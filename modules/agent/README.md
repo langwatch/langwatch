@@ -10,7 +10,7 @@ Agents a project builds and runs: their workflow configurations, the connected a
 | -------------- | ---------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                                |
 | Subjects       | agent                                                                                          |
-| Halves         | [contract](contract) · [process](process) · [browser](browser)                                 |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                       |
 | Api token      | `AgentApi` = `moduleApi<AgentApi>()("agent")`, `contract/src/agent.api.ts:189` (45 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                     |
 

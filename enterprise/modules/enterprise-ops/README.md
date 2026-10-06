@@ -10,7 +10,7 @@ Operator views over Enterprise subjects: issued licences and their seats and bin
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | Classification | enterprise (`modules/catalogue.json`)                                                                                            |
 | Subjects       | enterprise-ops                                                                                                                   |
-| Halves         | [contract](contract) · [process](process)                                                                                        |
+| Halves         | [contract](contract) · [process](process/README.md)                                                                              |
 | Api token      | `EnterpriseOpsApi` = `moduleApi<EnterpriseOpsApi>()("enterprise-ops")`, `contract/src/enterprise-ops.api.ts:122` (15 operations) |
 | Installed by   | api, worker, tasks (process)                                                                                                     |
 

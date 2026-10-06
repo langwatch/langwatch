@@ -10,7 +10,7 @@ Automations: triggers and their fire history, report schedules, delivery policy 
 | -------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Classification | core (`modules/catalogue.json`)                                                                                    |
 | Subjects       | automation, email-suppression, report-schedule, trigger, trigger-fire-history                                      |
-| Halves         | [contract](contract) · [process](process) · [browser](browser)                                                     |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                           |
 | Api token      | `AutomationApi` = `moduleApi<AutomationApi>()("automation")`, `contract/src/automation.api.ts:230` (62 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                         |
 

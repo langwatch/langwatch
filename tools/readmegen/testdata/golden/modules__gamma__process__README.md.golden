@@ -1,0 +1,33 @@
+# @lw/gamma-process
+
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
+
+## Installation
+
+≈ No `defineProcessModule(...)` read in `src/`.
+
+## Module API (`GammaApi`)
+
+Peers call these through the token, declared at `../contract/src/gamma.api.ts:1`; nothing else in this package is public.
+
+## REST transport
+
+None: this module declares no REST family.
+
+## tRPC transport
+
+None: this module declares no tRPC router.
+
+## Sockets
+
+None: this module declares no websocket, rawsocket or rawhttp door.
+
+## Workers
+
+None: gamma declares no pipeline, process manager, subscriber or task.
+
+## Configuration
+
+None: no `static secrets` or `static config` leaf.
+
+<!-- readme:generated:end -->

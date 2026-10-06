@@ -10,7 +10,7 @@ Product analytics and lifecycle messaging: every owner tells nurturing through a
 | -------------- | -------------------------------------------------------------------------------------------------------------- |
 | Classification | enterprise (`modules/catalogue.json`)                                                                          |
 | Subjects       | nurturing, product-milestone                                                                                   |
-| Halves         | [contract](contract) · [process](process)                                                                      |
+| Halves         | [contract](contract) · [process](process/README.md)                                                            |
 | Api token      | `NurturingApi` = `moduleApi<NurturingApi>()("nurturing")`, `contract/src/nurturing-types.ts:190` (1 operation) |
 | Installed by   | api, worker, tasks (process)                                                                                   |
 

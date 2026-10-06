@@ -10,7 +10,7 @@ Notifications: the records shown to users, mail delivery and SMTP checks, and we
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                                                                  |
 | Subjects       | notification                                                                                                                     |
-| Halves         | [contract](contract) · [process](process) · [browser](browser)                                                                   |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                                         |
 | Api token      | `NotificationService` = `moduleApi<NotificationService>()("notification")`, `contract/src/notification.api.ts:43` (9 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                                       |
 

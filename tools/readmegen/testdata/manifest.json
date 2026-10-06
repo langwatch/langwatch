@@ -3,71 +3,704 @@
     {
       "id": "alpha",
       "tokens": [
-        { "name": "AlphaApi", "type": "AlphaApi", "module": "alpha", "at": { "file": "modules/alpha/contract/src/alpha.api.ts", "line": 12 } },
-        { "name": "AlphaReplayApi", "type": "AlphaReplayDoorApi", "module": "alpha", "at": { "file": "modules/alpha/contract/src/alpha-replay.api.ts", "line": 4 } }
+        {
+          "name": "AlphaApi",
+          "type": "AlphaApi",
+          "module": "alpha",
+          "at": {
+            "file": "modules/alpha/contract/src/alpha.api.ts",
+            "line": 12
+          }
+        },
+        {
+          "name": "AlphaReplayApi",
+          "type": "AlphaReplayDoorApi",
+          "module": "alpha",
+          "at": {
+            "file": "modules/alpha/contract/src/alpha-replay.api.ts",
+            "line": 4
+          }
+        }
       ],
       "api": {
         "name": "AlphaApi",
         "doc": "Alpha's items.",
         "extends": [],
         "operations": [
-          { "name": "getItem", "params": "input: { id: string }", "returns": "Promise<AlphaItem>", "doc": "", "at": { "file": "modules/alpha/contract/src/alpha.api.ts", "line": 5 } }
+          {
+            "name": "getItem",
+            "params": "input: { id: string }",
+            "returns": "Promise<AlphaItem>",
+            "doc": "",
+            "at": {
+              "file": "modules/alpha/contract/src/alpha.api.ts",
+              "line": 5
+            }
+          }
         ],
-        "at": { "file": "modules/alpha/contract/src/alpha.api.ts", "line": 3 }
+        "at": {
+          "file": "modules/alpha/contract/src/alpha.api.ts",
+          "line": 3
+        }
       },
       "peers": [
-        { "name": "gammas", "token": "GammaApi", "module": "gamma", "resolved": true, "at": { "file": "modules/alpha/process/src/app/alpha.app.ts", "line": 9 } },
-        { "name": "...extraPeers", "token": "", "module": "", "resolved": false, "at": { "file": "modules/alpha/process/src/app/alpha.app.ts", "line": 10 } }
+        {
+          "name": "gammas",
+          "token": "GammaApi",
+          "module": "gamma",
+          "resolved": true,
+          "at": {
+            "file": "modules/alpha/process/src/app/alpha.app.ts",
+            "line": 9
+          }
+        },
+        {
+          "name": "...extraPeers",
+          "token": "",
+          "module": "",
+          "resolved": false,
+          "at": {
+            "file": "modules/alpha/process/src/app/alpha.app.ts",
+            "line": 10
+          }
+        }
       ],
       "secrets": [
-        { "name": "signingKey", "value": "ALPHA_SIGNING_KEY", "text": "signingKey", "resolved": true, "at": { "file": "modules/alpha/process/src/app/alpha.app.ts", "line": 14 } }
+        {
+          "name": "signingKey",
+          "value": "ALPHA_SIGNING_KEY",
+          "text": "signingKey",
+          "resolved": true,
+          "at": {
+            "file": "modules/alpha/process/src/app/alpha.app.ts",
+            "line": 14
+          }
+        }
       ],
       "config": [
-        { "name": "region", "value": "ALPHA_REGION", "text": "c.env(\"ALPHA_REGION\", z.string())", "resolved": true, "at": { "file": "modules/alpha/contract/src/alpha.config.ts", "line": 3 } },
-        { "name": "limits", "value": "", "text": "computeLimits()", "resolved": false, "at": { "file": "modules/alpha/contract/src/alpha.config.ts", "line": 4 } }
+        {
+          "name": "region",
+          "value": "ALPHA_REGION",
+          "text": "c.env(\"ALPHA_REGION\", z.string())",
+          "resolved": true,
+          "at": {
+            "file": "modules/alpha/contract/src/alpha.config.ts",
+            "line": 3
+          }
+        },
+        {
+          "name": "limits",
+          "value": "",
+          "text": "computeLimits()",
+          "resolved": false,
+          "at": {
+            "file": "modules/alpha/contract/src/alpha.config.ts",
+            "line": 4
+          }
+        }
       ],
       "stores": [
-        { "requires": ["prisma", "clickhouse"], "resolved": true, "at": { "file": "modules/alpha/process/src/repositories/prisma/prisma.alpha.repositories.ts", "line": 7 } }
+        {
+          "requires": [
+            "prisma",
+            "clickhouse"
+          ],
+          "resolved": true,
+          "at": {
+            "file": "modules/alpha/process/src/repositories/prisma/prisma.alpha.repositories.ts",
+            "line": 7
+          }
+        }
       ],
       "prismaClaims": [
-        { "model": "AlphaItem", "at": { "file": "modules/alpha/process/src/repositories/prisma/prisma.alpha-item.repository.ts", "line": 20 } }
+        {
+          "model": "AlphaItem",
+          "at": {
+            "file": "modules/alpha/process/src/repositories/prisma/prisma.alpha-item.repository.ts",
+            "line": 20
+          }
+        }
       ],
       "prismaDelegates": [
-        { "delegate": "$queryRaw", "at": { "file": "modules/alpha/process/src/repositories/prisma/prisma.alpha-item.repository.ts", "line": 8 } },
-        { "delegate": "alphaItem", "at": { "file": "modules/alpha/process/src/repositories/prisma/prisma.alpha-item.repository.ts", "line": 8 } },
-        { "delegate": "gammaThing", "at": { "file": "modules/alpha/process/src/repositories/prisma/prisma.alpha-item.repository.ts", "line": 9 } }
+        {
+          "delegate": "$queryRaw",
+          "at": {
+            "file": "modules/alpha/process/src/repositories/prisma/prisma.alpha-item.repository.ts",
+            "line": 8
+          }
+        },
+        {
+          "delegate": "alphaItem",
+          "at": {
+            "file": "modules/alpha/process/src/repositories/prisma/prisma.alpha-item.repository.ts",
+            "line": 8
+          }
+        },
+        {
+          "delegate": "gammaThing",
+          "at": {
+            "file": "modules/alpha/process/src/repositories/prisma/prisma.alpha-item.repository.ts",
+            "line": 9
+          }
+        }
       ],
       "clickhouseWrites": [
-        { "table": "alpha_events", "at": { "file": "modules/alpha/process/src/repositories/clickhouse/clickhouse.alpha-event.repository.ts", "line": 31 } }
-      ]
+        {
+          "table": "alpha_events",
+          "at": {
+            "file": "modules/alpha/process/src/repositories/clickhouse/clickhouse.alpha-event.repository.ts",
+            "line": 31
+          }
+        }
+      ],
+      "process": {
+        "installation": {
+          "text": "defineProcessModule(\"alpha\").withApi(AlphaModule).withTransports(alphaRest, alphaTrpc).withEventing(alphaEventing).withTasks(\u2026)",
+          "at": {
+            "file": "modules/alpha/process/src/alpha.module.ts",
+            "line": 9
+          },
+          "tasks": [
+            {
+              "name": {
+                "value": "alpha-backfill",
+                "text": "\"alpha-backfill\"",
+                "resolved": true,
+                "file": ""
+              },
+              "className": "AlphaBackfillTask",
+              "at": {
+                "file": "modules/alpha/process/src/tasks/alpha-backfill.task.ts",
+                "line": 12
+              }
+            }
+          ]
+        },
+        "rest": [
+          {
+            "name": "alphaRest",
+            "namespace": {
+              "value": "alpha-items",
+              "text": "\"alpha-items\"",
+              "resolved": true,
+              "file": ""
+            },
+            "version": {
+              "value": "2026-08-07",
+              "text": "MANAGEMENT_API_VERSION",
+              "resolved": true,
+              "file": ""
+            },
+            "addressing": "dated",
+            "v1Twin": true,
+            "generation": "v1",
+            "credential": "project",
+            "deprecated": false,
+            "at": {
+              "file": "modules/alpha/process/src/transport/alpha.rest.ts",
+              "line": 20
+            },
+            "routes": [
+              {
+                "method": "GET",
+                "methods": [],
+                "anyMethod": false,
+                "path": {
+                  "value": "/",
+                  "text": "\"/\"",
+                  "resolved": true,
+                  "file": ""
+                },
+                "operation": {
+                  "value": "listAlphaItems",
+                  "text": "\"listAlphaItems\"",
+                  "resolved": true,
+                  "file": ""
+                },
+                "version": "",
+                "credential": "",
+                "gate": {
+                  "kind": "permission",
+                  "detail": "alpha:view",
+                  "resolved": true
+                },
+                "entitlement": null,
+                "hidden": false,
+                "deprecated": false,
+                "summary": "List the project's alpha items.",
+                "schemas": [
+                  {
+                    "role": "response",
+                    "name": "z.array(alphaItemSchema)",
+                    "inline": true,
+                    "at": {
+                      "file": "modules/alpha/process/src/transport/alpha.rest.ts",
+                      "line": 24
+                    }
+                  }
+                ],
+                "at": {
+                  "file": "modules/alpha/process/src/transport/alpha.rest.ts",
+                  "line": 22
+                }
+              },
+              {
+                "method": "GET",
+                "methods": [],
+                "anyMethod": false,
+                "path": {
+                  "value": "/:id",
+                  "text": "\"/:id\"",
+                  "resolved": true,
+                  "file": ""
+                },
+                "operation": {
+                  "value": "getAlphaItem",
+                  "text": "\"getAlphaItem\"",
+                  "resolved": true,
+                  "file": ""
+                },
+                "version": "",
+                "credential": "",
+                "gate": {
+                  "kind": "public",
+                  "detail": "a share link reads one item",
+                  "resolved": true
+                },
+                "entitlement": null,
+                "hidden": true,
+                "deprecated": false,
+                "summary": "",
+                "schemas": [
+                  {
+                    "role": "params",
+                    "name": "alphaItemParams",
+                    "inline": false,
+                    "at": {
+                      "file": "modules/alpha/contract/src/alpha.schemas.ts",
+                      "line": 8
+                    }
+                  }
+                ],
+                "at": {
+                  "file": "modules/alpha/process/src/transport/alpha.rest.ts",
+                  "line": 30
+                }
+              }
+            ]
+          }
+        ],
+        "trpc": [
+          {
+            "namespace": {
+              "value": "alpha",
+              "text": "\"alpha\"",
+              "resolved": true,
+              "file": ""
+            },
+            "contractAt": {
+              "file": "modules/alpha/contract/src/alpha.trpc.ts",
+              "line": 5
+            },
+            "at": {
+              "file": "modules/alpha/process/src/transport/alpha.trpc.ts",
+              "line": 7
+            },
+            "procedures": [
+              {
+                "name": "list",
+                "kind": "query",
+                "gate": {
+                  "kind": "no permission",
+                  "detail": "every member lists",
+                  "resolved": true
+                },
+                "entitlement": null,
+                "input": {
+                  "role": "input",
+                  "name": "listInput",
+                  "inline": false,
+                  "at": {
+                    "file": "modules/alpha/contract/src/alpha.trpc.ts",
+                    "line": 3
+                  }
+                },
+                "output": null,
+                "implemented": true,
+                "at": {
+                  "file": "modules/alpha/process/src/transport/alpha.trpc.ts",
+                  "line": 9
+                }
+              },
+              {
+                "name": "remove",
+                "kind": "mutation",
+                "gate": {
+                  "kind": "none",
+                  "detail": "",
+                  "resolved": false
+                },
+                "entitlement": null,
+                "input": null,
+                "output": null,
+                "implemented": false,
+                "at": {
+                  "file": "modules/alpha/contract/src/alpha.trpc.ts",
+                  "line": 9
+                }
+              }
+            ]
+          }
+        ],
+        "sockets": [
+          {
+            "protocol": "rawsocket",
+            "paths": [
+              {
+                "value": "/api/alpha/stream/:id",
+                "text": "\"/api/alpha/stream/:id\"",
+                "resolved": true,
+                "file": ""
+              }
+            ],
+            "prefixes": [],
+            "at": {
+              "file": "modules/alpha/process/src/transport/alpha-stream.socket.ts",
+              "line": 4
+            }
+          }
+        ],
+        "pipelines": [
+          {
+            "name": {
+              "value": "alpha_items",
+              "text": "ALPHA_PIPELINE",
+              "resolved": true,
+              "file": ""
+            },
+            "aggregate": {
+              "value": "alpha_item",
+              "text": "\"alpha_item\"",
+              "resolved": true,
+              "file": ""
+            },
+            "events": [
+              "alphaItemAddedEventSchema"
+            ],
+            "commands": [
+              {
+                "kind": "command",
+                "name": {
+                  "value": "addItem",
+                  "text": "\"addItem\"",
+                  "resolved": true,
+                  "file": ""
+                },
+                "gated": false,
+                "at": {
+                  "file": "modules/alpha/process/src/eventing/alpha.pipeline.ts",
+                  "line": 14
+                }
+              }
+            ],
+            "processManagers": [
+              {
+                "name": {
+                  "value": "alphaSweep",
+                  "text": "ALPHA_SWEEP",
+                  "resolved": true,
+                  "file": ""
+                },
+                "schedule": {
+                  "everyMs": {
+                    "value": "60000",
+                    "text": "ALPHA_SWEEP_MS",
+                    "resolved": true,
+                    "file": ""
+                  },
+                  "source": "ALPHA_SWEEP_MS = 60 * 1000"
+                },
+                "intents": [
+                  "sweep"
+                ],
+                "outbox": true,
+                "applier": "(pm) => \u2026",
+                "read": true,
+                "gated": true,
+                "at": {
+                  "file": "modules/alpha/process/src/eventing/alpha.pipeline.ts",
+                  "line": 18
+                }
+              },
+              {
+                "name": {
+                  "value": "",
+                  "text": "input.process",
+                  "resolved": false,
+                  "file": ""
+                },
+                "schedule": null,
+                "intents": [],
+                "outbox": false,
+                "applier": "input.process",
+                "read": false,
+                "gated": true,
+                "at": {
+                  "file": "modules/alpha/process/src/eventing/alpha.pipeline.ts",
+                  "line": 19
+                }
+              }
+            ],
+            "subscribers": [
+              {
+                "kind": "peer subscriber",
+                "name": {
+                  "value": "gammaChanged",
+                  "text": "\"gammaChanged\"",
+                  "resolved": true,
+                  "file": ""
+                },
+                "eventType": {
+                  "value": "lw.gamma.changed",
+                  "text": "GAMMA_CHANGED",
+                  "resolved": true,
+                  "file": "modules/gamma/contract/src/gamma.events.ts"
+                },
+                "publisher": "gamma",
+                "gated": true,
+                "at": {
+                  "file": "modules/alpha/process/src/eventing/alpha.pipeline.ts",
+                  "line": 21
+                }
+              }
+            ],
+            "others": [
+              {
+                "kind": "ClickHouseFoldProjection",
+                "name": {
+                  "value": "alphaItems",
+                  "text": "\"alphaItems\"",
+                  "resolved": true,
+                  "file": ""
+                },
+                "gated": false,
+                "at": {
+                  "file": "modules/alpha/process/src/eventing/alpha.pipeline.ts",
+                  "line": 15
+                }
+              }
+            ],
+            "split": "!input.process",
+            "splitAt": {
+              "file": "modules/alpha/process/src/eventing/alpha.pipeline.ts",
+              "line": 16
+            },
+            "at": {
+              "file": "modules/alpha/process/src/eventing/alpha.pipeline.ts",
+              "line": 12
+            }
+          }
+        ]
+      }
     },
     {
       "id": "gamma",
-      "tokens": [ { "name": "GammaApi", "type": "GammaApi", "module": "gamma", "at": { "file": "modules/gamma/contract/src/gamma.api.ts", "line": 2 } } ],
-      "api": { "name": "GammaApi", "doc": "", "extends": [], "operations": [], "at": { "file": "modules/gamma/contract/src/gamma.api.ts", "line": 1 } },
+      "tokens": [
+        {
+          "name": "GammaApi",
+          "type": "GammaApi",
+          "module": "gamma",
+          "at": {
+            "file": "modules/gamma/contract/src/gamma.api.ts",
+            "line": 2
+          }
+        }
+      ],
+      "api": {
+        "name": "GammaApi",
+        "doc": "",
+        "extends": [],
+        "operations": [],
+        "at": {
+          "file": "modules/gamma/contract/src/gamma.api.ts",
+          "line": 1
+        }
+      },
       "peers": [],
       "secrets": [],
       "config": [],
       "stores": [],
       "prismaClaims": [],
       "prismaDelegates": [],
-      "clickhouseWrites": []
+      "clickhouseWrites": [],
+      "process": {
+        "installation": null,
+        "rest": [],
+        "trpc": [],
+        "sockets": [],
+        "pipelines": []
+      }
     },
     {
       "id": "beta",
       "tokens": [],
       "api": null,
-      "peers": [ { "name": "alphas", "token": "AlphaApi", "module": "alpha", "resolved": true, "at": { "file": "enterprise/modules/beta/process/src/app/beta.app.ts", "line": 6 } } ],
+      "peers": [
+        {
+          "name": "alphas",
+          "token": "AlphaApi",
+          "module": "alpha",
+          "resolved": true,
+          "at": {
+            "file": "enterprise/modules/beta/process/src/app/beta.app.ts",
+            "line": 6
+          }
+        }
+      ],
       "secrets": [],
       "config": [],
       "stores": [],
       "prismaClaims": [],
       "prismaDelegates": [],
-      "clickhouseWrites": []
+      "clickhouseWrites": [],
+      "process": {
+        "installation": {
+          "text": "defineProcessModule(\"beta\").withApi(BetaModule).withTransports(betaRest)",
+          "at": {
+            "file": "enterprise/modules/beta/process/src/beta.module.ts",
+            "line": 4
+          },
+          "tasks": []
+        },
+        "rest": [
+          {
+            "name": "betaRest",
+            "namespace": {
+              "value": "beta",
+              "text": "\"beta\"",
+              "resolved": true,
+              "file": ""
+            },
+            "version": {
+              "value": "2026-08-07",
+              "text": "\"2026-08-07\"",
+              "resolved": true,
+              "file": ""
+            },
+            "addressing": "literal",
+            "v1Twin": true,
+            "generation": "v1",
+            "credential": "organization",
+            "deprecated": false,
+            "at": {
+              "file": "enterprise/modules/beta/process/src/transport/beta.rest.ts",
+              "line": 10
+            },
+            "routes": [
+              {
+                "method": "POST",
+                "methods": [],
+                "anyMethod": false,
+                "path": {
+                  "value": "/api/beta/run",
+                  "text": "\"/api/beta/run\"",
+                  "resolved": true,
+                  "file": ""
+                },
+                "operation": {
+                  "value": "runBeta",
+                  "text": "\"runBeta\"",
+                  "resolved": true,
+                  "file": ""
+                },
+                "version": "",
+                "credential": "",
+                "gate": {
+                  "kind": "permission",
+                  "detail": "beta:manage",
+                  "resolved": true
+                },
+                "entitlement": {
+                  "entitlement": "enterprise",
+                  "feature": "beta_runs"
+                },
+                "hidden": false,
+                "deprecated": false,
+                "summary": "",
+                "schemas": [],
+                "at": {
+                  "file": "enterprise/modules/beta/process/src/transport/beta.rest.ts",
+                  "line": 12
+                }
+              }
+            ]
+          }
+        ],
+        "trpc": [],
+        "sockets": [],
+        "pipelines": []
+      }
     }
   ],
   "packages": [
-    { "name": "@lw/core", "root": "packages/core", "kind": "library", "feature": "" },
-    { "name": "@lw/alpha-process", "root": "modules/alpha/process", "kind": "process", "feature": "alpha" }
-  ]
+    {
+      "name": "@lw/core",
+      "root": "packages/core",
+      "kind": "library",
+      "feature": ""
+    },
+    {
+      "name": "@lw/alpha-process",
+      "root": "modules/alpha/process",
+      "kind": "process",
+      "feature": "alpha"
+    }
+  ],
+  "mounted": {
+    "routes": [
+      {
+        "method": "GET",
+        "path": "/api/alpha-items/2026-08-07",
+        "family": "alpha-items",
+        "canonicalPath": "/api/v1/alpha-items/2026-08-07"
+      },
+      {
+        "method": "GET",
+        "path": "/api/alpha-items/2026-08-07/:id",
+        "family": "alpha-items",
+        "canonicalPath": "/api/v1/alpha-items/2026-08-07/:id"
+      },
+      {
+        "method": "GET",
+        "path": "/api/alpha-items/latest",
+        "family": "alpha-items",
+        "canonicalPath": "/api/v1/alpha-items/latest"
+      },
+      {
+        "method": "GET",
+        "path": "/api/alpha-items/latest/:id",
+        "family": "alpha-items",
+        "canonicalPath": "/api/v1/alpha-items/latest/:id"
+      },
+      {
+        "method": "GET",
+        "path": "/api/alpha-items",
+        "family": "alpha-items",
+        "canonicalPath": "/api/v1/alpha-items"
+      },
+      {
+        "method": "GET",
+        "path": "/api/alpha-items/:id",
+        "family": "alpha-items",
+        "canonicalPath": "/api/v1/alpha-items/:id"
+      },
+      {
+        "method": "POST",
+        "path": "/api/beta/run",
+        "family": "beta",
+        "canonicalPath": "/api/v1/beta/run"
+      }
+    ],
+    "error": ""
+  }
 }

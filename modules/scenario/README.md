@@ -10,7 +10,7 @@ Scenarios and simulations: authored scenarios, their runs and events, exports, a
 | -------------- | ---------------------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                                            |
 | Subjects       | scenario, simulation                                                                                       |
-| Halves         | [contract](contract) · [process](process) · [browser](browser) · [client](client)                          |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                |
 | Api token      | `ScenarioApi` = `moduleApi<ScenarioApi>()("scenario")`, `contract/src/scenario.api.ts:442` (72 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                 |
 

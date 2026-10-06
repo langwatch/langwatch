@@ -10,8 +10,8 @@ Traces: ingestion and canonicalisation of spans, the projections built from them
 | -------------- | ----------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                                 |
 | Subjects       | trace, trace-ingestion                                                                          |
-| Halves         | [contract](contract) · [process](process) · [browser](browser)                                  |
-| Api token      | `TraceApi` = `moduleApi<TraceApi>()("trace")`, `contract/src/trace.api.ts:849` (140 operations) |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                        |
+| Api token      | `TraceApi` = `moduleApi<TraceApi>()("trace")`, `contract/src/trace.api.ts:844` (138 operations) |
 | Other token    | `CollectorApi`, `process/src/transport/collector.rest.ts:94`                                    |
 | Other token    | `TrackedEventApi`, `process/src/transport/tracked-event.rest.ts:41`                             |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                      |

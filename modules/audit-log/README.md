@@ -10,8 +10,8 @@ The audit log: every module records who did what through it, and an entity's his
 | -------------- | ------------------------------------------------------------------------------------------------------ |
 | Classification | core (`modules/catalogue.json`)                                                                        |
 | Subjects       | audit-log                                                                                              |
-| Halves         | [contract](contract) · [process](process)                                                              |
-| Api token      | `AuditLogApi` = `moduleApi<AuditLogApi>()("audit-log")`, `contract/src/audit-log.ts:66` (3 operations) |
+| Halves         | [contract](contract) · [process](process/README.md)                                                    |
+| Api token      | `AuditLogApi` = `moduleApi<AuditLogApi>()("audit-log")`, `contract/src/audit-log.ts:71` (3 operations) |
 | Other token    | `AuditLogHomeApi`, `process/src/transport/home.trpc.ts:14`                                             |
 | Installed by   | api, worker, tasks (process)                                                                           |
 
@@ -20,7 +20,7 @@ The audit log: every module records who did what through it, and an entity's his
 | Kind           | Name       | Declared at                                                                         |
 | -------------- | ---------- | ----------------------------------------------------------------------------------- |
 | Postgres table | `AuditLog` | `process/src/repositories/prisma/prisma.agent-audit-log-migration.repository.ts:11` |
-| Postgres table | `AuditLog` | `process/src/repositories/prisma/prisma.audit-log.repository.ts:25`                 |
+| Postgres table | `AuditLog` | `process/src/repositories/prisma/prisma.audit-log.repository.ts:37`                 |
 | Postgres table | `AuditLog` | `process/src/repositories/prisma/prisma.recent-touch.repository.ts:12`              |
 
 Anything else audit-log needs belongs to another module and is reached through its `*Api`.

@@ -65,6 +65,9 @@ func (g *generator) pages() []page {
 	}
 	for _, entry := range g.ws.catalogue {
 		pages = append(pages, g.modulePage(entry))
+		if half := g.ws.half(entry, "process"); half != nil {
+			pages = append(pages, g.processPage(entry, half))
+		}
 	}
 	sort.Slice(pages, func(i, j int) bool { return pages[i].Path < pages[j].Path })
 	return pages
@@ -94,7 +97,11 @@ func (g *generator) halves(entry catalogueEntry, linked bool) string {
 			continue
 		}
 		if linked {
-			name = link(name, name)
+			target := name
+			if name == "process" {
+				target = "process/README.md"
+			}
+			name = link(name, target)
 		}
 		present = append(present, name)
 	}
@@ -141,15 +148,23 @@ func (g *generator) moduleIndex(pagePath, title, classification string) page {
 		if entry.Classification != classification {
 			continue
 		}
-		rows = append(rows, []string{
+		row := []string{
 			link(entry.ID, relativeLink(dir, entry.Root)),
 			strings.Join(entry.Subjects, ", "),
 			g.halves(entry, false),
 			cell(orDash(g.ownedTables(entry.ID))),
 			cell(orDash(g.peerModules(entry.ID))),
-		})
+		}
+		if classification == "enterprise" {
+			row = append(row, cell(orDash(g.entitlements(entry.ID))))
+		}
+		rows = append(rows, row)
 	}
-	body := table([]string{"Module", "Subjects", "Halves", "Owns tables", "Peers"}, rows) +
+	header := []string{"Module", "Subjects", "Halves", "Owns tables", "Peers"}
+	if classification == "enterprise" {
+		header = append(header, "Entitlement gates")
+	}
+	body := table(header, rows) +
 		"\n**Who owns a subject?** Search this table, or `modules/catalogue.json`. A subject with no\n" +
 		"row is unowned: add it to the catalogue before writing code for it.\n"
 	return page{Path: pagePath, Title: title, Body: body}
@@ -163,6 +178,7 @@ func (g *generator) enterpriseIndex() page {
 				link(entry.ID, relativeLink("enterprise", entry.Root)),
 				strings.Join(entry.Subjects, ", "),
 				g.halves(entry, false),
+				cell(orDash(g.entitlements(entry.ID))),
 			})
 		}
 	}
@@ -172,7 +188,7 @@ func (g *generator) enterpriseIndex() page {
 			packages = append(packages, []string{g.packageName(pkg, "enterprise"), cell(orDash(pkg.Description))})
 		}
 	}
-	body := "## Modules\n\n" + table([]string{"Module", "Subjects", "Halves"}, modules) +
+	body := "## Modules\n\n" + table([]string{"Module", "Subjects", "Halves", "Entitlement gates"}, modules) +
 		"\nEvery module is listed in `modules/catalogue.json` with `classification: enterprise`; " +
 		"the generated module lists install it beside the core modules. Gating is per route, never per mount.\n\n" +
 		"## Packages\n\n" + table([]string{"Package", "Description"}, packages)
@@ -233,4 +249,50 @@ func (g *generator) appIndex() page {
 	body := table([]string{"App", "Package", "Installs", "What it is (package.json `description`)"}, rows) +
 		"\nInstalls counts the entries of the app's generated module list (`pnpm generate:modules`).\n"
 	return page{Path: "apps/README.md", Title: "Apps", Body: body}
+}
+
+// entitlements lists every entitlement a module's routes and procedures declare, with counts.
+func (g *generator) entitlements(id string) string {
+	counts := map[string]int{}
+	var order []string
+	for _, entitlement := range declaredEntitlements(g.facts[id].Process) {
+		key := code(entitlement.Entitlement)
+		if entitlement.Feature != "" {
+			key += " (" + code(entitlement.Feature) + ")"
+		}
+		if counts[key] == 0 {
+			order = append(order, key)
+		}
+		counts[key]++
+	}
+	sort.Strings(order)
+	parts := make([]string, 0, len(order))
+	for _, key := range order {
+		parts = append(parts, fmt.Sprintf("%s ×%d", key, counts[key]))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func declaredEntitlements(process ProcessFacts) []*Entitlement {
+	var found []*Entitlement
+	for index := range process.Rest {
+		routes := process.Rest[index].Routes
+		for inner := range routes {
+			found = appendEntitlement(found, routes[inner].Entitlement)
+		}
+	}
+	for index := range process.Trpc {
+		procedures := process.Trpc[index].Procedures
+		for inner := range procedures {
+			found = appendEntitlement(found, procedures[inner].Entitlement)
+		}
+	}
+	return found
+}
+
+func appendEntitlement(found []*Entitlement, entitlement *Entitlement) []*Entitlement {
+	if entitlement == nil {
+		return found
+	}
+	return append(found, entitlement)
 }

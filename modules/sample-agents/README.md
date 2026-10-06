@@ -10,7 +10,7 @@ The demo agents a caller runs to see its own project fill with traces.
 | -------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                                                           |
 | Subjects       | sample-agents                                                                                                             |
-| Halves         | [contract](contract) · [process](process)                                                                                 |
+| Halves         | [contract](contract) · [process](process/README.md)                                                                       |
 | Api token      | `SampleAgentsApi` = `moduleApi<SampleAgentsApi>()("sample-agents")`, `contract/src/sample-agents.api.ts:11` (1 operation) |
 | Installed by   | api, worker, tasks (process)                                                                                              |
 
