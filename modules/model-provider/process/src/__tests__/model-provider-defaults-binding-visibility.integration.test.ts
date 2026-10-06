@@ -157,6 +157,17 @@ describe.skipIf(!DB_URL)(
                 });
                 return rows.map((r) => r.id);
               },
+              findLiveNonGovernanceIdsByOrganization: async (input: { organizationId: string }) => {
+                const rows = await prisma.project.findMany({
+                  where: {
+                    archivedAt: null,
+                    team: { organizationId: input.organizationId },
+                    kind: { not: "internal_governance" },
+                  },
+                  select: { id: true },
+                });
+                return rows.map((r) => r.id);
+              },
               listNamesByIds: async (input: { projectIds: string[] }) => {
                 const rows = await prisma.project.findMany({
                   where: { id: { in: input.projectIds } },

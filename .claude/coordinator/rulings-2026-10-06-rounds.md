@@ -98,3 +98,17 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Org admins (Q-U10): NO org surface; platform operators only
 - Inline eval (regression found 2026-10-06 late; instant-eval-billing :210, eval-functions.feature): RESTORE synchronous judging as main had it. Analytics calls an InstantEvalApi judge operation from the query path, holds queryTokenBudget around it and records spend; main's 15 removed eval-functions scenarios and its instantEvalQueries tests come back; the sync path also hydrates extraction (conversation()). The branch's "a query never judges" spec rewrite (0e1bd32357) had no ruling and is reverted.
 - Adopt account (Auth 32, Q150): ONE new UserApi.adoptUnconfirmedAccount that confirms the address and drops pre-proof credentials in one transaction; auth calls it from completeVerification.
+
+## Round 14 (C, Q-U11, Q-U8, UP-3, Q-U8 (ops-upgrade-image-steps), S4-TARGETS)
+
+- Step text (Q-U11): REQUIRED one-line description per step
+- Who runs (Q-U8, UP-3): FRAMEWORK runs; ops reads and requests; record amended
+- imageSteps (Q-U8): PACKAGE root
+- CH targets (S4-TARGETS): RUN all targets, then fail
+
+## Round 15 (C, mig-declare (checkpoint), mig-declare (upcasts), mig-declare (rules), UP-1)
+
+- Checkpoint (mig-declare): THIS shape { resumeFrom, save({ report }) }
+- Upcast decl (mig-declare): .withUpcasts, after clarification (a read-time rule owned by the pipeline; the ledger step is derived)
+- Step checks (mig-declare): AS built
+- Upcast kind (UP-1): EVENT-upcast kind

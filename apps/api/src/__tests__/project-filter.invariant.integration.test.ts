@@ -178,7 +178,7 @@ const surfaces: ListingSurface[] = [
   },
   {
     name: "the model-defaults scope picker",
-    module: "modules/model-provider/process/src/services/model-provider-scope.service.ts",
+    module: PROJECT_REPOSITORY,
     ids: async () =>
       available
         .parse(
@@ -257,19 +257,6 @@ const NOT_A_LISTING: Record<string, string> = {
 const PROVEN_ELSEWHERE: Record<string, string> = {
   "modules/analytics/process/src/services/langwatch-ql-query-scope.service.ts":
     "modules/analytics/process/src/services/__tests__/langwatch-ql-query-scope.unit.test.ts",
-};
-
-/**
- * Surfaces that list the home today although main filtered it: held, not fixed, by the lane
- * that restored this gate (handoff a-billing-governance §11). Pinned both ways: a new leak
- * fails, and so does a fixed one until its line here goes.
- */
-const HELD_LEAKS: Record<string, string> = {
-  "the data-privacy scope picker": "its directory reads projects with no kind filter",
-  "the data-retention scope picker": "its directory reads projects with no kind filter",
-  "the model-defaults scope picker":
-    "it lists ProjectApi.listIdsByOrganization, which keeps the home",
-  "cost by project": "the spend rollup reads projects with no kind filter",
 };
 
 /** Bounded: it catches a filtering reader that stops, not a new reader that never filtered. */
@@ -458,7 +445,8 @@ describe.skipIf(!stores)("the hidden governance project as a member sees it", ()
   describe("given an organization holding both a real project and its governance home", () => {
     describe("when every listing surface is swept at once", () => {
       /** @scenario "The Lane-B suite asserts every Project consumer filters out internal governance projects" */
-      it("keeps the home out of every member-facing listing surface but the held leaks", async () => {
+      /** @scenario "The governance home never appears anywhere members list projects" */
+      it("keeps the home out of every member-facing listing surface", async () => {
         // The other end of the guard: unfiltered, the home IS in this organization's projects.
         const unfiltered = await prisma.project.findMany({
           where: { team: { organizationId } },
@@ -477,16 +465,22 @@ describe.skipIf(!stores)("the hidden governance project as a member sees it", ()
         }
 
         // Blind first: a surface that showed nothing "excluded" the home for the wrong reason.
-        expect({ blind, leaked }).toEqual({ blind: [], leaked: Object.keys(HELD_LEAKS) });
+        expect({ blind, leaked }).toEqual({ blind: [], leaked: [] });
       });
     });
 
-    describe("when the plan-limit alert is built", () => {
-      it("keeps it out of the alert's per-project lines", async () => {
-        const ids = await surfaceNamed({ name: "the plan-limit alert's per-project lines" }).ids();
+    describe("when the billing surfaces are built", () => {
+      /** @scenario "The hidden Governance Project never appears in billing exports or invoice line-items" */
+      it("keeps it out of per-project cost and plan-limit lines", async () => {
+        const costIds = await surfaceNamed({ name: "cost by project" }).ids();
+        const alertIds = await surfaceNamed({
+          name: "the plan-limit alert's per-project lines",
+        }).ids();
 
-        expect(ids).toContain(applicationProjectId);
-        expect(ids).not.toContain(governanceProjectId);
+        expect(costIds).toContain(applicationProjectId);
+        expect(costIds).not.toContain(governanceProjectId);
+        expect(alertIds).toContain(applicationProjectId);
+        expect(alertIds).not.toContain(governanceProjectId);
       });
     });
 
@@ -507,7 +501,6 @@ describe.skipIf(!stores)("the hidden governance project as a member sees it", ()
         ).toEqual([]);
 
         const stale = surfaces
-          .filter((surface) => !(surface.name in HELD_LEAKS))
           .map((surface) => surface.module)
           .filter((module) => !filtering.includes(module));
         expect(stale, "registered surfaces whose module no longer filters").toEqual([]);

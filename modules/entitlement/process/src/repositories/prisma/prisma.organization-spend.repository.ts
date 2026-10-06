@@ -22,6 +22,7 @@ export class PrismaOrganizationSpendRepository implements OrganizationSpendRepos
   async findSpendRollups(input: ListOrganizationSpendInput): Promise<ProjectSpendRollup[]> {
     const projects = await this.prisma.project.findMany({
       where: {
+        kind: { not: "internal_governance" },
         OR: [
           {
             team: {

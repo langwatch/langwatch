@@ -82,7 +82,7 @@ export class PrismaDataRetentionDirectoryRepository implements DataRetentionDire
         orderBy: { name: "asc" },
       }),
       this.database.project.findMany({
-        where: { team: { organizationId } },
+        where: { team: { organizationId }, kind: { not: "internal_governance" } },
         // `archivedAt` is SELECTED rather than filtered so a rule targeting a
         // since-archived project still resolves its name; the picker is where
         // the archived ones are dropped.
