@@ -6,18 +6,13 @@
 
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
 import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
-import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import type { CustomGraphInput } from "@langwatch/dashboard-contract";
 import type { DatasetColumn, MappingState } from "@langwatch/dataset-contract";
 import type { SystemStyleObject } from "@langwatch/design-system/primitives";
 import type { ComparisonEvaluatorConfig, TargetConfig } from "@langwatch/experiment-contract";
 import type { LangyKickoffBrief } from "@langwatch/langy-contract";
 import type { UiTokenIdentity } from "@langwatch/module";
-import type {
-  MediaAudioElement,
-  MediaPartProps,
-  ScenarioParameterDefinition,
-} from "@langwatch/scenario-contract";
+import type { MediaAudioElement } from "@langwatch/scenario-contract";
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
 import type {
   AvailableSource,
@@ -84,9 +79,6 @@ export type UiAuthenticationOverviewCardProps = {
 /** What organization's Directory hands the directory status band above its tabs. */
 export type UiDirectorySummaryProps = UiAuthenticationOverviewCardProps;
 
-/** What a landing hero hands project's lent inline command palette. */
-export type UiHeroAskFieldProps = { placeholder: string };
-
 /** What a screen hands analytics' lent graph: the graph to draw, and what to show when empty. */
 export type UiCustomGraphProps = {
   input: CustomGraphInput;
@@ -105,15 +97,6 @@ export type UiProjectDepartmentFieldProps = {
   organizationId: string;
   projectId: string;
   governanceEnabled: boolean;
-};
-
-/** What agent's test panel hands scenario's lent parameter line: the agent's own parameters. */
-export type UiParameterLineFieldProps = {
-  definitions: readonly ScenarioParameterDefinition[];
-  value: string;
-  onChange: (line: string) => void;
-  ariaLabel: string;
-  testId: string;
 };
 
 /** A dataset column as a dataset surface names it: its name and its type's name. */
@@ -185,46 +168,6 @@ export type UiDatasetRecordSyncProps = {
   onStatus: (state: "idle" | "saving" | "saved" | "error", error?: string) => void;
 };
 
-/** The surface coding-agent's lent activity tables read: where they are, who asks, and toasts. */
-export type UiCodingAgentActivityHost = {
-  hasPermission(permission: string): boolean;
-  route(): {
-    params: Readonly<Record<string, string | undefined>>;
-    query: Readonly<Record<string, string | undefined>>;
-  };
-  setQuery(
-    next: Readonly<Record<string, string | undefined>>,
-    options?: { replace?: boolean },
-  ): void;
-  navigate(to: string): void;
-  succeeded(notice: { title: string; description?: string; id?: string }): void;
-  failed(failure: { error: unknown; fallbackTitle: string; id?: string }): void;
-};
-
-/** What a screen hands coding-agent's lent pull requests table. */
-export type UiCodingAgentPullRequestsTableProps = {
-  projectId: string;
-  host: UiCodingAgentActivityHost;
-};
-
-/** What a screen hands coding-agent's lent sessions table. */
-export type UiCodingAgentSessionsTableProps = {
-  projectId: string;
-  projectSlug: string | null;
-  host: UiCodingAgentActivityHost;
-};
-
-/** What a screen hands scenario's lent Talk-to-it panel. */
-export type UiTalkToItPanelProps = {
-  projectId: string;
-  projectSlug: string;
-  transport: string;
-  agentId: string;
-  agentRowId?: string;
-  name?: string;
-  onAgentCreated?: (agentRowId: string) => void;
-};
-
 /**
  * What a screen hands the join offer. `currentOrganizationId` is required: a
  * string scopes to that organization, `null` means no organization context
@@ -269,21 +212,6 @@ export type UiModelSelectorProps = {
 export type UiModelDisplayProps = {
   model: string;
   fontSize?: string;
-};
-
-/** What a screen hands model-provider's form for adding or editing one provider's credentials. */
-export type UiEditModelProviderFormProps = {
-  providerKey: string;
-  /** `"new"` adds the provider; otherwise the stored provider being edited. */
-  modelProviderId?: string;
-  organizationId?: string | undefined;
-  projectId?: string | undefined;
-  /** What "the credential is saved" means to a surface that is not the settings drawer. */
-  onSaved?: (saved: { chatModel?: string }) => void;
-  /** Onboarding's presentation: Connect wording, model pills, no settings chrome. */
-  guided?: boolean;
-  /** Why the connection did not happen: a refused credential, or a failed or timed-out sign-in. */
-  onFailed?: (failure: { provider: string; code: string }) => void;
 };
 
 /**
@@ -336,22 +264,6 @@ export type UiTraceIdPeekProps = {
 export type UiTracePreviewHoverCardProps = {
   traceId: string;
   children: ReactNode;
-};
-
-/** What annotation's queue walker hands the conversation trace lends it. */
-export type UiAnnotationQueueConversationProps = {
-  /** The trace the queue item names; its turn is the one under review. */
-  traceId: string;
-  /** The thread that trace belongs to, or null for a trace in no thread. */
-  conversationId: string | null;
-};
-
-/** What a screen hands trace's way into correcting one trace. */
-export type UiTraceEditButtonProps = {
-  traceId: string;
-  /** When the trace started, so the drawer reads its partition; null when unknown. */
-  occurredAtMs: number | null;
-  disabled?: boolean;
 };
 
 /** What a screen hands trace's input/output viewer. */
@@ -580,15 +492,6 @@ export type UiGuidedTour = {
  * Each capability a peer reads by name, and the shape a declaration must have
  * to fill it: the CORE side of the contract, as `UiSlotProps` is for slots.
  */
-/** Annotation's form body in annotate mode, lent to the trace explorer. */
-export type UiAnnotateBodyProps = { state: AnnotationFormState };
-
-/** Annotation's form body in suggest mode, diffed against the output it corrects. */
-export type UiSuggestBodyProps = { state: AnnotationFormState; originalOutput: string };
-
-/** Annotation's form footer: save, delete and cancel over the same state. */
-export type UiAnnotationFormFooterProps = { state: AnnotationFormState; padding: number };
-
 /** Navigation's sidebar groups: fold, unfold, restore each to its remembered preference. */
 export type UiNavigationSidebar = {
   expandGroup(id: string): void;
@@ -619,9 +522,6 @@ export type UiFirstTouchAttribution = {
 export type UiDeclaredCapabilities = {
   addOrEditDatasetDrawer: UiDeclaredComponent<UiAddOrEditDatasetDrawerProps>;
   agentActionsMenu: UiDeclaredComponent<UiAgentActionsMenuProps>;
-  annotateBody: UiDeclaredComponent<UiAnnotateBodyProps>;
-  annotationFormFooter: UiDeclaredComponent<UiAnnotationFormFooterProps>;
-  annotationQueueConversation: UiDeclaredComponent<UiAnnotationQueueConversationProps>;
   /** A card on the Authentication overview; `section` places it, sign-in first. */
   authenticationOverviewCard: UiDeclaredComponent<UiAuthenticationOverviewCardProps> & {
     readonly section?: "sign-in" | "provisioning";
@@ -633,19 +533,15 @@ export type UiDeclaredCapabilities = {
   datasetEditorTable: UiDeclaredComponent<UiDatasetEditorTableProps>;
   datasetPickerList: UiDeclaredComponent<UiDatasetPickerListProps>;
   datasetRecordSync: UiDeclaredComponent<UiDatasetRecordSyncProps>;
-  editModelProviderForm: UiDeclaredComponent<UiEditModelProviderFormProps>;
   guidedOnboarding: UiLangyGuidedOnboarding;
   guidedOnboardingOffer: UiDeclaredComponent<UiGuidedOnboardingOfferProps>;
   guidedPathActive: UiGuidedPathActive;
   guidedTour: UiGuidedTour;
-  heroAskField: UiDeclaredComponent<UiHeroAskFieldProps>;
   hoverableBigText: UiDeclaredComponent<UiHoverableBigTextProps>;
   inlineCommandPalette: UiDeclaredComponent<UiInlineCommandPaletteProps>;
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
   comparisonConfigForm: UiDeclaredComponent<UiComparisonConfigFormProps>;
-  codingAgentPullRequestsTable: UiDeclaredComponent<UiCodingAgentPullRequestsTableProps>;
-  codingAgentSessionsTable: UiDeclaredComponent<UiCodingAgentSessionsTableProps>;
   evaluatorTracesMapping: UiDeclaredComponent<UiEvaluatorTracesMappingProps>;
   evaluatorSettingsForm: UiDeclaredComponent<UiEvaluatorSettingsFormProps>;
   filterSidebar: UiDeclaredComponent<UiFilterSidebarProps>;
@@ -653,11 +549,9 @@ export type UiDeclaredCapabilities = {
   httpConfigEditor: UiDeclaredComponent<UiHttpConfigEditorProps>;
   llmConfigField: UiDeclaredComponent<UiLlmConfigFieldProps>;
   llmConfigPopover: UiDeclaredComponent<UiLlmConfigPopoverProps>;
-  mediaPart: UiDeclaredComponent<MediaPartProps>;
   modelDisplay: UiDeclaredComponent<UiModelDisplayProps>;
   modelSelector: UiDeclaredComponent<UiModelSelectorProps>;
   outputsSection: UiDeclaredComponent<UiOutputsSectionProps>;
-  parameterLineField: UiDeclaredComponent<UiParameterLineFieldProps>;
   pendingJoinRequests: UiDeclaredComponent<UiPendingJoinRequestsProps>;
   projectDepartmentField: UiDeclaredComponent<UiProjectDepartmentFieldProps>;
   redactedField: UiDeclaredComponent<UiRedactedFieldProps>;
@@ -667,11 +561,8 @@ export type UiDeclaredCapabilities = {
   sampleChoice: UiGovernanceSampleChoice;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
   sidebar: UiNavigationSidebar;
-  suggestBody: UiDeclaredComponent<UiSuggestBodyProps>;
   studioEvaluatorEditor: UiDeclaredComponent<UiStudioEvaluatorEditorProps>;
   studioPromptEditor: UiDeclaredComponent<UiStudioPromptEditorProps>;
-  talkToItPanel: UiDeclaredComponent<UiTalkToItPanelProps>;
-  traceEditButton: UiDeclaredComponent<UiTraceEditButtonProps>;
   traceIdPeek: UiDeclaredComponent<UiTraceIdPeekProps>;
   tracePreviewHoverCard: UiDeclaredComponent<UiTracePreviewHoverCardProps>;
   versionBox: UiDeclaredComponent<UiVersionBoxProps>;

@@ -6,6 +6,7 @@
 
 import { defineBrowserModule } from "@langwatch/browser";
 import {
+  EditModelProviderFormToken,
   ModelDisplayToken,
   ModelSelectorToken,
   modelProviderTrpc,
@@ -60,13 +61,10 @@ export const modelProviderWeb = defineBrowserModule("model-provider")
       }),
     },
   })
-  /** Lent, not kitted: each reads this module's providers (§3.4 rule 7). */
-  .withCapabilities({
-    editModelProviderForm: {
-      load: async () => ({
-        default: (await import("./ui/sections/model-provider-form.tsx")).EditModelProviderForm,
-      }),
-    },
+  .lends(EditModelProviderFormToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/model-provider-form.tsx")).EditModelProviderForm,
+    }),
   })
   .lends(ModelDisplayToken, {
     load: async () => ({

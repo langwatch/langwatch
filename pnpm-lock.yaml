@@ -3465,6 +3465,9 @@ importers:
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../../../../modules/onboarding/contract
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/project/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time

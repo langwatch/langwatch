@@ -1,8 +1,5 @@
 // @vitest-environment jsdom
-/**
- * Governance draws onboarding's pill and model-provider's picker by token, and nothing where none
- * is lent: enterprise/modules/governance/specs/governance-lent-by-token.feature.
- */
+/** Governance draws peers' lent surfaces by token: specs/governance-lent-by-token.feature. */
 import {
   UiCapabilityContextProvider,
   type UiCapabilities,
@@ -11,10 +8,12 @@ import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/dec
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { ModelSelectorToken } from "@langwatch/model-provider-contract";
 import { GuidedOnboardingOfferToken } from "@langwatch/onboarding-contract";
+import { HeroAskFieldToken } from "@langwatch/project-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GuidedOnboardingOffer } from "../lent-guided-onboarding-offer.tsx";
+import { HeroAskField } from "../lent-hero-ask-field.tsx";
 import { ModelSelector } from "../lent-model-provider.tsx";
 
 const peersLend = uiDeclarations([
@@ -46,6 +45,22 @@ const peersLend = uiDeclarations([
       ],
     },
   },
+  {
+    name: "project",
+    installation: {
+      capabilities: {},
+      lends: [
+        {
+          token: HeroAskFieldToken,
+          load: async () => ({
+            default: ({ placeholder }: { placeholder: string }) => (
+              <input placeholder={placeholder} />
+            ),
+          }),
+        },
+      ],
+    },
+  },
 ]);
 
 function renderPeers({ declarations }: { declarations: UiDeclarations }) {
@@ -61,6 +76,7 @@ function renderPeers({ declarations }: { declarations: UiDeclarations }) {
       <div data-testid="screen">
         <GuidedOnboardingOffer space="governance" spaceInUse={false} />
         <ModelSelector model="gpt-5" options={["gpt-5", "gpt-5-mini"]} onChange={vi.fn()} />
+        <HeroAskField placeholder="Ask about governance" />
       </div>
     </UiCapabilityContextProvider>,
   );
@@ -87,7 +103,16 @@ describe("given governance's screens", () => {
     });
   });
 
-  describe("when no module lends either", () => {
+  describe("when project lends its ask field", () => {
+    /** @scenario The overview hero draws project's lent ask field */
+    it("draws the field with the placeholder", async () => {
+      renderPeers({ declarations: peersLend });
+
+      expect(await screen.findByPlaceholderText("Ask about governance")).toBeDefined();
+    });
+  });
+
+  describe("when no module lends any of them", () => {
     /** @scenario No module lends a token governance reads */
     it("draws nothing in their place", () => {
       renderPeers({ declarations: uiDeclarations([]) });

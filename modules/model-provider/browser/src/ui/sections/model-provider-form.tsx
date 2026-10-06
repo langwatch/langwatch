@@ -15,6 +15,7 @@ import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
   skipListToInput,
+  type EditModelProviderFormProps,
   type ModelProviderEditorValue,
   modelProviders as modelProvidersRegistry,
 } from "@langwatch/model-provider-contract";
@@ -31,11 +32,7 @@ import {
   useAllModelProvidersList,
 } from "../../behavior/use-all-model-providers-list.ts";
 import { useCredentialProbeGate } from "../../behavior/use-credential-probe-gate.ts";
-import {
-  type GuidedSave,
-  useApplyGuidedModel,
-  useGuidedSave,
-} from "../../behavior/use-guided-save.ts";
+import { useApplyGuidedModel, useGuidedSave } from "../../behavior/use-guided-save.ts";
 import { useModelProviderApiKeyValidation } from "../../behavior/use-model-provider-api-key-validation.ts";
 import { useModelProviderForm } from "../../behavior/use-model-provider-form.ts";
 import { useModelProvidersSettings } from "../../behavior/use-model-providers-settings.ts";
@@ -79,23 +76,6 @@ function readSkipPermissionsFieldError(fieldErrors: unknown): string | null {
   const message = Array.isArray(entry) ? entry[0] : entry;
   return typeof message === "string" && message !== "" ? message : null;
 }
-
-export type EditModelProviderFormProps = {
-  projectId?: string | undefined;
-  organizationId?: string | undefined;
-  modelProviderId?: string;
-  providerKey: string;
-  /**
-   * What "the credential is saved" means to a surface that is not a drawer.
-   * The onboarding step passes its advance here; without it the form closes
-   * the drawer it was written for.
-   */
-  onSaved?: (saved: GuidedSave) => void;
-  /** Onboarding's presentation: Connect wording, model pills, no settings chrome. */
-  guided?: boolean;
-  /** Why the connection did not happen: a refused credential, or a failed or timed out sign-in. */
-  onFailed?: (failure: { provider: string; code: string }) => void;
-};
 
 /**
  * The current provider counts as enabled: it will be when the form saves.

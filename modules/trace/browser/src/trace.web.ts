@@ -6,8 +6,10 @@
 
 import { defineBrowserModule } from "@langwatch/browser";
 import {
+  AnnotationQueueConversationToken,
   RenderInputOutputToken,
   SetupWithAgentButtonToken,
+  TraceEditButtonToken,
   TraceIdPeekToken,
 } from "@langwatch/trace-contract";
 
@@ -55,12 +57,6 @@ export const traceWeb = defineBrowserModule("trace")
         default: (await import("./ui/sections/setup-with-agent-button.tsx")).AgentActionsMenu,
       }),
     },
-    annotationQueueConversation: {
-      load: async () => ({
-        default: (await import("./ui/sections/annotation-queue/annotation-queue-conversation.tsx"))
-          .AnnotationQueueConversation,
-      }),
-    },
     conversationThread: {
       load: async () => ({
         default: (await import("./ui/sections/conversation/conversation-thread.tsx"))
@@ -76,12 +72,6 @@ export const traceWeb = defineBrowserModule("trace")
     presenceMenuItem: {
       load: async () => ({
         default: (await import("./ui/sections/presence/presence-menu-item.tsx")).PresenceMenuItem,
-      }),
-    },
-    traceEditButton: {
-      load: async () => ({
-        default: (await import("./ui/sections/annotation-queue/trace-edit-button.tsx"))
-          .TraceEditButton,
       }),
     },
     tracePreviewHoverCard: {
@@ -103,5 +93,17 @@ export const traceWeb = defineBrowserModule("trace")
   .lends(SetupWithAgentButtonToken, {
     load: async () => ({
       default: (await import("./ui/sections/setup-with-agent-button.tsx")).SetupWithAgentButton,
+    }),
+  })
+  .lends(AnnotationQueueConversationToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/annotation-queue/annotation-queue-conversation.tsx"))
+        .AnnotationQueueConversation,
+    }),
+  })
+  .lends(TraceEditButtonToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/annotation-queue/trace-edit-button.tsx"))
+        .TraceEditButton,
     }),
   });

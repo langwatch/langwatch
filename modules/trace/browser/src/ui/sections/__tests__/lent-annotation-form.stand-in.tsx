@@ -2,12 +2,12 @@
  * Annotation's lent form, stood in for trace's tests by plain controls that read
  * the form state. Annotation's own tests cover the real form.
  */
-import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import type {
-  UiAnnotateBodyProps,
-  UiAnnotationFormFooterProps,
-  UiSuggestBodyProps,
-} from "@langwatch/browser-host/declarations";
+  AnnotateBodyProps,
+  AnnotationFormFooterProps,
+  AnnotationFormState,
+  SuggestBodyProps,
+} from "@langwatch/annotation-contract";
 
 function CommentAndScores({ state }: { state: AnnotationFormState }) {
   const scores = state.scores.data ?? [];
@@ -32,7 +32,7 @@ function CommentAndScores({ state }: { state: AnnotationFormState }) {
   );
 }
 
-export function AnnotateBody({ state }: UiAnnotateBodyProps) {
+export function AnnotateBody({ state }: AnnotateBodyProps) {
   return (
     <>
       <span>{state.isEdit ? "Edit annotation" : "Add annotation"}</span>
@@ -41,7 +41,7 @@ export function AnnotateBody({ state }: UiAnnotateBodyProps) {
   );
 }
 
-export function SuggestBody({ state, originalOutput }: UiSuggestBodyProps) {
+export function SuggestBody({ state, originalOutput }: SuggestBodyProps) {
   return (
     <>
       <span>{state.suggestTarget === "input" ? "Suggested input" : "Expected output"}</span>
@@ -58,7 +58,7 @@ export function SuggestBody({ state, originalOutput }: UiSuggestBodyProps) {
   );
 }
 
-export function FormFooter({ state }: UiAnnotationFormFooterProps) {
+export function FormFooter({ state }: AnnotationFormFooterProps) {
   return (
     <>
       <button type="button" onClick={state.onCancel}>

@@ -1,7 +1,7 @@
 Feature: Governance draws what peers lend it by token
 
-  Onboarding lends its guided onboarding pill and model-provider lends its model picker,
-  each with a token from its own contract (ARCHITECTURE.md §10.1). Governance's screens read
+  Onboarding lends its guided onboarding pill, model-provider its model picker and project its
+  inline ask field, each with a token from its own contract (ARCHITECTURE.md §10.1). Governance's screens read
   those tokens, never a capability declaration, which §15 deletes for a peer lend.
 
   @integration
@@ -17,7 +17,13 @@ Feature: Governance draws what peers lend it by token
     Then the drawer draws model-provider's picker with those models
 
   @integration
+  Scenario: The overview hero draws project's lent ask field
+    Given project lends its inline ask field with HeroAskFieldToken
+    When the governance overview hero renders the ask field with a placeholder
+    Then the hero draws project's ask field with that placeholder
+
+  @integration
   Scenario: No module lends a token governance reads
-    Given no module lends GuidedOnboardingOfferToken or ModelSelectorToken
-    When governance renders the offer or the picker
+    Given no module lends GuidedOnboardingOfferToken, ModelSelectorToken or HeroAskFieldToken
+    When governance renders the offer, the picker or the ask field
     Then governance draws nothing in their place

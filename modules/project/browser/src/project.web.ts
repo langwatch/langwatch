@@ -4,7 +4,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { ProjectSwitcherToken } from "@langwatch/project-contract";
+import { HeroAskFieldToken, ProjectSwitcherToken } from "@langwatch/project-contract";
 
 export const projectWeb = defineBrowserModule("project")
   .withHosts({
@@ -31,13 +31,11 @@ export const projectWeb = defineBrowserModule("project")
       load: () => import("./ui/sections/project-settings/project-settings-screen.tsx"),
     },
   })
-  /** The inline command palette, lent to governance's overview hero (§3.4 rule 7). */
-  .withCapabilities({
-    heroAskField: {
-      load: async () => ({
-        default: (await import("./ui/sections/home/components/hero-ask-field.tsx")).HeroAskField,
-      }),
-    },
+  /** The inline command palette, lent to governance's overview hero by token (§10.1). */
+  .lends(HeroAskFieldToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/home/components/hero-ask-field.tsx")).HeroAskField,
+    }),
   })
   /** Main's project selector, lent to pages outside the navigation shell (§10). */
   .lends(ProjectSwitcherToken, { load: () => import("./ui/blocks/project-switcher.tsx") });

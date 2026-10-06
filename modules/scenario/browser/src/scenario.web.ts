@@ -5,7 +5,11 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { MediaPartToken } from "@langwatch/scenario-contract";
+import {
+  MediaPartToken,
+  ParameterLineFieldToken,
+  TalkToItPanelToken,
+} from "@langwatch/scenario-contract";
 
 export const scenarioWeb = defineBrowserModule("scenario")
   .withHosts({
@@ -70,18 +74,16 @@ export const scenarioWeb = defineBrowserModule("scenario")
       default: (await import("./ui/sections/media-part.tsx")).MediaPart,
     }),
   })
-  /** The call panel and parameter line lent to agent (§3.4 rule 7). */
-  .withCapabilities({
-    parameterLineField: {
-      load: async () => ({
-        default: (await import("./ui/sections/agent-testing/run/lent-parameter-line-field.tsx"))
-          .LentParameterLineField,
-      }),
-    },
-    talkToItPanel: {
-      load: async () => ({
-        default: (await import("./features/talk-to-it/ui/sections/wired-talk-to-it-panel.tsx"))
-          .LentTalkToItPanel,
-      }),
-    },
+  /** The call panel and parameter line lent to agent by token (§10.1). */
+  .lends(ParameterLineFieldToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/agent-testing/run/lent-parameter-line-field.tsx"))
+        .LentParameterLineField,
+    }),
+  })
+  .lends(TalkToItPanelToken, {
+    load: async () => ({
+      default: (await import("./features/talk-to-it/ui/sections/wired-talk-to-it-panel.tsx"))
+        .LentTalkToItPanel,
+    }),
   });

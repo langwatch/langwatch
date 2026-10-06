@@ -217,3 +217,4 @@ export * from "./explorer/origin-display.ts";
 export * from "./explorer/suggestion-items.ts";
 export * from "./trace-browser-slices.ts";
 export * from "./trace-lent-components.ts";
+export * from "./trace-lent-surfaces.ts";

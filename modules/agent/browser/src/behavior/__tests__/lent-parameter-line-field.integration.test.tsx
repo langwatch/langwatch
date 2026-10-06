@@ -2,21 +2,17 @@
 
 import "@testing-library/jest-dom/vitest";
 import {
-  uiDeclarations,
-  type UiDeclarations,
-  type UiParameterLineFieldProps,
-} from "@langwatch/browser-host/declarations";
+  UiCapabilityContextProvider,
+  type UiCapabilities,
+} from "@langwatch/browser-host/capabilities";
+import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import {
+  ParameterLineFieldToken,
+  type ParameterLineFieldProps,
+} from "@langwatch/scenario-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-const declarations: { current: UiDeclarations | undefined } = vi.hoisted(() => ({
-  current: undefined,
-}));
-
-vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  useUiDeclarations: () => declarations.current,
-}));
 
 import { ParameterLineField } from "../lent-parameter-line-field.tsx";
 
@@ -24,10 +20,12 @@ const scenarioLends = uiDeclarations([
   {
     name: "scenario",
     installation: {
-      capabilities: {
-        parameterLineField: {
+      capabilities: {},
+      lends: [
+        {
+          token: ParameterLineFieldToken,
           load: async () => ({
-            default: ({ definitions, testId }: UiParameterLineFieldProps) => (
+            default: ({ definitions, testId }: ParameterLineFieldProps) => (
               <input
                 data-testid={testId}
                 readOnly
@@ -36,45 +34,57 @@ const scenarioLends = uiDeclarations([
             ),
           }),
         },
-      },
+      ],
     },
   },
 ]);
 
-afterEach(() => {
-  cleanup();
-  declarations.current = undefined;
-});
+function renderField({
+  declarations,
+  definitions,
+}: {
+  declarations: UiDeclarations;
+  definitions: ParameterLineFieldProps["definitions"];
+}) {
+  const capabilities: UiCapabilities = {
+    ...createUiCapabilitiesFromHost({
+      route: () => ({ params: {}, query: {} }),
+      navigate: () => void 0,
+    }),
+    declarations,
+  };
+  return render(
+    <UiCapabilityContextProvider value={capabilities}>
+      <ParameterLineField
+        ariaLabel="Parameters"
+        testId="agent-test-parameters"
+        value=""
+        onChange={vi.fn()}
+        definitions={definitions}
+      />
+    </UiCapabilityContextProvider>,
+  );
+}
+
+afterEach(cleanup);
 
 describe("the parameter line scenario lends agent", () => {
   describe("given scenario is installed", () => {
     it("renders scenario's field with the agent's declared parameters", async () => {
-      declarations.current = scenarioLends;
-      render(
-        <ParameterLineField
-          ariaLabel="Parameters"
-          testId="agent-test-parameters"
-          value=""
-          onChange={vi.fn()}
-          definitions={[{ name: "plan" }, { name: "locale" }]}
-        />,
-      );
+      renderField({
+        declarations: scenarioLends,
+        definitions: [{ name: "plan" }, { name: "locale" }],
+      });
       expect(await screen.findByTestId("agent-test-parameters")).toHaveValue("plan,locale");
     });
   });
 
   describe("given nothing lends it", () => {
     it("renders no field", () => {
-      declarations.current = uiDeclarations([]);
-      const { container } = render(
-        <ParameterLineField
-          ariaLabel="Parameters"
-          testId="agent-test-parameters"
-          value=""
-          onChange={vi.fn()}
-          definitions={[{ name: "plan" }]}
-        />,
-      );
+      const { container } = renderField({
+        declarations: uiDeclarations([]),
+        definitions: [{ name: "plan" }],
+      });
       expect(container).toBeEmptyDOMElement();
     });
   });

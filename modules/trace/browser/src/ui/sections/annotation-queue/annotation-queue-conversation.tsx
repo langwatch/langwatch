@@ -3,11 +3,11 @@
  * rule 7): the item's thread, or its trace as the only turn when it has none.
  */
 
-import type { UiAnnotationQueueConversationProps } from "@langwatch/browser-host/declarations";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { CodeBlock } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
+import type { AnnotationQueueConversationProps } from "@langwatch/trace-contract";
 import { useCallback, useMemo } from "react";
 
 import { useTraceById } from "../../../behavior/reads/use-trace-mapping-reads.ts";
@@ -24,7 +24,7 @@ const partitionHint = (startedAt: unknown): number | null =>
 export function AnnotationQueueConversation({
   traceId,
   conversationId,
-}: UiAnnotationQueueConversationProps) {
+}: AnnotationQueueConversationProps) {
   const projectId = useDrawerProjectId();
   const { openDrawer } = useDrawer();
   const { colorMode } = useColorMode();
