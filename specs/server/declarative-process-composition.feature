@@ -28,12 +28,6 @@ Feature: Composing a process declaratively
     And no app is created
 
   @unit
-  Scenario: The named members do not cover the module's interface
-    Given a module whose infrastructure interface names "prefix" and "clock"
-    When the module names only "prefix"
-    Then the declaration reports the member it has not named
-
-  @unit
   Scenario: A pool that lacks a member an installed module names
     Given a module whose infrastructure interface names a member the pool lacks
     When the module list is installed

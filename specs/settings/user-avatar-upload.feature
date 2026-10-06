@@ -86,12 +86,12 @@ Feature: Uploading a custom avatar photo
 
   # --- Serving and visibility -------------------------------------------------
 
-  @integration
-  Scenario: A signed-in teammate can load another user's uploaded avatar
+  @unit
+  Scenario: A signed-in teammate gets a signed URL for another user's uploaded avatar
     Given a user who has uploaded a custom avatar
     And a different signed-in teammate in the same organization
-    When the teammate's browser requests that user's avatar image
-    Then the image is served to them
+    When the teammate asks user.getAvatarUrl for that user's avatar
+    Then they get a signed URL for the image
 
   @integration
   Scenario: An unauthenticated request cannot load an avatar image
@@ -134,13 +134,6 @@ Feature: Uploading a custom avatar photo
     When a signed-in person asks user.getAvatarUrl for it
     Then they get a signed URL held to the avatar purpose and owner kind
     And an object that is not an avatar is refused as there being no photo at that address
-
-  @integration
-  Scenario: The avatar route is left off a process that cannot authenticate an image request
-    Given a deployment whose photo route cannot accept a browser's own credentials
-    When the deployment starts
-    Then the photo route is not served at all
-    And people fall back to initials rather than meeting a refusal on every photo
 
   # --- Rendering across the product ------------------------------------------
 

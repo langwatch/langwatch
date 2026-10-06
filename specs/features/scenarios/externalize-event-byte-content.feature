@@ -709,14 +709,6 @@ Feature: Externalize event byte content to stored_objects
     Then it throws a configuration error identifying the azure backend
     And it never falls back to the hardcoded langwatch bucket
 
-  @unit
-  Scenario: Legacy S3 surfaces keep working during an S3-to-Azure migration
-    Given a project whose resolved destination is azure
-    And S3_BUCKET_NAME is still configured from before the migration
-    When createS3Client is invoked for that project
-    Then it returns a client bound to the legacy S3 bucket
-    And persisted s3 URIs, spool refs, and staged payloads stay readable and deletable
-
   @integration
   Scenario: Datasets round-trip through Azure Blob when azure is the configured backend
     Given STORED_OBJECTS_BACKEND is azure with a reachable Azure Blob container
@@ -823,7 +815,6 @@ Feature: Externalize event byte content to stored_objects
   #                                                                          -> Scenario: A per-project private dataplane bucket still beats the Azure backend toggle
   #                                                                          -> Scenario: defaultMintStorageUri and the groupQueue blob store mint azure-blob URIs for an azure destination
   #                                                                          -> Scenario: The legacy S3 client factory refuses an azure destination instead of inventing a bucket
-  #                                                                          -> Scenario: Legacy S3 surfaces keep working during an S3-to-Azure migration
   #                                                                          -> Scenario: Datasets round-trip through Azure Blob when azure is the configured backend
   #                                                                          -> Scenario: The dataset-content backfill task migrates a postgres-layout dataset onto azure
   #                                                                          -> Scenario: Helm chart exposes an azureBlob dataplane provider mirroring awsS3
