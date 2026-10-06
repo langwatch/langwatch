@@ -58,7 +58,7 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: RegisterConnectedAgentInstanceBody,
 ) -> Response[RegisterConnectedAgentInstanceResponse200]:
     """Register this process's agents
@@ -89,7 +89,7 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: RegisterConnectedAgentInstanceBody,
 ) -> RegisterConnectedAgentInstanceResponse200 | None:
     """Register this process's agents
@@ -115,7 +115,7 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: RegisterConnectedAgentInstanceBody,
 ) -> Response[RegisterConnectedAgentInstanceResponse200]:
     """Register this process's agents
@@ -144,7 +144,7 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: RegisterConnectedAgentInstanceBody,
 ) -> RegisterConnectedAgentInstanceResponse200 | None:
     """Register this process's agents

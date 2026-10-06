@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -34,7 +34,8 @@ def _get_kwargs(
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> (
-    PostApiEvaluationsBatchLogResultsResponse200
+    Any
+    | PostApiEvaluationsBatchLogResultsResponse200
     | PostApiEvaluationsBatchLogResultsResponse400
     | PostApiEvaluationsBatchLogResultsResponse401
     | PostApiEvaluationsBatchLogResultsResponse403
@@ -60,6 +61,10 @@ def _parse_response(
 
         return response_403
 
+    if response.status_code == 413:
+        response_413 = cast(Any, None)
+        return response_413
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -69,7 +74,8 @@ def _parse_response(
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[
-    PostApiEvaluationsBatchLogResultsResponse200
+    Any
+    | PostApiEvaluationsBatchLogResultsResponse200
     | PostApiEvaluationsBatchLogResultsResponse400
     | PostApiEvaluationsBatchLogResultsResponse401
     | PostApiEvaluationsBatchLogResultsResponse403
@@ -90,7 +96,8 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PostApiEvaluationsBatchLogResultsBody,
 ) -> Response[
-    PostApiEvaluationsBatchLogResultsResponse200
+    Any
+    | PostApiEvaluationsBatchLogResultsResponse200
     | PostApiEvaluationsBatchLogResultsResponse400
     | PostApiEvaluationsBatchLogResultsResponse401
     | PostApiEvaluationsBatchLogResultsResponse403
@@ -100,7 +107,8 @@ def sync_detailed(
      Report the rows of a batch evaluation against an experiment, so its scores and progress show up in
     the app. This is the second half of an SDK batch evaluation: create the experiment with `POST
     /api/experiment/init`, then post rows here as they finish. Identify the experiment by either
-    `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.
+    `experiment_id` or `experiment_slug`. Bodies up to 267 MB are accepted, sized for one dataset row
+    with ten 20 MB images inline. A larger body is refused with `evaluation_log_results_too_large`.
 
     Args:
         body (PostApiEvaluationsBatchLogResultsBody):
@@ -110,7 +118,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiEvaluationsBatchLogResultsResponse200 | PostApiEvaluationsBatchLogResultsResponse400 | PostApiEvaluationsBatchLogResultsResponse401 | PostApiEvaluationsBatchLogResultsResponse403]
+        Response[Any | PostApiEvaluationsBatchLogResultsResponse200 | PostApiEvaluationsBatchLogResultsResponse400 | PostApiEvaluationsBatchLogResultsResponse401 | PostApiEvaluationsBatchLogResultsResponse403]
     """
 
     kwargs = _get_kwargs(
@@ -129,7 +137,8 @@ def sync(
     client: AuthenticatedClient,
     body: PostApiEvaluationsBatchLogResultsBody,
 ) -> (
-    PostApiEvaluationsBatchLogResultsResponse200
+    Any
+    | PostApiEvaluationsBatchLogResultsResponse200
     | PostApiEvaluationsBatchLogResultsResponse400
     | PostApiEvaluationsBatchLogResultsResponse401
     | PostApiEvaluationsBatchLogResultsResponse403
@@ -140,7 +149,8 @@ def sync(
      Report the rows of a batch evaluation against an experiment, so its scores and progress show up in
     the app. This is the second half of an SDK batch evaluation: create the experiment with `POST
     /api/experiment/init`, then post rows here as they finish. Identify the experiment by either
-    `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.
+    `experiment_id` or `experiment_slug`. Bodies up to 267 MB are accepted, sized for one dataset row
+    with ten 20 MB images inline. A larger body is refused with `evaluation_log_results_too_large`.
 
     Args:
         body (PostApiEvaluationsBatchLogResultsBody):
@@ -150,7 +160,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiEvaluationsBatchLogResultsResponse200 | PostApiEvaluationsBatchLogResultsResponse400 | PostApiEvaluationsBatchLogResultsResponse401 | PostApiEvaluationsBatchLogResultsResponse403
+        Any | PostApiEvaluationsBatchLogResultsResponse200 | PostApiEvaluationsBatchLogResultsResponse400 | PostApiEvaluationsBatchLogResultsResponse401 | PostApiEvaluationsBatchLogResultsResponse403
     """
 
     return sync_detailed(
@@ -164,7 +174,8 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PostApiEvaluationsBatchLogResultsBody,
 ) -> Response[
-    PostApiEvaluationsBatchLogResultsResponse200
+    Any
+    | PostApiEvaluationsBatchLogResultsResponse200
     | PostApiEvaluationsBatchLogResultsResponse400
     | PostApiEvaluationsBatchLogResultsResponse401
     | PostApiEvaluationsBatchLogResultsResponse403
@@ -174,7 +185,8 @@ async def asyncio_detailed(
      Report the rows of a batch evaluation against an experiment, so its scores and progress show up in
     the app. This is the second half of an SDK batch evaluation: create the experiment with `POST
     /api/experiment/init`, then post rows here as they finish. Identify the experiment by either
-    `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.
+    `experiment_id` or `experiment_slug`. Bodies up to 267 MB are accepted, sized for one dataset row
+    with ten 20 MB images inline. A larger body is refused with `evaluation_log_results_too_large`.
 
     Args:
         body (PostApiEvaluationsBatchLogResultsBody):
@@ -184,7 +196,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiEvaluationsBatchLogResultsResponse200 | PostApiEvaluationsBatchLogResultsResponse400 | PostApiEvaluationsBatchLogResultsResponse401 | PostApiEvaluationsBatchLogResultsResponse403]
+        Response[Any | PostApiEvaluationsBatchLogResultsResponse200 | PostApiEvaluationsBatchLogResultsResponse400 | PostApiEvaluationsBatchLogResultsResponse401 | PostApiEvaluationsBatchLogResultsResponse403]
     """
 
     kwargs = _get_kwargs(
@@ -201,7 +213,8 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PostApiEvaluationsBatchLogResultsBody,
 ) -> (
-    PostApiEvaluationsBatchLogResultsResponse200
+    Any
+    | PostApiEvaluationsBatchLogResultsResponse200
     | PostApiEvaluationsBatchLogResultsResponse400
     | PostApiEvaluationsBatchLogResultsResponse401
     | PostApiEvaluationsBatchLogResultsResponse403
@@ -212,7 +225,8 @@ async def asyncio(
      Report the rows of a batch evaluation against an experiment, so its scores and progress show up in
     the app. This is the second half of an SDK batch evaluation: create the experiment with `POST
     /api/experiment/init`, then post rows here as they finish. Identify the experiment by either
-    `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.
+    `experiment_id` or `experiment_slug`. Bodies up to 267 MB are accepted, sized for one dataset row
+    with ten 20 MB images inline. A larger body is refused with `evaluation_log_results_too_large`.
 
     Args:
         body (PostApiEvaluationsBatchLogResultsBody):
@@ -222,7 +236,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiEvaluationsBatchLogResultsResponse200 | PostApiEvaluationsBatchLogResultsResponse400 | PostApiEvaluationsBatchLogResultsResponse401 | PostApiEvaluationsBatchLogResultsResponse403
+        Any | PostApiEvaluationsBatchLogResultsResponse200 | PostApiEvaluationsBatchLogResultsResponse400 | PostApiEvaluationsBatchLogResultsResponse401 | PostApiEvaluationsBatchLogResultsResponse403
     """
 
     return (

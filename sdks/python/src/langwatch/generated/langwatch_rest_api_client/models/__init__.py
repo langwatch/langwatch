@@ -660,6 +660,13 @@ from .get_api_dataset_by_slug_entries_response_200_data_item import GetApiDatase
 from .get_api_dataset_by_slug_entries_response_200_data_item_entry import (
     GetApiDatasetBySlugEntriesResponse200DataItemEntry,
 )
+from .get_api_dataset_by_slug_entries_response_200_dataset import GetApiDatasetBySlugEntriesResponse200Dataset
+from .get_api_dataset_by_slug_entries_response_200_dataset_column_types_item import (
+    GetApiDatasetBySlugEntriesResponse200DatasetColumnTypesItem,
+)
+from .get_api_dataset_by_slug_entries_response_200_dataset_column_types_item_type import (
+    GetApiDatasetBySlugEntriesResponse200DatasetColumnTypesItemType,
+)
 from .get_api_dataset_by_slug_entries_response_200_pagination import GetApiDatasetBySlugEntriesResponse200Pagination
 from .get_api_dataset_by_slug_or_id_records_response_200 import GetApiDatasetBySlugOrIdRecordsResponse200
 from .get_api_dataset_by_slug_or_id_records_response_200_data_item import (
@@ -667,6 +674,13 @@ from .get_api_dataset_by_slug_or_id_records_response_200_data_item import (
 )
 from .get_api_dataset_by_slug_or_id_records_response_200_data_item_entry import (
     GetApiDatasetBySlugOrIdRecordsResponse200DataItemEntry,
+)
+from .get_api_dataset_by_slug_or_id_records_response_200_dataset import GetApiDatasetBySlugOrIdRecordsResponse200Dataset
+from .get_api_dataset_by_slug_or_id_records_response_200_dataset_column_types_item import (
+    GetApiDatasetBySlugOrIdRecordsResponse200DatasetColumnTypesItem,
+)
+from .get_api_dataset_by_slug_or_id_records_response_200_dataset_column_types_item_type import (
+    GetApiDatasetBySlugOrIdRecordsResponse200DatasetColumnTypesItemType,
 )
 from .get_api_dataset_by_slug_or_id_records_response_200_pagination import (
     GetApiDatasetBySlugOrIdRecordsResponse200Pagination,
@@ -4282,6 +4296,11 @@ from .post_api_checkup_run_response_200_rows_item_verdict_type_2 import PostApiC
 from .post_api_dashboards_body import PostApiDashboardsBody
 from .post_api_dashboards_response_201 import PostApiDashboardsResponse201
 from .post_api_dataset_attachments_body import PostApiDatasetAttachmentsBody
+from .post_api_dataset_attachments_uploads_body import PostApiDatasetAttachmentsUploadsBody
+from .post_api_dataset_attachments_uploads_response_201 import PostApiDatasetAttachmentsUploadsResponse201
+from .post_api_dataset_attachments_uploads_response_201_headers import (
+    PostApiDatasetAttachmentsUploadsResponse201Headers,
+)
 from .post_api_dataset_body import PostApiDatasetBody
 from .post_api_dataset_body_column_types_item import PostApiDatasetBodyColumnTypesItem
 from .post_api_dataset_body_column_types_item_type import PostApiDatasetBodyColumnTypesItemType
@@ -8294,10 +8313,16 @@ __all__ = (
     "GetApiDatasetBySlugEntriesResponse200",
     "GetApiDatasetBySlugEntriesResponse200DataItem",
     "GetApiDatasetBySlugEntriesResponse200DataItemEntry",
+    "GetApiDatasetBySlugEntriesResponse200Dataset",
+    "GetApiDatasetBySlugEntriesResponse200DatasetColumnTypesItem",
+    "GetApiDatasetBySlugEntriesResponse200DatasetColumnTypesItemType",
     "GetApiDatasetBySlugEntriesResponse200Pagination",
     "GetApiDatasetBySlugOrIdRecordsResponse200",
     "GetApiDatasetBySlugOrIdRecordsResponse200DataItem",
     "GetApiDatasetBySlugOrIdRecordsResponse200DataItemEntry",
+    "GetApiDatasetBySlugOrIdRecordsResponse200Dataset",
+    "GetApiDatasetBySlugOrIdRecordsResponse200DatasetColumnTypesItem",
+    "GetApiDatasetBySlugOrIdRecordsResponse200DatasetColumnTypesItemType",
     "GetApiDatasetBySlugOrIdRecordsResponse200Pagination",
     "GetApiDatasetBySlugOrIdResponse200",
     "GetApiDatasetBySlugOrIdResponse200ColumnTypesItem",
@@ -10138,6 +10163,9 @@ __all__ = (
     "PostApiDashboardsBody",
     "PostApiDashboardsResponse201",
     "PostApiDatasetAttachmentsBody",
+    "PostApiDatasetAttachmentsUploadsBody",
+    "PostApiDatasetAttachmentsUploadsResponse201",
+    "PostApiDatasetAttachmentsUploadsResponse201Headers",
     "PostApiDatasetBody",
     "PostApiDatasetBodyColumnTypesItem",
     "PostApiDatasetBodyColumnTypesItemType",
