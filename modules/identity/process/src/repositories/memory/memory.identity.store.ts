@@ -26,6 +26,8 @@ interface MemoryUserRow {
   emailVerified: boolean;
   createdAtMs: number;
   userHashKey: string | null;
+  /** `User.lastLoginAt`; absent reads as never signed into. */
+  lastLoginAtMs?: number | null;
   payload: Record<string, unknown>;
 }
 

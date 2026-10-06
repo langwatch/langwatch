@@ -5,6 +5,7 @@ import type { IdentityRepositories } from "../identity.repositories.ts";
 import { MemoryIdentityAccountRekeyRepository } from "./memory.identity-account-rekey.repository.ts";
 import { MemoryIdentityLatchRepository } from "./memory.identity-latch.repository.ts";
 import { MemoryIdentityLookupRepository } from "./memory.identity-lookup.repository.ts";
+import { MemoryIdentityMigrationRepository } from "./memory.identity-migration.repository.ts";
 import { MemoryIdentityProjectionRepository } from "./memory.identity-projection.repository.ts";
 import { MemoryIdentityRateLimitRepository } from "./memory.identity-rate-limit.repository.ts";
 import { MemoryIdentitySecretCarryRepository } from "./memory.identity-secret-carry.repository.ts";
@@ -87,6 +88,7 @@ export function identityRepositoriesOverMemory(store: MemoryIdentityStore): Iden
     joinRequestProjection: MemoryStateProjectionRepository.create<JoinRequestFoldState>(),
     ssoConnectionHeads: MemoryStateProjectionRepository.create<SsoConnectionFoldState>(),
     secretCarry: MemoryIdentitySecretCarryRepository.create(),
+    migration: MemoryIdentityMigrationRepository.create(store),
     joinRequestAudience: MemoryJoinRequestAudienceRepository.create(store),
     joinRequestNotificationContext: MemoryJoinRequestNotificationContextRepository.create(store),
     ssoDomainOwnership: MemorySsoDomainOwnershipRepository.create(store),

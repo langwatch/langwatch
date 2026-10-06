@@ -21,6 +21,7 @@ function harness(pairs: AccountSecretPair[]) {
     findDriftedUserIdsAfter: async () => [],
     insertCredentialIfMissing,
     overwriteCredential,
+    deleteCredentials: async () => 0,
   };
   return {
     service: IdentitySecretCarryService.create(reads),

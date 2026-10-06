@@ -350,6 +350,45 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And the email identifier, which has no account row, is left alone
     And a further pass detaches nothing
 
+  # An account nobody has proven (never confirmed, never signed into) may hold a
+  # password somebody else chose. A confirmation link adopts it and drops that
+  # password from the legacy rows, so it stays on the legacy branch until then
+  # (Alex, 2026-10-06, "Adopt gap"; ADR-116 §2).
+  @unit
+  Scenario: The backfill never finalizes an account nobody has proven
+    Given "sam"'s account was never confirmed and never signed into
+    When the identity backfill migrates "sam"
+    Then "sam" is held at migrated and nothing is written for "sam"
+    And once "sam"'s address is confirmed, a later pass finalizes "sam" as before
+
+  @unit
+  Scenario: The backfill drops the stored credential of an account row that is gone
+    Given "sam"'s password was carried into identity's credential rows on an earlier pass
+    And the password's Account row has since been deleted
+    When the identity backfill migrates "sam" again
+    Then the carried credential row is dropped with the detached identifier
+    And a further pass drops nothing
+
+  @integration
+  Scenario: A blocking sweep reopens every unproven account an earlier pass finalized
+    Given an earlier pass finalized "sam", whose account was never confirmed and never signed into
+    And it finalized "kim", whose address is confirmed, and an operator pinned "lee" as rolled back
+    When the reopen sweep runs as a dry run
+    Then it reports "sam" and changes nothing
+    When the reopen sweep runs
+    Then "sam" is held at migrated, "kim" stays finalized and "lee" stays rolled back
+    And a second run changes nothing
+
+  @integration
+  Scenario: An adopted account keeps no pre-proof credential in identity's tables
+    Given an earlier pass finalized "sam" and carried the password set before the proof
+    And the reopen sweep has run
+    When a confirmation link adopts "sam"'s account
+    And the identity backfill migrates "sam" again
+    Then no credential row and no live identifier for that password remains in identity's tables
+    And the sign-in screen no longer offers "sam" a password
+    And "sam" is finalized again
+
   # D09: the Auth0 broker's subject is a compound — `google-oauth2|<sub>`
   # states the person's identity AT GOOGLE, wrapped in the broker's
   # namespace. Unfolding it at adoption is what lets the native provider's

@@ -234,6 +234,7 @@ export class MemoryIdentityBackfillRepository implements IdentityBackfillReposit
       emailVerified: row.emailVerified,
       createdAtMs: row.createdAtMs,
       userHashKey: row.userHashKey,
+      lastLoginAtMs: row.lastLoginAtMs ?? null,
     };
   }
 
