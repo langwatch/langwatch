@@ -241,6 +241,11 @@ function renderWithChakra(node: ReactNode, entry = "/") {
   );
 }
 
+function DepartmentColumnProbe() {
+  const dept = useDepartmentColumn("org-1");
+  return <div data-testid="show">{String(dept.show)}</div>;
+}
+
 describe("department assignment UI", () => {
   afterEach(cleanup);
   beforeEach(() => {
@@ -356,30 +361,26 @@ describe("department assignment UI", () => {
 
   describe("given a member without the governance:view grant", () => {
     /** @scenario The department lists are not requested without the grant to read them */
-    it("asks for neither the departments nor their assignments", () => {
-      function Harness() {
-        useDepartmentColumn("org-1");
-        return null;
-      }
+    it("asks for neither the departments nor their assignments, and shows no column", () => {
       canViewGovernance.current = false;
       departmentQueriesEnabled.current = [];
 
-      renderWithChakra(<Harness />);
+      renderWithChakra(<DepartmentColumnProbe />);
 
       expect(departmentQueriesEnabled.current).toEqual([false, false]);
+      expect(screen.getByTestId("show").textContent).toBe("false");
     });
+  });
 
-    it("asks for both once the grant is held", () => {
-      function Harness() {
-        useDepartmentColumn("org-1");
-        return null;
-      }
+  describe("given a member who holds the governance:view grant", () => {
+    it("asks for both the departments and their assignments", () => {
       canViewGovernance.current = true;
       departmentQueriesEnabled.current = [];
 
-      renderWithChakra(<Harness />);
+      renderWithChakra(<DepartmentColumnProbe />);
 
       expect(departmentQueriesEnabled.current).toEqual([true, true]);
+      expect(screen.getByTestId("show").textContent).toBe("true");
     });
   });
 

@@ -622,8 +622,8 @@ Feature: Credential Validation
   # anthropic) a trailing "/v1" is optional at runtime: the gateway drops it
   # and appends the full "/v1/..." path. The check appended "/models" to the
   # URL exactly as typed, so "https://api.openai.com" was refused with a 404
-  # here and then worked. The gateway's address is asked first, and the URL as
-  # typed second.
+  # here and then worked. Only the gateway's address is asked: a key that
+  # answers at another address would pass the check and fail on every request.
   #
   # Bindings: platform/app/src/server/modelProviders/__tests__/providerValidation.unit.test.ts
 
@@ -641,14 +641,14 @@ Feature: Credential Validation
       | https://proxy.acme.test/openai/v1 | https://proxy.acme.test/openai/v1/models |
 
   @unit
-  Scenario: An endpoint with its own models route still passes the check
+  Scenario: An address the gateway will not call cannot pass the check
     Given an "openai" provider whose endpoint lists models at "<base URL>/models" only
     When the API key is validated
-    Then the gateway's address is asked first and answers 404
-    And the base URL as typed is asked next and the key is accepted
+    Then only the gateway's address is asked
+    And the key is not reported as verified
 
   @unit
-  Scenario: A key refused at every address is still refused
-    Given an "openai" provider whose key every address refuses
+  Scenario: A key the gateway address refuses is refused
+    Given an "openai" provider whose key the gateway's address refuses
     When the API key is validated
     Then the key is reported as invalid

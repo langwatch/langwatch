@@ -28,7 +28,8 @@ export function useDepartmentColumn(organizationId: string) {
   const { hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
-  const enabled = !!organizationId && ffOn && hasPermission("governance:view");
+  const canRead = hasPermission("governance:view");
+  const enabled = !!organizationId && ffOn && canRead;
 
   const listQuery = api.departments.list.useQuery(
     { organizationId },
@@ -54,7 +55,7 @@ export function useDepartmentColumn(organizationId: string) {
   );
 
   return {
-    show: ffOn && departments.length > 0,
+    show: ffOn && canRead && departments.length > 0,
     departments,
     byUser,
     byTeam,

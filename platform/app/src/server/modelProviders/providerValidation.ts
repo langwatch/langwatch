@@ -213,13 +213,12 @@ function gatewayModelsEndpointUrl(baseUrl: string): string {
 }
 
 /**
- * Every models URL worth asking for one credential, most faithful first.
+ * The models URLs to ask for one credential.
  *
- * The gateway normalises the base URL, so `https://api.openai.com` works at
- * runtime although `https://api.openai.com/models` answers 404. The URL the
- * gateway will use is asked first; the as-typed one stays as a second try,
- * for an endpoint whose models route sits somewhere the "/v1" convention does
- * not reach.
+ * Where the gateway normalises the base URL, only the address it will call is
+ * asked: `https://api.openai.com` works at runtime although
+ * `https://api.openai.com/models` answers 404, and a key that answers only at
+ * the as-typed address would pass here and fail on every request.
  */
 function modelsEndpointUrls({
   provider,
@@ -230,12 +229,10 @@ function modelsEndpointUrls({
   baseUrl: string;
   defaultBaseUrl: string;
 }): string[] {
-  const asTyped = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
   if (!baseUrl || !GATEWAY_NORMALISED_BASE_URL_PROVIDERS.has(provider)) {
-    return [asTyped];
+    return [buildModelsEndpointUrl(baseUrl, defaultBaseUrl)];
   }
-  const asDispatched = gatewayModelsEndpointUrl(baseUrl);
-  return asDispatched === asTyped ? [asTyped] : [asDispatched, asTyped];
+  return [gatewayModelsEndpointUrl(baseUrl)];
 }
 
 const logger = createLogger("langwatch:api:providerValidation");

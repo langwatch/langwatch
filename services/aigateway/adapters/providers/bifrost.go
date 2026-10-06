@@ -1530,8 +1530,6 @@ func credentialGap(ctx context.Context, target credentialTarget) error {
 	return herr.New(ctx, domain.ErrProviderConfigInvalid, meta)
 }
 
-// credentialTarget is one dispatch as credentialGap reads it: the credential,
-// the bifrost provider it mapped to, and the model the request named.
 type credentialTarget struct {
 	cred     domain.Credential
 	provider bfschemas.ModelProvider

@@ -285,7 +285,7 @@ describe("validateProviderApiKey", () => {
           "https://proxy.acme.test/openai/v1",
           "https://proxy.acme.test/openai/v1/models",
         ],
-      ])("asks %s at %s first", async (baseUrl, expected) => {
+      ])("asks %s at %s", async (baseUrl, expected) => {
         mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
 
         const result = await validateProviderApiKey("openai", {
@@ -315,8 +315,8 @@ describe("validateProviderApiKey", () => {
         expect(result.outcome).toBe("verified");
       });
 
-      /** @scenario An endpoint with its own models route still passes the check */
-      it("falls back to the base URL as typed when the gateway address has no models route", async () => {
+      /** @scenario An address the gateway will not call cannot pass the check */
+      it("does not accept a key that answers only at the base URL as typed", async () => {
         mockFetch.mockImplementation(async (url: string) =>
           url === "https://llm.acme.test/api/models"
             ? { ok: true, status: 200 }
@@ -328,15 +328,14 @@ describe("validateProviderApiKey", () => {
           OPENAI_BASE_URL: "https://llm.acme.test/api",
         });
 
-        expect(result.outcome).toBe("verified");
+        expect(result.outcome).not.toBe("verified");
         expect(mockFetch.mock.calls.map((call) => call[0])).toEqual([
           "https://llm.acme.test/api/v1/models",
-          "https://llm.acme.test/api/models",
         ]);
       });
 
-      /** @scenario A key refused at every address is still refused */
-      it("still refuses a key that no address accepts", async () => {
+      /** @scenario A key the gateway address refuses is refused */
+      it("refuses a key the gateway address refuses", async () => {
         mockFetch.mockResolvedValue({ ok: false, status: 401 });
 
         const result = await validateProviderApiKey("openai", {

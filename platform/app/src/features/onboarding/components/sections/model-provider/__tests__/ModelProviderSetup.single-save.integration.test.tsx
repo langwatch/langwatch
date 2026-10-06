@@ -9,7 +9,7 @@
  * Covers @integration scenarios from
  * specs/model-providers/onboarding-flow.feature.
  */
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useSyncExternalStore } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -184,16 +184,30 @@ const BASE_URL = "https://llm.acme.test/v1";
 
 async function fillAndSave() {
   const user = userEvent.setup();
-  const inputs = Array.from(document.querySelectorAll("input"));
-  const [keyInput, urlInput] = inputs;
-  await user.type(keyInput!, TYPED_KEY);
-  await user.type(urlInput!, BASE_URL);
+  await user.type(
+    screen.getByLabelText(/OpenAI API Key/, { selector: "input" }),
+    TYPED_KEY,
+  );
+  await user.type(
+    screen.getByLabelText(/OpenAI Base URL/, { selector: "input" }),
+    BASE_URL,
+  );
   await user.click(screen.getByRole("button", { name: /^save$/i }));
   await waitFor(() => {
     expect(server.state.completedAfterWrites.length).toBeGreaterThan(0);
   });
-  // Let any write still queued behind the completion land.
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await settleQueuedWrites();
+}
+
+/**
+ * The stand-in server answers without timers, so one turn of the task queue
+ * runs every promise chain a save started, including a write queued behind
+ * the completion callback.
+ */
+async function settleQueuedWrites() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 }
 
 describe("Feature: saving a first provider from onboarding or the Langy gate", () => {
@@ -293,13 +307,15 @@ describe("Feature: saving a first provider from onboarding or the Langy gate", (
         await user.click(tile("Codex (OpenAI account)"));
         await user.click(tile("OpenAI"));
 
-        const [keyInput] = Array.from(document.querySelectorAll("input"));
-        await user.type(keyInput!, TYPED_KEY);
+        await user.type(
+          screen.getByLabelText(/OpenAI API Key/, { selector: "input" }),
+          TYPED_KEY,
+        );
         await user.click(screen.getByRole("button", { name: /^save$/i }));
         await waitFor(() => {
           expect(server.state.completedAfterWrites.length).toBeGreaterThan(0);
         });
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await settleQueuedWrites();
 
         // An untouched optional field travels as an empty string, not as a
         // value left behind by another provider's form.

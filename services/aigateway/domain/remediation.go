@@ -216,24 +216,18 @@ func configProblemTipsFor(e herr.E) []string {
 	if e.Code != ErrProviderConfigInvalid {
 		return nil
 	}
-	tips, ok := configProblemTips[ConfigProblemOf(e.Meta)]
+	tips, ok := configProblemTips[configProblemOf(e.Meta)]
 	if !ok {
 		return nil
 	}
 	return capTips(tips)
 }
 
-// ConfigProblemOf reads the problem an answer's meta names. The value is a
-// ConfigProblem where the error was built and a plain string once it has
-// crossed a JSON boundary, so both are read.
-func ConfigProblemOf(meta herr.M) ConfigProblem {
-	switch v := meta["problem"].(type) {
-	case ConfigProblem:
-		return v
-	case string:
-		return ConfigProblem(v)
-	}
-	return ""
+// configProblemOf reads the problem an answer's meta names. Both producers
+// write it as a plain string, which is also what survives a JSON boundary.
+func configProblemOf(meta herr.M) ConfigProblem {
+	problem, _ := meta["problem"].(string)
+	return ConfigProblem(problem)
 }
 
 // maxTips mirrors MAX_TIPS in

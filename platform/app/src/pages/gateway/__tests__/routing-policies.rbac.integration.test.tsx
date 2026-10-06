@@ -141,8 +141,7 @@ describe("routing policies page access", () => {
   describe("when the server refuses the policy list for a missing grant", () => {
     /** @scenario "A refused policy list reads as no access, not as a failed load" */
     it("names the grant and shows neither a load error nor the table", () => {
-      // Held on a project, which opens the page; the list is read at the
-      // organization, where this viewer holds nothing.
+      // The page guard passes; the refusal is the server's answer to the list.
       harness.permissions = ["organization:view", "routingPolicies:view"];
       harness.listError = {
         data: {
