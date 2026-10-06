@@ -179,6 +179,10 @@ export class ScenarioExecutionPrefetcherService {
           if (!project.success || apiKey === undefined) {
             return null;
           }
+          // A voice child needs the caller's keys, which arrive with the prefetched data.
+          if (target.type === "voice") {
+            return null;
+          }
 
           return {
             labels: scenario.config.labels,

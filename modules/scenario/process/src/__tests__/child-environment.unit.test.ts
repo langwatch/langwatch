@@ -54,6 +54,31 @@ describe("buildChildEnvironment", () => {
     });
   });
 
+  describe("given a prepared voice run with caller env keys and a prepared non-voice run", () => {
+    /** @scenario The caller voice keys reach the child env only for a voice target */
+    it("gives the voice child the caller OpenAI key and the non-voice child none", () => {
+      const callerEnv = { OPENAI_API_KEY: "sk-caller-openai" };
+
+      const voice = buildChildEnvironment({
+        config,
+        jobData: jobData("voice"),
+        labels: [],
+        telemetry,
+        callerEnv,
+      });
+      const nonVoice = buildChildEnvironment({
+        config,
+        jobData: jobData("http"),
+        labels: [],
+        telemetry,
+        callerEnv,
+      });
+
+      expect(voice.OPENAI_API_KEY).toBe("sk-caller-openai");
+      expect(nonVoice.OPENAI_API_KEY).toBeUndefined();
+    });
+  });
+
   describe("given a voice target whose worker has no public origin", () => {
     it("forwards the reason the phone run names", () => {
       const result = buildChildEnvironment({

@@ -2747,6 +2747,24 @@ describe("prefetchWithFixture, when the target is a voice agent", () => {
     });
   });
 
+  describe("given a voice target", () => {
+    it("announces no early child environment, since the caller keys arrive with the data", async () => {
+      const deps = createMockDeps({
+        agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
+      });
+      const observeChildEnvironment = vi.fn();
+
+      await prefetchScenarioData({
+        context: defaultContext,
+        target: voiceTarget,
+        deps,
+        observeChildEnvironment,
+      });
+
+      expect(observeChildEnvironment).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given the project has no OpenAI provider", () => {
     it("carries an empty caller env", async () => {
       const deps = createMockDeps({

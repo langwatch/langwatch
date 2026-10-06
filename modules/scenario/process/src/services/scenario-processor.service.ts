@@ -215,6 +215,9 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
         environment: {
           labels: prefetch.data.scenario.labels,
           telemetry: prefetch.telemetry,
+          ...(prefetch.data.adapterData.type === "voice"
+            ? { callerEnv: prefetch.data.adapterData.callerEnv }
+            : {}),
         },
       });
     }

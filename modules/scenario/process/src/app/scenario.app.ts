@@ -1191,6 +1191,8 @@ export interface CancellationSubscriber {
 export interface ScenarioChildEnvironment {
   labels: string[];
   telemetry: { endpoint: string; apiKey: string };
+  /** The caller's provider keys for a voice target's TTS and transcription; never logged. */
+  callerEnv?: Record<string, string>;
 }
 
 export interface ScenarioChildExecutionSession {
