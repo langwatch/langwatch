@@ -66,7 +66,11 @@ class StubRepository implements UserRepository {
   create = vi.fn(async () => user);
   updateProfile = vi.fn(async () => user);
   findAccountInfo = vi.fn(async () => ({ createdAt: user.createdAt }));
-  createCredentialUser = vi.fn(async () => ({ id: user.id }));
+  createCredentialUser = vi.fn(async () => ({
+    id: user.id,
+    accountId: "acc_1",
+    accountCreatedAtMs: 0,
+  }));
   createPasskeyUser = vi.fn(async () => ({ id: user.id }));
   hasPassword = vi.fn(async () => true);
   setFirstPassword = vi.fn(async () => "set" as const);

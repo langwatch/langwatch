@@ -48,7 +48,7 @@ import {
   type UserUsageCount,
 } from "@langwatch/user-contract";
 
-import type { UserRepository } from "../repositories/user.repository.ts";
+import type { CreatedCredentialUser, UserRepository } from "../repositories/user.repository.ts";
 import type { UserAvatarStorage } from "./user-avatar-object.service.ts";
 import { UserAvatarCodecService } from "./user-avatar.service.ts";
 import type { UserLifecycleNoticeService } from "./user-lifecycle-notice.service.ts";
@@ -175,7 +175,7 @@ export class UserService {
     return this.repository.create(createUserInputSchema.parse(input));
   }
 
-  createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser> {
+  createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedCredentialUser> {
     return this.repository.createCredentialUser({
       ...createCredentialUserInputSchema.parse(input),
       issuer: this.credentialIssuer,
@@ -185,7 +185,7 @@ export class UserService {
 
   /** The account a spent mailbox proof earned: born confirmed, as the proof confirmed
    *  the address. */
-  createConfirmedCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser> {
+  createConfirmedCredentialUser(input: CreateCredentialUserInput): Promise<CreatedCredentialUser> {
     return this.repository.createCredentialUser({
       ...createCredentialUserInputSchema.parse(input),
       issuer: this.credentialIssuer,

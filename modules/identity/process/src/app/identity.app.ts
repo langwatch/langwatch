@@ -139,6 +139,7 @@ import {
   IDENTITY_LATCH_CACHE_TTL_MS,
 } from "../services/per-subject-cached-latch.service.ts";
 import { SessionClaimsService } from "../services/session-claims.service.ts";
+import { SignUpIdentifierService } from "../services/sign-up-identifier.service.ts";
 import { SignInAccountLookupService } from "../services/signin-account-lookup.service.ts";
 import { SignInRouterService } from "../services/signin-router.service.ts";
 import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
@@ -211,6 +212,7 @@ type IdentityAppParts = {
   sessionClaims: SessionClaimsService;
   microsoftAccountRekey: MicrosoftAccountRekeyService;
   newbornSweep: IdentityNewbornReconciliationService;
+  signUpIdentifiers: SignUpIdentifierService;
   backfill: IdentityBackfillService;
   secrets: IdentitySecretCarryService;
   ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService;
@@ -501,6 +503,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       clock: { now: () => nowInstant().epochMilliseconds, newCommandId: newIdentityCommandId },
     });
     const newbornSweep = IdentityNewbornReconciliationService.create({ reservations });
+    const signUpIdentifiers = SignUpIdentifierService.create({ identity });
     const secrets = IdentitySecretCarryService.create(setup.repositories.secretCarry);
     const backfill = IdentityBackfillService.create({
       reads: setup.repositories.backfill,
@@ -518,8 +521,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       offersPasskeys: () => setup.dependencies.auth.offersPasskeys(),
       issuesOwnPasswords: () => setup.dependencies.auth.issuesOwnPasswords(),
       selfHosted: () => !setup.config.isSaas,
-      // No AuthApi read carries auth's mounted social set yet (restore-auth-rows, Risks R1).
-      mountedSocialMethodIds: () => [],
+      mountedSocialMethodIds: () => setup.dependencies.auth.findMountedSocialMethodIds(),
     });
     const passwordDoor = passwordDoorMounted(signInMethodPolicy);
     const holderCanWalkIn = breakGlassEligibility(
@@ -727,6 +729,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       breakGlass: setup.repositories.ssoBreakGlass,
       activity: setup.repositories.ssoMigrationEvidence,
       migrations: ssoMigrationProgress,
+      entitled: async ({ organizationId }) =>
+        isEnterpriseTier(
+          (await setup.dependencies.entitlements.getActivePlan({ organizationId })).type,
+        ),
     });
     const auth = setup.dependencies.auth;
     const resolveAuthProvider = () => auth.resolveAuthProvider();
@@ -808,6 +814,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
         accounts: setup.repositories.accountRekey,
       }),
       newbornSweep,
+      signUpIdentifiers,
       backfill,
       secrets,
       ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService.create(
@@ -1081,6 +1088,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
 
   newbornSweep(): IdentityNewbornReconciliationService {
     return this.#parts.newbornSweep;
+  }
+
+  signUpIdentifiers(): SignUpIdentifierService {
+    return this.#parts.signUpIdentifiers;
   }
 
   userMigrations(): readonly SystemMigration[] {

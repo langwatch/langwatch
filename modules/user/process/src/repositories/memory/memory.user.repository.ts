@@ -27,6 +27,7 @@ import {
 
 import type {
   CreateCredentialUserRow,
+  CreatedCredentialUser,
   CreatePasskeyUserRow,
   SetFirstUserPasswordRow,
   UserDeactivationOutcome,
@@ -96,19 +97,23 @@ export class MemoryUserRepository implements UserRepository {
     return userProfileSchema.parse(profileOf(row));
   }
 
-  async createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedUser> {
+  async createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser> {
     const row = this.#insertUser({
       name: input.name,
       email: input.email,
       emailVerified: input.emailVerified,
     });
-    this.#insertCredentialAccount({
+    const accountId = this.#insertCredentialAccount({
       userId: row.id,
       issuer: input.issuer,
       password: input.passwordHash,
     });
 
-    return createdUserSchema.parse({ id: row.id });
+    return {
+      ...createdUserSchema.parse({ id: row.id }),
+      accountId,
+      accountCreatedAtMs: nowInstant().epochMilliseconds,
+    };
   }
 
   async createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser> {
@@ -345,9 +350,10 @@ export class MemoryUserRepository implements UserRepository {
     userId: string;
     issuer: string;
     password: string | null;
-  }): void {
+  }): string {
+    const id = generate(USER_ACCOUNT_KSUID_RESOURCE).toString();
     this.#database.writeAccount({
-      id: generate(USER_ACCOUNT_KSUID_RESOURCE).toString(),
+      id,
       userId: input.userId,
       type: CREDENTIAL_PROVIDER,
       provider: CREDENTIAL_PROVIDER,
@@ -355,6 +361,7 @@ export class MemoryUserRepository implements UserRepository {
       providerAccountId: input.userId,
       password: input.password,
     });
+    return id;
   }
 }
 
