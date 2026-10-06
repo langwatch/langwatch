@@ -4514,6 +4514,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../../packages/design-system
+      '@langwatch/enterprise-scim-contract':
+        specifier: workspace:*
+        version: link:../../scim/contract
       '@langwatch/enterprise-sso-contract':
         specifier: workspace:*
         version: link:../contract
