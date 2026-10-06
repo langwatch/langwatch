@@ -20,6 +20,7 @@ import {
 import { lintClickhouseTableOwnership } from "./persistence/clickhouse-table-ownership.ts";
 import { lintEventingTableAccess } from "./persistence/eventing-table-access.ts";
 import { lintMemoryTwinDrift } from "./persistence/memory-twin-drift.ts";
+import { lintMigrationOwners } from "./persistence/migration-owners.ts";
 import { lintPrismaMigrationAccess } from "./persistence/prisma-migration-access.ts";
 import {
   lintPrismaTableOwnership,
@@ -115,6 +116,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "clickhouse-table-ownership",
     spec: "specs/tooling/lint-clickhouse-table-ownership.feature",
     run: lintClickhouseTableOwnership,
+  }),
+  definePolicy({
+    id: "migration-owners",
+    spec: "specs/migration-owners.feature",
+    run: lintMigrationOwners,
   }),
   definePolicy({
     id: "prisma-migration-access",
