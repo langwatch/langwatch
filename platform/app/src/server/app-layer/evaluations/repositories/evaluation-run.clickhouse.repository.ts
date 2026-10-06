@@ -74,9 +74,13 @@ export class EvaluationRunClickHouseRepository
 {
   private readonly resolveClient: ClickHouseClientResolver;
   /**
-   * The proof-fenced reader for the reads a trace page reaches (ADR-144
-   * block C). The per-evaluation and per-trace reads still resolve the
-   * tenant's own client by id; they are converted with their callers.
+   * The proof-fenced reader for the trace list's summary read (ADR-144
+   * block C). `queryScheduledAtMs`, `getByEvaluationId` and `findByTraceId`
+   * are not converted: they still resolve the tenant's own client by id
+   * and write their own tenant predicate. Block F converts them together
+   * with their callers; until then the lint gate in
+   * `clients/clickhouse/__tests__/store-call-carries-authorization.unit.test.ts`
+   * names them as not yet converted.
    */
   private readonly clickhouse: AuthorizedClickHouse;
 
