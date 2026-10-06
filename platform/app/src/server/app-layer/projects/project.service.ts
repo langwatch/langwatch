@@ -440,7 +440,33 @@ export class ProjectService {
 
     await this.syncLwqlKeyMapRow(project);
 
+    if (isAggregateProjectKind(project.kind)) {
+      await this.startAggregate({ aggregateProjectId: project.id });
+    }
+
     return project;
+  }
+
+  /**
+   * ADR-144 block E, trigger "rule created": a new aggregate gets its nightly
+   * sweep and its members' shared reads. Awaited, so the creator opens an
+   * aggregate that already reads its members, but it never fails the create:
+   * the row exists, and the sweep retries tonight. Both create paths call
+   * this, the tRPC router included.
+   */
+  async startAggregate({
+    aggregateProjectId,
+  }: {
+    aggregateProjectId: string;
+  }): Promise<void> {
+    if (!this.aggregateReconciler) {
+      logger.warn(
+        { projectId: aggregateProjectId },
+        "no aggregate reconciler is wired; the new aggregate reads no members until one runs",
+      );
+      return;
+    }
+    await this.aggregateReconciler.start({ aggregateProjectId });
   }
 
   /**

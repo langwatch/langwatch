@@ -282,8 +282,22 @@ export async function seedAggregateOrganization(
     makeTeamProject,
     makeAggregate,
     makeApiKey,
-    cleanup: () =>
-      cleanupTestRows(prisma, [
+    cleanup: async () => {
+      // Creating an aggregate schedules its nightly sweep (ADR-144 block E);
+      // those rows are keyed by project id only.
+      const projectIds = (
+        await prisma.project.findMany({
+          where: { team: { organizationId } },
+          select: { id: true },
+        })
+      ).map((project) => project.id);
+      if (projectIds.length > 0) {
+        await cleanupTestRows(prisma, [
+          ["scheduledJob", { projectId: { in: projectIds } }],
+        ]);
+      }
+      await cleanupTestRows(prisma, [
+        ["auditLog", { organizationId }],
         ["grant", { organizationId }],
         ["roleBinding", { organizationId }],
         ["apiKey", { organizationId }],
@@ -296,6 +310,7 @@ export async function seedAggregateOrganization(
         ["organizationUser", { organizationId }],
         ["organization", { id: organizationId }],
         ["user", { email: { contains: ns } }],
-      ]),
+      ]);
+    },
   };
 }

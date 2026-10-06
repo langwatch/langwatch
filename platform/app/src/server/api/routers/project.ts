@@ -267,8 +267,12 @@ export const projectRouter = createTRPCRouter({
       // what the caller holds; no long-lived project key is provisioned.)
 
       // An aggregate owns no traces, so it gets no gateway key whose traces
-      // would land on it (ADR-144 decision 7).
+      // would land on it (ADR-144 decision 7). It does get its members, before
+      // the creator lands on it, and never at the cost of the create.
       if (isAggregate) {
+        await getApp().projects.startAggregate({
+          aggregateProjectId: project.id,
+        });
         return { success: true, projectSlug: project.slug };
       }
 
