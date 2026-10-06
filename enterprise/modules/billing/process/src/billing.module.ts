@@ -21,11 +21,6 @@ import {
 } from "./repositories/redis/redis.billing-organization-cache.repository.ts";
 import { BillableEventsQueryService } from "./services/billable-events-query.service.ts";
 import {
-  DeploymentPlanSourcesService,
-  type DeploymentPlanSources,
-  type DeploymentPlanSourcesOptions,
-} from "./services/deployment-plan-sources.service.ts";
-import {
   StripeUsageReportingBuilder,
   type UsageReportingService,
 } from "./services/usage-reporting.service.ts";
@@ -89,11 +84,4 @@ export function createStripeUsageReporting(options: {
   nodeEnvironment: string | undefined;
 }): UsageReportingService {
   return StripeUsageReportingBuilder.create(options).build();
-}
-
-/** The plan legs this deployment resolves a tier from, in their fixed order. */
-export function createDeploymentPlanSources(
-  options: DeploymentPlanSourcesOptions,
-): DeploymentPlanSources {
-  return DeploymentPlanSourcesService.create(options).sources();
 }

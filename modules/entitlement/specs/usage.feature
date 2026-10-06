@@ -217,7 +217,7 @@ Feature: Entitlement's meters, decisions and who learns them
   # --- Stored names ---------------------------------------------------------------
   # Event types become lw.entitlement.* (Alex, 2026-10-06, night); stored lw.usage.* still reads.
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: A stored usage event reads as its entitlement event type
     Given a month_counted event stored as lw.usage.month_counted before the rename
     When the event is read back or delivered after the rename

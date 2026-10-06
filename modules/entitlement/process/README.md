@@ -109,19 +109,20 @@ Declared at `src/eventing/entitlement-usage-warning.pipeline.ts:31`.
 | --------------- | ------------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | process manager | `entitlementUsageWarningSweep` | every 1 d (`USAGE_WARNING_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/entitlement-usage-warning.pipeline.ts:36` |
 
-### Pipeline `usage` (aggregate `usage_organization`)
+### Pipeline `entitlement` (aggregate `entitlement_organization`)
 
-Declared at `src/eventing/usage.pipeline.ts:67`. Events: `monthCountedEventSchema`, `limitReachedEventSchema`, `limitClearedEventSchema`.
+Declared at `src/eventing/usage.pipeline.ts:73`. Events: `monthCountedEventSchema`, `limitReachedEventSchema`, `limitClearedEventSchema`.
 
-The chain builds early when `!meterStores` (`src/eventing/usage.pipeline.ts:85`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
+The chain builds early when `!meterStores` (`src/eventing/usage.pipeline.ts:109`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
 
 | Kind                  | Name                                                                         | Handles                                     | Declared at                          | Built                |
 | --------------------- | ---------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------ | -------------------- |
-| command               | –                                                                            | –                                           | `src/eventing/usage.pipeline.ts:72`  | always               |
-| command               | `recordLimitDecision`                                                        | –                                           | `src/eventing/usage.pipeline.ts:84`  | always               |
-| process manager       | `refusedOrganizations`                                                       | intents `countMonth`, `recordLimitDecision` | `src/eventing/usage.pipeline.ts:87`  | past the early build |
-| global map projection | `≈ BillableEventsMeterProjection.create(meterStores.billableEvents).build()` | –                                           | `src/eventing/usage.pipeline.ts:98`  | past the early build |
-| global map projection | `≈ TraceMeterProjection.create(meterStores.traces).build()`                  | –                                           | `src/eventing/usage.pipeline.ts:102` | past the early build |
+| command               | –                                                                            | –                                           | `src/eventing/usage.pipeline.ts:96`  | always               |
+| command               | `recordLimitDecision`                                                        | –                                           | `src/eventing/usage.pipeline.ts:108` | always               |
+| process manager       | `refusedOrganizations`                                                       | intents `countMonth`, `recordLimitDecision` | `src/eventing/usage.pipeline.ts:111` | past the early build |
+| upcasts               | –                                                                            | –                                           | `src/eventing/usage.pipeline.ts:79`  | always               |
+| global map projection | `≈ BillableEventsMeterProjection.create(meterStores.billableEvents).build()` | –                                           | `src/eventing/usage.pipeline.ts:122` | past the early build |
+| global map projection | `≈ TraceMeterProjection.create(meterStores.traces).build()`                  | –                                           | `src/eventing/usage.pipeline.ts:126` | past the early build |
 
 ## Configuration
 

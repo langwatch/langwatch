@@ -23,7 +23,7 @@ export class CountMonthCommand implements CommandHandler<
   UsageEvent
 > {
   static readonly schema = defineCommandSchema(
-    "lw.usage.count_month",
+    "lw.entitlement.count_month",
     countMonthCommandDataSchema,
     "Count an organization's month",
   );
@@ -69,7 +69,7 @@ export class RecordLimitDecisionCommand implements CommandHandler<
   UsageEvent
 > {
   static readonly schema = defineCommandSchema(
-    "lw.usage.record_limit_decision",
+    "lw.entitlement.record_limit_decision",
     recordLimitDecisionCommandDataSchema,
     "Record a usage limit decision",
   );

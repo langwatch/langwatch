@@ -6,7 +6,7 @@ The server half of [billing](../README.md). Billing: subscriptions, invoices and
 
 ## Installation
 
-`defineProcessModule("billing").withRepositories(billingRepositories).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withTasks(…)`, `src/billing.module.ts:42`.
+`defineProcessModule("billing").withRepositories(billingRepositories).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withTasks(…)`, `src/billing.module.ts:37`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -199,10 +199,10 @@ Declared at `src/eventing/billing-lifecycle.pipeline.ts:57`. Events: `subscripti
 
 Declared at `src/eventing/billing-reporting.pipeline.ts:72`.
 
-| Kind            | Name                | Handles                                                                                | Declared at                                     |
-| --------------- | ------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| command         | –                   | –                                                                                      | `src/eventing/billing-reporting.pipeline.ts:79` |
-| peer subscriber | `usageMonthCounted` | `lw.usage.month_counted` from [entitlement](../../../../modules/entitlement/README.md) | `src/eventing/billing-reporting.pipeline.ts:93` |
+| Kind            | Name                | Handles                                                                                      | Declared at                                     |
+| --------------- | ------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| command         | –                   | –                                                                                            | `src/eventing/billing-reporting.pipeline.ts:79` |
+| peer subscriber | `usageMonthCounted` | `lw.entitlement.month_counted` from [entitlement](../../../../modules/entitlement/README.md) | `src/eventing/billing-reporting.pipeline.ts:93` |
 
 ### Pipeline `connected_billing` (aggregate `global`)
 

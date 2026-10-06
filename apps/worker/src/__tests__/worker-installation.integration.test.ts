@@ -328,7 +328,9 @@ describe("the worker process installation", () => {
     const { runtime, eventing } = await bootWorker({ saas: true });
 
     try {
-      const usage = eventing.definitions.find((definition) => definition.metadata.name === "usage");
+      const usage = eventing.definitions.find(
+        (definition) => definition.metadata.name === "entitlement",
+      );
       expect(
         usage?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
       ).toEqual(["orgBillableEventsMeter", "usageTraceMeter"]);

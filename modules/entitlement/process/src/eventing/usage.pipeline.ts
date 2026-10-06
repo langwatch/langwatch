@@ -1,4 +1,9 @@
-import { USAGE_PIPELINE_NAME } from "@langwatch/entitlement-contract";
+import {
+  USAGE_LIMIT_CLEARED_EVENT_TYPE,
+  USAGE_LIMIT_REACHED_EVENT_TYPE,
+  USAGE_MONTH_COUNTED_EVENT_TYPE,
+  USAGE_PIPELINE_NAME,
+} from "@langwatch/entitlement-contract";
 import {
   type AppendStore,
   defineAggregate,
@@ -31,6 +36,7 @@ import {
   monthCountedEventSchema,
   type RecordLimitDecisionCommandData,
   recordLimitDecisionCommandDataSchema,
+  USAGE_AGGREGATE_TYPE,
   type UsageEvent,
 } from "./usage.events.ts";
 
@@ -66,9 +72,27 @@ export function buildUsagePipeline({
 }): UsagePipelineDefinition {
   const pipeline = definePipeline({
     name: USAGE_PIPELINE_NAME,
-    aggregate: defineAggregate({ type: "usage_organization" }),
+    aggregate: defineAggregate({ type: USAGE_AGGREGATE_TYPE }),
   })
     .withEvents([monthCountedEventSchema, limitReachedEventSchema, limitClearedEventSchema])
+    // Usage's stored names (Alex, 2026-10-06); jobs queued under `usage:` drain into these lanes.
+    .withUpcasts({
+      events: [
+        {
+          from: { type: "lw.usage.month_counted", aggregateType: "usage_organization" },
+          to: USAGE_MONTH_COUNTED_EVENT_TYPE,
+        },
+        {
+          from: { type: "lw.usage.limit_reached", aggregateType: "usage_organization" },
+          to: USAGE_LIMIT_REACHED_EVENT_TYPE,
+        },
+        {
+          from: { type: "lw.usage.limit_cleared", aggregateType: "usage_organization" },
+          to: USAGE_LIMIT_CLEARED_EVENT_TYPE,
+        },
+      ],
+      drain: { pipeline: "usage" },
+    })
     .withCommandInstance({
       name: "countMonth",
       handlerClass: CountMonthCommand,

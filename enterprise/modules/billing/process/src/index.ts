@@ -67,7 +67,6 @@ export type { BillableEventsWindow } from "./repositories/billable-events.reposi
 export {
   createBillableEventsQuery,
   createBillingOrganizationCache,
-  createDeploymentPlanSources,
   createStripeUsageReporting,
 } from "./billing.module.ts";
 export type { BillingSubscriptionRepository } from "./repositories/subscription.repository.ts";
@@ -80,10 +79,6 @@ export type {
   LicenseUnlockedFeatures,
 } from "./services/license-purchase.service.ts";
 export type { UsageLimitEmailData } from "./services/billing-usage-notice.service.ts";
-export type {
-  DeploymentPlanSources,
-  DeploymentPlanSourcesOptions,
-} from "./services/deployment-plan-sources.service.ts";
 export type { CheckoutCurrencyResolution } from "./services/stripe-customer-currency.service.ts";
 export type { SubscriptionItemUpdate } from "./services/subscription-item-calculator.service.ts";
 export type {

@@ -10,7 +10,7 @@ import {
 import { EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
 
-export const USAGE_AGGREGATE_TYPE = "usage_organization" as const;
+export const USAGE_AGGREGATE_TYPE = "entitlement_organization" as const;
 export const USAGE_EVENT_VERSION = "2026-10-01" as const;
 
 export const monthCountedEventSchema = z.object({

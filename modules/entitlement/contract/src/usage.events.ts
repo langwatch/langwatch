@@ -2,11 +2,12 @@ import { z } from "zod";
 
 import { usageUnitSchema } from "./usage.ts";
 
-/** The metering pipeline and the facts it records; peers subscribe to them, none asks (§3). */
-export const USAGE_PIPELINE_NAME = "usage" as const;
-export const USAGE_MONTH_COUNTED_EVENT_TYPE = "lw.usage.month_counted" as const;
-export const USAGE_LIMIT_REACHED_EVENT_TYPE = "lw.usage.limit_reached" as const;
-export const USAGE_LIMIT_CLEARED_EVENT_TYPE = "lw.usage.limit_cleared" as const;
+/** The metering pipeline and the facts it records; peers subscribe to them, none asks (§3).
+ * Stored as `lw.usage.*` before the rename; the pipeline upcasts those (Alex, 2026-10-06). */
+export const USAGE_PIPELINE_NAME = "entitlement" as const;
+export const USAGE_MONTH_COUNTED_EVENT_TYPE = "lw.entitlement.month_counted" as const;
+export const USAGE_LIMIT_REACHED_EVENT_TYPE = "lw.entitlement.limit_reached" as const;
+export const USAGE_LIMIT_CLEARED_EVENT_TYPE = "lw.entitlement.limit_cleared" as const;
 
 /** A UTC calendar month, `YYYY-MM`, as billing's checkpoints key it. */
 export const usageMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
