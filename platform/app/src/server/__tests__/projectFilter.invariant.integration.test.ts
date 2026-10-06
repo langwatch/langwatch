@@ -77,6 +77,7 @@ let aggregateProjectId: string;
 let userId: string;
 let memberUserId: string;
 let developerUserId: string;
+let externalUserId: string;
 let caller: ReturnType<typeof appRouter.createCaller>;
 
 /** The `ReadCtx` the three settings snapshots take, as their router builds it. */
@@ -598,6 +599,7 @@ beforeAll(async () => {
     "developer",
     OrganizationUserRole.DEVELOPER,
   );
+  externalUserId = await onTheTeam("external", OrganizationUserRole.EXTERNAL);
 
   caller = appRouter.createCaller(
     createInnerTRPCContext({
@@ -634,7 +636,12 @@ afterAll(async () => {
     ],
     ["team", { id: teamId }],
     ["organization", { id: organizationId }],
-    ["user", { id: { in: [userId, memberUserId, developerUserId] } }],
+    [
+      "user",
+      {
+        id: { in: [userId, memberUserId, developerUserId, externalUserId] },
+      },
+    ],
   ]);
 });
 
@@ -940,6 +947,11 @@ describe("the aggregate project as a non-admin sees it", () => {
         "a member holding only a Developer seat",
         () => developerUserId,
         OrganizationUserRole.DEVELOPER,
+      ],
+      [
+        "an external collaborator",
+        () => externalUserId,
+        OrganizationUserRole.EXTERNAL,
       ],
     ])("keeps it out of every project list %s can open", async (_who, personId, role) => {
       const leaked: string[] = [];

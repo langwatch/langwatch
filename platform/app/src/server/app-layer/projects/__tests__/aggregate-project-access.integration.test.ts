@@ -11,7 +11,11 @@
 import { TRPCError } from "@trpc/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { resolveLwqlQueryScope } from "~/app/api/query/[[...route]]/queryScope";
-import type { Project } from "~/generated/prisma/client";
+import {
+  OrganizationUserRole,
+  type Project,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
@@ -295,6 +299,38 @@ describe("Feature: only organisation admins open an aggregate project", () => {
         expect(toMember).not.toContain(aggregate.id);
         expect(await callerScope(null)).not.toContain(aggregate.id);
         expect(await callerScope(fixture.admin.id)).toContain(aggregate.id);
+      });
+    });
+  });
+
+  describe("given an external collaborator put on the aggregate's team", () => {
+    let externalId: string;
+
+    beforeAll(async () => {
+      externalId = (
+        await fixture.makeUser({
+          handle: "external",
+          organizationRole: OrganizationUserRole.EXTERNAL,
+          teamRole: TeamUserRole.ADMIN,
+        })
+      ).id;
+    });
+
+    describe("when they open the aggregate by id", () => {
+      it("is refused", async () => {
+        await expect(
+          callerFor(externalId).project.getHasFirstMessage({
+            projectId: aggregate.id,
+          }),
+        ).rejects.toBeInstanceOf(TRPCError);
+      });
+    });
+
+    describe("when they list the projects they can open", () => {
+      it("does not list the aggregate", async () => {
+        expect(
+          await listedProjectIds(externalId, fixture.organizationId),
+        ).not.toContain(aggregate.id);
       });
     });
   });
