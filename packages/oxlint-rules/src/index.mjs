@@ -37,6 +37,7 @@ import { moduleClassesRule } from "./rules/module-classes.rule.mjs";
 import { moduleLayersRule } from "./rules/module-layers.rule.mjs";
 import { namespaceClassRule } from "./rules/namespace-class.rule.mjs";
 import { noAliasReexportRule } from "./rules/no-alias-reexport.rule.mjs";
+import { noAmbientContextRule } from "./rules/no-ambient-context.rule.mjs";
 import { noBootHookOutsideGuardRule } from "./rules/no-boot-hook-outside-guard.rule.mjs";
 import { noFormWatchInChildRule } from "./rules/no-form-watch-in-child.rule.mjs";
 import { noHandRolledPlanGateRule } from "./rules/no-hand-rolled-plan-gate.rule.mjs";
@@ -117,6 +118,7 @@ const HOUSE_RULES = [
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
+  noAmbientContextRule,
   noInlineDynamicImportRule,
   noLoggerSpyRule,
   noPortVocabularyRule,
@@ -209,6 +211,7 @@ export {
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
+  noAmbientContextRule,
   noInlineDynamicImportRule,
   noLoggerSpyRule,
   noPortVocabularyRule,

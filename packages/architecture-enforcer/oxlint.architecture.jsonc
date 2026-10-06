@@ -54,6 +54,7 @@
     "langwatch/namespace-class": "error",
     "langwatch/no-alias-reexport": "error",
     "langwatch/no-boot-hook-outside-guard": "error",
+    "langwatch/no-ambient-context": "error",
     "langwatch/no-inline-dynamic-import": "error",
     "langwatch/no-logger-spy": "error",
     "langwatch/no-port-vocabulary": "error",
