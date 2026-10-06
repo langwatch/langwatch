@@ -67,6 +67,17 @@ describe("readOtlpBody magic-byte detection", () => {
         expect(names).toEqual(["test-span"]);
       });
     });
+
+    describe("when Content-Encoding is an unsupported encoding", () => {
+      /** @scenario A zstd body under an unsupported encoding is accepted */
+      it("reads the span", async () => {
+        const names = await spanNamesFrom(
+          makeRequest(body, { "content-encoding": "snappy" }),
+        );
+
+        expect(names).toEqual(["test-span"]);
+      });
+    });
   });
 
   describe("given a gzip-compressed trace export", () => {

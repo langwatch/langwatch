@@ -24,6 +24,11 @@ Feature: OTLP body compression is recognised from the bytes, not only the header
     When an exporter sends a zstd-compressed trace export declared as zstd
     Then the spans in the export are read
 
+  @unit
+  Scenario: A zstd body under an unsupported encoding is accepted
+    When an exporter sends a zstd-compressed trace export declared as snappy
+    Then the spans in the export are read
+
   @unit @regression
   Scenario: A gzip body under a wrong or unsupported encoding is accepted
     When an exporter sends a gzip-compressed trace export declared as deflate, br or snappy
