@@ -52,6 +52,13 @@ const STATUS_CIRCLE_COLORS: Record<string, string> = {
   [ScenarioRunStatus.RUNNING]: "orange.400",
 };
 
+/** The row's latency: the agent's average turn as the metrics pill reads it, else the duration. */
+function rowLatencyMs(scenarioRun: ScenarioRunData): number {
+  const agentLatencies = scenarioRun.roleLatencies?.Agent ?? [];
+  if (agentLatencies.length === 0) return scenarioRun.durationInMs;
+  return agentLatencies.reduce((sum, latency) => sum + latency, 0) / agentLatencies.length;
+}
+
 function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
   const roleCosts = scenarioRun.roleCosts ?? {};
   const roleLatencies = scenarioRun.roleLatencies ?? {};
@@ -163,7 +170,8 @@ export function ScenarioTargetRow({
   const config = SCENARIO_RUN_STATUS_CONFIG[scenarioRun.status];
 
   const hasCancelButton = onCancel && isCancellableStatus(scenarioRun.status);
-  const hasMetrics = scenarioRun.durationInMs > 0 || scenarioRun.totalCost != null;
+  const latencyMs = rowLatencyMs(scenarioRun);
+  const hasMetrics = latencyMs > 0 || scenarioRun.totalCost != null;
   const handlePrefetch = () => onPrefetch?.();
 
   const content = (
@@ -257,9 +265,7 @@ export function ScenarioTargetRow({
             interactive
           >
             <HStack position="relative" zIndex={1} gap={2} flexShrink={0} color="fg.subtle">
-              {scenarioRun.durationInMs > 0 && (
-                <Text fontSize="11px">{formatLatency(scenarioRun.durationInMs)}</Text>
-              )}
+              {latencyMs > 0 && <Text fontSize="11px">{formatLatency(latencyMs)}</Text>}
               {scenarioRun.totalCost != null && (
                 <>
                   <Text color="gray.300">{"⋅"}</Text>
