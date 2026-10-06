@@ -36,8 +36,9 @@ Each rule lives in the record or an ADR; this table only points at it.
 | Rule                                                                                                                                           | Source                                          |
 | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
 | Derived from `ContractApiMap<typeof <name>Trpc>`, never hand-written, never `AppRouter`                                                        | ADR-130 (`130-the-api-router-type-is-declared`) |
-| Holds the derived hooks plus a few thin ones, never a component                                                                                | §3.4                                            |
-| Imports its own contract and `@langwatch/api/web` only; a two-module hook lives in the screen                                                  | §3.4                                            |
+| Holds the derived hooks plus a few thin ones and the owner's lent tokens, never a component                                                    | §3.4, §10.1                                     |
+| Imports its own contract, `@langwatch/api/web`, `@langwatch/browser-host` and React only; a two-module hook lives in the screen                | §2, §3.4                                        |
+| Read only by browser packages and apps/ui; the linters' `client` role refuses any other reader                                                 | §2, §17                                         |
 | One call per request over `httpLink`; no batching, the server refuses it                                                                       | §10                                             |
 | Every read is mirrored to disk by default (`UI_QUERY_MIRROR_EXCLUDED` names the exceptions); no per-read `staleTime`; no credential in a query | §10, §10.2                                      |
 | One entity, one key: opaque id plus tenant scope; hints never enter a key                                                                      | §10.2                                           |
@@ -79,7 +80,8 @@ evaluator, prompt and scenario have one.
 - **Importing another module's `-browser` package for its hook.** It is closed.
   Use its client.
 - **Putting a component in a client** because two modules want it. It goes to
-  `design-system` taking props or a query result, or the owner lends it by token.
+  `design-system` taking props or a query result, or the owner lends it by a token
+  declared in its client (§10.1).
 - **Copying server data into `useState` or a store.** It stays in React Query
   (`query-data-in-state` lint, ADR-169).
 - **Calling a procedure by path from a typed hook's key.** A surface too wide

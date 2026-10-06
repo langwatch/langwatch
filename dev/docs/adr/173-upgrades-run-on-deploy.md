@@ -88,6 +88,47 @@ removes is unread from the floor up (rethink 6.12), and cloud waits for the same
 floor as self-hosted. There is no cloud-only early contract, so a cloud rollback
 always lands within the window.
 
+### 5. Rulings since the proposal (Alex, 2026-10-06, rounds 8 to 17)
+
+Source: `.claude/coordinator/rulings-2026-10-06-rounds.md`. Each line is Alex's answer.
+
+- **Kept as built** (round 11): one ledger keyed by step id and target (D1); the runner-owned
+  presence table, with `minimumWriterGeneration` as an override (D2); the child table
+  `_langwatch_upgrade_target` for per-target status (D4); the `withUpgradeGate` preamble step in
+  `packages/process` for api and worker, which also writes presence (D5).
+- **Guards and gates** (round 12): the migration guard refuses lock-heavy shapes and sessions set
+  `lock_timeout` (D6); all four CI gates stay (D7); contract steps wait for the floor on cloud too
+  (D8); manifests and the floor live in `packages/upgrade/releases/` (D9).
+- **Floor** (round 13): the first LTS floor is the newest release at merge (D10); collisions are
+  handled by keys and the migration-order check, with no checksum file (D11); a serving process
+  refuses to start below the ledger's floor, and level-triggered background steps re-run after a
+  rollback and re-upgrade (Q-U5).
+- **Who runs** (round 14): the framework runs; ops reads and requests (Q-U8, UP-3; the record's §7
+  is amended). `imageSteps` is exported from the `@langwatch/upgrade` package root. Every step
+  carries a required one-line description (Q-U11). Every ClickHouse target runs, then a failed
+  target fails the release (S4-TARGETS).
+- **Declaring steps** (round 15): a checkpoint is `{ resumeFrom, save({ report }) }`; upcasts are
+  declared with `.withUpcasts` on the owning pipeline and recorded as their own `event-upcast` kind;
+  step checks stay as built.
+- **Upcasts** (round 16): ids read `upcast:<pipeline>:<stored type>` (UP-2); the rewrite copies and
+  deletes originals at the floor (UP-4); a lint names drains older than one release (UP-5); a fresh
+  install plans upcast steps by their mode.
+- **The Upgrades surface** (rounds 8, 10, 13 and 17): six `OpsApi` reads (status, releases, steps,
+  step, runs, run) over an ops service on the upgrade reader (U2-API), renamed to `ops.upgrade.*`
+  with no aliases, a wire difference accepted (Q-U9); the runner raises a read hint the api relays,
+  and the page refreshes on it without polling (U2-LIVE); platform operators only, no organisation
+  surface (Q-U10). An empty ledger is an eighth state, "never upgraded" (U1-a); a run with no finish
+  time reads Upgrading until the lease table lands (U1-b); the reader refuses with `HandledError`,
+  `packages/upgrade` taking that dependency (U1-c); a refused upgrade is a failed run with
+  `report.refused` (S3-REFUSED-RUN).
+- **The run itself** (round 9): phases are written into the run report in a fixed shape the reader
+  parses, with no new table (U2-PHASES); a serving process stops serving once its last good presence
+  write is older than the stale bound, 60 s; a rollback is detected from presence, an older image's
+  live row after the last run reopening level-triggered background steps (S3-ROLLBACK).
+- **Fleet and alerts** (round 10): cloud regions send the same usage report as self-hosted installs,
+  so one fleet page shows both (Q-U6); a failed or held upgrade emails platform operators and shows
+  the operator banner, with Slack only where ops' notifier is configured (Q-U7).
+
 ## Alternatives considered
 
 - **Number cloud builds** (a build counter beside the `git-<sha>`). Ordering builds
@@ -107,8 +148,9 @@ always lands within the window.
 - A crashed process looks live until its row is stale, so "old writers gone" is
   late by at most the stale bound. A graceful stop clears its row at once.
 - A process whose refresh keeps failing drops out of presence while still
-  serving, and could release a step early. The serving gate must stop serving
-  when its own presence lapses (held for Alex with the bound itself).
+  serving, and could release a step early. The serving gate stops serving once
+  its last good presence write is older than the stale bound, 60 s (Alex,
+  2026-10-06, round 9).
 - Each process start adds one row and each interval one write. Dead rows stay
   until pruned; they never count as live.
 - Dead columns live up to one LTS cycle on cloud (D8).
