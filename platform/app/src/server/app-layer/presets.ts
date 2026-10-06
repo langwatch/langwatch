@@ -354,6 +354,11 @@ import { permissionsServiceFor } from "./permissions/runtime";
 import { PresenceService } from "./presence/presence.service";
 import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { RedisPresenceRepository } from "./presence/repositories/presence.redis.repository";
+import {
+  AGGREGATE_RECONCILE_SWEEP,
+  AggregateReconciler,
+  aggregateReconcileSweepHandler,
+} from "./projects/aggregate-reconciler.service";
 import { AggregateRuleService } from "./projects/aggregate-rule.service";
 import { ProjectService } from "./projects/project.service";
 import { PrismaAggregateRuleRepository } from "./projects/repositories/aggregate-rule.prisma.repository";
@@ -535,11 +540,25 @@ export function initializeDefaultApp(options?: {
   // One instance, shared with the governance cost screen's metered-lane scope
   // below, so both read projects through the same repository.
   const projectRepository = new PrismaProjectRepository(prisma);
+  const aggregateRuleRepository = new PrismaAggregateRuleRepository(prisma);
+  const aggregateRules = new AggregateRuleService(aggregateRuleRepository);
+  // ADR-144 block E: keeps every aggregate's shared reads in line with its
+  // rule. Its triggers reach it through the project service.
+  const aggregateReconciler = traced(
+    new AggregateReconciler({
+      aggregates: aggregateRuleRepository,
+      rules: aggregateRules,
+      ledger: grantsLedgerWriter,
+      schedule: new PrismaScheduledJobRepository(prisma),
+    }),
+    "AggregateReconciler",
+  );
   const projects = traced(
     new ProjectService(
       projectRepository,
       new LwqlKeyMapClickHouseRepository(resolveClickHouseClient),
-      new AggregateRuleService(new PrismaAggregateRuleRepository(prisma)),
+      aggregateRules,
+      aggregateReconciler,
     ),
     "ProjectService",
   );
@@ -1489,6 +1508,13 @@ export function initializeDefaultApp(options?: {
         }),
     });
 
+    // ADR-144 block E: the nightly sweep, one row per aggregate project,
+    // catches any member change a trigger missed.
+    schedulerRegistry.register({
+      targetType: AGGREGATE_RECONCILE_SWEEP.targetType,
+      handler: aggregateReconcileSweepHandler(aggregateReconciler),
+    });
+
     // ADR-044 durable self-heal: the report upsert route writes the Trigger row
     // and its ScheduledJob in two non-atomic steps, so a crash between them can
     // leave an active report with no schedule. Repair any such gaps at boot
@@ -2325,13 +2351,26 @@ export function createTestApp(overrides?: TestAppOverrides): App {
     "OrganizationService",
   );
   const nullProjectRepository = new NullProjectRepository();
+  // Real rather than doubles: they are Postgres-only, the tRPC create checks
+  // an aggregate's rule through them, and the reconciler writes through the
+  // ledger the test App's event sourcing composes (none, unless supplied).
+  const testAggregateRuleRepository = new PrismaAggregateRuleRepository(
+    testPrisma,
+  );
+  const testAggregateRules = new AggregateRuleService(
+    testAggregateRuleRepository,
+  );
   const nullProjects = traced(
     new ProjectService(
       nullProjectRepository,
       new NullLwqlKeyMapRepository(),
-      // Real rather than a double: it is Postgres-only, and the tRPC create
-      // checks an aggregate's rule through it.
-      new AggregateRuleService(new PrismaAggregateRuleRepository(testPrisma)),
+      testAggregateRules,
+      new AggregateReconciler({
+        aggregates: testAggregateRuleRepository,
+        rules: testAggregateRules,
+        ledger: () => new GrantsLedgerWriter(testPrisma),
+        schedule: new PrismaScheduledJobRepository(testPrisma),
+      }),
     ),
     "ProjectService",
   );

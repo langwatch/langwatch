@@ -17,6 +17,7 @@ import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
+import type { AggregateReconciler } from "./aggregate-reconciler.service";
 import { AGGREGATE_DEFAULT_RULE, type AggregateRule } from "./aggregate-rule";
 import type { AggregateRuleService } from "./aggregate-rule.service";
 import {
@@ -279,6 +280,13 @@ export class ProjectService {
     private readonly lwqlKeyMap?: LwqlKeyMapRepository,
     /** Absent where no aggregate can be created; such a request is refused. */
     private readonly aggregateRules?: AggregateRuleService,
+    /**
+     * ADR-144 block E: keeps aggregates' shared reads in line with their
+     * rules. Public because its other triggers (a personal workspace joining,
+     * a department move) live outside this service and reach it through the
+     * App's project service. Absent where nothing reconciles.
+     */
+    readonly aggregateReconciler?: AggregateReconciler,
   ) {}
 
   async getById(id: string): Promise<Project | null> {
