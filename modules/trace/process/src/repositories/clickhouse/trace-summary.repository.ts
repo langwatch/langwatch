@@ -17,7 +17,7 @@ import {
 } from "../trace-summary-projection.repository.ts";
 import type { FindByTraceIdOptions, TraceSummaryRepository } from "../trace-summary.repository.ts";
 import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
-import { chBoolean, chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
+import { chBoolean, chNumber, chString, chStringMap } from "./stored-span-row.mapper.ts";
 import { createTraceSummaryProjectionId } from "./trace-summary-id.mapper.ts";
 
 /**

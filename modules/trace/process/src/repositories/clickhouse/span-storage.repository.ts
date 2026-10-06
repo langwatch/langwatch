@@ -43,6 +43,9 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contr
 import { z } from "zod";
 
 import {
+  chNumber,
+  chString,
+  chStringMap,
   ensureStringRecord,
   fullSpanRowsSchema,
   mapChRowToNormalized,
@@ -64,7 +67,6 @@ import {
   MAX_EVENT_NAMES_PER_TRACE,
   MAX_LIGHT_SPAN_READ_ROWS,
 } from "../span-storage.repository.ts";
-import { chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
 
 const TABLE_NAME = "stored_spans" as const;
 

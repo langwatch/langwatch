@@ -1,3 +1,4 @@
+import { Kbd } from "@langwatch/design-system/kbd";
 import { Box, Flex, Icon, IconButton, Input, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useDeferredValue, useState } from "react";
@@ -13,6 +14,7 @@ import {
 import { useFindStore } from "../../behavior/find-store.ts";
 import { FindMatchCounter } from "../elements/find-match-counter.tsx";
 import { FindMatchHighlight } from "../elements/find-match-highlight.tsx";
+import { useTraceList } from "./explorer/hooks/use-trace-list.ts";
 
 type TraceFindBarProps = {
   traces: TraceSearchItem[];
@@ -164,4 +166,10 @@ export function TraceFindBar({ traces, renderShortcutKey }: TraceFindBarProps) {
       </Box>
     </>
   );
+}
+
+export function FindBar() {
+  const { data: traces } = useTraceList();
+
+  return <TraceFindBar traces={traces} renderShortcutKey={(label) => <Kbd>{label}</Kbd>} />;
 }

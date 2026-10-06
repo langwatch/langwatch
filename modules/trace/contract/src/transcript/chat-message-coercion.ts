@@ -1,6 +1,5 @@
-import { parseJSON } from "./content-format.ts";
+import { isRecord, parseJSON } from "./content-format.ts";
 import { parseContentBlocks } from "./content-parser.ts";
-import { isRecord } from "./record.ts";
 import type { ChatMessage } from "./types.ts";
 
 const VALID_CHAT_ROLES = new Set(["system", "user", "assistant", "tool", "developer", "function"]);

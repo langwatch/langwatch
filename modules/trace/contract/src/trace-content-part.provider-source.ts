@@ -1,5 +1,13 @@
-import { parseRecord } from "./trace-content-part.record-schema.ts";
+import { z } from "zod";
+
 import type { ContentSource } from "./trace-content-part.types.ts";
+
+const recordSchema = z.record(z.string(), z.unknown());
+
+export function parseRecord(value: unknown): Record<string, unknown> | null {
+  const parsed = recordSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
 
 interface NormalizedMediaPart {
   type: "image" | "audio" | "video" | "document";

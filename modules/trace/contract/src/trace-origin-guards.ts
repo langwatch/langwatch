@@ -1,8 +1,7 @@
 import { nowInstant } from "@langwatch/time";
 
-import { SPAN_RECEIVED_EVENT_TYPE } from "./trace-ingress.constants.ts";
 import type { TraceSummaryData } from "./trace-projection.ts";
-import { ORIGIN_RESOLVED_EVENT_TYPE } from "./trace.constants.ts";
+import { ORIGIN_RESOLVED_EVENT_TYPE, SPAN_RECEIVED_EVENT_TYPE } from "./trace.constants.ts";
 
 const OLD_TRACE_THRESHOLD_MS = 60 * 60 * 1000;
 

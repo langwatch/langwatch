@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { TraceExistenceRepository } from "../trace-existence.repository.ts";
 import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.repository.ts";
-import { chString } from "./clickhouse.trace-row.mapper.ts";
+import { chString } from "./stored-span-row.mapper.ts";
 
 const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
 const totalRowsSchema = z.array(z.looseObject({ Total: chString }));

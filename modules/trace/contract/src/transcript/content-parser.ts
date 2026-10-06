@@ -1,6 +1,5 @@
 import { convertMediaPartToMediaData } from "../trace-media-part.collector.ts";
-import { parseJSON } from "./content-format.ts";
-import { isRecord } from "./record.ts";
+import { isRecord, parseJSON } from "./content-format.ts";
 import type { ChatMessage, ContentBlock } from "./types.ts";
 
 function findJsonObjectEnd(text: string, start: number): number {

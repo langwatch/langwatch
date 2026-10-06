@@ -17,7 +17,7 @@ import {
   type TraceSpanSummaryRecord,
 } from "../trace-projected-read.repository.ts";
 import type { TraceClickHouse } from "./clickhouse.trace-member-client.repository.ts";
-import { chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
+import { chString, chStringMap } from "./stored-span-row.mapper.ts";
 
 const STORED_SPANS_TABLE = "stored_spans";
 const evaluationTraceSpansSchema = evaluationTraceSpanSchema.array();

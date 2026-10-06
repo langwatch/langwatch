@@ -6,6 +6,7 @@ import { useFilterStore } from "../../../../../../../behavior/explorer.store.ts"
 import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
+import { SpanTypeBadge } from "../../../../../../elements/explorer/trace-table/registry/cells/trace/span-type-badge.tsx";
 import type { TraceListItem } from "../../../../types/trace.ts";
 import { StatusIndicator } from "../../../status-row.tsx";
 import type { CellDef } from "../../types.ts";
@@ -111,6 +112,78 @@ export const TokensOutCell = {
   renderComfortable: ({ row }) => (
     <Text textStyle="sm" color="fg.muted" textAlign="right">
       {row.outputTokens != null ? formatTokens(row.outputTokens) : dash}
+    </Text>
+  ),
+} as const satisfies CellDef<TraceListItem>;
+
+export const RootSpanNameCell = {
+  id: "root-span-name",
+  label: "Root span name",
+  render: ({ row }) => (
+    <Text textStyle="sm" color={row.name ? "fg" : "fg.subtle"} fontWeight="500" truncate>
+      {row.name || dash}
+    </Text>
+  ),
+} as const satisfies CellDef<TraceListItem>;
+
+export const RootSpanTypeCell = {
+  id: "root-span-type",
+  label: "Root span type",
+  render: ({ row }) => {
+    const spanType = row.rootSpanType;
+    if (!spanType) {
+      return (
+        <Text textStyle="sm" color="fg.subtle">
+          —
+        </Text>
+      );
+    }
+    return <SpanTypeBadge spanType={spanType} display="inline-block" paddingY={0.5} />;
+  },
+} as const satisfies CellDef<TraceListItem>;
+
+export const ServiceCell = {
+  id: "service",
+  label: "Service",
+  render: ({ row }) => (
+    <MonoCell color="fg.subtle" truncate whiteSpace={undefined}>
+      {row.serviceName || dash}
+    </MonoCell>
+  ),
+  renderComfortable: ({ row }) => (
+    <Text textStyle="sm" color="fg.muted" truncate>
+      {row.serviceName || dash}
+    </Text>
+  ),
+} as const satisfies CellDef<TraceListItem>;
+
+export const SpanCountCell = {
+  id: "spans",
+  label: "Spans",
+  render: ({ row }) => <MonoCell>{row.spanCount.toLocaleString()}</MonoCell>,
+  renderComfortable: ({ row }) => (
+    <Text textStyle="sm" color="fg.muted" textAlign="right">
+      {row.spanCount.toLocaleString()}
+    </Text>
+  ),
+} as const satisfies CellDef<TraceListItem>;
+
+export const TraceIdCell = {
+  id: "trace-id",
+  label: "Trace ID",
+  render: ({ row }) => (
+    <Text textStyle="xs" color="fg.subtle" truncate userSelect="all">
+      {row.traceId}
+    </Text>
+  ),
+} as const satisfies CellDef<TraceListItem>;
+
+export const TraceNameCell = {
+  id: "trace-name",
+  label: "Trace name",
+  render: ({ row }) => (
+    <Text textStyle="sm" color={row.traceName ? "fg" : "fg.subtle"} fontWeight="500" truncate>
+      {row.traceName || dash}
     </Text>
   ),
 } as const satisfies CellDef<TraceListItem>;
