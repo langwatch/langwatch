@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createLedgerTables } from "../../ledger-tables.ts";
 import type { ReleaseTreeSteps } from "../../manifest/stamp.ts";
 import { UPGRADE_COMMAND } from "../serving-gate.ts";
-import { upgradeGateOver } from "../serving-upgrade-gate.ts";
+import { gatePoolConfig, upgradeGateOver } from "../serving-upgrade-gate.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 const PRISMA_FOLDER = "20261006180000_upgrade_ledger_widen";
@@ -106,6 +106,29 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
 
       await gate.release();
       expect(scratch.closed).toBe(true);
+    });
+  });
+
+  describe("given a DATABASE_URL that names the ledger's schema with ?schema=", () => {
+    /** @scenario "The gate reads the ledger in the schema DATABASE_URL names" */
+    it("connects in that schema and admits the api", async () => {
+      await recordSteps({ [PRISMA]: "done", [GOOSE]: "done" });
+      const url = new URL(DB_URL ?? "");
+      url.searchParams.set("schema", scratch.name);
+      const postgres = new pg.Pool(gatePoolConfig({ databaseUrl: url.toString() }));
+      const gate = upgradeGateOver({
+        role: "api",
+        postgres,
+        close: () => postgres.end(),
+        tree: TREE,
+        release: null,
+        withClickHouse: true,
+        processId: "test:api",
+        firstInstall: async () => 1,
+      });
+
+      await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
+      await gate.release();
     });
   });
 

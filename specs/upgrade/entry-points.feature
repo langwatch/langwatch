@@ -74,6 +74,13 @@ Feature: Every entry point runs the upgrade once; serving processes never migrat
     Then it is admitted
 
   @integration
+  Scenario: The gate reads the ledger in the schema DATABASE_URL names
+    Given DATABASE_URL names a schema with `?schema=`, as Prisma's URLs do
+    And the upgrade recorded every blocking step of this image as done in that schema
+    When the api's gate asks
+    Then it reads that schema's ledger and is admitted
+
+  @integration
   Scenario: The api's first boot on an empty installation runs the upgrade once
     Given an empty ledger on an empty schema
     When the api's gate asks

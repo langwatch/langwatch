@@ -95,6 +95,17 @@ export function upgradeGateOver({
   };
 }
 
+/** The gate's one connection, in the schema `?schema=` names, where the runner wrote the ledger. */
+export function gatePoolConfig({ databaseUrl }: { databaseUrl: string }): pg.PoolConfig {
+  const schema = URL.canParse(databaseUrl) ? new URL(databaseUrl).searchParams.get("schema") : null;
+  return {
+    connectionString: databaseUrl,
+    max: 1,
+    allowExitOnIdle: true,
+    ...(schema ? { options: `-c search_path="${schema}"` } : {}),
+  };
+}
+
 /**
  * `withUpgradeGate`'s factory for the api and worker (held question "mig-serving-gate data
  * source", default (a)): one connection of its own from the stores' `DATABASE_URL`, opened only
@@ -113,7 +124,7 @@ export async function servingUpgradeGate({
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
       secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) => {
         if (!database?.trim()) return NO_LEDGER_GATE;
-        const pool = new pg.Pool({ connectionString: database, max: 1, allowExitOnIdle: true });
+        const pool = new pg.Pool(gatePoolConfig({ databaseUrl: database }));
         return upgradeGateOver({
           role,
           postgres: pool,
