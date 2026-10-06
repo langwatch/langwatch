@@ -337,6 +337,9 @@ already have the container". A module class receives `repositories`, `channels`,
 `dependencies`, `config`, `secrets`, `role` and `resources`, never a bag of clients or facts.
 There are no supply tokens and no `.provide`; a test stubs a peer through the module's own test
 seams (§13).
+An installation test hands `bootInstalledProcess({ peers: [testPeer({ token, instance })] })`
+(`@langwatch/process/testing`) a stand-in for each peer it does not install; `package-boundaries`
+refuses that import outside test files.
 
 **Members are removed now** (Alex, 2026-10-05): before other module work, lanes remove `withMember`,
 `app/<f>.members.ts` and `app/<f>-composition.build.ts` (deleted, §15), each member becoming a config leaf, a secret

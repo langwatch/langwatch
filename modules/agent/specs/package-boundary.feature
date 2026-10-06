@@ -178,7 +178,7 @@ Feature: Agents package boundary
     And only header keys and values cross the transport boundary
     And the editor receives the established response, output, error, status, duration, header, rendered body, and warning fields
 
-  @architecture @registration
+  @unit @architecture @registration
   Scenario: Each runtime composes one Agent graph
     Given no Agents installer has been called
     Then importing an Agents package registers no route or background work

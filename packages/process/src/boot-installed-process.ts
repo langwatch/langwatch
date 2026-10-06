@@ -9,6 +9,7 @@ import type {
 } from "./feature-installer.ts";
 import type { MemberSource } from "./module-members.ts";
 import type { ExposedSurface } from "./process-supply.ts";
+import type { TestPeer } from "./testing.ts";
 
 /** Runtime translation after process composition has resolved its declared supplies. */
 export async function bootInstalledProcess(options: {
@@ -21,6 +22,8 @@ export async function bootInstalledProcess(options: {
   /** Scopes the stores' operator reads per module; omitted where the stores mint none. */
   operatorReads?: ModuleOperatorReadsScope;
   surface?: (peers: TransportPeers) => ExposedSurface<unknown, unknown>;
+  /** Stand-ins for uninstalled peers: `testPeer` from `@langwatch/process/testing`. */
+  peers?: readonly TestPeer[];
 }) {
   let surface: ExposedSurface<unknown, unknown> | undefined;
   const builder = new ApplicationBuilder<Record<string, unknown>, unknown, unknown>(options);

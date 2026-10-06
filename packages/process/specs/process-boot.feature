@@ -31,3 +31,18 @@ Feature: What a process refuses and what it skips at boot
     When its container boots
     Then the booted process answers that module's Api by its token
     And a token no installed module serves is refused by name
+
+  @unit
+  Scenario: An installation test stands in for a peer it does not install
+    Given a module that depends on another module's Api
+    And a boot that installs only that module and hands a test peer for the Api
+    When the process boots
+    Then the module reads the stand-in through its dependency
+    And the booted process answers that Api by its token with the same stand-in
+
+  @unit
+  Scenario: A test peer cannot replace a peer that is installed
+    Given a module that depends on another module's Api
+    And a boot that installs the peer's module and also hands a test peer for its Api
+    When the process boots
+    Then it refuses by name, naming that Api as provided more than once
