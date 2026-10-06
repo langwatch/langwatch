@@ -131,23 +131,26 @@ export const ingestPlanLimitRefusal: RestProtocolRefusal = ({ failure, response 
       })
     : response.decline();
 
+/** The collector's refusals: the plan limit, and main's 400 for a body not sent as JSON. */
+const collectorRefusal: RestProtocolRefusal = (context) =>
+  HandledError.isHandled(context.failure) && context.failure.code === "malformed_request"
+    ? context.response.write({
+        status: 400,
+        mediaType: PRODUCES_JSON,
+        body: JSON.stringify({ message: "Invalid body, expecting json" }),
+      })
+    : ingestPlanLimitRefusal(context);
+
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>
   new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 /** The request body as a JSON object, or the refusal reading it earned. */
-function readCollectorBody(request: Request, raw: string): CollectorBody | CollectorRejection {
+function readCollectorBody(raw: string): CollectorBody | CollectorRejection {
   // warn, not error: a malformed body is the caller's mistake and we answer
   // it with a 400. These three sites return rather than throw, so they never
   // reach the boundary that would classify them as customer fault, and at
   // error level they were about a fifth of this service's error stream.
-  const contentType = request.headers.get("content-type");
-  if (!contentType?.includes(PRODUCES_JSON)) {
-    logger.warn("collector request body is not json");
-
-    return { rejected: true, body: { message: "Invalid body, expecting json" }, status: 400 };
-  }
-
   let body: unknown;
   try {
     body = JSON.parse(raw);
@@ -299,7 +302,7 @@ async function collect({
     return refusalAnswer(error);
   }
 
-  const body = readCollectorBody(request, raw);
+  const body = readCollectorBody(raw);
   if (isCollectorRejection(body)) return answer(body.body, body.status);
 
   const project = auth.project;
@@ -336,10 +339,8 @@ export const collectorRest = defineRestRouter(CollectorApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/collector", "collectTrace")
-  // The body is read once and parsed by the family's own rules. It names no media type:
-  // the 401 above is the handler's, so the handler checks the content type after it
-  // and a malformed payload earns the sentence a deployed SDK already parses.
-  .withRawBody("text")
+  // A body not sent as JSON keeps main's 400 sentence (record §8, E9).
+  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withAccess(
     publicRoute({
       reason:
@@ -350,7 +351,7 @@ export const collectorRest = defineRestRouter(CollectorApi)
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
     because: COLLECTOR_PROTOCOL_REASON,
-    refusal: ingestPlanLimitRefusal,
+    refusal: collectorRefusal,
   })
   .withDocs({ hide: true })
   .handle(async ({ app, raw, request, response }) =>
