@@ -7,6 +7,7 @@ import { lintFrameworkModuleContracts } from "./boundaries/framework-module-cont
 import { lintManifests } from "./boundaries/manifests.ts";
 import { lintPeerCycles } from "./boundaries/peer-cycles.ts";
 import { lintPlatformOperatorCalls } from "./boundaries/platform-operator-calls.ts";
+import { lintRestNamespaceOwners } from "./boundaries/rest-namespace-owners.ts";
 import { lintFeatureConfiguration } from "./feature-configuration.ts";
 import { lintFeatureLayouts } from "./feature-layout.ts";
 import { lintFeatureShape } from "./feature-shape.ts";
@@ -189,6 +190,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "platform-operator-calls",
     spec: "specs/tooling/lint-platform-operator-calls.feature",
     run: lintPlatformOperatorCalls,
+  }),
+  definePolicy({
+    id: "rest-namespace-owners",
+    spec: "specs/api/rest-namespace-owners.feature",
+    run: lintRestNamespaceOwners,
   }),
   definePolicy({
     id: "framework-module-contracts",

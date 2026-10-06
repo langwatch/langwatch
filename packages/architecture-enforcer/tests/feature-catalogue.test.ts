@@ -9,6 +9,7 @@ import {
   readFeatureCatalogue,
   type ArchitectureViolation,
 } from "../src/index.ts";
+import { readRestNamespaceOwners } from "../src/workspace/feature-catalogue.ts";
 
 let root = "";
 
@@ -82,7 +83,7 @@ describe("feature catalogue", () => {
 
     expect(result.entries).toEqual([]);
     expect(result.violations.map((violation) => violation.message)).toEqual([
-      "Feature catalogue entry 0 must contain only id, root, classification, and subjects.",
+      "Feature catalogue entry 0 must contain only id, root, classification, subjects, and restNamespaces.",
     ]);
   });
 
@@ -191,5 +192,78 @@ describe("enterprise provider of a core port", () => {
       join(root, "enterprise/modules/audit-log"),
       join(root, "enterprise/modules/unknown"),
     ]);
+  });
+});
+
+describe("REST namespace owners in the feature catalogue", () => {
+  afterEach(() => {
+    if (root) rmSync(root, { recursive: true, force: true });
+    root = "";
+  });
+
+  function entry(id: string, restNamespaces?: unknown) {
+    return {
+      classification: "core",
+      id,
+      root: `modules/${id}`,
+      subjects: [id],
+      ...(restNamespaces === undefined ? {} : { restNamespaces }),
+    };
+  }
+
+  function owners(features: unknown[]) {
+    root = mkdtempSync(join(tmpdir(), "rest-namespace-owners-"));
+    writeCatalogue({ version: 0, features });
+    const violations: ArchitectureViolation[] = [];
+    const map = readRestNamespaceOwners({ workspaceRoot: root, violations });
+
+    return { map, messages: violations.map((violation) => violation.message) };
+  }
+
+  /** @scenario "A feature lists the REST namespaces it owns" */
+  it("maps each listed namespace, legacy underscores included, to its feature", () => {
+    const { map, messages } = owners([
+      entry("project", ["projects"]),
+      entry("trace", ["traces", "track_event"]),
+      entry("webhook"),
+    ]);
+
+    expect(messages).toEqual([]);
+    expect([...map]).toEqual([
+      ["projects", "project"],
+      ["traces", "trace"],
+      ["track_event", "trace"],
+    ]);
+  });
+
+  /** @scenario "Two features cannot own the same REST namespace" */
+  it("refuses a namespace two features list, naming both", () => {
+    const { messages } = owners([entry("dashboard", ["projects"]), entry("project", ["projects"])]);
+
+    expect(messages).toEqual([
+      'REST namespace "projects" is owned by both "dashboard" and "project".',
+    ]);
+  });
+
+  /** @scenario "A malformed REST namespace list is refused" */
+  it.each([[["teams", "groups"]], [["teams", "teams"]], [["Teams"]], [["teams/v1"]], [[]]])(
+    "refuses %j as a malformed entry",
+    (restNamespaces) => {
+      expect(owners([entry("organization", restNamespaces)]).messages).toEqual([
+        "Feature catalogue entry 0 is malformed.",
+      ]);
+    },
+  );
+
+  /** @scenario "The category prefixes are owned by no feature" */
+  it("gives none of the ruled category prefixes an owner in the repository's catalogue", () => {
+    const repository = join(import.meta.dirname, "../../..");
+    const violations: ArchitectureViolation[] = [];
+    const map = readRestNamespaceOwners({ workspaceRoot: repository, violations });
+    const categories = ["otel", "internal", "export", "webhooks", "connect", "auth", "scenario"];
+
+    expect(violations).toEqual([]);
+    expect(map.size).toBeGreaterThan(0);
+    expect(categories.filter((category) => map.has(category))).toEqual([]);
   });
 });

@@ -1512,12 +1512,15 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   apidiff's to catch, not a frozen copy's (Alex, 2026-09-29).
 - `/api/<x>` is the main path; `/v1` is optional; `/latest/` and `/<version>/` are supported but hidden from the
   published docs (Alex, 2026-09-25).
-- A REST path is served by its namespace's owner. For the migration only, another module may serve one
-  by declaring it on the route, `.withSharedPath({ owner, reason, deprecate })`, in a literal family (a
-  family claiming `/api/<x>` would run its middleware ahead of the owner's routes); every such route is
-  planned for deprecation and the route registry lists it (`RegisteredRoute.sharedPath`). A second
-  module mounting a family on a namespace another module claims is refused at mount (Alex, 2026-10-06,
-  R10; `packages/api/specs/shared-path.feature`).
+- A REST namespace (the first segment after `/api/` or `/api/v1/`) has one owner, named in
+  `modules/catalogue.json` `restNamespaces`; the category prefixes otel, internal, export, webhooks,
+  connect, auth and scenario stay unowned. Another module serves a path in an owned namespace only by
+  declaring it on the route, `.withSharedPath({ owner, reason, deprecate })`, in a literal family;
+  every such route is planned for deprecation except `/api/projects/:projectId/analytics/*`, declared
+  `permanent: true`, and the route registry lists them (`RegisteredRoute.sharedPath`). A literal
+  route under a prefix another module's family claims, undeclared or naming the wrong owner, is
+  refused at mount; the `rest-namespace-owners` policy holds every route to the map (Alex,
+  2026-10-05 night and 2026-10-06, R10; `specs/api/rest-namespace-owners.feature`).
 - A handler never sets a header to refuse: a `HandledError` carrying `meta.retryAfterMs` is rendered by
   the REST runtime with `Retry-After` (2026-09-23).
 - An action that takes no body declares an empty input schema from its contract; the runtime reads an

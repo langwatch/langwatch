@@ -48,6 +48,8 @@ anything; the process mounts every installed module's declarations.
    whose namespace it is, why, and the plan or release that retires it. A blank reason or plan is
    refused, a family claiming `/api/<x>` may not carry one, and a second module claiming a namespace is
    refused at mount. The route registry lists every shared path (`packages/api/specs/shared-path.feature`).
+   `withSharedPath` takes `permanent: true` instead of `deprecate` only for a ruled-permanent
+   path; the owner must be the namespace's owner in modules/catalogue.json `restNamespaces`.
 9. **Auth is the process's.** REST authenticates with API keys, tRPC with the session. A route names a
    permission (`.withPermission("triggers:view")`), never a credential source. The caller arrives as
    `actor`/`scope`; no handler reads headers or looks the key's owner up.
