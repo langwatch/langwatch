@@ -444,15 +444,19 @@ export class DashboardModule implements DashboardApi {
   }
 
   /** Every saved chart in the project. */
-  listSavedWorkbenchCharts(input: { projectId: string }): Promise<SavedWorkbenchChart[]> {
+  async listSavedWorkbenchCharts(input: { projectId: string }): Promise<SavedWorkbenchChart[]> {
+    await this.#requireWorkbench(input.projectId);
+
     return this.#charts.getAll(input);
   }
 
   /** One saved chart, with its query, parameters and specification. */
-  getSavedWorkbenchChart(input: {
+  async getSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
   }): Promise<SavedWorkbenchChart> {
+    await this.#requireWorkbench(input.projectId);
+
     return this.#charts.getById(input);
   }
 
