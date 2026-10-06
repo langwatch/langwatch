@@ -37,8 +37,8 @@ function hostWithoutBearers() {
   });
 }
 
-/** @scenario "A host given no deployment bearers leaves an unbound internal family closed" */
 describe("a RestHost with no bearers option", () => {
+  /** @scenario "A host given no deployment bearers leaves an unbound internal family closed" */
   it("refuses every call to an internal family that binds no door of its own", async () => {
     const read = vi.fn(() => ({ ok: true }));
     const server = hostWithoutBearers();
