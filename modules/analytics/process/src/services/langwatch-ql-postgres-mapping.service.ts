@@ -28,7 +28,7 @@ export interface PostgresNamedCollection {
 }
 
 /** A column of a PostgreSQL-engine table, in ClickHouse types. */
-export interface LangWatchQLColumn {
+interface LangWatchQLColumn {
   name: string;
   type: string;
 }

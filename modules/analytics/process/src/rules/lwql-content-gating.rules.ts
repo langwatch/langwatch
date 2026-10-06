@@ -38,7 +38,7 @@ export const CONTENT_ATTRIBUTE_KEYS: readonly string[] = CONTENT_CATEGORIES.flat
  * arrays write `gen_ai.prompt.0.content` rather than `gen_ai.prompt`, so an exact-key filter
  * alone would drop the blob and leave the pieces.
  */
-export const CONTENT_ATTRIBUTE_KEY_PREFIXES: readonly string[] = CONTENT_ATTRIBUTE_KEYS.map(
+const CONTENT_ATTRIBUTE_KEY_PREFIXES: readonly string[] = CONTENT_ATTRIBUTE_KEYS.map(
   (key) => `${key}.`,
 );
 

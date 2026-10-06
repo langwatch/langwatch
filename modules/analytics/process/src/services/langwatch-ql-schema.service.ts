@@ -60,12 +60,6 @@ function exampleLookbackPredicate({ view }: { view: LangWatchQLViewDefinition })
   return `WHERE ${view.timeColumn} >= subtractDays(now(), ${EXAMPLE_LOOKBACK_DAYS})`;
 }
 
-export type {
-  LangWatchQLSchema,
-  LangWatchQLSchemaColumn,
-  LangWatchQLSchemaDataset,
-} from "@langwatch/analytics-contract";
-
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 
 /** The endpoint's projection of the LangWatchQL catalog for one caller. */

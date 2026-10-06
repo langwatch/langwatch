@@ -35,7 +35,7 @@ export const LWQL_RECONVERGENCE_INITIAL_STATE: LwqlReconvergenceState = {
   gaveUp: false,
 };
 
-export type LwqlReconvergenceIntents = {
+type LwqlReconvergenceIntents = {
   reconverge: IntentSpec<typeof lwqlReconvergenceSchema>;
 };
 

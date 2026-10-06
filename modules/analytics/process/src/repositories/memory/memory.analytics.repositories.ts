@@ -11,7 +11,7 @@ import { MemoryAnalyticsSessionsRepository } from "./memory.analytics-sessions.r
 import { MemoryAnalyticsRepository } from "./memory.analytics.repository.ts";
 
 /** The memory tier has no ClickHouse server to probe: it answers nothing, as a silent one does. */
-export class MemoryLangWatchQLAppFunctionStoreRepository extends LangWatchQLAppFunctionStoreRepository {
+class MemoryLangWatchQLAppFunctionStoreRepository extends LangWatchQLAppFunctionStoreRepository {
   static create(): MemoryLangWatchQLAppFunctionStoreRepository {
     return new MemoryLangWatchQLAppFunctionStoreRepository();
   }

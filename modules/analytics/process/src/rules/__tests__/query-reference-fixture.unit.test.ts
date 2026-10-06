@@ -13,8 +13,8 @@ import { TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
-import { DEFAULT_LWQL_RESULT_LIMITS } from "../../services/langwatch-ql-executor.service.ts";
 import { LangWatchQLSchemaService } from "../../services/langwatch-ql-schema.service.ts";
+import { DEFAULT_LWQL_RESULT_LIMITS } from "../langwatch-ql-result-limits.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 import { buildQueryReference } from "../query-reference.rules.ts";
 

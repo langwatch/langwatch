@@ -9,7 +9,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 /** Reads rows from the admin ClickHouse; the guard never holds a client itself. */
 export type ClusterGuardQuery = (sql: string) => Promise<Record<string, unknown>[]>;
 
-export const LWQL_SQL_SINGLE_NODE_BYPASS = "LWQL_ACCESS_MODEL_SQL_SINGLE_NODE";
+const LWQL_SQL_SINGLE_NODE_BYPASS = "LWQL_ACCESS_MODEL_SQL_SINGLE_NODE";
 
 export class LwqlSqlModeUnsafeOnClusterError extends Error {
   readonly hostCount: number;

@@ -16,7 +16,7 @@ import { findLangWatchQLAppFunctions } from "./langwatch-ql-app-function-catalog
 import type { LangWatchQLAppFunctionDefinition } from "./langwatch-ql-app-function-shapes.rules.ts";
 
 /** Where a boolean call with no threshold of its own draws the line. */
-export const LWQL_DEFAULT_JUDGEMENT_THRESHOLD = 0.5;
+const LWQL_DEFAULT_JUDGEMENT_THRESHOLD = 0.5;
 
 /** What one option lookup is asked. */
 type OptionLookup = {

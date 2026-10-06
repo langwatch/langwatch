@@ -340,7 +340,7 @@ function connectionLimitFields(databaseUrl: string | undefined): { connectionLim
   }
 }
 
-export async function runLwqlProvisioningTask({
+async function runLwqlProvisioningTask({
   database,
   source,
 }: {

@@ -60,7 +60,7 @@ export interface LangWatchQLTable {
  * A row's tenant must be the one, and only the one, an in-set hash maps to; grouping by the hash
  * fails a conflicting hash closed without starving the rest.
  */
-export const LWQL_TENANT_PREDICATE_TEMPLATE =
+const LWQL_TENANT_PREDICATE_TEMPLATE =
   "{tenantColumn} IN (SELECT any({tenantId}) FROM {keyMap} WHERE has(splitByChar(',', getSetting('{tenantSetting}')), {keyHash}) GROUP BY {keyHash} HAVING uniqExact({tenantId}) = 1)";
 
 /**
@@ -68,7 +68,7 @@ export const LWQL_TENANT_PREDICATE_TEMPLATE =
  * it inside the tenant predicate's own subquery, so a bare equality against the joined set would
  * match no row and starve every tenant.
  */
-export const LWQL_KEY_MAP_SELF_FILTER_TEMPLATE =
+const LWQL_KEY_MAP_SELF_FILTER_TEMPLATE =
   "has(splitByChar(',', getSetting('{tenantSetting}')), {keyHash})";
 
 /** `database.table`, with the LangWatchQL database filled in when none is named. */

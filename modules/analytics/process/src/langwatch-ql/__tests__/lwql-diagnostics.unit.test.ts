@@ -4,6 +4,7 @@
  * @see specs/lwql/api.feature
  */
 
+import type { LangWatchQLColumn } from "@langwatch/analytics-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -15,7 +16,6 @@ import {
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLDiagnosticsService } from "../../services/langwatch-ql-diagnostics.service.ts";
-import type { LangWatchQLColumn } from "../../services/langwatch-ql-executor.service.ts";
 import { validateLangWatchQL } from "./lwql-validate.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();

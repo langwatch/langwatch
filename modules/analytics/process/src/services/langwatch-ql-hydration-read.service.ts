@@ -21,7 +21,7 @@ import type { LangWatchQLResolvedCall } from "../rules/langwatch-ql-hydration-pl
  * budget — which is what lets the budget stop a read close to the line rather
  * than one enormous call past it.
  */
-export const LWQL_HYDRATION_READ_CHUNK = {
+const LWQL_HYDRATION_READ_CHUNK = {
   traceIds: 25,
   threadKeys: 10,
 } as const;

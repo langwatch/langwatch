@@ -14,12 +14,12 @@ import {
 } from "@langwatch/analytics-contract";
 
 /** The trace identity every pass orders, pages and restricts by. */
-export const LWQL_PASS_TRACE_COLUMN = "TraceId";
+const LWQL_PASS_TRACE_COLUMN = "TraceId";
 
 const SPAN_COLUMN: LangWatchQLPassKeyColumn = "SpanId";
 
 /** One composed pass: the wrapper's text and the values its own parameters take. */
-export interface LangWatchQLComposedPass {
+interface LangWatchQLComposedPass {
   readonly sql: string;
   readonly parameters: Readonly<Record<string, unknown>>;
 }

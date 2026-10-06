@@ -104,7 +104,7 @@ function deriveAdminTarget({
 }
 
 /** The credential-free ClickHouse target, or unavailable when it cannot be derived safely. */
-export type LwqlClickHouseTarget =
+type LwqlClickHouseTarget =
   | { readonly available: false }
   | { readonly available: true; readonly url: string; readonly database: string };
 

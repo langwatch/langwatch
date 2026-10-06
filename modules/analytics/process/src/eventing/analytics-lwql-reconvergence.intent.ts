@@ -6,7 +6,7 @@ const logger = createLogger("langwatch:analytics:lwql:reconvergence");
 
 export const LWQL_RECONVERGENCE_PROCESS_NAME = "lwqlReconvergence";
 
-export interface LwqlReconvergenceRunDeps {
+interface LwqlReconvergenceRunDeps {
   /** Throws when ClickHouse is unreachable; the next wake probes again. */
   readonly probe: () => Promise<LwqlAccessModelOwner>;
   /** The whole self-provisioning run; logs and swallows its own failure. */

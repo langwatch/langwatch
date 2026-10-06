@@ -17,12 +17,11 @@ import {
 import {
   collectStringValues,
   EVAL_METRIC_KEYS,
-  type EvalMetricKey,
   hasFilterValues,
 } from "./clickhouse.timeseries-query-shared.mapper.ts";
 
 /** The six destination tables routed between. */
-export type AnalyticsTable =
+type AnalyticsTable =
   | "trace_analytics_rollup"
   | "trace_analytics"
   | "trace_summaries"
@@ -94,25 +93,6 @@ const ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST = [
 ] as const;
 export type TraceRollupMetricKey = (typeof ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST)[number];
 
-/**
- * Registry metric keys servable from `evaluation_analytics_rollup`'s
- * additive columns (migration 00040) — aggregation formulas in ADR-034
- * ("Eval fields").
- */
-export type EvalRollupMetricKey = EvalMetricKey;
-
-/** Backwards-compatible union — all rollup-rollable metric keys, any source. */
-export type RollupRollableMetricKey = TraceRollupMetricKey | EvalRollupMetricKey;
-
-export const ROLLUP_ROLLABLE_METRIC_KEYS: ReadonlySet<string> = new Set<string>([
-  ...ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST,
-  ...EVAL_METRIC_KEYS,
-]);
-
-export function isRollupRollableMetricKey(metric: string): metric is RollupRollableMetricKey {
-  return ROLLUP_ROLLABLE_METRIC_KEYS.has(metric);
-}
-
 const ROLLUP_ROLLABLE_TRACE_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
   ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST,
 );
@@ -139,10 +119,8 @@ export function isSlimEligibleTraceMetricKey(metric: string): metric is SlimTrac
  * (parity requires that — see ADR-034, Read routing).
  */
 const ROLLUP_AVG_METRIC_KEYS_LIST = ["performance.completion_time"] as const;
-export type RollupAvgMetricKey = (typeof ROLLUP_AVG_METRIC_KEYS_LIST)[number];
-export const ROLLUP_AVG_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
-  ROLLUP_AVG_METRIC_KEYS_LIST,
-);
+type RollupAvgMetricKey = (typeof ROLLUP_AVG_METRIC_KEYS_LIST)[number];
+const ROLLUP_AVG_METRIC_KEYS: ReadonlySet<string> = new Set<string>(ROLLUP_AVG_METRIC_KEYS_LIST);
 
 export function isRollupAvgMetricKey(metric: string): metric is RollupAvgMetricKey {
   return ROLLUP_AVG_METRIC_KEYS.has(metric);
@@ -183,18 +161,6 @@ const SLIM_ELIGIBLE_EVAL_METRIC_KEYS_LIST = [
   "evaluations.evaluation_pass_rate",
   "evaluations.evaluation_runs",
 ] as const;
-export type SlimEvalMetricKey = (typeof SLIM_ELIGIBLE_EVAL_METRIC_KEYS_LIST)[number];
-
-export type SlimEligibleMetricKey = SlimTraceMetricKey | SlimEvalMetricKey;
-
-export const SLIM_ELIGIBLE_METRIC_KEYS: ReadonlySet<string> = new Set<string>([
-  ...SLIM_ELIGIBLE_TRACE_METRIC_KEYS_LIST,
-  ...SLIM_ELIGIBLE_EVAL_METRIC_KEYS_LIST,
-]);
-
-export function isSlimEligibleMetricKey(metric: string): metric is SlimEligibleMetricKey {
-  return SLIM_ELIGIBLE_METRIC_KEYS.has(metric);
-}
 
 const SLIM_ELIGIBLE_TRACE_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
   SLIM_ELIGIBLE_TRACE_METRIC_KEYS_LIST,
@@ -305,7 +271,7 @@ const ROLLUP_EVAL_AGGREGATIONS: ReadonlySet<AnalyticsAggregation> = new Set<Anal
  * Input shape for the routing decision. Mirrors the relevant subset of
  * `TimeseriesInputType` — kept tight so the function stays trivially testable.
  */
-export interface PickAnalyticsTableInput {
+interface PickAnalyticsTableInput {
   series: AnalyticsSeries[];
   filters?: Partial<
     Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>
@@ -535,16 +501,3 @@ function isBlocklisted(rawKey: string): boolean {
 // (used by both slim + rollup builders too). Aliased below to preserve
 // the local name at call sites.
 const hasAnyFilterValue = hasFilterValues;
-
-/** Test-only helper to export the per-source sets for inspection. */
-export const __testOnly__ = {
-  ROLLUP_TRACE_GROUP_BY_KEYS,
-  ROLLUP_EVAL_GROUP_BY_KEYS,
-  SLIM_TRACE_GROUP_BY_KEYS,
-  SLIM_EVAL_GROUP_BY_KEYS,
-  ROLLUP_TRACE_FILTER_FIELDS,
-  ROLLUP_EVAL_FILTER_FIELDS,
-  SLIM_TRACE_FILTER_FIELDS,
-  SLIM_EVAL_FILTER_FIELDS,
-  ROLLUP_EVAL_AGGREGATIONS,
-};

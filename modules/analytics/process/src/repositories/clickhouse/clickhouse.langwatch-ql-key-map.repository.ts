@@ -40,20 +40,3 @@ export class LwqlKeyMapClickHouseRepository extends LwqlKeyMapRepository {
     });
   }
 }
-
-/**
- * For presets with no datastore. Refuses rather than silently succeeding: a key map that
- * accepted writes and kept none is the failure mode the deploy backfill exists to prevent,
- * and the caller already treats a throw as "the scheduled backfill will pick it up".
- */
-export class NullLwqlKeyMapRepository extends LwqlKeyMapRepository {
-  static create(): NullLwqlKeyMapRepository {
-    return new NullLwqlKeyMapRepository();
-  }
-
-  insertRow(): Promise<void> {
-    return Promise.reject(
-      new Error("No ClickHouse in this preset — the LangWatchQL key-map row was not written"),
-    );
-  }
-}

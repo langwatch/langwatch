@@ -13,7 +13,7 @@ export const LWQL_FLAG = "release_lwql_workbench";
  * here rather than imported: LangWatchQL must recognise and refuse eval
  * syntax whether or not the Instant Evals module is installed.
  */
-export const INSTANT_EVALS_FLAG = "release_instant_evals";
+const INSTANT_EVALS_FLAG = "release_instant_evals";
 
 /**
  * Whether the LangWatchQL surface is open to this project. Both boundaries

@@ -30,14 +30,14 @@ const sqlText = LangWatchQLSqlTextService.create();
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 const viewStatements = LangWatchQLViewStatementsService.create();
 
-export const LWQL_CUSTOM_SETTINGS_PREFIX = "custom_";
-export const LWQL_USERS_D_RELATIVE_PATH = "users.d/lwql-access.yaml";
-export const LWQL_CONFIG_D_RELATIVE_PATH = "config.d/lwql-named-collection.yaml";
+const LWQL_CUSTOM_SETTINGS_PREFIX = "custom_";
+const LWQL_USERS_D_RELATIVE_PATH = "users.d/lwql-access.yaml";
+const LWQL_CONFIG_D_RELATIVE_PATH = "config.d/lwql-named-collection.yaml";
 
 const LWQL_USER_NETWORKS_IP = "::/0";
 
 /** One settings-profile entry; `quoted` values are strings, the rest numbers. */
-export interface LwqlProfileSetting {
+interface LwqlProfileSetting {
   readonly name: string;
   readonly value: string | number;
   readonly quoted?: boolean;
@@ -45,13 +45,13 @@ export interface LwqlProfileSetting {
 }
 
 /** A SELECT grant; `columns` narrows it to a column list. */
-export interface LwqlGrantTarget {
+interface LwqlGrantTarget {
   readonly database: string;
   readonly table: string;
   readonly columns?: readonly string[];
 }
 
-export interface LwqlRowPolicyTarget {
+interface LwqlRowPolicyTarget {
   readonly name: string;
   readonly database: string;
   readonly table: string;

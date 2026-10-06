@@ -47,14 +47,14 @@ export const DEFAULT_LWQL_HYDRATION_LIMITS: LangWatchQLHydrationLimits = {
 };
 
 /** One call's values that were cut at the per-value ceiling. */
-export interface LangWatchQLValueTruncation {
+interface LangWatchQLValueTruncation {
   readonly column: string;
   readonly function: string;
   readonly values: number;
 }
 
 /** One call's keys that named nothing. */
-export interface LangWatchQLUnresolvedKeys {
+interface LangWatchQLUnresolvedKeys {
   readonly column: string;
   readonly function: string;
   readonly keys: number;

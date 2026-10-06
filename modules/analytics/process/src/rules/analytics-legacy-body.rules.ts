@@ -6,9 +6,9 @@ import { analyticsTimeseriesRestBodySchema } from "@langwatch/analytics-contract
 import { zodErrorMessage } from "@langwatch/config";
 import type { z } from "zod";
 
-export type AnalyticsLegacyTimeseriesBody = z.infer<typeof analyticsTimeseriesRestBodySchema>;
+type AnalyticsLegacyTimeseriesBody = z.infer<typeof analyticsTimeseriesRestBodySchema>;
 
-export type AnalyticsLegacyBodyReading =
+type AnalyticsLegacyBodyReading =
   | { readonly accepted: true; readonly body: AnalyticsLegacyTimeseriesBody }
   | {
       readonly accepted: false;

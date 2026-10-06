@@ -37,7 +37,7 @@ export interface DerivedPostgresView extends LangWatchQLViewDefinition {
 }
 
 /** One column's tenant scope, and the join chain that reaches its project. */
-export interface TenantScope {
+interface TenantScope {
   readonly kind: "project" | "team" | "organization" | "parent";
   /** Column read on the last alias of {@link tenantPath} to yield `TenantId`. */
   readonly column: string;
@@ -209,7 +209,7 @@ function columnDescription(field: PrismaField, exposedName: string): string {
 // ---------------------------------------------------------------------------
 
 /** What {@link resolveTenantScope} needs to resolve a `tenantVia` parent. */
-export interface TenantResolveContext {
+interface TenantResolveContext {
   readonly manifest: PrismaManifest;
   readonly overrides: Readonly<Record<string, PostgresDatasetOverride>>;
 }
@@ -330,7 +330,7 @@ function parentTenantScope(
 // ---------------------------------------------------------------------------
 
 /** What the builder reads of a catalogue table; a test may name a model the manifest lacks. */
-export type PostgresCatalogueTable = Pick<LwqlTableCatalogue, "columns"> &
+type PostgresCatalogueTable = Pick<LwqlTableCatalogue, "columns"> &
   Readonly<{ sourceTable: string }>;
 
 type GatedEntry = Exclude<LwqlColumnEntry, "inherit" | "omit">;
@@ -484,7 +484,7 @@ function tenantColumn(scope: TenantScope): LangWatchQLViewColumn {
  * kept here rather than in each override so the note can never be forgotten
  * by a future `rowFilter` that only sets the predicate.
  */
-export const ROW_FILTER_NOTE =
+const ROW_FILTER_NOTE =
   " Shared Langy conversations only; a member's private conversations are not queryable.";
 
 /** The default view description: the model's doc, else a generated line. */

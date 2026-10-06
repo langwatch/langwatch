@@ -35,7 +35,7 @@ const ta = "ta";
  * NOT here: model group-bys need per-SPAN attribution slim has no data for;
  * the router sends them to `trace_summaries` (see route-table.ts).
  */
-export type SlimGroupByKey =
+type SlimGroupByKey =
   | "topics.topics"
   | "traces.trace_name"
   | "metadata.user_id"

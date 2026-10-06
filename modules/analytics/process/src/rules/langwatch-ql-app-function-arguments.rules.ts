@@ -15,7 +15,7 @@ import { LWQL_MAX_SCORE_LEVELS } from "./langwatch-ql-eval-function-catalog.rule
 import { echoIdentifier } from "./langwatch-ql-violations.rules.ts";
 
 /** The option values, or the one sentence that says what is wrong. */
-export type AppFunctionArgumentsOutcome =
+type AppFunctionArgumentsOutcome =
   | { readonly ok: true; readonly options: LangWatchQLAppFunctionOption[] }
   | { readonly ok: false; readonly message: string };
 

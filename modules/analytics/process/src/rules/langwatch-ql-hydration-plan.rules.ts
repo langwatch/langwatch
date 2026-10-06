@@ -145,7 +145,7 @@ export function collectLangWatchQLKeys({
 }
 
 /** The distinct keys of each kind one execution needs, counted across calls. */
-export interface LangWatchQLDistinctKeys {
+interface LangWatchQLDistinctKeys {
   /** First key part of every trace- and span-keyed call. */
   readonly traceIds: ReadonlySet<string>;
   readonly threadKeys: ReadonlySet<string>;

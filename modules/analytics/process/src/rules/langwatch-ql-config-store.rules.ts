@@ -33,7 +33,7 @@ export type ConfigStoreLwqlEntity =
 /** Who owns the restricted identity right now. */
 export type LwqlAccessModelOwner = "config_store" | "sql_store" | "none";
 
-export interface ClickHouseErrorSummary {
+interface ClickHouseErrorSummary {
   /** The ClickHouse error code, when the failure came from the server. */
   readonly code: number | null;
   readonly type: string;
@@ -146,9 +146,9 @@ function assertPlainIdentifier(name: string): string {
 }
 
 /** Where a failure came from: a ClickHouse server code, or anything else (network, client). */
-export type ClickHouseFailureOrigin = { from: "server"; code: number } | { from: "client" };
+type ClickHouseFailureOrigin = { from: "server"; code: number } | { from: "client" };
 
-export function readClickHouseFailure(error: unknown): ClickHouseFailureOrigin {
+function readClickHouseFailure(error: unknown): ClickHouseFailureOrigin {
   const code = (error as { code?: unknown } | null)?.code;
   if (typeof code === "string" && /^\d+$/.test(code)) return { from: "server", code: Number(code) };
   if (typeof code === "number") return { from: "server", code };
@@ -232,7 +232,7 @@ export function findMissingObjects(error: unknown): string[] {
   });
 }
 
-export type ConfigStoreTolerance = { tolerated: true; code: number } | { tolerated: false };
+type ConfigStoreTolerance = { tolerated: true; code: number } | { tolerated: false };
 
 /**
  * 669/670/671 are tolerated only on a NAMED COLLECTION statement, and 495 only when the

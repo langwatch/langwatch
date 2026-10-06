@@ -21,7 +21,7 @@ const SLIM_TABLE = "evaluation_analytics" as const;
 const ea = "ea";
 
 /** Group-by keys the eval slim builder serves. */
-export type EvalSlimGroupByKey =
+type EvalSlimGroupByKey =
   | "evaluations.evaluator_type"
   | "evaluations.evaluation_passed"
   | "evaluations.evaluation_label"

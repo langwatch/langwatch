@@ -28,10 +28,10 @@ const sqlText = LangWatchQLSqlTextService.create();
  * already reference (see migration 00084). Not derived from `names.database`
  * or any env var — infra's filters name this table by this exact string.
  */
-export const LWQL_KEY_MAP_TABLE = "lwql_api_key_tenant_map";
+const LWQL_KEY_MAP_TABLE = "lwql_api_key_tenant_map";
 
 /** PostgreSQL schema the approved views live in when the URL names none. */
-export const LWQL_POSTGRES_SCHEMA = "public";
+const LWQL_POSTGRES_SCHEMA = "public";
 
 /**
  * The PostgreSQL role the ClickHouse named collection dials as. Provisioned

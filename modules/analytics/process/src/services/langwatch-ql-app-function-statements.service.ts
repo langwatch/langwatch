@@ -26,7 +26,7 @@ export interface LangWatchQLServerFunctionRow {
 }
 
 /** A declared name the server holds as something other than our own UDF. */
-export interface LangWatchQLAppFunctionConflict {
+interface LangWatchQLAppFunctionConflict {
   readonly name: string;
   /** What the server says it is. `System` for a builtin. */
   readonly origin: string;

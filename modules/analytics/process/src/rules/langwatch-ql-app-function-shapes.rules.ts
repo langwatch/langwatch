@@ -23,7 +23,7 @@ export type LangWatchQLAppFunctionKeyKind = (typeof LWQL_APP_FUNCTION_KEY_KINDS)
  */
 export const LWQL_APP_FUNCTION_ENCODINGS = ["text", "json"] as const;
 
-export type LangWatchQLAppFunctionEncoding = (typeof LWQL_APP_FUNCTION_ENCODINGS)[number];
+type LangWatchQLAppFunctionEncoding = (typeof LWQL_APP_FUNCTION_ENCODINGS)[number];
 
 /** One declared argument. */
 export interface LangWatchQLAppFunctionParameter {

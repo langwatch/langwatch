@@ -9,7 +9,7 @@
 export const RESERVED_DATABASES: readonly string[] = ["system", "information_schema"];
 
 /** Nesting ceilings. Both refuse with `NESTING_TOO_DEEP`. */
-export interface LangWatchQLLimits {
+interface LangWatchQLLimits {
   /**
    * Deepest subquery or CTE nesting allowed; the submitted statement is depth
    * 0, so `1` permits `SELECT … (SELECT …)` and refuses one level further.

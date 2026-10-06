@@ -12,8 +12,6 @@ import { analyticsRest } from "./transport/analytics.rest.ts";
 import { analyticsTrpcTransport } from "./transport/analytics.trpc.ts";
 import { queryRest } from "./transport/query.rest.ts";
 
-export type { AnalyticsInfrastructure } from "./app/analytics.app.ts";
-
 export const analyticsProcessModule = defineProcessModule("analytics")
   .withRepositories(analyticsRepositories)
   .withApi(AnalyticsModule)

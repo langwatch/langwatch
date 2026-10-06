@@ -23,7 +23,7 @@ const ra = "ra";
  * for every rollable metric, `avg` only for `ROLLUP_AVG_METRIC_KEYS` ungrouped. min/max are NOT
  * servable -- merge-state-dependent -- and throw rather than silently return wrong numbers.
  */
-export type RollupAggregation = Extract<AnalyticsAggregation, "sum" | "avg">;
+type RollupAggregation = Extract<AnalyticsAggregation, "sum" | "avg">;
 
 /**
  * Maps an additive registry metric to its rollup column expression. Narrowed to

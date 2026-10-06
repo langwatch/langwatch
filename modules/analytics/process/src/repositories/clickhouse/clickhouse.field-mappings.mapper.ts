@@ -41,17 +41,12 @@ export const TRACE_ANALYTICS_COLUMNS = [
  * Identity columns always included in evaluation_runs subqueries.
  * Required for deduplication, tenant isolation, and JOIN keys.
  */
-export const EVALUATION_IDENTITY_COLUMNS = [
-  "TenantId",
-  "TraceId",
-  "EvaluationId",
-  "UpdatedAt",
-] as const;
+const EVALUATION_IDENTITY_COLUMNS = ["TenantId", "TraceId", "EvaluationId", "UpdatedAt"] as const;
 
 /**
  * All evaluation_runs columns that analytics queries may reference.
  */
-export const EVALUATION_ANALYTICS_COLUMNS = [
+const EVALUATION_ANALYTICS_COLUMNS = [
   ...EVALUATION_IDENTITY_COLUMNS,
   "EvaluatorId",
   "EvaluatorName",
@@ -66,14 +61,14 @@ export const EVALUATION_ANALYTICS_COLUMNS = [
 /**
  * Identity columns always included in stored_spans subqueries.
  */
-export const SPAN_IDENTITY_COLUMNS = ["TenantId", "TraceId", "SpanId"] as const;
+const SPAN_IDENTITY_COLUMNS = ["TenantId", "TraceId", "SpanId"] as const;
 
 /**
  * All stored_spans columns that analytics queries may reference.
  * Excludes wide columns like Input, Output, and the full SpanAttributes map
  * when only specific attribute keys are needed.
  */
-export const SPAN_ANALYTICS_COLUMNS = [
+const SPAN_ANALYTICS_COLUMNS = [
   ...SPAN_IDENTITY_COLUMNS,
   "SpanAttributes",
   "StartTime",
@@ -95,7 +90,7 @@ export type CHTable = "trace_summaries" | "stored_spans" | "evaluation_runs";
  * (`aggregation-builder.ts`). ADR-034 routing metadata (`availableOn`) has
  * moved to `../routing/field-availability.ts`, consumed there directly.
  */
-export interface FieldMapping {
+interface FieldMapping {
   /** The ClickHouse table containing this field */
   table: CHTable;
   /** The ClickHouse column expression (may include map access) */

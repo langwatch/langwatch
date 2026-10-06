@@ -498,30 +498,6 @@ function quoteIdentifier(identifier: string): string {
 }
 
 /**
- * Date grouping options
- */
-export type DateGrouping = "minute" | "hour" | "day" | "week" | "month" | "year" | "full";
-
-/**
- * GroupBy field options
- */
-export type GroupByField =
-  | "metadata.user_id"
-  | "metadata.thread_id"
-  | "metadata.customer_id"
-  | "metadata.labels"
-  | "metadata.model"
-  | "metadata.span_type"
-  | "topics.topics"
-  | "traces.trace_name"
-  | "evaluations.evaluation_passed"
-  | "evaluations.evaluation_label"
-  | "evaluations.evaluation_processing_state"
-  | "events.event_type"
-  | "sentiment.thumbs_up_down"
-  | "error.has_error";
-
-/**
  * Result of resolving a groupBy field expression
  */
 interface GroupByExpression {
@@ -812,7 +788,7 @@ export interface TimeseriesQueryInput {
 /**
  * Built query result
  */
-export interface BuiltQuery {
+interface BuiltQuery {
   sql: string;
   params: Record<string, unknown>;
 }

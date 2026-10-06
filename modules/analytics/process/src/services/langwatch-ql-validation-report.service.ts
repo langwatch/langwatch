@@ -9,7 +9,7 @@ import {
 
 import type { WorkbenchProtectionsService } from "./workbench-protections.service.ts";
 
-export type LangWatchQLValidationReportDependencies = Readonly<{
+type LangWatchQLValidationReportDependencies = Readonly<{
   langWatchQL: Pick<LangWatchQLService, "validate">;
   protections: Pick<WorkbenchProtectionsService, "resolveMemberProtections">;
 }>;

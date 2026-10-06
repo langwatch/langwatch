@@ -82,6 +82,7 @@ import { canProvisionAppFunctions } from "../rules/langwatch-ql-app-function-sto
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { statementMightCallEvalFunction } from "../rules/langwatch-ql-eval-function-catalog.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
+import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
@@ -92,7 +93,6 @@ import {
   LangWatchQLConnectionService,
   LWQL_CONNECTION_DEFAULTS,
 } from "../services/langwatch-ql-connection.service.ts";
-import { DEFAULT_LWQL_RESULT_LIMITS } from "../services/langwatch-ql-executor.service.ts";
 import { LangWatchQLHydrationComputeService } from "../services/langwatch-ql-hydration-compute.service.ts";
 import {
   LangWatchQLHydrationReadService,
@@ -199,7 +199,7 @@ type AnalyticsDependencies = Readonly<{
   retention: typeof DataRetentionApi;
 }>;
 
-export type LwqlProvisioningOperations = Readonly<{
+type LwqlProvisioningOperations = Readonly<{
   probeOwner: () => Promise<LwqlAccessModelOwner>;
   converge: () => Promise<void>;
 }>;

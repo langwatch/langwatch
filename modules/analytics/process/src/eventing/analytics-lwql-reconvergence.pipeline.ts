@@ -31,10 +31,10 @@ import {
   lwqlReconvergenceWake,
 } from "./analytics-lwql-reconvergence.process.ts";
 
-export const LWQL_RECONVERGENCE_PIPELINE_NAME = "lwql_reconvergence";
+const LWQL_RECONVERGENCE_PIPELINE_NAME = "lwql_reconvergence";
 
 /** The operations this pipeline calls; absent LangWatchQL or rendered mode, all are no-ops. */
-export interface LwqlReconvergenceApp {
+interface LwqlReconvergenceApp {
   probeLwqlAccessModelOwner(): Promise<LwqlAccessModelOwner>;
   convergeLwqlAccessModel(): Promise<void>;
   syncLwqlKeyMapRow(input: { projectId: string }): Promise<void>;

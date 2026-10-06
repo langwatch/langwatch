@@ -22,9 +22,9 @@ const ra = "ra";
  * sums, so `min/max(ScoreSum/ScoreCount)` would be the extremum of
  * per-bucket AVERAGES, not the true per-eval extremum (route to slim for that).
  */
-export type EvalRollupAggregation = Extract<AnalyticsAggregation, "sum" | "avg" | "cardinality">;
+type EvalRollupAggregation = Extract<AnalyticsAggregation, "sum" | "avg" | "cardinality">;
 
-export type EvalRollupGroupByKey = "evaluations.evaluator_type" | "evaluations.evaluation_status";
+type EvalRollupGroupByKey = "evaluations.evaluator_type" | "evaluations.evaluation_status";
 
 function isEvalRollupGroupByKey(groupBy: string): groupBy is EvalRollupGroupByKey {
   return groupBy === "evaluations.evaluator_type" || groupBy === "evaluations.evaluation_status";
