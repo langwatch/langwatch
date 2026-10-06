@@ -22,7 +22,7 @@ import type { LangyMirrorTier } from "@langwatch/langy-contract";
 import { modelProviders } from "@langwatch/model-provider-contract";
 import { type Instant, toDate } from "@langwatch/time";
 
-export type GuardrailWire = {
+type GuardrailWire = {
   id: string;
   name: string;
   evaluator_id: string;
@@ -31,7 +31,7 @@ export type GuardrailWire = {
   failure_mode: "fail_open" | "fail_closed";
 };
 
-export type GuardrailAttachmentWire = {
+type GuardrailAttachmentWire = {
   direction: "pre" | "post" | "stream_chunk";
   guardrail_ids: string[];
 };
@@ -223,14 +223,14 @@ export type GatewayConfigPayload = {
   expires_at: number | null;
 };
 
-export type BundlePolicyRules = GatewayConfigPayload["policy_rules"];
+type BundlePolicyRules = GatewayConfigPayload["policy_rules"];
 
 const EMPTY_POLICY_RULE_DIM = {
   deny: [] as string[],
   allow: null as string[] | null,
 };
 
-export function emptyPolicyRules(): BundlePolicyRules {
+function emptyPolicyRules(): BundlePolicyRules {
   return {
     tools: { ...EMPTY_POLICY_RULE_DIM },
     mcp: { ...EMPTY_POLICY_RULE_DIM },
@@ -239,7 +239,7 @@ export function emptyPolicyRules(): BundlePolicyRules {
   };
 }
 
-export function mergePolicyDim(raw: unknown): {
+function mergePolicyDim(raw: unknown): {
   deny: string[];
   allow: string[] | null;
 } {
@@ -258,7 +258,7 @@ export function mergePolicyDim(raw: unknown): {
   return { deny, allow };
 }
 
-export function normalisePolicyRules(raw: unknown): BundlePolicyRules {
+function normalisePolicyRules(raw: unknown): BundlePolicyRules {
   if (!raw || typeof raw !== "object") {
     return emptyPolicyRules();
   }
@@ -356,7 +356,7 @@ export function buildProviderSlot({
  * declares served. Both absent, rather than empty, means there is nothing to say — read as said
  * nothing, not serves nothing.
  */
-export function routingWire({
+function routingWire({
   mp,
   assembly,
 }: {
@@ -377,7 +377,7 @@ function pickString(obj: Record<string, unknown>, key: string): string | undefin
   return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
-export function buildProviderConfig(mp: ModelProvider): Record<string, unknown> {
+function buildProviderConfig(mp: ModelProvider): Record<string, unknown> {
   const gatewayExtras = (mp.providerConfig ?? {}) as Record<string, unknown>;
 
   return {
@@ -395,7 +395,7 @@ export function buildProviderConfig(mp: ModelProvider): Record<string, unknown> 
   };
 }
 
-export function scopeToWire(
+function scopeToWire(
   scope: GatewayBudget["scopeType"],
 ): GatewayConfigPayload["budgets"][number]["scope"] {
   switch (scope) {
@@ -469,14 +469,14 @@ export function providerExclusions({
   return { routingExcluded, accessExcluded };
 }
 
-export type BudgetWire = GatewayConfigPayload["budgets"][number];
+type BudgetWire = GatewayConfigPayload["budgets"][number];
 
 /**
  * Current-period figure the bundle ships for one budget. Templates carry no aggregate, spend being
  * per end-user bucket and fetched on demand; every other scope takes the ClickHouse rollup when
  * loaded and the Postgres column when not.
  */
-export function budgetSpentMicroUSD(
+function budgetSpentMicroUSD(
   budget: GatewayBudgetResource,
   spendByBudgetId: Map<string, string>,
 ): number {
@@ -512,7 +512,7 @@ export function budgetToWire(
   };
 }
 
-export type CacheRuleWire = GatewayConfigPayload["cache_rules"][number];
+type CacheRuleWire = GatewayConfigPayload["cache_rules"][number];
 
 export function cacheRuleToWire(rule: GatewayCacheRuleResource): CacheRuleWire {
   return {
@@ -545,11 +545,11 @@ export function guardrailAttachmentToWire(
  * its exact value as a string and nothing more, so the conversion goes through
  * the same string parse the ClickHouse rollup takes.
  */
-export function decimalToMicroUSD(d: GatewayMoney): number {
+function decimalToMicroUSD(d: GatewayMoney): number {
   return decimalUSDStringToMicroUSD(d.toString());
 }
 
-export function decimalUSDStringToMicroUSD(s: string): number {
+function decimalUSDStringToMicroUSD(s: string): number {
   const n = Number.parseFloat(s);
   if (!Number.isFinite(n)) {
     return 0;

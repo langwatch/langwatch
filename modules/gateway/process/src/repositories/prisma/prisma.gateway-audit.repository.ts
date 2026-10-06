@@ -12,49 +12,8 @@ import type {
   GatewayAuditTransaction,
 } from "../gateway-audit.repository.ts";
 
-// Dotted-lowercase past-tense convention (Stripe / GitHub / Vercel / Datadog).
-// Namespaced under `gateway.` so a single `LIKE 'gateway.%'` filter scopes
-// SIEM exports to the entire gateway surface. See docs/ai-gateway/audit.mdx
-// for the full code table + rationale.
-export const GATEWAY_AUDIT_ACTIONS = [
-  "gateway.virtual_key.created",
-  "gateway.virtual_key.updated",
-  "gateway.virtual_key.rotated",
-  "gateway.virtual_key.revoked",
-  "gateway.virtual_key.disabled",
-  "gateway.virtual_key.enabled",
-  "gateway.virtual_key.deleted",
-  "gateway.virtual_key.guardrail_attached",
-  "gateway.virtual_key.guardrail_detached",
-  "gateway.budget.created",
-  "gateway.budget.updated",
-  "gateway.budget.reset",
-  "gateway.budget.deleted",
-  "gateway.provider_binding.created",
-  "gateway.provider_binding.updated",
-  "gateway.provider_binding.deleted",
-  "gateway.cache_rule.created",
-  "gateway.cache_rule.updated",
-  "gateway.cache_rule.deleted",
-  "gateway.guardrail.created",
-  "gateway.guardrail.updated",
-  "gateway.guardrail.archived",
-] as const;
-
-export type GatewayAuditAction = (typeof GATEWAY_AUDIT_ACTIONS)[number];
-
-export const GATEWAY_AUDIT_TARGET_KINDS = [
-  "virtual_key",
-  "budget",
-  "provider_binding",
-  "cache_rule",
-  "guardrail",
-] as const;
-
-export type GatewayAuditTargetKind = (typeof GATEWAY_AUDIT_TARGET_KINDS)[number];
-
 /** The client slice an audit row needs. */
-export type GatewayAuditDatabase = Pick<PrismaClient, "auditLog">;
+type GatewayAuditDatabase = Pick<PrismaClient, "auditLog">;
 
 export class PrismaGatewayAuditRepository implements GatewayAuditRepository {
   static create(database: GatewayAuditDatabase): PrismaGatewayAuditRepository {

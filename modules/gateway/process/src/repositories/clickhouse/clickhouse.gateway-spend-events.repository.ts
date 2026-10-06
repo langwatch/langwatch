@@ -55,7 +55,7 @@ const SUMMARIES_MAX_EXECUTION_SECONDS = 60;
 
 const logger = createLogger("langwatch:gateway:spend-repository");
 
-export const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
+const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
           PrincipalUserId, EndUserId, TraceId, Model, ProviderKey, RequestType,
           TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
           TokensReasoning, TokensInputImage, TokensOutputImage, ImageCount,

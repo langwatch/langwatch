@@ -22,7 +22,7 @@ import { PrismaVirtualKeyAuthorizationRepository } from "./prisma.virtual-key-au
 import { PrismaGatewayVirtualKeyRepository } from "./prisma.virtual-key.repository.ts";
 
 /** The gateway slots Postgres answers. */
-export type GatewayPostgresRepositories = Pick<
+type GatewayPostgresRepositories = Pick<
   GatewayRepositories,
   | "virtualKeys"
   | "transactions"

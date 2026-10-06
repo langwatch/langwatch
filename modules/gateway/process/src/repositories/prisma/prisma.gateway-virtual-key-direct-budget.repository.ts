@@ -5,7 +5,7 @@ import { VirtualKeyDirectBudgetRepository } from "../gateway-virtual-key-direct-
 import { PrismaGatewayBudgetRepository } from "./prisma.gateway-budget.repository.ts";
 
 /** The client slice the direct-budget read binds to. */
-export type VirtualKeyDirectBudgetDatabase = Pick<PrismaClient, "gatewayBudget">;
+type VirtualKeyDirectBudgetDatabase = Pick<PrismaClient, "gatewayBudget">;
 
 /** Private Prisma owner for the cap a virtual key carries on itself. */
 export class PrismaVirtualKeyDirectBudgetRepository extends VirtualKeyDirectBudgetRepository {

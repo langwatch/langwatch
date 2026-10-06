@@ -1,10 +1,10 @@
 import type { BudgetCrossingKind } from "@langwatch/gateway-contract";
 
 /** How much of a budget is spent before it warns; the data plane's `SoftWarnPercent`. */
-export const BUDGET_SOFT_WARN_PERCENT = 80;
+const BUDGET_SOFT_WARN_PERCENT = 80;
 
 /** A crossing's kind, or `not_crossed` below the warn line or without a positive limit. */
-export type BudgetCrossingDecision = BudgetCrossingKind | "not_crossed";
+type BudgetCrossingDecision = BudgetCrossingKind | "not_crossed";
 
 /** Breached once spend reaches the limit, threshold at the soft warn line. */
 export function budgetCrossingKind({

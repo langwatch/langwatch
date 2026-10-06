@@ -12,7 +12,7 @@ import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import type { AppendGatewayAuditInput } from "../gateway-audit.repository.ts";
 
 /** A group as the memory directory holds it; the organization module owns the real rows. */
-export type MemoryGatewayGroup = {
+type MemoryGatewayGroup = {
   id: string;
   organizationId: string;
   name: string;
@@ -20,10 +20,10 @@ export type MemoryGatewayGroup = {
 };
 
 /** A team as gateway reads it; the team module owns the real row. */
-export type MemoryGatewayTeam = { id: string; organizationId: string; name: string; slug: string };
+type MemoryGatewayTeam = { id: string; organizationId: string; name: string; slug: string };
 
 /** A person and the organizations they are a member of; the auth module owns the real rows. */
-export type MemoryGatewayUser = {
+type MemoryGatewayUser = {
   id: string;
   name: string | null;
   email: string | null;
@@ -31,12 +31,12 @@ export type MemoryGatewayUser = {
 };
 
 /** A model provider row and the scopes it is reachable from; the model-provider module owns it. */
-export type MemoryGatewayModelProvider = ModelProvider & {
+type MemoryGatewayModelProvider = ModelProvider & {
   scopes: readonly GatewayVirtualKeyScope[];
 };
 
 /** A routing policy row as a key's join and the dispatch order read it. */
-export type MemoryGatewayRoutingPolicy = {
+type MemoryGatewayRoutingPolicy = {
   id: string;
   organizationId: string;
   name: string;
@@ -47,7 +47,7 @@ export type MemoryGatewayRoutingPolicy = {
 };
 
 /** The CONNECT-only columns of a key row, which the shared key record does not carry. */
-export type MemoryGatewayConnectColumns = {
+type MemoryGatewayConnectColumns = {
   connectServices: string[];
   licenseTokenHash: string | null;
   licenseInstanceId: string | null;

@@ -9,7 +9,7 @@ import {
 import type { GatewayPersistenceTransaction } from "../gateway-transaction.repository.ts";
 
 /** The client slice the scope graph is read through. */
-export type GatewayScopeResolutionDatabase = Pick<
+type GatewayScopeResolutionDatabase = Pick<
   PrismaClient,
   "modelProvider" | "routingPolicy" | "virtualKey"
 >;

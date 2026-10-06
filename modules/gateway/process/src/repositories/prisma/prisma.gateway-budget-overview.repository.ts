@@ -5,7 +5,7 @@ import { GatewayBudgetOverviewRepository } from "../gateway-budget-overview.repo
 import { PrismaGatewayBudgetRepository } from "./prisma.gateway-budget.repository.ts";
 
 /** The client slice the budget-detail overview binds to. */
-export type GatewayBudgetOverviewDatabase = Pick<PrismaClient, "gatewayBudget">;
+type GatewayBudgetOverviewDatabase = Pick<PrismaClient, "gatewayBudget">;
 
 /** Private Prisma owner for the budget row a detail overview reports on. */
 export class PrismaGatewayBudgetOverviewRepository extends GatewayBudgetOverviewRepository {

@@ -6,7 +6,6 @@ import {
 import type { SpendUsage } from "@langwatch/gateway-contract";
 
 import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../rules/gateway-spend-projection.rules.ts";
-import { GATEWAY_SPEND_PIPELINE_NAME } from "./gateway-spend-commands.process.ts";
 import {
   type GatewaySpendAdmittedEvent,
   type GatewaySpendConfirmedEvent,
@@ -25,7 +24,7 @@ const gatewaySpendEvents = [
   gatewaySpendSettledEventSchema,
 ] as const;
 
-export type GatewaySpendStatus = "" | "admitted" | "confirmed" | "failed" | "settled";
+type GatewaySpendStatus = "" | "admitted" | "confirmed" | "failed" | "settled";
 
 /**
  * The spend record's working state. Every field is round-trippable through
@@ -291,5 +290,3 @@ export class GatewaySpendFoldProjection
     };
   }
 }
-
-export { GATEWAY_SPEND_PIPELINE_NAME };

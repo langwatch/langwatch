@@ -9,8 +9,6 @@ import {
 import { ClickHouseGatewayOpenAdmissionsRepository } from "./clickhouse.gateway-open-admissions.repository.ts";
 import type { GatewayClickHouseClient } from "./clickhouse.gateway-session.store.ts";
 
-export { ClickHouseGatewayOpenAdmissionsRepository };
-
 const logger = createLogger("langwatch:gateway-spend:settlement");
 
 /** One entry per configured ClickHouse instance: the shared one and every private org. */

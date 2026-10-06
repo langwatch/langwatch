@@ -43,7 +43,7 @@ const postCallSchema = z.object({
 
 type PostCall = z.infer<typeof postCallSchema>;
 
-export type ElevenLabsWebhookCollaborators = Readonly<{
+type ElevenLabsWebhookCollaborators = Readonly<{
   credentials: ElevenLabsCredentialCollaborators;
   sessions: GatewayRealtimeSessionCollaborators;
 }>;

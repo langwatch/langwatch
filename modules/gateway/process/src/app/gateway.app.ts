@@ -702,7 +702,7 @@ type GatewaySpendDefinition = StaticPipelineDefinition<
  * own ledger nor a peer's application: the one guarded Postgres connection its
  * two resolutions run on, and how long after a request an outcome may still arrive.
  */
-export type GatewaySpendCollaborators = Readonly<{
+type GatewaySpendCollaborators = Readonly<{
   spendScope: GatewaySpendScopeRepository;
   budgets: GatewayBudgetRepository;
   settlementGraceMs: number;
@@ -712,7 +712,7 @@ export type GatewaySpendCollaborators = Readonly<{
  * The two peers the per-member budget overview reads: organization
  * membership plus personal-workspace resolution, and the governance flag.
  */
-export type GatewayBudgetOverviewDeps = Readonly<{
+type GatewayBudgetOverviewDeps = Readonly<{
   organizations: OrganizationApi;
   featureFlags: FeatureFlagApi;
   traces: Pick<TraceApi, "findModelSpend">;

@@ -18,7 +18,7 @@ type Delegate<Model extends keyof PrismaClient, Methods extends keyof PrismaClie
   Methods
 >;
 
-export type VirtualKeyConfigBackfillDatabase = {
+type VirtualKeyConfigBackfillDatabase = {
   organization: Delegate<"organization", "findMany">;
   virtualKey: Delegate<"virtualKey", "findMany" | "update">;
   routingPolicy: Delegate<"routingPolicy", "create">;

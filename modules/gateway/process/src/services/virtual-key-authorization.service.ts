@@ -56,7 +56,7 @@ export type ActorContext = {
 };
 
 /** A key's scopes as given (or read from the stored key when absent) and its trace destination. */
-export type GuardrailProjectKey = {
+type GuardrailProjectKey = {
   organizationId: string;
   vkId: string | null;
   inputScopes: { scopeType: string; scopeId: string }[] | undefined;

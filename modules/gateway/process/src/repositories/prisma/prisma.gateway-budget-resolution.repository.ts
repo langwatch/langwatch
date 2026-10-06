@@ -10,7 +10,7 @@ import {
  */
 import type { GatewayBudget, Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
-export type BudgetResolutionTarget = {
+type BudgetResolutionTarget = {
   organizationId: string;
   /**
    * The team the request's traces land in. Callers pass only this one; the
@@ -40,7 +40,7 @@ export type BudgetResolutionTarget = {
   memberGroupIds: readonly string[];
 };
 
-export type ResolvedBudget = {
+type ResolvedBudget = {
   budget: GatewayBudget;
   /**
    * The id spend accumulates under. Equal to `budget.scopeId` for every

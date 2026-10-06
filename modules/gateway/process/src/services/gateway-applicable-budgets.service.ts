@@ -20,7 +20,7 @@ import type {
 import type { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
 import type { GatewayService } from "./gateway.service.ts";
 
-export type DraftVirtualKey = {
+type DraftVirtualKey = {
   organizationId: string;
   /** Null while the key is still a draft in the drawer. */
   virtualKeyId: string | null;

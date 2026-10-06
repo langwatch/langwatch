@@ -69,7 +69,7 @@ const logger = createLogger("langwatch:gateway:budget-service");
  * Per-person standing for a fanned-out (ATTRIBUTED_USER) budget: how many end users this
  * period, and how many are over cap. Every other scope leaves both fields absent.
  */
-export type GatewayBudgetWithSeats = GatewayBudgetResource & {
+type GatewayBudgetWithSeats = GatewayBudgetResource & {
   /**
    * Current-period spend as the ledger's nano-USD integer. spentUsd on the same row is this
    * rendered, so a consumer publishing an integer takes it from here rather than re-deriving
@@ -82,14 +82,14 @@ export type GatewayBudgetWithSeats = GatewayBudgetResource & {
   endUsersOver?: number;
 };
 
-export type BudgetHealth = {
+type BudgetHealth = {
   budget: GatewayBudgetWithSeats;
   spendAvailable: boolean;
   readAt: Instant;
   unreachableByAnyKey: boolean;
 };
 
-export type BudgetListWithHealth = {
+type BudgetListWithHealth = {
   budgets: GatewayBudgetWithSeats[];
   /**
    * False when spend could not be totalled. Consumers must say so rather
@@ -105,15 +105,9 @@ export type BudgetListWithHealth = {
   scopeReach: Map<string, GatewayBudgetScopeReach>;
 };
 
-export type BudgetPageWithHealth = BudgetListWithHealth & { total: number };
+type BudgetPageWithHealth = BudgetListWithHealth & { total: number };
 
-export type GatewayProjectBudgetScopeInput = {
-  organizationId: string;
-  teamId: string;
-  projectId: string;
-};
-
-export type BudgetScope =
+type BudgetScope =
   | { kind: "ORGANIZATION"; organizationId: string }
   | { kind: "TEAM"; teamId: string }
   | { kind: "PROJECT"; projectId: string }
@@ -128,7 +122,7 @@ export type BudgetScope =
       anchorProjectId?: string;
     };
 
-export type CreateBudgetInput = {
+type CreateBudgetInput = {
   organizationId: string;
   scope: BudgetScope;
   name: string;
@@ -162,7 +156,7 @@ export type CreateBudgetInput = {
   actorUserId: string;
 };
 
-export type UpdateBudgetInput = {
+type UpdateBudgetInput = {
   id: string;
   organizationId: string;
   name?: string;
@@ -177,24 +171,13 @@ export type UpdateBudgetInput = {
   actorUserId: string;
 };
 
-export type ArchiveBudgetInput = {
+type ArchiveBudgetInput = {
   id: string;
   organizationId: string;
   actorUserId: string;
 };
 
-export type BudgetLedgerLine = {
-  id: string;
-  virtualKeyId: string;
-  virtualKeyName: string;
-  virtualKeyPrefix: string;
-  amountUsd: string;
-  model: string;
-  status: "SUCCESS" | "PROVIDER_ERROR" | "BLOCKED_BY_GUARDRAIL" | "CANCELLED";
-  occurredAt: string;
-};
-
-export type BudgetDetail = {
+type BudgetDetail = {
   budget: GatewayBudgetWithSeats;
   scopeTarget: BudgetScopeTargetInfo;
   recentLedger: {
@@ -212,27 +195,9 @@ export type BudgetDetail = {
   unreachableByAnyKey: boolean;
 };
 
-export type BudgetCheckDecision = "allow" | "soft_warn" | "hard_block";
+type BudgetCheckDecision = "allow" | "soft_warn" | "hard_block";
 
-export type BudgetCheckInput = {
-  organizationId: string;
-  // Post-collapse: a VK with no PROJECT scope (TEAM/ORG-only) and no
-  // governance-project fallback has no trace project; the corresponding
-  // TEAM/PROJECT-scoped budgets are simply skipped from the OR-clause.
-  teamId: string | null;
-  projectId: string | null;
-  virtualKeyId: string;
-  principalUserId?: string | null;
-  projectedCostUsd: number | string;
-  /**
-   * The provider this request would dispatch to, when known. Given it, provider-filtered
-   * budgets are consulted; without it only unfiltered ones are — so a provider filter can
-   * never block a request never headed there.
-   */
-  providerKey?: string | null;
-};
-
-export type BudgetCheckResult = {
+type BudgetCheckResult = {
   decision: BudgetCheckDecision;
   warnings: { scope: string; pctUsed: number; limitUsd: string }[];
   blockReason: string | null;

@@ -25,10 +25,10 @@ import type { GatewayPersistenceTransaction } from "../gateway-transaction.repos
  * per query: a site missing a column doesn't fail, it silently materializes a bundle without
  * it (a policy's tier fallthrough stops reaching the gateway with nothing to notice).
  */
-export type VirtualKeyWithScopes = GatewayVirtualKeyRecord;
-export type ScopeInput = GatewayVirtualKeyScope;
-export type CreateVirtualKeyData = CreateGatewayVirtualKeyInput;
-export type SetVirtualKeyDisabledData = SetGatewayVirtualKeyDisabledInput;
+type VirtualKeyWithScopes = GatewayVirtualKeyRecord;
+type ScopeInput = GatewayVirtualKeyScope;
+type CreateVirtualKeyData = CreateGatewayVirtualKeyInput;
+type SetVirtualKeyDisabledData = SetGatewayVirtualKeyDisabledInput;
 
 export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyRepository {
   static create(database: PrismaClient): PrismaGatewayVirtualKeyRepository {

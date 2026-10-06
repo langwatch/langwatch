@@ -3,7 +3,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GatewayKeyReachRow } from "../gateway-budget.repository.ts";
 
 /** The client slice the reach walk reads. */
-export type GatewayBudgetScopeReachDatabase = Pick<PrismaClient, "virtualKey">;
+type GatewayBudgetScopeReachDatabase = Pick<PrismaClient, "virtualKey">;
 
 /** Gateway-owned active-key facts used by the budget reach policy. */
 export class PrismaGatewayBudgetScopeReachRepository {

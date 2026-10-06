@@ -66,14 +66,14 @@ type BudgetDebitRow = {
  * Deliberately not a `GatewayBudgetScopeType`, so no budget can be created under it and every
  * enforcement read resolves real budgets first (ADR-088).
  */
-export const PULLED_USAGE_SCOPE = "pulled" as const;
+const PULLED_USAGE_SCOPE = "pulled" as const;
 
 /**
  * The ledger's storage key is `(TenantId, BudgetId, GatewayRequestId)` and demands one; this is
  * not a cuid, so it can never equal a real `GatewayBudget.id`. One shared value also keeps
  * pulled rows contiguous under the sorting key, so the read below stays an index seek.
  */
-export const PULLED_USAGE_BUDGET_ID = "pulled" as const;
+const PULLED_USAGE_BUDGET_ID = "pulled" as const;
 
 /**
  * One pulled usage item, priced. Deliberately not a `BudgetDebitRow`: there is
@@ -112,7 +112,7 @@ type PulledUsageTotals = {
   tokensOutput: number;
 };
 
-export type ScopeSpend = {
+type ScopeSpend = {
   budgetId: string;
   scope: GatewayBudgetScopeType;
   scopeId: string;
@@ -135,7 +135,7 @@ export type BucketSpend = {
  * A per-bucket period boundary, as stored on `GatewayBudgetBucketBoundary`.
  * Callers batch-load these so the read stays one round-trip per budget.
  */
-export type BudgetBucketBoundary = {
+type BudgetBucketBoundary = {
   bucketScopeId: string;
   periodStartedAt: Instant;
 };
@@ -145,7 +145,7 @@ export type BudgetBucketBoundary = {
  * per-member GROUP allowance each accrue under their own key. `match: "prefix"` sums every
  * bucket under the key, for a GROUP budget's whole-group total.
  */
-export type BudgetSpendTarget = {
+type BudgetSpendTarget = {
   budgetId: string;
   scope: GatewayBudgetScopeType;
   scopeId: string;
@@ -168,7 +168,7 @@ export type BudgetSpendTarget = {
  * Read-shape for ledger events, scoped to whatever the caller needs (one VK, one budget, or all
  * VKs in a project). Field names mirror the equivalent Prisma row.
  */
-export type LedgerEventRow = {
+type LedgerEventRow = {
   id: string; // GatewayRequestId — unique within (tenant, budget)
   budgetId: string;
   virtualKeyId: string;

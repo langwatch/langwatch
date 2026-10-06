@@ -15,7 +15,7 @@ import { budgetSpendTargetsFor } from "../rules/gateway-budget-spend-targets.rul
 
 const logger = createLogger("langwatch:gateway:virtual-key-direct-budget");
 
-export type VirtualKeyDirectBudget = {
+type VirtualKeyDirectBudget = {
   budgetId: string;
   window: GatewayBudget["window"];
   limitUsd: string;

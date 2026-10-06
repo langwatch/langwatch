@@ -49,7 +49,7 @@ export interface GatewaySpendDoorApi {
   ): Promise<GatewayEndUserSpendResponse>;
 }
 
-export const GatewaySpendApi = moduleApi<GatewaySpendDoorApi>()("gateway");
+const GatewaySpendApi = moduleApi<GatewaySpendDoorApi>()("gateway");
 
 const spendResponses = canonicalBaseResponses;
 

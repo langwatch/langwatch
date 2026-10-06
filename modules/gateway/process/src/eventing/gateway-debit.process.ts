@@ -30,7 +30,7 @@ export const gatewayDebitsStateSchema = z.object({
   admitted: z.boolean(),
   pendingOutcome: writeGatewayDebitsSchema.nullable(),
 });
-export type GatewayDebitsState = z.infer<typeof gatewayDebitsStateSchema>;
+type GatewayDebitsState = z.infer<typeof gatewayDebitsStateSchema>;
 
 /** Who a debit is charged to, from the outcome itself or the admission remembered. */
 type DebitAttribution = Pick<

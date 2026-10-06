@@ -17,7 +17,7 @@ export const PAGE_LIMIT_DEFAULT = 50;
 export const PAGE_LIMIT_MAX = 200;
 
 /** One column of the sort key, most significant first. */
-export interface KeysetColumn {
+interface KeysetColumn {
   name: string;
   /** The value from the last row served. */
   value: string | number | Instant;
@@ -26,7 +26,7 @@ export interface KeysetColumn {
 }
 
 /** Opaque page cursor: base64url of the sort key's values. */
-export function encodePageCursor(values: (string | number)[]): string {
+function encodePageCursor(values: (string | number)[]): string {
   return Buffer.from(values.join(CURSOR_SEPARATOR), "utf8").toString("base64url");
 }
 
@@ -35,7 +35,7 @@ export function encodePageCursor(values: (string | number)[]): string {
  * rather than a throw, matching the spend walk — the ROUTE decides a
  * garbled cursor is a 400, since silently restarting would re-serve everything.
  */
-export function decodePageCursor(encoded: string, arity: number): string[] | null {
+function decodePageCursor(encoded: string, arity: number): string[] | null {
   try {
     const parts = Buffer.from(encoded, "base64url").toString("utf8").split(CURSOR_SEPARATOR);
     if (parts.length !== arity || parts.some((p) => p.length === 0)) {

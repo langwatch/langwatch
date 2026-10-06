@@ -36,8 +36,6 @@ import { gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
 import { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 import { virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
 
-export type { GatewayInfrastructure } from "./app/gateway.app.ts";
-
 export const gatewayProcessModule = defineProcessModule("gateway")
   .withRepositories(gatewayRepositories)
   .withApi(GatewayModule)

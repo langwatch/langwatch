@@ -27,7 +27,7 @@ export class VirtualKeyCryptoError extends Error {
  * optional so an unconfigured process retains the legacy operation-time
  * `pepper_missing` failure; the feature never reads an ambient environment source.
  */
-export type VirtualKeyCryptoConfig = {
+type VirtualKeyCryptoConfig = {
   pepper?: string;
 };
 

@@ -6,7 +6,7 @@ import type {
 } from "../gateway-transaction.repository.ts";
 
 /** The one client slice a transaction needs. */
-export type GatewayTransactionDatabase = Pick<PrismaClient, "$transaction">;
+type GatewayTransactionDatabase = Pick<PrismaClient, "$transaction">;
 
 /** Prisma's interactive transaction, handed to services as an opaque handle. */
 export class PrismaGatewayTransactionRepository implements GatewayTransactionRepository {

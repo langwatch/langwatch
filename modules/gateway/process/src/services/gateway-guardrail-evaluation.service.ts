@@ -18,9 +18,9 @@ import type { GatewayGuardrailRepository } from "../repositories/gateway-guardra
 
 const logger = createLogger("langwatch:gateway:guardrail-evaluation");
 
-export type GuardrailDecision = "allow" | "block" | "modify";
+type GuardrailDecision = "allow" | "block" | "modify";
 
-export type GuardrailCheckContent = {
+type GuardrailCheckContent = {
   messages?: unknown;
   output?: unknown;
   chunk?: unknown;

@@ -1,6 +1,6 @@
 import { createLogger, type Logger } from "@langwatch/observability";
 
-export type GatewayAuthDecision = {
+type GatewayAuthDecision = {
   request: Request | string | undefined;
   code: string;
   status: number;

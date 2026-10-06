@@ -6,7 +6,7 @@ import {
 } from "../gateway-organization-directory.repository.ts";
 
 /** The client slice the organization/group tenancy reads below touch. */
-export type GatewayOrganizationDirectoryDatabase = Pick<PrismaClient, "group" | "groupMembership">;
+type GatewayOrganizationDirectoryDatabase = Pick<PrismaClient, "group" | "groupMembership">;
 
 export class PrismaGatewayOrganizationDirectoryRepository extends GatewayOrganizationDirectoryRepository {
   static create(

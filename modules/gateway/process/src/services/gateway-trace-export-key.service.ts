@@ -7,7 +7,7 @@ import { type ApiKeyApi, TRACE_EXPORT_API_KEY_NAME } from "@langwatch/api-key-co
 
 import type { GatewayTraceExportKeyRepository } from "../repositories/gateway-trace-export-key.repository.ts";
 
-export const TRACE_EXPORT_PERMISSIONS: readonly string[] = ["traces:create"];
+const TRACE_EXPORT_PERMISSIONS: readonly string[] = ["traces:create"];
 
 export class GatewayTraceExportKeyService {
   private constructor(

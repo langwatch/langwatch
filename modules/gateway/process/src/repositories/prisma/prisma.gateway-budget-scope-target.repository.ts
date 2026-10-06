@@ -10,7 +10,7 @@ import type { ProjectIdentity } from "@langwatch/project-contract";
 import type { GatewayVirtualKeyProjectScope } from "../gateway-budget.repository.ts";
 
 /** The client slice scope-target expansion reads. */
-export type GatewayBudgetScopeTargetDatabase = Pick<
+type GatewayBudgetScopeTargetDatabase = Pick<
   PrismaClient,
   "group" | "groupMembership" | "organization" | "team" | "user" | "virtualKey"
 >;

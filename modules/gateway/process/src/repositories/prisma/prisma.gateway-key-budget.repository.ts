@@ -11,7 +11,7 @@ import type { GatewayPersistenceTransaction } from "../gateway-transaction.repos
 import { PrismaGatewayBudgetRepository } from "./prisma.gateway-budget.repository.ts";
 
 /** The client slice a key's own caps are written through. */
-export type GatewayKeyBudgetDatabase = Pick<PrismaClient, "gatewayBudget">;
+type GatewayKeyBudgetDatabase = Pick<PrismaClient, "gatewayBudget">;
 
 /** Private Prisma owner for the caps a virtual key's drawer manages. */
 export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository {

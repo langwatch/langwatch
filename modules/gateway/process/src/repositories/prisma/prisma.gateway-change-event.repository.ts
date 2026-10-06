@@ -14,7 +14,7 @@ import type {
 import type { GatewayPersistenceTransaction } from "../gateway-transaction.repository.ts";
 
 /** The client slice the revision feed needs. */
-export type GatewayChangeEventDatabase = Pick<PrismaClient, "gatewayChangeEvent">;
+type GatewayChangeEventDatabase = Pick<PrismaClient, "gatewayChangeEvent">;
 
 export class PrismaGatewayChangeEventsRepository implements GatewayChangeEventsRepository {
   static create(database: GatewayChangeEventDatabase): PrismaGatewayChangeEventsRepository {

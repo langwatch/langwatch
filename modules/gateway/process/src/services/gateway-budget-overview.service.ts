@@ -26,7 +26,7 @@ import type { GatewayService } from "./gateway.service.ts";
  * surfaces with only a few lines. `satisfies` over the Prisma enum keeps the map exhaustive: a new
  * scope kind fails to compile rather than silently sorting last.
  */
-export const BUDGET_SCOPE_RANK = {
+const BUDGET_SCOPE_RANK = {
   PRINCIPAL: 0,
   VIRTUAL_KEY: 1,
   GROUP: 2,
@@ -41,7 +41,7 @@ export const BUDGET_SCOPE_RANK = {
  * honest answer for a scope kind this module has no wording for: surfaces
  * then name the target instead of claiming a scope.
  */
-export type BudgetOverviewScopeClass =
+type BudgetOverviewScopeClass =
   | "organization"
   | "team"
   | "project"
@@ -50,7 +50,7 @@ export type BudgetOverviewScopeClass =
   | "department"
   | "other";
 
-export type BudgetOverviewItem = ApplicableBudget & {
+type BudgetOverviewItem = ApplicableBudget & {
   scopeClass: BudgetOverviewScopeClass;
   /**
    * The parenthetical every surface renders after the numbers:
@@ -72,7 +72,7 @@ export type BudgetOverviewItem = ApplicableBudget & {
   topModels?: { model: string; spentUsd: number }[];
 };
 
-export type BudgetOverviewForUser = {
+type BudgetOverviewForUser = {
   /**
    * False when this org gives the user no member-facing gateway path at
    * all: the governance flag is off, or they are not a member. Consumers
