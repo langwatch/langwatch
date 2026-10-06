@@ -118,7 +118,7 @@ export const dashboardWidgetRest: Readonly<{
   .withDocs({
     summary: "Create a dashboard widget",
     description:
-      "Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.",
+      "Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget, with an optional description the card shows behind its info icon. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.",
     tags: WIDGET_TAGS,
     responses: {
       ...canonicalBaseResponses,
@@ -132,6 +132,7 @@ export const dashboardWidgetRest: Readonly<{
       name: input.name,
       code: input.code,
       queries: input.queries,
+      ...(input.description === undefined ? {} : { description: input.description }),
     });
 
     return widgetResource(widget, platformUrl);

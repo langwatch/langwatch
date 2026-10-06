@@ -53,6 +53,32 @@ describe("DashboardModule dashboard widgets", () => {
     await expect(dashboard.listDashboardWidgets({ projectId: "project-1" })).resolves.toEqual([]);
   });
 
+  /** @scenario "AC113 Widget description: the description is stored and kept when the code is edited" */
+  it("stores a widget's description and keeps it when its code is edited", async () => {
+    const dashboard = createDashboardTestApp();
+    const created = await dashboard.createDashboardWidget({
+      projectId: "project-1",
+      name: "Usage",
+      code: "export default () => null;",
+      queries: [],
+      description: "Traces per bucket",
+    });
+
+    await dashboard.updateDashboardWidget({
+      projectId: "project-1",
+      id: created.id,
+      code: "export default () => <div />;",
+      queries: [],
+    });
+
+    expect(created.definition.description).toBe("Traces per bucket");
+    await expect(
+      dashboard.getDashboardWidget({ projectId: "project-1", id: created.id }),
+    ).resolves.toMatchObject({
+      definition: { code: "export default () => <div />;", description: "Traces per bucket" },
+    });
+  });
+
   it("mints widget ids under the house scheme", async () => {
     const dashboard = createDashboardTestApp();
 

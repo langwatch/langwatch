@@ -90,6 +90,8 @@ export interface ChartGridProps {
   width?: number;
   /** The height of one grid row, where a surface uses a finer grid than the default. */
   rowHeightPx?: number;
+  /** The fewest rows a resize may leave a card, where its content needs more than one. */
+  minRowSpan?: number;
 }
 
 export function ChartGrid({
@@ -98,6 +100,7 @@ export function ChartGrid({
   renderCard,
   width: fixedWidth,
   rowHeightPx = CHART_GRID_ROW_HEIGHT_PX,
+  minRowSpan = 1,
 }: ChartGridProps) {
   const { width: measuredWidth, containerRef, mounted } = useContainerWidth();
   const width = fixedWidth ?? measuredWidth;
@@ -111,7 +114,7 @@ export function ChartGrid({
     [onPlacementsCommit, placements],
   );
 
-  const layout = placements.map(toLayoutItem);
+  const layout = placements.map((placement) => ({ ...toLayoutItem(placement), minH: minRowSpan }));
 
   return (
     <Box ref={containerRef} width="100%" className="chart-grid">

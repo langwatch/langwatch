@@ -1,7 +1,7 @@
 /**
- * What every template builds its widgets from: a stored definition from code and
- * named queries, plus the presence query its empty face runs, and the full-width
- * and half-width places on the chart grid.
+ * What every template builds its widgets from: a stored definition from code, its
+ * description and named queries, plus the presence query its empty face runs, and
+ * the full-width and half-width places on the chart grid.
  */
 
 import { CHART_GRID_COLUMNS } from "../../../../model/chart-grid.ts";
@@ -25,6 +25,7 @@ export function definition({
     version: DASHBOARD_WIDGET_DEFINITION_VERSION,
     code: code.tsx,
     queries: Object.entries(all).map(([name, text]) => ({ name, sql: text, parameters: [] })),
+    description: code.description,
   };
 }
 

@@ -253,14 +253,32 @@ const BUTTON = `const BUTTON = {
 };
 const DASHED = { border: "1px dashed " + C.strong, borderRadius: 8, background: C.muted + "4d" };`;
 
+/** Below this frame height the full empty face drops its icon. */
+export const FACE_ICON_MIN_HEIGHT_PX = 220;
+/** Below this frame height the empty face is one row: title, truncated line, button. */
+export const FACE_FULL_MIN_HEIGHT_PX = 180;
+
+/**
+ * Plain CSS, so a face adapts live as its card is resized. Measured with the body padding:
+ * the full face is 208px with a two-line line, 164px without its icon; the row is 75px.
+ */
+const FIT_CSS = `.lw-row { display: none; }
+@media (max-height: ${FACE_ICON_MIN_HEIGHT_PX - 1}px) { .lw-icon { display: none !important; } }
+@media (max-height: ${FACE_FULL_MIN_HEIGHT_PX - 1}px) {
+  .lw-full { display: none !important; }
+  .lw-row { display: flex !important; }
+  .lw-setup { padding: 8px 12px !important; }
+}`;
+
 /**
  * The empty face. It asks whether the source sent data lately: if so, one quiet-period
  * line; if not, icon tile, title, one sentence and the button to the page that turns the
- * source on. Compact lays the setup step out as one row, for a panel only a strip tall.
+ * source on. A short frame gets the one-row layout instead; a strip only ever has that.
  */
 function callToActionCode({ source, compact }: { source: WidgetSource; compact: boolean }) {
   const cta = CALLS_TO_ACTION[source];
-  const icon = `<div style={{ ...CENTRED, flexShrink: 0, width: 36, height: 36, borderRadius: 8,
+  const icon = (className: string) => `<div${className}
+        style={{ ...CENTRED, flexShrink: 0, width: 36, height: 36, borderRadius: 8,
         background: C.muted }}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.teal}
           strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -274,60 +292,59 @@ function callToActionCode({ source, compact }: { source: WidgetSource; compact: 
   if (present.isError) return <Note color={C.red}>{present.error.message}</Note>;
   if (!present.data) return <Note>Loading</Note>;
   if (present.data.length > 0) return <Note>${cta.quiet}</Note>;`;
-  if (compact) {
-    return `${BUTTON}
-
-function CallToAction() {
-  ${presence}
-  return (
-    <div style={{ ...DASHED, display: "flex", alignItems: "center", gap: 12,
+  // The row's display comes from FIT_CSS when it stands in for the full face.
+  const row = ({ fallback }: { fallback: boolean }) => `<div${fallback ? ' className="lw-row"' : ""}
+      style={{ ...DASHED, ${fallback ? "" : 'display: "flex", '}alignItems: "center", gap: 12,
       padding: "12px 16px" }}>
-      ${icon}
+      ${icon("")}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600 }}>${cta.title}</div>
-        <div style={{ fontSize: 11.5, color: C.subtle }}>${cta.line}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, ...CTA_CLIP }}>${cta.title}</div>
+        <div style={{ fontSize: 11.5, color: C.subtle, ...CTA_CLIP }}>${cta.line}</div>
       </div>
       ${button}
-    </div>
-  );
-}`;
-  }
+    </div>`;
+  const face = compact
+    ? row({ fallback: false })
+    : `<div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      <div className="lw-full" style={{ ...DASHED, flex: 1, ...CENTRED, gap: 8,
+        padding: "24px 20px", textAlign: "center" }}>
+        ${icon(' className="lw-icon"')}
+        <div style={{ fontSize: 13, fontWeight: 600 }}>${cta.title}</div>
+        <div style={{ fontSize: 11.5, color: C.subtle, maxWidth: 320 }}>
+          ${cta.line}
+        </div>
+        <div style={{ marginTop: 4 }}>
+          ${button}
+        </div>
+      </div>
+      ${row({ fallback: true })}
+    </div>`;
   return `${BUTTON}
+const CTA_CLIP = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 
 function CallToAction() {
   ${presence}
   return (
-    <div style={{ ...DASHED, flex: 1, ...CENTRED, gap: 8, padding: "24px 20px",
-      textAlign: "center" }}>
-      ${icon}
-      <div style={{ fontSize: 13, fontWeight: 600 }}>${cta.title}</div>
-      <div style={{ fontSize: 11.5, color: C.subtle, maxWidth: 320 }}>
-        ${cta.line}
-      </div>
-      <div style={{ marginTop: 4 }}>
-        ${button}
-      </div>
-    </div>
+    ${face}
   );
 }`;
 }
 
 /**
- * The body frame every face sits in: the app's Inter, and the subtitle line the card header
- * does not draw, pulled up to sit directly under the card's title.
+ * The body frame every face sits in: the app's Inter and the height rules the empty faces
+ * read. The card header draws the title and its info tip, so the body starts with the face.
  */
-function panelCode(subtitle: string): string {
+function panelCode(): string {
   return `const CENTRED = { display: "flex", flexDirection: "column", alignItems: "center",
   justifyContent: "center" };
 const FRAME_CSS = '@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400..700' +
-  '&display=swap"); body { padding: 2px 8px 8px; }';
+  '&display=swap"); body { padding: 6px 8px 8px; } ' + ${JSON.stringify(FIT_CSS)};
 
 function Panel({ children }) {
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", color: C.text,
       fontFamily: "Inter, system-ui, sans-serif", fontSize: 13, lineHeight: 1.5 }}>
       <style>{FRAME_CSS}</style>
-      <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 8 }}>${subtitle}</div>
       {children}
     </div>
   );
@@ -352,11 +369,14 @@ function queryStatesCode(queries: readonly string[]): string {
 export interface WidgetCode {
   readonly tsx: string;
   readonly source: WidgetSource;
+  /** What the card's info tip says; the stored code no longer draws it. */
+  readonly description: string;
 }
 
 export interface WidgetCodeSpec {
   /** The one comment line at the top: what the panel shows. */
   readonly summary: string;
+  /** One line on what the panel is for: the widget's description, not part of its code. */
   readonly subtitle: string;
   readonly source: WidgetSource;
   /** Recharts components the panel imports, if it draws a chart. */
@@ -388,10 +408,11 @@ export function widgetCode({
   const sections = [
     PALETTE,
     ...parts,
-    panelCode(subtitle),
+    panelCode(),
     callToActionCode({ source, compact: compactCallToAction }),
     ...(components ? [components] : []),
     `export default function Widget() {\n${queryStatesCode(queries)}\n${body}\n}`,
   ];
-  return { tsx: `// ${summary}\n${imports}${sections.join("\n\n")}\n`, source };
+  const tsx = `// ${summary}\n${imports}${sections.join("\n\n")}\n`;
+  return { tsx, source, description: subtitle };
 }

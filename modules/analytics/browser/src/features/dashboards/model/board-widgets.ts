@@ -5,6 +5,7 @@
 
 import { chartGridBottomRow, type ChartGridPlacement } from "../../../model/chart-grid.ts";
 import type { DashboardWidgetDefinition } from "../../../model/dashboard-widget-definition.ts";
+import { atLeastBoardMinRows } from "./board-grid.ts";
 
 /** A stored widget, as much of it as a board reads. */
 export interface StoredBoardWidget {
@@ -26,7 +27,7 @@ export interface BoardWidget {
   readonly placement: ChartGridPlacement;
 }
 
-/** The widgets on one board, top to bottom, left to right. */
+/** The widgets on one board, top to bottom, left to right, none shorter than the minimum. */
 export function boardWidgetsOf({
   widgets,
   dashboardId,
@@ -40,7 +41,7 @@ export function boardWidgetsOf({
       id,
       name,
       definition: graph,
-      placement: { graphId: id, gridColumn, gridRow, colSpan, rowSpan },
+      placement: atLeastBoardMinRows({ graphId: id, gridColumn, gridRow, colSpan, rowSpan }),
     }))
     .toSorted(
       (a, b) =>

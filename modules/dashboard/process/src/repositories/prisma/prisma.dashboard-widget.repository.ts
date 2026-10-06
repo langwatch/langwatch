@@ -34,6 +34,7 @@ const graphOf = (input: DashboardWidgetDefinitionInput): Prisma.InputJsonValue =
   version: DASHBOARD_WIDGET_DEFINITION_VERSION,
   code: input.code,
   queries: [...input.queries],
+  ...(input.description === undefined ? {} : { description: input.description }),
 });
 
 export class PrismaDashboardWidgetRepository
@@ -140,7 +141,11 @@ export class PrismaDashboardWidgetRepository
       const data: Prisma.CustomGraphUpdateManyMutationInput = {};
       if (input.name !== undefined) data.name = input.name;
 
-      if (input.code !== undefined || input.queries !== undefined) {
+      if (
+        input.code !== undefined ||
+        input.queries !== undefined ||
+        input.description !== undefined
+      ) {
         data.graph = await this.#mergeDefinitionUpdate({
           tx,
           id,
@@ -183,9 +188,12 @@ export class PrismaDashboardWidgetRepository
       throw new DashboardWidgetDefinitionInvalidError(current.id, { reasons: [parsed.error] });
     }
     const definition = parsed.data;
+    // An edit of code or queries keeps the description the widget was saved with.
+    const description = input.description ?? definition.description;
     return graphOf({
       code: input.code ?? definition.code,
       queries: input.queries ?? definition.queries,
+      ...(description === undefined ? {} : { description }),
     });
   }
 

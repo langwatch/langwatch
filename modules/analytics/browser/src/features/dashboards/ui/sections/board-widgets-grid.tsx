@@ -1,13 +1,13 @@
 /**
  * A board's stored widgets on the shared chart grid, each moved by its drag
- * handle and resized from its corner; a finished move or resize is saved. Its
- * rows are the board's finer 44px rows.
+ * handle and resized from its corner, never below the board's minimum height; a
+ * finished move or resize is saved. Its rows are the board's finer 44px rows.
  */
 
 import type { ChartGridPlacement } from "../../../../model/chart-grid.ts";
 import type { DashboardWidgetDraft } from "../../../../model/dashboard-widget-definition.ts";
 import { ChartGrid } from "../../../../ui/sections/chart-grid.tsx";
-import { BOARD_GRID_ROW_HEIGHT_PX } from "../../model/board-grid.ts";
+import { BOARD_GRID_ROW_HEIGHT_PX, BOARD_MIN_ROW_SPAN } from "../../model/board-grid.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { BoardWidgetCard } from "./board-widget-card.tsx";
@@ -48,6 +48,7 @@ export function BoardWidgetsGrid({
       placements={widgets.map(({ placement }) => placement)}
       onPlacementsCommit={onPlacementsCommit}
       rowHeightPx={BOARD_GRID_ROW_HEIGHT_PX}
+      minRowSpan={BOARD_MIN_ROW_SPAN}
       renderCard={({ graphId }) => {
         const widget = byId.get(graphId);
         if (!widget) return null;

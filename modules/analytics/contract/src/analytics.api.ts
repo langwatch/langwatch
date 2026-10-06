@@ -59,6 +59,8 @@ export interface DashboardWidget {
 export interface DashboardWidgetDefinitionInput {
   readonly code: string;
   readonly queries: readonly DashboardWidgetQuery[];
+  /** What the card's info tip says; a widget without one shows no tip. */
+  readonly description?: string;
 }
 
 /** The callable analytics capability shared by process peers. */

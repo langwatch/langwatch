@@ -21,6 +21,8 @@ const MAX_PARAMETER_VALUE_LENGTH = 4_000;
 const MAX_CODE_LENGTH = 200_000;
 /** A widget name is a label, not a document — the persisted column is short. */
 const MAX_WIDGET_NAME_LENGTH = 200;
+/** What the card's info tip says: a few sentences, never a document. */
+const MAX_WIDGET_DESCRIPTION_LENGTH = 2_000;
 
 /**
  * Every author-declared parameter name starting with this prefix is rejected — the prefix,
@@ -133,11 +135,17 @@ export const dashboardWidgetCodeSchema = z.string().min(1).max(MAX_CODE_LENGTH);
 export const dashboardWidgetQueriesSchema = z
   .array(dashboardWidgetQuerySchema)
   .max(MAX_QUERIES_PER_WIDGET);
+/** Optional on every definition: widgets saved before it existed carry none. */
+export const dashboardWidgetDescriptionSchema = z
+  .string()
+  .min(1)
+  .max(MAX_WIDGET_DESCRIPTION_LENGTH);
 
 export const dashboardWidgetDefinitionSchema = z.object({
   version: z.literal(DASHBOARD_WIDGET_DEFINITION_VERSION),
   code: dashboardWidgetCodeSchema,
   queries: dashboardWidgetQueriesSchema,
+  description: dashboardWidgetDescriptionSchema.optional(),
 });
 
 export type DashboardWidgetQueryParameterDeclaration = z.infer<

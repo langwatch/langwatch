@@ -10,6 +10,7 @@ import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
 import type { DashboardWidgetDraft } from "../../../model/dashboard-widget-definition.ts";
 import { pickerWidgets } from "../catalogue/index.ts";
 import type { BlockQuestion } from "../model/block-questions.ts";
+import { atLeastBoardMinRows } from "../model/board-grid.ts";
 import {
   addedWidgetSlots,
   type BoardWidget,
@@ -61,6 +62,7 @@ export function useBoardWidgets() {
           name: widget.name,
           code: widget.definition.code,
           queries: widget.definition.queries,
+          description: widget.definition.description,
         });
         const placements = widgetsOn(dashboardId).map(({ placement }) => placement);
         const slot = duplicateSlot({ placements, original: widget.placement });
@@ -94,6 +96,7 @@ export function useBoardWidgets() {
               name: widget.name,
               code: widget.definition.code,
               queries: widget.definition.queries,
+              description: widget.definition.description,
             });
             return { graphId: created.id, ...slots[index]! };
           }),
@@ -131,7 +134,8 @@ export function useBoardWidgets() {
     write({
       fallbackTitle: "Couldn't save the layout",
       work: async () => {
-        await batchUpdateLayouts.mutateAsync({ projectId, layouts: [...placements] });
+        const layouts = placements.map(atLeastBoardMinRows);
+        await batchUpdateLayouts.mutateAsync({ projectId, layouts });
       },
     });
 

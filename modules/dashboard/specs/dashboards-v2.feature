@@ -647,6 +647,51 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And a coming-soon card says how many of its widgets are built and cannot create a board
 
   # ---------------------------------------------------------------------------
+  # Widget description and fit
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: AC110 Widget description: a built widget carries its description, not in its code
+    Given a widget built from the catalogue
+    Then its stored definition has a description: what the panel is for, then why it matters
+    And its stored code no longer draws that line inside the panel
+
+  @integration
+  Scenario: AC111 Widget description: the card shows the description behind an info icon
+    Given a board with a widget whose definition has a description
+    Then the card header shows only the title, with an info icon before the widget menu
+    And hovering or focusing the info icon shows the description
+
+  @integration
+  Scenario: AC112 Widget description: a widget without a description has no info icon
+    Given a board with a widget saved before descriptions existed
+    Then its card shows no info icon
+
+  @unit
+  Scenario: AC113 Widget description: the description is stored and kept when the code is edited
+    Given a widget created with a description
+    When its code is edited
+    Then the widget still has the description it was created with
+
+  @unit
+  Scenario: AC114 Widget fit: the empty face fits a short card
+    Given a widget whose source was never set up, on a card of any height
+    Then below 220px of frame height the empty face drops its icon
+    And below 180px it is one row: title, truncated line and button
+    And the button to set the source up is always visible
+
+  @unit
+  Scenario: AC115 Widget fit: a widget is never shorter than its title and one-row empty face
+    Given a board placement shorter than 3 rows
+    When it is laid out, resized or saved
+    Then it is 3 rows high
+
+  @unit
+  Scenario: AC116 Widget fit: every built widget is at least the minimum height
+    Given every catalogue and template widget
+    Then each spans at least 3 rows
+
+  # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
 
@@ -689,3 +734,5 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 60-71: "Where my agent breaks" and "Release check" widgets are built from the prototype's cards → Scenario: AC60 to Scenario: AC71
   # AC 80-93: "The boards preloaded for one agent kind are built" (By customer, Call quality, Field accuracy, Outputs users keep, Risk sign-off) → Scenario: AC80 By customer: the board groups by the first key the traces carry; Scenario: AC80b By customer: no grouping key says what to send; Scenario: AC81 By customer: conversations by customer with each one's share; Scenario: AC82 By customer: one row per customer with pass rate, the period before and AI cost; Scenario: AC83 By customer: pass rate on the newest prompt version against the one before; Scenario: AC84 By customer: spend by customer, top six; Scenario: AC85 Call quality: reply time by stage; Scenario: AC86 Call quality: calls not ended and repeated sentences; Scenario: AC87 Field accuracy: accuracy per field and document type; Scenario: AC88 Field accuracy: share sent to human review; Scenario: AC89 Outputs users keep: drop-off after generation; Scenario: AC90 Risk sign-off: sign-off status; Scenario: AC91 Risk sign-off: policy checks with their margin; Scenario: AC92 Risk sign-off: review queue; Scenario: AC93 Risk sign-off: change log
   # AC 100-106: "Templates library" → Scenario: AC100 Templates library: the sidebar opens the library; Scenario: AC100b Templates library: the library is behind the dashboards gate; Scenario: AC101 Templates library: every template is listed by trunk, ready ones first; Scenario: AC102 Templates library: search matches name, job, widget questions and agent kinds; Scenario: AC103 Templates library: filter chips narrow by trunk, agent kind and readiness; Scenario: AC104 Templates library: the search and filters are kept in the address; Scenario: AC105 Templates library: no match says so and offers to clear the filters; Scenario: AC106 Templates library: a ready template creates a board, a coming-soon one cannot
+  # AC 110-113: "Widget description: the description moves from the stored code to an info tip on the card" → Scenario: AC110 Widget description: a built widget carries its description, not in its code; Scenario: AC111 Widget description: the card shows the description behind an info icon; Scenario: AC112 Widget description: a widget without a description has no info icon; Scenario: AC113 Widget description: the description is stored and kept when the code is edited
+  # AC 114-116: "Widget fit: a short card keeps its empty face usable" → Scenario: AC114 Widget fit: the empty face fits a short card; Scenario: AC115 Widget fit: a widget is never shorter than its title and one-row empty face; Scenario: AC116 Widget fit: every built widget is at least the minimum height

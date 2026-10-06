@@ -11,6 +11,7 @@ import {
 import {
   dashboardWidgetCodeSchema,
   dashboardWidgetDefinitionSchema,
+  dashboardWidgetDescriptionSchema,
   dashboardWidgetNameSchema,
   dashboardWidgetQueriesSchema,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
@@ -76,6 +77,7 @@ export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
       name: dashboardWidgetNameSchema,
       code: dashboardWidgetCodeSchema,
       queries: dashboardWidgetQueriesSchema,
+      description: dashboardWidgetDescriptionSchema.optional(),
     }),
   )
   .withOutput(dashboardWidgetTrpcSchema)

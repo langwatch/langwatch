@@ -41,6 +41,7 @@ export function useBoardFromTemplate() {
           name,
           code: definition.code,
           queries: definition.queries,
+          description: definition.description,
         });
         return { graphId: created.id, ...layout };
       }),

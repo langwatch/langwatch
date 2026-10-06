@@ -8,18 +8,28 @@ import { definition, full, half } from "../../templates/model/template-widget.ts
 import { CATALOGUE_WIDGET_BUILDS } from "../widgets/index.ts";
 import { CATALOGUE_WIDGETS } from "./catalogue-widgets.ts";
 
-const questionById = new Map(CATALOGUE_WIDGETS.map(({ id, question }) => [id, question] as const));
+const widgetById = new Map(CATALOGUE_WIDGETS.map((widget) => [widget.id, widget] as const));
 
-/** The stored widget for a catalogue widget, named by its question; undefined without code. */
+/** The card's info tip: what the panel is for, then why it matters, a blank line apart. */
+const descriptionOf = ({ subtitle, why }: { subtitle: string; why: string }): string =>
+  [subtitle, why].filter((part) => part.length > 0).join("\n\n");
+
+/**
+ * The stored widget for a catalogue widget, named by its question and described by its
+ * subtitle and why; undefined without code.
+ */
 export function implementedWidget(id: string): BoardTemplateWidget | undefined {
   const build = CATALOGUE_WIDGET_BUILDS[id];
-  const question = questionById.get(id);
-  if (!build || question === void 0) return void 0;
+  const widget = widgetById.get(id);
+  if (!build || widget === void 0) return void 0;
   const place = { gridRow: 0, rowSpan: build.rows };
   return {
     key: id,
-    name: question,
-    definition: definition({ code: build.code, queries: build.queries }),
+    name: widget.question,
+    definition: {
+      ...definition({ code: build.code, queries: build.queries }),
+      description: descriptionOf({ subtitle: build.code.description, why: widget.why }),
+    },
     layout: build.width === "full" ? full(place) : half({ side: "left", ...place }),
   };
 }

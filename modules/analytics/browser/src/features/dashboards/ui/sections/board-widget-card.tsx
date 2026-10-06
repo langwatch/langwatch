@@ -1,5 +1,5 @@
 /**
- * One stored widget on a board: its name and menu over the widget's sandboxed
+ * One stored widget on a board: its name, info tip and menu over the widget's sandboxed
  * frame, drawn over the board's period and grain. The drag handle shows on hover
  * or focus. Edit opens the shared in-place editor on the widget's code and queries.
  */
@@ -15,6 +15,7 @@ import { DashboardWidgetInPlaceEditor } from "../../../../ui/sections/dashboard-
 import { boardCardHeightPx } from "../../model/board-grid.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
+import { WidgetInfoTip } from "../blocks/widget-info-tip.tsx";
 import { WidgetMenu } from "../blocks/widget-menu.tsx";
 
 /** The title row's height: its top padding and one 13px line. */
@@ -76,7 +77,7 @@ export function BoardWidgetCard({
         height={`${HEADER_HEIGHT_PX}px`}
         paddingTop="14px"
         paddingLeft={4}
-        paddingRight={16}
+        paddingRight={widget.definition.description ? 22 : 16}
         truncate
         fontSize="13px"
         lineHeight="19px"
@@ -98,6 +99,9 @@ export function BoardWidgetCard({
         >
           <GripVertical size={14} aria-hidden />
         </Box>
+        {widget.definition.description && (
+          <WidgetInfoTip name={widget.name} description={widget.definition.description} />
+        )}
         <WidgetMenu
           name={widget.name}
           disabled={isWriting}

@@ -38,7 +38,12 @@ type Widget = {
   id: string;
   dashboardId: string | null;
   name: string;
-  graph: { version: 1; code: string; queries: { name: string; sql: string }[] };
+  graph: {
+    version: 1;
+    code: string;
+    queries: { name: string; sql: string }[];
+    description?: string;
+  };
   gridColumn: number;
   gridRow: number;
   colSpan: number;
@@ -54,17 +59,24 @@ function storedWidget({
   dashboardId,
   name,
   gridRow = 0,
+  description,
 }: {
   id: string;
   dashboardId: string;
   name: string;
   gridRow?: number;
+  description?: string;
 }): Widget {
   return {
     id,
     dashboardId,
     name,
-    graph: { version: 1, code: WIDGET_CODE, queries: [{ name: "main", sql: "SELECT 1" }] },
+    graph: {
+      version: 1,
+      code: WIDGET_CODE,
+      queries: [{ name: "main", sql: "SELECT 1" }],
+      ...(description === undefined ? {} : { description }),
+    },
     gridColumn: 0,
     gridRow,
     colSpan: 4,
@@ -661,6 +673,46 @@ describe("a member's board", () => {
       });
 
       expect(await screen.findByRole("button", { name: "Visibility: Organisation" })).toBeEnabled();
+    });
+  });
+
+  describe("given widgets with and without a description", () => {
+    const DESCRIPTION = "Every trace that arrived\n\nTraces per bucket, with the period total.";
+    const server = () =>
+      inMemoryServer({
+        boards: OWN_BOARDS,
+        widgets: [
+          storedWidget({
+            id: "w-1",
+            dashboardId: "board-1",
+            name: "Traces",
+            description: DESCRIPTION,
+          }),
+          storedWidget({ id: "w-2", dashboardId: "board-1", name: "Latency", gridRow: 3 }),
+        ],
+      });
+
+    /** @scenario "AC111 Widget description: the card shows the description behind an info icon" */
+    it("shows an info icon on the described card that reveals its description", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      openBoard({ server: server() });
+
+      const info = await screen.findByRole("button", { name: "About Traces" });
+      await user.hover(info);
+
+      const tooltip = await screen.findByRole("tooltip");
+      expect(tooltip).toHaveTextContent("Every trace that arrived");
+      expect(tooltip).toHaveTextContent("Traces per bucket, with the period total.");
+    });
+
+    /** @scenario "AC112 Widget description: a widget without a description has no info icon" */
+    it("shows no info icon on the card without one", async () => {
+      openBoard({ server: server() });
+
+      expect(
+        await screen.findByRole("button", { name: "Actions for Latency" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "About Latency" })).toBeNull();
     });
   });
 
