@@ -7098,6 +7098,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../packages/process-stores
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
