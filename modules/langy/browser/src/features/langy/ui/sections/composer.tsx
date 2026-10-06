@@ -506,6 +506,7 @@ function composerKeyHandler({
 /**
  * What the empty field says, in the state the composer is actually in — never a promise to
  * send (there's no queue), and pointed at the open card rather than blaming Langy for the wait.
+ * A card holds a turn, so a pending entry with no turn in flight is a leftover: read idle.
  */
 export function composerPlaceholder({
   awaitingAnswer,
@@ -519,7 +520,7 @@ export function composerPlaceholder({
   /** What it says when nothing is running and nothing is waiting. */
   idle: string;
 }): string {
-  if (awaitingAnswer) {
+  if (awaitingAnswer && turnActive) {
     return terminalConnected ? AWAITING_ANSWER_TERMINAL_PLACEHOLDER : AWAITING_ANSWER_PLACEHOLDER;
   }
   return turnActive ? MID_TURN_PLACEHOLDER : idle;
