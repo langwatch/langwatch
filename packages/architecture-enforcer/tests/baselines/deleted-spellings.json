@@ -4,8 +4,7 @@
     "`*-composition.build.ts` files": 2,
     "`reads(...)` statics and `static readonly reads`": 23,
     "`refusing*` twins": 9,
-    "<UiSlot>": 4,
-    "absence classes (`Logged*Absence`, `Absent*`)": 4,
+    "absence classes (`Logged*Absence`, `Absent*`)": 3,
     "browser-host's `*-drawers.ts` props files": 1,
     "computeNextRunAt": 15,
     "createProcess": 2,
@@ -32,15 +31,11 @@
     "UiDeclaredName": 4,
     "UiDrawerMap": 7,
     "UiDrawerPropsOf": 4,
-    "uiSlots": 7,
-    "UiSlots": 9,
-    "useUiSlot / useUiSlots": 5,
     "withAnalytical": 2,
     "withKeyvalue": 5,
     "withMemoryRepositories": 15,
     "withPersistence": 1,
     "withProvided": 12,
-    "withRelational": 5,
-    "withSlots": 4
+    "withRelational": 5
   }
 }
