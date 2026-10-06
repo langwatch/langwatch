@@ -97,7 +97,7 @@ Feature: Feature API surfaces never hand back a secret or an internal detail
       Given the annotation store fails with a message naming the database host
       When a customer reads annotations over REST
       Then the response body does not carry the store's own message
-      And the body is the generic refusal this family has always published
+      And the body is the canonical internal_error refusal the host publishes for every family
 
     @integration
     Scenario: A legacy evaluation batch failure returns no driver diagnostic
