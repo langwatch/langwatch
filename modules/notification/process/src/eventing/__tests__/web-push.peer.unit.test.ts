@@ -22,8 +22,8 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { MemoryWebPushGatewayChannel } from "../../channels/memory/memory.web-push-gateway.channel.ts";
+import { MemoryWebPushVapidKeyRepository } from "../../repositories/memory/memory.notification.repositories.ts";
 import { MemoryWebPushSubscriptionRepository } from "../../repositories/memory/memory.web-push-subscription.repository.ts";
-import { MemoryWebPushVapidKeyRepository } from "../../repositories/memory/memory.web-push-vapid-key.repository.ts";
 import { WebPushService } from "../../services/web-push.service.ts";
 import { buildWebPushPipeline, webPushRetryDelayMs } from "../web-push.pipeline.ts";
 

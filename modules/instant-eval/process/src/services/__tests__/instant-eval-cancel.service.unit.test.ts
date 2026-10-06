@@ -10,8 +10,8 @@ import type {
   InstantEvalJudgmentPage,
   InstantEvalJudgmentsRepository,
 } from "../../repositories/instant-eval-judgments.repository.ts";
-import { MemoryInstantEvalCancellationRepository } from "../../repositories/memory/memory.instant-eval-cancellation.repository.ts";
 import { MemoryInstantEvalRunRepository } from "../../repositories/memory/memory.instant-eval-run.repository.ts";
+import { MemoryInstantEvalCancellationRepository } from "../../repositories/memory/memory.instant-eval.repositories.ts";
 import type { InstantEvalStoredStatus } from "../../rules/instant-eval-run-status.rules.ts";
 import {
   InstantEvalCancelService,

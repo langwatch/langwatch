@@ -13,7 +13,7 @@ import {
   type CodingAgentProcessingPipelineDeps,
   EventingCodingAgentProcessingAdapter,
 } from "../../eventing/coding-agent-processing.pipeline.ts";
-import { MemoryCodingAgentSessionFoldCacheRepository } from "../../repositories/memory/memory.coding-agent-session-fold-cache.repository.ts";
+import { MemoryCodingAgentSessionFoldCacheRepository } from "../../repositories/memory/memory.coding-agent.repositories.ts";
 import { MemorySessionContextMemoRepository } from "../../repositories/memory/memory.session-context-memo.repository.ts";
 import type { CodingAgentCostMetrics } from "../../services/coding-agent-cost-metrics.service.ts";
 import { TestClock, createTestProjects } from "./coding-agent.fixture.ts";

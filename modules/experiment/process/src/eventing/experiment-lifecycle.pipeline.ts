@@ -12,12 +12,12 @@ import {
 } from "@langwatch/experiment-contract";
 
 import type { ExperimentModule } from "../app/experiment.app.ts";
-import { RecordExperimentRanCommand } from "./experiment-lifecycle.commands.ts";
 import {
+  RecordExperimentRanCommand,
   experimentRanEventSchema,
   type ExperimentLifecycleEvent,
   type RecordExperimentRanCommandData,
-} from "./experiment-lifecycle.events.ts";
+} from "./experiment-lifecycle.commands.ts";
 
 export type ExperimentLifecyclePipeline = StaticPipelineDefinition<
   ExperimentLifecycleEvent,

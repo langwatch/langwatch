@@ -12,13 +12,11 @@ import type { WorkflowRepositories } from "../repositories/workflow-repositories
 import {
   RecordWorkflowCreatedCommand,
   type RecordWorkflowCreatedCommandData,
-} from "./workflow-lifecycle.commands.ts";
-import {
   WORKFLOW_AGGREGATE_TYPE,
   WORKFLOW_LIFECYCLE_PIPELINE_NAME,
   type WorkflowLifecycleEvent,
   workflowCreatedEventSchema,
-} from "./workflow-lifecycle.events.ts";
+} from "./workflow-lifecycle.commands.ts";
 
 export type WorkflowLifecyclePipeline = StaticPipelineDefinition<
   WorkflowLifecycleEvent,

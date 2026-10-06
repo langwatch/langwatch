@@ -6,7 +6,7 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { EnterpriseOpsApi, selfHostedInstancesTrpc } from "@langwatch/enterprise-ops-contract";
 
-import { operatorFact, STAFF } from "./enterprise-ops-operator.trpc.ts";
+import { operatorFact, STAFF } from "./license-registry.trpc.ts";
 
 export const selfHostedInstancesTrpcTransport: TrpcRouterDeclaration<
   EnterpriseOpsApi,

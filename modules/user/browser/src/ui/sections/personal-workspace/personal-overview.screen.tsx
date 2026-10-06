@@ -32,7 +32,6 @@ import {
   budgetDescription,
   isBudgetBreached,
   isBudgetNearLimit,
-  spentSubline,
 } from "../budget-overview/index.ts";
 import { CodingAgentUsageContent } from "../coding-agent-usage-content.tsx";
 import { ConnectYourAgentButton } from "../connect-your-agent-button.tsx";
@@ -44,6 +43,11 @@ import { TraceIngestSection } from "../trace-ingest-section.tsx";
 // /me/usage frequently surfaces sub-cent spend; defer to the shared
 // gateway formatter so values like $0.000165 don't render as $0.00.
 const fmtUsd = (amount: number) => formatBudgetUsd(amount);
+
+/** Reports bundled spend only; avoids budget mention which governs AI-Gateway, not tools. */
+export function spentSubline({ bundledUsd }: { bundledUsd: number }): string {
+  return bundledUsd > 0 ? `${formatBudgetUsd(bundledUsd)} bundled` : "";
+}
 
 const fmtPctDelta = (pct: number | null) =>
   pct === null ? null : `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct)}% vs last month`;

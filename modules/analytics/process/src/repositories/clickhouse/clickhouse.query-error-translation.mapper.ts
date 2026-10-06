@@ -5,7 +5,10 @@ import {
   QueryTimeoutError,
 } from "@langwatch/analytics-contract";
 
-import { toError } from "./clickhouse.to-error.mapper.ts";
+/** Anything thrown, as an `Error`, so a thrown string never reaches a log as `undefined`. */
+export function toError(value: unknown): Error {
+  return value instanceof Error ? value : new Error(String(value));
+}
 
 /** Errno codes for connection-level failures (shared with the retry loop). */
 const TRANSIENT_NETWORK_CODES = new Set([

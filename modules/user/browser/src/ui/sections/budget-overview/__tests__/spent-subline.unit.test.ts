@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { spentSubline } from "../spent-subline.ts";
+import { spentSubline } from "../../personal-workspace/personal-overview.screen.tsx";
 
 describe("spentSubline", () => {
   describe("when part of the month's spend is bundled", () => {

@@ -1,6 +1,6 @@
 import type { Alert } from "@langwatch/design-system/primitives";
 
-import { SlugAlert } from "./slug-alert.tsx";
+import { SlugAlert } from "./slug-conflict-alert.tsx";
 
 /** Warns that changing a Dataset slug invalidates external references. */
 export function SlugChangeWarningAlert(props: Alert.RootProps) {
