@@ -30,7 +30,13 @@ ALTER TABLE "GatewayRealtimeSession"
     ADD COLUMN "reportedCostNanoUsd" BIGINT NOT NULL DEFAULT 0,
     ADD COLUMN "reportCount" INTEGER NOT NULL DEFAULT 0;
 
-CREATE INDEX "GatewayRealtimeSession_status_metering_mintedAt_idx"
+-- Ops pre-build note: this index lands on an existing table, and a plain build
+-- blocks its writes while it runs. A deployment with real traffic builds it
+-- ahead, outside Prisma's transaction, as in 20261006120000_process_outbox_lease_by_process_index:
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS "GatewayRealtimeSession_status_metering_mintedAt_idx"
+--     ON "GatewayRealtimeSession" ("status", "metering", "mintedAt");
+-- and this statement is then the no-op that records the same intent.
+CREATE INDEX IF NOT EXISTS "GatewayRealtimeSession_status_metering_mintedAt_idx"
     ON "GatewayRealtimeSession"("status", "metering", "mintedAt");
 
 CREATE TABLE "GatewayRealtimeSessionReport" (
