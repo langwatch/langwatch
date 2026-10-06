@@ -122,7 +122,7 @@ describe("Feature: the aggregate project is no place to send traces", () => {
 
         expect(response.status).toBe(403);
         expect(await response.json()).toMatchObject({
-          error: "project_not_a_trace_destination",
+          error: "aggregate_project_has_no_credential",
         });
       });
     });
@@ -136,7 +136,7 @@ describe("Feature: the aggregate project is no place to send traces", () => {
 
         expect(response.status).toBe(403);
         expect(await response.json()).toMatchObject({
-          error: "project_not_a_trace_destination",
+          error: "aggregate_project_has_no_credential",
         });
         expect(
           await prisma.apiKey.count({

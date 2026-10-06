@@ -13,6 +13,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { AggregateProjectHasNoCredentialError } from "~/server/api-key/errors";
 import { sessionRevocation } from "~/server/app-layer/identity/runtime";
 import { traceDestinationViolation } from "~/server/app-layer/projects/project-kinds";
 import { getServerAuthSession } from "~/server/auth";
@@ -54,9 +55,8 @@ secured.access(authPolicy()).post("/auth/validate", async (c) => {
   }
   // ADR-144 decision 7: an aggregate accepts no key, so an SDK must not be
   // told its stored one is good to send traces with.
-  const notADestination = traceDestinationViolation(project.kind);
-  if (notADestination) {
-    return c.json({ message: notADestination }, 403);
+  if (traceDestinationViolation(project.kind)) {
+    throw new AggregateProjectHasNoCredentialError();
   }
 
   return c.json({ projectSlug: project.slug });

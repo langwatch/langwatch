@@ -68,7 +68,10 @@ import {
   deviceLabelForSession,
   sanitizeDeviceLabel,
 } from "~/server/api-key/device-label";
-import { ApiKeyScopeViolationError } from "~/server/api-key/errors";
+import {
+  AggregateProjectHasNoCredentialError,
+  ApiKeyScopeViolationError,
+} from "~/server/api-key/errors";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
 import {
   probeOrganizationPermission,
@@ -434,15 +437,21 @@ async function isDeveloperSeat({
  * ADR-144 decision 7: an aggregate project receives no traces, so no key the
  * CLI hands out (a project's base key, a minted ingestion key) may point at
  * it. Checked before any permission, because no grant changes the answer.
+ *
+ * Answered in this router's OAuth-style envelope rather than thrown: the
+ * CLI's project-key login reads `error` and `error_description` at the top
+ * level of the body without looking for the handled-error envelope, so a
+ * thrown error would reach it as a bare status. The code is still the
+ * registered one, so every surface names this refusal the same way.
  */
 function refuseNonDestination(
   c: Context,
   project: { kind: string },
 ): Response | null {
-  const violation = traceDestinationViolation(project.kind);
-  if (!violation) return null;
+  if (!traceDestinationViolation(project.kind)) return null;
+  const refusal = new AggregateProjectHasNoCredentialError();
   return c.json(
-    { error: "project_not_a_trace_destination", error_description: violation },
+    { error: refusal.code, error_description: refusal.message },
     403,
   );
 }

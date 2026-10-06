@@ -945,9 +945,7 @@ secured
     // hidden governance project reads as not reachable, as everywhere else.
     if (NON_DESTINATION_PROJECT_KINDS.includes(project.kind)) {
       if (!isAggregateProjectKind(project.kind)) return noAccessResponse();
-      const refusal = new AggregateProjectHasNoCredentialError({
-        meta: { projectId: project.id },
-      });
+      const refusal = new AggregateProjectHasNoCredentialError();
       return c.json(
         {
           error: "access_denied",

@@ -124,6 +124,8 @@ describe("Feature: the aggregate project receives no traces", () => {
         });
 
         expect(response.status).toBe(403);
+        const body = (await response.json()) as { error: string };
+        expect(body.error).toBe("aggregate_project_has_no_credential");
       });
     });
 
