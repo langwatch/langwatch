@@ -6,9 +6,13 @@ import type { Project } from "~/generated/prisma/client";
 // incompatible with its input type (InputJsonValue | NullableJsonNullValueInput).
 // Excluding them lets the factory output be spread directly into prisma.*.create()
 // while Prisma applies the column default (NULL). Every nullable Json column on
-// Project (personalFeatures, langyEgressAllowlist) must be listed here.
+// Project (personalFeatures, langyEgressAllowlist, aggregateRule) must be
+// listed here.
 export const projectFactory = Factory.define<
-  Omit<Project, "personalFeatures" | "langyEgressAllowlist">
+  Omit<
+    Project,
+    "personalFeatures" | "langyEgressAllowlist" | "aggregateRule"
+  >
 >(({ sequence }) => ({
   id: nanoid(),
   name: `Test Project ${sequence}`,

@@ -1454,6 +1454,14 @@ const presentations = {
   },
 
   // ---- access, org & limits ----
+  aggregate_rule_outside_organization: {
+    // Raised before anything is written, so the form is still open with the
+    // rule in it: the copy says what to change there. One answer for a
+    // foreign id and a missing one, on purpose.
+    title: "That rule names something outside this organization",
+    describe: () =>
+      "An aggregate project can only read projects and departments of this organization. Remove the project or department that isn't listed here, then create it again.",
+  },
   project_not_found: {
     title: "Project not found",
     describe: () =>

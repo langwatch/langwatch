@@ -1,5 +1,6 @@
 import type { Project, Team } from "~/generated/prisma/client";
 import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
+import type { AggregateRule } from "../aggregate-rule";
 
 export type ProjectWithTeam = Project & { team: Team };
 
@@ -35,6 +36,10 @@ export interface CreateProjectInput {
   framework: string;
   teamId: string;
   apiKey: string;
+  /** Omitted means the column default, `"application"`. */
+  kind?: string;
+  /** ADR-144: set only on an aggregate project. */
+  aggregateRule?: AggregateRule;
 }
 
 export interface CreateTeamWithBindingInput {

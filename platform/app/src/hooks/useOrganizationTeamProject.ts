@@ -222,6 +222,7 @@ export const useOrganizationTeamProject = (
         lwqlKey: "",
         teamId: "",
         kind: "application",
+        aggregateRule: null,
         firstMessage: true,
         integrated: false,
         createdAt: new Date(0),

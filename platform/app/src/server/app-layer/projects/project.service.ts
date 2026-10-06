@@ -17,6 +17,11 @@ import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
+import {
+  AGGREGATE_DEFAULT_RULE,
+  type AggregateRule,
+} from "./aggregate-rule";
+import type { AggregateRuleService } from "./aggregate-rule.service";
 import { mintProjectSlug } from "./projectSlug";
 import type {
   PaginatedResult,
@@ -190,6 +195,89 @@ export function governanceProjectRouteViolation(
 }
 
 /**
+ * ADR-144: a project that owns no traces and reads its member projects through
+ * shared project-reader grants. Spelled here, beside the governance kind, for
+ * the same reason: ingest and the REST API reach this module, and must not
+ * reach the enterprise tree to learn a kind.
+ */
+export const AGGREGATE_PROJECT_KIND = "aggregate";
+
+/** Whether this kind is the aggregate kind. */
+export function isAggregateProjectKind(
+  kind: string | null | undefined,
+): boolean {
+  return kind === AGGREGATE_PROJECT_KIND;
+}
+
+/**
+ * The kinds that never hold traces of their own, so no "send traces here"
+ * picker offers them and no trace destination resolves to them. The governance
+ * project receives ingestion-source data through its own path, never through
+ * a picker; the aggregate receives nothing at all.
+ */
+export const NON_DESTINATION_PROJECT_KINDS: readonly string[] = [
+  INTERNAL_GOVERNANCE_PROJECT_KIND,
+  AGGREGATE_PROJECT_KIND,
+];
+
+/** The refusal a non-admin gets from any route that opens an aggregate. */
+export const AGGREGATE_PROJECT_ADMIN_ONLY_REFUSAL =
+  "Only organization admins can open an aggregate project.";
+
+/**
+ * Whether this caller may open this project, and the reason to refuse if not
+ * (ADR-144 decision 5). An aggregate reads other people's personal projects,
+ * so being on its team is not enough: only an organisation admin opens it.
+ * Every other kind answers null and is left to the ordinary permission check.
+ *
+ * `organizationRole` is the caller's `OrganizationUser.role`, the same value
+ * the permission engine hands back with every project decision; compared as a
+ * string so this module carries no value import of the Prisma enum.
+ */
+export function aggregateProjectRouteViolation({
+  kind,
+  organizationRole,
+}: {
+  kind: string | null | undefined;
+  organizationRole: string | null | undefined;
+}): string | null {
+  if (!isAggregateProjectKind(kind)) return null;
+  return organizationRole === "ADMIN"
+    ? null
+    : AGGREGATE_PROJECT_ADMIN_ONLY_REFUSAL;
+}
+
+/**
+ * The project kinds a caller with this organisation role must not see in any
+ * project list: the governance project for everyone, and the aggregate for
+ * everyone who is not an organisation admin. Meant for a Prisma
+ * `kind: { notIn }` filter.
+ */
+export function projectKindsHiddenFrom(
+  organizationRole: string | null | undefined,
+): string[] {
+  return organizationRole === "ADMIN"
+    ? [INTERNAL_GOVERNANCE_PROJECT_KIND]
+    : [INTERNAL_GOVERNANCE_PROJECT_KIND, AGGREGATE_PROJECT_KIND];
+}
+
+/** The refusal any trace destination gives when it resolves to an aggregate. */
+export const AGGREGATE_PROJECT_INGEST_REFUSAL =
+  "This project reads traces from other projects and does not receive traces of its own. Send traces to one of its member projects instead.";
+
+/**
+ * Whether traces may be sent to a project of this kind, and the reason to
+ * refuse if not (ADR-144 decision 7). Only the aggregate is refused here: the
+ * governance project's ingestion-source writes do not pass through the
+ * destinations that ask this.
+ */
+export function traceDestinationViolation(
+  kind: string | null | undefined,
+): string | null {
+  return isAggregateProjectKind(kind) ? AGGREGATE_PROJECT_INGEST_REFUSAL : null;
+}
+
+/**
  * Whether creating a project in this team would put a second project in a
  * personal workspace, and the reason to give back if it would.
  *
@@ -232,6 +320,42 @@ export interface CreateProjectParams {
   name: string;
   language: string;
   framework: string;
+  /**
+   * ADR-144: `"aggregate"` creates a project that reads its members through
+   * grants and owns no traces. The caller has already decided the actor may
+   * (organisation admins only); this service validates the rule.
+   */
+  kind?: "application" | typeof AGGREGATE_PROJECT_KIND;
+  /** Only read for an aggregate; defaults to {@link AGGREGATE_DEFAULT_RULE}. */
+  aggregateRule?: AggregateRule;
+}
+
+/**
+ * The kind and rule columns a new project is written with. One function so the
+ * tRPC router, which writes Prisma directly, and {@link ProjectService.create}
+ * cannot disagree on what an aggregate is stored as: a non-aggregate never
+ * carries a rule, and an aggregate never lands without a validated one.
+ */
+export async function aggregateProjectCreateFields({
+  kind,
+  aggregateRule,
+  organizationId,
+  aggregateRules,
+}: {
+  kind: CreateProjectParams["kind"];
+  aggregateRule: AggregateRule | undefined;
+  organizationId: string;
+  aggregateRules: AggregateRuleService | undefined;
+}): Promise<{ kind?: string; aggregateRule?: AggregateRule }> {
+  if (!isAggregateProjectKind(kind)) return {};
+  if (!aggregateRules) {
+    throw new Error(
+      "No aggregate rule service is wired; an aggregate project cannot be created here",
+    );
+  }
+  const rule = aggregateRule ?? AGGREGATE_DEFAULT_RULE;
+  await aggregateRules.assertValid({ rule, organizationId });
+  return { kind: AGGREGATE_PROJECT_KIND, aggregateRule: rule };
 }
 
 export class ProjectService {
@@ -243,6 +367,8 @@ export class ProjectService {
      * same way a failed write is.
      */
     private readonly lwqlKeyMap?: LwqlKeyMapRepository,
+    /** Absent where no aggregate can be created; such a request is refused. */
+    private readonly aggregateRules?: AggregateRuleService,
   ) {}
 
   async getById(id: string): Promise<Project | null> {
@@ -304,6 +430,14 @@ export class ProjectService {
       throw new Error("Either teamId or newTeamName must be provided");
     }
 
+    // Validated before the team is created, so a refused rule writes nothing.
+    const kindFields = await aggregateProjectCreateFields({
+      kind: params.kind,
+      aggregateRule: params.aggregateRule,
+      organizationId: params.organizationId,
+      aggregateRules: this.aggregateRules,
+    });
+
     let teamId: string;
 
     if (params.teamId) {
@@ -361,6 +495,7 @@ export class ProjectService {
       framework: params.framework,
       teamId,
       apiKey: generateApiKey(),
+      ...kindFields,
     });
 
     await this.syncLwqlKeyMapRow(project);
