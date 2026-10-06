@@ -128,6 +128,11 @@ recommendation, and "default taken" if a lane proceeded on it.
 - P8484-R2 Download ceiling: main accepts getAllForDownload up to 10000; the branch refuses above 4000 and clamps to the plan (predates #8484). Options: (a) new registry key tracesDownloadPageSizeMax; (b) fixed 10000 in the trace contract; (c) keep and amend the spec. No default taken; one scenario unbound.
 - P8484-R3 Annotations filtered mode: the branch's AllAnnotationsList has no filtered mode, so main's useTraceIdsAcrossPages has no caller; restoring it adds an annotation -> analytics browser edge (use-filter-params). Options: (a) restore the mode with that edge or a filter-params seam; (b) record a known parity gap. No default taken; two scenarios unbound.
 
+### apidiff on 087ec10 (handoffs/apidiff-087ec10.md)
+
+- AD-1 tRPC rename `agents.testRun`/`agents.testTurn` -> `scenarios.testAgent*` (d9936d6739) has no ruling line; apidiff reports it as spec-trpc-missing. Recommendation: accept as an internal tRPC rename (the UI is the only caller) and add it to the parity rulings. Default taken, held for Alex.
+- AD-2 Live test fixtures (bootLiveApi, bootLiveWorker, api-executable; about 19 files) are refused by the serving gate unless `upgrade` ran on LANGWATCH_TEST_DATABASE_URL; CI skips them. Recommendation: a memoised upgrade spawn in both fixtures, controlled env, no --env-file (handoffs/entry-points-landing.md §11). Default taken, held for Alex.
+
 ### Older numbered questions
 
 - Up to 79 ids in `.claude/coordinator/questions-2026-10-06.md` that no ruling cites (Q11 to Q13, Q29 to Q39, Q43 to Q78, Q86 to Q152, Q155 to Q220); an upper bound, several are coordinator defaults for review.
