@@ -283,3 +283,13 @@ From the fifth wave (secret-archived, api-live, api-composition, auth-device, sm
 - **Default collectors:** main called `collectDefaultMetrics`; the branch does not. Restore (regression row)?
 - **Q154(2):** the executable readiness gate scenario is unbound; needs a ruling on what readiness means before boot completes.
 - Follow-up binding lane: specs/server auth :101 plus three user-directory rows, the tenancy cipher row, eventing :74/:82.
+
+## Audit via outbox (Q72), 8ef727ba85 landed the keyed record + automation's outbox
+- **R1:** request-handler producers cannot put the intent in the domain transaction (`appendIntents` takes no tx). (a) append to own outbox right after commit (lost only if the process dies in between), (b) a transaction-scoped append in packages/eventing (atomic, new framework shape), (c) command + process manager per mutation. Main's four atomic writes (invite, join request, SSO membership, personal workspace features) need (b) or (c) to keep main's guarantee; main's invite audit has no caller on the branch (possible regression). Coordinator leaning: (b), one framework change instead of per-producer process managers. Held until the Postgres-load investigation reports (each producer outbox adds a poller).
+- **R2:** keyed rows use KSUID ids, unkeyed rows keep cuid ids (two id schemes) vs a unique idempotencyKey column (migration).
+
+## Browser supply (639a5d45e6 landed lazy restore + doubly claimed address refusal)
+1. Undeclared drawer name: spec wants a refusal by name; today it renders nothing, and drawer names travel in shared links. Coordinator leaning: reword to "ignored, stale links do not crash".
+2. Unclaimed config key refusal assumes a strict schema; publicAppConfigSchema landed as a per-owner record (ADR-148 §9 differs).
+3. Config projection scenarios assume `withConfig(schema, project)` (ADR-148 §5), not the landed shape.
+4. Flag scenarios assume ADR-148 §4, which conflicts with the 2026-10-05 ruling that `useFeatureFlag` keeps its name. Coordinator leaning: reword to the ruling.
