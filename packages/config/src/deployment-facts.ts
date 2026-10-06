@@ -38,6 +38,11 @@ export const { nodeEnvironment } = Config.define((c) => ({
   nodeEnvironment: c.env("NODE_ENV", z.string().optional()),
 }));
 
+/** The port the worker's raw-socket doors listen on (VOICE_WS_PORT); voice media dials here. */
+export const { rawSocketPort } = Config.define((c) => ({
+  rawSocketPort: c.env("VOICE_WS_PORT", z.coerce.number().int().min(0).max(65535).default(3300)),
+}));
+
 /** The standard proxy spellings, keyed by env name: one group every egress-making owner holds. */
 export const { outboundProxy } = Config.define((c) => ({
   outboundProxy: {

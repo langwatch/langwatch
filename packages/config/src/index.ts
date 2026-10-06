@@ -34,6 +34,7 @@ export {
   posthogHost,
   posthogKey,
   publicBaseUrl,
+  rawSocketPort,
   releaseVersionOf,
   SAAS_GATEWAY_URL,
   serviceVersion,

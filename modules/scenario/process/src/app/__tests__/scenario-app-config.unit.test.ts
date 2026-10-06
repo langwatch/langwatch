@@ -25,7 +25,6 @@ import {
   scenarioExecutorPeers,
   scenarioTestSecrets,
   scenarioVoicePeers,
-  scenarioHostMembers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
@@ -56,7 +55,6 @@ async function buildProductionApp(publicBaseUrl: string | undefined, emitter = n
     config: { ...scenarioTestConfig, publicBaseUrl },
     resources: createApiFixture<ResourceOwnership>(),
     secrets: scenarioTestSecrets,
-    members: scenarioHostMembers,
   });
 }
 

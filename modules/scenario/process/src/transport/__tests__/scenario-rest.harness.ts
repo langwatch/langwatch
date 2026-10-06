@@ -29,7 +29,6 @@ import {
   scenarioExecutorPeers,
   scenarioTestSecrets,
   scenarioVoicePeers,
-  scenarioHostMembers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import {
@@ -93,7 +92,6 @@ export async function createScenarioRestTestApp(
         "Feature flag API",
       ),
     },
-    members: scenarioHostMembers,
     resources: createApiFixture<ResourceOwnership>(),
     config: { ...scenarioTestConfig, publicBaseUrl: "https://app.langwatch.test" },
     secrets: scenarioTestSecrets,

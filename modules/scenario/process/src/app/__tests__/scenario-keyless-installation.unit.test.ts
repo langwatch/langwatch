@@ -102,7 +102,6 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       scenario: { ...scenarioTestConfig, publicBaseUrl: "https://app.langwatch.test" },
     })
     .withStores(memoryStores())
-    .withMember("rawSocketPort", 0)
     .provide({
       agent: createApiFixture<AgentApi>({
         getById: async ({ id }) => {

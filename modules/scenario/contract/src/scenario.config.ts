@@ -9,6 +9,7 @@ import {
   nlpServiceUrl,
   nodeEnvironment,
   publicBaseUrl,
+  rawSocketPort,
   type ConfigOf,
 } from "@langwatch/config";
 import { nlpFetchMaxTimeoutMs } from "@langwatch/workflow-contract";
@@ -109,6 +110,8 @@ export const scenarioConfig = Config.define((c) => ({
   nlpCodeBlockTimeoutSeconds,
   /** The deployment's public origin (the shared leaf); absent, platform links refuse by name. */
   publicBaseUrl,
+  /** The worker's raw-socket door port (the shared leaf), which the quick tunnel points at. */
+  rawSocketPort,
   /** The nlpgo deadlines an agent-test turn answers inside; unusable values clamp to defaults. */
   nlpTimeouts: {
     maxTimeoutMs: nlpFetchMaxTimeoutMs,

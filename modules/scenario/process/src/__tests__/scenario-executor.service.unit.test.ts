@@ -16,7 +16,7 @@ import type { ScenarioService } from "../services/scenario.service.ts";
 import { VoiceNonceRegistryService } from "../services/voice-nonce-registry.service.ts";
 import {
   scenarioExecutorPeers,
-  scenarioHostMembers,
+  scenarioTestVoicePublicUrl,
   scenarioTestConfig,
 } from "./support/scenario-app-setup.fixture.ts";
 
@@ -40,7 +40,7 @@ function harness({ langwatchEndpoint }: { langwatchEndpoint: string | undefined 
     cancellationSubscriptions: channel,
     config: { ...scenarioTestConfig, langwatchEndpoint },
     host: {
-      ...scenarioHostMembers,
+      voicePublicUrl: scenarioTestVoicePublicUrl,
       nlpServiceUrl: "http://nlp.test",
       nlpInternalSecret: void 0,
       isSaas: false,

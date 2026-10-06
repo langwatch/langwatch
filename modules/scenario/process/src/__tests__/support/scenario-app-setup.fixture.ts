@@ -26,6 +26,7 @@ export const scenarioTestConfig: ScenarioServerConfig = {
   defaultModel: void 0,
   nlpServiceUrl: void 0,
   publicBaseUrl: void 0,
+  rawSocketPort: 0,
   nlpTimeouts: { maxTimeoutMs: void 0 },
   childParentEnvironment: {
     path: void 0,
@@ -52,11 +53,8 @@ export function scenarioExecutorPeers() {
   };
 }
 
-/** The process facts a child is started with, as a test process answers them. */
-export const scenarioHostMembers = {
-  rawSocketPort: 0,
-  voicePublicUrl: { unavailable: "no media door in a test process" },
-};
+/** The voice origin a child is started with, as a test process answers it. */
+export const scenarioTestVoicePublicUrl = { unavailable: "no media door in a test process" };
 
 /** The voice doors' peers, each throwing by name if a test reaches it. */
 export function scenarioVoicePeers() {

@@ -33,7 +33,6 @@ import {
   scenarioExecutorPeers,
   scenarioTestSecrets,
   scenarioVoicePeers,
-  scenarioHostMembers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import { simulationSendersOver } from "../../__tests__/support/simulation-service-fake.fixture.ts";
@@ -72,7 +71,6 @@ async function harness() {
     config: { ...scenarioTestConfig, publicBaseUrl: "https://langwatch.test" },
     resources: {} as ResourceOwnership,
     secrets: scenarioTestSecrets,
-    members: scenarioHostMembers,
   });
   app.connectSimulationCommands(simulationSendersOver(simulations));
 
@@ -387,7 +385,6 @@ describe("ScenarioModule.getRunDataForAllSuites", () => {
         config: scenarioTestConfig,
         resources: {} as ResourceOwnership,
         secrets: scenarioTestSecrets,
-        members: scenarioHostMembers,
       });
 
       await expect(
@@ -435,7 +432,6 @@ describe("given a live process whose scenario registry reads ClickHouse", () => 
       config: scenarioTestConfig,
       resources: {} as ResourceOwnership,
       secrets: scenarioTestSecrets,
-      members: scenarioHostMembers,
     });
 
     await expect(

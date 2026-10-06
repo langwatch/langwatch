@@ -255,17 +255,9 @@ export const scenarioAppDependencyTokens = {
   apiKeys: ApiKeyApi,
 };
 
-/** The one process fact scenario still reads off the process, until it is a shared leaf. */
-type ScenarioAppMembers = Readonly<{
-  /** The raw-socket door's port, which the worker's quick tunnel points at. */
-  rawSocketPort: number;
-}>;
-
 export class ScenarioModule implements ScenarioApi {
   static readonly contract = ScenarioApi;
   static readonly dependencies = scenarioAppDependencyTokens;
-  /** Every name is from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["rawSocketPort"] as const;
   static readonly config = scenarioConfig;
   /** Main's voice-session signing key: CREDENTIALS_SECRET, else NEXTAUTH_SECRET. */
   static readonly secrets = {
@@ -278,7 +270,7 @@ export class ScenarioModule implements ScenarioApi {
   static async create(
     setup: FeatureSetup<
       typeof scenarioAppDependencyTokens,
-      ScenarioAppMembers,
+      never,
       ScenarioServerConfig,
       ScenarioRepositories
     >,
@@ -300,7 +292,7 @@ export class ScenarioModule implements ScenarioApi {
       configuredUrl: setup.config.voicePublicBaseUrl,
       tunnelEnabled: isVoiceTunnelEnabled(setup.config),
       workerOnly: setup.config.voiceWorkerOnly,
-      port: setup.members.rawSocketPort,
+      port: setup.config.rawSocketPort,
     });
     if (setup.role === "worker") {
       setup.resources.own("scenario voice public URL", () => voice.close());
