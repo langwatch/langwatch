@@ -7,6 +7,7 @@ import { authApi as api } from "../../behavior/auth-api.ts";
 import { signIn } from "../../behavior/auth-client.tsx";
 import { confirmSignUpAddress } from "../../behavior/confirm-sign-up-address.ts";
 import { hardRedirect } from "../../behavior/hard-redirect.ts";
+import { usePasskeyCeremony } from "../../behavior/passkey-ceremony.store.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
 import { forgetCarriedEmail, readCarriedEmail } from "../../model/carried-email.ts";
@@ -25,6 +26,7 @@ import { CredentialSignInForm } from "./credential-sign-in-form.tsx";
 import { FrontDoorFinePrint } from "./front-door-fine-print.tsx";
 import { RoutedToConnection } from "./identifier-first-sign-in.tsx";
 import { IdentifierStepForm } from "./identifier-step-form.tsx";
+import { PasskeyCeremonyPanel, passkeyCeremonyTitle } from "./passkey-ceremony-panel.tsx";
 import {
   AlternativeMethods,
   hasAlternativeMethods,
@@ -258,6 +260,8 @@ export function VerificationFirstSignUp() {
   // Told once, from the same state the returns below branch on, so the ground
   // can never be showing a step other than the one drawn over it.
   const twoStep = useTwoStepChallenge();
+  // A passkey ceremony somebody deliberately started, from whichever passkey button they pressed.
+  const passkeyCeremony = usePasskeyCeremony();
   usePublishFrontDoorStage({
     door: "signup",
     depth: signUpDepth({
@@ -275,6 +279,14 @@ export function VerificationFirstSignUp() {
     return (
       <AuthCard title={twoStepChallengeTitle({ factor: twoStep.factor })}>
         <TwoStepChallengePanel factor={twoStep.factor} callbackUrl={twoStep.callbackUrl} />
+      </AuthCard>
+    );
+  }
+
+  if (passkeyCeremony) {
+    return (
+      <AuthCard title={passkeyCeremonyTitle({ ceremony: passkeyCeremony })}>
+        <PasskeyCeremonyPanel ceremony={passkeyCeremony} />
       </AuthCard>
     );
   }

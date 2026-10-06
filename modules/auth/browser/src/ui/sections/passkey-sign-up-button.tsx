@@ -1,7 +1,8 @@
 import type { SignInMethod } from "@langwatch/identity-contract";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { authClient, navigate, safeRedirectTarget } from "../../behavior/auth-client.tsx";
+import { endPasskeyCeremony, startPasskeyCeremony } from "../../behavior/passkey-ceremony.store.ts";
 import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
 import { isCeremonyAbandoned, passkeyFailure } from "../../model/passkey-failure.ts";
 import { passkeySignUpContext } from "../../model/passkey-sign-up-claim.ts";
@@ -121,12 +122,30 @@ export function PasskeySignUpButton({
   onAddressAlreadyRegistered?: () => void;
 }) {
   const [isBusy, setIsBusy] = useState(false);
+  // Cancelling cannot stop the browser's prompt, so it makes the screen stop acting on it.
+  const attempt = useRef<{ abandoned: boolean } | null>(null);
 
-  const dial = async () => {
+  const dial = () => {
     onError(null);
     setIsBusy(true);
+    if (attempt.current) attempt.current.abandoned = true;
+    const current = { abandoned: false };
+    attempt.current = current;
+    startPasskeyCeremony({
+      purpose: "sign-up",
+      cancel: () => {
+        current.abandoned = true;
+        setIsBusy(false);
+      },
+      retry: dial,
+    });
+    void run(current);
+  };
 
+  const run = async (current: { abandoned: boolean }) => {
     const outcome = await createAccountWithPasskey({ email, addressProof });
+    if (current.abandoned) return;
+    endPasskeyCeremony();
     if (outcome === "created") {
       // Busy stays on: the session is open and the next thing to happen is a
       // navigation, so releasing the button first only flashes it back.
@@ -145,7 +164,7 @@ export function PasskeySignUpButton({
       icon={<SignInMethodIcon method={PASSKEY} />}
       label="Create account with a passkey"
       isBusy={isBusy}
-      onClick={() => void dial()}
+      onClick={dial}
       testId="passkey-sign-up"
     />
   );

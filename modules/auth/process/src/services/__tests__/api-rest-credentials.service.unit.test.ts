@@ -141,6 +141,7 @@ async function refusalCode(attempt: Promise<unknown>): Promise<string> {
 
 describe("the key door", () => {
   describe("given a legacy project key", () => {
+    /** @scenario "A legacy prefix-less project key with no session still authenticates" */
     it("resolves the key to exactly its own project, in that project's organization", async () => {
       const credential = await door.identifyKey({
         request: request({ "x-auth-token": "legacy-key" }),
@@ -227,6 +228,7 @@ describe("the key door", () => {
   });
 
   describe("given a request with no credential", () => {
+    /** @scenario "A request with neither credential is refused" */
     it("is refused as missing credentials", async () => {
       expect(await refusalCode(door.identifyKey({ request: request({}) }))).toBe(
         "missing_credentials",
@@ -235,6 +237,7 @@ describe("the key door", () => {
   });
 
   describe("given a token that resolves to neither a project nor an organization", () => {
+    /** @scenario "An invalid API key is refused without falling back to the session" */
     it("is refused as invalid credentials", async () => {
       expect(
         await refusalCode(
@@ -379,6 +382,7 @@ describe("the project door", () => {
   });
 
   describe("given a live key that names a project it does not resolve", () => {
+    /** @scenario "A key for one organization cannot resolve another organization's project" */
     it("stays an invalid credential, saying nothing about the project", async () => {
       const asked = request({ authorization: "Bearer sk-lw-org", "x-project-id": "project-9" });
 

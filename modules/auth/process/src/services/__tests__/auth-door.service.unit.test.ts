@@ -276,17 +276,27 @@ describe("AuthDoorService", () => {
       expect(world.revokeBrowserSession).toHaveBeenCalledWith({ sessionId: "session-1" });
     });
 
-    it("still resolves when the session lookup fails, so the cookies are cleared", async () => {
+    it("reports a failed session lookup instead of confirming the sign-out", async () => {
       const world = door({
         verifyBrowserSession: async () => {
-          throw new Error("store down");
+          throw new Error("session lookup unavailable");
         },
       });
 
       await expect(
         world.service.revokeSessionFromCookies({ cookie: SESSION_COOKIE }),
-      ).resolves.toBeUndefined();
+      ).rejects.toThrow("session lookup unavailable");
       expect(world.revokeBrowserSession).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Logout reports a revocation failure instead of confirming success" */
+    it("reports a failed revocation instead of confirming the sign-out", async () => {
+      const world = door();
+      world.revokeBrowserSession.mockRejectedValueOnce(new Error("session store unavailable"));
+
+      await expect(
+        world.service.revokeSessionFromCookies({ cookie: SESSION_COOKIE }),
+      ).rejects.toThrow("session store unavailable");
     });
 
     it("looks nothing up for a caller carrying no session cookie", async () => {

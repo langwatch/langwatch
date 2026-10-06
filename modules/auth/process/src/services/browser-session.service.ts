@@ -351,16 +351,21 @@ export class BrowserSessionService {
     logger.info({ deleted, userId }, "Revoked all browser sessions for user");
   }
 
+  /** Both stores are always attempted; either failing is thrown, so a sign-out never lies. */
   async revokeBrowserSession({ sessionId }: { sessionId: string }): Promise<void> {
     const session = await this.deps.sessions.findById({ id: sessionId });
     if (!session) {
       return;
     }
 
-    const tokens = await this.tokensToClear({ userId: session.userId });
-    const deleted = await this.deps.sessions.deleteById({ id: sessionId });
-    await this.clearCachedSessions({ userId: session.userId, tokens });
-    logger.info({ deleted, sessionId, userId: session.userId }, "Revoked browser session");
+    const userId = session.userId;
+    const tokens = await this.tokensToClear({ userId });
+    const [deletion] = await Promise.allSettled([this.deps.sessions.deleteById({ id: sessionId })]);
+    const [cache] = await Promise.allSettled([this.dropCachedSessions({ userId, tokens })]);
+    for (const outcome of [deletion, cache]) {
+      if (outcome.status === "rejected") throw outcome.reason;
+    }
+    logger.info({ sessionId, userId }, "Revoked browser session");
   }
 
   async revokeOtherBrowserSessions({
@@ -391,40 +396,52 @@ export class BrowserSessionService {
     tokens: readonly string[];
     keepToken?: string;
   }): Promise<void> {
-    const cache = this.deps.cache;
-    if (!cache) {
-      return;
-    }
-
     try {
-      const indexKey = activeSessionsKey(userId);
-      const cached = (await cache.findValues({ key: indexKey })).flatMap(parseCachedSessions);
-      const retained = cached.filter(({ token }) => token === keepToken);
-      for (const { token } of cached) {
-        if (token !== keepToken) {
-          await cache.delete({ key: tokenCacheKey(token) });
-        }
-      }
-
-      for (const token of tokens) {
-        if (token !== keepToken) {
-          await cache.delete({ key: tokenCacheKey(token) });
-        }
-      }
-
-      // Better Auth's own lifetime for this index: its furthest live session.
-      const furthest = Math.max(0, ...retained.map(({ expiresAt }) => expiresAt));
-      const ttlSeconds = Math.ceil((furthest - this.deps.now().epochMilliseconds) / 1_000);
-      if (ttlSeconds > 0) {
-        await cache.set({ key: indexKey, value: JSON.stringify(retained), ttlSeconds });
-      } else {
-        await cache.delete({ key: indexKey });
-      }
+      await this.dropCachedSessions({ userId, tokens, keepToken });
     } catch (error) {
       logger.error(
         { error, userId },
         "Failed to clear Better Auth session cache during revocation",
       );
+    }
+  }
+
+  private async dropCachedSessions({
+    userId,
+    tokens,
+    keepToken,
+  }: {
+    userId: string;
+    tokens: readonly string[];
+    keepToken?: string;
+  }): Promise<void> {
+    const cache = this.deps.cache;
+    if (!cache) {
+      return;
+    }
+
+    const indexKey = activeSessionsKey(userId);
+    const cached = (await cache.findValues({ key: indexKey })).flatMap(parseCachedSessions);
+    const retained = cached.filter(({ token }) => token === keepToken);
+    for (const { token } of cached) {
+      if (token !== keepToken) {
+        await cache.delete({ key: tokenCacheKey(token) });
+      }
+    }
+
+    for (const token of tokens) {
+      if (token !== keepToken) {
+        await cache.delete({ key: tokenCacheKey(token) });
+      }
+    }
+
+    // Better Auth's own lifetime for this index: its furthest live session.
+    const furthest = Math.max(0, ...retained.map(({ expiresAt }) => expiresAt));
+    const ttlSeconds = Math.ceil((furthest - this.deps.now().epochMilliseconds) / 1_000);
+    if (ttlSeconds > 0) {
+      await cache.set({ key: indexKey, value: JSON.stringify(retained), ttlSeconds });
+    } else {
+      await cache.delete({ key: indexKey });
     }
   }
 }

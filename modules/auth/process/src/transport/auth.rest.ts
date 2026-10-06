@@ -151,9 +151,11 @@ async function endSession({
   const headers = clearedCookies();
 
   if (request.method === "GET") {
-    const federated = await app.federatedLogout({ returnTo: `${app.baseUrl()}/auth/signin` });
+    const federated = await app.federatedLogout({
+      returnTo: `${app.baseUrl()}/auth/signin?signedOut=1`,
+    });
 
-    headers.set("Location", federated ?? "/auth/signin");
+    headers.set("Location", federated ?? "/auth/signin?signedOut=1");
 
     return new Response(null, { status: 302, headers });
   }

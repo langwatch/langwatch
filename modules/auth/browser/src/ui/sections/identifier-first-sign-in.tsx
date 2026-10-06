@@ -6,6 +6,10 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { safeRedirectTarget, signIn, useSession } from "../../behavior/auth-client.tsx";
 import { replaceLocation } from "../../behavior/browser-navigation.ts";
+import {
+  type PasskeyCeremonyState,
+  usePasskeyCeremony,
+} from "../../behavior/passkey-ceremony.store.ts";
 import { useExpiredSessionRecovery } from "../../behavior/use-expired-session-recovery.ts";
 import { usePasskeyAutofill } from "../../behavior/use-passkey-autofill.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
@@ -37,6 +41,7 @@ import { SecondaryActionLink } from "../elements/secondary-action-link.tsx";
 import { CredentialSignInForm } from "./credential-sign-in-form.tsx";
 import { FrontDoorFinePrint } from "./front-door-fine-print.tsx";
 import { IdentifierStepForm } from "./identifier-step-form.tsx";
+import { PasskeyCeremonyPanel, passkeyCeremonyTitle } from "./passkey-ceremony-panel.tsx";
 import { SignInError } from "./sign-in-error-screen.tsx";
 import {
   AlternativeMethods,
@@ -103,6 +108,8 @@ export function IdentifierFirstSignIn() {
   const [passkeyTried, setPasskeyTried] = useState(false);
   // A correct password that owes a second factor takes the whole card.
   const twoStep = useTwoStepChallenge();
+  // A passkey ceremony somebody deliberately started, published by the button they pressed.
+  const passkeyCeremony = usePasskeyCeremony();
 
   // The recommended way in, ahead of the button in the rail below: a passkey
   // offered from the address field's own autofill, where somebody who does not
@@ -179,14 +186,9 @@ export function IdentifierFirstSignIn() {
     }),
   });
 
-  // Ahead of everything: a password has already been accepted.
-  if (twoStep) {
-    return (
-      <AuthCard title={twoStepChallengeTitle({ factor: twoStep.factor })}>
-        <TwoStepChallengePanel factor={twoStep.factor} callbackUrl={twoStep.callbackUrl} />
-      </AuthCard>
-    );
-  }
+  // Ahead of everything: a password was accepted, or a ceremony is waiting on a device.
+  const takenOver = cardTakenOver({ twoStep, passkeyCeremony });
+  if (takenOver) return takenOver;
 
   if (sentTo) {
     return (
@@ -331,6 +333,31 @@ export function IdentifierFirstSignIn() {
       />
     </AuthCard>
   );
+}
+
+/** A state that takes the whole card: a second factor owed, or a ceremony, never a spinner. */
+function cardTakenOver({
+  twoStep,
+  passkeyCeremony,
+}: {
+  twoStep: ReturnType<typeof useTwoStepChallenge>;
+  passkeyCeremony: PasskeyCeremonyState | null;
+}): ReactNode {
+  if (twoStep) {
+    return (
+      <AuthCard title={twoStepChallengeTitle({ factor: twoStep.factor })}>
+        <TwoStepChallengePanel factor={twoStep.factor} callbackUrl={twoStep.callbackUrl} />
+      </AuthCard>
+    );
+  }
+  if (passkeyCeremony) {
+    return (
+      <AuthCard title={passkeyCeremonyTitle({ ceremony: passkeyCeremony })}>
+        <PasskeyCeremonyPanel ceremony={passkeyCeremony} />
+      </AuthCard>
+    );
+  }
+  return null;
 }
 
 /**
