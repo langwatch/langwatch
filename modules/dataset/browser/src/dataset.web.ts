@@ -4,7 +4,13 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { SelectDatasetDrawerToken, UploadCsvDrawerToken } from "@langwatch/dataset-contract";
+import {
+  AddOrEditDatasetDrawerToken,
+  DatasetPickerListToken,
+  DatasetRecordSyncToken,
+  SelectDatasetDrawerToken,
+  UploadCsvDrawerToken,
+} from "@langwatch/dataset-contract";
 
 export const datasetWeb = defineBrowserModule("dataset")
   .withHosts({
@@ -46,27 +52,27 @@ export const datasetWeb = defineBrowserModule("dataset")
   })
   /** The create-or-edit drawer, editor table, picker list and record sync, lent (§3.4 rule 7). */
   .withCapabilities({
-    addOrEditDatasetDrawer: {
-      load: async () => ({
-        default: (await import("./ui/sections/datasets/lent-add-or-edit-dataset-drawer.tsx"))
-          .LentAddOrEditDatasetDrawer,
-      }),
-    },
     datasetEditorTable: {
       load: async () => ({
         default: (await import("./ui/sections/datasets/lent-dataset-editor-table.tsx"))
           .LentDatasetEditorTable,
       }),
     },
-    datasetPickerList: {
-      load: async () => ({
-        default: (await import("./ui/sections/dataset-picker-list.tsx")).DatasetPickerList,
-      }),
-    },
-    datasetRecordSync: {
-      load: async () => ({
-        default: (await import("./ui/sections/datasets/lent-dataset-record-sync.tsx"))
-          .LentDatasetRecordSync,
-      }),
-    },
+  })
+  .lends(AddOrEditDatasetDrawerToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/datasets/lent-add-or-edit-dataset-drawer.tsx"))
+        .LentAddOrEditDatasetDrawer,
+    }),
+  })
+  .lends(DatasetPickerListToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/dataset-picker-list.tsx")).DatasetPickerList,
+    }),
+  })
+  .lends(DatasetRecordSyncToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/datasets/lent-dataset-record-sync.tsx"))
+        .LentDatasetRecordSync,
+    }),
   });

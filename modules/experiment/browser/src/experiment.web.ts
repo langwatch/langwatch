@@ -9,7 +9,7 @@ import { defineBrowserModule } from "@langwatch/browser";
 import { batchRecordTrpc, datasetRecordTrpc, datasetTrpc } from "@langwatch/dataset-contract";
 import { evaluationTrpc } from "@langwatch/evaluation-contract";
 import { evaluatorTrpc } from "@langwatch/evaluator-contract";
-import { experimentsTrpc } from "@langwatch/experiment-contract";
+import { ComparisonConfigFormToken, experimentsTrpc } from "@langwatch/experiment-contract";
 import { opsDashboardTrpc } from "@langwatch/ops-contract";
 import { promptTrpc } from "@langwatch/prompt-contract";
 
@@ -65,12 +65,10 @@ export const experimentWeb = defineBrowserModule("experiment")
     },
   })
   /** The comparison evaluator form, lent to the evaluator editor (§3.4 rule 7). */
-  .withCapabilities({
-    comparisonConfigForm: {
-      load: async () => ({
-        default: (
-          await import("./ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx")
-        ).ComparisonConfigForm,
-      }),
-    },
+  .lends(ComparisonConfigFormToken, {
+    load: async () => ({
+      default: (
+        await import("./ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx")
+      ).ComparisonConfigForm,
+    }),
   });

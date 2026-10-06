@@ -40,3 +40,4 @@ export * from "./workbench/actions/run-scope.ts";
 export * from "./workbench/actions/schemas.ts";
 export * from "./workbench/actions/transforms/index.ts";
 export * from "./experiment-lifecycle-events.ts";
+export * from "./comparison-config-form.ts";

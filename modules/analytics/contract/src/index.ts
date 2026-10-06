@@ -39,3 +39,4 @@ export * from "./langwatch-ql-app-function.errors.ts";
 export * from "./langwatch-ql-violation.ts";
 export * from "./langwatch-ql-validation.errors.ts";
 export * from "./analytics.config.ts";
+export * from "./filter-sidebar.ts";

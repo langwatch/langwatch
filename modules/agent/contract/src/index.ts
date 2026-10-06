@@ -27,3 +27,4 @@ export * from "./connected-agent.transport.ts";
 export * from "./connected-agent.view.ts";
 export * from "./connected-agent.visibility.ts";
 export * from "./agent.config.ts";
+export * from "./http-config-editor.ts";

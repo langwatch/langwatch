@@ -5,7 +5,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { evaluatorTrpc } from "@langwatch/evaluator-contract";
+import { EvaluatorSettingsFormToken, evaluatorTrpc } from "@langwatch/evaluator-contract";
 
 import { evaluatorApi } from "./behavior/evaluator-api.ts";
 
@@ -83,10 +83,10 @@ export const evaluatorWeb = defineBrowserModule("evaluator")
           .LentStudioEvaluatorEditor,
       }),
     },
-    evaluatorSettingsForm: {
-      load: async () => ({
-        default: (await import("./ui/sections/evaluators/lent-studio-evaluator.tsx"))
-          .LentEvaluatorSettingsForm,
-      }),
-    },
+  })
+  .lends(EvaluatorSettingsFormToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/evaluators/lent-studio-evaluator.tsx"))
+        .LentEvaluatorSettingsForm,
+    }),
   });
