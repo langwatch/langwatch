@@ -23,6 +23,7 @@ import {
   type AnnotationHostUser,
   type AnnotationRouteReading,
   type AnnotationSuccessNotice,
+  type AnnotationTraceFilters,
 } from "../model/annotation-host.ts";
 import { isOwnPersonalWorkspace } from "../model/annotation-personal-workspace.ts";
 import { annotationApi } from "./annotation-api.ts";
@@ -77,6 +78,11 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
     const reading = this.deps.route.reading();
 
     return { params: reading.params, query: reading.query };
+  }
+
+  /** No capability carries the reader's trace filters yet: absence, never an empty filter. */
+  traceFilters(): AnnotationTraceFilters | undefined {
+    return void 0;
   }
 
   setQuery(

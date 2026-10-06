@@ -6,6 +6,7 @@
 import type { annotationScoreTrpc, annotationTrpc } from "@langwatch/annotation-contract";
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type { personalWorkspaceFeaturesTrpc } from "@langwatch/organization-contract";
+import type { tracesTrpc } from "@langwatch/trace-contract";
 
 import type { AnnotationScopeGraph } from "../model/annotation-personal-workspace.ts";
 import type { AnnotationTrace } from "../model/annotation-row.ts";
@@ -66,8 +67,14 @@ type BorrowedProcedures = {
   };
 };
 
-/** Everything this family calls: the three derived namespaces plus the borrowed three. */
+/** The trace list page, derived from trace's contract: the filtered list walks it. */
+type TraceListProcedures = {
+  traces: Pick<ContractApiMap<typeof tracesTrpc>["traces"], "getAllForProject">;
+};
+
+/** Everything this family calls: the derived namespaces plus the borrowed three. */
 type AnnotationProcedures = ContractApiMap<typeof annotationTrpc> &
+  TraceListProcedures &
   ContractApiMap<typeof annotationScoreTrpc> &
   ContractApiMap<typeof personalWorkspaceFeaturesTrpc> &
   BorrowedProcedures;

@@ -147,3 +147,5 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - No CH target (S3-NO-CLICKHOUSE): ALWAYS count ClickHouse steps (not the recommended ignore-if-absent); clarification on installs with no ClickHouse asked
 - First boot (S3-FIRST-INSTALL): API runs upgrade once on a first install
 - Tenant pass (S3-PREPARE-PASS): AFTER upgrade in the preparation script
+- Judge cycle (lwql-sync-eval): ALLOW analytics -> InstantEvalApi for one hold-judge-record operation, one named cycle finding (210 -> 211). Alex: "this one cycle pass is needed because we can't make assumptions about which cycles to cut and how without a global look at cycles".
+- No-ClickHouse installs (S3-NO-CLICKHOUSE, confirmed): YES, always refuse; ClickHouse is mandatory and an install without it refuses to serve by name.

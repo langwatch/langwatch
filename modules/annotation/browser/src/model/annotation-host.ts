@@ -4,7 +4,9 @@
  * `annotation-view.ts`; the queue slug is a route parameter).
  */
 
+import type { traceListInputSchema } from "@langwatch/trace-contract";
 import { createContext, useContext } from "react";
+import type { z } from "zod";
 
 /** The project every annotation read is scoped to. */
 export type AnnotationHostProject = {
@@ -27,6 +29,15 @@ export type AnnotationRouteReading = {
   /** The query string, single-valued — the last write of a repeated key wins. */
   query: Readonly<Record<string, string | undefined>>;
 };
+
+/**
+ * The trace filters the reader has applied, as the shell passes them in: the
+ * filtered All Annotations list reads the annotations of the traces they match.
+ */
+export type AnnotationTraceFilters = Pick<
+  z.input<typeof traceListInputSchema>,
+  "startDate" | "endDate" | "filters" | "query" | "negateFilters"
+>;
 
 /**
  * A short confirmation of something the reviewer just did. `action` is the one
@@ -74,6 +85,9 @@ export abstract class AnnotationHostApi {
   abstract isOwnPersonalWorkspace(): boolean;
 
   abstract route(): AnnotationRouteReading;
+
+  /** The applied trace filters; undefined when none is applied or the shell passes none. */
+  abstract traceFilters(): AnnotationTraceFilters | undefined;
 
   /** Replaces the WHOLE query, so a screen can remove a key as well as set one. */
   abstract setQuery(
