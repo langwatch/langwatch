@@ -5,9 +5,10 @@
  * consumer address, dialled with the same document the identity module
  * stores; the only stand-in is the identity provider, whose certificates are
  * generated when the test runs. The connection's identity policy is the
- * plugin's `resolveUser` hook, which a recorder takes the place of.
+ * plugin's `resolveUser` hook, which a recorder takes the place of; it lets
+ * every arrival continue, as identity does for an admitted one.
  *
- * Spec: specs/identity/sso-idp-termination.feature
+ * Spec: specs/identity/sso-idp-termination.feature, specs/auth/phase-1-better-auth-config.feature
  */
 import { inflateRawSync } from "node:zlib";
 
@@ -29,7 +30,7 @@ const PROVIDER_ID = "acme-saml";
 const IDP_ENTITY_ID = "https://idp.acme.test/entity";
 const SP_ENTITY_ID = "https://app.langwatch.test/sso/acme";
 const ACS_URL = `${BASE_URL}/api/auth/sso/saml2/sp/acs/${PROVIDER_ID}`;
-const EMAIL = "ada@acme.test";
+const EMAIL = "ana@acme.com";
 
 type Dialling = { cert: string } | { metadata: string };
 
@@ -37,7 +38,7 @@ type Dialling = { cert: string } | { metadata: string };
 function samlConnection(dialling: Dialling) {
   return {
     providerId: PROVIDER_ID,
-    domain: "acme.test",
+    domain: "acme.com",
     samlConfig: {
       issuer: IDP_ENTITY_ID,
       entryPoint: "https://idp.acme.test/sso",
@@ -171,6 +172,25 @@ describe("given a SAML connection configured with a known signing certificate", 
   const dialling = { cert: known.certificatePem };
 
   describe("when its identity provider sends an assertion signed by the corresponding key", () => {
+    /** @scenario "A signed SAML callback creates the federated identity rows" */
+    it("creates one user, one account naming the connection, and one session", async () => {
+      const { response, database } = await signInWith({
+        dialling,
+        sign: assertionSignedBy(known),
+      });
+
+      expectAdmitted(response);
+      expect(database.user).toHaveLength(1);
+      expect(database.account).toHaveLength(1);
+      expect(database.session).toHaveLength(1);
+      const users: { id: string; email: string }[] = database.user;
+      const accounts: { userId: string; providerId: string }[] = database.account;
+      const sessions: { userId: string }[] = database.session;
+      expect(users[0]?.email).toBe(EMAIL);
+      expect(accounts[0]).toMatchObject({ userId: users[0]?.id, providerId: PROVIDER_ID });
+      expect(sessions[0]?.userId).toBe(users[0]?.id);
+    });
+
     /** @scenario "A valid signing certificate authenticates an assertion" */
     it("reaches the connection's identity policy", async () => {
       const { response, policyAsked } = await signInWith({
@@ -206,7 +226,7 @@ describe("given a SAML connection configured with a known signing certificate", 
           tamperWithAssertion({
             signedResponse: assertionSignedBy(known)({ requestId }),
             replace: `<saml:AttributeValue>${EMAIL}</saml:AttributeValue>`,
-            with: "<saml:AttributeValue>root@acme.test</saml:AttributeValue>",
+            with: "<saml:AttributeValue>root@acme.com</saml:AttributeValue>",
           }),
       });
 
