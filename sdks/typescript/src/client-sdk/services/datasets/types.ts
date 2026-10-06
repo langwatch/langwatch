@@ -203,7 +203,10 @@ export type ListRecordsOptions = {
 /**
  * API response for listing records in a dataset.
  */
-export type ListRecordsApiResponse = PaginatedResponse<DatasetRecordResponse>;
+export type ListRecordsApiResponse = PaginatedResponse<DatasetRecordResponse> & {
+  /** The dataset the page belongs to. Absent on servers that do not send it. */
+  dataset?: DatasetMetadata;
+};
 
 /**
  * Options for creating a dataset from a file upload.

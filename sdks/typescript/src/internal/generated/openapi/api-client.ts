@@ -1162,7 +1162,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List records for a dataset (paginated) */
+        /** @description List records for a dataset (paginated). Each page also carries the dataset itself. A page too large for one response is refused with `dataset_page_too_large`: ask again with the smaller `limit` the error names. */
         get: operations["getApiDatasetBySlugOrIdRecords"];
         put?: never;
         /** @description Create records in a dataset in batch */
@@ -1283,9 +1283,29 @@ export interface paths {
         put?: never;
         /**
          * @deprecated
-         * @description Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field. upload the file as a stored object, then put its reference in the cell
+         * @description Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field. create the upload, send the file to the address it answers, confirm it as a stored object, then put its reference in the cell
          */
         post: operations["postApiDatasetAttachments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dataset/attachments/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create an upload for an image or file cell
+         * @description Answers the address to PUT the file to. After the PUT, confirm the upload at `POST /api/v1/stored-objects/uploads/{objectId}/confirmation`, then write `/api/files/{projectId}/{objectId}/{filename}` into the cell.
+         */
+        post: operations["postApiDatasetAttachmentsUploads"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1299,7 +1319,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Get a dataset by its slug or id. */
+        /** @description Get a dataset by its slug or id, with every record inline. A dataset too large for one response is refused: read it page by page from `GET /{slugOrId}/records`. */
         get: operations["getApiDatasetBySlugOrId"];
         put?: never;
         post?: never;
@@ -1359,7 +1379,7 @@ export interface paths {
         put?: never;
         /**
          * Report batch evaluation results
-         * @description Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.
+         * @description Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 267 MB are accepted, sized for one dataset row with ten 20 MB images inline. A larger body is refused with `evaluation_log_results_too_large`.
          */
         post: operations["postApiEvaluationsBatchLogResults"];
         delete?: never;
@@ -14953,6 +14973,21 @@ export interface operations {
                             total: number;
                             totalPages: number;
                         };
+                        dataset?: {
+                            id: string;
+                            name: string;
+                            slug: string;
+                            columnTypes: {
+                                name: string;
+                                /** @enum {string} */
+                                type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
+                            }[];
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                            platformUrl: string;
+                        };
                     };
                 };
             };
@@ -15069,6 +15104,21 @@ export interface operations {
                             limit: number;
                             total: number;
                             totalPages: number;
+                        };
+                        dataset?: {
+                            id: string;
+                            name: string;
+                            slug: string;
+                            columnTypes: {
+                                name: string;
+                                /** @enum {string} */
+                                type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
+                            }[];
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                            platformUrl: string;
                         };
                     };
                 };
@@ -15267,6 +15317,68 @@ export interface operations {
                 };
             };
             /** @description The file is larger than the upload limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The media type is not accepted. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many uploads for this project in one minute. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    postApiDatasetAttachmentsUploads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The file name the reference will carry. */
+                    filename: string;
+                    /** @description The media type of the file. */
+                    mediaType: string;
+                    /** @description The size of the file, in bytes. */
+                    byteLength: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        objectId: string;
+                        /** Format: uri */
+                        uploadUrl: string;
+                        /** @constant */
+                        method: "PUT";
+                        headers?: {
+                            [key: string]: string;
+                        };
+                        expiresAt: string;
+                    };
+                };
+            };
+            /** @description The file is larger than the organization's limit. */
             413: {
                 headers: {
                     [name: string]: unknown;
@@ -15653,6 +15765,13 @@ export interface operations {
                         };
                     };
                 };
+            };
+            /** @description The body is larger than the organization accepts in one request; `error.code` is `evaluation_log_results_too_large` and `error.meta.maxBytes` is the limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

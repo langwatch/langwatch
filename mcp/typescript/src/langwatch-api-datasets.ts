@@ -1,4 +1,4 @@
-import { makeRequest } from "./langwatch-api.ts";
+import { LangWatchApiError, makeRequest } from "./langwatch-api.ts";
 
 // --- Dataset types ---
 
@@ -40,6 +40,10 @@ export interface DatasetDetailResponse {
   createdAt: string;
   updatedAt: string;
   data: DatasetRecord[];
+  /** Records in the dataset, when `data` is a preview of them. */
+  totalRecords?: number;
+  /** Records of the dataset left out of `data`. */
+  omittedRecords?: number;
 }
 
 export interface DatasetMutationResponse {
@@ -72,7 +76,15 @@ export interface DatasetRecordListResponse {
     limit: number;
     totalPages: number;
   };
+  /** The dataset the page belongs to. Absent on servers that do not send it. */
+  dataset?: DatasetMutationResponse;
 }
+
+/** The most records a dataset preview holds. */
+export const DATASET_PREVIEW_MAX_RECORDS = 100;
+
+/** The most bytes of records a dataset preview holds. */
+export const DATASET_PREVIEW_MAX_BYTES = 1024 * 1024;
 
 // --- Dataset API functions ---
 
@@ -89,12 +101,78 @@ export async function listDatasets(params?: {
   return makeRequest("GET", path) as Promise<DatasetListResponse>;
 }
 
-/** Retrieves a single dataset by slug or ID, including records. */
+/**
+ * Retrieves a dataset by slug or ID with a preview of its records: the first page, cut at
+ * `DATASET_PREVIEW_MAX_RECORDS` records and `DATASET_PREVIEW_MAX_BYTES` bytes. A dataset of
+ * any size can be read this way. `omittedRecords` counts what the preview leaves out.
+ */
 export async function getDataset(slugOrId: string): Promise<DatasetDetailResponse> {
-  return makeRequest(
-    "GET",
-    `/api/v1/dataset/${encodeURIComponent(slugOrId)}`,
-  ) as Promise<DatasetDetailResponse>;
+  const page = await readPreviewPage(slugOrId);
+  // A server without the records endpoint, or one that sends no dataset with a page, is
+  // asked for the whole dataset in one response.
+  if (!page?.dataset) {
+    return makeRequest(
+      "GET",
+      `/api/v1/dataset/${encodeURIComponent(slugOrId)}`,
+    ) as Promise<DatasetDetailResponse>;
+  }
+
+  const data: DatasetRecord[] = [];
+  let bytes = 0;
+  for (const record of page.data) {
+    bytes += JSON.stringify(record).length;
+    if (bytes > DATASET_PREVIEW_MAX_BYTES) break;
+    data.push(record);
+  }
+
+  const { id, name, slug, columnTypes, createdAt, updatedAt } = page.dataset;
+  const totalRecords = page.pagination.total;
+  return {
+    id,
+    name,
+    slug,
+    columnTypes,
+    createdAt,
+    updatedAt,
+    data,
+    totalRecords,
+    omittedRecords: Math.max(0, totalRecords - data.length),
+  };
+}
+
+/**
+ * The first page of a dataset's records, or `null` when the records endpoint answers 404. A
+ * page refused as too large is asked for again with the size the refusal suggests, or half.
+ */
+async function readPreviewPage(slugOrId: string): Promise<DatasetRecordListResponse | null> {
+  let limit = DATASET_PREVIEW_MAX_RECORDS;
+  for (;;) {
+    try {
+      return await listDatasetRecords({ slugOrId, page: 1, limit });
+    } catch (error) {
+      if (!(error instanceof LangWatchApiError)) throw error;
+      if (error.status === 404) return null;
+      if (error.status !== 413 || limit <= 1) throw error;
+      limit = smallerLimit(limit, error.responseBody);
+    }
+  }
+}
+
+/** The page size a `dataset_page_too_large` refusal suggests, or half the refused one. */
+function smallerLimit(limit: number, responseBody: string): number {
+  const half = Math.max(1, Math.floor(limit / 2));
+  try {
+    const suggested: unknown = (JSON.parse(responseBody) as { meta?: { suggestedLimit?: unknown } })
+      .meta?.suggestedLimit;
+    const usable =
+      typeof suggested === "number" &&
+      Number.isInteger(suggested) &&
+      suggested >= 1 &&
+      suggested < limit;
+    return usable ? suggested : half;
+  } catch {
+    return half;
+  }
 }
 
 /** Creates a new dataset. */
