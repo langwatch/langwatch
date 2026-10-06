@@ -10,12 +10,15 @@
 import {
   Alert,
   Badge,
+  Button,
   Heading,
   HStack,
   Skeleton,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
 
 import { scimApi, type ScimRequestRow } from "../../behavior/scim-api.ts";
 import { connectionLabel, readableDate } from "../../model/display-formatters.ts";
@@ -29,9 +32,9 @@ export type DirectoryRequestsConnection = {
 };
 
 /**
- * No control, not even a disclosure: the remedy for a refused push is the
- * directory's next one, and a surface whose only button cannot help is worse
- * than one with none.
+ * Folded until asked for: everybody else is here for the state and the
+ * tokens, and the raw requests are for the reader whose provider reports
+ * errors that nothing else on the page explains.
  */
 export function DirectoryRequests({
   organizationId,
@@ -40,18 +43,34 @@ export function DirectoryRequests({
   organizationId: string;
   connections: DirectoryRequestsConnection[];
 }) {
+  const [open, setOpen] = useState(false);
+
   if (connections.length === 0) return null;
 
   return (
     <VStack gap={4} width="full" align="stretch">
-      <Heading size="md">Requests from your identity provider</Heading>
-      {connections.map((connection) => (
-        <ConnectionRequests
-          key={connection.connectionId}
-          organizationId={organizationId}
-          connection={connection}
-        />
-      ))}
+      <Button
+        size="xs"
+        variant="ghost"
+        alignSelf="start"
+        onClick={() => setOpen((shown) => !shown)}
+        data-testid="directory-requests-toggle"
+      >
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        {open ? "Hide what your identity provider sent" : "Show what your identity provider sent"}
+      </Button>
+      {open && (
+        <>
+          <Heading size="md">Requests from your identity provider</Heading>
+          {connections.map((connection) => (
+            <ConnectionRequests
+              key={connection.connectionId}
+              organizationId={organizationId}
+              connection={connection}
+            />
+          ))}
+        </>
+      )}
     </VStack>
   );
 }

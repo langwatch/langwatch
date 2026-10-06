@@ -196,6 +196,24 @@ describe("given the connectors page inside the Authentication section", () => {
   });
 });
 
+describe("given an administrator reads where their provider sends people", () => {
+  /** @scenario The protocol keeps its name in the body copy */
+  it("names SCIM in the copy while no page or rail entry is titled after it", () => {
+    renderWithScimHost(<ConnectorsScreen />);
+
+    expect(screen.getByText(/removes people here on its own, over SCIM/)).toBeTruthy();
+    expect(screen.getByText(/talks to us over SCIM/)).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Connectors" })).toBeTruthy();
+    const rail = screen.getByRole("navigation", { name: "Authentication navigation" });
+    for (const link of within(rail).getAllByRole("link")) {
+      expect(link.textContent).not.toMatch(/scim/i);
+    }
+    for (const heading of screen.getAllByRole("heading")) {
+      expect(heading.textContent).not.toMatch(/^scim/i);
+    }
+  });
+});
+
 describe("given the identity provider has to be pointed somewhere", () => {
   it("shows the base URL this deployment answers on", () => {
     renderWithScimHost(
@@ -344,6 +362,39 @@ const request = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("given the directory has been pushing through a connection", () => {
+  /** @scenario "What the provider sent is there for whoever needs it, and folded for everybody else" */
+  it("folds what the provider sent away until it is asked for", () => {
+    state.requests["org-1/ssoconn_1"] = [request()];
+    state.panel = {
+      connections: [],
+      recentChanges: [
+        {
+          grantId: "grant_sam_member",
+          summary: "Sam Patel lost access",
+          author: "Your identity provider",
+          occurredAtMs: Date.UTC(2026, 8, 20, 9, 0, 0),
+          kind: "removed",
+        },
+      ],
+    };
+
+    renderWithScimHost(<ConnectorsScreen />);
+
+    expect(screen.getByTestId("directory-recent-changes").textContent).toContain(
+      "Sam Patel lost access",
+    );
+    expect(screen.getByTestId("directory-requests-toggle").textContent).toContain(
+      "Show what your identity provider sent",
+    );
+    expect(screen.queryByTestId("directory-requests")).toBeNull();
+    expect(calls.getRequests).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("directory-requests-toggle"));
+
+    expect(within(screen.getByTestId("directory-requests")).getByText(/POST users/)).toBeTruthy();
+    expect(calls.getRequests).toHaveBeenCalled();
+  });
+
   /** @scenario "The requests a connection has served are on the SCIM settings page" */
   it("reads them newest first, refusals in our own words", () => {
     state.requests["org-1/ssoconn_1"] = [
@@ -360,6 +411,7 @@ describe("given the directory has been pushing through a connection", () => {
     ];
 
     renderWithScimHost(<ScimScreen />);
+    fireEvent.click(screen.getByTestId("directory-requests-toggle"));
 
     const feed = screen.getByTestId("directory-requests");
     expect(within(feed).getByText(/POST users/)).toBeTruthy();
@@ -376,6 +428,7 @@ describe("given the directory has been pushing through a connection", () => {
 
   it("says what it still holds rather than that nothing was ever sent", () => {
     renderWithScimHost(<ScimScreen />);
+    fireEvent.click(screen.getByTestId("directory-requests-toggle"));
 
     const feed = screen.getByTestId("directory-requests");
     expect(within(feed).getByText(/thirty days/i)).toBeTruthy();
@@ -391,6 +444,7 @@ describe("given another organization's directory has been pushing too", () => {
     ];
 
     renderWithScimHost(<ScimScreen />);
+    fireEvent.click(screen.getByTestId("directory-requests-toggle"));
 
     expect(calls.getRequests).toHaveBeenCalledWith({
       organizationId: "org-1",
@@ -421,6 +475,7 @@ describe("given no identity provider is connected", () => {
     expect(door.getAttribute("href")).toBe("/settings/authentication");
   });
 
+  /** @scenario "The first step is not offered to somebody who would be refused it" */
   it("offers no control to a reader who cannot manage it", () => {
     renderWithScimHost(<ScimScreen />, new FakeScimHost({ withheld: ["sso:manage"] }));
 
