@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * What the backoffice organization list hands the operator's browser.
+ * What the instance admin organization list hands the operator's browser.
  * @see specs/self-hosting/connected-services/license-registry.feature
  */
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
@@ -56,9 +56,9 @@ const LIST_ORGANIZATIONS = {
   req: { headers: {} },
 } as const;
 
-describe("PrismaAdminBackofficeRepository", () => {
-  describe("when an operator lists organizations in the backoffice", () => {
-    /** @scenario "The backoffice organizations list does not carry license keys" */
+describe("the instance admin organization read", () => {
+  describe("when an operator lists organizations in the instance admin", () => {
+    /** @scenario "The instance admin organizations list does not carry license keys" */
     it("answers every organization without its license key", async () => {
       const repository = PrismaAdminBackofficeRepository.create(organizationDelegate());
 

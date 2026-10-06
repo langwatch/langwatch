@@ -81,8 +81,8 @@ Feature: License registry
     Then the held copy is erased
 
   @unit
-  Scenario: The backoffice organizations list does not carry license keys
-    When an operator lists organizations in the backoffice
+  Scenario: The instance admin organizations list does not carry license keys
+    When an operator lists organizations in the instance admin
     Then no organization in the response includes its license key
 
   @unit
