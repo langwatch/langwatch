@@ -67,13 +67,22 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
 
   async findStoredSettings(organizationId: string): Promise<StoredOrganizationSettings | null> {
     const organization = this.memory.organizations.get(organizationId);
-    return organization
-      ? {
-          ...organization,
-          createdAt: toDate(organization.createdAt),
-          updatedAt: toDate(organization.updatedAt),
-        }
-      : null;
+    if (!organization) return null;
+
+    return {
+      id: organization.id,
+      name: organization.name,
+      slug: organization.slug,
+      supportContact: organization.supportContact,
+      presenceEnabled: organization.presenceEnabled,
+      traceSharingEnabled: organization.traceSharingEnabled,
+      primaryIntent: organization.primaryIntent,
+      s3Endpoint: organization.s3Endpoint,
+      s3AccessKeyId: organization.s3AccessKeyId,
+      s3Bucket: organization.s3Bucket,
+      createdAt: toDate(organization.createdAt),
+      updatedAt: toDate(organization.updatedAt),
+    };
   }
 
   async hasStoredS3Secret(organizationId: string): Promise<boolean> {
