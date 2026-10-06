@@ -4,17 +4,26 @@
  * does not name.
  * @see specs/auth/dev-port-origin-alignment.feature
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
-vi.hoisted(() => {
+const startedWith = vi.hoisted(() => {
+  const before = { ...process.env };
   process.env.NODE_ENV = "development";
   process.env.PORT = "5620";
   process.env.BASE_HOST = "http://localhost:5560";
   process.env.NEXTAUTH_URL = "http://localhost:5560";
   process.env.LANGWATCH_ENDPOINT = "http://localhost:5560";
+  vi.resetModules();
+  return before;
 });
 
 import { processEnvironment } from "../config.ts";
+
+afterAll(() => {
+  for (const name of Object.keys(process.env)) delete process.env[name];
+  Object.assign(process.env, startedWith);
+  vi.resetModules();
+});
 
 describe("the api's process environment", () => {
   describe("given a development start whose environment file names the committed port", () => {

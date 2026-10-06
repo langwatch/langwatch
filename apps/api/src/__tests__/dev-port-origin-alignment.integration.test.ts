@@ -43,10 +43,12 @@ async function bootOnSecondPort({ aligned }: { aligned: boolean }) {
     BASE_HOST: COMMITTED_ADDRESS,
     NEXTAUTH_URL: COMMITTED_ADDRESS,
   };
-  const environment = aligned
-    ? alignDevAuthUrlsToPort({ environment: started }).environment
-    : started;
-  const live = await bootLiveApi({ environment: { ...environment }, withWorker: true });
+  const environment: Record<string, string> = {};
+  const offered = aligned ? alignDevAuthUrlsToPort({ environment: started }).environment : started;
+  for (const [name, value] of Object.entries(offered)) {
+    if (value !== undefined) environment[name] = value;
+  }
+  const live = await bootLiveApi({ environment, withWorker: true });
   const baseUrl = `http://localhost:${port}`;
   const api: LiveApi = {
     ...live,
