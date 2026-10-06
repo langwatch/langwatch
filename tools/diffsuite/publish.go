@@ -62,16 +62,10 @@ func publish(ctx context.Context, request publishRequest) error {
 		return err
 	}
 	statePath := filepath.Join(filepath.Dir(out), "published.json")
-	state := readPublished(statePath)
-	before := state.Latest
-	if state.Out == out {
-		before = state.Before
-	}
+	before := readPublished(statePath).before(out)
 	rows := found.runRows()
 	if !request.dryRun {
-		if screens := publishScreens(ctx, root, request.pr, rows, request.stderr); screens != "" {
-			rows[1].latest += " · [screens](" + screens + ")"
-		}
+		rows[1].latest += screensLink(publishScreens(ctx, screensRequest{root: root, pr: request.pr, usable: rows[1].usable == "yes", stderr: request.stderr}))
 	}
 	body, err := ghOutput(ctx, root, "api", "repos/{owner}/{repo}/pulls/"+request.pr, "--jq", ".body")
 	if err != nil {
@@ -90,11 +84,23 @@ func publish(ctx context.Context, request publishRequest) error {
 		return err
 	}
 	fmt.Fprintf(request.stderr, "diffsuite publish: %s\n", strings.TrimSpace(url))
+	return writePublished(statePath, published{Out: out, Latest: latestOf(rows), Before: before})
+}
+
+// screensLink is the UI row's link to the screens comment, or "" without one.
+func screensLink(screens string) string {
+	if screens == "" {
+		return ""
+	}
+	return " · [screens](" + screens + ")"
+}
+
+func latestOf(rows []runRow) map[string]string {
 	latest := map[string]string{}
 	for _, row := range rows {
 		latest[row.key] = row.latest
 	}
-	return writePublished(statePath, published{Out: out, Latest: latest, Before: before})
+	return latest
 }
 
 // published is what the last publish showed per check, so the next can show it as the run before.
@@ -103,6 +109,15 @@ type published struct {
 	Out    string            `json:"out"`
 	Latest map[string]string `json:"latest"`
 	Before map[string]string `json:"before"`
+}
+
+// before is what to show as the run before out: what the last publish showed,
+// or, when that publish was of out itself, what it showed as the run before.
+func (state published) before(out string) map[string]string {
+	if state.Out == out {
+		return state.Before
+	}
+	return state.Latest
 }
 
 func readPublished(path string) published {
@@ -131,12 +146,21 @@ func ghOutput(ctx context.Context, root string, args ...string) (string, error) 
 	return string(out), nil
 }
 
+// screensRequest is what publishScreens needs: the checkout, the PR, whether
+// the UI run is usable, and where errors go.
+type screensRequest struct {
+	root, pr string
+	usable   bool
+	stderr   io.Writer
+}
+
 // publishScreens updates visualdiff's one screens comment from check's report when the
 // UI run is usable, and withdraws it when not; it answers the comment's address, or "".
-func publishScreens(ctx context.Context, root, pr string, rows []runRow, stderr io.Writer) string {
-	if rows[1].usable == "yes" {
+func publishScreens(ctx context.Context, request screensRequest) string {
+	root, stderr := request.root, request.stderr
+	if request.usable {
 		command := exec.CommandContext(ctx, filepath.Join(root, ".bin", "visualdiff", "visualdiff"), "publish", // #nosec G204 -- the suite's own binary.
-			"-root", root, "-run-dir", filepath.Join(root, ".visualdiff", "check"), "-pr", pr)
+			"-root", root, "-run-dir", filepath.Join(root, ".visualdiff", "check"), "-pr", request.pr)
 		command.Dir, command.Stderr = root, stderr
 		out, err := command.Output()
 		if err != nil {
@@ -144,7 +168,14 @@ func publishScreens(ctx context.Context, root, pr string, rows []runRow, stderr 
 		}
 		return strings.TrimSpace(string(out))
 	}
-	ids, err := ghOutput(ctx, root, "api", "--paginate", "repos/{owner}/{repo}/issues/"+pr+"/comments",
+	withdrawScreens(ctx, request)
+	return ""
+}
+
+// withdrawScreens deletes every screens comment on the PR.
+func withdrawScreens(ctx context.Context, request screensRequest) {
+	root, stderr := request.root, request.stderr
+	ids, err := ghOutput(ctx, root, "api", "--paginate", "repos/{owner}/{repo}/issues/"+request.pr+"/comments",
 		"--jq", `.[] | select(.body | contains("`+visualdiff.PublishMarker+`")) | .id`)
 	if err != nil {
 		fmt.Fprintln(stderr, "diffsuite publish: screens:", err)
@@ -154,7 +185,6 @@ func publishScreens(ctx context.Context, root, pr string, rows []runRow, stderr 
 			fmt.Fprintln(stderr, "diffsuite publish: withdraw the screens comment:", err)
 		}
 	}
-	return ""
 }
 
 // runRow is one line of "Test runs": a check, this run, the run before and whether it can be used.
@@ -164,49 +194,68 @@ type runRow struct {
 
 // runRows are the four checks in a fixed order: API, UI, fuzz API, fuzz UI.
 func (found results) runRows() []runRow {
-	api, visual, fuzzAPI, fuzzUI := found.api, found.visual, found.fuzzAPI, found.fuzzUI
 	rows := []runRow{
 		{key: "API", check: "API: apidiff", latest: found.notRun("api"), usable: "no"},
 		{key: "UI", check: "UI: visualdiff", latest: found.notRun("visual"), usable: "no"},
 		{key: "Fuzz API", check: "Fuzz API", latest: found.notRun("fuzzapi"), usable: "no"},
 		{key: "Fuzz UI", check: "Fuzz UI", latest: found.notRun("fuzzui"), usable: "no"},
 	}
-	if api.ran {
-		measured := api.pass + api.fail + api.errors
-		rows[0].check = fmt.Sprintf("API: apidiff, %s scenarios", thousands(measured+api.deferred))
-		rows[0].latest = fmt.Sprintf("%s pass · %s fail · %s tool errors", thousands(api.pass), thousands(api.fail), thousands(api.errors))
-		if api.deferred > 0 {
-			rows[0].latest += fmt.Sprintf(" · %s deferred to the self-hosted pass", thousands(api.deferred))
-		}
-		rows[0].usable = found.verdictFor("api", api.errors*10 >= measured, "too many tool errors")
+	if found.api.ran {
+		found.apiRow(&rows[0])
 	}
-	if visual.ran {
-		rows[1].latest = fmt.Sprintf("%d of %d flows pass", visual.flowsPass, visual.flowsTotal)
-		if visual.routesTotal > 0 {
-			rows[1].latest += fmt.Sprintf(" · %d of %d routes without a finding", visual.routesClean, visual.routesTotal)
-		}
-		rows[1].usable = found.verdictFor("visual", visual.flowsTotal == 0, "no flow ran")
+	if found.visual.ran {
+		found.visualRow(&rows[1])
 	}
-	if fuzzAPI.ran {
-		rows[2].check = fmt.Sprintf("Fuzz API: %s operations, %s requests", thousands(fuzzAPI.operations), thousands(fuzzAPI.requests))
-		rows[2].latest = thousands(fuzzAPI.findings) + " findings"
-		if fuzzAPI.proxy502 > 0 {
-			rows[2].latest += fmt.Sprintf(", %s of them 502s from the proxy", thousands(fuzzAPI.proxy502))
-		}
-		rows[2].usable = found.verdictFor("fuzzapi", fuzzAPI.proxy502*2 > fuzzAPI.findings, "most findings are 502s from the proxy")
+	if found.fuzzAPI.ran {
+		found.fuzzAPIRow(&rows[2])
 	}
-	if fuzzUI.ran {
-		rows[3].latest = fmt.Sprintf("%d of %d routes visited · %s findings", fuzzUI.visited, fuzzUI.routes, thousands(fuzzUI.findings))
-		if fuzzUI.hangs > 0 {
-			rows[3].latest += fmt.Sprintf(", %s never finished loading", thousands(fuzzUI.hangs))
-		}
-		broken, why := fuzzUI.visited == 0, "no page finished loading"
-		if !broken && fuzzUI.hangs*2 > fuzzUI.findings {
-			broken, why = true, "most pages never finished loading"
-		}
-		rows[3].usable = found.verdictFor("fuzzui", broken, why)
+	if found.fuzzUI.ran {
+		found.fuzzUIRow(&rows[3])
 	}
 	return rows
+}
+
+func (found results) apiRow(row *runRow) {
+	api := found.api
+	measured := api.pass + api.fail + api.errors
+	row.check = fmt.Sprintf("API: apidiff, %s scenarios", thousands(measured+api.deferred))
+	row.latest = fmt.Sprintf("%s pass · %s fail · %s tool errors", thousands(api.pass), thousands(api.fail), thousands(api.errors))
+	if api.deferred > 0 {
+		row.latest += fmt.Sprintf(" · %s deferred to the self-hosted pass", thousands(api.deferred))
+	}
+	row.usable = found.verdictFor("api", api.errors*10 >= measured, "too many tool errors")
+}
+
+func (found results) visualRow(row *runRow) {
+	visual := found.visual
+	row.latest = fmt.Sprintf("%d of %d flows pass", visual.flowsPass, visual.flowsTotal)
+	if visual.routesTotal > 0 {
+		row.latest += fmt.Sprintf(" · %d of %d routes without a finding", visual.routesClean, visual.routesTotal)
+	}
+	row.usable = found.verdictFor("visual", visual.flowsTotal == 0, "no flow ran")
+}
+
+func (found results) fuzzAPIRow(row *runRow) {
+	fuzzAPI := found.fuzzAPI
+	row.check = fmt.Sprintf("Fuzz API: %s operations, %s requests", thousands(fuzzAPI.operations), thousands(fuzzAPI.requests))
+	row.latest = thousands(fuzzAPI.findings) + " findings"
+	if fuzzAPI.proxy502 > 0 {
+		row.latest += fmt.Sprintf(", %s of them 502s from the proxy", thousands(fuzzAPI.proxy502))
+	}
+	row.usable = found.verdictFor("fuzzapi", fuzzAPI.proxy502*2 > fuzzAPI.findings, "most findings are 502s from the proxy")
+}
+
+func (found results) fuzzUIRow(row *runRow) {
+	fuzzUI := found.fuzzUI
+	row.latest = fmt.Sprintf("%d of %d routes visited · %s findings", fuzzUI.visited, fuzzUI.routes, thousands(fuzzUI.findings))
+	if fuzzUI.hangs > 0 {
+		row.latest += fmt.Sprintf(", %s never finished loading", thousands(fuzzUI.hangs))
+	}
+	broken, why := fuzzUI.visited == 0, "no page finished loading"
+	if !broken && fuzzUI.hangs*2 > fuzzUI.findings {
+		broken, why = true, "most pages never finished loading"
+	}
+	row.usable = found.verdictFor("fuzzui", broken, why)
 }
 
 // notRun says why a tool left no results: missing from the suite, stopped, or its exit.
@@ -239,6 +288,10 @@ func (found results) verdictFor(name string, broken bool, why string) string {
 
 // preamble is the header line and the one-line verdict.
 func (found results) preamble(rows []runRow, zone *time.Location) []string {
+	return []string{"## Parity status", "", "_" + strings.Join(found.header(zone), " · ") + "_", "", found.verdictLine(rows), ""}
+}
+
+func (found results) header(zone *time.Location) []string {
 	header := []string{}
 	if !found.at.IsZero() {
 		header = append(header, "Latest run: "+found.at.In(zone).Format("2006-01-02 15:04 MST"))
@@ -250,10 +303,12 @@ func (found results) preamble(rows []runRow, zone *time.Location) []string {
 		header = append(header, "stack `"+found.branch+"`")
 	}
 	if found.main != "" {
-		header = append(header, "compared with main's stack `"+found.main+"`")
-	} else {
-		header = append(header, "compared with main's baselines")
+		return append(header, "compared with main's stack `"+found.main+"`")
 	}
+	return append(header, "compared with main's baselines")
+}
+
+func (found results) verdictLine(rows []runRow) string {
 	var unusable []string
 	for _, row := range rows {
 		if row.usable != "yes" {
@@ -274,7 +329,7 @@ func (found results) preamble(rows []runRow, zone *time.Location) []string {
 	if len(unusable) > 0 {
 		verdict += " Not usable from this run: " + strings.Join(unusable, ", ") + " (see \"Test runs\")."
 	}
-	return []string{"## Parity status", "", "_" + strings.Join(header, " · ") + "_", "", verdict, ""}
+	return verdict
 }
 
 // tableSpec is one machine table: the heading it sits under, the column its rows are
@@ -319,49 +374,66 @@ func cellsAt(cells []string, indexes ...int) []string {
 // coverageTable is one row per area, red first: green when every API scenario passes and
 // the UI is proven, orange at 90% or more or with the UI unproven, red below or untested.
 func (found results) coverageTable(hand map[string][]string) []string {
-	type row struct {
-		rank int
-		line string
-		area string
-	}
-	var rows []row
+	var rows []areaRow
 	for _, area := range found.areaNames() {
-		kept := cellsAt(hand[area], 0, 1)
-		ui, rest := kept[0], kept[1]
-		if ui == "" {
-			ui = "not tested yet"
-		}
-		proven := ui != "not tested yet"
-		if flows := found.visual.areas[area]; flows != nil && flows.total > 0 {
-			ui, proven = fmt.Sprintf("%d of %d flows pass", flows.pass, flows.total), flows.pass == flows.total
-		}
-		api, rank := "not tested yet", 0
-		if scenarios := found.api.areas[area]; scenarios != nil && scenarios.total > 0 {
-			api = fmt.Sprintf("%d/%d", scenarios.pass, scenarios.total)
-			if failing := scenarios.total - scenarios.pass; failing > 0 {
-				api += fmt.Sprintf(" · %d failing", failing)
-			}
-			switch {
-			case scenarios.pass == scenarios.total && proven:
-				rank = 2
-			case scenarios.pass*10 >= scenarios.total*9:
-				rank = 1
-			}
-		}
-		colour := []string{"🔴", "🟠", "🟢"}[rank]
-		rows = append(rows, row{rank: rank, area: area, line: "| " + strings.Join([]string{colour, area, api, ui, rest}, " | ") + " |"})
+		rows = append(rows, found.coverageRow(area, hand[area]))
 	}
-	slices.SortFunc(rows, func(a, b row) int {
+	slices.SortFunc(rows, func(a, b areaRow) int {
 		if a.rank != b.rank {
 			return a.rank - b.rank
 		}
 		return strings.Compare(a.area, b.area)
 	})
-	lines := []string{"| | area | API vs main (latest run) | UI proven against main | not tested yet or failing |", "|---|---|---|---|---|"}
+	return tableLines([]string{"| | area | API vs main (latest run) | UI proven against main | not tested yet or failing |", "|---|---|---|---|---|"}, rows)
+}
+
+// areaRow is one area's rendered line and what the table sorts it by.
+type areaRow struct {
+	rank int
+	area string
+	line string
+}
+
+func tableLines(head []string, rows []areaRow) []string {
+	lines := head
 	for _, row := range rows {
 		lines = append(lines, row.line)
 	}
 	return lines
+}
+
+func (found results) coverageRow(area string, hand []string) areaRow {
+	kept := cellsAt(hand, 0, 1)
+	ui, rest := kept[0], kept[1]
+	if ui == "" {
+		ui = "not tested yet"
+	}
+	proven := ui != "not tested yet"
+	if flows := found.visual.areas[area]; flows != nil && flows.total > 0 {
+		ui, proven = fmt.Sprintf("%d of %d flows pass", flows.pass, flows.total), flows.pass == flows.total
+	}
+	api, rank := apiCoverage(found.api.areas[area], proven)
+	colour := []string{"🔴", "🟠", "🟢"}[rank]
+	return areaRow{rank: rank, area: area, line: "| " + strings.Join([]string{colour, area, api, ui, rest}, " | ") + " |"}
+}
+
+// apiCoverage is an area's API cell and its rank: 2 when every scenario passes
+// and the UI is proven, 1 at 90% or more, else 0.
+func apiCoverage(scenarios *tally, proven bool) (string, int) {
+	if scenarios == nil || scenarios.total == 0 {
+		return "not tested yet", 0
+	}
+	api := fmt.Sprintf("%d/%d", scenarios.pass, scenarios.total)
+	if failing := scenarios.total - scenarios.pass; failing > 0 {
+		api += fmt.Sprintf(" · %d failing", failing)
+	}
+	switch {
+	case scenarios.pass == scenarios.total && proven:
+		return api, 2
+	case scenarios.pass*10 >= scenarios.total*9:
+		return api, 1
+	}
+	return api, 0
 }
 
 // areaNames are every mapped area plus any other the run's results name, sorted.
@@ -387,47 +459,42 @@ func (found results) areaNames() []string {
 // defectsTable is the failures grouped by area, most first, with example ids; what's
 // wrong and the status are hand-kept per area.
 func (found results) defectsTable(hand map[string][]string) []string {
-	type row struct {
-		count int
-		area  string
-		line  string
-	}
-	var rows []row
+	var rows []areaRow
 	for _, area := range found.areaNames() {
-		var parts, ids []string
-		count := 0
-		if scenarios := found.api.areas[area]; scenarios != nil && len(scenarios.failing) > 0 {
-			parts = append(parts, fmt.Sprintf("%d scenarios", len(scenarios.failing)))
-			ids, count = append(ids, scenarios.failing...), count+len(scenarios.failing)
+		if row, ok := found.defectRow(area, hand[area]); ok {
+			rows = append(rows, row)
 		}
-		if flows := found.visual.areas[area]; flows != nil && len(flows.failing) > 0 {
-			parts = append(parts, fmt.Sprintf("%d UI flows", len(flows.failing)))
-			ids, count = append(ids, flows.failing...), count+len(flows.failing)
-		}
-		if count == 0 {
-			continue
-		}
-		kept := cellsAt(hand[area], 0, 1)
-		status := kept[1]
-		if status == "" {
-			status = "open"
-		}
-		rows = append(rows, row{count: count, area: area, line: "| " + strings.Join([]string{area, kept[0], strings.Join(parts, ", "), examples(ids), status}, " | ") + " |"})
 	}
-	slices.SortFunc(rows, func(a, b row) int {
-		if a.count != b.count {
-			return b.count - a.count
+	slices.SortFunc(rows, func(a, b areaRow) int {
+		if a.rank != b.rank {
+			return b.rank - a.rank
 		}
 		return strings.Compare(a.area, b.area)
 	})
-	lines := []string{"| area | what's wrong | failing | examples | status |", "|---|---|---|---|---|"}
-	for _, row := range rows {
-		lines = append(lines, row.line)
-	}
+	lines := tableLines([]string{"| area | what's wrong | failing | examples | status |", "|---|---|---|---|---|"}, rows)
 	if len(rows) == 0 {
 		lines = append(lines, "| none | nothing failed in the latest run | 0 | | |")
 	}
 	return lines
+}
+
+// defectRow is an area's failures, ranked by their count; ok is false when none failed.
+func (found results) defectRow(area string, hand []string) (areaRow, bool) {
+	var parts, ids []string
+	if scenarios := found.api.areas[area]; scenarios != nil && len(scenarios.failing) > 0 {
+		parts = append(parts, fmt.Sprintf("%d scenarios", len(scenarios.failing)))
+		ids = append(ids, scenarios.failing...)
+	}
+	if flows := found.visual.areas[area]; flows != nil && len(flows.failing) > 0 {
+		parts = append(parts, fmt.Sprintf("%d UI flows", len(flows.failing)))
+		ids = append(ids, flows.failing...)
+	}
+	if len(ids) == 0 {
+		return areaRow{}, false
+	}
+	kept := cellsAt(hand, 0, 1)
+	status := cmpOr(kept[1], "open")
+	return areaRow{rank: len(ids), area: area, line: "| " + strings.Join([]string{area, kept[0], strings.Join(parts, ", "), examples(ids), status}, " | ") + " |"}, true
 }
 
 // examples names the first three ids and how many more.
@@ -466,26 +533,11 @@ func splice(body string, preamble []string, tables []tableSpec) (string, error) 
 	if start < 0 || end < start {
 		return "", fmt.Errorf("the body has no %s ... %s section", sectionStart, sectionEnd)
 	}
-	inner := strings.Trim(body[start+len(sectionStart):end], "\n")
-	chunks := []chunk{{}}
-	for _, line := range strings.Split(inner, "\n") {
-		if heading, ok := strings.CutPrefix(line, "### "); ok {
-			chunks = append(chunks, chunk{heading: strings.TrimSpace(heading)})
-		}
-		chunks[len(chunks)-1].lines = append(chunks[len(chunks)-1].lines, line)
-	}
+	chunks := splitChunks(strings.Trim(body[start+len(sectionStart):end], "\n"))
 	chunks[0].lines = preamble
 	for index, spec := range tables {
-		at := findChunk(chunks, spec.heading)
-		if at < 0 {
-			at = 1
-			if index > 0 {
-				if previous := findChunk(chunks, tables[index-1].heading); previous >= 0 {
-					at = previous + 1
-				}
-			}
-			chunks = slices.Insert(chunks, at, chunk{heading: spec.heading, lines: []string{"### " + spec.heading, ""}})
-		}
+		var at int
+		chunks, at = chunkFor(chunks, tables, index)
 		chunks[at].lines = replaceTable(chunks[at].lines, spec)
 	}
 	var lines []string
@@ -495,6 +547,34 @@ func splice(body string, preamble []string, tables []tableSpec) (string, error) 
 	return body[:start] + sectionStart + "\n" + strings.Trim(strings.Join(lines, "\n"), "\n") + "\n" + body[end:], nil
 }
 
+// splitChunks cuts the section at each "### " heading; the first chunk has none.
+func splitChunks(inner string) []chunk {
+	chunks := []chunk{{}}
+	for _, line := range strings.Split(inner, "\n") {
+		if heading, ok := strings.CutPrefix(line, "### "); ok {
+			chunks = append(chunks, chunk{heading: strings.TrimSpace(heading)})
+		}
+		chunks[len(chunks)-1].lines = append(chunks[len(chunks)-1].lines, line)
+	}
+	return chunks
+}
+
+// chunkFor finds the chunk under tables[index]'s heading, adding it after the
+// previous table's chunk (or first, after the preamble) when it is missing.
+func chunkFor(chunks []chunk, tables []tableSpec, index int) ([]chunk, int) {
+	heading := tables[index].heading
+	if at := findChunk(chunks, heading); at >= 0 {
+		return chunks, at
+	}
+	at := 1
+	if index > 0 {
+		if previous := findChunk(chunks, tables[index-1].heading); previous >= 0 {
+			at = previous + 1
+		}
+	}
+	return slices.Insert(chunks, at, chunk{heading: heading, lines: []string{"### " + heading, ""}}), at
+}
+
 func findChunk(chunks []chunk, heading string) int {
 	return slices.IndexFunc(chunks, func(candidate chunk) bool { return candidate.heading == heading })
 }
@@ -502,17 +582,7 @@ func findChunk(chunks []chunk, heading string) int {
 // replaceTable swaps the first table in lines for the spec's, rendered with the hand
 // cells of the rows it replaces; with no table, the new one goes under the heading.
 func replaceTable(lines []string, spec tableSpec) []string {
-	first, last := -1, -1
-	for index, line := range lines {
-		if strings.HasPrefix(line, "|") {
-			if first < 0 {
-				first = index
-			}
-			last = index
-		} else if first >= 0 {
-			break
-		}
-	}
+	first, last := tableBounds(lines)
 	hand := map[string][]string{}
 	for index := first + 2; first >= 0 && index <= last; index++ {
 		cells := splitCells(lines[index])
@@ -526,6 +596,24 @@ func replaceTable(lines []string, spec tableSpec) []string {
 		return slices.Concat(lines[:at], table, []string{""}, lines[at:])
 	}
 	return slices.Concat(lines[:first], table, lines[last+1:])
+}
+
+// tableBounds are the first and last lines of the first run of "|" lines, or -1, -1.
+func tableBounds(lines []string) (first, last int) {
+	first, last = -1, -1
+	for index, line := range lines {
+		if !strings.HasPrefix(line, "|") {
+			if first >= 0 {
+				break
+			}
+			continue
+		}
+		if first < 0 {
+			first = index
+		}
+		last = index
+	}
+	return first, last
 }
 
 func splitCells(line string) []string {

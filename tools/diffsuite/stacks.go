@@ -21,7 +21,7 @@ const bootTimeout = 20 * time.Minute
 // haven is what the suite asks of haven and of visualdiff's main boot; tests replace it.
 var haven = struct {
 	read    func(ctx context.Context, slug string) (diffkit.SharedStack, error)
-	up      func(ctx context.Context, root, slug string, deltas []string, env havenrun.EnvOptions, stderr io.Writer) error
+	up      func(ctx context.Context, request upRequest) error
 	destroy func(root, slug string, stderr io.Writer)
 	upMain  func(ctx context.Context, request visualdiff.MainStackRequest) (string, func(), error)
 }{read: diffkit.ReadSharedStack, up: havenUp, destroy: havenDestroy, upMain: visualdiff.BootMainStack}
@@ -69,9 +69,45 @@ func (stacks *stacks) env() []string {
 	return env
 }
 
+// stackRequest is what resolve needs: the flags, the checkout a stack starts
+// from, the suite's output directory and where progress goes.
+type stackRequest struct {
+	flags  stackFlags
+	root   string
+	out    string
+	stderr io.Writer
+	stamp  string
+}
+
+// upRequest is one haven up: the checkout, the slug, the deltas and the env.
+type upRequest struct {
+	root   string
+	slug   string
+	deltas []string
+	env    havenrun.EnvOptions
+	stderr io.Writer
+}
+
 // resolve adopts or starts each stack; a stack it started is stopped by stop, even
 // when resolve fails part-way.
-func (stacks *stacks) resolve(ctx context.Context, flags stackFlags, root, out string, stderr io.Writer) error {
+func (stacks *stacks) resolve(ctx context.Context, request stackRequest) error {
+	if err := request.flags.validate(); err != nil {
+		return err
+	}
+	request.stamp = time.Now().Format("0102-150405")
+	if err := stacks.resolveBranch(ctx, request); err != nil {
+		return err
+	}
+	if err := stacks.resolveMain(ctx, request); err != nil {
+		return fmt.Errorf("main stack: %w", err)
+	}
+	if request.flags.deployment == selfHosted {
+		return stacks.requireSelfHosted()
+	}
+	return nil
+}
+
+func (flags stackFlags) validate() error {
 	if flags.up && flags.stack != "" {
 		return fmt.Errorf("-stack names a running stack and -up starts one: pass one")
 	}
@@ -84,29 +120,24 @@ func (stacks *stacks) resolve(ctx context.Context, flags stackFlags, root, out s
 	if flags.deployment != saas && flags.deployment != selfHosted {
 		return fmt.Errorf("-deployment is saas or self-hosted, not %q", flags.deployment)
 	}
-	isSelfHosted := flags.deployment == selfHosted
-	if isSelfHosted && flags.main {
+	if flags.deployment == selfHosted && flags.main {
 		return fmt.Errorf("-main boots pinned main as SaaS; under -deployment self-hosted name a self-hosted main with -main-stack")
 	}
-	stamp := time.Now().Format("0102-150405")
+	return nil
+}
+
+// resolveBranch adopts or starts the branch stack. A failed haven up is
+// returned as it is; a failed read is a "branch stack" error.
+func (stacks *stacks) resolveBranch(ctx context.Context, request stackRequest) error {
+	flags := request.flags
 	var err error
 	switch {
 	case flags.up:
-		slug, env := havenrun.Slug("diffsuite", stamp, "branch"), havenrun.EnvOptions{}
-		if isSelfHosted {
-			slug, env = havenrun.Slug("diffsuite", stamp, "selfhosted"), selfHostedEnv
-		}
-		stacks.stops = append(stacks.stops, func() { haven.destroy(root, slug, stderr) })
-		fmt.Fprintf(stderr, "diffsuite: starting the %s branch stack %s from %s\n", flags.deployment, slug, root)
-		var deltas []string
-		if flags.langevals {
-			deltas = append(deltas, "+langevals")
-		}
-		if err := haven.up(ctx, root, slug, deltas, env, stderr); err != nil {
+		if err := stacks.startBranch(ctx, request); err != nil {
 			return err
 		}
-		stacks.branch, err = haven.read(ctx, slug)
-	case isSelfHosted:
+		stacks.branch, err = haven.read(ctx, havenrun.Slug("diffsuite", request.stamp, branchKind(flags)))
+	case flags.deployment == selfHosted:
 		slug := cmp.Or(flags.stack, selfHostedSlug)
 		if stacks.branch, err = haven.read(ctx, slug); err != nil {
 			err = fmt.Errorf("%w (start it with: IS_SAAS=false LANGWATCH_SLUG=%s haven up --agent --detach, or pass -up)", err, slug)
@@ -117,28 +148,56 @@ func (stacks *stacks) resolve(ctx context.Context, flags stackFlags, root, out s
 	if err != nil {
 		return fmt.Errorf("branch stack: %w", err)
 	}
+	return nil
+}
+
+// branchKind names the branch stack -up starts: "selfhosted" or "branch".
+func branchKind(flags stackFlags) string {
+	if flags.deployment == selfHosted {
+		return "selfhosted"
+	}
+	return "branch"
+}
+
+// startBranch starts the branch stack -up asks for and registers its destroy.
+func (stacks *stacks) startBranch(ctx context.Context, request stackRequest) error {
+	flags, root, stderr := request.flags, request.root, request.stderr
+	slug, env := havenrun.Slug("diffsuite", request.stamp, branchKind(flags)), havenrun.EnvOptions{}
+	if flags.deployment == selfHosted {
+		env = selfHostedEnv
+	}
+	stacks.stops = append(stacks.stops, func() { haven.destroy(root, slug, stderr) })
+	fmt.Fprintf(stderr, "diffsuite: starting the %s branch stack %s from %s\n", flags.deployment, slug, root)
+	var deltas []string
+	if flags.langevals {
+		deltas = append(deltas, "+langevals")
+	}
+	return haven.up(ctx, upRequest{root: root, slug: slug, deltas: deltas, env: env, stderr: stderr})
+}
+
+func (stacks *stacks) resolveMain(ctx context.Context, request stackRequest) error {
+	var err error
 	switch {
-	case flags.main:
-		slug := havenrun.Slug("diffsuite", stamp, "main")
-		fmt.Fprintf(stderr, "diffsuite: starting pinned main as %s\n", slug)
-		_, stop, err := haven.upMain(ctx, visualdiff.MainStackRequest{Root: root, RunDir: filepath.Join(out, "main"), Slug: slug, Stderr: stderr})
+	case request.flags.main:
+		slug := havenrun.Slug("diffsuite", request.stamp, "main")
+		fmt.Fprintf(request.stderr, "diffsuite: starting pinned main as %s\n", slug)
+		var stop func()
+		_, stop, err = haven.upMain(ctx, visualdiff.MainStackRequest{Root: request.root, RunDir: filepath.Join(request.out, "main"), Slug: slug, Stderr: request.stderr})
 		stacks.stops = append(stacks.stops, stop)
 		if err == nil {
 			stacks.main, err = haven.read(ctx, slug)
 		}
-		if err != nil {
-			return fmt.Errorf("main stack: %w", err)
-		}
-	case flags.mainStack != "":
-		if stacks.main, err = haven.read(ctx, flags.mainStack); err != nil {
-			return fmt.Errorf("main stack: %w", err)
-		}
+	case request.flags.mainStack != "":
+		stacks.main, err = haven.read(ctx, request.flags.mainStack)
 	}
-	if isSelfHosted {
-		for _, stack := range []diffkit.SharedStack{stacks.branch, stacks.main} {
-			if stack.AppURL != "" && answersAsSaaS(stack.AppURL) {
-				return fmt.Errorf("-deployment self-hosted: %s hides the instance-admin routes (GET /api/organizations is 404): it runs as SaaS or has no LANGWATCH_INSTANCE_ADMIN_API_KEY; start it with IS_SAAS=false", stack.Slug)
-			}
+	return err
+}
+
+// requireSelfHosted refuses a stack that answers as SaaS under -deployment self-hosted.
+func (stacks *stacks) requireSelfHosted() error {
+	for _, stack := range []diffkit.SharedStack{stacks.branch, stacks.main} {
+		if stack.AppURL != "" && answersAsSaaS(stack.AppURL) {
+			return fmt.Errorf("-deployment self-hosted: %s hides the instance-admin routes (GET /api/organizations is 404): it runs as SaaS or has no LANGWATCH_INSTANCE_ADMIN_API_KEY; start it with IS_SAAS=false", stack.Slug)
 		}
 	}
 	return nil
@@ -155,10 +214,10 @@ func answersAsSaaS(apiOrigin string) bool {
 	return response.StatusCode == http.StatusNotFound
 }
 
-func havenUp(ctx context.Context, root, slug string, deltas []string, env havenrun.EnvOptions, stderr io.Writer) error {
-	command := exec.CommandContext(ctx, havenrun.Command, havenrun.UpArgs(deltas...)...) // #nosec G204 -- fixed haven args.
-	command.Dir, command.Env = root, havenrun.Env(os.Environ(), slug, env)
-	command.Stdout, command.Stderr = stderr, stderr
+func havenUp(ctx context.Context, request upRequest) error {
+	command := exec.CommandContext(ctx, havenrun.Command, havenrun.UpArgs(request.deltas...)...) // #nosec G204 -- fixed haven args.
+	command.Dir, command.Env = request.root, havenrun.Env(os.Environ(), request.slug, request.env)
+	command.Stdout, command.Stderr = request.stderr, request.stderr
 	return command.Run()
 }
 

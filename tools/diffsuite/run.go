@@ -76,89 +76,143 @@ type suite struct {
 	appendLog   bool // continuous mode keeps one events.log across restarts
 }
 
-// Run is the command: it returns the process exit code.
-func Run(args []string, stderr io.Writer) int {
+// runOptions is the parsed command line.
+type runOptions struct {
+	out, policy, health, chosen, deferred string
+	stackChoice                           stackFlags
+	continuous                            bool
+	visualEvery                           time.Duration
+	loadMax                               float64
+	names, specs                          []string
+}
+
+func parseRunOptions(args []string, stderr io.Writer) (runOptions, bool) {
+	var options runOptions
 	flags := flag.NewFlagSet("diffsuite", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	out := flags.String("out", "", "directory for logs, events.log and summary.json")
-	policy := flags.String("policy", "half", "half | same-cause | any | none")
-	health := flags.String("health", "", "URL that must answer 2xx before and while the tools run (default: the branch stack's /api/health)")
-	chosen := flags.String("tools", strings.Join(defaultNames(), ","), "which of the default tools run; name=command after -- adds or replaces one")
-	var stackChoice stackFlags
+	flags.StringVar(&options.out, "out", "", "directory for logs, events.log and summary.json")
+	flags.StringVar(&options.policy, "policy", "half", "half | same-cause | any | none")
+	flags.StringVar(&options.health, "health", "", "URL that must answer 2xx before and while the tools run (default: the branch stack's /api/health)")
+	flags.StringVar(&options.chosen, "tools", strings.Join(defaultNames(), ","), "which of the default tools run; name=command after -- adds or replaces one")
+	stackChoice := &options.stackChoice
 	flags.StringVar(&stackChoice.stack, "stack", "", "a running haven stack to test (default "+diffkit.CheckSlug+")")
 	flags.BoolVar(&stackChoice.up, "up", false, "start the branch stack from this checkout, and destroy it at the end")
 	flags.StringVar(&stackChoice.mainStack, "main-stack", "", "a running haven stack of main to compare with")
 	flags.BoolVar(&stackChoice.main, "main", false, "start pinned main as a stack of its own, and destroy it at the end")
 	flags.BoolVar(&stackChoice.langevals, "langevals", false, "run langevals in the branch stack -up starts (haven up +langevals)")
 	flags.StringVar(&stackChoice.deployment, "deployment", saas, "saas | self-hosted: self-hosted adopts "+selfHostedSlug+" (or -up starts one with IS_SAAS=false) and runs only api by default")
-	continuous := flags.Bool("continuous", false, "loop against -stack until interrupted: api and fuzzapi back to back, visual and fuzzui every -visual-every")
-	visualEvery := flags.Duration("visual-every", 30*time.Minute, "with -continuous: how often visual and fuzzui start, when the load allows")
-	loadMax := flags.Float64("load-max", 0, "with -continuous: visual and fuzzui wait while the 1m load average is at or above this (default: the CPU count)")
-	deferred := flags.String("deferred", "", "a SaaS run's apidiff deferred.txt: api runs only the scenarios it lists")
+	flags.BoolVar(&options.continuous, "continuous", false, "loop against -stack until interrupted: api and fuzzapi back to back, visual and fuzzui every -visual-every")
+	flags.DurationVar(&options.visualEvery, "visual-every", 30*time.Minute, "with -continuous: how often visual and fuzzui start, when the load allows")
+	flags.Float64Var(&options.loadMax, "load-max", 0, "with -continuous: visual and fuzzui wait while the 1m load average is at or above this (default: the CPU count)")
+	flags.StringVar(&options.deferred, "deferred", "", "a SaaS run's apidiff deferred.txt: api runs only the scenarios it lists")
 	if flags.Parse(args) != nil {
+		return options, false
+	}
+	options.names, options.specs = splitNames(options.chosen), flags.Args()
+	if stackChoice.deployment == selfHosted && !flagSet(flags, "tools") {
+		options.names = []string{"api"}
+	}
+	return options, true
+}
+
+// addDeferred narrows api to the scenarios a -deferred file lists.
+func (options *runOptions) addDeferred() error {
+	if options.deferred == "" {
+		return nil
+	}
+	path, err := filepath.Abs(options.deferred)
+	if err != nil {
+		return err
+	}
+	options.specs = append(options.specs, "api+=-scenario-id '@"+path+"'")
+	return nil
+}
+
+// Run is the command: it returns the process exit code.
+func Run(args []string, stderr io.Writer) int {
+	options, ok := parseRunOptions(args, stderr)
+	if !ok {
 		return 2
 	}
-	names, specs := splitNames(*chosen), flags.Args()
-	if *continuous && (stackChoice.up || stackChoice.main) {
+	if options.continuous && (options.stackChoice.up || options.stackChoice.main) {
 		fmt.Fprintln(stderr, "diffsuite: -continuous never starts a stack: adopt one with -stack")
 		return 2
 	}
-	if stackChoice.deployment == selfHosted && !flagSet(flags, "tools") {
-		names = []string{"api"}
-	}
-	if *deferred != "" {
-		path, err := filepath.Abs(*deferred)
-		if err != nil {
-			fmt.Fprintln(stderr, "diffsuite:", err)
-			return 2
-		}
-		specs = append(specs, "api+=-scenario-id '@"+path+"'")
+	if err := options.addDeferred(); err != nil {
+		fmt.Fprintln(stderr, "diffsuite:", err)
+		return 2
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	suite := &suite{out: *out, policy: *policy, stderr: stderr, root: repoRoot(), appendLog: *continuous}
-	if err := suite.setup(names, specs); err != nil {
+	suite := &suite{out: options.out, policy: options.policy, stderr: stderr, root: repoRoot(), appendLog: options.continuous}
+	if err := suite.setup(options.names, options.specs); err != nil {
 		fmt.Fprintln(stderr, "diffsuite:", err)
 		return 2
 	}
 	defer suite.events.Close()
 	stacks := &stacks{}
 	defer stacks.stop()
-	if err := stacks.resolve(ctx, stackChoice, suite.root, suite.out, stderr); err != nil {
+	if err := stacks.resolve(ctx, stackRequest{flags: options.stackChoice, root: suite.root, out: suite.out, stderr: stderr}); err != nil {
 		fmt.Fprintln(stderr, "diffsuite:", err)
 		return 2
 	}
 	suite.env = append(append(os.Environ(), "DIFFSUITE_OUT="+suite.out), stacks.env()...)
 	suite.stacks = stacks
 	fmt.Fprintf(stderr, "diffsuite: branch %s at %s; main %s\n", stacks.branch.Slug, stacks.branch.AppURL, cmp.Or(stacks.main.AppURL, "none (baselines)"))
-	*health = cmp.Or(*health, stacks.branch.AppURL+"/api/health")
-	if *continuous {
-		return suite.continuous(ctx, continuousOptions{health: *health, visualEvery: *visualEvery, loadMax: *loadMax})
+	health := cmp.Or(options.health, stacks.branch.AppURL+"/api/health")
+	if options.continuous {
+		return suite.continuous(ctx, continuousOptions{health: health, visualEvery: options.visualEvery, loadMax: options.loadMax})
 	}
-	if !healthy(*health) {
-		fmt.Fprintln(stderr, "diffsuite: refusing to start: not healthy:", *health)
+	return suite.once(ctx, health)
+}
+
+// once runs every tool together until all end, then summarizes.
+func (suite *suite) once(ctx context.Context, health string) int {
+	if !healthy(health) {
+		fmt.Fprintln(suite.stderr, "diffsuite: refusing to start: not healthy:", health)
 		return 2
 	}
 	if err := suite.build(ctx, suite.tools); err != nil {
-		fmt.Fprintln(stderr, "diffsuite:", err)
+		fmt.Fprintln(suite.stderr, "diffsuite:", err)
 		return 2
 	}
 	began := time.Now()
 	suite.began = began
+	if err := suite.startAll(); err != nil {
+		fmt.Fprintln(suite.stderr, "diffsuite:", err)
+		return 2
+	}
+	suite.waitAll(ctx, health)
+	suite.line("all runs ended: %s", filepath.Join(suite.out, "events.log"))
+	code := suite.summarize(time.Since(began))
+	suite.eventsMu.Lock()
+	fmt.Fprint(stdout, summaryTable(suite.tools))
+	fmt.Fprint(stdout, summaryReport(suite.tools))
+	suite.eventsMu.Unlock()
+	return code
+}
+
+// startAll starts every tool; when one fails to start, it kills the rest.
+func (suite *suite) startAll() error {
 	for _, tool := range suite.tools {
 		if err := suite.start(tool); err != nil {
 			suite.signal(syscall.SIGKILL)
-			fmt.Fprintln(stderr, "diffsuite:", err)
-			return 2
+			return err
 		}
 	}
+	return nil
+}
+
+// waitAll waits for every tool, watching health and heartbeating meanwhile;
+// cancelling ctx stops them all.
+func (suite *suite) waitAll(ctx context.Context, health string) {
 	var running sync.WaitGroup
 	for _, tool := range suite.tools {
 		running.Add(1)
 		go func() { defer running.Done(); suite.wait(tool) }()
 	}
 	finished := make(chan struct{})
-	go suite.watch(*health, finished)
+	go suite.watch(health, finished)
 	go suite.heartbeat(finished)
 	go func() {
 		<-ctx.Done()
@@ -168,13 +222,6 @@ func Run(args []string, stderr io.Writer) int {
 	}()
 	running.Wait()
 	close(finished)
-	suite.line("all runs ended: %s", filepath.Join(suite.out, "events.log"))
-	code := suite.summarize(time.Since(began))
-	suite.eventsMu.Lock()
-	fmt.Fprint(stdout, summaryTable(suite.tools))
-	fmt.Fprint(stdout, summaryReport(suite.tools))
-	suite.eventsMu.Unlock()
-	return code
 }
 
 // flagSet is true when the command line named the flag, rather than leaving its default.
@@ -229,48 +276,65 @@ func (suite *suite) start(tool *tool) error {
 	}
 	pipeIn, pipeOut := io.Pipe()
 	tool.output, tool.scanned = pipeOut, make(chan struct{})
-	tool.cmd = exec.Command("bash", "-c", tool.command) // #nosec G204 -- the operator's own suite.
-	tool.cmd.Dir, tool.cmd.Env = suite.root, suite.env
-	if tool.dir != "" {
-		tool.cmd.Env = append(slices.Clone(suite.env), "DIFFSUITE_OUT="+tool.dir)
-	}
-	tool.cmd.Stdout, tool.cmd.Stderr = pipeOut, pipeOut
-	tool.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	tool.cmd.WaitDelay = 2 * time.Second
+	tool.cmd = suite.command(tool, pipeOut)
 	tool.began = time.Now()
 	if err := tool.cmd.Start(); err != nil {
 		logFile.Close()
 		return fmt.Errorf("%s: %w", tool.name, err)
 	}
-	go func() {
-		defer close(tool.scanned)
-		defer logFile.Close()
-		scanner := bufio.NewScanner(pipeIn)
-		scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
-		for scanner.Scan() {
-			text := scanner.Text()
-			fmt.Fprintln(logFile, text)
-			if eventLine.MatchString(text) {
-				suite.line("[%s] %s", tool.name, text)
-			}
-			suite.mu.Lock()
-			tool.noteLine(text)
-			streamed := tool.result(text)
-			suite.mu.Unlock()
-			if streamed != "" && !eventLine.MatchString(text) {
-				suite.say(tool.name, streamed)
-			}
-			if reason, ok := stopReason(text); ok {
-				suite.mu.Lock()
-				tool.stopLine = text
-				suite.mu.Unlock()
-				suite.say(tool.name, "STOPPED ("+classify(reason)+"): "+reason)
-			}
-		}
-		io.Copy(io.Discard, pipeIn)
-	}()
+	go suite.scan(tool, pipeIn, logFile)
 	go suite.followFindings(tool)
 	return nil
+}
+
+// command is the tool's shell command, run from the root in its own process
+// group with both streams on output.
+func (suite *suite) command(tool *tool, output *io.PipeWriter) *exec.Cmd {
+	cmd := exec.Command("bash", "-c", tool.command) // #nosec G204 -- the operator's own suite.
+	cmd.Dir, cmd.Env = suite.root, suite.env
+	if tool.dir != "" {
+		cmd.Env = append(slices.Clone(suite.env), "DIFFSUITE_OUT="+tool.dir)
+	}
+	cmd.Stdout, cmd.Stderr = output, output
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.WaitDelay = 2 * time.Second
+	return cmd
+}
+
+// scan copies the tool's output to its log line by line, noting each line,
+// until the output closes.
+func (suite *suite) scan(tool *tool, pipeIn *io.PipeReader, logFile *os.File) {
+	defer close(tool.scanned)
+	defer logFile.Close()
+	scanner := bufio.NewScanner(pipeIn)
+	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
+	for scanner.Scan() {
+		text := scanner.Text()
+		fmt.Fprintln(logFile, text)
+		suite.noteLine(tool, text)
+	}
+	io.Copy(io.Discard, pipeIn)
+}
+
+// noteLine passes one output line to the events log, the tool's state and
+// the operator's stream.
+func (suite *suite) noteLine(tool *tool, text string) {
+	if eventLine.MatchString(text) {
+		suite.line("[%s] %s", tool.name, text)
+	}
+	suite.mu.Lock()
+	tool.noteLine(text)
+	streamed := tool.result(text)
+	suite.mu.Unlock()
+	if streamed != "" && !eventLine.MatchString(text) {
+		suite.say(tool.name, streamed)
+	}
+	if reason, ok := stopReason(text); ok {
+		suite.mu.Lock()
+		tool.stopLine = text
+		suite.mu.Unlock()
+		suite.say(tool.name, "STOPPED ("+classify(reason)+"): "+reason)
+	}
 }
 
 // wait ends one tool: its EXIT line, its stop reason, then the policy.

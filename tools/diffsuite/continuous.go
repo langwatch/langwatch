@@ -99,39 +99,57 @@ type session struct {
 	run     func(ctx context.Context, name, dir string) outcome
 }
 
+// loopState is what one tool's loop carries between iterations.
+type loopState struct {
+	toolDir string
+	n       int
+	before  *summary
+	began   time.Time
+}
+
 func (s *session) loop(ctx context.Context, j job) {
 	toolDir := filepath.Join(s.out, j.name)
-	n, before := lastIteration(toolDir), s.baseline(toolDir, j.name)
-	var began time.Time
+	state := &loopState{toolDir: toolDir, n: lastIteration(toolDir), before: s.baseline(toolDir, j.name)}
 	for ctx.Err() == nil {
-		if !began.IsZero() && s.clock.sleepUntil(ctx, began.Add(max(j.every, minGap))) != nil {
+		if !s.pace(ctx, j, state.began) || !s.iterate(ctx, j, state) {
 			return
 		}
-		if j.every > 0 && s.waitLoad(ctx, j.name) != nil || s.ready(ctx) != nil {
-			return
-		}
-		commit, err := s.prepare(ctx, j.name)
-		if err != nil {
-			s.say("[%s] BUILD FAILED: %v", j.name, err)
-			began = s.clock.now()
-			continue
-		}
-		n++
-		dir := filepath.Join(toolDir, fmt.Sprintf("%04d", n))
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			s.say("[%s] cannot create %s: %v", j.name, dir, err)
-			return
-		}
-		began = s.clock.now()
-		result := s.run(ctx, j.name, dir)
-		done := summarize(j.name, n, commit, began, s.clock.now(), dir, result, before)
-		if result.Stopped == "" {
-			before = &done
-		}
-		writeLatest(toolDir, done)
-		prune(toolDir, keepIterations)
-		s.report(done)
 	}
+}
+
+// pace waits out the gap since the last start, then the load and the stack;
+// false ends the loop.
+func (s *session) pace(ctx context.Context, j job, began time.Time) bool {
+	if !began.IsZero() && s.clock.sleepUntil(ctx, began.Add(max(j.every, minGap))) != nil {
+		return false
+	}
+	return !(j.every > 0 && s.waitLoad(ctx, j.name) != nil || s.ready(ctx) != nil)
+}
+
+// iterate prepares and runs one iteration and records it; false ends the loop.
+func (s *session) iterate(ctx context.Context, j job, state *loopState) bool {
+	commit, err := s.prepare(ctx, j.name)
+	if err != nil {
+		s.say("[%s] BUILD FAILED: %v", j.name, err)
+		state.began = s.clock.now()
+		return true
+	}
+	state.n++
+	dir := filepath.Join(state.toolDir, fmt.Sprintf("%04d", state.n))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		s.say("[%s] cannot create %s: %v", j.name, dir, err)
+		return false
+	}
+	state.began = s.clock.now()
+	result := s.run(ctx, j.name, dir)
+	done := summarize(iteration{name: j.name, n: state.n, commit: commit, began: state.began, ended: s.clock.now(), dir: dir, result: result}, state.before)
+	if result.Stopped == "" {
+		state.before = &done
+	}
+	writeLatest(state.toolDir, done)
+	prune(state.toolDir, keepIterations)
+	s.report(done)
+	return true
 }
 
 func (s *session) waitLoad(ctx context.Context, name string) error {
@@ -146,9 +164,20 @@ func (s *session) waitLoad(ctx context.Context, name string) error {
 	return ctx.Err()
 }
 
-func summarize(name string, n int, commit string, began, ended time.Time, dir string, result outcome, before *summary) summary {
-	done := summary{outcome: result, Tool: name, Iteration: n, Commit: commit, StartedAt: began,
-		DurationMs: ended.Sub(began).Milliseconds(), Dir: dir, New: []string{}, Fixed: []string{}}
+// iteration is one finished run of a tool: which, when, where and what it showed.
+type iteration struct {
+	name         string
+	n            int
+	commit       string
+	began, ended time.Time
+	dir          string
+	result       outcome
+}
+
+func summarize(run iteration, before *summary) summary {
+	result := run.result
+	done := summary{outcome: result, Tool: run.name, Iteration: run.n, Commit: run.commit, StartedAt: run.began,
+		DurationMs: run.ended.Sub(run.began).Milliseconds(), Dir: run.dir, New: []string{}, Fixed: []string{}}
 	if done.Failing == nil {
 		done.Failing = []string{}
 	}
@@ -284,12 +313,7 @@ func (s *session) baseline(toolDir, name string) *summary {
 // apidiffBaseline reads the newest <runs>/*/out/apidiff/scenarios.jsonl as a summary.
 func apidiffBaseline(runs string) *summary {
 	paths, _ := filepath.Glob(filepath.Join(runs, "*", "out", "apidiff", "scenarios.jsonl"))
-	newest, at := "", time.Time{}
-	for _, path := range paths {
-		if info, err := os.Stat(path); err == nil && info.ModTime().After(at) {
-			newest, at = path, info.ModTime()
-		}
-	}
+	newest := newestFile(paths)
 	if newest == "" {
 		return nil
 	}
@@ -303,18 +327,34 @@ func apidiffBaseline(runs string) *summary {
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 64*1024), 16*1024*1024)
 	for scanner.Scan() {
-		var line struct{ ID, Verdict string }
-		if json.Unmarshal(scanner.Bytes(), &line) != nil || line.ID == "" {
-			continue
-		}
-		if line.Verdict == "PASS" {
-			last.Pass++
-			continue
-		}
-		last.Fail++
-		last.Failing = append(last.Failing, line.Verdict+" "+line.ID)
+		last.countScenario(scanner.Bytes())
 	}
 	return &last
+}
+
+// newestFile is the most recently modified of paths, or "" when none can be read.
+func newestFile(paths []string) string {
+	newest, at := "", time.Time{}
+	for _, path := range paths {
+		if info, err := os.Stat(path); err == nil && info.ModTime().After(at) {
+			newest, at = path, info.ModTime()
+		}
+	}
+	return newest
+}
+
+// countScenario adds one scenarios.jsonl line to the summary; a line without an id is skipped.
+func (last *summary) countScenario(body []byte) {
+	var line struct{ ID, Verdict string }
+	if json.Unmarshal(body, &line) != nil || line.ID == "" {
+		return
+	}
+	if line.Verdict == "PASS" {
+		last.Pass++
+		return
+	}
+	last.Fail++
+	last.Failing = append(last.Failing, line.Verdict+" "+line.ID)
 }
 
 // writeLatest replaces latest.json by rename, so an agent never reads half of it.
@@ -390,36 +430,16 @@ func (suite *suite) continuous(ctx context.Context, options continuousOptions) i
 	for _, tool := range suite.tools {
 		templates[tool.name] = tool
 	}
-	jobs := make([]job, 0, len(suite.tools))
-	for _, tool := range suite.tools {
-		every := options.visualEvery
-		if tool.name == "api" || tool.name == "fuzzapi" {
-			every = 0
-		}
-		jobs = append(jobs, job{tool.name, every})
-	}
+	jobs := continuousJobs(suite.tools, options.visualEvery)
 	suite.tools, suite.policy, suite.began = nil, "none", time.Now()
 	alive := func() bool { return healthy(options.health) }
-	var buildMu sync.Mutex
-	built := map[string]string{}
 	s := &session{
 		out: suite.out, clock: realClock, say: suite.line, load: currentLoad,
 		loadMax: options.loadMax,
 		ready:   (&gate{clock: realClock, probe: alive, say: suite.line}).wait,
-		prepare: func(ctx context.Context, name string) (string, error) {
-			buildMu.Lock()
-			defer buildMu.Unlock()
-			commit, template := headCommit(suite.root), templates[name]
-			if template.binary != "" && built[template.binary] != commit {
-				if err := suite.build(ctx, []*tool{template}); err != nil {
-					return "", err
-				}
-				built[template.binary] = commit
-			}
-			return commit, nil
-		},
+		prepare: suite.preparer(templates),
 		run: func(ctx context.Context, name, dir string) outcome {
-			return suite.runOnce(ctx, templates[name], dir, alive)
+			return suite.runOnce(ctx, iterationOf(templates[name], dir), alive)
 		},
 	}
 	if s.loadMax <= 0 {
@@ -427,15 +447,7 @@ func (suite *suite) continuous(ctx context.Context, options continuousOptions) i
 	}
 	finished := make(chan struct{})
 	go suite.heartbeat(finished)
-	go func() {
-		select {
-		case <-ctx.Done():
-			suite.mu.Lock()
-			defer suite.mu.Unlock()
-			suite.stopAll("cancelled")
-		case <-finished:
-		}
-	}()
+	go suite.stopOnCancel(ctx, finished)
 	suite.line("[suite] continuous: %d tools against %s", len(jobs), options.health)
 	var loops sync.WaitGroup
 	for _, j := range jobs {
@@ -448,11 +460,60 @@ func (suite *suite) continuous(ctx context.Context, options continuousOptions) i
 	return 0
 }
 
-// runOnce runs one iteration of a tool in dir and answers what it showed.
-func (suite *suite) runOnce(ctx context.Context, template *tool, dir string, alive func() bool) outcome {
+// continuousJobs loops api and fuzzapi back to back and the rest every visualEvery.
+func continuousJobs(tools []*tool, visualEvery time.Duration) []job {
+	jobs := make([]job, 0, len(tools))
+	for _, tool := range tools {
+		every := visualEvery
+		if tool.name == "api" || tool.name == "fuzzapi" {
+			every = 0
+		}
+		jobs = append(jobs, job{tool.name, every})
+	}
+	return jobs
+}
+
+// preparer builds a tool's binary when HEAD moved since its last build, one
+// build at a time, and answers the commit.
+func (suite *suite) preparer(templates map[string]*tool) func(ctx context.Context, name string) (string, error) {
+	var buildMu sync.Mutex
+	built := map[string]string{}
+	return func(ctx context.Context, name string) (string, error) {
+		buildMu.Lock()
+		defer buildMu.Unlock()
+		commit, template := headCommit(suite.root), templates[name]
+		if template.binary == "" || built[template.binary] == commit {
+			return commit, nil
+		}
+		if err := suite.build(ctx, []*tool{template}); err != nil {
+			return "", err
+		}
+		built[template.binary] = commit
+		return commit, nil
+	}
+}
+
+// stopOnCancel stops every tool when ctx ends before finished closes.
+func (suite *suite) stopOnCancel(ctx context.Context, finished <-chan struct{}) {
+	select {
+	case <-ctx.Done():
+		suite.mu.Lock()
+		defer suite.mu.Unlock()
+		suite.stopAll("cancelled")
+	case <-finished:
+	}
+}
+
+// iterationOf is a copy of a tool's template that runs in dir.
+func iterationOf(template *tool, dir string) *tool {
 	copied := *template
-	live := &copied
-	live.dir = dir
+	copied.dir = dir
+	return &copied
+}
+
+// runOnce runs one iteration of a tool, a copy of its template set to its
+// iteration directory, and answers what it showed.
+func (suite *suite) runOnce(ctx context.Context, live *tool, alive func() bool) outcome {
 	if err := suite.start(live); err != nil {
 		suite.line("[%s] START FAILED: %v", live.name, err)
 		return outcome{Exit: 2, Stopped: err.Error(), Failing: []string{}}

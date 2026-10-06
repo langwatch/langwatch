@@ -74,26 +74,41 @@ func cmpOr(value, fallback string) string {
 
 // result files one output line and answers the line to stream, when the events filter does not print it already.
 func (tool *tool) result(text string) string {
-	r := &tool.results
+	if streamed, ok := tool.results.verdict(text); ok {
+		return streamed
+	}
+	if apiStepLine.MatchString(text) {
+		return strings.TrimSpace(text)
+	}
+	tool.results.tally(text)
+	return ""
+}
+
+// verdict files an api or visual verdict line; ok is false for any other line.
+func (r *toolResults) verdict(text string) (streamed string, ok bool) {
 	if match := apiVerdictLine.FindStringSubmatch(text); match != nil {
 		endpoint := cmpOr(strings.TrimSpace(strings.Split(match[3], ",")[0]), match[2])
 		if r.mark("fail " + match[2]) {
 			r.failing = append(r.failing, item{match[1] + " " + match[2], family(fields(endpoint))})
 		}
-		return ""
+		return "", true
 	}
-	if match := visualVerdictLine.FindStringSubmatch(text); match != nil {
-		if r.mark(match[1] + " " + match[2]) {
-			r.failing = append(r.failing, item{match[1] + " " + match[2], family(match[2])})
-			if match[1] != "FAIL" {
-				return strings.TrimSpace(text)
-			}
-		}
-		return ""
+	match := visualVerdictLine.FindStringSubmatch(text)
+	if match == nil {
+		return "", false
 	}
-	if apiStepLine.MatchString(text) {
-		return strings.TrimSpace(text)
+	if !r.mark(match[1] + " " + match[2]) {
+		return "", true
 	}
+	r.failing = append(r.failing, item{match[1] + " " + match[2], family(match[2])})
+	if match[1] != "FAIL" {
+		return strings.TrimSpace(text), true
+	}
+	return "", true
+}
+
+// tally files the counts and the findings directory a line may carry.
+func (r *toolResults) tally(text string) {
 	if match := flowTally.FindStringSubmatch(text); match != nil {
 		r.pass, r.fail = number(match[1]), number(match[2])-number(match[1])
 	}
@@ -107,7 +122,6 @@ func (tool *tool) result(text string) string {
 		}
 		r.dir = dir
 	}
-	return ""
 }
 
 // fields answers the path in an endpoint such as `GET /api/x`.
@@ -230,13 +244,40 @@ func summaryReport(tools []*tool) string {
 		r := &tool.results
 		fmt.Fprintf(&out, "\n[%s] pass %d fail %d error %d distinct findings %d latency %d\n", tool.name, r.pass, r.fail, r.errs, len(r.findings), r.latency)
 		budget := reportLines
-		budget = groupLines(&out, "failing", r.failing, budget, tool.name+".log")
-		groupLines(&out, "finding", r.findings, budget, filepath.Join(r.dir, "findings.jsonl"))
+		budget = groupLines(&out, itemGroup{label: "failing", items: r.failing, file: tool.name + ".log"}, budget)
+		groupLines(&out, itemGroup{label: "finding", items: r.findings, file: filepath.Join(r.dir, "findings.jsonl")}, budget)
 	}
 	return out.String()
 }
 
-func groupLines(out *strings.Builder, label string, items []item, budget int, file string) int {
+// itemGroup is one kind of item in the report: its label, the items and the
+// file that holds the ones the budget hides.
+type itemGroup struct {
+	label string
+	items []item
+	file  string
+}
+
+func groupLines(out *strings.Builder, group itemGroup, budget int) int {
+	groups, names := groupedItems(group.items)
+	hidden := 0
+	for index, name := range names {
+		if budget < 1 || (budget == 1 && (index < len(names)-1 || hidden > 0)) {
+			hidden += len(groups[name])
+			continue
+		}
+		fmt.Fprintf(out, "  %s %s (%d): %s\n", group.label, name, len(groups[name]), strings.Join(groups[name], "; "))
+		budget--
+	}
+	if hidden > 0 {
+		fmt.Fprintf(out, "  %d more %s in %s\n", hidden, group.label, group.file)
+		budget--
+	}
+	return budget
+}
+
+// groupedItems groups item lines by group, and orders the groups largest first, then by name.
+func groupedItems(items []item) (map[string][]string, []string) {
 	groups := map[string][]string{}
 	for _, entry := range items {
 		groups[entry.group] = append(groups[entry.group], entry.line)
@@ -251,18 +292,5 @@ func groupLines(out *strings.Builder, label string, items []item, budget int, fi
 		}
 		return strings.Compare(a, b)
 	})
-	hidden := 0
-	for index, name := range names {
-		if budget < 1 || (budget == 1 && (index < len(names)-1 || hidden > 0)) {
-			hidden += len(groups[name])
-			continue
-		}
-		fmt.Fprintf(out, "  %s %s (%d): %s\n", label, name, len(groups[name]), strings.Join(groups[name], "; "))
-		budget--
-	}
-	if hidden > 0 {
-		fmt.Fprintf(out, "  %d more %s in %s\n", hidden, label, file)
-		budget--
-	}
-	return budget
+	return groups, names
 }
