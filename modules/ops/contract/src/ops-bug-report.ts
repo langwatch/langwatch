@@ -57,7 +57,7 @@ export type BugReportCreateInput = {
 const bugReportInstantSchema = z.custom<Instant>((value) => value !== null && value !== undefined);
 
 /**
- * One inbox row as the back office lists it, WITHOUT the stored transcript:
+ * One inbox row as the instance admin lists it, WITHOUT the stored transcript:
  * `sessionData` is the whole session a reporter attached, and carrying every
  * transcript on a page would be the listing's whole payload.
  */

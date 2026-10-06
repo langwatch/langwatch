@@ -86,7 +86,7 @@ export class AdminSessionExpiredError extends HandledError {
   }
 }
 
-/** The back office sent something that was not a JSON object. */
+/** The instance admin sent something that was not a JSON object. */
 export class AdminMalformedBodyError extends HandledError {
   declare readonly code: "malformed_request";
 
