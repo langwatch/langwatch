@@ -25,7 +25,7 @@ const runtime = createRestRuntime({
 const passThroughBody = z.custom<TraceLegacySearchFields>(() => true);
 
 function mount() {
-  const listTraces = vi.fn(async () => ({ groups: [], totalHits: 0 }));
+  const listTraces = vi.fn(async () => ({ groups: [], totalHits: 0, traceChecks: {} }));
   const members: TraceLegacyRestMembers<TraceLegacySearchFields, unknown> = {
     traces: () => ({
       findTrace: vi.fn(),
@@ -42,6 +42,7 @@ function mount() {
   const family = runtime.mount(traceLegacyRest.router(), {
     app: () => members,
     facts: [bindRestMiddleware(tracesRestCredential, () => ({ principal: null }))],
+    onError: (error, context) => context.json({ error: String(error) }, 500),
   });
   const send = (body: Record<string, unknown>) =>
     family.request("/api/trace/search", {

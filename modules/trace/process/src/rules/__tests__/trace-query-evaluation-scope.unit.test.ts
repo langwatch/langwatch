@@ -84,8 +84,8 @@ describe("an evaluator paired with its own result", () => {
   describe("when the result is excluded and another evaluator holds it", () => {
     it("matches the evaluator that did not pass", () => {
       const xFailedYPassed = traceWith([
-        makeEval({ evaluationId: "e-x", evaluatorId: "X", passed: false }),
-        makeEval({ evaluationId: "e-y", evaluatorId: "Y", passed: true }),
+        makeEval({ evaluatorId: "X", passed: false }),
+        makeEval({ evaluatorId: "Y", passed: true }),
       ]);
       expect(traceMatchesQuery("evaluator:X AND NOT evaluatorVerdict:pass", xFailedYPassed)).toBe(
         true,
@@ -137,8 +137,8 @@ describe("an evaluator paired with its own result", () => {
 
   describe("when the evaluator ran more than once", () => {
     const xPassedThenFailed = traceWith([
-      makeEval({ evaluationId: "e-x1", evaluatorId: "X", passed: true }),
-      makeEval({ evaluationId: "e-x2", evaluatorId: "X", passed: false }),
+      makeEval({ evaluatorId: "X", passed: true }),
+      makeEval({ evaluatorId: "X", passed: false }),
     ]);
 
     it("matches a kept result held by any of its runs", () => {
@@ -170,8 +170,8 @@ describe("an evaluator paired with its own result", () => {
 
     it("needs one run to sit inside both score bounds", () => {
       const scoredLowThenHigh = traceWith([
-        makeEval({ evaluationId: "e-x1", evaluatorId: "X", score: 0.1 }),
-        makeEval({ evaluationId: "e-x2", evaluatorId: "X", score: 0.9 }),
+        makeEval({ evaluatorId: "X", score: 0.1 }),
+        makeEval({ evaluatorId: "X", score: 0.9 }),
       ]);
       expect(
         traceMatchesQuery(

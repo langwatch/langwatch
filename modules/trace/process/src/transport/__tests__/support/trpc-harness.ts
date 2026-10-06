@@ -1,5 +1,4 @@
-import type { AccessDeclaration } from "@langwatch/api/access";
-import { createTrpcRuntime, type TrpcProcedureFactory } from "@langwatch/api/trpc";
+import { createTrpcRuntime, type TrpcAccess, type TrpcProcedureFactory } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authorization";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
@@ -16,8 +15,8 @@ export function createTestTrpcRuntime() {
 /** The access each declared procedure asked for, keyed `namespace.procedure`, building nothing. */
 export function accessDeclaredBy(declaration: {
   router(runtime: TrpcProcedureFactory<object>, app: (ctx: object) => never): unknown;
-}): Record<string, AuthzPermission | AccessDeclaration> {
-  const declared: Record<string, AuthzPermission | AccessDeclaration> = {};
+}): Record<string, AuthzPermission | TrpcAccess> {
+  const declared: Record<string, AuthzPermission | TrpcAccess> = {};
   const runtime: TrpcProcedureFactory<object> = {
     procedure: ({ access, procedure }) => {
       declared[procedure] = access.kind === "permission" ? access.permission : access;

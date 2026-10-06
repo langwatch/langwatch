@@ -9,8 +9,12 @@ import { traceMatchesQuery } from "../trace-query-evaluation.rules.ts";
 import { translateFilter } from "../trace-query.rules.ts";
 
 function traceWithEvents(names: string[]): InMemoryTrace {
+  const summary: Pick<TraceSummaryData, "traceId" | "annotationIds"> = {
+    traceId: "trace-1",
+    annotationIds: [],
+  };
   return {
-    summary: { traceId: "trace-1", annotationIds: [] } as TraceSummaryData,
+    summary: summary as TraceSummaryData,
     events: names.map((name) => ({ spanId: "s1", timestamp: 0, name, attributes: {} })),
   };
 }

@@ -21,6 +21,7 @@ import {
   type Span,
   type Trace,
   type TraceLegacyListInput,
+  type TraceSharedFiltersInput,
   type TracesForProjectResult,
 } from "@langwatch/trace-contract";
 import { HTTPException } from "hono/http-exception";
@@ -108,8 +109,9 @@ export interface TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw> {
   formatSpansDigest(input: { spans: Span[] }): Promise<string>;
 }
 
-/** The four fields the legacy search body adds to the shared filter input. */
+/** The legacy search body's own fields, plus the shared filter map its transport inspects. */
 export type TraceLegacySearchFields = Readonly<{
+  filters?: TraceSharedFiltersInput["filters"];
   startDate: string | number;
   endDate: string | number;
   pageSize?: number | undefined;
