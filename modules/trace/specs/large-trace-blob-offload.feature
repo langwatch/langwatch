@@ -23,7 +23,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
   # Decision:
   #   - event_log carries FULL content (ZSTD-compressed). Single source of truth.
   #   - S3 is reduced to a transient spool, only for commands > 256 KB.
-  #     Eagerly DELETEd after event_log INSERT succeeds; 24h lifecycle safety
+  #     Eagerly DELETEd after event_log INSERT succeeds; 3-day lifecycle safety
   #     net catches orphans.
   #   - leanForProjection(event) runs at TWO call sites:
   #       (a) eventSourcingService.ts:242-251 (live, between storeEvents and

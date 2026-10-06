@@ -1,4 +1,5 @@
-# See ../adrs/029-content-addressed-payload-store.md
+# See ../adrs/029-content-addressed-payload-store.md and
+# ../../../dev/docs/adr/172-oversized-payloads-live-under-expirable-prefixes.md
 Feature: GroupQueue content-addressed tiered payload store
   As the LangWatch event-sourcing queue absorbing fan-out from a single event
   I want one event's shared payload stored once by content hash and referenced
@@ -23,10 +24,12 @@ Feature: GroupQueue content-addressed tiered payload store
   #     s3 >256 KiB (boundary aligned with ADR-022 COMMAND_INLINE_THRESHOLD).
   #   - Blob id = SHA-256(canonical bytes) truncated to 128 bits, base64url.
   #     Identical bytes -> identical key -> one stored copy. PUTs idempotent.
-  #     Keys are namespaced by projectId and the caller-owned group-queue segment,
-  #     minting s3://{bucket}/{projectId}/group-queue/<hash>. Tenants never share
-  #     a blob, feature sweeps cannot reach Stored Objects, and the platform can
-  #     still purge the complete project prefix.
+  #     Keys are kind first, tenant second (ADR-172): s3://{bucket}/group-queue/{projectId}/<hash>.
+  #     Tenants never share a blob, the operator's lifecycle rule on the
+  #     group-queue/ prefix can reach every object, and the owner can purge
+  #     group-queue/{projectId}/. Today's code still writes {projectId}/<hash>
+  #     (no lifecycle rule can reach it); the scenarios tagged @unimplemented
+  #     below describe the move.
   #   - Flat jobs: the fan-out producer hoists the shared component (event, fold
   #     state) out of every job; each job carries refs, not the payload. Decode
   #     resolves refs before the handler, which is unchanged.
@@ -34,9 +37,12 @@ Feature: GroupQueue content-addressed tiered payload store
   #     lease-take and renewal set `now + lease TTL`, and terminal retirement
   #     removes that holder's lease idempotently. Releases never delete blobs.
   #   - 4-day TTL on Redis blobs and lease deadlines are refreshed on access;
-  #     Redis expiry and GroupQueue's durable-tier sweep reclaim blobs lazily.
+  #     Redis expiry reclaims Redis blobs lazily. The S3 tier is reclaimed by an
+  #     operator lifecycle rule on the group-queue/ prefix (minimum 7 days, longer
+  #     than the 3-day lease and 4-day backstop); GroupQueue deletes no S3 object.
   #     A missing blob completes the slot without the handler
-  #     (recoverable via replay) — a fail-safe, never a wedge.
+  #     (recoverable via replay) — a fail-safe, never a wedge. A group parked past
+  #     the lifecycle loses its blob the same way; replay recovers it.
   #   - Retiring the LAST lease shortens the blob's expiry to a 1-hour grace
   #     window rather than leaving the full 4-day backstop.
   #     Shortening an expiry is not deletion: any later take re-arms the 4-day
@@ -74,19 +80,38 @@ Feature: GroupQueue content-addressed tiered payload store
     And the queued value is a flat envelope referencing the blob by tier "redis" and hash
     And the handler receives the payload intact
 
+  # Gap: today the key is {projectId}/{contentHash}; the group-queue/ prefix lands with the group-queue code slice of ADR-172.
   @integration @unimplemented
   Scenario: A very large payload offloads to S3 through the reused object store
     When a job whose shared payload exceeds the S3 threshold is staged
-    Then the body is stored via the neutral object-storage port under {projectId}/group-queue/{contentHash}
+    Then the body is stored via the neutral object-storage port under group-queue/{projectId}/{contentHash}
     And the queued value is a flat envelope referencing the blob by tier "s3" and hash
     And the handler receives the payload intact
 
+  # Gap: today a deduplicated re-stage may skip the PUT; the unconditional PUT lands with the group-queue code slice of ADR-172.
   @unit @unimplemented
   Scenario: The same bytes always produce the same blob key
     Given two payloads with byte-identical canonical serializations
     When each is offloaded
     Then both resolve to the same content-addressed key
-    And the second offload is a no-op PUT over the existing key
+    And the second offload is a PUT over the existing key that restarts its lifecycle age
+
+  # Gap: no mint or store test asserts the prefix; the code slice of ADR-172 writes it.
+  @unit @unimplemented
+  Scenario: The S3-tier key carries the lifecycle prefix first
+    Given a payload above the S3 threshold for a project
+    When it is offloaded
+    Then the object key starts with the group-queue/ prefix
+    And the project id is the second segment and the content hash the last
+    And no key is written outside that prefix
+
+  # Gap: the legacy read lands with the group-queue code slice of ADR-172 and is removed one release later.
+  @unit @unimplemented
+  Scenario: A blob staged before the move is read from its old key
+    Given an S3-tier envelope staged under {projectId}/{contentHash} before the prefix move
+    When the envelope is decoded and the new key is missing
+    Then the blob is read from the old key and the handler receives the payload intact
+    And a key missing at both addresses completes the slot fail-safe
 
   # ===========================================================================
   # flat jobs and content-addressed sharing (store-once)
@@ -132,14 +157,14 @@ Feature: GroupQueue content-addressed tiered payload store
   @unit @unimplemented
   # Multi-tenancy guard: blob keys are namespaced by projectId (the tenant id;
   # tenantId === projectId) and the caller-owned group-queue segment. Isolation
-  # is structural — in the key path — not incidental to content. GroupQueue can
-  # sweep only .../{projectId}/group-queue/*, while the platform project-delete
-  # cascade can purge .../{projectId}/* across registered owner namespaces. The
-  # Redis tier needs none; its 4-day TTL clears once the project's jobs drain.
+  # is structural — in the key path — not incidental to content. The operator's
+  # lifecycle rule covers group-queue/*, and the owner can purge
+  # group-queue/{projectId}/. The Redis tier needs none; its 4-day TTL clears
+  # once the project's jobs drain.
   Scenario: Blob keys are namespaced by tenant so tenants never share a blob
     Given two tenants whose jobs carry byte-identical user content
     When each payload is offloaded
-    Then each blob key is namespaced under its own projectId and group-queue owner segment
+    Then each blob key is namespaced under the group-queue prefix and its own projectId
     And the two payloads resolve to different keys
     And neither tenant's job can resolve the other tenant's blob
 
@@ -199,7 +224,7 @@ Feature: GroupQueue content-addressed tiered payload store
     Given an S3-tier blob whose holders no longer renew their leases
     When every lease has expired
     Then no completion path deletes the object eagerly
-    And the object-store lifecycle sweep eventually reclaims it
+    And the operator's lifecycle rule on the group-queue/ prefix eventually reclaims it
 
   @integration @unimplemented
   Scenario: An access refreshes the blob and lease so a long-dwell job keeps its payload
@@ -271,7 +296,7 @@ Feature: GroupQueue content-addressed tiered payload store
     Given an S3-tier blob whose only lease holder is retiring
     When that holder releases its lease
     Then no object-store delete is issued
-    And the object remains for the GroupQueue durable-tier lifecycle sweep
+    And the object remains for the operator's lifecycle rule on the group-queue/ prefix
 
   # ===========================================================================
   # Active blob reclaim

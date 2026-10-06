@@ -4,8 +4,8 @@ Feature: Evaluation payload offload
   I want oversized evaluation inputs offloaded to object storage with a
   bounded inline preview, instead of truncated or stored raw
   So that evaluation history keeps its full content, ClickHouse rows stay
-  merge-safe, queue payloads stay lean, and offloaded bytes remain
-  attributable to the tenant for storage accounting.
+  merge-safe, queue payloads stay lean, and offloaded bytes expire with the
+  retention of the run they belong to.
 
   # Incident lineage: 2026-05-29 and the stuck merge discovered 2026-07-10 -
   # raw JSON-stringified evaluator inputs (full conversation context) reached
@@ -15,7 +15,13 @@ Feature: Evaluation payload offload
   # input content, and the evaluation events in event_log remain unbounded.
   # This feature replaces truncation with the offload pattern already proven
   # for trace payloads (ADR-022 lineage): bounded inline preview, full content
-  # durable, transparent resolution on read.
+  # in object storage, transparent resolution on read.
+  #
+  # Where the bytes live (ADR-172, superseding ADR-040's stored-object offload):
+  # evaluation-inputs/r<days>/<projectId>/<sha256>.json, kind first and tenant
+  # second, one operator lifecycle rule per retention class, no stored-object
+  # record. Scenarios tagged @unimplemented describe that move; the code still
+  # writes <projectId>/evaluation-inputs/<id>.json.
 
   # Implementation notes (bindings live on the test cases as @scenario tags):
   #   - Offload decision + marker shaping + resolve fail-safe:
@@ -33,9 +39,8 @@ Feature: Evaluation payload offload
   #     8 MiB; Details/Error/ErrorDetails -> observable text truncation).
   #   - Read resolution seam: EvaluationService.getEvaluationInputs
   #     (evaluation.service.ts) resolves the marker; folds/subscribers get it raw.
-  #   - Byte ledger: the Stored Objects Postgres projection counts each active
-  #     project content ID once; getStorageUsageByProject reads that authority.
-  #     The ClickHouse stored_objects collector is migration compatibility only.
+  #   - Lifecycle: an operator rule per evaluation-inputs/r<days>/ class expires
+  #     the object with the run; a missing object answers the preview (ADR-172).
   # Integration coverage:
   #   src/server/app-layer/evaluations/__tests__/evaluation-payload-offload.integration.test.ts
   #   Unit coverage:
@@ -44,12 +49,57 @@ Feature: Evaluation payload offload
   Background:
     Given the evaluations pipeline persists evaluator inputs with each run
 
+  # Gap: the offload still writes <projectId>/evaluation-inputs/<id>.json through a stored-object purpose; the new key lands with the evaluation code slice of ADR-172.
+  @unit @unimplemented
   Scenario: an oversized evaluation input is offloaded, not truncated
     Given an evaluation run whose serialized inputs exceed the inline threshold
     When the evaluation run is persisted
     Then the stored row carries a bounded preview and a reference to the full content
-    And the full inputs are stored durably in object storage under the tenant's scope
+    And the full inputs are stored under the evaluation-inputs prefix, kind first and tenant second, with no stored-object record
     And no truncation marker replaces the content
+
+  # Gap: the key is still derived from the evaluation id, not the content.
+  @unit @unimplemented
+  Scenario: the offload key is derived from the content, never from the marker's stored location
+    Given two evaluation runs whose serialized inputs are byte-identical
+    When both are offloaded
+    Then both resolve to the same object key built from the content hash
+    And the key is never read back from a location stored in the marker
+
+  # Gap: no retention class exists in the key yet; ADR-172 leaves how the marker names it open.
+  @unit @unimplemented
+  Scenario: the offload key carries the retention class in force when it was written
+    Given a project whose evaluation retention is a given number of days
+    When an oversized input is offloaded
+    Then the object key has the evaluation-inputs prefix, then the retention class, then the project, then the content hash
+    And a later retention change does not move objects already written
+
+  # Gap: the reader still refuses a marker whose id is not 64 hex.
+  @unit @unimplemented
+  Scenario: a run offloaded before the move is read from its old address
+    Given an evaluation run whose marker was written when inputs were stored objects
+    When the evaluation run detail is read
+    Then the inputs are read from the project's old address built from the marker's content hash
+    And no stored-object record is consulted
+
+  # Gap: a miss answers the preview and warns with the tenant and object id, not the evaluation, and no test binds it.
+  @unit @unimplemented
+  Scenario: an expired offload answers its preview and warns
+    Given an evaluation run whose offloaded object has expired
+    When the evaluation run detail is read
+    Then the returned inputs are the bounded preview carried by the row
+    And a structured warning attributes the missing object to the tenant and evaluation
+    And the read does not fail
+
+  # Gap: nothing refuses a filesystem or unconfirmed Azure destination for evaluation inputs.
+  @unit @unimplemented
+  Scenario: a destination that cannot expire objects keeps the inputs as a preview marker
+    Given a project whose object storage is the local filesystem or an unconfirmed Azure container
+    And an evaluation run whose serialized inputs exceed the inline threshold
+    When the evaluation run is persisted
+    Then no object is written
+    And the event payload carries a preview-only marker naming the failed offload
+    And the evaluation still records its result
 
   Scenario: reading an offloaded evaluation run returns the full inputs
     Given an evaluation run whose inputs were offloaded
@@ -87,24 +137,13 @@ Feature: Evaluation payload offload
     Then the content is bounded at the hard ceiling with an observable marker
     And a structured warning attributes the bound to the tenant and evaluation
 
-  Scenario: offloaded bytes are recorded for storage accounting
-    Given an evaluation run whose inputs were offloaded
-    When the offload completes
-    Then the offloaded object's byte size is recorded against the tenant
-    And the tenant's storage usage reflects offloaded bytes alongside database bytes
-
-  # The offload writes to the same content-addressed stored-objects service used
-  # for scenario media and trace blobs, whose project-delete cascade
-  # (StoredObjectsService.deleteOwnedBy, called from project.service.ts) already
-  # removes every row and its bytes. Bound by the existing stored-objects cascade
-  # integration test; marked @unimplemented here because no eval-specific cascade
-  # code exists to bind (offloaded eval inputs are ordinary stored_objects rows).
-  @unimplemented
+  # Gap: project deletion records no project-deleted fact yet and the object-storage client has no prefix delete; ADR-172 adds both.
+  @unit @unimplemented
   Scenario: deleting the project removes its offloaded evaluation content
     Given a project with offloaded evaluation inputs
-    When the project's data is deleted
-    Then the offloaded objects under that project's scope are removed
-    And their bytes stop counting toward the tenant's storage usage
+    When the project is deleted
+    Then the evaluation module deletes the project's objects under every evaluation-inputs retention class
+    And no object remains under that project's evaluation-inputs prefix
 
   # Fail-open, bounded: the offload is a protective transform, never a gate on
   # producing the evaluation result. If object storage rejects the PUT (S3

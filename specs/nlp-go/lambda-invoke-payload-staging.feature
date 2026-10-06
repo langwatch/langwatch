@@ -49,7 +49,7 @@ Feature: Auto S3 staging for large nlpgo Lambda invoke payloads
     Given a payload was staged to S3 for a nlpgo invoke
     When the Lambda invoke returns
     Then the staged object is deleted from the same bucket and key
-    And a delete failure is non-fatal because a bucket lifecycle rule reaps orphans
+    And a delete failure is non-fatal because a bucket lifecycle rule on the studio-staging/ prefix (3-day minimum) reaps orphans
 
   @unit
   Scenario: A staged object is deleted even when the invoke fails
@@ -58,7 +58,7 @@ Feature: Auto S3 staging for large nlpgo Lambda invoke payloads
     Then the staged object is still deleted from the same bucket and key
     And the invoke error propagates to the caller
     # The finally-block reap must run on failure too, otherwise a failed run
-    # leaks an S3 object that only the lifecycle rule would eventually clean up.
+    # leaks an S3 object that only the studio-staging/ lifecycle rule would eventually clean up.
 
   @unit
   Scenario: An invoke body over the hard cap is rejected before staging
