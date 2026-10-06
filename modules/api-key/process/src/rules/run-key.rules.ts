@@ -4,7 +4,7 @@ import { RUN_KEY_LIFETIME_MS } from "@langwatch/api-key-contract";
 export const RUN_KEY_REUSE_MARGIN_MS = 5 * 60 * 1000;
 
 /** The life a handed-out key must still have: the caller's bound, never under the margin. */
-export function runKeyFloorMs(minRemainingMs: number | undefined): number {
+function runKeyFloorMs(minRemainingMs: number | undefined): number {
   return Math.max(RUN_KEY_REUSE_MARGIN_MS, minRemainingMs ?? 0);
 }
 

@@ -3,7 +3,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { CodingAgentScopeProject } from "./coding-agent-scope-directory.service.ts";
 
 /** The two cuts a pull-request rollup is resolved over. */
-export type CodingAgentScopePermission = "traces:view" | "cost:view";
+type CodingAgentScopePermission = "traces:view" | "cost:view";
 
 // Cross-project cut resolver; API keys may narrow holder's access, so scope
 // resolved from key's bindings, not holder's; SERVICE keys have no user.

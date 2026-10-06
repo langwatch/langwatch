@@ -28,7 +28,7 @@ export type MemoryUserRow = {
   notificationPreferences: Readonly<Record<string, UserNotificationChoice>>;
 };
 
-export type MemoryUserAccountRow = {
+type MemoryUserAccountRow = {
   id: string;
   userId: string;
   type: string;
@@ -38,7 +38,7 @@ export type MemoryUserAccountRow = {
   password: string | null;
 };
 
-export type MemoryUserPasskeyRow = {
+type MemoryUserPasskeyRow = {
   id: string;
   userId: string;
 };

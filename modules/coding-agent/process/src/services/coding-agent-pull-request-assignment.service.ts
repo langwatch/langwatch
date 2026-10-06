@@ -135,7 +135,7 @@ export type AssignableSession = {
   headBranch: string;
 };
 
-export type AssignableDrivingSession = {
+type AssignableDrivingSession = {
   sessionId: string;
   startedAtMs: number;
   headBranches: readonly string[];

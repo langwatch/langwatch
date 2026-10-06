@@ -9,7 +9,7 @@ function withoutTrailingSlashes(value: string): string {
   return value.replace(/\/+$/, "");
 }
 
-export interface SsoServiceProviderAddresses {
+interface SsoServiceProviderAddresses {
   redirectUrl: string;
   assertionConsumerServiceUrl: string;
   singleLogoutUrl: string;
@@ -62,7 +62,7 @@ const DEPLOYMENT_PROVIDER_NAMES: Readonly<Record<string, string>> = {
 };
 const SINGLE_SIGN_ON = "single sign-on";
 
-export interface DeploymentSignIn {
+interface DeploymentSignIn {
   name: string;
   redirectUrl: string;
 }

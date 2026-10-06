@@ -30,7 +30,7 @@ function lifecycleCommands() {
     .withCommand("recordUserRegistered", RecordUserRegisteredCommand);
 }
 
-export type UserLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;
+type UserLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;
 
 /** user_lifecycle: user records its account's facts; peers react from their own side (§9). */
 export function buildUserLifecyclePipeline(): UserLifecycleDefinition {

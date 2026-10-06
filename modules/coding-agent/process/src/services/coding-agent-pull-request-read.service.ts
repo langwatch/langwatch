@@ -43,7 +43,7 @@ import type { CodingAgentSessionReadService } from "./coding-agent-session-read.
 
 export const SESSIONS_LIST_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 export const SESSIONS_LIST_LIMIT = 200;
-export const DETAIL_SESSIONS_LIMIT = 50;
+const DETAIL_SESSIONS_LIMIT = 50;
 
 /** Private owner of GitHub-enriched coding-agent session and pull-request reads. */
 export class CodingAgentPullRequestReadService {

@@ -19,7 +19,7 @@ export abstract class SsoProviderMountInspector {
   abstract isMounted(configuration: SsoConfiguration): boolean;
 }
 
-export interface SsoGateServiceOptions {
+interface SsoGateServiceOptions {
   configuration: SsoConfiguration;
   licensing: LicensingApi;
   logger: SsoGateLogger;

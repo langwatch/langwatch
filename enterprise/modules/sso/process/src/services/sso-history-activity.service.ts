@@ -29,7 +29,7 @@ export interface SsoConnectionHistoryReads {
 export type SsoActivityLogger = Pick<SsoGateLogger, "warn">;
 
 /** What a subscriber is told: which connection moved, never what changed. */
-export interface SsoHistoryActivity {
+interface SsoHistoryActivity {
   connectionId: string;
 }
 

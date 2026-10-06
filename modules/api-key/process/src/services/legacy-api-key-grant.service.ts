@@ -11,7 +11,7 @@ import { Temporal, fromDate, nowInstant, type Instant } from "@langwatch/time";
 const MINT_GUARD_TTL_MS = 60_000;
 const MINT_GUARD_MAX_ENTRIES = 10_000;
 
-export type AuthzBindingIdDeriver = (input: {
+type AuthzBindingIdDeriver = (input: {
   organizationId: string;
   principal: LedgerPrincipal;
   scope: LedgerScope;

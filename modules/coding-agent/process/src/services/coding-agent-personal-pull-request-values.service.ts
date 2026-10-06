@@ -6,7 +6,7 @@ import type {
   CodingAgentModelUsage,
 } from "./coding-agent-pull-request-usage.service.ts";
 
-export type CodingAgentPersonalSession = {
+type CodingAgentPersonalSession = {
   sessionId: string;
   startedAtMs: number;
   lastEventOccurredAtMs: number;
