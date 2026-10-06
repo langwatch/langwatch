@@ -398,7 +398,7 @@ function deployment(p) {
   p.text(24, 42, title, { size: 22, weight: 700 });
   const cols = [
     { name: "LangWatch Cloud", line: "LangWatch runs everything" },
-    { name: "Hybrid", line: "trace data stays in your network" },
+    { name: "Hybrid", line: "trace data is stored in your cloud" },
     { name: "Self-managed", line: "one Helm chart runs it all" },
     { name: "Managed databases", line: "self-managed, chart runs the services" },
   ];
@@ -491,8 +491,8 @@ function deployment(p) {
   chip(x(3) + 20, 596, "store", "Object storage", ["S3 or Azure Blob"]);
 
   const facts = [
-    ["Setup time", ["Minutes", "Days", "Hours", "Hours"]],
-    ["Trace data stays in your network", ["No", "Yes", "Yes", "Yes"]],
+    ["Trace data stored in", ["LangWatch Cloud", "Your cloud", "Your cloud", "Your cloud"]],
+    ["Passes through LangWatch", ["Yes", "Yes", "No", "No"]],
   ];
   facts.forEach(([name, values], r) => {
     values.forEach((value, i) => {

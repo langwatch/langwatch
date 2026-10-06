@@ -66994,7 +66994,7 @@ LangWatch manages the control plane (App, Workers, NLP, LangEvals). You provide 
 | You manage infrastructure  |           |       Yes        |                      |            |
 | You manage data storage    |           |       Yes        |         Yes          |    Yes     |
 | LangWatch manages app      |    Yes    |                  |         Yes          |    Yes     |
-| Data stays in your network |           |       Yes        |         Yes          |    Yes     |
+| Data stored in your network |           |       Yes        |         Yes          |    Yes     |
 | Setup time                 |  Minutes  |      Hours       |         Days         |    Days    |
 
 ## Quick Start

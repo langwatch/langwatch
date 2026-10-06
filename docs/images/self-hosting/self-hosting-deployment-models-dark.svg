@@ -10,7 +10,7 @@
 <rect x="24" y="364" width="296" height="318" rx="14" fill="#15151e" stroke="#3a3a44" stroke-width="1.5"/>
 <text x="40" y="388" font-size="13.5" font-weight="600" fill="#b4bccb" text-anchor="start">Your side</text>
 <text x="336" y="84" font-size="17" font-weight="700" fill="#f1f5f9" text-anchor="start">Hybrid</text>
-<text x="336" y="106" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">trace data stays in your network</text>
+<text x="336" y="106" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">trace data is stored in your cloud</text>
 <rect x="336" y="122" width="296" height="226" rx="14" fill="#2a1c0d" stroke="#c8782a" stroke-width="1.5"/>
 <text x="352" y="146" font-size="13.5" font-weight="600" fill="#ffc78a" text-anchor="start">Run by LangWatch</text>
 <rect x="336" y="364" width="296" height="318" rx="14" fill="#15151e" stroke="#3a3a44" stroke-width="1.5"/>
@@ -82,20 +82,20 @@
 <rect x="980" y="596" width="256" height="58" rx="10" fill="#111d33" stroke="#4a6fae" stroke-width="1.5"/>
 <text x="1108" y="621.5" font-size="14.5" font-weight="650" fill="#a9c7f7" text-anchor="middle">Object storage</text>
 <text x="1108" y="641" font-size="12.5" font-weight="400" fill="#b4bccb" text-anchor="middle">S3 or Azure Blob</text>
-<text x="24" y="712" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Setup time:</text>
-<text x="117.10000000000001" y="712" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">Minutes</text>
-<text x="336" y="712" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Setup time:</text>
-<text x="429.1" y="712" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">Days</text>
-<text x="648" y="712" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Setup time:</text>
-<text x="741.1" y="712" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">Hours</text>
-<text x="960" y="712" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Setup time:</text>
-<text x="1053.1" y="712" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">Hours</text>
-<text x="24" y="742" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Trace data stays in your network:</text>
-<text x="280.45000000000005" y="742" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">No</text>
-<text x="336" y="742" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Trace data stays in your network:</text>
-<text x="592.45" y="742" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">Yes</text>
-<text x="648" y="742" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Trace data stays in your network:</text>
-<text x="904.45" y="742" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">Yes</text>
-<text x="960" y="742" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Trace data stays in your network:</text>
-<text x="1216.45" y="742" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">Yes</text>
+<text x="24" y="712" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Trace data stored in:</text>
+<text x="191.35000000000002" y="712" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">LangWatch Cloud</text>
+<text x="336" y="712" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Trace data stored in:</text>
+<text x="503.35" y="712" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">Your cloud</text>
+<text x="648" y="712" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Trace data stored in:</text>
+<text x="815.35" y="712" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">Your cloud</text>
+<text x="960" y="712" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Trace data stored in:</text>
+<text x="1127.35" y="712" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">Your cloud</text>
+<text x="24" y="742" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Passes through LangWatch:</text>
+<text x="221.05" y="742" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">Yes</text>
+<text x="336" y="742" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Passes through LangWatch:</text>
+<text x="533.05" y="742" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">Yes</text>
+<text x="648" y="742" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Passes through LangWatch:</text>
+<text x="845.05" y="742" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">No</text>
+<text x="960" y="742" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="start">Passes through LangWatch:</text>
+<text x="1157.05" y="742" font-size="13.5" font-weight="700" fill="#f1f5f9" text-anchor="start">No</text>
 </svg>
