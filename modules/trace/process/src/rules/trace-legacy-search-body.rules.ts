@@ -22,6 +22,9 @@ const searchBodySchema = traceListInputSchema
   .safeExtend({
     startDate: dateBound("startDate"),
     endDate: dateBound("endDate"),
+    // Public search clamps an oversized page to the plan's bound instead of
+    // refusing it, so existing API clients keep working (#8479).
+    pageSize: z.number().int().positive().optional(),
     scrollId: z.string().optional().nullable(),
     format: z.enum(["digest", "json"]).optional(),
     llmMode: z.boolean().optional().default(false),

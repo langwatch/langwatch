@@ -757,3 +757,17 @@ describe("POST /search with a trace filter", () => {
     });
   });
 });
+
+describe("POST /search page size", () => {
+  describe("when pageSize is above every plan's page bound", () => {
+    /** @scenario "Public trace search clamps an oversized page instead of rejecting it" */
+    it("accepts the request and hands the size to the read, which clamps it", async () => {
+      const { send, listTraces } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, pageSize: 5000 });
+      expect(res.status).toBe(200);
+      expect(listTraces).toHaveBeenCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ pageSize: 5000 }) }),
+      );
+    });
+  });
+});

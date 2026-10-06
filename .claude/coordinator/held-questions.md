@@ -81,6 +81,8 @@ recommendation, and "default taken" if a lane proceeded on it.
 - S3-REFUSED-RUN (mig-s3-runner): a refused upgrade (below the floor, or the image below the ledger's floor) is recorded as a failed `upgrade` run with no floor and `report.refused`, so the page shows the refusal. Default taken, held for Alex.
 - S3-ROLLBACK (mig-s3-runner, Q-U5 2): background steps are reopened when an older image itself runs `upgrade`. A rollback that never runs `upgrade` (the Helm pre-roll is pre-upgrade only) is not detected; that needs presence history (an older release heartbeating after the last run). No recommendation; held for Alex.
 - S3-NO-CLICKHOUSE (mig-s3-runner): with no ClickHouse target configured (or `SKIP_CLICKHOUSE_MIGRATE`), ClickHouse steps stay `pending`, so a serving gate that requires every blocking step would refuse. Options: leave pending; mark `not-needed` (never re-run if ClickHouse is added later); the gate ignores ClickHouse steps when no target is configured. No recommendation; held for Alex.
+- U3-a Checkup rows: a failed ClickHouse blocking step reuses `checkup_clickhouse_migrations_pending` rather than a new `checkup_clickhouse_migration_failed` (the code registry in `packages/handled-error` is shared); the detail says "failed". A row names at most five step ids and counts the rest (a chosen constant). Default taken, held for Alex.
+- U3-b Doctor: `npx @langwatch/server doctor` prints the same text as `pnpm task upgrade status` by running that task against the local Postgres, never bundling the reader or a database client into the CLI; an unreachable database prints "status unavailable" and the exit code stays decided by predeps and ports alone. Default taken, held for Alex.
 
 ### SDK paths (sdk share-path lane, 2026-10-06 night)
 
@@ -113,6 +115,12 @@ recommendation, and "default taken" if a lane proceeded on it.
 
 - Q29 graph default: REST 1×1 as main, tRPC 4×3; default taken, held for Alex.
 - GET /api/dataset/{slugOrId}/records gains an additive `dataset` summary (branch-only, commit abe7da6705); main returns {data, pagination}. Default taken: keep (additive); held for Alex.
+
+### Main #8484 port (trace list page-size cap, 2026-10-06 night)
+
+- P8484-R1 List cap: main's tRPC getAllForProject refuses pageSize above 1000; the branch clamps to the plan's tracesPageSizeMax (1000/2000/4000, ruled 2026-10-01) and refuses above 4000. Options: (a) keep the per-plan clamp, amend the spec; (b) cap tRPC at 1000 (paid plans lose their bound over tRPC); (c) refuse above the plan's bound with a HandledError. No default taken; scenario "A trace list read above the page cap is rejected" stays unbound.
+- P8484-R2 Download ceiling: main accepts getAllForDownload up to 10000; the branch refuses above 4000 and clamps to the plan (predates #8484). Options: (a) new registry key tracesDownloadPageSizeMax; (b) fixed 10000 in the trace contract; (c) keep and amend the spec. No default taken; one scenario unbound.
+- P8484-R3 Annotations filtered mode: the branch's AllAnnotationsList has no filtered mode, so main's useTraceIdsAcrossPages has no caller; restoring it adds an annotation -> analytics browser edge (use-filter-params). Options: (a) restore the mode with that edge or a filter-params seam; (b) record a known parity gap. No default taken; two scenarios unbound.
 
 ### Older numbered questions
 
