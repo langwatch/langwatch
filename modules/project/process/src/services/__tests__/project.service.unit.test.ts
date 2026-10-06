@@ -1348,3 +1348,19 @@ describe("ProjectService department facts for data privacy's fold", () => {
     expect(departments).not.toHaveBeenCalled();
   });
 });
+
+describe("ProjectService legacy key lookup", () => {
+  describe("when a caller presents a revoked legacy key", () => {
+    /** @scenario "Revoking the legacy key stops nothing the platform runs" */
+    it("resolves no project and never asks the store", async () => {
+      const repository = new StubRepository();
+      repository.findIdByLegacyApiKey.mockResolvedValue("project_alpha");
+      const service = createService(repository);
+
+      await expect(
+        service.findIdByLegacyApiKey({ token: "lw-revoked-project_alpha" }),
+      ).resolves.toBeNull();
+      expect(repository.findIdByLegacyApiKey).not.toHaveBeenCalled();
+    });
+  });
+});

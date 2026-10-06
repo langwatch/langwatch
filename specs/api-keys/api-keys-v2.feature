@@ -121,21 +121,21 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
     @unit
     Scenario: A new project gets no customer-facing project key
       When "ada" creates project "gamma"
-      Then no project key row is listed for project "gamma"
-      And the setup screens offer "Create a key" instead
+      Then project "gamma" stores a legacy key value that never authenticates
+      And its legacy key status answers absent, so no project key row is listed
 
-    # Until ADR-166 exists, internal callers read Project.apiKey. These two hold that seam.
-    @integration
-    Scenario: Internal callers keep working while the legacy key is hidden
-      Given project "alpha" has a legacy key that no screen or response shows
+    @unit
+    Scenario: No internal caller reads the legacy key
+      Given the legacy key of project "alpha" is revoked
       When a scenario run, a workflow code block and the gateway's trace export run for project "alpha"
-      Then each authenticates as project "alpha"
+      Then each authenticates with a key minted for that run or export
+      And none of them reads the project's legacy key
 
-    @integration
-    Scenario: Revoking the legacy key does not stop internal callers
+    @unit
+    Scenario: Revoking the legacy key stops nothing the platform runs
       Given "ada" revoked the legacy key of project "alpha"
       When a scenario run for project "alpha" sends its traces
-      Then the traces are accepted
+      Then it authenticates with the run's own minted key
       And the revoked key itself is still refused
 
   Rule: a revoked or expired key is refused everywhere, within the cache bound
@@ -174,6 +174,13 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then the expiry field asks her to choose one
       And Create is unavailable
       And when she chooses an expiry Create becomes available
+
+    @integration
+    Scenario: The authorize page mints nothing until an expiry is chosen
+      Given "ada" opens the authorize page for a CLI or MCP setup
+      Then it offers the same expiry choices as the create drawer, "No expiration" included
+      And no choice is preselected
+      And the mint stays unavailable until she chooses one
 
     @integration
     Scenario: Choosing no expiration mints a key with no expiry
