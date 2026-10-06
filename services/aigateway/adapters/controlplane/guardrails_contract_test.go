@@ -662,7 +662,7 @@ func TestControlPlaneSchemaAgreesOnTheWireShape(t *testing.T) {
 // declares, so the values are never hardcoded twice.
 func controlPlaneDecisions(t *testing.T, service string) []string {
 	t.Helper()
-	const marker = "export type GuardrailDecision ="
+	const marker = "type GuardrailDecision ="
 	start := strings.Index(service, marker)
 	if start < 0 {
 		t.Fatal("GuardrailDecision is no longer declared by the control plane")
