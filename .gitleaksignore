@@ -37,3 +37,9 @@ ee724546d96949b22f8d04adc3a2ec5d8c79616a:platform/app/ee/sso/__tests__/sso-gate.
 635662acfe2f7e9142982b0955b7655b1159ceec:modules/workflow/process/src/services/__tests__/workflow-http-secrets.service.unit.test.ts:generic-api-key:12
 635662acfe2f7e9142982b0955b7655b1159ceec:modules/workflow/process/src/services/__tests__/workflow-http-secrets.service.unit.test.ts:generic-api-key:159
 48f9eb920a2a021bbb8723d1d61896acea00b2b7:modules/api-key/process/src/services/__tests__/api-key-token-resolution-cache.unit.test.ts:generic-api-key:550
+
+# A connect-protocol test named its never-logged sentinel SECRET_MARKER with the
+# value SECRETMARK-9f3a, which clears the generic-api-key bar beside a SECRET
+# name. It was never a credential; the constant now reads CONTENT_MARKER =
+# "content-marker", so only this pull request's history carries the literal.
+e361040a34adcefc378718482969f16445ac70e9:modules/agent/process/src/transport/__tests__/agent-connect-output.rest.unit.test.ts:generic-api-key:21

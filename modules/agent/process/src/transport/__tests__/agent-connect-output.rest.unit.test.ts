@@ -18,7 +18,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 
 import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
 
-const SECRET_MARKER = "SECRETMARK-9f3a";
+const CONTENT_MARKER = "content-marker";
 
 function buildApi(connectFrames: AgentApi["connectFrames"]) {
   const app = createApiFixture<AgentApi>({ connectFrames });
@@ -59,20 +59,20 @@ describe("a connect answer that breaks its schema", () => {
   /** @scenario "A malformed protocol output preserves the response without logging its content" */
   it("is sent as the App produced it and logged by endpoint and failure alone", async () => {
     log.error.mockClear();
-    const hono = buildApi((async () => ({ accepted: SECRET_MARKER })) as never);
+    const hono = buildApi((async () => ({ accepted: CONTENT_MARKER })) as never);
 
     const response = await hono.request("http://api.test/api/v1/agents/connect/frames", request);
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ accepted: SECRET_MARKER });
+    expect(await response.json()).toEqual({ accepted: CONTENT_MARKER });
     expect(log.error).toHaveBeenCalledTimes(1);
     const [fields, message] = log.error.mock.calls[0] as [Record<string, unknown>, string];
     expect(fields).toMatchObject({
       endpoint: "POST /connect/frames",
       issues: [{ path: "accepted", code: "invalid_type" }],
     });
-    expect(JSON.stringify(log.error.mock.calls)).not.toContain(SECRET_MARKER);
-    expect(message).not.toContain(SECRET_MARKER);
+    expect(JSON.stringify(log.error.mock.calls)).not.toContain(CONTENT_MARKER);
+    expect(message).not.toContain(CONTENT_MARKER);
   });
 
   describe("when the answer keeps its schema", () => {
