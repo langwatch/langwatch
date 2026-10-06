@@ -11,7 +11,7 @@ import {
 } from "./prisma.slack-connection.repository.ts";
 
 /** Every model the live tier reads, and nothing else. */
-export type SlackLiveDatabase = SlackConnectionDatabase & SlackConnectionClaimDatabase;
+type SlackLiveDatabase = SlackConnectionDatabase & SlackConnectionClaimDatabase;
 
 export class PrismaSlackRepositories {
   static readonly requires = ["prisma", "encryption"] as const;

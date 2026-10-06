@@ -17,7 +17,7 @@ import type {
 import type { DataRetentionService } from "./data-retention.service.ts";
 import type { RetentionPermissionsService } from "./retention-permissions.service.ts";
 
-export type DataRetentionSnapshotServiceOptions = Readonly<{
+type DataRetentionSnapshotServiceOptions = Readonly<{
   retention: Pick<DataRetentionService, "getResolvedForProject" | "listOrganizationRules">;
   directory: DataRetentionDirectoryReader;
   permissions: RetentionPermissionsService;

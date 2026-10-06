@@ -1,17 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { z } from "zod";
 
-export const DIGEST_TEMPLATE_IDS = [
-  "digest-plan-pressure",
-  "digest-scenarios-trend",
-  "digest-coding-agent-week",
-  "digest-traces-week",
-  "digest-whats-new",
-] as const;
-
-export const digestTemplateIdSchema = z.enum(DIGEST_TEMPLATE_IDS);
-export type DigestTemplateId = z.infer<typeof digestTemplateIdSchema>;
-
 /** Tuned from the Cloud admin gallery; the first eligible template wins. */
 export const DIGEST_TEMPLATE_THRESHOLDS = {
   planPressurePercent: 80,
@@ -24,7 +13,7 @@ const count = z.number().int().nonnegative();
 
 const scenarioWeekSchema = z.object({ runs: count, failures: count });
 
-export const digestTemplateInputSchema = z.object({
+const digestTemplateInputSchema = z.object({
   member: z.object({
     isOrganizationAdmin: z.boolean(),
     codingAgentSessions: count,
@@ -46,7 +35,7 @@ export const digestTemplateInputSchema = z.object({
 });
 export type DigestTemplateInput = z.infer<typeof digestTemplateInputSchema>;
 
-export const digestTemplatePickSchema = z.discriminatedUnion("template", [
+const digestTemplatePickSchema = z.discriminatedUnion("template", [
   z.object({ template: z.literal("digest-plan-pressure") }),
   z.object({
     template: z.literal("digest-scenarios-trend"),
@@ -56,7 +45,7 @@ export const digestTemplatePickSchema = z.discriminatedUnion("template", [
   z.object({ template: z.literal("digest-traces-week") }),
   z.object({ template: z.literal("digest-whats-new") }),
 ]);
-export type DigestTemplatePick = z.infer<typeof digestTemplatePickSchema>;
+type DigestTemplatePick = z.infer<typeof digestTemplatePickSchema>;
 
 /** Every eligible template in send order; what's new is always last. */
 export function eligibleDigestTemplates(input: DigestTemplateInput): DigestTemplatePick[] {

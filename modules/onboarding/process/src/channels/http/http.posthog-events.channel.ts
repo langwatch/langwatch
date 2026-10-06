@@ -11,7 +11,7 @@ import type { PostHogEventInput, PostHogEventsChannel } from "../posthog-events.
 
 const logger = createLogger("langwatch:onboarding:posthog");
 
-export interface HttpPostHogEventsOptions {
+interface HttpPostHogEventsOptions {
   readonly targets: () => ProductAnalyticsTarget[];
 }
 

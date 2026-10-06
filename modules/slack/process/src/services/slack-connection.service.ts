@@ -38,7 +38,7 @@ import type {
 import { slackSecretFingerprint } from "../rules/slack-secret-fingerprint.rules.ts";
 
 /** Where a project sits: what an ORGANIZATION connection is checked against. */
-export interface SlackProjectScope {
+interface SlackProjectScope {
   projectId: string;
   projectName: string;
   organizationId: string;
@@ -52,7 +52,7 @@ type StoredSecret = Pick<
 >;
 
 /** The repositories, peer slices, channel and keys the service is composed from. */
-export type SlackConnectionServiceDeps = Readonly<{
+type SlackConnectionServiceDeps = Readonly<{
   connections: SlackConnectionRepository;
   claims: SlackConnectionClaimRepository;
   projects: Pick<ProjectApi, "listNamesByIds">;

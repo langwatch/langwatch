@@ -20,7 +20,7 @@ import type { DataPrivacyPermissionsService } from "./data-privacy-permissions.s
  * `DataPrivacyService`, because the write half of that service drags an organization service
  * this read never asks anything of.
  */
-export type DataPrivacySnapshotPolicies = Readonly<{
+type DataPrivacySnapshotPolicies = Readonly<{
   getResolvedForProject(input: { projectId: string }): Promise<DataPrivacySnapshot["effective"]>;
   listOrganizationRules(input: { organizationId: string }): Promise<DataPrivacyPolicy[]>;
 }>;

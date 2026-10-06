@@ -110,7 +110,7 @@ const presidioFindingsSchema = z.array(
 type PresidioFinding = z.infer<typeof presidioFindingsSchema>[number];
 
 /** A spared redaction: the new text, nothing left to redact, or findings that cannot be placed. */
-export type SparedRedaction =
+type SparedRedaction =
   | { kind: "redacted"; text: string }
   | { kind: "unchanged" }
   | { kind: "unplaceable" };

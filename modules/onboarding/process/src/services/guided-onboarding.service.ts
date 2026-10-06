@@ -35,9 +35,9 @@ type GuidedOnboardingEvent =
   | "conversation_attached"
   | "virtual_key_minted";
 
-export type TourStatus = "completed" | "skipped" | "replayed";
+type TourStatus = "completed" | "skipped" | "replayed";
 
-export interface GuidedOnboardingActor {
+interface GuidedOnboardingActor {
   readonly organizationId: string;
   /** Absent when the write came through a project credential with no user. */
   readonly userId: string | undefined;

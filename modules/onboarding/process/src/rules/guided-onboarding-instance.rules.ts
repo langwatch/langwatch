@@ -6,7 +6,7 @@
  */
 import { ensureGatewayV1BaseUrl } from "@langwatch/langy-contract";
 
-export type GuidedOnboardingGatewayConfig = Readonly<{ publicUrl: string | undefined }>;
+type GuidedOnboardingGatewayConfig = Readonly<{ publicUrl: string | undefined }>;
 
 export function withInstanceFacts<S extends object>(
   state: S,

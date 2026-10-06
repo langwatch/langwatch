@@ -3,13 +3,13 @@ import type {
   OrganizationMfaSetting,
 } from "../two-step-verification.repository.ts";
 
-export type MemoryTwoStepPerson = AccountSecondFactors & {
+type MemoryTwoStepPerson = AccountSecondFactors & {
   name: string | null;
   email: string | null;
 };
-export type MemoryTwoStepOrganization = OrganizationMfaSetting;
-export type MemoryConnection = { organizationId: string; state: string };
-export type MemoryIdentifier = { userId: string; providerId: string };
+type MemoryTwoStepOrganization = OrganizationMfaSetting;
+type MemoryConnection = { organizationId: string; state: string };
+type MemoryIdentifier = { userId: string; providerId: string };
 
 /** The two-step twin's seedable rows: people, organizations, seats, connections and identifiers. */
 export class MemoryTwoStepVerificationStore {
