@@ -75,6 +75,37 @@ export class PrismaStoredObjectRecordRepository
 
     return rows.map((row) => fromRow(row));
   }
+
+  async findPageByPurpose(input: {
+    purpose: string;
+    after?: Readonly<{ tenantId: StoredObjectProjectId; id: StoredObjectId }>;
+    limit: number;
+  }): Promise<StoredObjectRecord[]> {
+    const { after } = input;
+    const rows = await this.prisma.storedObject.findMany({
+      where: {
+        purpose: input.purpose,
+        ...(after
+          ? {
+              OR: [
+                { tenantId: { gt: after.tenantId } },
+                { tenantId: after.tenantId, id: { gt: after.id } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ tenantId: "asc" }, { id: "asc" }],
+      take: input.limit,
+    });
+
+    return rows.map((row) => fromRow(row));
+  }
+
+  async delete(input: { tenantId: StoredObjectProjectId; id: StoredObjectId }): Promise<void> {
+    await this.prisma.storedObject.deleteMany({
+      where: { tenantId: input.tenantId, id: input.id },
+    });
+  }
 }
 
 interface StoredObjectRow {
