@@ -1773,9 +1773,18 @@ model Project {
   ///     (project picker, /api/v1/projects, billing exports, RBAC
   ///     pickers, etc.) - the regression-test invariant in
   ///     specs/ai-gateway/governance/ui-contract.feature codifies this.
+  ///   - "aggregate": a project that owns no traces and reads its member
+  ///     projects through shared project-reader grants (ADR-144). Hidden
+  ///     from every "send traces here" picker and from ingestion; visible in
+  ///     the project switcher to organisation admins only.
   /// Stored as a free-form string (matching IngestionSource.sourceType
   /// pattern) so future routing kinds can ship without schema migrations.
   kind                String                    @default("application")
+  /// ADR-144: the scope rule an aggregate project materialises into grants.
+  /// Null on every other kind. Shapes: { kind: "all-personal" } |
+  /// { kind: "personal-by-department", departmentId } |
+  /// { kind: "explicit", projectIds: string[] }.
+  aggregateRule       Json?
   firstMessage        Boolean                   @default(false)
   integrated          Boolean                   @default(false)
   createdAt           DateTime                  @default(now())
