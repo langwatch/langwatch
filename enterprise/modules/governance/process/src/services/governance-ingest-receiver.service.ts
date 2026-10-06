@@ -11,23 +11,26 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import { type GatewayApi } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
-import {
-  applyOtlpReceiverPolicy,
-  parseOtlpLogs,
-  parseOtlpMetrics,
-  parseOtlpTraces,
-} from "@langwatch/otlp";
+import { applyOtlpReceiverPolicy, parseOtlpLogs, parseOtlpTraces } from "@langwatch/otlp";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 import type {
   IExportLogsServiceRequest,
   IExportMetricsServiceRequest,
   IExportTraceServiceRequest,
-  IKeyValue,
 } from "@opentelemetry/otlp-transformer";
 
+import {
+  buildWebhookLogRequest,
+  countLogRecords,
+  countSpans,
+  stampLogOriginAttrs,
+  stampOriginAttrs,
+} from "../rules/governance-ingest-payload.rules.ts";
 import type { CanonicalCostExtractorService } from "./canonical-cost-extractor.service.ts";
 import { GovernanceIngestCostService } from "./governance-ingest-cost.service.ts";
+import { GovernanceIngestLandingService } from "./governance-ingest-landing.service.ts";
+import { GovernanceIngestMetricReceiverService } from "./governance-ingest-metric-receiver.service.ts";
 import type { IngestionSourceService } from "./ingestion-source.service.ts";
 
 const logger = createLogger("langwatch:ingest");
@@ -171,158 +174,19 @@ export interface GovernanceIngestReceiverApi {
 
 const OTLP_SOURCE_TYPES = new Set(["otel_generic", "claude_cowork", "claude_code"]);
 const WEBHOOK_SOURCE_TYPES = new Set(["workato", "otel_generic", "s3_custom"]);
-const RESERVED_ORIGIN_PREFIXES = ["langwatch.origin.", "langwatch.ingestion_source."] as const;
-
-/**
- * Stamp `langwatch.origin.*` and `langwatch.ingestion_source.*` onto a
- * payload. Downstream consumers filter on
- * `langwatch.origin.kind = "ingestion_source"`, which is why these are
- * receiver-authoritative rather than advisory.
- */
-function buildOriginAttrs(source: GovernanceIngestionSource): IKeyValue[] {
-  return [
-    { key: "langwatch.origin.kind", value: { stringValue: "ingestion_source" } },
-    { key: "langwatch.ingestion_source.id", value: { stringValue: source.id } },
-    {
-      key: "langwatch.ingestion_source.organization_id",
-      value: { stringValue: source.organizationId },
-    },
-    { key: "langwatch.ingestion_source.source_type", value: { stringValue: source.sourceType } },
-  ] as IKeyValue[];
-}
-
-/**
- * Receiver-authoritative origin attributes REPLACE any the payload supplied
- * under a reserved key: appending would leave two entries under one key and
- * let a payload forge its own origin.
- */
-function withOriginAttrs(
-  existing: IKeyValue[] | undefined,
-  source: GovernanceIngestionSource,
-): IKeyValue[] {
-  const caller = (existing ?? []).filter(
-    (attribute) => !RESERVED_ORIGIN_PREFIXES.some((prefix) => attribute.key?.startsWith(prefix)),
-  );
-
-  return [...caller, ...buildOriginAttrs(source)];
-}
-
-function stampOriginAttrs(
-  request: IExportTraceServiceRequest,
-  source: GovernanceIngestionSource,
-): void {
-  for (const resourceSpans of request.resourceSpans ?? []) {
-    for (const scopeSpans of resourceSpans.scopeSpans ?? []) {
-      for (const span of scopeSpans.spans ?? []) {
-        span.attributes = withOriginAttrs(span.attributes, source);
-      }
-    }
-  }
-}
-
-function stampLogOriginAttrs(
-  request: IExportLogsServiceRequest,
-  source: GovernanceIngestionSource,
-): void {
-  for (const resourceLogs of request.resourceLogs ?? []) {
-    for (const scopeLogs of resourceLogs.scopeLogs ?? []) {
-      for (const record of scopeLogs.logRecords ?? []) {
-        record.attributes = withOriginAttrs(record.attributes, source);
-      }
-    }
-  }
-}
-
-function stampMetricOriginAttrs(input: {
-  request: IExportMetricsServiceRequest;
-  source: GovernanceIngestionSource;
-}): void {
-  for (const resourceMetrics of input.request.resourceMetrics ?? []) {
-    const resource = resourceMetrics.resource ?? { attributes: [], droppedAttributesCount: 0 };
-
-    resource.attributes = withOriginAttrs(resource.attributes, input.source);
-    resourceMetrics.resource = resource;
-  }
-}
-
-/**
- * Map a webhook envelope — arbitrary JSON pushed by an upstream platform —
- * onto ONE OTLP log record, because that keeps the unified-trace contract
- * simple: body is the raw JSON string, attributes carry the origin metadata.
- */
-function buildWebhookLogRequest(
-  rawBody: string,
-  source: GovernanceIngestionSource,
-): IExportLogsServiceRequest {
-  const nowNanos = String(BigInt(nowInstant().epochMilliseconds) * 1_000_000n);
-
-  return {
-    resourceLogs: [
-      {
-        resource: {
-          attributes: [
-            {
-              key: "service.name",
-              value: { stringValue: `ingestion-source/${source.sourceType}` },
-            },
-          ],
-          droppedAttributesCount: 0,
-        },
-        scopeLogs: [
-          {
-            scope: { name: "langwatch.governance.ingestion", version: "1" },
-            logRecords: [
-              {
-                timeUnixNano: nowNanos,
-                observedTimeUnixNano: nowNanos,
-                severityNumber: 9, // SeverityNumber.INFO
-                severityText: "INFO",
-                body: { stringValue: rawBody },
-                attributes: buildOriginAttrs(source),
-                droppedAttributesCount: 0,
-                traceId: new Uint8Array(0),
-                spanId: new Uint8Array(0),
-                flags: 0,
-              },
-            ],
-            schemaUrl: "",
-          },
-        ],
-        schemaUrl: "",
-      },
-    ],
-  };
-}
-
-/** Every data point in a metrics export, across all five point shapes. */
-function countMetricDataPoints(request: IExportMetricsServiceRequest): number {
-  return (request.resourceMetrics ?? []).reduce(
-    (acc, resourceMetrics) =>
-      acc +
-      (resourceMetrics.scopeMetrics ?? []).reduce(
-        (scopeAcc, scopeMetrics) =>
-          scopeAcc +
-          (scopeMetrics.metrics ?? []).reduce(
-            (metricAcc, metric) =>
-              metricAcc +
-              (metric?.gauge?.dataPoints?.length ?? 0) +
-              (metric?.sum?.dataPoints?.length ?? 0) +
-              (metric?.histogram?.dataPoints?.length ?? 0) +
-              (metric?.exponentialHistogram?.dataPoints?.length ?? 0) +
-              (metric?.summary?.dataPoints?.length ?? 0),
-            0,
-          ),
-        0,
-      ),
-    0,
-  );
-}
 
 export class GovernanceIngestReceiverService implements GovernanceIngestReceiverApi {
   private readonly costs: GovernanceIngestCostService;
+  private readonly landing: GovernanceIngestLandingService;
+  private readonly metrics: GovernanceIngestMetricReceiverService;
 
   private constructor(private readonly members: GovernanceIngestReceiverMembers) {
     this.costs = GovernanceIngestCostService.create(members);
+    this.landing = GovernanceIngestLandingService.create(members);
+    this.metrics = GovernanceIngestMetricReceiverService.create({
+      members,
+      landing: this.landing,
+    });
   }
 
   static create(members: GovernanceIngestReceiverMembers): GovernanceIngestReceiverService {
@@ -354,14 +218,10 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
       if (!parsed.ok) {
         parseHint = parsed.error;
       } else {
-        const spans = (parsed.request.resourceSpans ?? []).flatMap((resourceSpans) =>
-          (resourceSpans.scopeSpans ?? []).flatMap((scopeSpans) => scopeSpans.spans ?? []),
-        );
-
-        eventCount = spans.length;
+        eventCount = countSpans(parsed.request);
 
         if (eventCount > 0) {
-          const tenantId = await this.governanceTenantOf(source);
+          const tenantId = await this.landing.governanceTenantOf(source);
 
           stampOriginAttrs(parsed.request, source);
           applyOtlpReceiverPolicy({ request: parsed.request, signal: "traces", apiKeyId: null });
@@ -382,7 +242,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
       );
     }
 
-    await this.recordEvent(source);
+    await this.landing.recordEvent(source);
     logger.info(
       {
         sourceId: source.id,
@@ -424,9 +284,13 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
     try {
       if (bodyBytes > 0) {
         await logCollection({
-          tenantId: await this.governanceTenantOf(source),
+          tenantId: await this.landing.governanceTenantOf(source),
           organizationId: source.organizationId,
-          logRequest: buildWebhookLogRequest(input.body, source),
+          logRequest: buildWebhookLogRequest({
+            rawBody: input.body,
+            source,
+            nowNanos: String(BigInt(nowInstant().epochMilliseconds) * 1_000_000n),
+          }),
         });
         handoffOk = true;
       }
@@ -437,7 +301,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
       );
     }
 
-    await this.recordEvent(source);
+    await this.landing.recordEvent(source);
     logger.info(
       {
         sourceId: source.id,
@@ -460,12 +324,10 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
    */
   async receiveLogs(batch: GovernanceIngestBatch): Promise<GovernanceIngestLogReceipt> {
     const { source } = batch;
-    const { logCollection } = this.members;
 
     let bodyBytes = 0;
     let logRecordCount = 0;
-    let costEventCount = 0;
-    let ledgerRowsWritten = 0;
+    const landed = { costEvents: 0, ledgerRows: 0 };
     let parseHint: string | undefined;
 
     try {
@@ -478,52 +340,10 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
       if (!parsed.ok) {
         parseHint = parsed.error;
       } else {
-        logRecordCount = (parsed.request.resourceLogs ?? []).reduce(
-          (acc, resourceLogs) =>
-            acc +
-            (resourceLogs.scopeLogs ?? []).reduce(
-              (scopeAcc, scopeLogs) => scopeAcc + (scopeLogs.logRecords?.length ?? 0),
-              0,
-            ),
-          0,
-        );
+        logRecordCount = countLogRecords(parsed.request);
 
         if (logRecordCount > 0) {
-          const tenantId = await this.governanceTenantOf(source);
-
-          stampLogOriginAttrs(parsed.request, source);
-          applyOtlpReceiverPolicy({ request: parsed.request, signal: "logs", apiKeyId: null });
-
-          try {
-            await logCollection({
-              tenantId,
-              organizationId: source.organizationId,
-              logRequest: parsed.request,
-            });
-          } catch (handoffErr) {
-            logger.warn(
-              { sourceId: source.id, err: String(handoffErr) },
-              "log pipeline handoff failed (cost extraction continues)",
-            );
-          }
-
-          const events = await this.costs.extractCostEvents({
-            source,
-            body,
-            contentType: batch.contentType,
-            parsed: parsed.request,
-          });
-
-          costEventCount = events.length;
-
-          if (events.length > 0) {
-            ledgerRowsWritten += await this.costs.priceCostEvents({
-              events,
-              source,
-              spend: this.members.spend,
-              governanceProjectId: tenantId,
-            });
-          }
+          await this.landParsedLogs({ batch, body, request: parsed.request, landed });
         }
       }
     } catch (err) {
@@ -534,15 +354,15 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
       );
     }
 
-    await this.recordEvent(source);
+    await this.landing.recordEvent(source);
     logger.info(
       {
         sourceId: source.id,
         sourceType: source.sourceType,
         bytes: bodyBytes,
         logRecords: logRecordCount,
-        costEvents: costEventCount,
-        ledgerRows: ledgerRowsWritten,
+        costEvents: landed.costEvents,
+        ledgerRows: landed.ledgerRows,
       },
       "otel logs ingest landed",
     );
@@ -551,138 +371,67 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
       outcome: "received",
       bytes: bodyBytes,
       logRecords: logRecordCount,
-      costEvents: costEventCount,
-      ledgerRows: ledgerRowsWritten,
+      costEvents: landed.costEvents,
+      ledgerRows: landed.ledgerRows,
       hint: parseHint,
     };
+  }
+
+  receiveMetrics(batch: GovernanceIngestBatch): Promise<GovernanceIngestMetricReceipt> {
+    return this.metrics.receiveMetrics(batch);
   }
 
   /**
-   * The one signal that does NOT acknowledge every failure: a throw AFTER the
-   * parse is ours rather than the sender's, so it answers retryably and the
-   * source event is deliberately not recorded — the collector re-sends this
-   * same request and must not double-count.
+   * A non-empty log batch stamped, handed to the log pipeline, and its cost
+   * events priced. `landed` is tallied as it goes, so a pricing failure still
+   * reports the cost events it extracted.
    */
-  async receiveMetrics(batch: GovernanceIngestBatch): Promise<GovernanceIngestMetricReceipt> {
+  private async landParsedLogs({
+    batch,
+    body,
+    request,
+    landed,
+  }: {
+    batch: GovernanceIngestBatch;
+    body: ArrayBuffer;
+    request: IExportLogsServiceRequest;
+    landed: { costEvents: number; ledgerRows: number };
+  }): Promise<void> {
     const { source } = batch;
+    const tenantId = await this.landing.governanceTenantOf(source);
 
-    let bodyBytes = 0;
-    let metricCount = 0;
-    let rejectedDataPoints = 0;
-    let acceptedDataPoints = 0;
-    let parseHint: string | undefined;
+    stampLogOriginAttrs(request, source);
+    applyOtlpReceiverPolicy({ request, signal: "logs", apiKeyId: null });
 
     try {
-      const body = await batch.read();
-
-      bodyBytes = body.byteLength;
-
-      const parsed = parseOtlpMetrics(body, batch.contentType);
-
-      if (!parsed.ok) {
-        parseHint = parsed.error;
-      } else {
-        metricCount = countMetricDataPoints(parsed.request);
-
-        // Gate on the payload carrying metrics AT ALL, not on its data-point
-        // arrays being well-formed: a request whose metrics all have malformed
-        // data points has a zero pre-count, and skipping validation would
-        // acknowledge it as fully accepted with nothing rejected.
-        const resourceMetrics = parsed.request.resourceMetrics;
-        const hasMetricPayload = Array.isArray(resourceMetrics)
-          ? resourceMetrics.length > 0
-          : resourceMetrics != null;
-
-        if (hasMetricPayload) {
-          // Scoped away from the outer catch, which turns anything it sees
-          // into a `hint` on an acknowledgement.
-          const collected = await this.collectParsedMetrics(parsed.request, source);
-
-          if (collected.outcome !== "ok") return collected;
-
-          rejectedDataPoints = collected.rejectedDataPoints;
-          acceptedDataPoints = collected.acceptedDataPoints;
-          parseHint = collected.parseHint;
-        }
-      }
-    } catch (err) {
-      parseHint = String(err);
-    }
-
-    await this.recordEvent(source);
-    logger.info(
-      { sourceId: source.id, bytes: bodyBytes, metrics: metricCount },
-      "otel metrics ingest landed",
-    );
-
-    return {
-      outcome: "received",
-      bytes: bodyBytes,
-      metrics: metricCount,
-      acceptedDataPoints,
-      rejectedDataPoints,
-      hint: parseHint,
-    };
-  }
-
-  /** Project resolution, provenance stamping and collection, in one step. */
-  private async collectParsedMetrics(
-    parsedRequest: IExportMetricsServiceRequest,
-    source: GovernanceIngestionSource,
-  ): Promise<
-    | Readonly<{ outcome: "unavailable"; errorMessage?: string | undefined }>
-    | Readonly<{ outcome: "error" }>
-    | Readonly<{
-        outcome: "ok";
-        rejectedDataPoints: number;
-        acceptedDataPoints: number;
-        parseHint?: string | undefined;
-      }>
-  > {
-    const { metricCollection } = this.members;
-
-    try {
-      const tenantId = await this.governanceTenantOf(source);
-
-      stampMetricOriginAttrs({ request: parsedRequest, source });
-      applyOtlpReceiverPolicy({ request: parsedRequest, signal: "metrics", apiKeyId: null });
-
-      const result = await metricCollection({
+      await this.members.logCollection({
         tenantId,
         organizationId: source.organizationId,
-        metricRequest: parsedRequest,
+        logRequest: request,
       });
-
-      if (result.outcome === "unavailable") {
-        return { outcome: "unavailable", errorMessage: result.errorMessage };
-      }
-
-      return {
-        outcome: "ok",
-        rejectedDataPoints: result.rejectedDataPoints,
-        acceptedDataPoints: result.acceptedDataPoints,
-        parseHint: result.errorMessage,
-      };
-    } catch (error) {
-      logger.error(
-        { error, sourceId: source.id },
-        "otel metrics ingest failed after parsing; answering retryably",
+    } catch (handoffErr) {
+      logger.warn(
+        { sourceId: source.id, err: String(handoffErr) },
+        "log pipeline handoff failed (cost extraction continues)",
       );
-
-      return { outcome: "error" };
     }
-  }
 
-  private async governanceTenantOf(source: GovernanceIngestionSource): Promise<string> {
-    const project = await this.members.projects.ensureInternal({
-      organizationId: source.organizationId,
-      kind: "internal_governance",
+    const events = await this.costs.extractCostEvents({
+      source,
+      body,
+      contentType: batch.contentType,
+      parsed: request,
     });
 
-    return project.id;
-  }
+    landed.costEvents = events.length;
 
-  private recordEvent(source: GovernanceIngestionSource): Promise<unknown> {
-    return this.members.sources.recordEventReceived(source.id);
+    if (events.length > 0) {
+      landed.ledgerRows += await this.costs.priceCostEvents({
+        events,
+        source,
+        spend: this.members.spend,
+        governanceProjectId: tenantId,
+      });
+    }
   }
 }
