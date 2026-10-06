@@ -68,6 +68,7 @@ import {
   TRACE_RECEIVED_EVENT_TYPE,
   traceReceivedEventDataSchema,
 } from "@langwatch/trace-contract";
+import { USER_REGISTERED_EVENT_TYPE, userLifecycleEventDataSchema } from "@langwatch/user-contract";
 import {
   WORKFLOW_CREATED_EVENT_TYPE,
   workflowCreatedEventDataSchema,
@@ -92,6 +93,7 @@ import {
   subscriptionChangedSignal,
   subscriptionStartedSignal,
   traceReceivedSignal,
+  userRegisteredSignal,
   workflowCreatedSignal,
 } from "../rules/nurturing-owner-signals.rules.ts";
 import { nurturingSignalKey, RecordNurturingSignalCommand } from "./nurturing-signal.commands.ts";
@@ -220,6 +222,14 @@ export function buildNurturingPipeline(deps: {
       data: organizationSignedUpEventDataSchema,
       handle: (data, { aggregateId }) => {
         const signal = signedUpSignal({ data, aggregateId });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("userRegistered", {
+      eventType: USER_REGISTERED_EVENT_TYPE,
+      data: userLifecycleEventDataSchema,
+      handle: (data) => {
+        const signal = userRegisteredSignal({ data });
         return deps.deliver({ key: nurturingSignalKey(signal), signal });
       },
     })

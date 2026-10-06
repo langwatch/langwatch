@@ -249,8 +249,9 @@ export class NurturingDeliveryService {
       case "experiment_ran":
       case "evaluation_ran":
         return track({ userId: signal.userId, event: "evaluation_ran" });
+      case "user_registered":
+        return track({ userId: signal.userId, event: "signed_up" });
       case "signed_up":
-        track({ userId: signal.userId, event: "signed_up" });
         return posthog.track(fireOrganizationCreated(signal));
       case "team_member_invited":
         return track({

@@ -414,17 +414,13 @@ describe("NurturingDeliveryService", () => {
       });
     });
 
-    it("tracks the signed_up milestone with no attribution", async () => {
+    it("tracks only organization_created; PostHog's signed_up comes from registration", async () => {
       const { posthog, delivery } = deliveryOverBothSinks();
 
       await delivery.deliver({ key: "signed_up:event-20", signal: signedUp });
       await settle();
 
-      expect(posthog.tracked.map(({ event }) => event)).toEqual([
-        "signed_up",
-        "organization_created",
-      ]);
-      expect(posthog.tracked[0]).toEqual({ userId: "user-1", event: "signed_up", properties: {} });
+      expect(posthog.tracked.map(({ event }) => event)).toEqual(["organization_created"]);
     });
 
     /** @scenario A failure while tracking organization_created does not fail onboarding */

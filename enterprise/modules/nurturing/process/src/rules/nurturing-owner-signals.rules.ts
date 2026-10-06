@@ -27,6 +27,7 @@ import type {
   FirstTraceRecordedEventData,
   TraceReceivedEventData,
 } from "@langwatch/trace-contract";
+import type { UserLifecycleEventData } from "@langwatch/user-contract";
 import type { WorkflowCreatedEventData } from "@langwatch/workflow-contract";
 
 import { isConnectedAgentRunSucceeded } from "./nurturing-scenario-run.rules.ts";
@@ -200,6 +201,17 @@ export function sessionStartedSignal({
     userId: data.userId,
     // Auth records only a member of an organization, so nurturing never makes a ghost person.
     hasOrganization: true,
+  };
+}
+
+/** A self-service registration: user records it once per user, so it is keyed by the user. */
+export function userRegisteredSignal({ data }: { data: UserLifecycleEventData }): NurturingSignal {
+  return {
+    kind: "user_registered",
+    sourceEventId: data.userId,
+    tenantId: data.tenantId,
+    occurredAt: data.occurredAt,
+    userId: data.userId,
   };
 }
 
