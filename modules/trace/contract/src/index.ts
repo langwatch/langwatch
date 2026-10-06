@@ -160,8 +160,6 @@ export {
   TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
   TRACE_SUMMARY_PROJECTION_VERSIONS,
   isStorageAnchoredVersion,
-  traceConfig,
-  type TraceServerConfig,
   type TraceProcessingCommandType,
   type TraceProcessingEventType,
 } from "./trace.constants.ts";
@@ -219,3 +217,4 @@ export * from "./explorer/suggestion-items.ts";
 export * from "./trace-browser-slices.ts";
 export * from "./trace-lent-components.ts";
 export * from "./trace-lent-surfaces.ts";
+export { traceConfig, type TraceServerConfig } from "./trace.config.ts";

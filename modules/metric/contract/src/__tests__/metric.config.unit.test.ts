@@ -1,7 +1,7 @@
 import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
-import { metricConfig } from "../metric.api.ts";
+import { metricConfig } from "../metric.config.ts";
 
 describe("metric server configuration", () => {
   describe("given the metric pipeline's lane count", () => {

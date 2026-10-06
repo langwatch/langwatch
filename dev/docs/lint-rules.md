@@ -1069,7 +1069,7 @@ Messages:
 
 - `requestDeliveryOutsideIntent`
   - what: `{{callee}}.requestDelivery(...)` is called outside an outbox intent executor.
-  - fix: Record a deliver intent in the producer's commit and call requestDelivery from that intent's `IntentExecutor` (ADR-167).
+  - fix: Record a deliver intent in the producer's commit and call requestDelivery from that intent's `IntentExecutor` (ADR-167). Read the `eventing-and-worker` skill.
   - why: Outside an intent it sends for a step that may roll back, or loses the request if the process dies mid-step.
 
 ## `langwatch/require-fetch-timeout`

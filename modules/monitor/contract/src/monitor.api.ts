@@ -1,4 +1,3 @@
-import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import type { OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
 import { moduleApi } from "@langwatch/module";
 
@@ -74,10 +73,3 @@ export interface MonitorApi {
 }
 
 export const MonitorApi = moduleApi<MonitorApi>()("monitor");
-
-/** Monitor's settings: only the shared deployment origin its platform links are built on. */
-export const monitorConfig = Config.define(() => ({
-  publicBaseUrl,
-}));
-
-export type MonitorServerConfig = ConfigOf<typeof monitorConfig>;

@@ -1,4 +1,3 @@
-import { Config, isSaas, type ConfigOf } from "@langwatch/config";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { moduleApi } from "@langwatch/module";
 import { USAGE_REPORT_MAX_BODY_BYTES, usageReportBodySchema } from "@langwatch/ops-contract";
@@ -63,8 +62,3 @@ export const saasWebConfigSchema = z.strictObject({
 });
 
 export type SaasWebConfig = z.infer<typeof saasWebConfigSchema>;
-
-/** Whether this deployment is LangWatch Cloud: the shared `isSaas` leaf, one claim among many. */
-export const saasConfig = Config.define(() => ({ isSaas }));
-
-export type SaasServerConfig = ConfigOf<typeof saasConfig>;

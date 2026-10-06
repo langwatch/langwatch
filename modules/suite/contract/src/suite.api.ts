@@ -1,4 +1,3 @@
-import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { moduleApi } from "@langwatch/module";
 import type {
@@ -121,10 +120,3 @@ export interface SuiteApi {
 }
 
 export const SuiteApi = moduleApi<SuiteApi>()("suite");
-
-/** Suite's settings: only the shared deployment origin its run plan links are built on. */
-export const suiteConfig = Config.define(() => ({
-  publicBaseUrl,
-}));
-
-export type SuiteServerConfig = ConfigOf<typeof suiteConfig>;

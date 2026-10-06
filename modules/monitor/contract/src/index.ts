@@ -4,3 +4,4 @@ export * from "./monitor-trpc.schemas.ts";
 export * from "./monitor-rest.schemas.ts";
 export * from "./monitor.trpc.ts";
 export * from "./monitor.api.ts";
+export * from "./monitor.config.ts";
