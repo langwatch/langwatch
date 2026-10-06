@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { looksLikeSsoConnectionId } from "@langwatch/identity";
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { AuthShell } from "~/features/auth";
 import { AUTH_PRIMARY_STYLE } from "~/features/auth/components/AuthPrimaryButton";
@@ -52,6 +52,41 @@ export const bounceConnectionFrom = (
   if (!target || !looksLikeSsoConnectionId(target)) return null;
   return target;
 };
+
+/**
+ * The bounce itself: dial the connection the refusal named, and answer the
+ * connection still being dialled, or null once there is nothing to wait for.
+ *
+ * The dial is a request to the server, and the server can say no: a
+ * connection it never registered, or one that has since gone. A refused dial
+ * is not "on their way somewhere", so the answer drops to null and the page
+ * falls through to the stable copy for this code rather than leaving them on a
+ * card that says one moment about a provider that will never answer.
+ */
+function useConnectionBounce(
+  error: string | null | undefined,
+  target: string | null | undefined,
+): string | null {
+  const connectionId = bounceConnectionFrom(error, target);
+  const [dialRefused, setDialRefused] = useState(false);
+
+  // Ahead of every other effect on this page and not waiting on the
+  // five-second timer: this is not somebody being told why they failed, it is
+  // somebody being taken to the door their organization chose. They should
+  // see their own provider, not a page about Google.
+  useEffect(() => {
+    if (!connectionId) return;
+    let cancelled = false;
+    void signIn(connectionId, { callbackUrl: "/" }).then((result) => {
+      if (!cancelled && result?.error) setDialRefused(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [connectionId]);
+
+  return dialRefused ? null : connectionId;
+}
 
 /**
  * Server route that clears the app session and, on Auth0 deployments,
@@ -148,16 +183,7 @@ function SignInErrorScreen() {
   usePublishAuthStage({ door: "signin", depth: "entry" });
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
   const isAzureAD = publicEnv.data?.NEXTAUTH_PROVIDER === "azure-ad";
-  const bounceTo = bounceConnectionFrom(error, query?.get("error_description"));
-
-  // The bounce, ahead of every other effect on this page and not waiting on
-  // the five-second timer: this is not somebody being told why they failed, it
-  // is somebody being taken to the door their organization chose. They should
-  // see their own provider, not a page about Google.
-  useEffect(() => {
-    if (!bounceTo) return;
-    void signIn(bounceTo, { callbackUrl: "/" });
-  }, [bounceTo]);
+  const bounceTo = useConnectionBounce(error, query?.get("error_description"));
 
   useEffect(() => {
     if (!publicEnv.data) {

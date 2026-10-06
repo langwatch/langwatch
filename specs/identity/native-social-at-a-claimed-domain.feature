@@ -100,6 +100,23 @@ Feature: A native social button at a domain somebody's connection proved
       When somebody signs in through the broker on one of its other connections
       Then nothing refuses them, because that is the population the migration flag is for
 
+    # A grandfathered connection is routed THROUGH THE BROKER: the router
+    # answers it with the connection's id but a method that dials `auth0`,
+    # because the deployment holds no credentials of its own for it and the
+    # engine registers nothing under the connection's id. A bounce that named
+    # such a connection would hand the error route an identifier it cannot
+    # dial, and the person would wait on a spinner for a provider that never
+    # answers. The refusal still stands, but it is the LEGACY guard's refusal,
+    # whose page tells them to type their address, which the router then
+    # routes through the broker as it always has.
+    @unit
+    Scenario: A connection reached through the broker refuses without bouncing
+      Given an organization whose connection is live and has proved "acme.com"
+      And the router dials that connection through the broker rather than by its own id
+      When somebody with an "acme.com" address signs up with Google
+      Then nothing bounces them to the connection
+      And the legacy guard refuses them with the page that says to use the organization's sign-in
+
   Rule: The refusal is a bounce, and the bounce cannot be pointed anywhere
 
     @integration
@@ -116,3 +133,13 @@ Feature: A native social button at a domain somebody's connection proved
       Given a refusal whose named target is an external address rather than a connection
       When the person lands on the error route
       Then nothing is dialled and the ordinary refusal is shown instead
+
+    # The dial is a request to the server, and the server can say no: a
+    # connection the engine never registered, or one that has since gone. A
+    # card that keeps saying "one moment" about a dial that was refused is a
+    # dead end dressed as progress.
+    @integration
+    Scenario: A dial the server refuses shows the refusal instead of waiting
+      Given a refusal that named a connection the server will not dial
+      When the person lands on the error route and the dial is refused
+      Then the ordinary refusal is shown instead of the waiting card

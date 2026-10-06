@@ -77,6 +77,9 @@ describe("Auth error page referrer redirect", () => {
     origin = window.location.origin;
     hardNavigate.mockClear();
     signIn.mockClear();
+    // The real `signIn` is async and resolves to a result or undefined; a
+    // bare mock returns undefined synchronously, which no caller awaits.
+    signIn.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -142,6 +145,37 @@ describe("Auth error page referrer redirect", () => {
       expect(signIn).not.toHaveBeenCalled();
       // The ordinary refusal instead, which is a dead end but a safe one.
       expect(screen.getByText(/Use your organization's sign-in/i)).toBeTruthy();
+    });
+
+    /** @scenario "A dial the server refuses shows the refusal instead of waiting" */
+    it("shows the refusal when the server will not dial the named connection", async () => {
+      // The refusal lands asynchronously, so this one waits on real time.
+      vi.useRealTimers();
+      // The engine holds nothing under this id: the connection is reached
+      // through the broker, or has since gone. The dial answers 404.
+      signIn.mockResolvedValueOnce({
+        error: "No provider found for the issuer",
+        status: 404,
+        ok: false,
+      });
+      searchParamsRef.current = new URLSearchParams(
+        "error=SSO_REQUIRED_BY_ORGANIZATION&error_description=ssoc_gone",
+      );
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Error />
+        </ChakraProvider>,
+      );
+
+      expect(signIn).toHaveBeenCalledWith("ssoc_gone", { callbackUrl: "/" });
+      // Not a spinner about a provider that will never answer: the stable
+      // copy for this code, which tells them what to do instead.
+      expect(
+        await screen.findByText(/Use your organization's sign-in/i),
+      ).toBeTruthy();
+      expect(
+        screen.queryByText(/Taking you to your organization's sign-in/i),
+      ).toBeNull();
     });
   });
 
