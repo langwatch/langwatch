@@ -83,6 +83,28 @@ describe("StoredObjectOwnerLookupService over the ClickHouse owner read", () => 
     );
   });
 
+  /** @scenario A legacy id-only stored-object URL resolves its owning project */
+  it("asks the shared and the private endpoint for the id and answers the project that holds the row", async () => {
+    const shared = makeMockClient([]);
+    const privateClient = makeMockClient([{ project_id: "proj_private" }]);
+    resolveInstances.mockResolvedValue([
+      { target: "shared", client: shared },
+      { target: "org_byoc", client: privateClient },
+    ]);
+
+    const { service: resolver } = service();
+
+    await expect(resolver.getOwner({ id: "legacy-obj" })).resolves.toEqual({
+      projectId: "proj_private",
+    });
+    for (const client of [shared, privateClient]) {
+      expect(client.query).toHaveBeenCalledTimes(1);
+      expect(client.query).toHaveBeenCalledWith(
+        expect.objectContaining({ query_params: { id: "legacy-obj" } }),
+      );
+    }
+  });
+
   /** @scenario "Cross-tenant owner lookup fans out to every ClickHouse instance" */
   it("finds a private ClickHouse owner after the shared instance misses", async () => {
     resolveInstances.mockResolvedValue([

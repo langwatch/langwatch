@@ -175,6 +175,43 @@ describe("ScenarioVoiceTargetService", () => {
     });
   });
 
+  describe("given accessible providers with disabled and other-vendor rows beside an enabled ElevenLabs row", () => {
+    /** @scenario "The enabled ElevenLabs provider row is resolved for a project" */
+    it("reads the credential of the enabled ElevenLabs row and no other", async () => {
+      const { service, credentialReads } = harness({
+        agent: elevenLabsAgent,
+        providers: [
+          summary({ id: "prov_off", provider: "elevenlabs", enabled: false }),
+          summary({ id: "prov_openai", provider: "openai", enabled: true }),
+          summary({ id: "prov_on", provider: "elevenlabs", enabled: true }),
+        ],
+      });
+
+      expect(await service.getVoiceTarget(target)).toMatchObject({
+        voiceTarget: { credential: { kind: "elevenlabs", apiKey: "xi-key" } },
+      });
+      expect(credentialReads).toEqual(["prov_on"]);
+    });
+  });
+
+  describe("given accessible providers that are only disabled or from another vendor", () => {
+    /** @scenario "A project with no enabled ElevenLabs provider resolves none" */
+    it("resolves no credential and reads none", async () => {
+      const { service, credentialReads } = harness({
+        agent: elevenLabsAgent,
+        providers: [
+          summary({ id: "prov_off", provider: "elevenlabs", enabled: false }),
+          summary({ id: "prov_openai", provider: "openai", enabled: true }),
+        ],
+      });
+
+      expect(await service.getVoiceTarget(target)).toMatchObject({
+        voiceTarget: { credential: null },
+      });
+      expect(credentialReads).toEqual([]);
+    });
+  });
+
   describe("given a phone target whose Twilio row holds no key", () => {
     it("carries a null credential", async () => {
       const { service } = harness({
