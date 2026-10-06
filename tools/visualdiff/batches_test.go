@@ -167,13 +167,13 @@ func TestWaitForBatchSkipsUnreadyAndReviewedBatches(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	if path, err := waitForBatch(ctx, root, 1, 5*time.Millisecond); err == nil {
+	if path, err := waitForBatch(ctx, batchWait{root: root, after: 1, poll: 5 * time.Millisecond}); err == nil {
 		t.Fatalf("0002 has no READY, yet %s was answered", path)
 	}
 	if err := os.WriteFile(filepath.Join(root, "0002-flows", BatchReadyFile), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	path, err := waitForBatch(context.Background(), root, 1, 5*time.Millisecond)
+	path, err := waitForBatch(context.Background(), batchWait{root: root, after: 1, poll: 5 * time.Millisecond})
 	if err != nil || path != filepath.Join(root, "0002-flows") {
 		t.Fatalf("wait = %s, %v", path, err)
 	}

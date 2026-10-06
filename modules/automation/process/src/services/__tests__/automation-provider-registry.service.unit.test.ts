@@ -1,12 +1,15 @@
 import type { TriggerAction } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
 
+import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
 import { AutomationProviderRegistryService } from "../automation-provider-registry.service.ts";
 
-const registry = AutomationProviderRegistryService.create({
-  encrypt: (value: string) => `enc(${value})`,
-  decrypt: (value: string) => value,
-});
+const registry = AutomationProviderRegistryService.create(
+  sealWith({
+    encrypt: (value: string) => `enc(${value})`,
+    decrypt: (value: string) => value,
+  }),
+);
 
 // wrong-typed input: a stored row can name a channel this build no longer offers
 const RETIRED_CHANNEL = "SEND_CARRIER_PIGEON" as TriggerAction;

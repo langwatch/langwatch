@@ -42,6 +42,7 @@ import {
   selectVisibleAiTools,
 } from "../rules/ai-tool-visibility.rules.ts";
 import type { AiToolProviderReachService } from "./ai-tool-provider-reach.service.ts";
+import type { CodingAssistantBillingFactService } from "./coding-assistant-billing-fact.service.ts";
 
 type AiToolCatalogCollaborators = {
   repository: AiToolCatalogRepository;
@@ -55,6 +56,7 @@ type AiToolCatalogCollaborators = {
   routingPolicies: Pick<EnterpriseGatewayApi, "listRoutingPolicies">;
   sources: Pick<IngestionSourceRepository, "findAll">;
   members: Pick<OrganizationApi, "findMemberDepartments">;
+  billingFacts: Pick<CodingAssistantBillingFactService, "recordAfterChange">;
   diagnostics: { warn(message: string, context: Record<string, unknown>): void };
 };
 
@@ -140,10 +142,15 @@ export class DefaultGovernanceAiToolCatalogService {
     });
     await this.assertDepartments(parsed.organizationId, parsed.departmentIds);
 
-    return this.repository.create({
+    const created = await this.repository.create({
       values: parsed,
       slug: this.collaborators.slugs.generate(parsed.displayName),
     });
+    await this.recordBillingIf({
+      applies: parsed.type === "coding_assistant",
+      organizationId: parsed.organizationId,
+    });
+    return created;
   }
 
   async update(input: UpdateAiToolEntryInput): Promise<AiToolEntry> {
@@ -160,28 +167,43 @@ export class DefaultGovernanceAiToolCatalogService {
       await this.assertDepartments(parsed.organizationId, parsed.departmentIds);
     }
 
-    return this.repository.update(parsed);
+    const updated = await this.repository.update(parsed);
+    await this.recordBillingIf({
+      applies: existing.type === "coding_assistant" || updated.type === "coding_assistant",
+      organizationId: parsed.organizationId,
+    });
+    return updated;
   }
 
   async remove(input: FindAiToolEntryInput): Promise<AiToolEntry> {
     const parsed = findAiToolEntryInputSchema.parse(input);
-    await this.getOwn(parsed.id, parsed.organizationId);
+    const existing = await this.getOwn(parsed.id, parsed.organizationId);
 
-    return this.repository.remove(parsed.id);
+    const removed = await this.repository.remove(parsed.id);
+    await this.recordBillingIf({
+      applies: existing.type === "coding_assistant",
+      organizationId: parsed.organizationId,
+    });
+    return removed;
   }
 
-  ensureDefaultCatalog(
+  async ensureDefaultCatalog(
     input: AiToolOrganizationInput,
   ): Promise<{ hasSeeded: boolean; created: number }> {
     const parsed = aiToolOrganizationInputSchema.parse(input);
 
-    return this.repository.ensureDefaultCatalog({
+    const result = await this.repository.ensureDefaultCatalog({
       organizationId: parsed.organizationId,
       tiles: AI_TOOL_STARTER_TILES,
     });
+    await this.recordBillingIf({
+      applies: result.created > 0,
+      organizationId: parsed.organizationId,
+    });
+    return result;
   }
 
-  seedStarterPack(
+  async seedStarterPack(
     input: SeedAiToolStarterPackInput,
   ): Promise<{ created: number; updated: number; skipped: number }> {
     const parsed = seedAiToolStarterPackInputSchema.parse(input);
@@ -189,7 +211,12 @@ export class DefaultGovernanceAiToolCatalogService {
       ? AI_TOOL_STARTER_TILES.filter((tile) => parsed.slugs?.includes(tile.slug))
       : AI_TOOL_STARTER_TILES;
 
-    return this.repository.seedStarterPack({ values: parsed, tiles: selected });
+    const result = await this.repository.seedStarterPack({ values: parsed, tiles: selected });
+    await this.recordBillingIf({
+      applies: result.created + result.updated > 0,
+      organizationId: parsed.organizationId,
+    });
+    return result;
   }
 
   listConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]> {
@@ -352,6 +379,17 @@ export class DefaultGovernanceAiToolCatalogService {
       }),
     ]);
     return selectVisibleAiTools({ entries, departmentId: members[0]?.departmentId ?? null });
+  }
+
+  /** Q82: a coding-assistant write is a billing fact trace folds; non-coding tiles change none. */
+  private async recordBillingIf({
+    applies,
+    organizationId,
+  }: {
+    applies: boolean;
+    organizationId: string;
+  }): Promise<void> {
+    if (applies) await this.collaborators.billingFacts.recordAfterChange({ organizationId });
   }
 
   private async getOwn(id: string, organizationId: string): Promise<AiToolEntry> {

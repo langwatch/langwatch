@@ -8,6 +8,7 @@ import {
   EMAIL_RX,
   InvalidEmailRecipientError,
   NOTIFY_TRIGGER_ACTIONS,
+  TriggerAction,
   TriggerActionUnsupportedError,
   type AutomationAction,
   type AutomationFilters,
@@ -147,4 +148,11 @@ export function notifyingActionOr(
   }
 
   return action;
+}
+
+/** Whether an email draft carries a recipient list to check the shape of. */
+export function namesEmailRecipients(
+  input: Readonly<{ action: AutomationAction; actionParams: { members?: string[] | undefined } }>,
+): boolean {
+  return input.action === TriggerAction.SEND_EMAIL && (input.actionParams.members?.length ?? 0) > 0;
 }

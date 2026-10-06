@@ -1,5 +1,6 @@
 import { createDecipheriv } from "node:crypto";
 
+import { studioClientEventSchema } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { LambdaWorkflowStudioStreamChannel } from "../aws.lambda-workflow-studio-stream.channel.ts";
@@ -14,10 +15,27 @@ const SECRET = "tok_live_partner_123";
 
 const INPUT: WorkflowStudioStreamInput = {
   projectId: "project-1",
-  body: {
+  body: studioClientEventSchema.parse({
     type: "execute_flow",
-    payload: { workflow: { secrets: { PARTNER_TOKEN: SECRET } } },
-  } as unknown as WorkflowStudioStreamInput["body"],
+    payload: {
+      trace_id: "trace-1",
+      workflow: {
+        workflow_id: "wf-1",
+        api_key: "k",
+        spec_version: "1.4",
+        name: "Test",
+        icon: "x",
+        description: "x",
+        version: "1.0",
+        template_adapter: "default",
+        default_llm: { model: "openai/gpt-5-mini" },
+        nodes: [],
+        edges: [],
+        state: { execution: { status: "idle" } },
+        secrets: { PARTNER_TOKEN: SECRET },
+      },
+    },
+  }),
   origin: "workflow",
 };
 

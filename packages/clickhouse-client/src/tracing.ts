@@ -6,8 +6,8 @@
 
 import { nowInstant } from "@langwatch/time";
 
-import { quietly } from "./observability.ts";
 import type { QueryRequest, QueryResult } from "./query.ts";
+import { quietly } from "./resilience.ts";
 
 /**
  * A failure, reduced to what is safe to ship — never the raw error, since a

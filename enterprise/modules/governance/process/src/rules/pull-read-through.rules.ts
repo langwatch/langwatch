@@ -3,7 +3,7 @@
 import type { PullResult } from "@langwatch/enterprise-governance-contract";
 import { Temporal } from "@langwatch/time";
 
-export type PullReadThrough = { outcome: "read-through"; at: number } | { outcome: "read-nowhere" };
+type PullReadThrough = { outcome: "read-through"; at: number } | { outcome: "read-nowhere" };
 
 /** A stamp with an offset, as epoch ms; none when it carries no offset or is malformed. */
 function offsetEpochMs(stamp: string): number[] {

@@ -9,7 +9,10 @@ import {
   MigrationDrainProofRequiresMigratedError,
   MigrationStateNotFoundError,
 } from "@langwatch/ops-contract";
-import { SystemMigrationRecordNotFoundError } from "@langwatch/system-migrations";
+import {
+  type MigrationPassSummary,
+  SystemMigrationRecordNotFoundError,
+} from "@langwatch/system-migrations";
 import { nowInstant } from "@langwatch/time";
 
 import {
@@ -25,7 +28,6 @@ import { SystemMigrationRunService } from "./system-migration-run.service.ts";
 
 export type {
   MigrationEnrollmentRecord,
-  MigrationOverview,
   SystemMigrationEnrollmentStore,
   SystemMigrationStateReader,
 } from "../rules/system-migration-support.rules.ts";
@@ -173,8 +175,13 @@ export class SystemMigrationsService {
       logger.debug("no parked or held tenant; skipping the system migration re-drive");
       return;
     }
-    const summary = await this.deps.runPass();
+    const summary = await this.deps.runPass({});
     logger.info({ summary, redrive }, "system migration pass complete");
+  }
+
+  /** One pass of the startup convergence the tasks process drives, stopping at `signal`. */
+  runConvergencePass({ signal }: { signal: AbortSignal }): Promise<MigrationPassSummary> {
+    return this.deps.runPass({ signal });
   }
 
   /**

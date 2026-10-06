@@ -143,6 +143,7 @@ describe("given a project whose FAST role default is a codex model", () => {
 
   describe.each(cases)("when the run is prefetched for a $label target", ({ label, agent }) => {
     /** @scenario Coding defaults never break a simulation run */
+    /** @scenario "A project whose FAST/coding default is codex still runs workflow, code, and http simulations" */
     it("prefetches successfully instead of hitting the codex coding-assistant backstop", async () => {
       const target: TargetConfig = { type: label, referenceId: agent.id };
 

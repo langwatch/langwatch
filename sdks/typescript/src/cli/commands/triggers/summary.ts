@@ -48,18 +48,22 @@ export function summariseGraphAlert({
   return `${text({ value: graphAlert.seriesName, fallback: "series" })} ${symbol} ${text({ value: graphAlert.threshold, fallback: "?" })} over ${text({ value: graphAlert.timePeriod, fallback: "?" })}m${graph}`;
 }
 
+function reportTarget({ source }: { source: Record<string, unknown> }): string {
+  if (source.kind === "dashboard") {
+    return `dashboard ${text({ value: source.dashboardId, fallback: "?" })}`;
+  }
+  if (source.kind === "customGraph") {
+    return `graph ${text({ value: source.customGraphId, fallback: "?" })}`;
+  }
+  if (source.kind === "traceQuery") return "trace table";
+  return text({ value: source.kind, fallback: "report" });
+}
+
 export function summariseReport({ report }: { report: Loose }): string | undefined {
   if (!report) return undefined;
   const source = isRecord(report.source) ? report.source : {};
   const schedule = isRecord(report.schedule) ? report.schedule : {};
-  const target =
-    source.kind === "dashboard"
-      ? `dashboard ${text({ value: source.dashboardId, fallback: "?" })}`
-      : source.kind === "customGraph"
-        ? `graph ${text({ value: source.customGraphId, fallback: "?" })}`
-        : source.kind === "traceQuery"
-          ? "trace table"
-          : text({ value: source.kind, fallback: "report" });
+  const target = reportTarget({ source });
   const compare = report.compareToPrevious ? ", vs previous" : "";
   return `${target} at "${text({ value: schedule.cron, fallback: "?" })}" ${text({ value: schedule.timezone, fallback: "" })}${compare}`.trimEnd();
 }

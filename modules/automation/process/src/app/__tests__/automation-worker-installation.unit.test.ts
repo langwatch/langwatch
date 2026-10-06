@@ -19,19 +19,17 @@ import { DispatchError, EventSourcing, InMemoryProcessStore } from "@langwatch/e
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { NotificationService, SendEmailCommand } from "@langwatch/notification-contract";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createLogger } from "@langwatch/observability";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import type { SlackApi } from "@langwatch/slack-contract";
-import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WebhookApi, WebhookSendRequest } from "@langwatch/webhook-contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 import {
   createSettlementProjects,
@@ -48,6 +46,7 @@ const CONFIG: AutomationServerConfig = {
   persistDailyCapFree: 50,
   persistDailyCapPaid: 500,
   persistDailyCapEnterprise: 5_000,
+  publicBaseUrl: "https://app.langwatch.test",
 };
 
 function eventingFor(role: "api" | "worker"): EventSourcing {
@@ -77,26 +76,31 @@ type Installed = Readonly<{
   authz?: AuthzApi;
   notification?: NotificationService;
   webhook?: WebhookApi;
-  logger?: ReturnType<typeof createTestLogger>["logger"];
 }>;
 
-function composed(role: "api" | "worker", eventing: EventSourcing, installed: Installed = {}) {
+function composed(role: "api" | "worker", eventing: EventSourcing) {
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: { NEXTAUTH_SECRET: "session-secret" } }).withEnv(),
   );
   return createApp({ role, secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(automationProcessModule)])
+    .withModules([automationProcessModule])
     .withConfig({ automation: CONFIG })
     .withStores(memoryStores())
-    .withEventing(eventing)
-    .withKeyvalue(memoryRedisDouble())
-    .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
-    .withMember("encryption", {
-      encrypt: (value: string) => value,
-      decrypt: (value: string) => value,
-    })
-    .withMember("publicBaseUrl", "https://app.langwatch.test")
-    .withMember("logging", installed.logger ?? createTestLogger().logger);
+    .withEventing(eventing);
+}
+
+/** What automation's own logger writes during one test, read off the module's named logger. */
+function automationLogLines(): unknown[] {
+  const logger = createLogger("langwatch:automation");
+  const lines: unknown[] = [];
+  const capture = (fields: unknown) => void lines.push(fields);
+  for (const level of ["error", "warn", "info", "debug"] as const) {
+    vi.spyOn(logger, level).mockImplementation(capture as never);
+  }
+  onTestFinished(() => {
+    vi.restoreAllMocks();
+  });
+  return lines;
 }
 
 function peers(installed: Installed = {}) {
@@ -119,7 +123,7 @@ function peers(installed: Installed = {}) {
 }
 
 function process(role: "api" | "worker", eventing: EventSourcing, installed: Installed = {}) {
-  return composed(role, eventing, installed).provide(peers(installed));
+  return composed(role, eventing).provide(peers(installed));
 }
 
 /** A worker whose process supplies every peer but `absent`. */
@@ -229,8 +233,12 @@ function tracesHolding(traceIds: string[]): TraceApi {
   });
 }
 
-function planWithCeiling(ceiling: number): EntitlementApi {
+function planWithCeiling(
+  ceiling: number,
+  nextStep?: EntitlementApi["resolvePlanNextStep"],
+): EntitlementApi {
   return createApiFixture<EntitlementApi>({
+    ...(nextStep ? { resolvePlanNextStep: nextStep } : {}),
     getActivePlan: async () => ({
       planSource: "subscription",
       type: "LAUNCH",
@@ -386,10 +394,9 @@ describe("given a memory-tier worker settling a match end to end", () => {
 
     /** @scenario "A confirmed match is held to the ceiling this project's plan grants" */
     it("appends inside the plan's ceiling and records the breach against it", async () => {
-      const { logger, lines } = createTestLogger();
+      const lines = automationLogLines();
       const appended: string[] = [];
       const worker = await settlingWorker({
-        logger,
         trace: tracesHolding(["trace-1", "trace-2"]),
         entitlement: planWithCeiling(1),
         dataset: createApiFixture<DatasetApi>({
@@ -500,13 +507,14 @@ function organizationOf(members: { email: string; role: "ADMIN" | "MEMBER" }[]):
 
 async function breachedWorker(input: {
   filters: CreateTriggerCommand["filters"];
+  nextStep?: EntitlementApi["resolvePlanNextStep"];
   countTracesInLastDay: TraceApi["countTracesInLastDay"];
 }) {
   const { notification, sent } = capturingMail();
   const appended: string[] = [];
   const worker = await settlingWorker({
     notification,
-    entitlement: planWithCeiling(1),
+    entitlement: planWithCeiling(1, input.nextStep),
     authz: organizationOf([
       { email: "admin@acme.test", role: "ADMIN" },
       { email: "member@acme.test", role: "MEMBER" },
@@ -566,6 +574,39 @@ describe("given a memory-tier worker whose automation passes its plan's ceiling"
     expect(trigger.active).toBe(true);
     expect(sent.map(({ to }) => to)).toEqual(["admin@acme.test"]);
     expect(counted).toEqual(["project-1"]);
+  });
+});
+
+describe("given a memory-tier worker pricing its plans", () => {
+  /** @scenario "A ceiling notice sent from the background process offers the same next tier" */
+  it("names the next self-serve tier, at its own price, in the ceiling mail", async () => {
+    const asked: Parameters<EntitlementApi["resolvePlanNextStep"]>[0][] = [];
+    const { sent } = await breachedWorker({
+      filters: { "metadata.labels": ["checkout"] },
+      countTracesInLastDay: async () => 1_000_000,
+      nextStep: async (input) => {
+        asked.push(input);
+        return {
+          kind: "self_serve",
+          tier: "GROWTH",
+          name: "Growth-marker",
+          monthlyPrice: 12_345,
+          currency: "EUR",
+          pricedPerSeat: false,
+          maxMessagesPerMonth: 1,
+          maxMembers: 1,
+          automationDailyDispatchCeiling: 777,
+        };
+      },
+    });
+
+    expect(asked).toEqual([expect.objectContaining({ organizationId: "organization-1" })]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.html).toContain("Growth-marker");
+    expect(sent[0]?.html).toContain("12,345");
+    expect(sent[0]?.html).toContain(
+      "https://app.langwatch.test/settings/subscription/checkout/growth",
+    );
   });
 });
 

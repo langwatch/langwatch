@@ -65,7 +65,9 @@ export const joinRequestTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("admitAutomatically")
   .noPermission(OWN_DOMAIN_ADMISSION_ONLY)
-  .handle(({ app, actor }) => app.admitAutomatically({ userId: actor.id }))
+  .handle(({ app, input, actor }) =>
+    app.admitAutomatically({ userId: actor.id, origin: input.origin }),
+  )
 
   .procedure("mine")
   .noPermission(OWN_PENDING_REQUESTS)
@@ -74,7 +76,11 @@ export const joinRequestTrpcTransport: TrpcRouterDeclaration<
   .procedure("request")
   .noPermission(OFFERED_ORGANIZATION_ONLY)
   .handle(({ app, input, actor }) =>
-    app.fileJoinRequest({ userId: actor.id, organizationId: input.organizationId }),
+    app.fileJoinRequest({
+      userId: actor.id,
+      organizationId: input.organizationId,
+      origin: input.origin,
+    }),
   )
 
   .procedure("withdraw")
@@ -138,6 +144,7 @@ export const joinRequestTrpcTransport: TrpcRouterDeclaration<
       organizationId: input.organizationId,
       domainJoin: input.domainJoin,
       domains: input.domains,
+      joinerRole: input.joinerRole,
       actorUserId: actor.id,
     }),
   )

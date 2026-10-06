@@ -1,6 +1,6 @@
 # @langwatch/process: runtime composition
 
-Feature declarations construct nothing. `await application.boot({ role })`
+Feature declarations construct nothing. `await application.boot()`
 validates dependencies and constructs the graph. `runtime.start()` starts its
 registered services; `runtime.stop()` closes them in reverse order before
 releasing feature resources. Concurrent calls share their lifecycle result.
@@ -19,4 +19,4 @@ a boot or start failure remains the cause when its cleanup also fails.
 
 `ResourceScope` implements close-once resource ownership. `GracefulShutdown`
 adds process signal handling and deadlines. See
-[ADR-133](../../../dev/docs/adr/133-composition-spec.md) for the shared contract.
+[ARCHITECTURE.md §4 and §5](../../dev/docs/ARCHITECTURE.md#4-a-process-whole) for the shared contract.

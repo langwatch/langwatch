@@ -26,7 +26,7 @@ const NAVIGATE_ORGANIZATION_PAGES: Record<string, string> = {
 };
 
 /** A page's path, and whether it sits under the project slug or at the top level. */
-export type NavigatePage = { scope: "project" | "organization"; path: string };
+type NavigatePage = { scope: "project" | "organization"; path: string };
 
 /**
  * The page this name addresses, or null when the name is not a page. Matched

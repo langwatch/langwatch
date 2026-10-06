@@ -27,14 +27,15 @@ an expired or unrecognised access token is answered 401 with a challenge.
 ## Dependencies
 
 `ProjectApi`, `AuthzApi` (grant re-checks), `AuthApi` (access and refresh
-tokens) and `GovernanceRestApi` (session tools). Members read: `redis`,
-`encryption`, `publicBaseUrl`.
+tokens) and `GovernanceRestApi` (session tools). Config: `publicBaseUrl`.
+The live repository tier requires `redis` and `encryption`; the memory tier
+requires nothing.
 
 ## Persistence
 
-OAuth clients, authorization codes and sessions in Redis, with memory twins
-for clients and sessions. The session relay is a channel with Redis and
-memory tiers.
+OAuth clients, authorization codes and sessions in Redis, with memory twins.
+The session relay is Redis pub/sub, built in the live repositories bundle
+beside them, with a memory twin (presence's broadcast repository precedent).
 
 ## Runtime and registration
 

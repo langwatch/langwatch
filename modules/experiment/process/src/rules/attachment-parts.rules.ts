@@ -12,14 +12,14 @@ export type AttachmentBytes = {
 };
 
 /** A data URL read back into its parts. */
-export type ParsedAttachmentDataUrl = {
+type ParsedAttachmentDataUrl = {
   mediaType: string;
   base64: string;
   name?: string;
 };
 
 /** What an attachment looks like inside a message the agent reads. */
-export type AttachmentContentPart =
+type AttachmentContentPart =
   | { type: "image_url"; image_url: { url: string } }
   | { type: "input_audio"; input_audio: { data: string; format: string } }
   | { type: "file"; file: { filename: string; file_data: string } };
@@ -41,14 +41,13 @@ export const attachmentDataUrl = ({ mediaType, bytes, name }: AttachmentBytes): 
 };
 
 /** Whether the media type names an image. */
-export const isImageType = (mediaType: string): boolean =>
-  mediaType.toLowerCase().startsWith("image/");
+const isImageType = (mediaType: string): boolean => mediaType.toLowerCase().startsWith("image/");
 
 /**
  * A base64 data URL read back into its parts, or nothing. Only the base64 form:
  * the run writes no other, and a text data URL carries no attachment.
  */
-export const parseAttachmentDataUrl = (value: string): ParsedAttachmentDataUrl | null => {
+const parseAttachmentDataUrl = (value: string): ParsedAttachmentDataUrl | null => {
   if (!value.startsWith("data:")) return null;
   const commaIndex = value.indexOf(",");
   if (commaIndex === -1) return null;

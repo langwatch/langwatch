@@ -4,7 +4,7 @@
  * Enterprise gates the FEATURE, not the PAGE — never a missing page.
  */
 
-import { UiSlot } from "@langwatch/browser-host/slots";
+import { Lent } from "@langwatch/browser-host/lent";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import {
@@ -22,6 +22,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ContactSalesToken } from "@langwatch/enterprise-billing-contract";
 import { Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -85,7 +86,7 @@ export default function GroupsScreen() {
           </Alert.Content>
         </Alert.Root>
         <Box width="full">
-          <UiSlot name="contactSales" props={{}} />
+          <Lent of={ContactSalesToken} props={{}} />
         </Box>
       </VStack>
     );

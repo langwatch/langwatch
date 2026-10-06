@@ -45,6 +45,7 @@ export interface FinishRunDeps {
   loadOrganizationAdmin?: (projectId: string) => Promise<{
     userId: string | null;
     onboardingVariant?: NonNullable<OrganizationAdmin>["onboardingVariant"];
+    organizationCreatedAt?: { epochMilliseconds: number } | null;
   }>;
 }
 
@@ -136,7 +137,7 @@ function buildFinishResults({
  * Command handler for finishing runs: emits RunFinished with event-carried
  * state (identity, traceIds; optional deps for backward compat).
  */
-export class FinishRunAdapter implements CommandHandler<
+class FinishRunAdapter implements CommandHandler<
   Command<FinishRunCommandData>,
   SimulationProcessingEvent
 > {
@@ -308,8 +309,15 @@ export class FinishRunAdapter implements CommandHandler<
   }): Promise<OrganizationAdmin> {
     if (!this.deps?.loadOrganizationAdmin) return undefined;
     try {
-      const { userId, onboardingVariant } = await this.deps.loadOrganizationAdmin(tenantId);
-      return userId ? { userId, onboardingVariant } : undefined;
+      const { userId, onboardingVariant, organizationCreatedAt } =
+        await this.deps.loadOrganizationAdmin(tenantId);
+      return userId
+        ? {
+            userId,
+            onboardingVariant,
+            organizationCreatedAt: organizationCreatedAt?.epochMilliseconds,
+          }
+        : undefined;
     } catch (error) {
       logger.warn(
         { tenantId, scenarioRunId, error },

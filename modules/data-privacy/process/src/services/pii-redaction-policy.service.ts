@@ -54,14 +54,12 @@ export type BatchClearPIIFunction = (
 export type PiiAnalysisItem = { text: string; isNameExempt: boolean };
 
 /** The tenant's native-redaction context, or the analysis-service path when none applies. */
-export type NativeContext =
+type NativeContext =
   | { kind: "native"; policy: ResolvedDataPrivacy; level: PiiLevel }
   | { kind: "analysis" };
 
 /** The options for one analysis-service call, or the reason nothing is sent. */
-export type RedactionOptions =
-  | { kind: "redact"; options: PIICheckOptions }
-  | { kind: "skip_redaction" };
+type RedactionOptions = { kind: "redact"; options: PIICheckOptions } | { kind: "skip_redaction" };
 
 /**
  * Dependencies for OtlpSpanPiiRedactionService that can be injected for testing.

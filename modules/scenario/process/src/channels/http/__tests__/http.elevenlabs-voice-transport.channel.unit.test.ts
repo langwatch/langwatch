@@ -319,8 +319,8 @@ describe("isAcceptableSignedUrl and the dev loopback switch", () => {
   const VOICESIM_SOCKET = "ws://127.0.0.1:5591/v1/convai/conversation?agent_id=a";
   afterEach(() => vi.unstubAllGlobals());
 
-  /** @scenario The product reaches a loopback voice host only under the dev switch */
   describe("when the switch is off", () => {
+    /** @scenario "The product reaches a loopback voice host only under the dev switch" */
     it.each([VOICESIM_SOCKET, "ws://localhost:5591/v1/convai/conversation"])(
       "refuses the loopback socket %s",
       (signedUrl) => {
@@ -330,6 +330,7 @@ describe("isAcceptableSignedUrl and the dev loopback switch", () => {
       },
     );
 
+    /** @scenario "The product reaches a loopback voice host only under the dev switch" */
     it("refuses voicesim's socket through the transport", async () => {
       mockFetchOnce({ json: async () => ({ signed_url: VOICESIM_SOCKET }) });
       await expect(

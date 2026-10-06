@@ -19,7 +19,7 @@ export function refusedIssuersIn(values: readonly unknown[]): string[] {
   });
 }
 
-export type IssuerMismatchRedirect = { kind: "pass" } | { kind: "rewrite"; location: string };
+type IssuerMismatchRedirect = { kind: "pass" } | { kind: "rewrite"; location: string };
 
 /**
  * The engine's generic token refusal, rewritten to `sso_issuer_mismatch` with

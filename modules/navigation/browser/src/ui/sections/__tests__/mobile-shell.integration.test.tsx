@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Spec: specs/navigation/mobile-chrome.feature
+ * Spec: modules/navigation/specs/mobile-chrome.feature
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -47,6 +47,7 @@ function readyState(overrides: Partial<NavigationShellReadyState> = {}): Navigat
     currentRoute: undefined,
     activeProductId: "llm-ops",
     isSettingsRoute: false,
+    seatRefusal: null,
     showDevelopmentIndicator: false,
     isCompactSidebar: false,
     isMobile: true,

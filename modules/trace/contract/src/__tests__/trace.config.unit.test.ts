@@ -1,7 +1,7 @@
 import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
-import { traceConfig } from "../trace.config.ts";
+import { traceConfig } from "../trace.constants.ts";
 
 const read = (environment: Record<string, string | undefined>) =>
   parseProcessConfig({ owners: [{ name: "trace", config: traceConfig }], environment }).trace;

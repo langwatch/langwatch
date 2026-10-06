@@ -1,7 +1,19 @@
 import type { MetricPiiRedactionLevel } from "@langwatch/metric-contract";
 
-import type { MetricRedaction } from "../app/metric.members.ts";
 import { isRecord, type UnknownRecord } from "../rules/metric-serialization.rules.ts";
+
+/** Private redaction dependency for metric preparation. */
+export interface MetricRedaction {
+  redactMetricAttributes(
+    input: {
+      attributes: Record<string, string>;
+      resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
+    },
+    level: MetricPiiRedactionLevel,
+    tenantId?: string,
+  ): Promise<void>;
+}
 
 type StringRef = {
   owner: UnknownRecord;

@@ -10,6 +10,8 @@ import {
   composeIdentityPipeline,
   type IdentityPipeline,
 } from "../../eventing/user-identity.pipeline.ts";
+import { MemoryIdentityHistoryRepository } from "../../repositories/memory/memory.identity-history.repository.ts";
+import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 
 const USER = "user_sam";
 const IDENTIFIER = "idf_1";
@@ -75,6 +77,7 @@ function compose() {
   const recording = recordingDatabase();
   const pipeline: IdentityPipeline = composeIdentityPipeline({
     repositories: liveRepositories(recording.database),
+    history: MemoryIdentityHistoryRepository.create(MemoryIdentityStore.create()),
   });
   return { ...recording, pipeline };
 }

@@ -13,6 +13,7 @@ Feature: Gateway budget decision service
     When the Gateway checks a request for another provider
     Then that budget is absent from the scopes response
 
+  @unit
   Scenario: The process owns one budget decision service
     Given the API, CLI, and Gateway routes use the application instance
     When multiple requests perform budget checks
@@ -47,6 +48,12 @@ Feature: Gateway budget decision service
     Given a page of budgets, one of which no active key can reach
     When the budget list is answered
     Then each row carries scope_reach from the same per-row reach read the detail route uses
+
+  @integration
+  Scenario: A budget read on its own carries its scope reach
+    Given a budget no active key can reach
+    When the budget is read by id
+    Then the answer carries scope_reach "unreachable", as its row in the budget list does
 
   @integration
   Scenario: A budget reset answers with the row it moved, carrying no reach read

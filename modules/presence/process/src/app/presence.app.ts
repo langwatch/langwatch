@@ -1,31 +1,31 @@
 import type { EventEmitter } from "node:events";
 
+import { createLogger } from "@langwatch/observability";
 import {
   type PresenceBroadcastFabric,
   PresenceApi,
   type PresenceApi as PresenceApiContract,
   type PresenceCursorSubscription,
-  type PresenceCursorTickInput,
-  type PresenceHeartbeatInput,
+  type PresenceCursorInput,
   type PresenceLeaveInput,
   type PresenceProjectInput,
   type PresenceProjectEvent,
   type PresenceSession,
   type PresenceTenantEmitter,
-  type PresenceUser,
+  type PresenceUpdateInput,
   type PresenceCursorEvent,
   type PresenceEvent,
   type ReadHint,
   type ReadHintsWatchInput,
 } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
-import { UserApi } from "@langwatch/user-contract";
-import type { Cluster, Redis } from "ioredis";
 
+import {
+  buildPresenceSettingsPipeline,
+  type PresenceSettingsPipeline,
+} from "../eventing/presence-settings.pipeline.ts";
 import type { PresenceRepositories } from "../repositories/presence.repositories.ts";
-import { RedisBroadcastRepository } from "../repositories/redis/redis.broadcast.repository.ts";
-import { BroadcastTenantRateLimiterService } from "../services/broadcast-tenant-rate-limiter.service.ts";
+import { PresenceSettingsService } from "../services/presence-settings.service.ts";
 import { PresenceStreamService } from "../services/presence-stream.service.ts";
 import { PresenceService } from "../services/presence.service.ts";
 import { ReadHintStreamService } from "../services/read-hint-stream.service.ts";
@@ -50,97 +50,81 @@ export interface PresenceEmitter {
   cleanupTenantEmitter(tenantId: string): void;
 }
 
-/**
- * The closed members presence derives its broadcast fabric from: shared Redis (or null, degraded)
- * and a warning sink. `broadcast`/`emitters`/`diagnostics` are a test-only seam, absent in
- * production.
- */
-type PresenceProcessMembers = Readonly<{
-  redis: Redis | Cluster | null;
-  logger: Readonly<{ warn(payload: Readonly<Record<string, unknown>>, message: string): void }>;
-  broadcast?: PresenceBroadcast;
-  emitters?: PresenceEmitter;
-  diagnostics?: PresenceDiagnostics;
-}>;
-
 type PresenceSetup = FeatureSetup<
   typeof PresenceModule.dependencies,
-  PresenceProcessMembers,
+  never,
   undefined,
   PresenceRepositories
 >;
 
 export class PresenceModule implements PresenceApiContract, PresenceBroadcastFabric {
   static readonly contract = PresenceApi;
-  static readonly dependencies = { projects: ProjectApi, users: UserApi };
-  static readonly reads = ["redis", "logger"] as const;
+  static readonly dependencies = {};
 
   readonly #presence: PresenceService;
+  readonly #settings: PresenceSettingsService;
   readonly #stream: PresenceStreamService;
   readonly #readHints: ReadHintStreamService;
-  readonly #users: UserApi;
   /** The same fabric {@link PresenceBroadcastFabric} exposes to a peer. */
   readonly #emitters: PresenceEmitter;
   readonly #broadcast: PresenceBroadcast;
 
   private constructor({
     presence,
+    settings,
     stream,
     readHints,
-    users,
     emitters,
     broadcast,
   }: {
     presence: PresenceService;
+    settings: PresenceSettingsService;
     stream: PresenceStreamService;
     readHints: ReadHintStreamService;
-    users: UserApi;
     emitters: PresenceEmitter;
     broadcast: PresenceBroadcast;
   }) {
     this.#presence = presence;
+    this.#settings = settings;
     this.#stream = stream;
     this.#readHints = readHints;
-    this.#users = users;
     this.#emitters = emitters;
     this.#broadcast = broadcast;
   }
 
-  static create({ repositories, members, dependencies, resources }: PresenceSetup): PresenceModule {
-    const needsDerivedFabric = !members.broadcast || !members.emitters;
-    const derived = needsDerivedFabric
-      ? RedisBroadcastRepository.create(members.redis, {
-          sender: BroadcastTenantRateLimiterService.create(),
-          subscriber: BroadcastTenantRateLimiterService.create(),
-        })
-      : undefined;
-    if (derived) {
-      resources.ownService({
-        name: "presence-broadcast",
-        start: () => derived.start(),
-        stop: () => derived.close(),
-      });
-    }
-    const broadcast: PresenceBroadcast = members.broadcast ?? derived!;
-    const emitters: PresenceEmitter = members.emitters ?? derived!;
-    const diagnostics: PresenceDiagnostics = members.diagnostics ?? {
-      warn: (message, context) => members.logger.warn(context, message),
+  static create({ repositories, resources }: PresenceSetup): PresenceModule {
+    const { broadcast } = repositories;
+    resources.ownService({
+      name: "presence-broadcast",
+      start: () => broadcast.start(),
+      stop: () => broadcast.close(),
+    });
+    const emitters: PresenceEmitter = broadcast;
+    const logger = createLogger("langwatch:presence");
+    const diagnostics: PresenceDiagnostics = {
+      warn: (message, context) => logger.warn(context, message),
     };
+    const settings = PresenceSettingsService.create({ repository: repositories.settings });
     const presence = PresenceService.create({
       repository: repositories.sessions,
       broadcast,
-      projects: dependencies.projects,
+      settings,
       diagnostics,
     });
 
     return new PresenceModule({
       presence,
+      settings,
       stream: PresenceStreamService.create({ presence, emitters }),
       readHints: ReadHintStreamService.create({ emitters }),
-      users: dependencies.users,
       emitters,
       broadcast,
     });
+  }
+
+  /** The pipeline whose peer subscribers fold the presence-setting facts. */
+  settingsPipeline(): PresenceSettingsPipeline {
+    return buildPresenceSettingsPipeline({ settings: this.#settings });
   }
 
   /** {@link PresenceBroadcastFabric}: the tenant's live-update signals. */
@@ -163,15 +147,10 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
     return this.#presence.isEnabledForProject(input);
   }
 
-  async update(input: PresenceHeartbeatInput): Promise<void> {
+  async update(input: PresenceUpdateInput): Promise<void> {
     if (!(await this.#presence.isEnabledForProject({ projectId: input.projectId }))) return;
 
-    await this.#presence.update({
-      projectId: input.projectId,
-      sessionId: input.sessionId,
-      user: await this.#presenting(input.userId),
-      location: input.location,
-    });
+    await this.#presence.update(input);
   }
 
   async leave(input: PresenceLeaveInput): Promise<void> {
@@ -184,15 +163,10 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
     return this.#presence.list(input);
   }
 
-  async broadcastCursor(input: PresenceCursorTickInput): Promise<void> {
+  async broadcastCursor(input: PresenceCursorInput): Promise<void> {
     if (!(await this.#presence.isEnabledForProject({ projectId: input.projectId }))) return;
 
-    await this.#presence.broadcastCursor({
-      projectId: input.projectId,
-      sessionId: input.sessionId,
-      user: await this.#presenting(input.userId),
-      payload: input.payload,
-    });
+    await this.#presence.broadcastCursor(input);
   }
 
   events(input: PresenceProjectInput & { signal?: AbortSignal }): AsyncGenerator<PresenceEvent> {
@@ -213,16 +187,5 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
   }: ReadHintsWatchInput & { signal?: AbortSignal }): AsyncIterable<ReadHint> {
     const tenantIds = [userId, organizationId, ...(projectId === undefined ? [] : [projectId])];
     return this.#readHints.watch({ tenantIds, ...(signal === undefined ? {} : { signal }) });
-  }
-
-  /**
-   * The person peers see, read from the directory by the id the boundary
-   * authenticated — never from the payload, which would let one member publish
-   * a session under another member's name and avatar.
-   */
-  async #presenting(userId: string): Promise<PresenceUser> {
-    const profile = await this.#users.findById({ id: userId });
-
-    return { id: userId, name: profile?.name ?? null, image: profile?.image ?? null };
   }
 }

@@ -19,7 +19,7 @@ import (
 // provider that actually served the request"), contract §4.5.
 
 func TestEmitter_ModelProviderID_StampedOnSpan(t *testing.T) {
-	span := recordSpanForParams(t, aitrace.AITraceParams{
+	span := recordSpanForParams(t, aitrace.Params{
 		ProviderID:      aitrace.ProviderOpenAI,
 		Model:           "gpt-5-mini",
 		VirtualKeyID:    "vk_1",
@@ -36,7 +36,7 @@ func TestEmitter_ModelProviderID_StampedOnSpan(t *testing.T) {
 // provider to attribute; the attribute must be absent so the fold debits
 // unfiltered budgets only instead of guessing a vendor.
 func TestEmitter_NoModelProviderID_NoAttribute(t *testing.T) {
-	span := recordSpanForParams(t, aitrace.AITraceParams{
+	span := recordSpanForParams(t, aitrace.Params{
 		ProviderID:   aitrace.ProviderOpenAI,
 		Model:        "gpt-5-mini",
 		VirtualKeyID: "vk_1",

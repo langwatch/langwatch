@@ -39,7 +39,7 @@ type BetterAuthRefusal = Readonly<{
  * Main's per-family table (handled-errors.ts): a code is named only where the cause is known and
  * the caller can act, and causes a caller must not tell apart share one code.
  */
-export const BETTER_AUTH_REFUSALS: readonly BetterAuthRefusal[] = [
+const BETTER_AUTH_REFUSALS: readonly BetterAuthRefusal[] = [
   {
     family: "/two-factor/",
     betterAuthCode: "INVALID_CODE",

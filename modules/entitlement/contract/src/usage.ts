@@ -14,6 +14,12 @@ export type MessageLimitStatus = z.infer<typeof messageLimitStatusSchema>;
 export const usageUnitSchema = z.enum(["traces", "events"]);
 export type UsageUnit = z.infer<typeof usageUnitSchema>;
 
+/** How a plan's counting unit reads on an alert, as main labelled it. */
+export const USAGE_UNIT_DISPLAY_LABELS: Record<UsageUnit, string> = {
+  traces: "Monthly Traces",
+  events: "Monthly Events",
+};
+
 /**
  * Copy is pre-formatted so the sidebar, settings, and email cannot render it differently.
  */
@@ -45,6 +51,8 @@ export const usageStatsSchema = z
     maxMonthlyUsageLimit: z.number(),
     membersCount: z.number(),
     membersLiteCount: z.number(),
+    /** Developer seats (ADR-171): shown beside the metered seats, never capped. */
+    membersDeveloperCount: z.number(),
     messageLimitInfo: messageLimitInfoSchema,
     usageUnit: usageUnitSchema,
   })

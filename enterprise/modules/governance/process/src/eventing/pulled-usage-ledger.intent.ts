@@ -1,7 +1,7 @@
-import { Temporal } from "@langwatch/time";
+import type { PulledUsagePricedEventData } from "@langwatch/enterprise-governance-contract";
 import { z } from "zod";
 
-import { type PulledUsageLedgerRepository } from "../app/governance.members.ts";
+import type { RetractCommandEnvelope } from "./pulled-usage-retraction.intent.ts";
 
 export const writePulledUsageSchema = z.object({
   restatement_key: z.string(),
@@ -25,28 +25,37 @@ export const writePulledUsageSchema = z.object({
 
 export type WritePulledUsagePayload = z.infer<typeof writePulledUsageSchema>;
 
-export class PulledUsageLedgerIntent {
-  private constructor(private readonly ledger: PulledUsageLedgerRepository) {}
+/** Where a priced observation goes: governance's own `recordPulledUsagePriced` command. */
+export interface PulledUsagePricingDeps {
+  sendRecordPulledUsagePriced: (
+    data: PulledUsagePricedEventData & RetractCommandEnvelope,
+  ) => Promise<void>;
+}
 
-  static create(ledger: PulledUsageLedgerRepository): PulledUsageLedgerIntent {
-    return new PulledUsageLedgerIntent(ledger);
+/** Records the priced fact; gateway's ledger subscribes and debits it (Q208C, Alex 2026-10-06). */
+export class PulledUsageLedgerIntent {
+  private constructor(private readonly deps: PulledUsagePricingDeps) {}
+
+  static create(deps: PulledUsagePricingDeps): PulledUsageLedgerIntent {
+    return new PulledUsageLedgerIntent(deps);
   }
 
   async execute(payload: WritePulledUsagePayload): Promise<void> {
-    await this.ledger.insert([
-      {
-        tenantId: payload.tenant_id,
-        scopeId: payload.scope_id,
-        restatementKey: payload.restatement_key,
-        amountNanoUsd: payload.cost_nano_usd,
-        tokensInput: payload.tokens_input,
-        tokensOutput: payload.tokens_output,
-        tokensCacheRead: payload.tokens_cache_read,
-        tokensCacheWrite: payload.tokens_cache_write,
-        model: payload.model,
-        occurredAt: Temporal.Instant.fromEpochMilliseconds(payload.occurred_at_ms),
-        observedAt: Temporal.Instant.fromEpochMilliseconds(payload.observed_at_ms),
-      },
-    ]);
+    await this.deps.sendRecordPulledUsagePriced({
+      tenantId: payload.tenant_id,
+      occurredAt: payload.occurred_at_ms,
+      restatementKey: payload.restatement_key,
+      organizationId: payload.organization_id,
+      teamId: payload.team_id,
+      scopeId: payload.scope_id,
+      model: payload.model,
+      amountNanoUsd: payload.cost_nano_usd,
+      tokensInput: payload.tokens_input,
+      tokensOutput: payload.tokens_output,
+      tokensCacheRead: payload.tokens_cache_read,
+      tokensCacheWrite: payload.tokens_cache_write,
+      occurredAtMs: payload.occurred_at_ms,
+      observedAtMs: payload.observed_at_ms,
+    });
   }
 }

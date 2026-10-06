@@ -14,6 +14,7 @@ import {
   type PersonalFeatures,
   type PersonalWorkspace,
   type OrganizationUsageCount,
+  type PricingModel,
 } from "@langwatch/organization-contract";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
@@ -30,6 +31,8 @@ import type {
 } from "./memory.organization.database.ts";
 
 /** In-memory `OrganizationRepository`, for tests and a memory-backed boot. */
+const BYTES_PER_MEBIBYTE = 1024 * 1024;
+
 export class MemoryOrganizationRepository extends OrganizationRepository {
   private constructor(private readonly memory: MemoryOrganizationDatabase) {
     super();
@@ -67,13 +70,22 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
 
   async findStoredSettings(organizationId: string): Promise<StoredOrganizationSettings | null> {
     const organization = this.memory.organizations.get(organizationId);
-    return organization
-      ? {
-          ...organization,
-          createdAt: toDate(organization.createdAt),
-          updatedAt: toDate(organization.updatedAt),
-        }
-      : null;
+    if (!organization) return null;
+
+    return {
+      id: organization.id,
+      name: organization.name,
+      slug: organization.slug,
+      supportContact: organization.supportContact,
+      presenceEnabled: organization.presenceEnabled,
+      traceSharingEnabled: organization.traceSharingEnabled,
+      primaryIntent: organization.primaryIntent,
+      s3Endpoint: organization.s3Endpoint,
+      s3AccessKeyId: organization.s3AccessKeyId,
+      s3Bucket: organization.s3Bucket,
+      createdAt: toDate(organization.createdAt),
+      updatedAt: toDate(organization.updatedAt),
+    };
   }
 
   async hasStoredS3Secret(organizationId: string): Promise<boolean> {
@@ -90,6 +102,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     return {
       domainJoin: organization.domainJoin ?? "request",
       joinDomains: [...(organization.joinDomains ?? [])],
+      joinerRole: organization.joinerRole ?? "MEMBER",
     };
   }
 
@@ -112,6 +125,39 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     this.requireOrganization(organizationId).maxSessionDurationDays = maxSessionDurationDays;
   }
 
+  async getPricing({ organizationId }: { organizationId: string }): Promise<{
+    pricingModel: PricingModel | null;
+    currency: "USD" | "EUR";
+  }> {
+    const organization = this.memory.organizations.get(organizationId);
+    return {
+      pricingModel: organization ? (organization.pricingModel ?? "SEAT_EVENT") : null,
+      currency: organization ? (organization.currency ?? "USD") : "EUR",
+    };
+  }
+
+  async getDatasetLimits({ organizationId }: { organizationId: string }): Promise<{
+    attachmentMaxBytes: number | null;
+  }> {
+    const megabytes = this.memory.organizations.get(organizationId)?.datasetAttachmentMaxMb ?? null;
+    return { attachmentMaxBytes: megabytes === null ? null : megabytes * BYTES_PER_MEBIBYTE };
+  }
+
+  async isInstantEvalsOptedIn({ organizationId }: { organizationId: string }): Promise<boolean> {
+    return !!this.memory.organizations.get(organizationId)?.instantEvalsEnabledAt;
+  }
+
+  async recordInstantEvalsOptIn(input: {
+    organizationId: string;
+    userId: string;
+    at: Instant;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization || organization.instantEvalsEnabledAt) return;
+    organization.instantEvalsEnabledAt = input.at;
+    organization.instantEvalsEnabledByUserId = input.userId;
+  }
+
   async saveJoinSetting({
     organizationId,
     setting,
@@ -122,6 +168,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     const organization = this.requireOrganization(organizationId);
     organization.domainJoin = setting.domainJoin;
     organization.joinDomains = [...setting.joinDomains];
+    organization.joinerRole = setting.joinerRole;
   }
 
   async getGuidedOnboarding({
@@ -184,10 +231,10 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       organization.traceSharingEnabled = input.traceSharingEnabled;
     }
     if (input.primaryIntent !== undefined) organization.primaryIntent = input.primaryIntent;
-    if (input.s3Endpoint !== undefined) organization.s3Endpoint = input.s3Endpoint;
-    if (input.s3AccessKeyId !== undefined) organization.s3AccessKeyId = input.s3AccessKeyId;
+    if (input.s3Endpoint !== undefined) organization.s3Endpoint = input.s3Endpoint || null;
+    if (input.s3AccessKeyId !== undefined) organization.s3AccessKeyId = input.s3AccessKeyId || null;
     if (input.s3SecretAccessKey !== undefined) {
-      organization.s3SecretAccessKey = input.s3SecretAccessKey;
+      organization.s3SecretAccessKey = input.s3SecretAccessKey || null;
     }
     if (input.s3Bucket !== undefined) organization.s3Bucket = input.s3Bucket || null;
     organization.updatedAt = nowInstant();
@@ -296,14 +343,21 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       createdAt: now,
       personalFeatures: null,
     });
-    this.memory.organizationUsers.push({
-      userId: input.workspace.userId,
-      organizationId: input.workspace.organizationId,
-      role: "MEMBER",
-      disabledAt: null,
-      createdAt: now,
-      updatedAt: now,
-    });
+    const alreadyMember = this.memory.organizationUsers.some(
+      (row) =>
+        row.userId === input.workspace.userId &&
+        row.organizationId === input.workspace.organizationId,
+    );
+    if (!alreadyMember) {
+      this.memory.organizationUsers.push({
+        userId: input.workspace.userId,
+        organizationId: input.workspace.organizationId,
+        role: "MEMBER",
+        disabledAt: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
 
     const created = this.findWorkspace(input.workspace);
     if (!created) throw new Error("personal workspace vanished after being written");

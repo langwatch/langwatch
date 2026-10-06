@@ -26,7 +26,7 @@ The browser package mounts the onboarding screens.
 
 ## Dependencies
 
-`OrganizationApi`, `AuthzApi`, `OpsApi` and `GatewayApi`, among others
+`OrganizationApi`, `AuthzApi` and `GatewayApi`, among others
 declared on `OnboardingModule`.
 
 ## Persistence

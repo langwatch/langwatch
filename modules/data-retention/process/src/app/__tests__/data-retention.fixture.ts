@@ -1,5 +1,4 @@
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
-import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
@@ -217,17 +216,6 @@ export function createDataRetentionTestUsers(
   });
 }
 
-/** No statement this fixture issues ever reaches a server. */
-function noopClickHouse(): ClickHouseQueryClient {
-  return new ClickHouseQueryClient({
-    driver: {
-      execute: async () => ({ rows: [] }),
-      insert: async () => {},
-      command: async () => {},
-    },
-  });
-}
-
 /** The plan entitlement answers: an enterprise plan unless a test states otherwise. */
 export function createDataRetentionTestEntitlement(
   plan: Readonly<{ free: boolean; type: string }> = { free: false, type: "ENTERPRISE" },
@@ -251,17 +239,10 @@ function testPlan(plan: Readonly<{ free: boolean; type: string }>): Plan {
   };
 }
 
-type DataRetentionTestMembers = Readonly<{
-  clickhouse: ClickHouseQueryClient;
-  nodeEnvironment: string | undefined;
-  redis: null;
-}>;
-
 export function createDataRetentionTestApp(
   input: Readonly<{
     repositories?: DataRetentionRepositories;
     directory?: DataRetentionDirectoryReader;
-    clickhouse?: ClickHouseQueryClient;
     dependencies?: Partial<{
       projects: ProjectApi;
       organizations: OrganizationApi;
@@ -272,18 +253,11 @@ export function createDataRetentionTestApp(
     platformDefaultRetentionDays?: number;
   }> = {},
 ): DataRetentionModule {
-  const members: DataRetentionTestMembers = {
-    clickhouse: input.clickhouse ?? noopClickHouse(),
-    nodeEnvironment: "test",
-    redis: null,
-  };
-
   return DataRetentionModule.create({
     repositories: input.repositories ?? {
       ...MemoryDataRetentionRepositories.create(),
       directory: input.directory ?? MemoryRetentionDirectory.create(),
     },
-    members,
     dependencies: {
       projects: input.dependencies?.projects ?? createDataRetentionTestProjects(),
       organizations: input.dependencies?.organizations ?? createDataRetentionTestOrganizations(),
@@ -294,6 +268,7 @@ export function createDataRetentionTestApp(
     config: {
       platformDefaultDays: input.platformDefaultRetentionDays?.toString(),
       isSaas: true,
+      nodeEnvironment: "test",
     },
     resources: new ResourceScope(),
     // No handle is ever resolved through it in these tests.

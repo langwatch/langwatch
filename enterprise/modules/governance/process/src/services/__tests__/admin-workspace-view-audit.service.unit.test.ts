@@ -12,7 +12,7 @@ import type {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type { GovernanceOcsfEventWriter } from "../../app/governance.members.ts";
+import type { GovernanceOcsfEventWriter } from "../../repositories/governance.repositories.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../admin-workspace-view-audit.service.ts";
 
 class RecordingAuditLog implements Pick<AuditLogApi, "record" | "hasRecordedSince"> {

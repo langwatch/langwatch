@@ -10,7 +10,6 @@ import {
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
-import type { TraceIoExtraction } from "../app/trace.members.ts";
 import {
   type ExtractedIO,
   type FlattenMode,
@@ -21,6 +20,20 @@ import {
   type SpanTreeNode,
   stringifyForText,
 } from "../rules/trace-io-text.rules.ts";
+
+export type TraceIoSide = "input" | "output";
+
+export type TraceIoValue = {
+  raw: unknown;
+  text: string;
+  source: "gen_ai" | "langwatch";
+};
+
+export interface TraceIoExtraction {
+  extractRichIOFromSpan(span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null;
+
+  extractFallbackIOFromSpan(span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null;
+}
 
 /**
  * Service for extracting input/output text from spans using tree traversal and

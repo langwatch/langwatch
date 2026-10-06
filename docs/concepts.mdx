@@ -12,7 +12,7 @@ LangWatch organizes what your LLM application sends into threads, traces and spa
 
 Field: `thread_id`
 
-Think of a **Thread** as the entire journey a user takes in a single session. It's the complete chat with your AI travel buddy, from "Where should I go?" to booking the flight. For the blog post generator, a `thread_id` bundles up the whole session – from brainstorming headlines to polishing the final SEO-optimized draft. It groups _all_ the back-and-forth interactions (Traces) for a specific task or conversation.
+Think of a **Thread** as the entire journey a user takes in a single session. It's the complete chat with your AI travel buddy, from "Where should I go?" to booking the flight. For the blog post generator, a `thread_id` bundles up the whole session, from brainstorming headlines to polishing the final SEO-optimized draft. It groups _all_ the back-and-forth interactions (Traces) for a specific task or conversation.
 
 ### Traces: One Task, End-to-End
 
@@ -26,7 +26,7 @@ Field: `trace_id`
 Zooming in from Threads, a **Trace** represents a single, complete task performed by your AI. It's one round trip.
 
 - **Travel Bot:** A user asking, "What are the cheapest flights to Bali in July?" is one Trace. Asking, "Does the hotel allow llamas?" is another Trace.
-- **Blog Tool:** Generating headline options? That's a Trace. Drafting the intro paragraph? Another Trace. Optimizing for keywords? You guessed it – a Trace.
+- **Blog Tool:** Generating headline options? That's a Trace. Drafting the intro paragraph? Another Trace. Optimizing for keywords? You guessed it, a Trace.
 
 Each `trace_id` captures an entire end-to-end generation, no matter how many internal steps (Spans) it takes.
 

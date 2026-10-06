@@ -24,7 +24,9 @@ describe("a token typed into an HTTP agent", () => {
     const { app } = createAgentAppFixture({ secrets });
 
     const created = await app.create(httpAgent(TOKEN));
-    const read = agentWithoutSecrets(await app.getById({ id: "agent_http", projectId: "project_1" }));
+    const read = agentWithoutSecrets(
+      await app.getById({ id: "agent_http", projectId: "project_1" }),
+    );
 
     expect(values).toEqual({ HTTP_AGENT_HTTP_AUTH_TOKEN: TOKEN });
     expect(JSON.stringify(created)).not.toContain(TOKEN);

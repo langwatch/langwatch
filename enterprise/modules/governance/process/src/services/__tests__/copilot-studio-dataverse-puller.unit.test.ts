@@ -16,7 +16,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError, z } from "zod";
 
-import type { GovernanceHttpClient } from "../../app/governance.members.ts";
+import type { GovernanceHttpClient } from "../../channels/governance-http.channel.ts";
 
 interface FetchCall {
   url: string;

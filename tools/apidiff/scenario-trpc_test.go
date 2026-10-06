@@ -76,7 +76,7 @@ func TestScenarioSetupWritesOneBodyForBothTransformers(t *testing.T) {
 		Concurrency: 2, Shards: 1, Glob: writeScenarioYAML(t, trpcScenarios), RunDir: t.TempDir(),
 	}
 	var report bytes.Buffer
-	if code := runScenarioPhase(context.Background(), options, &report, &report); code != exitEqual {
+	if code := runScenarioPhase(context.Background(), scenarioPhase{options: options, report: &report, progress: &report}); code != exitEqual {
 		t.Fatalf("exit %d:\n%s", code, report.String())
 	}
 	for _, result := range readResults(t, options.RunDir) {

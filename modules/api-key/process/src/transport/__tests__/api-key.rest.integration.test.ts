@@ -91,6 +91,8 @@ describe("the api-keys REST family", () => {
   });
 
   describe("given a credential the door refuses the route's permission to", () => {
+    /** @scenario A project API key lacking the required permission is forbidden */
+    /** @scenario A read-only key cannot perform a write action */
     it("refuses the mint before the application is asked anything", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
       const { send } = mountApiKeyRest({
@@ -109,6 +111,8 @@ describe("the api-keys REST family", () => {
   });
 
   describe("when a key is minted", () => {
+    /** @scenario Minting a key answers its token once */
+    /** @scenario An authorized key passes the permission gate */
     it("returns the token once, alongside the key's identity", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
       const { send } = mountApiKeyRest({
@@ -298,6 +302,7 @@ describe("the api-keys REST family", () => {
 
   describe("given a caller who holds organization:manage but is not an organization admin", () => {
     /** @scenario A manage-permission holder cannot mint an unbound service key */
+    /** @scenario Only an organization admin mints a service key */
     it("refuses a service key and mints nothing", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
       const isOrgAdmin = vi.fn(async () => false);
@@ -549,6 +554,7 @@ describe("the api-keys REST family", () => {
 
   describe("when keys are listed", () => {
     /** @scenario A view-only member lists only their own API keys */
+    /** @scenario No read after the mint carries the token */
     it("lists the caller's own keys, without the secret or its lookup id", async () => {
       const listForCaller = vi.fn(async () => [apiKey()]);
       const { send } = mountApiKeyRest({
@@ -670,6 +676,7 @@ describe("the api-keys REST family", () => {
     });
 
     /** @scenario Fetching an API key returns its bindings */
+    /** @scenario No read after the mint carries the token */
     it("returns the key's identity, permission mode and bindings in both shapes", async () => {
       const getByIdForCaller = vi.fn(async () =>
         apiKeyDetail({
@@ -1157,6 +1164,41 @@ describe("the api-keys REST family", () => {
 
       expect(response.status).toBe(422);
       expect(create).not.toHaveBeenCalled();
+    });
+
+    /** @scenario An API key cannot mint an ingestion key */
+    it("refuses a non-person before it judges the shape", async () => {
+      const { send, create } = mountIngestion();
+
+      const response = await send("/api/api-keys/ingestion", {
+        method: "POST",
+        body: { ...INGESTION_SHAPE, keyType: "service" },
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "api_key_scope_violation",
+        message: "Only a person's sign-in session mints an ingestion key",
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The ingestion key route refuses any other shape */
+    it("names the shape when a person asks for another one", async () => {
+      const { send } = mountIngestion();
+
+      const response = await send("/api/api-keys/ingestion", {
+        method: "POST",
+        body: { ...INGESTION_SHAPE, keyType: "service" },
+        as: AS_SESSION,
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "api_key_scope_violation",
+        message:
+          "An ingestion key is personal, bound to this one project, and holds only ingestion",
+      });
     });
 
     /** @scenario An API key cannot mint an ingestion key */

@@ -7,9 +7,11 @@ import type {
   GovernanceKpiContributionWriter,
   GovernanceOcsfEvent,
   GovernanceOcsfEventWriter,
-  GovernanceTraceSummary,
-} from "../../app/governance.members.ts";
-import { GovernanceTraceFactsService } from "../governance-trace-facts.service.ts";
+} from "../../repositories/governance.repositories.ts";
+import {
+  type GovernanceTraceSummary,
+  GovernanceTraceFactsService,
+} from "../governance-trace-facts.service.ts";
 
 const summary: GovernanceTraceSummary = {
   traceId: "trace-1",

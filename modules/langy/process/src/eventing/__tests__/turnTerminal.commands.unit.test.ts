@@ -36,6 +36,7 @@ function envelope(data: Record<string, unknown>) {
 describe("turn terminal commands", () => {
   describe("given a turn whose completion and stale failure race each other", () => {
     describe("when both commands emit their events", () => {
+      /** @scenario "A turn reaches exactly one terminal, first writer wins" */
       it("stamps the SAME idempotency key on both terminals, so the first wins", async () => {
         const [responded] = await new RecordAgentResponseCommand().handle(
           envelope({

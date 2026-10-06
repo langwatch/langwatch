@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryOrganizationMfaRequirementMailChannel } from "../../channels/memory/memory.organization-mfa-requirement-mail.channel.ts";
 import { MemoryTwoStepVerificationRepository } from "../../repositories/memory/memory.two-step-verification.repository.ts";
+import { MemoryTwoStepVerificationStore } from "../../repositories/memory/memory.two-step-verification.store.ts";
 import { OrganizationMfaNotifierService } from "../organization-mfa-notifier.service.ts";
 import { OrganizationMfaService } from "../organization-mfa.service.ts";
 import { TwoStepAccountService } from "../two-step-account.service.ts";
@@ -60,39 +61,41 @@ function organizationService(
 }
 
 describe("two-step verification", () => {
+  let store: MemoryTwoStepVerificationStore;
   let accounts: MemoryTwoStepVerificationRepository;
 
   beforeEach(() => {
-    accounts = MemoryTwoStepVerificationRepository.create();
-    accounts.putPerson({
+    store = MemoryTwoStepVerificationStore.create();
+    accounts = MemoryTwoStepVerificationRepository.create(store);
+    store.putPerson({
       userId: "user_ana",
       name: "Ana",
       email: "ana@acme.test",
       accountEnrollmentEnabled: true,
       passkeyCount: 0,
     });
-    accounts.putPerson({
+    store.putPerson({
       userId: "user_bo",
       name: "Bo",
       email: "bo@acme.test",
       accountEnrollmentEnabled: false,
       passkeyCount: 2,
     });
-    accounts.putOrganization({
+    store.putOrganization({
       organizationId: "org_acme",
       name: "Acme",
       slug: "acme",
       mfaRequired: true,
     });
-    accounts.putOrganization({
+    store.putOrganization({
       organizationId: "org_open",
       name: "Open",
       slug: "open",
       mfaRequired: false,
     });
-    accounts.putSeat({ organizationId: "org_acme", userId: "user_ana" });
-    accounts.putSeat({ organizationId: "org_acme", userId: "user_bo" });
-    accounts.putSeat({ organizationId: "org_open", userId: "user_ana" });
+    store.putSeat({ organizationId: "org_acme", userId: "user_ana" });
+    store.putSeat({ organizationId: "org_acme", userId: "user_bo" });
+    store.putSeat({ organizationId: "org_open", userId: "user_ana" });
   });
 
   describe("given the caller reads their own security screen", () => {
@@ -199,9 +202,78 @@ describe("two-step verification", () => {
     });
   });
 
+  describe("given the organization requires nothing", () => {
+    /** @scenario "An organization that requires nothing is satisfied after one read" */
+    it("answers satisfied after the organization read alone", async () => {
+      const { service } = organizationService(accounts);
+      const reads = {
+        setting: vi.spyOn(accounts, "getOrganizationSetting"),
+        membership: vi.spyOn(accounts, "isActiveMember"),
+        factors: vi.spyOn(accounts, "getAccountFactors"),
+      };
+
+      await expect(
+        service.getStanding({ userId: "user_ana", organizationId: "org_open", sessionId: "s_1" }),
+      ).resolves.toMatchObject({
+        organizationId: "org_open",
+        required: false,
+        satisfaction: { satisfied: true, by: "not_required" },
+      });
+      expect(reads.setting).toHaveBeenCalledTimes(1);
+      expect(reads.membership).not.toHaveBeenCalled();
+      expect(reads.factors).not.toHaveBeenCalled();
+    });
+
+    it("reads no session sign-in method", async () => {
+      const findSessionAmr = vi.fn(async () => [] as string[]);
+      const service = OrganizationMfaService.create({
+        accounts,
+        auth: createApiFixture<AuthApi>({ offersTwoStepVerification: () => true, findSessionAmr }),
+        notifier: OrganizationMfaNotifierService.create({
+          accounts,
+          mail: MemoryOrganizationMfaRequirementMailChannel.create(),
+          emails: { resolveEmail: async () => KEEP_LEGACY },
+        }),
+        entitled: async () => true,
+      });
+
+      await service.getStanding({
+        userId: "user_ana",
+        organizationId: "org_open",
+        sessionId: "s_1",
+      });
+
+      expect(findSessionAmr).not.toHaveBeenCalled();
+    });
+
+    it("reads nothing at all where two-step verification is not offered", async () => {
+      const { service } = organizationService(accounts, { offered: false });
+      const setting = vi.spyOn(accounts, "getOrganizationSetting");
+
+      await expect(
+        service.getStanding({ userId: "user_bo", organizationId: "org_acme", sessionId: "s_1" }),
+      ).resolves.toMatchObject({ required: false, satisfaction: { satisfied: true } });
+      expect(setting).not.toHaveBeenCalled();
+    });
+
+    it("tells nothing apart between an organization that does not exist and one that requires nothing", async () => {
+      const { service } = organizationService(accounts);
+
+      await expect(
+        service.getStanding({ userId: "user_ana", organizationId: "org_missing", sessionId: null }),
+      ).resolves.toEqual({
+        organizationId: "org_missing",
+        organizationName: null,
+        required: false,
+        satisfaction: { satisfied: true, by: "not_required" },
+        holdsPasskey: false,
+      });
+    });
+  });
+
   describe("given an administrator reads the requirement", () => {
     it("says there is no connection when the only one was torn down", async () => {
-      accounts.putConnection({
+      store.putConnection({
         connectionId: "conn_old",
         organizationId: "org_acme",
         state: "TORN_DOWN",
@@ -216,12 +288,12 @@ describe("two-step verification", () => {
     });
 
     it("reports only recognised factors the connection's own sign-ins asserted", async () => {
-      accounts.putConnection({
+      store.putConnection({
         connectionId: "conn_idp",
         organizationId: "org_acme",
         state: "ACTIVE",
       });
-      accounts.putIdentifier({
+      store.putIdentifier({
         identifierId: "ident_bo",
         userId: "user_bo",
         providerId: "conn_idp",
@@ -331,7 +403,7 @@ describe("two-step verification", () => {
     });
 
     it("hands the request's own cookie to the plugin's re-proof and disable", async () => {
-      accounts.putPerson({
+      store.putPerson({
         userId: "user_cy",
         name: "Cy",
         email: "cy@solo.test",

@@ -6,14 +6,8 @@ export { gatewayProcessModule, createGatewayBudgetChangeDedupe } from "./gateway
 export { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 export { agentCacheRest } from "./transport/agent-cache.rest.ts";
 export { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";
-export { gatewaySpendBillingPlanGate, gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
-export type {
-  GatewaySpendApp,
-  GatewaySpendWebhookDelivery,
-  GatewaySpendWebhookEndpoint,
-  GatewaySpendWebhookEndpoints,
-  GatewaySpendWebhookEvents,
-} from "./services/gateway-spend-reconciliation.service.ts";
+export { gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
+export type { GatewaySpendApp } from "./services/gateway-spend-reconciliation.service.ts";
 export { gatewayInternalRest } from "./transport/gateway-internal.rest.ts";
 export { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
 export { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
@@ -21,7 +15,6 @@ export { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trp
 export { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 export { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
 export { gatewaySessionFact, virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
-export type { GatewayPersistence } from "./app/gateway-composition.build.ts";
 export type {
   GatewayUsageProjects,
   GatewayUsageVirtualKeys,
@@ -39,28 +32,28 @@ export type {
   BudgetDebitRow,
   PulledUsageRow,
   PulledUsageTotals,
-  GatewayBudgetSpend,
-} from "./app/gateway.members.ts";
+  GatewayBudgetSpendRepository,
+} from "./repositories/gateway-budget-spend.repository.ts";
 export type {
   GatewayChangeEventKind,
   GatewayChangeEvent,
   AppendGatewayChangeEventInput,
-  GatewayPersistenceTransaction,
-  GatewayChangeEvents,
-} from "./app/gateway.members.ts";
+  GatewayChangeEventsRepository,
+} from "./repositories/gateway-change-event.repository.ts";
+export type { GatewayPersistenceTransaction } from "./repositories/gateway-transaction.repository.ts";
 export type {
   GatewayAuditAction,
   GatewayAuditTargetKind,
   AppendGatewayAuditInput,
   GatewayAuditTransaction,
-  GatewayAudit,
-} from "./app/gateway.members.ts";
+  GatewayAuditRepository,
+} from "./repositories/gateway-audit.repository.ts";
 export type {
   GatewayClickHouseClient,
   GatewayClickHouseResolver,
   GatewayClickHouse,
-} from "./app/gateway.members.ts";
-export type { GatewaySettlementPolicy } from "./app/gateway.members.ts";
+} from "./repositories/clickhouse/clickhouse.gateway-session.store.ts";
+export type { GatewaySettlementPolicy } from "./rules/gateway-spend-grouping.rules.ts";
 export * from "./eventing/gateway-spend.intent.ts";
 export {
   GatewayBudgetCycleAnchorInvalidError,
@@ -131,7 +124,10 @@ export type {
   ElevenLabsCredentialCollaborators,
   ElevenLabsWebhookSecret,
 } from "./services/gateway-elevenlabs-credential.service.ts";
-export type { GatewayRealtimeSessionCollaborators, ReserveInput } from "./services/gateway-realtime-session.service.ts";
+export type {
+  GatewayRealtimeSessionCollaborators,
+  ReserveInput,
+} from "./services/gateway-realtime-session.service.ts";
 export type { ReserveResult } from "./repositories/gateway-realtime-session.repository.ts";
 export type { GatewayJwtClaims, GatewayJwtSubject } from "./services/gateway-jwt.service.ts";
 export type { ElevenLabsCredentialReader } from "./services/gateway-realtime-session-reconciliation.service.ts";
@@ -143,14 +139,17 @@ export {
 export type {
   GatewayGovernanceSignals,
   GatewayVirtualKeyLifecycleSignal,
-} from "./app/gateway.members.ts";
-export type { GatewayModelProviderCredentials } from "./app/gateway.members.ts";
-export type { GatewayScopePermissions, GatewayPermissionScope } from "./app/gateway.members.ts";
-export type { GatewayConfigAssembly } from "./app/gateway.members.ts";
-export type { GatewayVirtualKeyCrypto } from "./app/gateway.members.ts";
-export type { GatewaySpanIngestion } from "./app/gateway.members.ts";
-export type { GatewaySpendConfirmation } from "./app/gateway.members.ts";
-export type { GatewaySpendRating } from "./app/gateway.members.ts";
+} from "./services/gateway-governance-events.service.ts";
+export type { GatewayModelProviderCredentials } from "./rules/gateway-config-wire.rules.ts";
+export type {
+  GatewayScopePermissions,
+  GatewayPermissionScope,
+} from "./services/virtual-key-authorization.service.ts";
+export type { GatewayConfigAssembly } from "./rules/gateway-config-wire.rules.ts";
+export type { GatewayVirtualKeyCrypto } from "./services/virtual-key-crypto.service.ts";
+export type { GatewaySpanIngestion } from "./services/gateway-realtime-session.service.ts";
+export type { GatewaySpendConfirmation } from "./services/gateway-realtime-session.service.ts";
+export type { GatewaySpendRating } from "./services/model-catalog-gateway-spend-rating.service.ts";
 
 // The R3 config walk, main's `scripts/migrations/backfill-vk-config-to-rp.ts`.
 export {

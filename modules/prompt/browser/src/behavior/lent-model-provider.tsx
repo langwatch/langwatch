@@ -1,44 +1,19 @@
-/** What model-provider lends this module through its declaration (ARCHITECTURE.md §3.4, rule 7). */
+/** What model-provider lends this module by token (ARCHITECTURE.md §10, §10.1). */
 
-import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
+import { Lent } from "@langwatch/browser-host/lent";
 import {
-  type UiModelDisplayProps,
-  type UiModelSelectorProps,
-} from "@langwatch/browser-host/declarations";
-import { lazy, Suspense, useMemo } from "react";
+  ModelDisplayToken,
+  ModelSelectorToken,
+  type ModelDisplayProps,
+  type ModelSelectorProps,
+} from "@langwatch/model-provider-contract";
 
 /** Model-provider's display of one chosen model, rendered as model-provider lends it. */
-export function LLMModelDisplay(props: UiModelDisplayProps) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("modelDisplay")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function LLMModelDisplay(props: ModelDisplayProps) {
+  return <Lent of={ModelDisplayToken} props={props} />;
 }
 
 /** Model-provider's model picker, rendered as model-provider lends it. */
-export function ModelSelector(props: UiModelSelectorProps) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("modelSelector")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function ModelSelector(props: ModelSelectorProps) {
+  return <Lent of={ModelSelectorToken} props={props} />;
 }

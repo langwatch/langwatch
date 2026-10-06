@@ -4,8 +4,10 @@
  * shapes — the requester's address withheld from the organization until membership.
  */
 
+import { seatForJoiner } from "@langwatch/identity-contract";
 import type {
   JoinRequestAdmitted,
+  JoinRequestApiOrigin,
   JoinRequestAutomaticJoins,
   JoinRequestFiled,
   JoinRequestJoining,
@@ -15,16 +17,16 @@ import type {
 } from "@langwatch/organization-contract";
 import { Temporal, toDate } from "@langwatch/time";
 
+import type { OrganizationDirectory } from "./organization-directory.service.ts";
 import type {
-  OrganizationDirectory,
   OrganizationJoinRequestState,
   OrganizationJoinRequests,
-} from "../app/organization.members.ts";
+} from "./organization-join-requests.service.ts";
 
 /** Shown where the ledger knows a requester's id but nobody's name. */
 const UNNAMED_COLLEAGUE = "A colleague";
 
-export interface OrganizationJoinDoorDependencies {
+interface OrganizationJoinDoorDependencies {
   readonly joinRequests: OrganizationJoinRequests;
   readonly directory: OrganizationDirectory;
 }
@@ -65,10 +67,13 @@ export class OrganizationJoinDoorService {
   }
 
   /** Walk in where the organization asked for that; a null organization is the ordinary case. */
-  async admitAutomatically(input: Readonly<{ userId: string }>): Promise<JoinRequestAdmitted> {
+  async admitAutomatically(
+    input: Readonly<{ userId: string; origin?: JoinRequestApiOrigin }>,
+  ): Promise<JoinRequestAdmitted> {
     return this.deps.joinRequests.joinAutomaticallyIfAdmitted({
       userId: input.userId,
       verifiedEmail: await this.deps.directory.findVerifiedEmail(input),
+      ...(input.origin === undefined ? {} : { origin: input.origin }),
     });
   }
 
@@ -105,12 +110,13 @@ export class OrganizationJoinDoorService {
   }
 
   async file(
-    input: Readonly<{ userId: string; organizationId: string }>,
+    input: Readonly<{ userId: string; organizationId: string; origin?: JoinRequestApiOrigin }>,
   ): Promise<JoinRequestFiled> {
     return this.deps.joinRequests.request({
       userId: input.userId,
       verifiedEmail: await this.deps.directory.findVerifiedEmail({ userId: input.userId }),
       organizationId: input.organizationId,
+      ...(input.origin === undefined ? {} : { origin: input.origin }),
     });
   }
 
@@ -125,6 +131,7 @@ export class OrganizationJoinDoorService {
    */
   async listPending(input: Readonly<{ organizationId: string }>): Promise<JoinRequestPending> {
     const pending = await this.deps.joinRequests.pendingForOrganization(input);
+    const { joinerRole } = await this.deps.joinRequests.readJoining(input);
     const names = await this.deps.directory.listUserNames({
       userIds: pending.map((request) => request.userId),
     });
@@ -135,6 +142,7 @@ export class OrganizationJoinDoorService {
       userId: request.userId,
       name: nameById.get(request.userId) ?? UNNAMED_COLLEAGUE,
       domain: request.domain,
+      seat: seatForJoiner({ origin: request.origin, joinerRole }),
     }));
   }
 
@@ -160,6 +168,7 @@ export class OrganizationJoinDoorService {
       organizationId: string;
       domainJoin: JoinRequestJoining["domainJoin"];
       domains: readonly string[];
+      joinerRole?: JoinRequestJoining["joinerRole"];
       actorUserId: string;
     }>,
   ): Promise<JoinRequestJoiningChanged> {
@@ -170,6 +179,8 @@ export class OrganizationJoinDoorService {
       next: change.next,
       previousDomains: [...change.previousDomains],
       nextDomains: [...change.nextDomains],
+      previousJoinerRole: change.previousJoinerRole,
+      nextJoinerRole: change.nextJoinerRole,
     };
   }
 }

@@ -11,8 +11,10 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { IdentityHeadsRepository } from "../../repositories/identity-heads.repository.ts";
+import { MemoryIdentityLatchRepository } from "../../repositories/memory/memory.identity-latch.repository.ts";
 import { MemoryIdentitySignInAccountsRepository } from "../../repositories/memory/memory.identity-signin-accounts.repository.ts";
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
+import { CachedIdentityLatchService } from "../per-subject-cached-latch.service.ts";
 import { SignInAccountLookupService } from "../signin-account-lookup.service.ts";
 import { SignInRouterService } from "../signin-router.service.ts";
 
@@ -266,6 +268,59 @@ describe("SignInAccountLookupService", () => {
       expect(decision.outcome).toBe("method_picker");
       expect(decision.reasonCode).toBe("account_methods");
       expect(decision.methodSet).toEqual([PASSWORD]);
+    });
+  });
+
+  describe("when the sign-up form just made the account after other users finalized", () => {
+    const PASSWORD: SignInMethod = { id: "password", kind: "password", connectionId: null };
+
+    /** @scenario "An account the sign-up form just made is not mistaken for no account" */
+    it("offers the password and never routes the new address to sign-up", async () => {
+      const store = MemoryIdentityStore.create();
+      store.finalizedUsers.add("user_earlier");
+      store.legacySignInAccounts.set("new@home.net", {
+        userId: "user_new",
+        methods: { hasPassword: true, hasPasskey: false, providerIds: [], connectionIds: [] },
+        auth0Subjects: [],
+      });
+      const latch = CachedIdentityLatchService.create({
+        repository: MemoryIdentityLatchRepository.create(store),
+        ttlMs: 60_000,
+        maxUsers: 10,
+        now: () => 0,
+      });
+      const router = SignInRouterService.create({
+        domains: {
+          findConnectionsForDomain: async () => [],
+          findActiveConnections: async () => [],
+        },
+        legacy: {
+          findLegacyConnectionForDomain: async () => null,
+          findLegacyActiveConnections: async () => [],
+        },
+        policy: {
+          resolvePolicy: async () => ({
+            defaultMethods: [PASSWORD],
+            localMethods: [PASSWORD],
+            federationLicensed: true,
+            selfHosted: true,
+          }),
+        },
+        breakGlass: { allow: async () => false },
+        accounts: SignInAccountLookupService.create({
+          heads: new SeededHeads([]),
+          legacy: MemoryIdentitySignInAccountsRepository.create(store),
+          isLatched: latch.gate(),
+        }),
+        recorder: { decided: () => undefined },
+      });
+
+      const decision = await router.route({ identifier: "new@home.net" });
+
+      expect(decision.outcome).toBe("method_picker");
+      expect(decision.methodSet).toEqual([PASSWORD]);
+      expect(decision.reasonCode).not.toBe("identifier_unknown");
+      expect(decision.outcome).not.toBe("route_to_signup");
     });
   });
 });

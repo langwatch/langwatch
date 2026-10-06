@@ -141,6 +141,28 @@ export class LiteMemberViewerOnlyError extends HandledError {
   }
 }
 
+/**
+ * A role on a shared team, project or the organization was asked for somebody
+ * on a Developer seat (ADR-171). No team role would be allowed: the way forward
+ * is a different seat, and the message says so.
+ */
+export class DeveloperSeatNoSharedAccessError extends HandledError {
+  declare readonly code: "developer_seat_no_shared_access";
+
+  constructor(scopeName?: string | null) {
+    super(
+      "developer_seat_no_shared_access",
+      "A Developer seat holds no role outside its own personal project.",
+      {
+        meta: scopeName ? { scopeName } : {},
+        httpStatus: 409,
+        fault: "customer",
+      },
+    );
+    this.name = "DeveloperSeatNoSharedAccessError";
+  }
+}
+
 export class TeamMembershipChangedError extends HandledError {
   declare readonly code: "team_membership_changed";
 

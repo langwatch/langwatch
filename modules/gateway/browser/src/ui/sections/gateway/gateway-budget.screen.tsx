@@ -596,8 +596,16 @@ function statusPalette(status: LedgerStatus): "green" | "red" | "orange" | "gray
   return "gray";
 }
 
+const KNOWN_LEDGER_STATUSES: readonly string[] = [
+  "SUCCESS",
+  "BLOCKED_BY_GUARDRAIL",
+  "PROVIDER_ERROR",
+  "CANCELLED",
+];
+
 function StatusBadge({ status }: { status: LedgerStatus }) {
-  return <Badge colorPalette={statusPalette(status)}>{status.toLowerCase()}</Badge>;
+  const label = KNOWN_LEDGER_STATUSES.includes(status) ? status.toLowerCase() : status;
+  return <Badge colorPalette={statusPalette(status)}>{label}</Badge>;
 }
 
 // Per-row ledger debit formatter. Same precision tiers as

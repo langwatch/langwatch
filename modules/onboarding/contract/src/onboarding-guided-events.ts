@@ -9,13 +9,15 @@ export const GUIDED_ONBOARDING_AGGREGATE_TYPE = "guided_onboarding" as const;
 export const GUIDED_ONBOARDING_RECORDED_EVENT_TYPE = "lw.guided_onboarding.recorded" as const;
 export const GUIDED_ONBOARDING_RECORDED_EVENT_VERSION = "2026-09-30" as const;
 
-/** The guided events a peer hears of: the picks, and the steps that finish something. */
+/** The guided events a peer hears of: every step of the guide that is not bookkeeping. */
 export const guidedOnboardingRecordedEventNameSchema = z.enum([
   "paths_selected",
   "path_begun",
   "provider_connected",
+  "provider_skipped",
   "tour_completed",
   "tour_skipped",
+  "tour_replayed",
   "path_completed",
 ]);
 export type GuidedOnboardingRecordedEventName = z.infer<
@@ -25,6 +27,7 @@ export type GuidedOnboardingRecordedEventName = z.infer<
 /** The state as far as a peer reads it: no conversation and no key reveal ride the event. */
 export const guidedOnboardingRecordedStateSchema = guidedOnboardingStateSchema.pick({
   paths: true,
+  currentPath: true,
   donePaths: true,
   provider: true,
   tourCompletedAt: true,

@@ -16,7 +16,7 @@ export interface SsoIssuerDirectory {
   findEndpointOrigins(args: { issuers: readonly string[] }): Promise<string[]>;
 }
 
-export interface SsoRegisteredIssuersServiceDeps {
+interface SsoRegisteredIssuersServiceDeps {
   issuers: SsoIssuerDirectory;
   logger: Logger;
 }

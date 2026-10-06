@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 //go:embed inventory/main-trpc.mjs inventory/branch-trpc.mjs inventory/main-routes.mjs inventory/branch-routes.mjs
@@ -29,14 +30,25 @@ type inventoryCandidate struct {
 	layout inventoryLayout
 }
 
-// detectLayout is the first candidate whose marker the checkout holds.
+// detectLayout is the first candidate whose marker the checkout holds. A
+// marker may carry a glob ("modules/*/contract/src"): any match holds it.
 func detectLayout(dir string, candidates []inventoryCandidate) (inventoryLayout, bool) {
 	for _, candidate := range candidates {
-		if _, err := os.Stat(filepath.Join(dir, candidate.marker)); err == nil {
+		if holdsMarker(dir, candidate.marker) {
 			return candidate.layout, true
 		}
 	}
 	return inventoryLayout{}, false
+}
+
+func holdsMarker(dir, marker string) bool {
+	pattern := filepath.Join(dir, filepath.FromSlash(marker))
+	if !strings.ContainsAny(marker, "*?[") {
+		_, err := os.Stat(pattern)
+		return err == nil
+	}
+	matches, err := filepath.Glob(pattern)
+	return err == nil && len(matches) > 0
 }
 
 // placeholderDatastores points every datastore URL the imports might read at a

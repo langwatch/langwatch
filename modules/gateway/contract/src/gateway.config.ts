@@ -6,6 +6,7 @@ import {
   gatewayLegacyUrl,
   gatewayPublicUrl,
   isSaas,
+  publicBaseUrl,
   type ConfigOf,
 } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
@@ -26,6 +27,8 @@ export const gatewayConfig = Config.define((c) => ({
   internalUrl: gatewayInternalUrl,
   /** Where the gateway is told to reach this control plane; the public base URL otherwise. */
   controlPlaneUrl: c.env("GATEWAY_CONTROL_PLANE_URL", z.string().optional()),
+  /** This deployment's public origin, the shared leaf: the expected control plane by default. */
+  publicBaseUrl,
   /** Where apps reach the gateway, when no internal address is set. Legacy name, still honoured. */
   baseUrl: gatewayLegacyUrl,
   /** Where apps outside the deployment reach the gateway. */

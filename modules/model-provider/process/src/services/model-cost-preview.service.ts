@@ -19,7 +19,7 @@ import type { ModelCostRegexSafetyService } from "./model-cost-regex-safety.serv
  * How far back the preview looks for spans. Wide enough to catch models that
  * only run a few times a week, narrow enough to stay on warm partitions.
  */
-export const PREVIEW_WINDOW_DAYS = 7;
+const PREVIEW_WINDOW_DAYS = 7;
 
 /** Project-wide distinct-model inventory cap for one preview round. */
 const MAX_DISTINCT_MODELS = 500;

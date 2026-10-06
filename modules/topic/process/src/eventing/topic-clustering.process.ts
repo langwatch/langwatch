@@ -11,13 +11,13 @@ import {
 } from "@langwatch/topic-contract";
 import { z } from "zod";
 
-import { nextDailySlot, runIdForSlot } from "../rules/topic-clustering-process.rules.ts";
-import type { TopicClusteringProcessingEvent } from "../services/topic-events.service.ts";
+import type { TopicClusteringProcessingEvent } from "../rules/topic-clustering-events.rules.ts";
 import {
   TopicClusteringRequestedEventSchema,
   TopicClusteringRunCompletedEventSchema,
   TopicClusteringRunFailedEventSchema,
-} from "../services/topic-events.service.ts";
+} from "../rules/topic-clustering-events.rules.ts";
+import { nextDailySlot, runIdForSlot } from "../rules/topic-clustering-process.rules.ts";
 import {
   createTopicClusteringRunHandler,
   TOPIC_CLUSTERING_MAX_ATTEMPTS,
@@ -61,18 +61,18 @@ export type TopicClusteringProcessState = z.infer<typeof topicClusteringProcessS
  * Clustering events carry no customer content, but the boundary keeps the
  * same shape discipline as other process managers.
  */
-export const topicClusteringProcessEventViewSchema = z.object({
+const topicClusteringProcessEventViewSchema = z.object({
   trigger: z.string().nullable(),
   runId: z.string().nullable(),
   page: z.number().nullable(),
   hasNextPage: z.boolean(),
   nextSearchAfter: topicClusteringSearchAfterSchema.nullable(),
 });
-export type TopicClusteringProcessEventView = z.infer<typeof topicClusteringProcessEventViewSchema>;
+type TopicClusteringProcessEventView = z.infer<typeof topicClusteringProcessEventViewSchema>;
 
 type Ctx = ProcessHandlerContext<TopicClusteringIntents>;
 
-export const INITIAL_TOPIC_CLUSTERING_STATE: TopicClusteringProcessState = {
+const INITIAL_TOPIC_CLUSTERING_STATE: TopicClusteringProcessState = {
   projectId: "",
   enabled: false,
   currentRun: null,

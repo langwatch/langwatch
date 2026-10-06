@@ -7,6 +7,7 @@ import {
 } from "@langwatch/eventing";
 
 import type { GatewayModule } from "../app/gateway.app.ts";
+import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
 import {
   type GatewayRealtimeSessionReconcileDeps,
   runGatewayRealtimeSessionReconcile,
@@ -20,12 +21,12 @@ import {
   gatewayRealtimeSessionReconcileWake,
 } from "./gateway-realtime-session-reconcile.process.ts";
 
-export const GATEWAY_REALTIME_SESSION_PIPELINE_NAME = "gateway_realtime_session_maintenance";
+const GATEWAY_REALTIME_SESSION_PIPELINE_NAME = "gateway_realtime_session_maintenance";
 
 /** The voice reconciler, hosted by the worker like every scheduled process manager. */
 export const gatewayRealtimeSessionEventing = defineEventingModule({
   pipeline: GATEWAY_REALTIME_SESSION_PIPELINE_NAME,
-  build: ({ app, processStore }: EventingSetup<undefined, GatewayModule>) =>
+  build: ({ app, processStore }: EventingSetup<GatewayRepositories, GatewayModule>) =>
     buildGatewayRealtimeSessionMaintenancePipeline({
       reconcile: () => app.reconcileRealtimeSessions(),
       deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
@@ -34,7 +35,7 @@ export const gatewayRealtimeSessionEventing = defineEventingModule({
 
 // Settles brokered voice sessions whose post-call webhook never arrived. No events: the
 // sweep spans every tenant, so the aggregate is `global` like the other maintenance pipelines.
-export function buildGatewayRealtimeSessionMaintenancePipeline(
+function buildGatewayRealtimeSessionMaintenancePipeline(
   reconcile: GatewayRealtimeSessionReconcileDeps,
 ): StaticPipelineDefinition<never> {
   return definePipeline({

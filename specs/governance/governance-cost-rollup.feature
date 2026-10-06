@@ -212,16 +212,13 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
 
   @integration
   Scenario: A correction still retracts its earlier version after the summary is rebuilt
-    Given a day summarized from a bill issued in one currency
-    And the summary rebuilt from its recorded history
+    Given a day's bill pulled in one currency, its filed cell held in the ledger's own persisted state
     When the provider reissues that same bill in another currency
-    Then the amount held under the first currency is retracted
-    And the day holds the reissued amount only
-    # Where a charge landed the first time is written down beside the
-    # summary as it is built, out of the same events, so a rebuild
-    # reproduces it. Held only in memory it would be lost by every
-    # restart, and looked for by searching the day it would mean reading
-    # every row of that day on every correction.
+    Then the amount held under the first currency is retracted from the filed cell
+    And the retraction reads no summary, so rebuilding the summary cannot lose it
+    # Where a charge landed the first time is written down in the ledger
+    # process's own persisted state, not in the summary. A rebuild of the
+    # summary therefore leaves it untouched, and a restart does not lose it.
 
   @integration
   Scenario: A cell priced in another currency is not a cell we hold no amount for

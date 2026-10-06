@@ -326,6 +326,29 @@
   }
 }
 
+/*
+ * The passkey ceremony's mark breathes rather than spins: nothing is being
+ * processed, the device holds the screen. Declared only where motion is
+ * welcome, so for anybody asking for less it never starts and the mark is still.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .lw-front-door-passkey-glyph {
+    animation: lw-front-door-breathe 2.6s ease-in-out infinite;
+  }
+}
+
+@keyframes lw-front-door-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 var(--chakra-colors-front-door-glow);
+  }
+  50% {
+    transform: scale(1.045);
+    box-shadow: 0 0 0 10px rgba(245, 107, 26, 0);
+  }
+}
+
 @keyframes lw-front-door-boom {
   from {
     box-shadow: 0 0 0 0 rgba(245, 107, 26, 0.35);

@@ -10,7 +10,8 @@ const TIME_PACKAGE = /^packages\/time\//;
 // The published SDK, MCP server and ksuid cannot resolve the private
 // @langwatch/time the fix names, so they are out of scope; their wire contract
 // stays ISO 8601 (specs/tooling/lint-temporal-only.feature).
-const PUBLISHED_ARTEFACT = /^(?:sdks\/typescript\/|mcp\/typescript\/|packages\/ksuid\/)/;
+const PUBLISHED_ARTEFACT =
+  /^(?:sdks\/typescript\/|mcp\/typescript\/|packages\/ksuid\/|packages\/webhook-verify\/)/;
 // The seams where a driver binds a real `Date` and will not take an `Instant`.
 // Eventing's Prisma stores predate `repositories/prisma/`; the path goes when they move.
 const PERSISTENCE_SEAM =
@@ -127,22 +128,26 @@ export const temporalOnlyRule = defineRule({
     mintNow: {
       what: "{{name}} mints a Date for the current moment.",
       why: "One clock: every moment in the product is a Temporal.Instant.",
-      fix: "Call `nowInstant()` from @langwatch/time.",
+      fix: "Call `nowInstant()` from @langwatch/time. Read the `backend` skill.",
     },
     mintNowMilliseconds: {
       what: "{{name}} reads the current moment as Date epoch milliseconds.",
+      why: "One clock: every moment in the product is a Temporal.Instant.",
       fix: "Call `nowInstant().epochMilliseconds` from @langwatch/time.",
     },
     constructInstant: {
       what: "{{name}} builds a Date out of a value.",
+      why: "One clock: every moment in the product is a Temporal.Instant.",
       fix: "Use `Temporal.Instant.from(iso)` for an ISO string, `Temporal.Instant.fromEpochMilliseconds(ms)` for a millisecond count, or `fromDate(date)` from @langwatch/time when a boundary handed you a Date.",
     },
     parseInstant: {
       what: "{{name}} parses a moment through Date.",
+      why: "One clock: every moment in the product is a Temporal.Instant.",
       fix: "Use `Temporal.Instant.from(iso).epochMilliseconds` from @langwatch/time.",
     },
     utcInstant: {
       what: "{{name}} builds an epoch count out of calendar parts through Date.",
+      why: "One clock: every moment in the product is a Temporal.Instant.",
       fix: 'Build the moment with `Temporal.PlainDateTime.from({ year, month, day }).toZonedDateTime("UTC").epochMilliseconds` from @langwatch/time.',
     },
     dateType: {

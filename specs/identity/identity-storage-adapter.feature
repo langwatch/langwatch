@@ -571,7 +571,9 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
   # no-op ceremonies runs the legacy branch for everybody, latched or not, and
   # says nothing about it: the gate reads closed for a reason nobody chose.
 
-  @unit
+  # Alex 2026-10-06: never built. The API composes the stock Prisma engine only; the identity
+  # adapter is exercised by its own test stack and no process composes it (Phase 2).
+  @unit @unimplemented
   Scenario: The API process composes the identity branch when it has an event stack
     Given an API process that registered its identity pipeline
     When it composes better-auth
@@ -618,9 +620,11 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
   # instead: a command is atomic at its append, and replaying it is
   # idempotent.
 
-  @unit
+  # Today the storage better-auth is composed with is the stock Prisma engine, declared
+  # `transaction: true` in the auth module; the identity adapter declares none yet.
+  @integration
   Scenario: The adapter declares native transaction support
-    Given the identity storage adapter
+    Given the storage better-auth is composed with
     When a plugin asks whether it supports native transactions
     Then it says yes
     # `resolveUser` is refused outright otherwise, and with it every single
@@ -629,13 +633,13 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   @integration
   Scenario: Work inside a transaction commits together
-    Given a transaction against the identity storage adapter
+    Given a transaction against the storage better-auth is composed with
     When two Postgres-backed writes are made inside it and the callback returns
     Then both writes are visible afterwards
 
   @integration
   Scenario: Work inside a transaction rolls back together
-    Given a transaction against the identity storage adapter
+    Given a transaction against the storage better-auth is composed with
     When a Postgres-backed write is made inside it and the callback then throws
     Then that write is not visible afterwards
     And the error reaches the caller unchanged
@@ -661,7 +665,9 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     # Regression: single sign-on shipped with `resolveUser` configured and an
     # adapter that declared no transaction, so this had never once succeeded.
 
-  @unit
+  # Alex 2026-10-06: never built. Needs the identity branch composed on better-auth, which
+  # no process does today, so there is no fact to append inside a transaction.
+  @unit @unimplemented
   Scenario: The transaction does not claim to span the event store
     Given a transaction against the identity storage adapter
     When a fact is appended on the identity branch inside it and the callback then throws

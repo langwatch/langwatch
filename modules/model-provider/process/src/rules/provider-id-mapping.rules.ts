@@ -58,17 +58,8 @@ export function mapModelId(
   return `${mappedProvider}/${normalizedName}`;
 }
 
-/** Every unique provider segment across a list of model ids, sorted. */
-export function getUniqueProviders(modelIds: string[]): string[] {
-  const providers: string[] = [];
-  for (const id of modelIds.map(extractProvider)) {
-    if (!providers.includes(id)) providers.push(id);
-  }
-  return providers.toSorted();
-}
-
 /** Known routing variant suffixes filtered from the registry. */
-export const KNOWN_VARIANT_SUFFIXES = ["free", "thinking", "extended", "beta"];
+const KNOWN_VARIANT_SUFFIXES = ["free", "thinking", "extended", "beta"];
 
 /** Whether a model id carries a variant suffix (`:free`, `:thinking`, ...). */
 export function hasVariantSuffix(modelId: string): boolean {

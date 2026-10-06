@@ -3,7 +3,6 @@ import type { z } from "zod";
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { TenantId } from "../domain/tenantId.ts";
 import type { Event, EventMetadataBase } from "../domain/types.ts";
-import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 import type { DeduplicationStrategy } from "../queues/queue.types.ts";
 
 /**
@@ -50,12 +49,6 @@ export interface EnqueueDispatchOptions<E extends Event = Event> {
 }
 
 export interface EventSubscriberOptions<E extends Event = Event> {
-  /**
-   * Operator stop for this component, resolved per tenant at dispatch time.
-   * Absent means the generated key; a `customKey` must also be what the
-   * descriptors advertise or the switch cannot be set.
-   */
-  killSwitch?: KillSwitchOptions;
   /** Compile-time off switch. */
   disabled?: boolean;
   delay?: number;
@@ -95,8 +88,13 @@ export interface PeerSubscriberDefinition<Data extends z.ZodType> {
   options?: Pick<EventSubscriberOptions, "delay" | "deduplication" | "groupKeyFn">;
 }
 
-/** A peer subscriber's context: the event's tenant, aggregate, instant and id (a k-sortable cursor). */
+/**
+ * A peer subscriber's context: the event's tenant, aggregate, instant, id (a k-sortable cursor)
+ * and, when the event carries one, its idempotency key: two appends of one fact share the key
+ * but not the id, so a handler deduping per fact keys on `idempotencyKey ?? eventId`.
+ */
 export interface PeerSubscriberContext extends EventSubscriberContext {
   occurredAt: number;
   eventId: string;
+  idempotencyKey?: string;
 }

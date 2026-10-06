@@ -1,33 +1,37 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi, PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { dataPrivacyProcessModule } from "../../data-privacy.module.ts";
 import {
   createDataPrivacyTestProjects,
-  installableDataPrivacy,
   dataPrivacyTestGraph,
+  dataPrivacyTestSecrets,
 } from "./data-privacy.fixture.ts";
 
 const PROJECT_ID = dataPrivacyTestGraph.projectId;
 const ORGANIZATION_ID = dataPrivacyTestGraph.organizationId;
 
 function process(role: "api" | "worker", googleCredentials?: string) {
-  return createApp({ role })
-    .withModules([installableDataPrivacy({ googleCredentials })])
-    .withMember("nodeEnvironment", undefined)
-    .withConfig({ "data-privacy": { googleDlpDisabled: undefined, enforcement: undefined } })
+  return createApp({ role, secrets: dataPrivacyTestSecrets({ googleCredentials }) })
+    .withModules([dataPrivacyProcessModule])
+    .withStores(memoryStores())
+    .withConfig({
+      "data-privacy": {
+        googleDlpDisabled: undefined,
+        enforcement: undefined,
+        nodeEnvironment: undefined,
+        langevalsEndpoint: undefined,
+      },
+    })
     .provide({
       project: createDataPrivacyTestProjects(),
-      organization: createApiFixture<OrganizationApi>(),
       authz: createApiFixture<AuthzApi>(),
       "feature-flag": createApiFixture<FeatureFlagApi>(),
-      evaluation: createApiFixture<EvaluationApi>(),
     });
 }
 

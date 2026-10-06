@@ -618,6 +618,7 @@ tester.run("conditional-type-depth", plugin.rules["conditional-type-depth"], {
         {
           message:
             "Type Resolve nests 4 conditional types; the maximum is 3." +
+            " A type this deep re-computes what a plain interface or discriminated union already says. Read the `contract` skill." +
             " State the shape rather than deriving it. A type this deep is usually re-computing something a plain interface, a discriminated union, or a `satisfies` clause already says.",
         },
       ],
@@ -648,6 +649,7 @@ export function configUrl(options?: { env?: string; optional?: boolean }): Leaf<
         {
           message:
             "configUrl carries overloads that differ only by `optional: true` versus `optional: false`." +
+            " An overload set that only flips a flag makes the reader diff two signatures. Read the `contract` skill." +
             " Give the two behaviours two names, or one signature whose return type already admits the absent case. An overload set the reader has to diff is not documentation.",
         },
       ],

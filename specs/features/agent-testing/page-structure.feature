@@ -44,13 +44,13 @@ Feature: The Agent Testing page
     Then the current Simulations group is shown, unchanged
     And no Agent Testing item is shown
 
-  @integration
+  @unit
   Scenario: A rule that names the organization lights up the main menu
     Given the Agent Testing release flag is off by default
     And the flag carries one targeting rule that names the organization of
         the person who reads the menu
-    When the main menu is read
-    Then one item named "Agent Testing" is shown
+    When the flag is read for that person
+    Then it is on, which is what shows the one "Agent Testing" item in the main menu
     And the Simulations group is not shown
 
   @integration

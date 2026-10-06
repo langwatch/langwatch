@@ -55,6 +55,7 @@ import {
 } from "@langwatch/experiment-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
+import type { ExperimentDspyRetentionRepository } from "../repositories/experiment-dspy-retention.repository.ts";
 import type { ExperimentDspyRepository } from "../repositories/experiment-dspy.repository.ts";
 import type { ExperimentRunRepository } from "../repositories/experiment-run.repository.ts";
 import {
@@ -81,6 +82,8 @@ export type ExperimentServiceOptions = {
   repository: ExperimentRepository;
   runRepository: ExperimentRunRepository;
   dspyRepository: ExperimentDspyRepository;
+  /** The tenant's DSPy retention, which a written step is stamped with. */
+  dspyRetention: ExperimentDspyRetentionRepository;
   /** Refuses by name where the runtime composes no Eventing pipeline. */
   execution?: ExperimentExecution;
   slugify: (value: string) => string;
@@ -346,7 +349,10 @@ export class ExperimentService {
   }
 
   async upsertDspyStep(input: ExperimentDspyStep): Promise<void> {
-    await this.options.dspyRepository.upsert(experimentDspyStepSchema.parse(input));
+    await this.options.dspyRepository.upsert({
+      step: experimentDspyStepSchema.parse(input),
+      retention: this.options.dspyRetention,
+    });
   }
 
   async listDspySteps(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]> {

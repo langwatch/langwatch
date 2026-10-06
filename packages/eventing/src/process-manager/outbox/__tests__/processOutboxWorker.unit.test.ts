@@ -15,6 +15,11 @@ function report() {
   return { dispatched: [], retried: [], dead: [], released: [], fenced: [] };
 }
 
+/** A drain that leased and dispatched one message: never idle. */
+function busyReport() {
+  return { ...report(), dispatched: ["message-1"] };
+}
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -255,7 +260,7 @@ describe("ProcessOutboxWorker", () => {
   /** @scenario Outbox workers registered together do not poll in lockstep */
   it("phase-shifts the recovery poll by the drawn fraction of one interval", async () => {
     vi.useFakeTimers();
-    const runOnce = vi.fn().mockResolvedValue(report());
+    const runOnce = vi.fn().mockResolvedValue(busyReport());
     const worker = new ProcessOutboxWorker({
       dispatcher: { runOnce },
       logger: makeLogger(),
@@ -300,5 +305,162 @@ describe("ProcessOutboxWorker", () => {
       .map((line) => line.phaseMs);
     expect(phases).toEqual([100, 800]);
     draw.mockRestore();
+  });
+
+  describe("given drains that lease nothing", () => {
+    /** @scenario "An idle outbox worker backs off its recovery poll until notified" */
+    it("doubles the interval after each empty poll, up to the ceiling", async () => {
+      vi.useFakeTimers();
+      const runOnce = vi.fn().mockResolvedValue(report());
+      const worker = new ProcessOutboxWorker({
+        dispatcher: { runOnce },
+        logger: makeLogger(),
+        jitter: () => 0,
+        intervalMs: 1_000,
+        maxIdleIntervalMs: 16_000,
+      });
+
+      worker.start();
+      await vi.advanceTimersByTimeAsync(0);
+      const pollTimes: number[] = [];
+      for (let elapsed = 0; elapsed < 50_000; elapsed += 250) {
+        const before = runOnce.mock.calls.length;
+        await vi.advanceTimersByTimeAsync(250);
+        if (runOnce.mock.calls.length > before) pollTimes.push(elapsed + 250);
+      }
+
+      // The start drain and the phase-shifted first poll are both idle; each poll after that
+      // is armed once its drain settled, so every gap already carries that drain's doubling.
+      expect(pollTimes).toEqual([1_000, 5_000, 13_000, 29_000, 45_000]);
+      await worker.stop();
+    });
+
+    /** @scenario "An idle outbox worker backs off its recovery poll until notified" */
+    it("drains at once on notify and polls at the base interval again", async () => {
+      vi.useFakeTimers();
+      const runOnce = vi.fn().mockResolvedValue(report());
+      const worker = new ProcessOutboxWorker({
+        dispatcher: { runOnce },
+        logger: makeLogger(),
+        jitter: () => 0,
+        intervalMs: 1_000,
+      });
+
+      worker.start();
+      await vi.advanceTimersByTimeAsync(20_000);
+      const backedOff = runOnce.mock.calls.length;
+
+      runOnce.mockResolvedValueOnce(busyReport());
+      worker.notify();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(runOnce).toHaveBeenCalledTimes(backedOff + 1);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(runOnce).toHaveBeenCalledTimes(backedOff + 2);
+      await worker.stop();
+    });
+
+    /** @scenario "An idle outbox worker backs off its recovery poll until notified" */
+    it("returns to the base interval once a poll leases a message", async () => {
+      vi.useFakeTimers();
+      const runOnce = vi.fn().mockResolvedValue(report());
+      const worker = new ProcessOutboxWorker({
+        dispatcher: { runOnce },
+        logger: makeLogger(),
+        jitter: () => 0,
+        intervalMs: 1_000,
+        maxIdleIntervalMs: 8_000,
+      });
+
+      worker.start();
+      // Drains at 0s, 1s and 5s; the last settles idle and arms the next 8s out, for 13s.
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(runOnce).toHaveBeenCalledTimes(3);
+
+      runOnce.mockResolvedValueOnce(busyReport());
+      await vi.advanceTimersByTimeAsync(8_000);
+      expect(runOnce).toHaveBeenCalledTimes(4);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(runOnce).toHaveBeenCalledTimes(5);
+      await worker.stop();
+    });
+
+    /** @scenario "An idle outbox worker backs off its recovery poll until notified" */
+    it("drains again at once after a full batch, and waits a poll after a partial one", async () => {
+      vi.useFakeTimers();
+      const fullBatch = { ...report(), dispatched: ["message-1", "message-2"] };
+      const runOnce = vi
+        .fn()
+        .mockResolvedValueOnce(fullBatch)
+        .mockResolvedValueOnce(fullBatch)
+        .mockResolvedValueOnce(busyReport())
+        .mockResolvedValue(report());
+      const worker = new ProcessOutboxWorker({
+        dispatcher: { runOnce },
+        logger: makeLogger(),
+        jitter: () => 0,
+        intervalMs: 1_000,
+        batchSize: 2,
+      });
+
+      worker.start();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(runOnce).toHaveBeenCalledTimes(3);
+
+      await vi.advanceTimersByTimeAsync(999);
+      expect(runOnce).toHaveBeenCalledTimes(3);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(runOnce).toHaveBeenCalledTimes(4);
+      await worker.stop();
+    });
+
+    /** @scenario "An idle outbox worker backs off its recovery poll until notified" */
+    it("measures the next poll from when a slow drain settles, not from when it fired", async () => {
+      vi.useFakeTimers();
+      const runOnce = vi.fn(
+        () =>
+          new Promise<ReturnType<typeof report>>((resolve) =>
+            setTimeout(() => resolve(report()), 500),
+          ),
+      );
+      const worker = new ProcessOutboxWorker({
+        dispatcher: { runOnce },
+        logger: makeLogger(),
+        jitter: () => 0,
+        intervalMs: 1_000,
+      });
+
+      worker.start();
+      // Drains at 0s and 1s, both idle; the second settles at 1.5s with the interval at 4s.
+      await vi.advanceTimersByTimeAsync(5_499);
+      expect(runOnce).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(runOnce).toHaveBeenCalledTimes(3);
+      await vi.advanceTimersByTimeAsync(500);
+      await worker.stop();
+    });
+
+    /** @scenario "An idle outbox worker backs off its recovery poll until notified" */
+    it("backs off while drains fail instead of polling at the base interval", async () => {
+      vi.useFakeTimers();
+      const runOnce = vi.fn().mockRejectedValue(new Error("database unavailable"));
+      const worker = new ProcessOutboxWorker({
+        dispatcher: { runOnce },
+        logger: makeLogger(),
+        jitter: () => 0,
+        intervalMs: 1_000,
+      });
+
+      worker.start();
+      // Failed drains at 0s, 1s and 5s; the next is armed 8s out, for 13s.
+      await vi.advanceTimersByTimeAsync(12_999);
+      expect(runOnce).toHaveBeenCalledTimes(3);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(runOnce).toHaveBeenCalledTimes(4);
+      await worker.stop();
+    });
   });
 });

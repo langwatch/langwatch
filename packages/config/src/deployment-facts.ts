@@ -30,6 +30,31 @@ export const { langevalsStagingThresholdBytes, langevalsStagingTtlSeconds } = Co
   }),
 );
 
+/**
+ * The deployment's environment name (`NODE_ENV`): the process derives `production` from it and
+ * every owner that reads it holds this one leaf.
+ */
+export const { nodeEnvironment } = Config.define((c) => ({
+  nodeEnvironment: c.env("NODE_ENV", z.string().optional()),
+}));
+
+/** The port the worker's raw-socket doors listen on (VOICE_WS_PORT); voice media dials here. */
+export const { rawSocketPort } = Config.define((c) => ({
+  rawSocketPort: c.env("VOICE_WS_PORT", z.coerce.number().int().min(0).max(65535).default(3300)),
+}));
+
+/** The standard proxy spellings, keyed by env name: one group every egress-making owner holds. */
+export const { outboundProxy } = Config.define((c) => ({
+  outboundProxy: {
+    HTTPS_PROXY: c.env("HTTPS_PROXY", z.string().optional()),
+    https_proxy: c.env("https_proxy", z.string().optional()),
+    HTTP_PROXY: c.env("HTTP_PROXY", z.string().optional()),
+    http_proxy: c.env("http_proxy", z.string().optional()),
+    NO_PROXY: c.env("NO_PROXY", z.string().optional()),
+    no_proxy: c.env("no_proxy", z.string().optional()),
+  },
+}));
+
 /** The outbound address fence every egress-making owner judges a call by. */
 export const { blockLocalHttpCalls, allowedProxyHosts } = Config.define((c) => ({
   blockLocalHttpCalls: c.env("BLOCK_LOCAL_HTTP_CALLS", environmentOneOrTrueSchema),
@@ -64,6 +89,103 @@ export const { telemetryExporterEndpoint } = Config.define((c) => ({
   telemetryExporterEndpoint: c.env(
     "OTEL_EXPORTER_OTLP_ENDPOINT",
     z.preprocess((value) => (value === "" ? undefined : value), z.string().min(1).optional()),
+  ),
+}));
+
+/**
+ * This deployment's public origin (`BASE_HOST`): the process and every module that links back
+ * hold this one leaf. Absent and blank both mean "named none".
+ */
+export const { publicBaseUrl } = Config.define((c) => ({
+  publicBaseUrl: c.env(
+    "BASE_HOST",
+    z
+      .string()
+      .optional()
+      .transform((value) => value?.trim() || void 0),
+  ),
+}));
+
+/**
+ * How long a code block may run inside the NLP engine, raw as the engine reads it. Workflow
+ * pushes it to the studio engine and scenario clamps by it; each holds this one leaf.
+ */
+export const { nlpCodeBlockTimeoutSeconds } = Config.define((c) => ({
+  nlpCodeBlockTimeoutSeconds: c.env(
+    "NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS",
+    z.string().optional(),
+  ),
+}));
+
+const optionalNonBlank = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.string().min(1).optional(),
+);
+
+/**
+ * The release this install runs, as the deployment names it: observability and every module that
+ * reports a version hold these two leaves. Read them through `releaseVersionOf`.
+ */
+export const { serviceVersion, otelResourceAttributes } = Config.define((c) => ({
+  serviceVersion: c.env("SERVICE_VERSION", optionalNonBlank),
+  otelResourceAttributes: c.env("OTEL_RESOURCE_ATTRIBUTES", optionalNonBlank),
+}));
+
+/**
+ * `SERVICE_VERSION`, then `service.version` in `OTEL_RESOURCE_ATTRIBUTES` (the OTLP
+ * `key=value,...` encoding, values percent-decoded), and `unknown` rather than a made-up number.
+ */
+export function releaseVersionOf({
+  serviceVersion,
+  otelResourceAttributes,
+}: {
+  serviceVersion: string | undefined;
+  otelResourceAttributes: string | undefined;
+}): string {
+  const explicit = serviceVersion?.trim();
+  if (explicit) return explicit;
+  return (
+    resourceAttributeOf({ attributes: otelResourceAttributes, key: "service.version" }) || "unknown"
+  );
+}
+
+/** The last pair naming `key` wins, as a later attribute overrides an earlier one. */
+function resourceAttributeOf({
+  attributes,
+  key,
+}: {
+  attributes: string | undefined;
+  key: string;
+}): string | undefined {
+  let found: string | undefined;
+  for (const pair of attributes?.split(",") ?? []) {
+    const separator = pair.indexOf("=");
+    if (separator <= 0 || pair.slice(0, separator).trim() !== key) continue;
+    found = percentDecoded(pair.slice(separator + 1).trim());
+  }
+  return found;
+}
+
+/** A value that does not decode is kept as it was written. */
+function percentDecoded(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * The NLP engine's address (`LANGWATCH_NLP_SERVICE`): the process and every module that calls
+ * the engine hold this one leaf. Absent and blank both mean "named none".
+ */
+export const { nlpServiceUrl } = Config.define((c) => ({
+  nlpServiceUrl: c.env(
+    "LANGWATCH_NLP_SERVICE",
+    z
+      .string()
+      .optional()
+      .transform((value) => value?.trim() || void 0),
   ),
 }));
 

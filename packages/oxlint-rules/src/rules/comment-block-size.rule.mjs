@@ -1,6 +1,7 @@
 import {
   COMMENT_BLOCK_ERROR_FIX,
   COMMENT_BLOCK_ERROR_WHAT,
+  COMMENT_BLOCK_ERROR_WHY,
   MAX_COMMENT_BLOCK_LINES,
   isExemptBlock,
   marksGeneratedHeader,
@@ -46,6 +47,29 @@ function commentsOf(program) {
     : comments.toSorted((left, right) => left.start - right.start || left.end - right.end);
 }
 
+const LINE_BREAK = /\r\n|[\r\n\u2028\u2029]/gu;
+
+/** Each comment's first and last line as oxlint's `loc` counts them, without its line table. */
+function commentLines({ comments, text }) {
+  const lines = new Map();
+  let line = 1;
+  LINE_BREAK.lastIndex = 0;
+  let next = LINE_BREAK.exec(text);
+  const lineAt = (offset) => {
+    while (next !== null && next.index + next[0].length <= offset) {
+      line += 1;
+      next = LINE_BREAK.exec(text);
+    }
+
+    return line;
+  };
+  for (const comment of comments) {
+    lines.set(comment, { start: lineAt(comment.start), end: lineAt(comment.end) });
+  }
+
+  return lines;
+}
+
 /** The comment text within the first `lastLine` lines, cut at the line boundary. */
 function headerTextOf({ comments, lastLine, text }) {
   let limit = -1;
@@ -60,9 +84,9 @@ function headerTextOf({ comments, lastLine, text }) {
     .join("\n");
 }
 
-function hasHeader({ comments, text }) {
+function hasHeader({ comments, lines, text }) {
   const first = comments[0];
-  if (first === undefined || first.loc.start.line > LICENSE_HEADER_LINES) return false;
+  if (first === undefined || lines.get(first).start > LICENSE_HEADER_LINES) return false;
 
   return (
     marksGeneratedHeader(headerTextOf({ comments, lastLine: GENERATED_HEADER_LINES, text })) ||
@@ -71,31 +95,31 @@ function hasHeader({ comments, text }) {
 }
 
 /** The lines that carry code beside a comment, found from the text around each comment alone. */
-function linesWithCode({ comments, text }) {
+function linesWithCode({ comments, lines, text }) {
   const withCode = new Set();
   comments.forEach((comment, index) => {
     let lineStart = text.lastIndexOf("\n", comment.start - 1) + 1;
     const previous = comments[index - 1];
     if (previous !== undefined && previous.end > lineStart) lineStart = previous.end;
-    if (/\S/.test(text.slice(lineStart, comment.start))) withCode.add(comment.loc.start.line);
+    if (/\S/.test(text.slice(lineStart, comment.start))) withCode.add(lines.get(comment).start);
 
     let lineEnd = text.indexOf("\n", comment.end);
     if (lineEnd === -1) lineEnd = text.length;
     const next = comments[index + 1];
     if (next !== undefined && next.start < lineEnd) lineEnd = next.start;
-    if (/\S/.test(text.slice(comment.end, lineEnd))) withCode.add(comment.loc.end.line);
+    if (/\S/.test(text.slice(comment.end, lineEnd))) withCode.add(lines.get(comment).end);
   });
 
   return withCode;
 }
 
 /** The runs of consecutive comment-only lines, as `{ line, lines }`. */
-function commentBlocks({ comments, text }) {
-  const withCode = linesWithCode({ comments, text });
+function commentBlocks({ comments, lines, text }) {
+  const withCode = linesWithCode({ comments, lines, text });
   const runs = [];
   for (const comment of comments) {
-    let from = comment.loc.start.line;
-    let to = comment.loc.end.line;
+    let from = lines.get(comment).start;
+    let to = lines.get(comment).end;
     if (withCode.has(from)) from += 1;
     if (withCode.has(to)) to -= 1;
     if (from > to) continue;
@@ -115,13 +139,13 @@ function describeBlock(block, sourceCode) {
 }
 
 /** Every comment line past the column limit, each reported once however many comments cover it. */
-function overlongCommentLines({ comments, text }) {
+function overlongCommentLines({ comments, lines, text }) {
   const seen = new Set();
   const overflows = [];
 
   for (const comment of comments) {
     let lineStart = text.lastIndexOf("\n", comment.start - 1) + 1;
-    let line = comment.loc.start.line;
+    let line = lines.get(comment).start;
     while (lineStart <= Math.max(comment.start, comment.end - 1)) {
       const newline = text.indexOf("\n", lineStart);
       const lineEnd = newline === -1 ? text.length : newline;
@@ -145,16 +169,18 @@ function overlongCommentLines({ comments, text }) {
 export function commentBlockAnalysis(context, program) {
   const comments = commentsOf(program);
   const text = context.sourceCode.text;
-  if (comments.length === 0 || hasHeader({ comments, text })) {
+  if (comments.length === 0) return { blocks: [], columnOverflows: [] };
+  const lines = commentLines({ comments, text });
+  if (hasHeader({ comments, lines, text })) {
     return { blocks: [], columnOverflows: [] };
   }
 
-  const blocks = commentBlocks({ comments, text })
+  const blocks = commentBlocks({ comments, lines, text })
     .filter((block) => block.lines > MAX_COMMENT_BLOCK_LINES)
     .map((block) => describeBlock(block, context.sourceCode))
     .filter((block) => !block.exempt);
 
-  return { blocks, columnOverflows: overlongCommentLines({ comments, text }) };
+  return { blocks, columnOverflows: overlongCommentLines({ comments, lines, text }) };
 }
 
 export const commentBlockSizeRule = defineRule({
@@ -163,14 +189,12 @@ export const commentBlockSizeRule = defineRule({
   messages: {
     commentBlockSize: {
       what: COMMENT_BLOCK_ERROR_WHAT,
-      why:
-        "A comment is for what the code cannot say. The rule makes two checks: a block of" +
-        ` more than ${MAX_COMMENT_BLOCK_LINES} lines, and a comment line wider than ${MAX_COMMENT_COLUMNS} columns.`,
+      why: COMMENT_BLOCK_ERROR_WHY,
       fix: COMMENT_BLOCK_ERROR_FIX,
     },
     commentColumns: {
       what: "Comment line is {{width}} columns; wrap at {{max}}.",
-      why: `The rule's second check: a comment line is at most ${MAX_COMMENT_COLUMNS} columns wide.`,
+      why: `A line wider than ${MAX_COMMENT_COLUMNS} columns wraps in editors and diffs, so it reads broken. Read the linting skill.`,
       fix:
         "Wrap it at {{max}} columns, keeping the sentence whole across the break. If it only" +
         " restates the code beside it, delete it instead of wrapping it.",

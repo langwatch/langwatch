@@ -4,10 +4,9 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
 import type { RoleApi } from "@langwatch/role-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import type { ShareApi } from "@langwatch/share-contract";
@@ -27,17 +26,14 @@ import { organizationProcessModule } from "../../organization.module.ts";
 function process(role: "api" | "worker") {
   const secrets = SecretsResolver.over(SecretsChain.start({ environment: {} }));
   return createApp({ role, secrets: (owner, declared) => secrets.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(organizationProcessModule)])
-    .withMembers({
-      encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-      processName: "organization-installation-test",
-      publicBaseUrl: undefined,
-    })
-    .withRelational(createApiFixture<PrismaClient>())
-    .withKeyvalue(createApiFixture<RedisConnection>())
+    .withModules([organizationProcessModule])
+    .withStores(memoryStores())
     .withObservability((observability) => observability.withLogging(createTestLogger().logger))
     .withConfig({
-      organization: { signUp: { mode: "open", allowedDomains: [], adminEmails: [] } },
+      organization: {
+        signUp: { mode: "open", allowedDomains: [], adminEmails: [] },
+        publicBaseUrl: undefined,
+      },
     })
     .provide({
       "api-key": createApiFixture<ApiKeyApi>(),
@@ -60,6 +56,24 @@ describe("organization app installation", () => {
       expect(runtime.service(OrganizationApi)).toBe(
         runtime.module(organizationProcessModule).provided,
       );
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "A feature needs organization behaviour" */
+  it("hands every feature the one OrganizationApi, with no repository member on it", async () => {
+    const runtime = await process("api").boot();
+
+    try {
+      const first = runtime.service(OrganizationApi);
+      const second = runtime.service(OrganizationApi);
+
+      expect(second).toBe(first);
+      expect(first).toBe(runtime.module(organizationProcessModule).provided);
+      expect(
+        Object.keys(first).filter((name) => /repositor|prisma|persistence/i.test(name)),
+      ).toEqual([]);
     } finally {
       await runtime.stop();
     }

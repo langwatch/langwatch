@@ -1,14 +1,14 @@
 import { prismaRepositories } from "@langwatch/prisma-client";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { ObjectStorage } from "@langwatch/process-stores/members";
 
 import type { DatasetRepositories } from "../dataset.repositories.ts";
 import { ObjectStorageDatasetChunkRepository } from "../object-storage/object-storage.dataset-chunk.repository.ts";
 import { PrismaBatchEvaluationRepository } from "./prisma.batch-evaluation.repository.ts";
 import { PrismaDatasetContentRepository } from "./prisma.dataset-content.repository.ts";
+import { PrismaDatasetCountRepository } from "./prisma.dataset-count.repository.ts";
 import { PrismaDatasetMigrationRepository } from "./prisma.dataset-migration.repository.ts";
 import { PrismaDatasetRecordContentRepository } from "./prisma.dataset-record-content.repository.ts";
 import { PrismaDatasetRecordRepository } from "./prisma.dataset-record.repository.ts";
-import { PrismaDatasetUsageRepository } from "./prisma.dataset-usage.repository.ts";
 import { PrismaDatasetRepository } from "./prisma.dataset.repository.ts";
 
 const PostgresDatasetTableRepositories = prismaRepositories({
@@ -17,7 +17,7 @@ const PostgresDatasetTableRepositories = prismaRepositories({
   content: PrismaDatasetContentRepository,
   recordContent: PrismaDatasetRecordContentRepository,
   batchEvaluations: PrismaBatchEvaluationRepository,
-  usage: PrismaDatasetUsageRepository,
+  count: PrismaDatasetCountRepository,
 });
 
 /** Dataset's live stores: its Postgres tables, plus the content move into object storage. */
@@ -28,11 +28,15 @@ export class PostgresDatasetRepositories {
   static create({
     prisma,
     objectStorage,
-  }: Pick<ProcessMembers, "prisma" | "objectStorage">): DatasetRepositories {
+  }: Parameters<typeof PostgresDatasetTableRepositories.create>[0] & {
+    objectStorage: ObjectStorage;
+  }): DatasetRepositories {
+    const chunks = ObjectStorageDatasetChunkRepository.create({ objectStorage });
     return {
       ...PostgresDatasetTableRepositories.create({ prisma }),
+      chunks,
       migration: PrismaDatasetMigrationRepository.create({ database: prisma }),
-      migrationChunks: ObjectStorageDatasetChunkRepository.create({ objectStorage }),
+      migrationChunks: chunks,
     };
   }
 }

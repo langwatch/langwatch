@@ -23,7 +23,7 @@ const CONTINUE = { action: "continue" } as const;
 const REFUSE = { action: "reject", code: "OAuthAccountNotLinked" } as const;
 const logger = createLogger("langwatch:identity:sso-user-resolution");
 
-export interface SsoUserResolutionServiceDeps {
+interface SsoUserResolutionServiceDeps {
   /** Identity's own person rows: `User`, `Account`, `Identifier`, credentials. */
   people: SsoRegistrantReadRepository;
   connections: SsoConnectionReadRepository;
@@ -128,6 +128,8 @@ export class SsoUserResolutionService {
       accountKey: input.accountKey,
     });
     if (contested) return REFUSE;
+    // A repeat sign-in of a linked identity continues: the binding is reused.
+    if (await this.holdsThisBinding({ input, userId: user.id })) return CONTINUE;
     // Native linking rechecks the exact issuer/subject owner and provider.
     return { action: "link", userId: user.id, profile: "preserve" };
   }
@@ -246,7 +248,8 @@ export class SsoUserResolutionService {
           account.issuer === input.accountKey.issuer &&
           account.providerAccountId === input.accountKey.accountId,
       );
-      return alreadyLinked ? { action: "link", userId, profile: "preserve" } : REFUSE;
+      if (!alreadyLinked) return REFUSE;
+      return input.protocol === "saml" ? CONTINUE : { action: "link", userId, profile: "preserve" };
     }
     if (await this.deps.people.hasStoredCredential({ userId })) return REFUSE;
     const proven = await this.deps.people.hasProvingIdentifier({
@@ -285,7 +288,10 @@ export class SsoUserResolutionService {
     input: SsoUserResolutionInput;
     userId: string;
   }): Promise<boolean> {
-    const owners = await this.deps.directory.findDirectoryConnectionsForUser({ userId });
+    const owners = await this.deps.directory.findDirectoryConnectionsForUser({
+      organizationId: connection.organizationId,
+      userId,
+    });
     if (owners.includes(input.providerId)) return true;
     const replaced = connection.replacesConnectionId;
     return replaced !== null && owners.includes(replaced);

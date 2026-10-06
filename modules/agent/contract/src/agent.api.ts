@@ -1,5 +1,7 @@
+import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
+import { z } from "zod";
 
 import type {
   RegisterConnectedAgentInput,
@@ -29,6 +31,7 @@ import type { AgentCallInput, AgentCallContext, AgentCallResult } from "./connec
 import type {
   AgentCallSignal,
   AgentConnection,
+  AgentConnectAdmission,
   AgentConnectCredentials,
   AgentConnectFramesInput,
   AgentConnectPollInput,
@@ -49,10 +52,7 @@ export interface AgentApi {
     agents: readonly { id: string; type: string }[];
   }): Promise<Map<string, AgentPresence>>;
   call(input: AgentCallInput, context: AgentCallContext): Promise<AgentCallResult>;
-  acceptConnection(
-    connection: AgentConnection,
-    credentials: AgentConnectCredentials,
-  ): Promise<void>;
+  acceptConnection(connection: AgentConnection, admission: AgentConnectAdmission): Promise<void>;
   connectRegister(
     body: unknown,
     credentials: AgentConnectCredentials,
@@ -191,3 +191,15 @@ export const AgentApi = moduleApi<AgentApi>()("agent");
 export type AgentWorkflowInput = { projectId: string; workflowId: string };
 export type AgentWorkflowConfig = { id: string; config: Record<string, unknown> };
 export type UpdateAgentWorkflowConfigInput = AgentWorkflowInput & AgentWorkflowConfig;
+
+/** Single-replica installs may relay without Redis. No payload limit means the protocol cap. */
+export const agentServerConfig = Config.define((c) => ({
+  replicaCount: c.env("LANGWATCH_APP_REPLICAS", z.coerce.number().int().positive().default(1)),
+  relayMaxPayloadMb: c.env(
+    "LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB",
+    z.coerce.number().positive().optional(),
+  ),
+  publicBaseUrl,
+}));
+
+export type AgentServerConfig = ConfigOf<typeof agentServerConfig>;

@@ -7,7 +7,9 @@
  */
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 
-import type { QuarantineTenantResolver } from "../app/governance.members.ts";
+export interface QuarantineTenantResolver {
+  resolveTenantId(organizationId: string): Promise<string>;
+}
 
 /** The one project operation this service needs, out of `ProjectApi`'s whole surface. */
 type QuarantineTenantProjects = Pick<ProjectApi, "ensureInternal">;

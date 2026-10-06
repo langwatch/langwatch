@@ -122,7 +122,7 @@ func (s *Server) handleConversation(w http.ResponseWriter, r *http.Request) {
 		if json.Unmarshal(raw, &msg) != nil {
 			continue
 		}
-		if err := s.receive(ws, call, &turn, msg); err != nil {
+		if err := s.receive(callLine{ws: ws, call: call}, &turn, msg); err != nil {
 			return
 		}
 	}
@@ -134,7 +134,14 @@ type callerTurn struct {
 	frames   int
 }
 
-func (s *Server) receive(ws *wsConn, call *Call, turn *callerTurn, msg clientMessage) error {
+// callLine is one open call and the socket it runs over.
+type callLine struct {
+	ws   *wsConn
+	call *Call
+}
+
+func (s *Server) receive(line callLine, turn *callerTurn, msg clientMessage) error {
+	call := line.call
 	switch {
 	case msg.UserAudioChunk != "":
 		// An undecodable chunk reads as silence, which is what the provider would hear.
@@ -146,10 +153,10 @@ func (s *Server) receive(ws *wsConn, call *Call, turn *callerTurn, msg clientMes
 		}
 		frames := turn.frames
 		turn.frames = 0
-		return s.answerTurn(ws, call, frames)
+		return s.answerTurn(line, frames)
 	case msg.Type == "conversation_initiation_client_data":
 		s.calls.event(call, "in", msg.Type)
-		return s.send(ws, call, "conversation_initiation_metadata", map[string]any{
+		return s.send(line, "conversation_initiation_metadata", map[string]any{
 			"conversation_initiation_metadata_event": map[string]string{
 				"conversation_id":           call.ID,
 				"agent_output_audio_format": "pcm_24000",
@@ -165,7 +172,8 @@ func (s *Server) receive(ws *wsConn, call *Call, turn *callerTurn, msg clientMes
 // answerTurn speaks the next scripted line: transcript first, so the SDK has it
 // before the audio drains, then the audio in 100 ms events. The turn is logged
 // before anything is sent, so a console read after the reply always sees it.
-func (s *Server) answerTurn(ws *wsConn, call *Call, callerFrames int) error {
+func (s *Server) answerTurn(callLine callLine, callerFrames int) error {
+	ws, call := callLine.ws, callLine.call
 	var audio []byte
 	var line string
 	s.calls.update(call, func(c *Call) {
@@ -179,12 +187,12 @@ func (s *Server) answerTurn(ws *wsConn, call *Call, callerFrames int) error {
 			CallerFrames: callerFrames, AgentFrames: frames,
 		})
 	})
-	if err := s.send(ws, call, "user_transcript", map[string]any{
+	if err := s.send(callLine, "user_transcript", map[string]any{
 		"user_transcription_event": map[string]string{"user_transcript": CallerTranscript},
 	}); err != nil {
 		return err
 	}
-	if err := s.send(ws, call, "agent_response", map[string]any{
+	if err := s.send(callLine, "agent_response", map[string]any{
 		"agent_response_event": map[string]string{"agent_response": line},
 	}); err != nil {
 		return err
@@ -202,9 +210,9 @@ func (s *Server) answerTurn(ws *wsConn, call *Call, callerFrames int) error {
 }
 
 // send writes one typed event and records it on the call.
-func (s *Server) send(ws *wsConn, call *Call, kind string, body map[string]any) error {
-	s.calls.event(call, "out", kind)
-	return s.write(ws, kind, body)
+func (s *Server) send(line callLine, kind string, body map[string]any) error {
+	s.calls.event(line.call, "out", kind)
+	return s.write(line.ws, kind, body)
 }
 
 func (s *Server) write(ws *wsConn, kind string, body map[string]any) error {

@@ -1,19 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import { secretReferenceOf } from "../http-node.ts";
+import { readSecretReference } from "../http-node.ts";
 
-describe("secretReferenceOf", () => {
+describe("readSecretReference", () => {
   describe("given a bare reference", () => {
     /** @scenario "A credential's reference is read from its value" */
-    it("returns the secret name", () => {
-      expect(secretReferenceOf("{{ secrets.HTTP_AGENT_TOKEN }}")).toBe("HTTP_AGENT_TOKEN");
+    it("reads the secret name", () => {
+      expect(readSecretReference("{{ secrets.HTTP_AGENT_TOKEN }}")).toEqual({
+        isReference: true,
+        name: "HTTP_AGENT_TOKEN",
+      });
     });
   });
 
   describe("given a reference after a scheme", () => {
     /** @scenario "A credential's reference is read from its value" */
     it.each(["Bearer", "Basic", "Token"])("returns the name after %s", (scheme) => {
-      expect(secretReferenceOf(`${scheme} {{ secrets.API_KEY_2 }}`)).toBe("API_KEY_2");
+      expect(readSecretReference(`${scheme} {{ secrets.API_KEY_2 }}`)).toEqual({
+        isReference: true,
+        name: "API_KEY_2",
+      });
     });
   });
 
@@ -28,8 +34,8 @@ describe("secretReferenceOf", () => {
       "{{secrets.API_KEY}}",
       "{{ secrets.API_KEY }} extra",
       "prefix {{ secrets.API_KEY }}",
-    ])("returns nothing for %j", (value) => {
-      expect(secretReferenceOf(value)).toBeUndefined();
+    ])("reads %j as no reference", (value) => {
+      expect(readSecretReference(value)).toEqual({ isReference: false });
     });
   });
 });

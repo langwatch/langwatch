@@ -1,4 +1,4 @@
-/** @see specs/instant-evals/instant-eval-billing.feature */
+/** @see modules/instant-eval/specs/instant-eval-billing.feature */
 
 export interface SpendKeyLabelInput {
   row: { virtualKeyId: string; requestType: string };

@@ -53,6 +53,7 @@ function renderSync(sync: ConnectEnabledStatus["sync"]) {
     entitledServices: null,
     usage: null,
     refusal: null,
+    isUsageUnavailable: false,
     sync,
   };
   renderWithDesignSystem(

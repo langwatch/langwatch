@@ -6,6 +6,7 @@ import {
   IssuedLicenseNotActiveError,
   IssuedLicenseNotFoundError,
   LicenseAlreadyRegisteredError,
+  LicenseAlreadyReissuedError,
   LicenseKeyInvalidError,
   LicenseOverageMaxRequiresOverageError,
   LicenseSigningNotConfiguredError,
@@ -19,8 +20,8 @@ import {
   TEST_PRIVATE_KEY,
   TEST_PUBLIC_KEY,
 } from "../../__tests__/fixtures/license-keys.fixture.ts";
-import type { ConnectManagedKeys } from "../../app/licensing.members.ts";
 import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
+import type { ConnectManagedKeys } from "../license-registry.service.ts";
 import { LicenseRegistryService } from "../license-registry.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
@@ -85,11 +86,26 @@ class RecordingBudgets {
   }
 }
 
+type IssuedLicenseStore = MemoryIssuedLicenseRepository;
+
+/** The table's own refusal of a duplicate, reported the way Prisma reports it. */
+function uniqueViolation({ column }: { column: string }): Error {
+  return Object.assign(new Error(`unique constraint on ${column}`), {
+    code: "P2002",
+    meta: { target: [column] },
+  });
+}
+
 function harness({
   signingKey = TEST_PRIVATE_KEY,
   organizations = new RecordingCustomers(),
-}: { signingKey?: string; organizations?: RecordingCustomers } = {}) {
-  const repository = MemoryIssuedLicenseRepository.create();
+  over = (store) => store,
+}: {
+  signingKey?: string;
+  organizations?: RecordingCustomers;
+  over?: (store: IssuedLicenseStore) => IssuedLicenseStore;
+} = {}) {
+  const repository = over(MemoryIssuedLicenseRepository.create());
   const managedKeys = new RecordingManagedKeys();
   const contractBudgets = new RecordingBudgets();
   const cryptography = NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY });
@@ -100,7 +116,6 @@ function harness({
     contractBudgets,
     cryptography,
     generation: LicenseGenerationService.create(cryptography),
-    cipher: { encrypt: (plain) => `sealed:${plain}`, decrypt: (cipher) => cipher.slice(7) },
     signingKey: () => signingKey,
     now: () => NOW,
   });
@@ -199,6 +214,55 @@ describe("the license registry", () => {
     await expect(registry.record({ licenseKey, source: "SCRIPT" })).rejects.toBeInstanceOf(
       LicenseAlreadyRegisteredError,
     );
+  });
+
+  /** @scenario The same license written twice at once is still refused by name */
+  it("refuses a second write that got past the duplicate check as already registered", async () => {
+    const { registry } = harness({
+      over: (store) =>
+        new Proxy(store, {
+          get: (target, property) => {
+            if (property === "findByTokenHash") return async () => null;
+            const member: unknown = Reflect.get(target, property, target);
+            return typeof member === "function" ? member.bind(target) : member;
+          },
+        }),
+    });
+    const { licenseKey } = await registry.issue(issueInput());
+
+    const refusal = await registry.record({ licenseKey, source: "SCRIPT" }).catch((error) => error);
+
+    expect(refusal).toBeInstanceOf(LicenseAlreadyRegisteredError);
+  });
+
+  /** @scenario A reissue names the constraint the table refused it on */
+  it("names a reissue clash on the replaced license, and one on the license itself", async () => {
+    const refused: { column: string | null } = { column: null };
+    const { registry } = harness({
+      over: (store) =>
+        Object.create(store, {
+          create: {
+            value: (draft: Parameters<IssuedLicenseStore["create"]>[0]) =>
+              refused.column
+                ? Promise.reject(uniqueViolation({ column: refused.column }))
+                : store.create(draft),
+          },
+        }),
+    });
+    const { license } = await registry.issue(issueInput());
+    const reissue = () =>
+      registry.reissue({
+        id: license.id,
+        maxMembers: 80,
+        expiresAt: TERM_END,
+        operatorId: "operator-3",
+      });
+
+    refused.column = "replacesId";
+    await expect(reissue()).rejects.toBeInstanceOf(LicenseAlreadyReissuedError);
+
+    refused.column = "tokenHash";
+    await expect(reissue()).rejects.toBeInstanceOf(LicenseAlreadyRegisteredError);
   });
 
   /** @scenario "Revoking a license" */

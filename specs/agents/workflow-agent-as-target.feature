@@ -7,17 +7,19 @@ Feature: Workflow agent as an experiment target
     Given the user has a workflow built in Optimization Studio
     And the user has saved the workflow as an agent
 
+  @unit
   Scenario: Running the experiment executes the underlying workflow
     Given the workflow agent is added as a target in the Experiments Workbench
     When the user runs the experiment
     Then each row executes the agent's workflow
     And no row shows a code validation error
 
-  @unit
+  @integration
   Scenario: The target column shows a workflow icon
     Given the workflow agent is added as a target in the Experiments Workbench
     Then the target column shows a workflow icon, not a code icon
 
+  @integration
   Scenario: Editing the target opens a mapping drawer, not a dead end
     Given the workflow agent is added as a target in the Experiments Workbench
     When the user opens the target's edit menu and selects Edit Agent
@@ -29,14 +31,21 @@ Feature: Workflow agent as an experiment target
       with mapping controls, matching the mapping UI code and HTTP
       agent targets already get
 
+  @integration
   Scenario: Mapping a dataset column to a workflow input field
     Given the workflow agent target's drawer is open
     And the underlying workflow declares an input field named "question"
     When the user maps "question" to a dataset column
     Then the mapping is saved immediately, without a separate save step
-    And running the experiment passes that column's value into the
-      workflow's "question" input
 
+  # Gap: no experiment-process test runs a workflow agent target with a mapped column and asserts the dispatched input.
+  @unimplemented
+  Scenario: Running the experiment passes a mapped column into the workflow's input
+    Given the workflow agent target maps the workflow's "question" input to a dataset column
+    When the user runs the experiment
+    Then each row passes that column's value into the workflow's "question" input
+
+  @integration
   Scenario: Switching away from a workflow target
     Given the workflow agent is added as a target in the Experiments Workbench
     When the user switches the target to a different agent

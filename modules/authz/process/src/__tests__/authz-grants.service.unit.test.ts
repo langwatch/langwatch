@@ -1103,3 +1103,40 @@ describe("AuthzGrantsService central caller ceiling", () => {
     expect(ledger.attachBindings).toHaveBeenCalledOnce();
   });
 });
+
+describe("when founder creation attaches its two admin grants", () => {
+  it("hands the membership stamp and bootstrap marker to the ledger unchanged", async () => {
+    const ledger = makeLedger();
+    const service = AuthzGrantsService.create({
+      permissions: permissiveGrantGuards,
+      repository: makeRepository(),
+      ledger,
+      epoch: new StubAuthzEpoch(),
+      newBindingId: () => "rb_test_ksuid",
+      bindings: new StubAuthzManagedGrantRepository(),
+    });
+    const founderBinding = {
+      bindingId: "rb-founder",
+      principal: { userId: "founder-1" },
+      role: "ADMIN",
+      customRoleId: null,
+      scopeType: "ORGANIZATION",
+      scopeId: ORG,
+      membershipStamp: "stamp-1",
+      membershipBootstrap: true,
+    } as const;
+
+    await service.attachBindings({
+      organizationId: ORG,
+      bindings: [founderBinding],
+      caller: { type: "system" },
+      actor: WRITE_ACTOR,
+      onDuplicate: "skip",
+      requireProjection: true,
+    });
+
+    expect(ledger.attachBindings).toHaveBeenCalledWith(
+      expect.objectContaining({ bindings: [founderBinding], requireProjection: true }),
+    );
+  });
+});

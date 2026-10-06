@@ -9,6 +9,7 @@ export class TestApiKeyService implements ApiKeyApi {
   assertSelectionWithinCeiling = unsupported<ApiKeyApi["assertSelectionWithinCeiling"]>();
   create = unsupported<ApiKeyApi["create"]>();
   createKey = unsupported<ApiKeyApi["createKey"]>();
+  createIngestionKey = unsupported<ApiKeyApi["createIngestionKey"]>();
   credentialCanManageOrganization = unsupported<ApiKeyApi["credentialCanManageOrganization"]>();
   enrichApiKeyList = unsupported<ApiKeyApi["enrichApiKeyList"]>();
   enrichBindingsWithNames = unsupported<ApiKeyApi["enrichBindingsWithNames"]>();
@@ -24,6 +25,7 @@ export class TestApiKeyService implements ApiKeyApi {
   findVerifiedToken = unsupported<ApiKeyApi["findVerifiedToken"]>();
   getByIdForCaller = unsupported<ApiKeyApi["getByIdForCaller"]>();
   mintRunKey = unsupported<ApiKeyApi["mintRunKey"]>();
+  mintAgentSandboxKey = unsupported<ApiKeyApi["mintAgentSandboxKey"]>();
   getOrgMembers = unsupported<ApiKeyApi["getOrgMembers"]>();
   getOrgProjects = unsupported<ApiKeyApi["getOrgProjects"]>();
   getOrgTeams = unsupported<ApiKeyApi["getOrgTeams"]>();

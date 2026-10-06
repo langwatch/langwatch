@@ -79,6 +79,33 @@ export function aesEncryption(key: Uint8Array): Encryption {
 }
 
 /**
+ * The cipher while a key rotation is under way: every write seals under the
+ * current key, and a read the current key refuses is tried under the previous one.
+ */
+export function rotatingEncryption({
+  current,
+  previous,
+}: {
+  current: Encryption;
+  previous: Encryption;
+}): Encryption {
+  return {
+    encrypt: (plaintext) => current.encrypt(plaintext),
+    decrypt(ciphertext) {
+      try {
+        return current.decrypt(ciphertext);
+      } catch (refusal) {
+        try {
+          return previous.decrypt(ciphertext);
+        } catch {
+          throw refusal;
+        }
+      }
+    },
+  };
+}
+
+/**
  * The secrets this process was started with, already resolved through the
  * chain in @langwatch/secrets. Reading one this process was not given is a
  * refusal naming the key, never an empty string.

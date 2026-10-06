@@ -84,3 +84,21 @@ describe("given the project's only model provider is connected at the organizati
     });
   });
 });
+
+describe("given Langy rides beside a drawer", () => {
+  describe("when the composer's model picker opens", () => {
+    /** @scenario "The model list opens above the panel when Langy rides beside a drawer" */
+    it("puts the model list on the overlay layer, above the panel", async () => {
+      const user = userEvent.setup();
+      renderPill();
+
+      await user.click(screen.getByTestId("langy-model-picker"));
+
+      const [option] = await screen.findAllByRole("option");
+      const positioner = option?.closest<HTMLElement>('[data-part="positioner"]');
+      // The panel sits at z 1600 beside a drawer and the drawer at 1500.
+      expect(Number(positioner?.style.getPropertyValue("z-index"))).toBe(2010);
+      expect(positioner?.style.getPropertyPriority("z-index")).toBe("important");
+    });
+  });
+});

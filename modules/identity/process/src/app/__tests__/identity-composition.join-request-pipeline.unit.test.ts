@@ -1,8 +1,11 @@
-import { createTenantId, EventSourcing, type StateProjectionStore } from "@langwatch/eventing";
+import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
+import { JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { liveRepositories } from "../../__tests__/support/live-repositories.ts";
+import { ConnectedIdentityEventing } from "../../eventing/identity-command-senders.store.ts";
+import { IdentityEventStores } from "../../eventing/identity-event-stores.store.ts";
 import type { JoinRequestFoldState } from "../../eventing/join-request-state.projection.ts";
 import {
   composeJoinRequestPipeline,
@@ -48,10 +51,11 @@ function recordingDatabase() {
 
 function compose() {
   const recording = recordingDatabase();
-  const eventSourcing = new EventSourcing({ enabled: false });
+  // No store kept and no senders: this process has not built the pipeline, so nothing commits.
   const pipeline: JoinRequestPipeline = composeJoinRequestPipeline({
     repositories: liveRepositories(recording.database),
-    eventSourcing,
+    eventStore: IdentityEventStores.create().of({ pipeline: JOIN_REQUEST_PIPELINE_NAME }),
+    commands: ConnectedIdentityEventing.create(),
     notifier: new SilentNotifier(),
   });
   return { ...recording, pipeline };
@@ -73,6 +77,7 @@ function foldedState(): JoinRequestFoldState {
     domain: "acme.example",
     state: "PENDING",
     matchedVia: "verified-identifier-domain",
+    origin: "web",
     createdAtMs: 1_600_000_000_000,
     updatedAtMs: 1_700_000_000_000,
     expiresAtMs: 1_700_600_000_000,
@@ -99,6 +104,7 @@ describe("given a process holding one typed Prisma client", () => {
      * dropped.
      */
     /** @scenario "The worker builds the join-request ledger from its own client" */
+    /** @scenario "The identity module composes the join-request ledger itself" */
     it("builds the pipeline the legacy registry registers, key for key", () => {
       const { pipeline } = compose();
 

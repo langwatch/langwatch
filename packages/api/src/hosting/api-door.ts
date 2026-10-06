@@ -3,9 +3,11 @@ import type {
   AuthzDeclaredScopeId,
   AuthzPermission,
   PermissionDecision,
+  PlatformTierPermission,
 } from "@langwatch/authorization";
 
-import type { Authorize, Entitlements } from "../access/access.ts";
+import type { Authorize, Entitlements, PlatformDecision } from "../access/access.ts";
+import type { RestKeyKind } from "../rest/key-credential.ts";
 import type { SessionVerification } from "./session-reader.ts";
 import type { TransportFactBinding, TransportPeers } from "./transport-hosts.ts";
 
@@ -20,7 +22,11 @@ export type ApiDoor = Readonly<{
   /** The decisions REST and tRPC both authorize through, and the session version tRPC carries. */
   authz: Authorize & TrpcSessionVersions;
   /** The API-key doors: a project key, an organization key, and any key with no project asked. */
-  identities: Readonly<{ project: RestIdentity; organization: RestIdentity; api_key: RestIdentity }>;
+  identities: Readonly<{
+    project: RestIdentity;
+    organization: RestIdentity;
+    api_key: RestIdentity;
+  }>;
   /** The plan every declared entitlement gate asks. */
   entitlements: Entitlements;
   /** Where every declared trail lands, on each transport. */
@@ -100,7 +106,17 @@ export type RestCaller = Readonly<{
 export type RestIdentity = Readonly<{
   authenticate(input: {
     request: Request;
+    /** The first of `permissions`, kept while a door asks one; a door asks every one. */
     permission: AuthzPermission;
+    /** Every permission the route asks, in declared order; the first one missing refuses. */
+    permissions: readonly AuthzPermission[];
+    /** How far a key door asks the permission; only a route that declared one carries it. */
+    reach?: "grants" | "organization";
+    /**
+     * The key kinds the route admits (E7): a project door refuses any other kind once the key
+     * resolves and before the permission, with `KeyKindRefusedError`. Absent admits every kind.
+     */
+    keyKinds?: readonly RestKeyKind[];
   }): Promise<RestCaller> | RestCaller;
   /**
    * The door, opened with no permission asked of it. Only a declaration
@@ -127,6 +143,15 @@ export type RestIdentity = Readonly<{
     permission: AuthzPermission;
     target: AuthzDeclaredScopeId;
   }): Promise<PermissionDecision> | PermissionDecision;
+  /**
+   * Whether the caller holds a platform-tier permission at the PLATFORM (E4), asked of the
+   * operator behind an impersonated caller. Only a declaration carrying a platform route needs
+   * it, and a mount that supplies none is refused by name.
+   */
+  authorizePlatform?(input: {
+    caller: RestCaller;
+    permission: PlatformTierPermission;
+  }): Promise<PlatformDecision> | PlatformDecision;
 }>;
 
 /**
@@ -158,7 +183,19 @@ export type TrpcAuditSink = Readonly<{
     action: string;
     args?: unknown;
     error?: Error;
+    /** The resource the row is about: a declared target, else what the answer named. */
+    targetKind?: string;
+    targetId?: string;
+    /** The human behind an impersonated call, as `impersonatorId`. */
+    metadata?: Record<string, string>;
   }): Promise<void> | void;
+  /**
+   * The organization holding a project or team, null when none does. A procedure declaring
+   * `.withAudit({ target: "organization", via })` is refused at mount by a sink without it.
+   */
+  organizationOf?(
+    scope: Readonly<{ tier: "project" | "team"; id: string }>,
+  ): Promise<string | null> | string | null;
 }>;
 
 /** Where a caller's session version is read; the authz module answers it. */

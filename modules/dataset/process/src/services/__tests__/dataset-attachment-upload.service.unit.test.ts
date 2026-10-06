@@ -9,6 +9,7 @@ import type {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
 import { DatasetAttachmentUploadService } from "../dataset-attachment-upload.service.ts";
 
 const projectId = "project-1";
@@ -53,7 +54,13 @@ function service() {
     },
     "storedObjects",
   );
-  return { stores, attachments: DatasetAttachmentUploadService.create({ storedObjects }) };
+  return {
+    stores,
+    attachments: DatasetAttachmentUploadService.create({
+      storedObjects,
+      requestBounds: createDatasetTestRequestBounds(),
+    }),
+  };
 }
 
 describe("DatasetAttachmentUploadService", () => {

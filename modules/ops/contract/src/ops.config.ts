@@ -2,8 +2,13 @@ import {
   adminEmails,
   Config,
   environmentOneOrTrueSchema,
+  isSaas,
+  nodeEnvironment,
+  otelResourceAttributes,
   posthogHost,
   posthogKey,
+  publicBaseUrl,
+  serviceVersion,
   type ConfigOf,
 } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
@@ -37,10 +42,19 @@ export const opsConfig = Config.define((c) => ({
       .transform((value) => !BACKUP_METRICS_OFF_VALUES.has((value ?? "").trim().toLowerCase())),
   ),
   productAnalytics: { key: posthogKey, host: posthogHost },
+  /** The Slack channel a new bug report is announced in; blank means `#dev`. */
+  bugReportSlackChannel: c.env("SLACK_BUG_REPORTS_CHANNEL", z.string().optional()),
   /** Asks for Cloud admin; boot refuses unless the licence private key matches (§3.5). */
   cloudOps: c.env("LANGWATCH_CLOUD_OPS", z.stringbool().default(false)),
   /** Read only by the one-time platform-operator seed; set afterwards, boot warns it is ignored. */
   adminEmails,
+  /** Process facts (§3.3) the checkup, the usage report and EXPLAIN's fail-closed rule read. */
+  nodeEnvironment,
+  isSaas,
+  publicBaseUrl,
+  /** The release, read through `releaseVersionOf`. */
+  serviceVersion,
+  otelResourceAttributes,
 }));
 
 export type OpsServerConfig = ConfigOf<typeof opsConfig>;

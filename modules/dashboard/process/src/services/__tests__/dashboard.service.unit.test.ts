@@ -9,8 +9,8 @@ import {
 } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
-import type { WorkbenchAccess } from "../../app/dashboard.members.ts";
 import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
+import type { WorkbenchAccess } from "../dashboard.service.ts";
 import { DashboardService } from "../dashboard.service.ts";
 
 class FixedWorkbenchAccess implements WorkbenchAccess {
@@ -98,6 +98,23 @@ describe("DashboardService", () => {
       expect(detail.graphs).toHaveLength(1);
       expect(JSON.stringify(detail)).not.toContain("SELECT 1");
       expect(listed?.graphCount).toBe(detail.graphs.length);
+    });
+
+    /** @scenario "The dashboard's card procedures admit workbench rows only when the workbench flag is on" */
+    it("admits the workbench chart with the flag on and the builder graph alone with it off", async () => {
+      const on = await dashboardWithBothChartKinds(true);
+      const off = await dashboardWithBothChartKinds(false);
+
+      const [admitted] = await on.service.getAll({
+        projectId: PROJECT,
+        graphCountScope: "placeable",
+      });
+      const [builderOnly] = await off.service.getAll({
+        projectId: PROJECT,
+        graphCountScope: "placeable",
+      });
+
+      expect([admitted?.graphCount, builderOnly?.graphCount]).toEqual([2, 1]);
     });
 
     describe("when the project may not place workbench cards", () => {

@@ -1,18 +1,17 @@
-import {
-  RECORD_SPAN_COMMAND_TYPE,
-  SPAN_MAX_PAST_MS,
-  SPAN_RECEIVED_EVENT_TYPE,
-  SPAN_RECEIVED_EVENT_VERSION_LATEST,
-  SPAN_RECEIVED_EVENT_VERSIONS,
-} from "./trace-ingress.constants.ts";
+import { Config, publicBaseUrl, type ConfigOf } from "@langwatch/config";
+import { z } from "zod";
 
-export {
-  RECORD_SPAN_COMMAND_TYPE,
-  SPAN_MAX_PAST_MS,
-  SPAN_RECEIVED_EVENT_TYPE,
-  SPAN_RECEIVED_EVENT_VERSION_LATEST,
-  SPAN_RECEIVED_EVENT_VERSIONS,
-};
+/** Durable raw ingress fact. Its name, version, and payload are replay compatibility. */
+export const SPAN_RECEIVED_EVENT_TYPE = "lw.obs.trace.span_received" as const;
+export const SPAN_RECEIVED_EVENT_VERSION_LATEST = "2025-12-14" as const;
+
+export const SPAN_RECEIVED_EVENT_VERSIONS = [SPAN_RECEIVED_EVENT_VERSION_LATEST] as const;
+
+/** Legacy raw-span command accepted by the OTLP ingress boundary. */
+export const RECORD_SPAN_COMMAND_TYPE = "lw.obs.trace.record_span" as const;
+
+/** Maximum accepted span age, shared by every Trace ingestion transport. */
+export const SPAN_MAX_PAST_MS = 31 * 24 * 60 * 60 * 1000;
 
 export const SPAN_RECORDED_EVENT_TYPE = "lw.trace.span_recorded" as const;
 export const SPAN_RECORDED_EVENT_VERSION_LATEST = "2026-08-27" as const;
@@ -185,3 +184,21 @@ export const RECORD_SPAN_COALESCE_MAX_BATCH = 64;
  * 4 MiB byte budget bounds large previews before this count does.
  */
 export const TRACE_CORRELATION_COALESCE_MAX_BATCH = 256;
+
+/**
+ * Span pipeline config: lane count and tokenizer settings, kept in original types so producer
+ * and consumer clamp identically. `publicBaseUrl` is the shared origin `platformUrl` links to.
+ */
+export const traceConfig = Config.define((c) => ({
+  spanProcessingShards: c.env("TRACE_SPAN_PROCESSING_SHARDS", z.string().optional()),
+  tokenizer: {
+    bpeDirectory: c.env("TIKTOKENS_PATH", z.string().optional()),
+    fetchTimeoutMs: c.env(
+      "TIKTOKEN_FETCH_TIMEOUT_MS",
+      z.union([z.string(), z.number()]).optional(),
+    ),
+  },
+  publicBaseUrl,
+}));
+
+export type TraceServerConfig = ConfigOf<typeof traceConfig>;

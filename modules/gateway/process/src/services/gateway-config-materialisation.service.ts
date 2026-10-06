@@ -21,12 +21,10 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
+import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
 import {
   type GatewayConfigAssembly,
   type GatewayModelProviderCredentials,
-  type GatewayBudgetSpend,
-} from "../app/gateway.members.ts";
-import {
   budgetToWire,
   buildProviderSlot,
   cacheRuleToWire,
@@ -69,7 +67,7 @@ function isKeyBag(value: unknown): value is Record<string, unknown> {
 export class GatewayConfigMaterialiserService {
   private readonly scopeResolution: GatewayScopeResolutionService;
   private readonly projects: ProjectApi;
-  private readonly chRepo: GatewayBudgetSpend | null;
+  private readonly chRepo: GatewayBudgetSpendRepository | null;
   private readonly budgetDecisions: GatewayService;
   private readonly modelProviders: GatewayCustomKeys;
   private readonly assembly: GatewayConfigAssembly;
@@ -92,7 +90,7 @@ export class GatewayConfigMaterialiserService {
     }: {
       scopeResolution: GatewayScopeResolutionService;
       projects: ProjectApi;
-      chRepo: GatewayBudgetSpend | null;
+      chRepo: GatewayBudgetSpendRepository | null;
       budgetDecisions: GatewayService;
       modelProviders: GatewayCustomKeys;
       assembly: GatewayConfigAssembly;
@@ -115,7 +113,7 @@ export class GatewayConfigMaterialiserService {
   static create(input: {
     scopeResolution: GatewayScopeResolutionService;
     projects: ProjectApi;
-    chRepo: GatewayBudgetSpend | null;
+    chRepo: GatewayBudgetSpendRepository | null;
     budgetDecisions: GatewayService;
     /** Model provider decrypts its own rows' keys; the gateway never holds that cipher. */
     modelProviders: GatewayCustomKeys;
@@ -354,7 +352,7 @@ export class GatewayConfigMaterialiserService {
       // every member's bucket, and the gateway would then cap each member
       // at what the whole group spent together.
       const deadline = AbortSignal.timeout(CONFIG_SPEND_READ_TIMEOUT_MS);
-      const read = this.chRepo.getSpendForBudgetsAcrossTenantsUntil({
+      const read = this.chRepo.findSpendForBudgetsAcrossTenantsUntil({
         tenantIds,
         budgets: budgets
           // Templates have no single bucket to read; their per-user spend

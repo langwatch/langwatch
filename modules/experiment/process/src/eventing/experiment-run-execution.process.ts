@@ -117,7 +117,7 @@ function settle(state: State, ctx: Context, intents: ProcessIntent[]): ProcessEv
 }
 
 /** A run's start opens the window; a start without a plan is folded, never driven. */
-export const handleRunStarted: Handler = (state, view, ctx) => {
+const handleRunStarted: Handler = (state, view, ctx) => {
   if (view.kind !== "started" || !view.window || state.status !== "idle") {
     return { state, nextWakeAt: state.status === "running" ? stallDeadline(state) : null };
   }
@@ -137,7 +137,7 @@ export const handleRunStarted: Handler = (state, view, ctx) => {
 };
 
 /** A finished cell counts once, then frees its place in the window for the next. */
-export const handleCellFinished: Handler = (state, view, ctx) => {
+const handleCellFinished: Handler = (state, view, ctx) => {
   if (view.kind !== "cell_finished" || state.status !== "running") {
     return { state, nextWakeAt: state.status === "running" ? stallDeadline(state) : null };
   }
@@ -158,7 +158,7 @@ export const handleCellFinished: Handler = (state, view, ctx) => {
 };
 
 /** An abort sends nothing more; the run stops once its cells in flight have finished. */
-export const handleAbortRequested: Handler = (state, _view, ctx) => {
+const handleAbortRequested: Handler = (state, _view, ctx) => {
   if (state.status !== "running") {
     return { state, nextWakeAt: null };
   }
@@ -166,16 +166,13 @@ export const handleAbortRequested: Handler = (state, _view, ctx) => {
 };
 
 /** However the run ended, the manager is done with it. */
-export const handleRunCompleted: Handler = (state) => ({
+const handleRunCompleted: Handler = (state) => ({
   state: { ...state, status: "terminal" },
   nextWakeAt: null,
 });
 
 /** No cell finished for the stall window: every unfinished cell is failed so the run completes. */
-export const experimentRunStallWake: WakeHandler<State, ExperimentRunExecutionIntents> = (
-  state,
-  ctx,
-) => {
+const experimentRunStallWake: WakeHandler<State, ExperimentRunExecutionIntents> = (state, ctx) => {
   if (state.status !== "running") return { state, nextWakeAt: null };
   if (ctx.now < stallDeadline(state)) return { state, nextWakeAt: stallDeadline(state) };
 

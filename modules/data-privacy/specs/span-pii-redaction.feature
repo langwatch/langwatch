@@ -171,7 +171,7 @@ Feature: Redacting personal data out of a span at ingestion
   Scenario: The analysis request is the one the service expects
     Given a process that composed the analysis transport from its configuration
     When it sends a batch
-    Then evaluation is asked to detect the level's entity list for the batch's tenant
+    Then the analysis service is asked to detect the level's entity list for the batch
     And text past the scan ceiling is left unscanned and put back afterwards
     And the analyzer's angle-bracket markers are normalized to the platform's brackets
 
@@ -202,17 +202,15 @@ Feature: Redacting personal data out of a span at ingestion
   @unit
   Scenario: The four privacy variables are read the way the application reads them
     Given a process resolving its configuration
-    Then redaction is on without any of them being set
+    Then redaction is on without any variable being set
     And the native floor is turned off only by the application's own spelling
-    And the DLP kill switch reads only the spellings the application reads
-    And an unusable credentials document leaves DLP unavailable rather than failing the boot
+    And the DLP kill switch is carried as the deployment wrote it
 
   @unit
   Scenario: The privacy graph builds end to end from what the process already holds
-    Given a composition root holding the privacy configuration, the data-privacy service and the feature flags
-    When it builds the span redaction port
-    Then a span carrying personal data comes back scrubbed
-    And a deployment that named no analysis service still scrubs the native floor
+    Given the booted data-privacy module with no analysis service named
+    When a peer asks it to redact a span carrying an email address
+    Then the span comes back scrubbed by the native floor
 
   @unit
   Scenario: A peer redacts a span through the data-privacy API
@@ -221,8 +219,8 @@ Feature: Redacting personal data out of a span at ingestion
     Then the address is redacted in place
 
   @unit
-  Scenario: Whether the analysis service is reachable is asked of evaluation, once
-    Given a process whose evaluation module answers PII detection
+  Scenario: Whether the analysis service is configured is asked once
+    Given a process whose configuration names the analysis service's endpoint
     When the redaction pass asks whether the analysis service is configured
-    Then it asks evaluation with an empty batch that sends nothing
+    Then it asks the analysis service with an empty batch that sends nothing
     And it asks again only after an answer failed

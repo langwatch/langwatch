@@ -7,7 +7,7 @@ export const SIGN_IN_LOCK_REAP_PROCESS_NAME = "signInLockReap";
 /** Outbox rows are bookkeeping, one per tick, pruned like every recurring process's. */
 const REAP_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
-export interface SignInLockReapDeps {
+interface SignInLockReapDeps {
   /** Removes the rows that are finished with; answers how many went. */
   reap: () => Promise<number>;
   deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;

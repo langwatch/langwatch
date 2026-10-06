@@ -6,6 +6,7 @@ import {
   type TenantMigrationRecord,
 } from "@langwatch/system-migrations";
 
+import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
 import { MemoryAutomationStore } from "../../repositories/memory/memory.automation.store.ts";
 import { MemoryTriggerRepository } from "../../repositories/memory/memory.trigger.repository.ts";
 import { AutomationSlackConnectionService } from "../../services/automation-slack-connection.service.ts";
@@ -173,15 +174,19 @@ export function slackMigrationWorld({
       getOrganizationId: async (projectId: string) =>
         projectId === SECOND_PROJECT_ID ? SECOND_ORGANIZATION_ID : ORGANIZATION_ID,
     },
-    crypto: fixtureCrypto,
+    triggers: sealWith(fixtureCrypto),
   });
   const migration = SlackConnectionMigration.create({
     pass: SlackConnectionMigrationService.create({
-      triggers,
+      // The memory twin stores plaintext; these rows carry the fixture's ciphertext.
+      triggers: {
+        findSlackTriggers: (input) => triggers.findSlackTriggers(input),
+        replaceActionParamsIfUnchanged: (input) => triggers.replaceActionParamsIfUnchanged(input),
+        openSecret: sealWith(fixtureCrypto).openSecret,
+      },
       projects,
       slack,
       slackConnections,
-      crypto: fixtureCrypto,
     }),
   });
 

@@ -4,7 +4,7 @@ export const CONNECTED_BILLING_PROCESS_NAME = "connectedBillingTick";
 /** Outbox rows are bookkeeping, one per tick, pruned like every recurring process's. */
 const TICK_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
-export interface ConnectedBillingTickRunDeps {
+interface ConnectedBillingTickRunDeps {
   /** One tick; each of its jobs reports its own failure and never stops the next. */
   readonly tick: () => Promise<void>;
   readonly deleteDispatchedBefore: (params: {

@@ -3,27 +3,18 @@
 import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
 import {
   type UiConversationThreadProps,
-  type UiSetupWithAgentButtonProps,
   type UiTracePreviewHoverCardProps,
 } from "@langwatch/browser-host/declarations";
+import { Lent } from "@langwatch/browser-host/lent";
+import {
+  SetupWithAgentButtonToken,
+  type SetupWithAgentButtonProps,
+} from "@langwatch/trace-contract";
 import { lazy, Suspense, useMemo } from "react";
 
 /** Trace's "Setup via Agent" menu, rendered as trace lends it. */
-export function SetupWithAgentButton(props: UiSetupWithAgentButtonProps) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("setupWithAgentButton")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function SetupWithAgentButton(props: SetupWithAgentButtonProps) {
+  return <Lent of={SetupWithAgentButtonToken} props={props} />;
 }
 
 /** Trace's hover peek around a trigger, rendered as trace lends it. */

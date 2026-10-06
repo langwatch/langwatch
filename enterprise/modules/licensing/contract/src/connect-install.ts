@@ -184,6 +184,7 @@ export const connectStatusSchema = z.union([
     entitledServices: z.array(z.string()).nullable(),
     usage: connectUsageViewSchema.nullable(),
     refusal: connectRefusalSchema.nullable(),
+    isUsageUnavailable: z.boolean(),
     sync: connectSyncViewSchema,
   }),
 ]);

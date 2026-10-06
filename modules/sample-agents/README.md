@@ -1,0 +1,34 @@
+# sample-agents
+
+The demo agents a caller runs to see its own project fill with traces.
+
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
+
+## At a glance
+
+|                |                                                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                                                           |
+| Subjects       | sample-agents                                                                                                             |
+| Halves         | [contract](contract) · [process](process)                                                                                 |
+| Api token      | `SampleAgentsApi` = `moduleApi<SampleAgentsApi>()("sample-agents")`, `contract/src/sample-agents.api.ts:11` (1 operation) |
+| Installed by   | api, worker, tasks (process)                                                                                              |
+
+## What sample-agents owns
+
+| Kind    | Name                        | Declared at                               |
+| ------- | --------------------------- | ----------------------------------------- |
+| Secrets | `openAi` (OPENAI_API_KEY)   | `process/src/app/sample-agents.app.ts:30` |
+| Config  | `publicBaseUrl` (BASE_HOST) | `contract/src/sample-agents.api.ts:37`    |
+
+Anything else sample-agents needs belongs to another module and is reached through its `*Api`.
+
+## Peers (static dependencies)
+
+None: sample-agents declares no peers.
+
+## Who depends on sample-agents
+
+No module names sample-agents as a peer.
+
+<!-- readme:generated:end -->

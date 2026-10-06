@@ -81,6 +81,15 @@ describe("given a verified address an organization is open to", () => {
       expect(requestMock).not.toHaveBeenCalled();
     });
 
+    /** @scenario The invitation and join screens stand on the same ground */
+    it("stands on the auth card and ground every other door uses", async () => {
+      const { container } = renderScreen();
+
+      await screen.findAllByRole("button");
+      expect(container.querySelector("[data-auth-card]")).toBeTruthy();
+      expect(screen.getByTestId("front-door-ambient")).toBeTruthy();
+    });
+
     /** @scenario "No organization is created for somebody who did not ask for one" */
     it("asks to join without creating anything", async () => {
       renderScreen();

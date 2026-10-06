@@ -4,8 +4,8 @@
  * that records what each procedure declared without building one.
  */
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { AuthzDeclaration } from "@langwatch/api/access";
 import type {
+  TrpcAccess,
   TrpcProcedureFactory,
   TrpcRouterDeclaration,
   TrpcRuntimeAuditEntry,
@@ -98,8 +98,8 @@ export function apiKeyTrpcCaller<Api, Contract extends TrpcContract>(options: {
 /** Records the access each declared procedure asked for, building nothing. */
 export function accessDeclaredBy(declaration: {
   router(runtime: TrpcProcedureFactory<TestContext>, app: (ctx: TestContext) => never): unknown;
-}): (AuthzPermission | AuthzDeclaration)[] {
-  const declared: (AuthzPermission | AuthzDeclaration)[] = [];
+}): (AuthzPermission | TrpcAccess)[] {
+  const declared: (AuthzPermission | TrpcAccess)[] = [];
   const runtime: TrpcProcedureFactory<TestContext> = {
     procedure: ({ access }) => {
       declared.push(access.kind === "permission" ? access.permission : access);

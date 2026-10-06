@@ -69,6 +69,16 @@ Path-scoped rules in `.claude/rules/` load the details when you open those files
    with a one-line link. Delete comments that restate the code.
 5. **Named parameters** (`fn({ a, b })`), top-level `import`/`import type` only
    (no inline `import()`), Zod + `infer` instead of duplicated TS types.
+6. **A route's authorization is declared, never hand-rolled.** Name the
+   permission with `.withPermission(...)`; the door asks it before the handler
+   runs. `.withAccess(anyAuthenticated(...))` followed by a permission check in
+   a middleware fact, the handler or the `*Api` is a bypass. When the library
+   cannot express the check, extend `packages/api` and the door; don't route
+   around them. The application asks only what depends on the loaded row.
+7. **Product analytics and lifecycle messaging belong to nurturing.** A module
+   records a fact event from its service (`subscription_started`,
+   `user_created`); nurturing subscribes and talks to PostHog and Customer.io.
+   No other module holds an analytics channel, client or key.
 
 ## Verify every change
 

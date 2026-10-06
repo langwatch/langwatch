@@ -4,6 +4,7 @@ import { nowInstant } from "@langwatch/time";
 import type { TopicClusteringClaimRepository } from "../repositories/topic-clustering-claim.repository.ts";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
 import type { EventingTopicClusteringCommandsService } from "../services/topic-clustering-commands.service.ts";
+import type { EventingTopicClusteringScheduleService } from "../services/topic-clustering-schedule.service.ts";
 
 const logger = createLogger("langwatch:topic-clustering:seed");
 const scheduleLogger = createLogger("langwatch:topic-clustering:schedule-seed");
@@ -47,17 +48,20 @@ export class LegacyImportTopicClusteringMigration {
     EventingTopicClusteringCommandsService,
     "recordTopics" | "requestClustering"
   >;
+  private readonly schedule: Pick<EventingTopicClusteringScheduleService, "findNextWakeAt">;
   private readonly schedulePageSize?: number;
 
   private constructor(deps: {
     repository: TopicClusteringRepository;
     claims: TopicClusteringClaimRepository;
     commands: Pick<EventingTopicClusteringCommandsService, "recordTopics" | "requestClustering">;
+    schedule: Pick<EventingTopicClusteringScheduleService, "findNextWakeAt">;
     schedulePageSize?: number;
   }) {
     this.repository = deps.repository;
     this.claims = deps.claims;
     this.commands = deps.commands;
+    this.schedule = deps.schedule;
     this.schedulePageSize = deps.schedulePageSize;
   }
 
@@ -66,6 +70,8 @@ export class LegacyImportTopicClusteringMigration {
     /** Coordination only — when it cannot answer, both seeds still run safely. */
     claims: TopicClusteringClaimRepository;
     commands: Pick<EventingTopicClusteringCommandsService, "recordTopics" | "requestClustering">;
+    /** Eventing's durable wake: a project with one is already scheduled and skipped. */
+    schedule: Pick<EventingTopicClusteringScheduleService, "findNextWakeAt">;
     /** Test override for the schedule walk's page size. */
     schedulePageSize?: number;
   }): LegacyImportTopicClusteringMigration {
@@ -73,6 +79,7 @@ export class LegacyImportTopicClusteringMigration {
       repository: options.repository,
       claims: options.claims,
       commands: options.commands,
+      schedule: options.schedule,
       schedulePageSize: options.schedulePageSize,
     });
   }
@@ -264,14 +271,11 @@ export class LegacyImportTopicClusteringMigration {
         continue;
       }
 
-      const alreadyScheduled = new Set(
-        await this.repository.findAlreadyScheduledProjectIds(page.map((project) => project.id)),
-      );
-
       for (const project of page) {
         summary.scanned++;
 
-        if (alreadyScheduled.has(project.id)) {
+        const wake = await this.schedule.findNextWakeAt({ projectId: project.id });
+        if (wake !== null) {
           summary.skipped++;
           continue;
         }

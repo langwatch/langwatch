@@ -4,16 +4,13 @@
  * the flat legacy envelope this family publishes.
  */
 import {
+  canonicalErrorResponse,
   bindRestMiddleware,
   createRestRuntime,
   ForbiddenError,
-  HttpError,
   UnauthorizedError,
-  type RestErrorHandler,
 } from "@langwatch/api/rest";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
-import { HandledError } from "@langwatch/handled-error";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { experimentRest, experimentRestCredential } from "../experiment.rest.ts";
 
@@ -32,21 +29,6 @@ function callerOf(request: Request): string | null | undefined {
 
   return undefined;
 }
-
-/** The flat body this family has always published on a refusal. */
-const renderRefusal: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    return c.json(
-      { error: error.code, message: error.message },
-      (error.httpStatus ?? 500) as ContentfulStatusCode,
-    );
-  }
-  if (error instanceof HttpError) {
-    return c.json({ error: error.error, message: error.message }, error.status);
-  }
-
-  return c.json({ error: "Internal server error" }, 500);
-};
 
 /**
  * An `ExperimentApi` that answers only what a test stubbed; any other member a
@@ -100,7 +82,7 @@ export function mountExperimentRest(
 
   const hono = runtime.mount(experimentRest.router(), {
     app: () => app,
-    onError: renderRefusal,
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(experimentRestCredential, (c) => {
         const userId = callerOf(c.req.raw);

@@ -20,6 +20,19 @@ const PROJECT_ID = "project-1";
 const GOOD_KEY = "sk-lw-good";
 const MAX_BODY_BYTES = 20 * 1024 * 1024;
 
+/** One step the contract accepts, with its timestamp in milliseconds. */
+const BATCH_STEP = {
+  run_id: "run-1",
+  index: "0",
+  score: 0.5,
+  label: "score",
+  optimizer: { name: "MIPROv2", parameters: {} },
+  predictors: [],
+  examples: [],
+  llm_calls: [],
+  timestamps: { created_at: 1_700_000_000_000 },
+};
+
 /** The key ceiling as the credential port raises it; this module may not import its owner. */
 class KeyCeilingDenied extends HandledError {
   declare readonly code: "api_key_permission_denied";
@@ -121,14 +134,45 @@ describe("given the DSPy optimizer's step log door", () => {
   });
 
   describe("when the body is not valid JSON", () => {
-    it("refuses at 422 with the validation code and stores nothing", async () => {
+    it("refuses at 400 with the framework's malformed-request code and stores nothing", async () => {
       const listModelCosts = vi.fn();
       const send = mountLogSteps({ stubs: { listModelCosts } });
 
       const response = await send("[not json");
 
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: "malformed_request" });
+      expect(listModelCosts).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the request carries no body at all", () => {
+    it("refuses at 400 with the malformed-request code rather than storing an empty batch", async () => {
+      const listModelCosts = vi.fn();
+      const send = mountLogSteps({ stubs: { listModelCosts } });
+
+      const response = await send("");
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: "malformed_request" });
+      expect(listModelCosts).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a step carries its timestamps in seconds", () => {
+    it("refuses at 422 naming the field and the fix, and stores nothing", async () => {
+      const listModelCosts = vi.fn();
+      const send = mountLogSteps({ stubs: { listModelCosts } });
+      const step = { ...BATCH_STEP, timestamps: { created_at: 1_700_000_000 } };
+
+      const response = await send(JSON.stringify([step]));
+
       expect(response.status).toBe(422);
-      expect(await response.json()).toMatchObject({ code: "validation_error" });
+      expect(await response.json()).toMatchObject({
+        code: "validation_error",
+        message: "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+        meta: { fieldErrors: { "timestamps.created_at": [expect.any(String)] } },
+      });
       expect(listModelCosts).not.toHaveBeenCalled();
     });
   });

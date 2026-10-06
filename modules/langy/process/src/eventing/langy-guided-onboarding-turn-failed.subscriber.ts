@@ -1,14 +1,18 @@
 /**
  * `guided_onboarding_turn_failed`: once per failed turn of the organization's guided onboarding
- * conversation, against the conversation's user, with the failure's code and the path run.
+ * conversation, recorded as a fact against the conversation's user, with the failure's code and
+ * the path run. Nurturing sends the analytics event from it.
  * @see specs/analytics/posthog-guided-onboarding.feature
  */
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
-import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
+import {
+  type GuidedOnboardingTurnFailedEventData,
+  LANGY_CONVERSATION_EVENT_TYPES,
+} from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
+import type { GuidedPath, OnboardingVariant } from "@langwatch/onboarding-contract";
 
-import { analyticsUuidForEvent } from "../rules/langy-analytics-event-uuid.rules.ts";
 import type { LangyConversationProcessingEvent } from "./langy-conversation-state.projection.ts";
 
 const logger = createLogger("langwatch:langy:guided-onboarding-turn-failed");
@@ -17,9 +21,9 @@ const logger = createLogger("langwatch:langy:guided-onboarding-turn-failed");
 export interface GuidedOnboardingForProject {
   organizationId: string;
   conversationId: string | null | undefined;
-  currentPath: string | null | undefined;
-  /** The A/B experiment property to spread, empty for an organization without a variant. */
-  experimentProperties: Record<string, string>;
+  currentPath: GuidedPath | null | undefined;
+  /** Where the onboarding experiment put the organization; null for one older than it. */
+  variant: OnboardingVariant | null;
 }
 
 export interface GuidedOnboardingReader {
@@ -28,7 +32,7 @@ export interface GuidedOnboardingReader {
 }
 
 /** The owner of a conversation, for the distinct id the failure is tracked against. */
-export interface LangyConversationOwnerReader {
+interface LangyConversationOwnerReader {
   /** Throws `langy_conversation_not_found` until the conversation is folded. */
   getById(params: {
     projectId: string;
@@ -36,22 +40,15 @@ export interface LangyConversationOwnerReader {
   }): Promise<{ ownerUserId: string | null }>;
 }
 
-/** Fire and forget: a failed turn must not fail again on its analytics. */
-export interface GuidedOnboardingAnalytics {
-  track(input: {
-    userId: string;
-    event: string;
-    projectId: string;
-    properties: Record<string, unknown>;
-    /** The same for every delivery of one event, so the sink keeps one. */
-    uuid: string;
-  }): void;
+/** The facts langy records about the guided conversation; peers react to them. */
+export interface GuidedOnboardingFacts {
+  recordTurnFailed(data: GuidedOnboardingTurnFailedEventData): Promise<void>;
 }
 
-export interface GuidedOnboardingTurnFailedSubscriberDeps {
+interface GuidedOnboardingTurnFailedSubscriberDeps {
   guidedOnboarding: GuidedOnboardingReader;
   conversations: LangyConversationOwnerReader;
-  analytics: GuidedOnboardingAnalytics;
+  facts: GuidedOnboardingFacts;
 }
 
 /** The failure a terminal event describes; a stop by the user is not one. */
@@ -108,12 +105,12 @@ export function createGuidedOnboardingTurnFailedSubscriber(
           failure,
           projectId,
           conversationId,
-          uuid: analyticsUuidForEvent(event.id),
+          sourceEvent: { id: event.id, occurredAt: event.occurredAt },
         });
       } catch (error) {
         logger.error(
           { projectId, conversationId, turnId: failure.turnId, error },
-          "Failed to track guided_onboarding_turn_failed, the event is discarded",
+          "Failed to record guided_onboarding_turn_failed, the fact is discarded",
         );
       }
     },
@@ -125,13 +122,13 @@ async function trackGuidedTurnFailure({
   failure,
   projectId,
   conversationId,
-  uuid,
+  sourceEvent,
 }: {
   deps: GuidedOnboardingTurnFailedSubscriberDeps;
   failure: { turnId: string; code: string };
   projectId: string;
   conversationId: string;
-  uuid: string;
+  sourceEvent: { id: string; occurredAt: number };
 }): Promise<void> {
   const guided = await deps.guidedOnboarding.getByProject({ projectId }).catch((error: unknown) => {
     if (HandledError.isHandled(error) && error.code === "project_not_found") return null;
@@ -150,23 +147,21 @@ async function trackGuidedTurnFailure({
   if (!userId) {
     logger.warn(
       { projectId, conversationId, turnId: failure.turnId },
-      "Guided conversation has no owner, guided_onboarding_turn_failed not tracked",
+      "Guided conversation has no owner, guided_onboarding_turn_failed not recorded",
     );
     return;
   }
 
-  deps.analytics.track({
+  await deps.facts.recordTurnFailed({
+    tenantId: projectId,
+    occurredAt: sourceEvent.occurredAt,
+    sourceEventId: sourceEvent.id,
+    organizationId: guided.organizationId,
     userId,
-    event: "guided_onboarding_turn_failed",
-    projectId,
-    uuid,
-    properties: {
-      code: failure.code,
-      path: guided.currentPath ?? null,
-      conversation_id: conversationId,
-      turn_id: failure.turnId,
-      organization_id: guided.organizationId,
-      ...guided.experimentProperties,
-    },
+    conversationId,
+    turnId: failure.turnId,
+    code: failure.code,
+    path: guided.currentPath ?? null,
+    onboardingVariant: guided.variant,
   });
 }

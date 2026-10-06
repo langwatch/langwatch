@@ -36,9 +36,16 @@ export function isCodexTemporaryStructuredRequestSpan({
   );
 }
 
-/** The thread id a queue child names, read off its Debug-formatted `key` attribute. */
-export function queuedThreadIdOf({ key }: { key: unknown }): string | undefined {
-  return typeof key === "string" ? QUEUE_KEY_THREAD_ID.exec(key)?.[1] : undefined;
+/** What a queue child's `key` says of its thread: the id it names, or that it names none. */
+export type QueuedThread =
+  | Readonly<{ kind: "named"; threadId: string }>
+  | Readonly<{ kind: "unnamed" }>;
+
+/** The thread a queue child names, read off its Debug-formatted `key` attribute. */
+export function queuedThreadOf({ key }: { key: unknown }): QueuedThread {
+  const threadId = typeof key === "string" ? QUEUE_KEY_THREAD_ID.exec(key)?.[1] : undefined;
+
+  return threadId === undefined ? { kind: "unnamed" } : { kind: "named", threadId };
 }
 
 /** The session fact a codex helper thread's request span contributes, or none. */

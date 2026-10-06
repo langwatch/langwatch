@@ -41,10 +41,9 @@ const statements = {
   memberType: 'createApp({ role: "api" }).withModules([clockModule]).withClock(42);',
   customMissing: 'createApp({ role: "api" }).withModules([connectionsModule]).boot();',
   customType:
-    'createApp({ role: "api" }).withModules([connectionsModule]).withMember("connections", { primary: () => 42 });',
+    'createApp({ role: "api" }).withModules([connectionsModule]).withMembers({ connections: { primary: () => 42 } });',
   customUndeclared:
-    'createApp({ role: "api" }).withModules([connectionsModule]).withMember("connection", connections);',
-  customBeforeModules: 'createApp({ role: "api" }).withMember("connections", connections);',
+    'createApp({ role: "api" }).withModules([connectionsModule]).withMembers({ connection: connections });',
   config: 'createApp({ role: "api" }).withModules([configModule]).boot();',
   configSlice: 'createApp({ role: "api" }).withModules([configModule]).withConfig({});',
   configType:
@@ -118,7 +117,7 @@ const statements = {
     'createApp({ role: "worker" }).withService({ name: "producer", start: () => void 0 });',
   goodClock: 'createApp({ role: "api" }).withModules([clockModule]).withClock(clock).boot();',
   goodCustom:
-    'createApp({ role: "api" }).withModules([connectionsModule]).withMember("connections", connections).boot();',
+    'createApp({ role: "api" }).withModules([connectionsModule]).withMembers({ connections }).boot();',
   goodMemory:
     'createApp({ role: "api" }).withModules([memoryRepositoryModule]).withClock(clock).boot();',
   goodPeer: 'createApp({ role: "api" }).withModules([peerModule]).provide({ project }).boot();',
@@ -163,7 +162,7 @@ beforeAll(() => {
         noEmit: true,
         skipLibCheck: true,
         strict: true,
-        target: "ES2022",
+        target: "ES2023",
         typeRoots: [resolve(root, "node_modules/@types")],
         types: ["node"],
       },
@@ -202,13 +201,13 @@ beforeAll(() => {
 }, 30_000);
 
 describe("compiler checked process supply", () => {
+  /** @scenario "Compiler-negative cases start from a valid declaration" */
   it.each([
     "member",
     "memberType",
     "customMissing",
     "customType",
     "customUndeclared",
-    "customBeforeModules",
     "configSlice",
     "configType",
     "peer",
@@ -314,6 +313,7 @@ describe("compiler checked process supply", () => {
     expect(outstanding).toContain("more");
   });
 
+  /** @scenario "Compiler-negative cases start from a valid declaration" */
   it.each([
     "goodClock",
     "goodCustom",

@@ -19,3 +19,28 @@
 # credential; the fixture now reads `xoxb-bad-5678`, below the bar, so the tree
 # is clean and only this pull request's history still carries the literal.
 5575c828111cee9893e905201a240c26aa3d7437:platform/app/src/server/app-layer/automations/slack-integration/__tests__/slack-integration.service.unit.test.ts:generic-api-key:288
+
+# The SSO gate test set LANGWATCH_LICENSE_KEY to a made-up activation code
+# (LW- followed by sixteen characters), which clears the generic-api-key bar
+# beside a LICENSE_KEY name. It was never a credential; the test now mints a
+# code at runtime, so only this pull request's history carries the literal.
+ee724546d96949b22f8d04adc3a2ec5d8c79616a:platform/app/ee/sso/__tests__/sso-gate.test.ts:generic-api-key:248
+
+# Test fixtures moved into modules on this branch: a JWT whose payload is
+# {"projectId":"project-1"} signed with the word "signature", and named
+# placeholders (tok_live_partner_123, tok_live_rotated_456, lw-revoked-...).
+# None was ever a credential; the commits carrying them are history.
+41e28084ce434702e92ed7341bd82b8203f113a6:modules/api-key/process/src/services/__tests__/api-key-token-resolution.service.unit.test.ts:jwt:357
+41e28084ce434702e92ed7341bd82b8203f113a6:modules/auth/process/src/services/__tests__/api-rest-credentials.service.unit.test.ts:jwt:262
+635662acfe2f7e9142982b0955b7655b1159ceec:modules/agent/process/src/services/__tests__/agent-http-secrets.integration.test.ts:generic-api-key:56
+635662acfe2f7e9142982b0955b7655b1159ceec:modules/workflow/process/src/channels/__tests__/staged-run-body-seal.unit.test.ts:generic-api-key:13
+635662acfe2f7e9142982b0955b7655b1159ceec:modules/workflow/process/src/services/__tests__/workflow-http-secrets.service.unit.test.ts:generic-api-key:12
+635662acfe2f7e9142982b0955b7655b1159ceec:modules/workflow/process/src/services/__tests__/workflow-http-secrets.service.unit.test.ts:generic-api-key:159
+48f9eb920a2a021bbb8723d1d61896acea00b2b7:modules/api-key/process/src/services/__tests__/api-key-token-resolution-cache.unit.test.ts:generic-api-key:550
+
+# A connect-protocol test named its never-logged sentinel SECRET_MARKER with the
+# value SECRETMARK-9f3a, which clears the generic-api-key bar beside a SECRET
+# name. It was never a credential; the constant now reads CONTENT_MARKER =
+# "content-marker", so only this pull request's history carries the literal.
+e361040a34adcefc378718482969f16445ac70e9:modules/agent/process/src/transport/__tests__/agent-connect-output.rest.unit.test.ts:generic-api-key:21
+2ab77b8edccec30eca91ddab0618a9765b9b6a01:charts/langwatch/tests/credentials-secret-previous.sh:generic-api-key:57

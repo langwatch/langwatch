@@ -28,7 +28,7 @@ import {
   StartSuiteRunCommand,
 } from "./suite-run.commands.ts";
 
-export interface SuiteRunProcessingPipelineDeps {
+interface SuiteRunProcessingPipelineDeps {
   suiteRunStateFoldStore: FoldProjectionStore<SuiteRunStateData>;
   /** Each tenant's retention, stamped on the run rows in place of the default (§9). */
   retention?: RetentionPolicyResolver;

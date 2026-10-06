@@ -84,6 +84,7 @@ export const prismaTableCatalogue = {
   "ShareLink": "ShareLink",
   "PinnedTrace": "PinnedTrace",
   "TraceEditOverlay": "TraceEditOverlay",
+  "TraceIngestSourceBilling": "TraceIngestSourceBilling",
   "RetentionPolicy": "RetentionPolicy",
   "DataPrivacyPolicy": "DataPrivacyPolicy",
   "CustomLLMModelCost": "CustomLLMModelCost",
@@ -502,6 +503,7 @@ export const prismaModelFieldCatalogue = {
     "domain",
     "state",
     "matchedVia",
+    "origin",
     "expiresAt",
     "resolvedAt",
     "resolvedByType",
@@ -568,6 +570,7 @@ export const prismaModelFieldCatalogue = {
     "updatedAt",
     "OrganizationInvite",
     "usageSpendingMaxLimit",
+    "datasetAttachmentMaxMb",
     "maxSessionDurationDays",
     "mfaRequired",
     "lockoutAfterFailedAttempts",
@@ -588,6 +591,7 @@ export const prismaModelFieldCatalogue = {
     "ssoDomain",
     "ssoProvider",
     "domainJoin",
+    "joinerRole",
     "joinDomains",
     "presenceEnabled",
     "traceSharingEnabled",
@@ -611,6 +615,8 @@ export const prismaModelFieldCatalogue = {
     "licenseLastValidatedAt",
     "selfHostedCustomer",
     "connectServicesDisabled",
+    "instantEvalsEnabledAt",
+    "instantEvalsEnabledByUserId",
     "connectLastSyncAt",
     "connectLastSyncError",
     "issuedLicenses",
@@ -1557,6 +1563,13 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "TraceIngestSourceBilling": [
+    "organizationId",
+    "sourceType",
+    "billed",
+    "recordedAt",
+    "updatedAt"
+  ],
   "RetentionPolicy": [
     "id",
     "organizationId",
@@ -1656,7 +1669,8 @@ export const prismaModelFieldCatalogue = {
     "targetKind",
     "targetId",
     "before",
-    "after"
+    "after",
+    "idempotencyKey"
   ],
   "LlmPromptConfig": [
     "id",
@@ -3131,6 +3145,7 @@ export const prismaRelationCatalogue = {
     "createdBy": "User",
     "updatedBy": "User"
   },
+  "TraceIngestSourceBilling": {},
   "RetentionPolicy": {},
   "DataPrivacyPolicy": {},
   "CustomLLMModelCost": {},

@@ -33,9 +33,6 @@
       "path": "../observability/tsconfig.build.json"
     },
     {
-      "path": "../../modules/ops/contract/tsconfig.build.json"
-    },
-    {
       "path": "../prisma-client/tsconfig.build.json"
     },
     {
@@ -43,6 +40,9 @@
     },
     {
       "path": "../secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../test-harness/tsconfig.build.json"
     },
     {
       "path": "../time/tsconfig.build.json"

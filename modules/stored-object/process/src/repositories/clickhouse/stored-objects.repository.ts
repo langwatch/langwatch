@@ -1,3 +1,4 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 /**
  * StoredObjectsRepository — ClickHouse I/O for the stored_objects table.
@@ -5,12 +6,53 @@ import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
-import type { StoredObjectsClickHouse } from "../../app/stored-object.members.ts";
 import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import { storedObjectSchema } from "../../rules/stored-object-row.rules.ts";
 import { StoredObjectsRepository } from "../stored-objects.repository.ts";
 
 const TABLE_NAME = "stored_objects" as const;
+
+/** The one operation the legacy stored-object index needs, as the driver exposes it. */
+export type StoredObjectsClickHouseClient = Readonly<{
+  query(input: {
+    query: string;
+    query_params: Record<string, unknown>;
+    format: "JSONEachRow";
+    unscoped?: { reason: string };
+  }): Promise<{ json<Result>(): Promise<Result[]> }>;
+}>;
+
+/** Resolves the client one project's stored-object rows live on. */
+export interface StoredObjectsClickHouse {
+  resolveClient(projectId: string): Promise<StoredObjectsClickHouseClient>;
+}
+
+/**
+ * The routed ClickHouse store, adapted to the driver shape this repository asks
+ * for. One tenant per resolution: every statement names its tenant.
+ */
+export class RoutedStoredObjectsClickHouse implements StoredObjectsClickHouse {
+  static create(clickhouse: ClickHouseQueryClient): RoutedStoredObjectsClickHouse {
+    return new RoutedStoredObjectsClickHouse(clickhouse);
+  }
+
+  private constructor(private readonly clickhouse: ClickHouseQueryClient) {}
+
+  async resolveClient(projectId: string): Promise<StoredObjectsClickHouseClient> {
+    const clickhouse = this.clickhouse;
+    return {
+      async query(input) {
+        const result = await clickhouse.query({
+          tenantId: projectId,
+          sql: input.query,
+          params: input.query_params,
+          unscoped: input.unscoped,
+        });
+        return { json: async <Result>() => result.rows as Result[] };
+      },
+    };
+  }
+}
 
 /**
  * The table is the read-only legacy index (ADR-158) and has no TenantId column: every

@@ -26,10 +26,10 @@ import {
   mapToTraceListItem,
   SORT_COLUMN_MAP,
 } from "../rules/trace-list-row.rules.ts";
+import { teaserOf } from "../rules/trace-visibility-teaser.rules.ts";
 import { TraceDiscoverService } from "./trace-discover.service.ts";
 import { TraceFacetValuesService } from "./trace-facet-values.service.ts";
 import { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
-import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
 
 interface ListParams {
   tenantId: string;
@@ -175,10 +175,10 @@ export class TraceListService {
   static #teaseItem(item: TraceListItem): TraceListItem {
     return {
       ...item,
-      input: item.input ? VisibilityWindowService.teaserOf(item.input) : item.input,
-      output: item.output ? VisibilityWindowService.teaserOf(item.output) : item.output,
-      error: item.error ? VisibilityWindowService.teaserOf(item.error) : item.error,
-      labels: item.labels.map((label) => VisibilityWindowService.teaserOf(label)),
+      input: item.input ? teaserOf(item.input) : item.input,
+      output: item.output ? teaserOf(item.output) : item.output,
+      error: item.error ? teaserOf(item.error) : item.error,
+      labels: item.labels.map((label) => teaserOf(label)),
     };
   }
 

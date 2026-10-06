@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { FieldMapping } from "../field-mapping.ts";
-import { isScenarioMappingValid } from "../resolve-field-mappings.ts";
+import { isScenarioMappingValid, resolveFieldMappings } from "../resolve-field-mappings.ts";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -96,6 +96,31 @@ describe("isScenarioMappingValid", () => {
           }),
         ).toBe(false);
       });
+    });
+  });
+});
+
+describe("an agent input mapping used by authoring and by execution", () => {
+  const agentInput = {
+    threadId: "thread-1",
+    messages: [{ role: "user", content: "Where is my order?" }],
+  };
+
+  describe("when authoring accepts the mapping", () => {
+    /** @scenario "Scenario input mapping is portable" */
+    it("resolves it at execution to what the scenario said, and refuses a mapping that would resolve to nothing", () => {
+      expect(isScenarioMappingValid({ mappings: INPUT_MAPPED })).toBe(true);
+      expect(resolveFieldMappings({ fieldMappings: INPUT_MAPPED, agentInput })).toEqual({
+        userMessage: "Where is my order?",
+      });
+
+      expect(isScenarioMappingValid({ mappings: MESSAGES_MAPPED })).toBe(true);
+      expect(resolveFieldMappings({ fieldMappings: MESSAGES_MAPPED, agentInput })).toEqual({
+        history: JSON.stringify(agentInput.messages),
+      });
+
+      expect(isScenarioMappingValid({ mappings: THREAD_ID_ONLY })).toBe(false);
+      expect(isScenarioMappingValid({ mappings: VALUE_ONLY })).toBe(false);
     });
   });
 });

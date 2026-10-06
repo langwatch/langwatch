@@ -1,6 +1,5 @@
 import type { AuditLogApi, AuditLogJsonValue } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   DOMAIN_CLAIM_QUEUE_LIMIT,
   IDENTITY_LOOKUP_AUDIT_PREFIX,
@@ -20,9 +19,7 @@ import {
   OPERATOR_ACTIVITY_LIMIT,
   routingIdentifierOf,
 } from "@langwatch/identity-contract";
-import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { RateLimiter } from "@langwatch/process-stores";
 import { Temporal } from "@langwatch/time";
 
 import type { IdentityHistoryRepository } from "../repositories/identity-history.repository.ts";
@@ -31,6 +28,7 @@ import type {
   LookupDomainClaimRow,
   LookupIdentifierRow,
 } from "../repositories/identity-lookup.repository.ts";
+import type { IdentityRateLimitRepository } from "../repositories/identity-rate-limit.repository.ts";
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import type { IdentityService } from "./identity.service.ts";
 import type { LinkProposalService } from "./link-proposal.service.ts";
@@ -42,9 +40,8 @@ export interface IdentityLookupServiceDeps {
   router: Pick<AuthApi, "route">;
   identity: () => Pick<IdentityService, "detachIdentifier">;
   links: Pick<LinkProposalService, "confirmLink" | "rejectLink">;
-  authorization: Pick<AuthzApi, "can">;
   auditLog: AuditLogApi;
-  rateLimiter: RateLimiter;
+  rateLimiter: IdentityRateLimitRepository;
   sessions: Pick<
     AuthApi,
     "listBrowserSessions" | "revokeAllBrowserSessions" | "endBrowserSessionsForIdentifier"
@@ -54,9 +51,9 @@ export interface IdentityLookupServiceDeps {
 }
 
 /**
- * The platform operator's identity lookup (D05). The read IS the act: every
- * call is recorded and then gated, and every repair is a guarded command the
- * guards decide - nothing here re-checks a rule they already hold.
+ * The platform operator's identity lookup (D05). The door admits the operator;
+ * the read IS the act, so every call is recorded, and every repair is a guarded
+ * command the guards decide - nothing here re-checks a rule they already hold.
  */
 export class IdentityLookupService {
   private readonly deps: IdentityLookupServiceDeps;
@@ -308,11 +305,21 @@ export class IdentityLookupService {
     return { expiresAtMs: invite.expiration?.getTime() ?? null };
   }
 
-  /**
-   * Record first, then decide whether the caller may proceed - the refused
-   * attempt is the one the trail most needs. An operator is never
-   * throttled; a stranger's attempts spend a shared budget instead.
-   */
+  /** A stranger the door refused: recorded while the shared budget lasts, then dropped. */
+  async recordRefusedLookup({
+    operator,
+    action,
+    args,
+  }: {
+    operator: IdentityLookupOperator;
+    action: string;
+    args: Readonly<Record<string, string | null>>;
+  }): Promise<void> {
+    if (!(await this.withinAttemptBudget(operator.userId))) return;
+    await this.recorded({ operator, action, args: { ...args } });
+  }
+
+  /** The door admitted an operator, who is never throttled out of the trail. */
   private async recorded({
     operator,
     action,
@@ -324,23 +331,13 @@ export class IdentityLookupService {
     args: Record<string, AuditLogJsonValue>;
     targetId?: string;
   }): Promise<void> {
-    const isOperator = await this.deps.authorization.can({
-      principal: { type: "user", id: operator.userId },
-      permission: "ops:manage",
-      scope: { type: "platform" },
+    await this.deps.auditLog.record({
+      userId: operator.userId,
+      action: `${IDENTITY_LOOKUP_AUDIT_PREFIX}${action}`,
+      args,
+      targetKind: "identityLookup",
+      targetId,
     });
-    const withinBudget = isOperator || (await this.withinAttemptBudget(operator.userId));
-
-    if (withinBudget) {
-      await this.deps.auditLog.record({
-        userId: operator.userId,
-        action: `${IDENTITY_LOOKUP_AUDIT_PREFIX}${action}`,
-        args,
-        targetKind: "identityLookup",
-        targetId,
-      });
-    }
-    if (!isOperator) throw new AdminSurfaceHiddenError();
   }
 
   /** The subject's user id is the tenant; the operator is the actor. */

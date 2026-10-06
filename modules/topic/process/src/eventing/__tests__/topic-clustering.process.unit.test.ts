@@ -3,11 +3,11 @@ import { buildProcessDefinition, buildProcessManager } from "@langwatch/eventing
 import { TOPIC_CLUSTERING_STALE_RUN_MS } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
+import type { TopicClusteringProcessingEvent } from "../../rules/topic-clustering-events.rules.ts";
 import {
   nextDailySlot,
   TOPIC_CLUSTERING_PROCESS_NAME,
 } from "../../rules/topic-clustering-process.rules.ts";
-import type { TopicClusteringProcessingEvent } from "../../services/topic-events.service.ts";
 import {
   buildTopicClusteringProcessEventView,
   topicClusteringProcessManager,

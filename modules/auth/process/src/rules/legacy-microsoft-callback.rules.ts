@@ -6,7 +6,7 @@ import {
 const LEGACY_PATH = `/api/auth/callback/${MICROSOFT_LEGACY_CALLBACK_ID}`;
 const PROVIDER_PATH = `/api/auth/callback/${MICROSOFT_PROVIDER_CALLBACK_ID}`;
 
-export type MicrosoftCallbackRoute = { kind: "pass" } | { kind: "forward"; url: string };
+type MicrosoftCallbackRoute = { kind: "pass" } | { kind: "forward"; url: string };
 
 /**
  * The Microsoft callback arriving at the path Azure app registrations list is

@@ -35,8 +35,8 @@ export type LwqlColumnEntry<Column extends string = string> =
   | (LwqlGate & Readonly<{ source?: Column }>);
 
 /** Every ClickHouse table and Prisma model a catalogue table may read, by name. */
-export type LwqlSourceRows = LwqlClickHouseRows & LwqlPrismaRows;
-export type LwqlSourceTable = keyof LwqlSourceRows;
+type LwqlSourceRows = LwqlClickHouseRows & LwqlPrismaRows;
+type LwqlSourceTable = keyof LwqlSourceRows;
 type SourceColumn<Table extends LwqlSourceTable> = keyof LwqlSourceRows[Table] & string;
 
 type Columns<Column extends string> = Readonly<Record<string, LwqlColumnEntry<Column>>>;

@@ -2,11 +2,12 @@ import type { ModelProviderRepositories } from "../model-provider.repositories.t
 import { MemoryModelCostRepository } from "./memory.model-cost.repository.ts";
 import { MemoryModelDefaultRepository } from "./memory.model-default.repository.ts";
 import { MemoryModelProviderEvidenceRepository } from "./memory.model-provider-evidence.repository.ts";
+import { MemoryModelProviderRateLimitRepository } from "./memory.model-provider-rate-limit.repository.ts";
 import { MemoryModelProviderDatabase } from "./memory.model-provider.database.ts";
 import { MemoryModelProviderRepository } from "./memory.model-provider.repository.ts";
 
 /**
- * The four twins over one store. No credential codec: nothing is encoded on
+ * The twins over one store. No credential codec: nothing is encoded on
  * the way in, so a test reads back exactly the credential it wrote.
  */
 export class MemoryModelProviderRepositories {
@@ -20,6 +21,7 @@ export class MemoryModelProviderRepositories {
       defaults: MemoryModelDefaultRepository.create({ database }),
       costs: MemoryModelCostRepository.create({ database }),
       evidence: MemoryModelProviderEvidenceRepository.create({ database }),
+      rateLimits: MemoryModelProviderRateLimitRepository.create(),
     };
   }
 }

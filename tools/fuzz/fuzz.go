@@ -36,8 +36,17 @@ type Options struct {
 	Root                 string // repository root, for .fuzz output and the UI runner
 }
 
-// Main parses args and runs the fuzzer, returning a process exit code.
-func Main(ctx context.Context, args []string, streams Streams, root string) int {
+// Invocation is what a command line hands Main: the arguments after the
+// program name, where to write, and the repository root.
+type Invocation struct {
+	Args    []string
+	Streams Streams
+	Root    string
+}
+
+// Main parses the invocation's args and runs the fuzzer, returning a process exit code.
+func Main(ctx context.Context, invocation Invocation) int {
+	args, streams, root := invocation.Args, invocation.Streams, invocation.Root
 	if len(args) == 0 {
 		fmt.Fprintln(streams.Err, "usage: fuzz api|ui|all [-seed N] [-workers N] [-duration D] [-only AREA] [-reload-every N] [-actions N] [-max-consecutive-errors N] [-url URL]")
 		return 2
@@ -58,21 +67,28 @@ func Main(ctx context.Context, args []string, streams Streams, root string) int 
 	}
 	switch options.Mode {
 	case "api":
-		return runOrReport(ctx, streams, options, runAPI)
+		return runOrReport(ctx, modeRun{streams: streams, options: options}, runAPI)
 	case "ui":
-		return runOrReport(ctx, streams, options, runUI)
+		return runOrReport(ctx, modeRun{streams: streams, options: options}, runUI)
 	case "all":
-		if code := runOrReport(ctx, streams, options, runAPI); code != 0 {
+		if code := runOrReport(ctx, modeRun{streams: streams, options: options}, runAPI); code != 0 {
 			return code
 		}
-		return runOrReport(ctx, streams, options, runUI)
+		return runOrReport(ctx, modeRun{streams: streams, options: options}, runUI)
 	default:
 		fmt.Fprintf(streams.Err, "unknown mode %q; want api, ui or all\n", options.Mode)
 		return 2
 	}
 }
 
-func runOrReport(ctx context.Context, streams Streams, options Options, run func(context.Context, Streams, Options) error) int {
+// modeRun is one mode's run: where it writes and what it was asked.
+type modeRun struct {
+	streams Streams
+	options Options
+}
+
+func runOrReport(ctx context.Context, mode modeRun, run func(context.Context, Streams, Options) error) int {
+	streams, options := mode.streams, mode.options
 	err := run(ctx, streams, options)
 	var stopped *diffkit.Stopped
 	if errors.As(err, &stopped) {

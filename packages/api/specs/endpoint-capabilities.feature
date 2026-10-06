@@ -276,3 +276,20 @@ Feature: Endpoint capabilities - rate limiting, response caching, deprecation
   Scenario: A rate-limit window is declared whole or not at all
     When a route declares a request count with no window length, or a length with no count
     Then the declaration is refused where it is written, saying requests and seconds travel together
+
+  @unit
+  Scenario: An endpoint asks whether its tenant holds a named plan capability
+    Given an endpoint declares that its tenant must hold the webhook endpoints capability (Alex, 2026-10-05, E6)
+    When a caller the access check admitted reaches it
+    Then the plan is asked about that capability by name, at the scope access resolved
+    And a tenant without it is refused with the refusal the process gives for that capability, before the handler
+    And a process that gives no refusal of its own answers the framework's plan refusal
+
+  @unit
+  Scenario: An endpoint asks its plan before its permission
+    Given an endpoint declares an entitlement asked before its permission (Alex, 2026-10-06, Q31)
+    When a caller reaches it
+    Then the door identifies the caller, then the plan is asked at the credential's scope, then the permission
+    And a tenant without the plan is refused with the plan refusal even when the permission would refuse too
+    And an entitled tenant without the permission is refused with the permission refusal
+    And an endpoint whose permission is asked anywhere but the credential's scope may not ask it first

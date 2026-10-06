@@ -6,7 +6,8 @@ import { useCallback, useRef, useState } from "react";
 
 import { useDatasetHost } from "../model/dataset-host.ts";
 import { uploadDatasetAttachment } from "./attachment-upload.ts";
-import { useStoredObjectUploadTransport } from "./use-stored-object-upload.ts";
+import { useDatasetLimits } from "./use-dataset-limits.ts";
+import { useDatasetAttachmentUploadTransport } from "./use-stored-object-upload.ts";
 
 export type AttachmentUpload = {
   /** The hidden file input the cell renders. */
@@ -30,7 +31,8 @@ export function useAttachmentUpload({
   onChange: (value: string) => void;
 }): AttachmentUpload {
   const project = useDatasetHost().project();
-  const transport = useStoredObjectUploadTransport();
+  const transport = useDatasetAttachmentUploadTransport();
+  const { attachmentBytes } = useDatasetLimits(project?.id);
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploadingName, setUploadingName] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<unknown>(null);
@@ -53,6 +55,7 @@ export function useAttachmentUpload({
           projectId: project.id,
           file,
           transport,
+          maxBytes: attachmentBytes,
         });
         onChange(reference);
       } catch (error) {
@@ -61,7 +64,7 @@ export function useAttachmentUpload({
         setUploadingName(null);
       }
     },
-    [onChange, project?.id, transport],
+    [onChange, project?.id, transport, attachmentBytes],
   );
 
   const clear = useCallback(() => {

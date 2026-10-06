@@ -38,6 +38,33 @@ type sigV4Request struct {
 	payloadHash   string
 }
 
+// checkRequestTime refuses a presigned URL past its expiry or not yet valid, and
+// a header-signed request whose clock is too far from the server's.
+func (s *Server) checkRequestTime(r *http.Request, claims sigV4Request, obj object) *s3Error {
+	now := s.now().UTC()
+	if !claims.presigned {
+		if skew := now.Sub(claims.amzDate); skew > maxClockSkew || skew < -maxClockSkew {
+			e := obj.fail(http.StatusForbidden, "RequestTimeTooSkewed",
+				"The difference between the request time and the current time is too large.")
+			e.RequestTime, e.ServerTime = claims.amzDateRaw, now.Format(time.RFC3339)
+			return &e
+		}
+		return nil
+	}
+	expires, _ := strconv.Atoi(r.URL.Query().Get("X-Amz-Expires"))
+	if deadline := claims.amzDate.Add(time.Duration(expires) * time.Second); now.After(deadline) {
+		e := obj.fail(http.StatusForbidden, "AccessDenied", "Request has expired")
+		e.Expires, e.ServerTime = deadline.Format(time.RFC3339), now.Format(time.RFC3339)
+		e.XAmzExpires = strconv.Itoa(expires)
+		return &e
+	}
+	if claims.amzDate.After(now.Add(maxClockSkew)) {
+		e := obj.fail(http.StatusForbidden, "AccessDenied", "Request is not yet valid")
+		return &e
+	}
+	return nil
+}
+
 // authenticate checks r's SigV4 signature against the dev key the way S3
 // does: header or presigned-query auth, the credential scope, the clock or
 // the expiry, then the signature itself. It answers the S3 error or nil.
@@ -46,24 +73,8 @@ func (s *Server) authenticate(r *http.Request, obj object) *s3Error {
 	if fail != nil {
 		return fail
 	}
-	now := s.now().UTC()
-	if claims.presigned {
-		expires, _ := strconv.Atoi(r.URL.Query().Get("X-Amz-Expires"))
-		if deadline := claims.amzDate.Add(time.Duration(expires) * time.Second); now.After(deadline) {
-			e := obj.fail(http.StatusForbidden, "AccessDenied", "Request has expired")
-			e.Expires, e.ServerTime = deadline.Format(time.RFC3339), now.Format(time.RFC3339)
-			e.XAmzExpires = strconv.Itoa(expires)
-			return &e
-		}
-		if claims.amzDate.After(now.Add(maxClockSkew)) {
-			e := obj.fail(http.StatusForbidden, "AccessDenied", "Request is not yet valid")
-			return &e
-		}
-	} else if skew := now.Sub(claims.amzDate); skew > maxClockSkew || skew < -maxClockSkew {
-		e := obj.fail(http.StatusForbidden, "RequestTimeTooSkewed",
-			"The difference between the request time and the current time is too large.")
-		e.RequestTime, e.ServerTime = claims.amzDateRaw, now.Format(time.RFC3339)
-		return &e
+	if e := s.checkRequestTime(r, claims, obj); e != nil {
+		return e
 	}
 	if claims.accessKey != s.cfg.AccessKeyID {
 		e := obj.fail(http.StatusForbidden, "InvalidAccessKeyId",

@@ -26,6 +26,7 @@ import { SAMPLE_CHOICE_KEY } from "../../../../ui/elements/governance-sample-mod
 
 const harness = vi.hoisted(() => ({
   list: { data: undefined as unknown, isLoading: false, error: null as unknown },
+  listInputs: [] as unknown[],
   sources: { data: undefined as unknown, isLoading: false },
   openDrawer: vi.fn(),
   requested: 0,
@@ -50,7 +51,12 @@ vi.mock("../../../../behavior/governance-api.ts", () => {
           if (typeof property !== "string") return undefined;
           if (property === "useQuery") {
             const full = path.join(".");
-            if (full === "governanceAgents.list") return () => harness.list;
+            if (full === "governanceAgents.list") {
+              return (input: unknown) => {
+                harness.listInputs.push(input);
+                return harness.list;
+              };
+            }
             if (full === "governanceAgents.syncSources") return () => harness.sources;
             return () => ({ data: undefined, isLoading: false, error: null });
           }
@@ -130,6 +136,7 @@ const emptyText = (testId: string) => screen.getByTestId(testId).textContent ?? 
 beforeEach(() => {
   window.sessionStorage.clear();
   harness.list = { data: undefined, isLoading: false, error: null };
+  harness.listInputs = [];
   harness.sources = { data: undefined, isLoading: false };
   harness.openDrawer.mockReset();
   harness.requested = 0;
@@ -439,6 +446,45 @@ describe("the header of the Agents page", () => {
   });
 });
 
+describe("a governance viewer opening the Agents page", () => {
+  describe("when sample data is off", () => {
+    /** @scenario "The agents page reads the organization's own agents" */
+    it("asks for the organization's agents and names no project", () => {
+      withNoAgents();
+      renderPage();
+
+      expect(harness.listInputs.length).toBeGreaterThan(0);
+      for (const input of harness.listInputs) {
+        expect(input).toEqual({ organizationId: "org-1" });
+      }
+    });
+
+    /** @scenario "The agents page default layout stays out of the address" */
+    it("renders the heading and the empty state with a way to register, and writes no view", () => {
+      withNoAgents();
+      const { host } = renderPage();
+
+      expect(screen.getAllByRole("heading", { name: "Agents" }).length).toBeGreaterThan(0);
+      expect(
+        within(screen.getByTestId("agents-empty")).getByRole("button", { name: "Register agent" }),
+      ).toBeInTheDocument();
+      expect(host.recording.queries.filter((q) => "view" in q.next)).toEqual([]);
+      expect(screen.getByTestId("address")).not.toHaveTextContent("view=");
+    });
+  });
+
+  describe("when the address names a layout the page does not have", () => {
+    /** @scenario "An unknown agents layout value falls back to the list" */
+    it("renders the agents list rather than a blank pane", () => {
+      withSampleOn();
+      renderPage({ query: { view: "nonsense" } });
+
+      expect(screen.getByTestId("governance-agents-table")).toBeInTheDocument();
+      expect(screen.queryAllByTestId("governance-agent-card")).toHaveLength(0);
+    });
+  });
+});
+
 describe("the register-agent deep link", () => {
   describe("given the address carries add=1 and no drawer", () => {
     it("opens the register drawer once", () => {
@@ -535,6 +581,7 @@ describe("the Agents page with the sample agents on screen", () => {
     });
 
     /** @scenario "The fleet summary strip sits above the filter chips and the agents" */
+    /** @scenario "The sample toggle sits top-right and the banner directly under the header" */
     it("shows four headed cards below the banner and above every chip", () => {
       renderPage();
 

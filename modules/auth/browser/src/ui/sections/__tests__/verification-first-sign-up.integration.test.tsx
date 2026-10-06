@@ -322,6 +322,7 @@ describe("given the sign-up screen", () => {
     };
 
     /** @scenario "A sign-up on a web address the installation is not set up for writes no account" */
+    /** @scenario "Sign-up failures read the same way" */
     it("says which address to check when creating the account is refused", async () => {
       requestVerificationMock.mockResolvedValue({
         sent: false,
@@ -411,6 +412,7 @@ describe("given the sign-up screen", () => {
   });
 
   describe("when a reopened link returns no usable proof", () => {
+    /** @scenario "A claimed proof whose enrollment failed recovers by email" */
     it("offers a fresh link and confirms nothing", async () => {
       searchParamsRef.current = new URLSearchParams("verify=spent-token");
       completeVerificationMock.mockResolvedValue({

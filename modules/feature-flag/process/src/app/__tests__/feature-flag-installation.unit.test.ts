@@ -1,23 +1,20 @@
 import { FeatureFlagApi, UnknownFeatureFlagError } from "@langwatch/feature-flag-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
 import { featureFlagProcessModule } from "../../feature-flag.module.ts";
-import {
-  createFeatureFlagTestAuthz,
-  createFeatureFlagTestProjects,
-  TestOrganizations,
-} from "./feature-flag.fixture.ts";
+import { createFeatureFlagTestAuthz, TestOrganizations } from "./feature-flag.fixture.ts";
 
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(featureFlagProcessModule)])
+    .withModules([featureFlagProcessModule])
+    .withStores(memoryStores())
     .withConfig({ "feature-flag": { forceEnable: [], overrides: {}, legacy: {} } })
     .provide({
       authz: createFeatureFlagTestAuthz(),
-      project: createFeatureFlagTestProjects(),
       organization: TestOrganizations.create().api(),
     });
 }

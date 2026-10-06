@@ -21,15 +21,11 @@ import {
   type OrganizationTeamPage,
   type PersonalFeatures,
   type PersonalWorkspace,
+  type PricingModel,
 } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import type {
-  GroupIdentity,
-  PersonalWorkspaceIdentity,
-  TeamIdentity,
-} from "../../app/organization.members.ts";
 import type * as groupRepositoryModule from "../../repositories/group.repository.ts";
 import {
   OrganizationRepository,
@@ -38,7 +34,10 @@ import {
   type StoredOrganizationSettings,
 } from "../../repositories/organization.repository.ts";
 import { TeamRepository } from "../../repositories/team.repository.ts";
+import type { GroupIdentity } from "../group-identity.service.ts";
 import { OrganizationService } from "../organization.service.ts";
+import type { PersonalWorkspaceIdentity } from "../personal-workspace-identity.service.ts";
+import type { TeamIdentity } from "../team-identity.service.ts";
 
 class StubRepository extends OrganizationRepository {
   async findAllIds(): Promise<string[]> {
@@ -52,8 +51,12 @@ class StubRepository extends OrganizationRepository {
   guidedOnboarding: GuidedOnboardingRecord = { state: { paths: [], donePaths: [] }, variant: null };
   storedSettings: StoredOrganizationSettings | null = null;
 
-  async getJoinSetting(): Promise<{ domainJoin: "request"; joinDomains: string[] }> {
-    return { domainJoin: "request", joinDomains: [] };
+  async getJoinSetting(): Promise<{
+    domainJoin: "request";
+    joinDomains: string[];
+    joinerRole: "MEMBER";
+  }> {
+    return { domainJoin: "request", joinDomains: [], joinerRole: "MEMBER" };
   }
 
   async saveJoinSetting(): Promise<void> {}
@@ -63,6 +66,20 @@ class StubRepository extends OrganizationRepository {
   }
 
   async saveSessionPolicy(): Promise<void> {}
+
+  async getPricing(): Promise<{ pricingModel: PricingModel | null; currency: "USD" | "EUR" }> {
+    return { pricingModel: null, currency: "EUR" };
+  }
+
+  async getDatasetLimits(): Promise<{ attachmentMaxBytes: number | null }> {
+    return { attachmentMaxBytes: null };
+  }
+
+  async isInstantEvalsOptedIn(): Promise<boolean> {
+    return false;
+  }
+
+  async recordInstantEvalsOptIn(): Promise<void> {}
 
   async getGuidedOnboarding(): Promise<GuidedOnboardingRecord> {
     return this.guidedOnboarding;
@@ -350,7 +367,6 @@ function createService(
     groupIdentities: {} as GroupIdentity,
     authz: authzApi,
     grants: authzApi,
-    settingsSecrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
   });
 }
 
@@ -489,8 +505,7 @@ describe("OrganizationService", () => {
       updatedAt: new Date(2),
     };
 
-    // The stub's settingsSecrets is the identity function, so the decrypted
-    // answer equals the stored row byte for byte.
+    // The repository opens the stored settings, so the answer is the row it returns.
     await expect(createService(repository).getSettings({ organizationId: "org" })).resolves.toEqual(
       repository.storedSettings,
     );
@@ -513,10 +528,10 @@ describe("OrganizationService", () => {
       updatedAt: new Date(2),
     };
     await expect(
-      createService(repository).updateSettings({
-        organizationId: "org",
-        traceSharingEnabled: false,
-      }),
+      createService(repository).updateSettings(
+        { organizationId: "org", traceSharingEnabled: false },
+        { id: "admin" },
+      ),
     ).resolves.toEqual({ traceShareRevocationRequired: true });
     expect(repository.settingsUpdate).toEqual({
       organizationId: "org",
@@ -535,7 +550,9 @@ describe("OrganizationService", () => {
     it("refuses it when no secret is stored yet", async () => {
       const repository = new StubRepository("team");
 
-      await expect(createService(repository).updateSettings(storage)).rejects.toMatchObject({
+      await expect(
+        createService(repository).updateSettings(storage, { id: "admin" }),
+      ).rejects.toMatchObject({
         code: "validation_error",
         httpStatus: 400,
       });
@@ -547,7 +564,7 @@ describe("OrganizationService", () => {
       const repository = new StubRepository("team");
       repository.hasS3Secret = true;
 
-      await createService(repository).updateSettings(storage);
+      await createService(repository).updateSettings(storage, { id: "admin" });
 
       expect(repository.settingsUpdate).not.toHaveProperty("s3SecretAccessKey");
     });
@@ -557,7 +574,10 @@ describe("OrganizationService", () => {
     const repository = new StubRepository("team");
 
     await expect(
-      createService(repository).updateSettings({ organizationId: "org", name: "Renamed" }),
+      createService(repository).updateSettings(
+        { organizationId: "org", name: "Renamed" },
+        { id: "admin" },
+      ),
     ).resolves.toEqual({ traceShareRevocationRequired: false });
     expect(repository.settingsUpdate).toEqual({ organizationId: "org", name: "Renamed" });
   });
@@ -573,6 +593,7 @@ describe("OrganizationService", () => {
     expect(teams.organizationMemberReads).toBe(1);
   });
 
+  /** @scenario "A disabled member is checked for active access" */
   it("distinguishes active membership from a disabled membership", async () => {
     const teams = new MemoryTeams();
     teams.activeMember = false;
@@ -586,6 +607,7 @@ describe("OrganizationService", () => {
     ).resolves.toBe(true);
   });
 
+  /** @scenario "A caller requires the oldest team" */
   it("returns the required oldest team", async () => {
     await expect(
       createService(new StubRepository("oldest-team")).getOldestTeamId({
@@ -594,6 +616,7 @@ describe("OrganizationService", () => {
     ).resolves.toBe("oldest-team");
   });
 
+  /** @scenario "An organization has no team" */
   it("propagates the organization-owned missing-team error", async () => {
     await expect(
       createService(new StubRepository(null)).getOldestTeamId({
@@ -628,6 +651,7 @@ describe("OrganizationService", () => {
     ).resolves.toMatchObject({ id: "team", slug: "team" });
   });
 
+  /** @scenario "A request mutates a personal team" */
   it("protects personal teams from archive and membership mutation", async () => {
     const teams = new MemoryTeams();
     teams.team = { ...sharedTeam, isPersonal: true, ownerUserId: "owner" };
@@ -647,6 +671,7 @@ describe("OrganizationService", () => {
     ).rejects.toBeInstanceOf(PersonalTeamProtectedError);
   });
 
+  /** @scenario "A request changes team membership" */
   it("uses AuthZ grants for team membership writes", async () => {
     const teams = new MemoryTeams();
     const grants = new RecordingGrants();

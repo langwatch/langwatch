@@ -48,10 +48,7 @@ function serveDescriptor(descriptor, source) {
   }
 }
 
-const installed = join(
-  repoRoot,
-  "apps/api/src/process-modules.generated.ts",
-);
+const installed = join(repoRoot, "apps/api/src/process-modules.generated.ts");
 const { processModules } = await import(pathToFileURL(installed).href);
 for (const module of processModules) {
   const source = `module ${module.name}`;

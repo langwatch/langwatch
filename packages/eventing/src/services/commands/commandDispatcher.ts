@@ -13,11 +13,6 @@ import type { TenantId } from "../../domain/tenantId.ts";
 import { createTenantId } from "../../domain/tenantId.ts";
 import type { Event } from "../../domain/types.ts";
 import { EventSchema } from "../../domain/types.ts";
-import {
-  isComponentKilled,
-  type KillSwitchOptions,
-  type KillSwitch,
-} from "../../kill-switch/index.ts";
 import { incrementEsCommandTotal, observeEsCommandDuration } from "../../metrics.ts";
 import type { CommandSerializationOptions } from "../../pipeline/staticBuilder.types.ts";
 import type { DeduplicationStrategy } from "../../queues/index.ts";
@@ -45,8 +40,6 @@ export interface ProcessCommandParams<
   aggregateType: AggregateType;
   commandName: string;
   pipelineName: string;
-  killSwitch?: KillSwitch;
-  killSwitchOptions?: KillSwitchOptions;
   logger?: ReturnType<typeof createLogger>;
   /** The queue job's stable id; a crash replay of the job carries the same one. */
   jobId?: string;
@@ -195,11 +188,7 @@ export async function processCommand<EventType extends Event, Payload extends Te
     handler,
     getAggregateId,
     storeEventsFn,
-    aggregateType,
-    commandName,
     pipelineName,
-    killSwitch,
-    killSwitchOptions,
     logger: log,
     jobId,
   } = params;
@@ -207,20 +196,6 @@ export async function processCommand<EventType extends Event, Payload extends Te
   const validated = payload;
   const tenantId = createTenantId(String(validated.tenantId));
   const aggregateId = getAggregateId(validated);
-
-  if (
-    await isComponentKilled({
-      killSwitch,
-      aggregateType,
-      componentType: "command",
-      componentName: commandName,
-      tenantId,
-      customKey: killSwitchOptions?.customKey,
-      logger: log,
-    })
-  ) {
-    return;
-  }
 
   const command = createCommand({ tenantId, aggregateId, type: commandType, data: validated });
 
@@ -325,29 +300,13 @@ async function handleBatchCommands<
   progress: BatchProgress;
 }): Promise<{ handledCommands: Command<Payload>[]; allEvents: EventType[] }> {
   const { params, validatedPayloads, progress } = args;
-  const { getAggregateId, handler, commandType, aggregateType } = params;
+  const { getAggregateId, handler, commandType } = params;
 
   const handledCommands: Command<Payload>[] = [];
   const allEvents: EventType[] = [];
   for (const [position, validated] of validatedPayloads.entries()) {
     const payloadTenantId = createTenantId(String(validated.tenantId));
     const aggregateId = getAggregateId(validated);
-
-    // Mirrors the single path's silent return: no events, no metrics — but
-    // the rest of the batch still runs.
-    if (
-      await isComponentKilled({
-        killSwitch: params.killSwitch,
-        aggregateType,
-        componentType: "command",
-        componentName: params.commandName,
-        tenantId: payloadTenantId,
-        customKey: params.killSwitchOptions?.customKey,
-        logger: params.logger,
-      })
-    ) {
-      continue;
-    }
 
     progress.attempted++;
     const command = createCommand({
@@ -479,8 +438,6 @@ export async function processCommandBatch<
  * Options for configuring a command handler.
  */
 export interface CommandHandlerOptions<Payload> extends CommandSerializationOptions<Payload> {
-  /** Operator stop for this command, resolved per tenant at dispatch time. */
-  killSwitch?: KillSwitchOptions;
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
   delay?: number;

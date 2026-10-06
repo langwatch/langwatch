@@ -95,6 +95,20 @@ describe("given the saved workbench chart tRPC family", () => {
     });
   });
 
+  describe("when the workbench switch is off and a permitted member reads charts", () => {
+    /** @scenario "A saved chart stays unreachable while the workbench switch is off" */
+    it("refuses opening a chart and listing charts with lwql_not_enabled", async () => {
+      const { caller } = await member({ held: ["analytics:view"], enabled: false });
+
+      await expect(caller.getById({ projectId: "project-1", id: "chart-1" })).rejects.toMatchObject(
+        { cause: { code: "lwql_not_enabled" } },
+      );
+      await expect(caller.getAll({ projectId: "project-1" })).rejects.toMatchObject({
+        cause: { code: "lwql_not_enabled" },
+      });
+    });
+  });
+
   describe("when the switch is on and the member lacks the analytics view permission", () => {
     /** @scenario "Running a saved chart carries the same permission and switch as every other chart procedure" */
     /** @scenario "A run is refused for a member without the analytics view permission, and nothing is executed" */

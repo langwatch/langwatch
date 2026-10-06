@@ -14,13 +14,13 @@ import type {
 } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { LangyTitleGenerator } from "../app/langy.members.ts";
 import type { LangyWorker } from "../channels/langy-worker.channel.ts";
 import { RedisLangyEffectRepository } from "../repositories/redis/redis.langy-effect.repository.ts";
 import type { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
 import type { ControlTurnStarter } from "../rules/langy-local-session-contract.rules.ts";
 import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
+import type { LangyTitleGenerator } from "../services/langy-title-generator.service.ts";
 import type { LangyAnalyticsEventProjectionRecord } from "./langy-analytics-event.projection.ts";
 import {
   buildLangyConversationPipeline,
@@ -34,7 +34,7 @@ import {
 } from "./langy-conversation.subscriber.ts";
 import {
   createGuidedOnboardingTurnFailedSubscriber,
-  type GuidedOnboardingAnalytics,
+  type GuidedOnboardingFacts,
   type GuidedOnboardingReader,
 } from "./langy-guided-onboarding-turn-failed.subscriber.ts";
 import {
@@ -88,8 +88,8 @@ export interface EventingLangyConversationAdapterOptions {
   sessionKeys: Pick<LangySessionKeyService, "mintForUser" | "revoke">;
   /** The folder's owed connect turn (ADR-129); presence is read at handle time. */
   localConnectTurn: { presence: () => LocalConnectTurnPresence; turns: ControlTurnStarter };
-  /** Onboarding's answer for a project, and the sink its failed turns are tracked to. */
-  guidedOnboarding: { reader: GuidedOnboardingReader; analytics: GuidedOnboardingAnalytics };
+  /** Onboarding's answer for a project, and where its failed turns are recorded as facts. */
+  guidedOnboarding: { reader: GuidedOnboardingReader; facts: GuidedOnboardingFacts };
   /** Who a notification goes to and whether they want it, and notification's Web Push. */
   webPush: Pick<LangyWebPushSubscriberDeps, "users" | "projects" | "notifications">;
 }
@@ -191,7 +191,7 @@ export class EventingLangyConversationAdapter {
     const guidedOnboardingTurnFailedSubscriber = createGuidedOnboardingTurnFailedSubscriber({
       guidedOnboarding: options.guidedOnboarding.reader,
       conversations: conversationReader,
-      analytics: options.guidedOnboarding.analytics,
+      facts: options.guidedOnboarding.facts,
     });
     const localConnectTurnSubscriber = createLocalConnectTurnSubscriber({
       presence: options.localConnectTurn.presence,

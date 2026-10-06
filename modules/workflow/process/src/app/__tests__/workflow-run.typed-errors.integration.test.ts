@@ -12,9 +12,6 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -25,35 +22,27 @@ import type { WorkflowRepositories } from "../../repositories/workflow-repositor
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
 import { workflowRunCallerKey, workflowRunRest } from "../../transport/workflow-run.rest.ts";
 import { WorkflowModule } from "../workflow.app.ts";
-import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 async function postRun({ repositories }: { repositories: WorkflowRepositories }) {
-  const members = createWorkflowTestInfrastructure();
   const app = await WorkflowModule.create({
-    members: {
-      ...members,
-      prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-      nlpCodeBlockTimeoutSeconds: void 0,
-      nlpInternalSecret: void 0,
-      nlpServiceUrl: void 0,
-      publicBaseUrl: void 0,
-    },
     dependencies: {
       evaluators: createApiFixture<EvaluatorApi>({}, "EvaluatorApi"),
       modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
       apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
-      projects: createApiFixture<ProjectApi>({}, "ProjectApi"),
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
       monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
       secrets: createApiFixture<SecretApi>({}, "SecretApi"),
-      organizations: createApiFixture<OrganizationApi>({}, "OrganizationApi"),
     },
     config: {
+      nlpServiceUrl: void 0,
       stagingThresholdBytes: void 0,
       stagingTtlSeconds: 600,
+      relayTurnCeilingMs: void 0,
+      publicBaseUrl: void 0,
+      nlpCodeBlockTimeoutSeconds: void 0,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

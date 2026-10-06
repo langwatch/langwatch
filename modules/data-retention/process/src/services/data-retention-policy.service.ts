@@ -24,7 +24,7 @@ import type { DataRetentionPlan, RetentionPlanService } from "./retention-plan.s
 /** The caller a gate is decided for, resolved once per request by the app. */
 export type RetentionActor = Readonly<{ userId: string; email: string | null }>;
 
-export type DataRetentionPolicyServiceOptions = Readonly<{
+type DataRetentionPolicyServiceOptions = Readonly<{
   directory: DataRetentionDirectoryReader;
   permissions: RetentionPermissionsService;
   plans: Pick<RetentionPlanService, "getPlan">;

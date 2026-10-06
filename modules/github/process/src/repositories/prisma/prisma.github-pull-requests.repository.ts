@@ -73,6 +73,7 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
     organizationIds: readonly string[];
     since?: number;
   }): Promise<GithubUsageCount> {
+    if (organizationIds.length === 0) return { pullRequests: 0 };
     const scope = { organizationId: { in: [...organizationIds] } };
     const pullRequests = await this.prisma.githubPullRequest.count({
       where: since === undefined ? scope : { ...scope, prCreatedAt: { gte: new Date(since) } },

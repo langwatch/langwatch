@@ -10,9 +10,9 @@ import { filterAST, walkAST } from "./trace-query-ast.ts";
 import { escapeValue } from "./trace-query-mutations.ts";
 import { isEmptyAST, parse, serialize } from "./trace-query-parser.ts";
 
-const EVALUATOR_FIELD = "evaluator";
+export const EVALUATOR_FIELD = "evaluator";
 export const EVALUATOR_VERDICT_FIELD = "evaluatorVerdict";
-const EVALUATOR_SCORE_FIELD = "evaluatorScore";
+export const EVALUATOR_SCORE_FIELD = "evaluatorScore";
 /**
  * Per-evaluator emitted-label filter. Mirrors `evaluatorVerdict`: a categorical
  * value scoped to one evaluation's group, translated to an `evaluation_runs`

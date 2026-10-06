@@ -69,22 +69,31 @@ Feature: A process cannot boot without what its modules declared
 
   Rule: stores are built from the deployment's own configuration
 
-    @unit @unimplemented
+    @unit
     Scenario: A configured deployment names no store
       Given a deployment whose configuration carries its connection strings
       When the process boots
       Then every store its modules need is opened from that configuration
       And the composition names none of them
 
-    @unit @unimplemented
+    @unit
     Scenario: A store a module needs and the deployment did not configure
       Given an installed module that keeps relational state
       And a deployment that configured no database
       Then the boot refuses, naming the setting that would configure one
 
+    @unit
+    Scenario: A queue a module needs and the deployment did not configure
+      Given an installed module that keeps its state in Redis
+      And a deployment that configured no Redis
+      Then the boot refuses, naming REDIS_URL
+      # The eventing queue runs over the process's one Redis, so a process
+      # with no Redis cannot compose dispatch either: it refuses to boot
+      # rather than naming "no dispatch" and serving without it.
+
   Rule: choosing memory is an override, and an override against a real endpoint is said out loud
 
-    @unit @unimplemented
+    @unit
     Scenario: A test runs a module over memory
       Given an installed module that keeps relational state
       When the process chooses memory for its relational store
@@ -110,7 +119,7 @@ Feature: A process cannot boot without what its modules declared
       Then the module reads the field as unset
       And a warning names the module and the setting that was dropped
 
-    @unit @unimplemented
+    @unit
     Scenario: A misspelled required setting refuses the boot
       Given a module whose settings carry a required field
       When the process sends that field under a misspelled name
@@ -137,13 +146,18 @@ Feature: A process cannot boot without what its modules declared
 
   Rule: a credential the deployment supplies is named, not spelled
 
-    @unit
-    Scenario: A misspelled shared secret is refused where it is written
-      Given a process supplying the deployment's own shared secrets
-      When one is given under a name no door guards
-      Then it is refused where it was written, rather than guarding nothing
+    # The deployment's shared-secret map (CRON_API_KEY) is retired: no family
+    # used it. A module that needs a bearer owns it and binds it on its own
+    # family (record section 4), so there is no host-side name to misspell.
 
-    @unit @unimplemented
+    @integration
+    Scenario: A host given no deployment bearers leaves an unbound internal family closed
+      Given a REST host created with no bearers option
+      And a family naming the internal secret credential that binds no door of its own
+      When a caller presents a bearer to it
+      Then the call is refused and the handler is never reached
+
+    @unit
     Scenario: A door whose credential was never supplied refuses callers
       Given a process that supplies no instance administrator bearer
       When a caller presents one

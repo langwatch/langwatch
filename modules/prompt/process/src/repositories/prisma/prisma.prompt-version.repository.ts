@@ -26,7 +26,7 @@ import type { LlmConfigRepository } from "../prompt.repository.ts";
  * The client slice version persistence binds to, transaction included: a version row and
  * the config row whose pointer it moves land together.
  */
-export type PromptVersionDatabase = Pick<
+type PromptVersionDatabase = Pick<
   PrismaClient,
   "llmPromptConfig" | "llmPromptConfigVersion" | "project" | "$transaction"
 >;

@@ -214,8 +214,9 @@ describe("given a repository class or interface file", () => {
       expect(found.map((entry) => entry.messageId)).toEqual(["repositoryServiceVocabulary"]);
       expect(found[0].data).toEqual({ name: "getById", rest: "ById" });
       expect(found[0].message).toBe(
-        "Repository method `getById` uses service vocabulary; repositories answer `find*`, services answer `get*`." +
-          " Rename it `findById` here and in the repository interface this class implements.",
+        "Repository method `getById` uses service vocabulary; repositories answer `find*`, services answer `get*`. A repository answers what it found; deciding that absence is an error is the service's job (ADR-146)." +
+          " Rename it `findById` here and in the repository interface this class implements." +
+          " Read the `contract` skill.",
       );
     });
 

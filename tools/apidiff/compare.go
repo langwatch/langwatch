@@ -155,9 +155,9 @@ func (cmp Comparison) compareJSONBodies(beforeBody, afterBody any, bothErrored b
 	beforeShape, afterShape := ShapeOf(beforeBody), ShapeOf(afterBody)
 	if beforeShape.Signature() != afterShape.Signature() {
 		if bothErrored {
-			return []Finding{cmp.finding(FindingErrorShapeDiff, map[string][2]any{
+			return []Finding{cmp.ruleErrorEnvelope(cmp.finding(FindingErrorShapeDiff, map[string][2]any{
 				"shape": {beforeShape.Signature(), afterShape.Signature()},
-			})}
+			}), beforeBody, afterBody)}
 		}
 		return cmp.ruleShape(cmp.finding(FindingBodyShapeDiff, map[string][2]any{
 			"shape": {beforeShape.Signature(), afterShape.Signature()},

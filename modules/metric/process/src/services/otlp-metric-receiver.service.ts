@@ -24,12 +24,12 @@ import type { MetricRequestCollectionService } from "./metric-request-collection
 const CANONICAL_METRICS_PATH = "/api/otel/v1/metrics";
 
 /** Trace's share of the door: the key, the allowance, the key's clock and the failure report. */
-export type MetricReceiverTraceSlice = Pick<
+type MetricReceiverTraceSlice = Pick<
   TraceApi,
   "otlpCredential" | "otlpUsageLimit" | "otlpMarkCredentialUsed" | "otlpReportError"
 >;
 
-export interface OtlpMetricReceiverDeps {
+interface OtlpMetricReceiverDeps {
   traces: MetricReceiverTraceSlice;
   collection: Pick<MetricRequestCollectionService, "handleOtlpMetricRequest">;
 }

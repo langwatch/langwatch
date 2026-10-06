@@ -1,11 +1,26 @@
+import type { FoldProjectionStore } from "@langwatch/eventing";
+
+import type { CodingAgentSessionFoldCacheRepository } from "../coding-agent-session-fold-cache.repository.ts";
 import type { CodingAgentRepositories } from "../coding-agent.repositories.ts";
 import { MemoryCodingAgentSessionEventRepository } from "./memory.coding-agent-session-event.repository.ts";
-import { MemoryCodingAgentSessionFoldCacheRepository } from "./memory.coding-agent-session-fold-cache.repository.ts";
 import { MemoryCodingAgentSessionRepository } from "./memory.coding-agent-session.repository.ts";
 import { MemoryCodingAgentTraceSessionRepository } from "./memory.coding-agent-trace-session.repository.ts";
 import { MemoryCodingAgentDatabase } from "./memory.coding-agent.database.ts";
 import { MemorySessionContextMemoRepository } from "./memory.session-context-memo.repository.ts";
 import { MemorySessionMetricSeriesRepository } from "./memory.session-metric-series.repository.ts";
+
+/** No cache tier in memory: the durable store is already as fast as a cache. */
+export class MemoryCodingAgentSessionFoldCacheRepository implements CodingAgentSessionFoldCacheRepository {
+  private constructor() {}
+
+  static create(): MemoryCodingAgentSessionFoldCacheRepository {
+    return new MemoryCodingAgentSessionFoldCacheRepository();
+  }
+
+  cached<State>(store: FoldProjectionStore<State>): FoldProjectionStore<State> {
+    return store;
+  }
+}
 
 /** The "memory" tier: every coding-agent row the app is tested without a store. */
 export class MemoryCodingAgentRepositories {

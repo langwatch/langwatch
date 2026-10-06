@@ -22,6 +22,7 @@ import {
 } from "./trace-read.contract.ts";
 import { traceMetadataResponseSchema, traceMetadataUpdateSchema } from "./trace-rest.schemas.ts";
 import { routeSearchInputSchema, routeSearchResultSchema } from "./trace-search-route.ts";
+import { sharedTraceDtoSchema } from "./trace-share.schemas.ts";
 import {
   spanDetailSchema,
   traceHeaderSchema,
@@ -47,6 +48,8 @@ import {
   tracesSuggestSchema,
   tracesTraceEventsSchema,
   tracesTraceLogsSchema,
+  promptStudioSpanSchema,
+  spansForTraceSchema,
 } from "./trace.responses.ts";
 import { spanTreePageSchema } from "./trace.ts";
 
@@ -590,4 +593,26 @@ export const tracesTrpc = defineTrpcContract("traces")
   )
   .withOutput(tracesTraceEventsSchema)
 
+  .build();
+
+/** The one public trace read (ADR-057): the share token in the input is the whole authorization. */
+const sharedTraceGetInputSchema = z.object({ token: z.string() });
+
+export const sharedTraceTrpc = defineTrpcContract("sharedTrace")
+  .query("get")
+  .withInput(sharedTraceGetInputSchema)
+  .withOutput(sharedTraceDtoSchema)
+  .build();
+
+/** Every `spans.*` procedure; both take `traces:view`, since a span is trace content. */
+const spanScopeSchema = z.object({ projectId: z.string(), spanId: z.string() });
+
+export const spansTrpc = defineTrpcContract("spans")
+  .query("getAllForTrace")
+  .withInput(traceScopeSchema)
+  .withOutput(spansForTraceSchema)
+
+  .query("getForPromptStudio")
+  .withInput(spanScopeSchema)
+  .withOutput(promptStudioSpanSchema)
   .build();

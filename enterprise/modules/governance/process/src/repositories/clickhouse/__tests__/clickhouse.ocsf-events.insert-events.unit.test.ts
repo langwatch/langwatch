@@ -15,7 +15,7 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type { GovernanceOcsfEvent } from "../../../app/governance.members.ts";
+import type { GovernanceOcsfEvent } from "../../governance.repositories.ts";
 import {
   ClickHouseOcsfEventsRepository,
   OCSF_ACTIVITY,

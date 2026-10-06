@@ -1,10 +1,10 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
+  canonicalErrorResponse,
   bindRestHeader,
   bindRestMiddleware,
   createRestRuntime,
-  type RestErrorHandler,
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
@@ -33,15 +33,12 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { memoryRateLimiter } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { GovernanceModule } from "../../app/governance.app.ts";
-import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import type { NewIngestionTemplate } from "../../repositories/ingestion-template.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import { governanceRest, governanceRestCaller, governanceRestSurface } from "../governance.rest.ts";
@@ -83,22 +80,6 @@ function newTemplateInput(overrides: Partial<NewIngestionTemplate> = {}): NewIng
     ...overrides,
   };
 }
-
-/**
- * The two things the process supplies and this package does not own: who the caller is, and how
- * a refusal is rendered. A credential the door does not recognise and a permission outside the
- * key's ceiling are both raised as handled errors, exactly as a real mount raises them.
- */
-const renderHandled: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    return c.json(
-      { error: error.code, message: error.message },
-      (error.httpStatus ?? 500) as ContentfulStatusCode,
-    );
-  }
-
-  return c.json({ error: "Internal server error" }, 500);
-};
 
 /** The member a presented credential names, or nothing for the legacy project token. */
 function viewerOf(request: Request): string | null {
@@ -151,11 +132,6 @@ async function buildApi(
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
     },
-    members: {
-      encryption: createApiFixture<GovernanceEncryptor>(),
-      isSaas: false,
-      rateLimiter: memoryRateLimiter(),
-    },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
@@ -190,7 +166,7 @@ async function buildApi(
   const hono = runtime.mount(governanceRest.router(), {
     app: () => app,
     credential: "project",
-    onError: renderHandled,
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(governanceRestCaller, (context) => ({
         viewerUserId: viewerOf(context.req.raw),
@@ -263,8 +239,8 @@ describe("the governance REST family", () => {
       const response = await asProjectKey("/api/governance/ingestion-templates/admin");
 
       expect(response.status).toBe(403);
-      await expect(response.json()).resolves.toEqual({
-        error: "user_token_required",
+      await expect(response.json()).resolves.toMatchObject({
+        code: "user_token_required",
         message: expect.any(String),
       });
       expect(findAdminVisible).not.toHaveBeenCalled();
@@ -283,8 +259,8 @@ describe("the governance REST family", () => {
       });
 
       expect(response.status).toBe(403);
-      const body = (await response.json()) as { error: string };
-      expect(body.error).toBe("user_token_required");
+      const body = (await response.json()) as { code: string };
+      expect(body.code).toBe("user_token_required");
       expect(createWithAudit).not.toHaveBeenCalled();
     });
   });
@@ -413,8 +389,8 @@ describe("the governance REST family", () => {
       // 422, the status this framework gives every validation failure — the
       // 400 this family used to answer was the deleted mapper's own choice.
       expect(response.status).toBe(422);
-      const body = (await response.json()) as { error: string };
-      expect(body.error).toBe(new InvalidSourceTypeError().code);
+      const body = (await response.json()) as { code: string };
+      expect(body.code).toBe(new InvalidSourceTypeError().code);
     });
 
     it("refuses a body with no display name before the application sees it", async () => {
@@ -427,8 +403,8 @@ describe("the governance REST family", () => {
       });
 
       expect(response.status).toBe(422);
-      const body = (await response.json()) as { error: string };
-      expect(body.error).toBe("validation_error");
+      const body = (await response.json()) as { code: string };
+      expect(body.code).toBe("validation_error");
       expect(createWithAudit).not.toHaveBeenCalled();
     });
   });
@@ -511,8 +487,8 @@ describe("the governance REST family", () => {
       );
 
       expect(response.status).toBe(403);
-      const body = (await response.json()) as { error: string };
-      expect(body.error).toBe(new PlatformTemplateImmutableError().code);
+      const body = (await response.json()) as { code: string };
+      expect(body.code).toBe(new PlatformTemplateImmutableError().code);
     });
   });
 
@@ -545,8 +521,8 @@ describe("the governance REST family", () => {
       });
 
       expect(response.status).toBe(404);
-      const body = (await response.json()) as { error: string };
-      expect(body.error).toBe(new TemplateNotFoundError("nope").code);
+      const body = (await response.json()) as { code: string };
+      expect(body.code).toBe(new TemplateNotFoundError("nope").code);
     });
   });
 
@@ -629,8 +605,8 @@ describe("the governance REST family", () => {
       const response = await asUser("/api/governance/ingestion-templates/foreign");
 
       expect(response.status).toBe(404);
-      const body = (await response.json()) as { error: string };
-      expect(body.error).toBe("template_not_found");
+      const body = (await response.json()) as { code: string };
+      expect(body.code).toBe("template_not_found");
     });
 
     /**
@@ -670,8 +646,8 @@ describe("the governance REST family", () => {
       const response = await asProjectKey(`/api/governance/ingestion-templates/${seeded.id}`);
 
       expect(response.status).toBe(403);
-      const body = (await response.json()) as { error: string };
-      expect(body.error).toBe("user_token_required");
+      const body = (await response.json()) as { code: string };
+      expect(body.code).toBe("user_token_required");
       expect(findVisible).not.toHaveBeenCalled();
     });
   });

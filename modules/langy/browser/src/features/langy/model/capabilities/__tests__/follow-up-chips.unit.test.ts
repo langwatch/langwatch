@@ -33,6 +33,7 @@ const CARRIED_ALERT = {
 describe("deriveFollowUpChips", () => {
   describe("given a trace search that found traces", () => {
     describe("when the search carried free text", () => {
+      /** @scenario "The traces card suggests alerting on the search" */
       it("offers to alert on the search, carrying the text as the alert's subject", () => {
         const chips = deriveFollowUpChips({
           call: traceSearch(),
@@ -42,6 +43,7 @@ describe("deriveFollowUpChips", () => {
         expect(chips).toContainEqual(CARRIED_ALERT);
       });
 
+      /** @scenario "The graphing offer never claims to carry what the graph cannot hold" */
       it("keeps the graph offer honest — analytics cannot hold the text, so it only opens the surface", () => {
         const chips = deriveFollowUpChips({
           call: traceSearch(),
@@ -56,6 +58,7 @@ describe("deriveFollowUpChips", () => {
         });
       });
 
+      /** @scenario "The traces card puts the offer that carries the search first" */
       it("puts the chip that carries the search before the ones that only navigate", () => {
         const chips = deriveFollowUpChips({
           call: traceSearch(),
@@ -82,6 +85,7 @@ describe("deriveFollowUpChips", () => {
        * is no subject to alert on, so no offer may claim to carry one. The
        * offers still resolve, as plain navigation to real surfaces.
        */
+      /** @scenario "A search with no filters and no text suggests nothing to carry" */
       it("offers the surfaces as plain chips with real destinations", () => {
         const chips = deriveFollowUpChips({
           call: traceSearch({
@@ -109,6 +113,23 @@ describe("deriveFollowUpChips", () => {
             href: "/demo/datasets",
             carried: false,
           },
+        ]);
+      });
+
+      /** @scenario "A search with nothing to carry offers no alert" */
+      it("offers no alert, since there is no search to alert on", () => {
+        const chips = deriveFollowUpChips({
+          call: traceSearch({
+            input: { command: "langwatch trace search --limit 25" },
+          }),
+          projectSlug: "demo",
+        });
+
+        expect(chips.map((chip) => chip.id)).not.toContain("traces:triggers");
+        expect(chips.map((chip) => chip.label)).toEqual([
+          "Open in Analytics",
+          "Open in Annotations",
+          "Open in Datasets",
         ]);
       });
     });
@@ -159,6 +180,7 @@ describe("deriveFollowUpChips", () => {
   });
 
   describe("given a search that matched nothing", () => {
+    /** @scenario "A search that matched nothing offers no dataset suggestion" */
     it("offers nothing — there is no 'these' to act on", () => {
       const chips = deriveFollowUpChips({
         call: traceSearch({
@@ -225,6 +247,42 @@ describe("deriveFollowUpChips", () => {
       it("offers no chip at all — no destination can receive a prompt", () => {
         expect(deriveFollowUpChips({ call: promptList, projectSlug: "demo" })).toEqual([]);
       });
+    });
+  });
+
+  describe("given a single trace lookup", () => {
+    /** @scenario "A trace lookup offers the surfaces that act on traces" */
+    it("offers the trace surfaces as plain chips and no alert, since a lookup carries no search", () => {
+      const chips = deriveFollowUpChips({
+        call: {
+          name: "langwatch.trace.get",
+          state: "output-available",
+          input: { command: "langwatch trace get trace_1 -o json" },
+          output: JSON.stringify({ trace_id: "trace_1", spans: [] }),
+        },
+        projectSlug: "demo",
+      });
+
+      expect(chips).toEqual([
+        {
+          id: "traces:observability.analytics",
+          label: "Open in Analytics",
+          href: "/demo/analytics",
+          carried: false,
+        },
+        {
+          id: "traces:observability.annotations",
+          label: "Open in Annotations",
+          href: "/demo/annotations",
+          carried: false,
+        },
+        {
+          id: "traces:library.datasets",
+          label: "Open in Datasets",
+          href: "/demo/datasets",
+          carried: false,
+        },
+      ]);
     });
   });
 

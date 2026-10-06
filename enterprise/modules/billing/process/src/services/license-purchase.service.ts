@@ -80,7 +80,7 @@ export type PurchasedCheckout = Pick<
 > & { customer_details: { email: string | null; name: string | null } | null };
 
 /** The one Stripe read the purchase makes: the seats bought. */
-export type CheckoutLineItems = {
+type CheckoutLineItems = {
   checkout: {
     sessions: {
       listLineItems(id: string): Promise<{ data: readonly { quantity: number | null }[] }>;

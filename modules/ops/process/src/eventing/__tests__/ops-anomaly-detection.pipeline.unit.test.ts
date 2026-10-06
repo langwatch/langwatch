@@ -86,7 +86,9 @@ describe("given ops's anomaly detection declaration", () => {
     const { definition, process } = built(async () => ({ surfaced: 0, cleared: 0 }));
 
     expect(anomalyDetectionEventing.pipeline).toBe(ANOMALY_DETECTION_PIPELINE_NAME);
-    expect(opsProcessModule.eventing?.pipeline.split(", ")).toContain(ANOMALY_DETECTION_PIPELINE_NAME);
+    expect(opsProcessModule.eventing?.pipeline.split(", ")).toContain(
+      ANOMALY_DETECTION_PIPELINE_NAME,
+    );
     expect(definition.metadata.name).toBe(ANOMALY_DETECTION_PIPELINE_NAME);
     expect(process.config.schedule?.everyMs).toBe(60_000);
   });

@@ -29,7 +29,7 @@ type Remembered<T> = { value: T; until: number };
  */
 
 /** The session as this service needs to see it. */
-export interface BoundableSession {
+interface BoundableSession {
   id: string;
   userId: string;
   /** When the sign-in that minted it happened. */
@@ -43,11 +43,11 @@ export interface BoundableSession {
 }
 
 /** Recording that a session was used. */
-export interface SessionActivityWriter {
+interface SessionActivityWriter {
   touch(input: { sessionId: string; at: Instant }): Promise<void>;
 }
 
-export interface SessionBoundDeps {
+interface SessionBoundDeps {
   settings: SignInSecuritySettingsRepository;
   activity: SessionActivityWriter;
   now: () => Instant;

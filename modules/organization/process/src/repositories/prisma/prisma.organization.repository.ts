@@ -1,3 +1,4 @@
+import { readJoinerRole } from "@langwatch/identity-contract";
 import {
   type GuidedOnboardingRecord,
   parseGuidedOnboardingState,
@@ -16,12 +17,14 @@ import {
   type PersonalFeatures,
   type PersonalWorkspace,
   type OrganizationUsageCount,
+  type PricingModel,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import {
   OrganizationRepository,
+  type OrganizationSettingsCipher,
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
   type StoredOrganizationSettings,
@@ -29,13 +32,24 @@ import {
 
 type Client = Prisma.TransactionClient | PrismaClient;
 
+const BYTES_PER_MEBIBYTE = 1024 * 1024;
+
 export class PrismaOrganizationRepository extends OrganizationRepository {
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(
+    private readonly database: PrismaClient,
+    private readonly cipher: OrganizationSettingsCipher,
+  ) {
     super();
   }
 
-  static create(database: PrismaClient): PrismaOrganizationRepository {
-    return new PrismaOrganizationRepository(database);
+  static create({
+    database,
+    cipher,
+  }: {
+    database: PrismaClient;
+    cipher: OrganizationSettingsCipher;
+  }): PrismaOrganizationRepository {
+    return new PrismaOrganizationRepository(database, cipher);
   }
 
   async findAllIds(): Promise<string[]> {
@@ -48,6 +62,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   }: {
     organizationIds: readonly string[];
   }): Promise<OrganizationUsageCount> {
+    if (organizationIds.length === 0) return { members: 0, teams: 0, ssoProviders: [] };
     const scope = { organizationId: { in: [...organizationIds] } };
     const [members, teams, organizations, firstTwo] = await Promise.all([
       this.database.organizationUser.count({ where: scope }),
@@ -79,7 +94,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   }): Promise<JoinRequestJoining> {
     const row = await this.database.organization.findUnique({
       where: { id: organizationId },
-      select: { domainJoin: true, joinDomains: true },
+      select: { domainJoin: true, joinDomains: true, joinerRole: true },
     });
     if (!row) throw new OrganizationNotFoundError();
 
@@ -87,6 +102,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     return {
       domainJoin: domainJoin.success ? domainJoin.data : "request",
       joinDomains: row.joinDomains,
+      joinerRole: readJoinerRole(row.joinerRole),
     };
   }
 
@@ -115,6 +131,54 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     });
   }
 
+  async getPricing({ organizationId }: { organizationId: string }): Promise<{
+    pricingModel: PricingModel | null;
+    currency: "USD" | "EUR";
+  }> {
+    const row = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { pricingModel: true, currency: true },
+    });
+    return { pricingModel: row?.pricingModel ?? null, currency: row?.currency ?? "EUR" };
+  }
+
+  async getDatasetLimits({ organizationId }: { organizationId: string }): Promise<{
+    attachmentMaxBytes: number | null;
+  }> {
+    const row = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { datasetAttachmentMaxMb: true },
+    });
+    const megabytes = row?.datasetAttachmentMaxMb ?? null;
+    return { attachmentMaxBytes: megabytes === null ? null : megabytes * BYTES_PER_MEBIBYTE };
+  }
+
+  async isInstantEvalsOptedIn({ organizationId }: { organizationId: string }): Promise<boolean> {
+    const row = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { instantEvalsEnabledAt: true },
+    });
+    return !!row?.instantEvalsEnabledAt;
+  }
+
+  async recordInstantEvalsOptIn(input: {
+    organizationId: string;
+    userId: string;
+    at: Instant;
+  }): Promise<void> {
+    // The condition sits on the table, as in `claimBillingCustomerId`: a second
+    // click parked on the row lock re-checks it and keeps the first record.
+    await this.database.$executeRaw`
+      -- @tenancy: an organization is addressed by its own primary key.
+      UPDATE "Organization"
+         SET "instantEvalsEnabledAt" = ${toDate(input.at)},
+             "instantEvalsEnabledByUserId" = ${input.userId},
+             "updatedAt" = now()
+       WHERE "id" = ${input.organizationId}
+         AND "instantEvalsEnabledAt" IS NULL
+    `;
+  }
+
   async saveJoinSetting({
     organizationId,
     setting,
@@ -124,7 +188,11 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   }): Promise<void> {
     await this.database.organization.update({
       where: { id: organizationId },
-      data: { domainJoin: setting.domainJoin, joinDomains: setting.joinDomains },
+      data: {
+        domainJoin: setting.domainJoin,
+        joinDomains: setting.joinDomains,
+        joinerRole: setting.joinerRole,
+      },
     });
   }
 
@@ -194,7 +262,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   }
 
   async findStoredSettings(organizationId: string): Promise<StoredOrganizationSettings | null> {
-    return this.database.organization.findUnique({
+    const stored = await this.database.organization.findUnique({
       where: { id: organizationId },
       select: {
         id: true,
@@ -211,13 +279,15 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
         updatedAt: true,
       },
     });
+    if (!stored) return null;
+
+    return {
+      ...stored,
+      s3Endpoint: stored.s3Endpoint ? this.cipher.decrypt(stored.s3Endpoint) : null,
+      s3AccessKeyId: stored.s3AccessKeyId ? this.cipher.decrypt(stored.s3AccessKeyId) : null,
+    };
   }
 
-  /**
-   * `input`'s `s3Endpoint`/`s3AccessKeyId`/`s3SecretAccessKey` already carry
-   * whatever the caller wants stored (the service encrypts before calling):
-   * persistence stores columns, it does not decide what they mean.
-   */
   async updateSettings(input: UpdateOrganizationSettingsInput): Promise<void> {
     await this.database.organization.update({
       where: { id: input.organizationId },
@@ -231,14 +301,22 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
           ? { traceSharingEnabled: input.traceSharingEnabled }
           : {}),
         ...(input.primaryIntent !== undefined ? { primaryIntent: input.primaryIntent } : {}),
-        ...(input.s3Endpoint !== undefined ? { s3Endpoint: input.s3Endpoint } : {}),
-        ...(input.s3AccessKeyId !== undefined ? { s3AccessKeyId: input.s3AccessKeyId } : {}),
+        ...(input.s3Endpoint !== undefined
+          ? { s3Endpoint: this.#sealOrNull(input.s3Endpoint) }
+          : {}),
+        ...(input.s3AccessKeyId !== undefined
+          ? { s3AccessKeyId: this.#sealOrNull(input.s3AccessKeyId) }
+          : {}),
         ...(input.s3SecretAccessKey !== undefined
-          ? { s3SecretAccessKey: input.s3SecretAccessKey }
+          ? { s3SecretAccessKey: this.#sealOrNull(input.s3SecretAccessKey) }
           : {}),
         ...(input.s3Bucket !== undefined ? { s3Bucket: input.s3Bucket || null } : {}),
       },
     });
+  }
+
+  #sealOrNull(value: string | null): string | null {
+    return value ? this.cipher.encrypt(value) : null;
   }
 
   async getOldestTeamId(organizationId: string): Promise<string> {

@@ -15,6 +15,9 @@ import DirectoryScreen from "../directory.screen.tsx";
 const state = vi.hoisted(() => ({
   provenanceFails: false,
   requests: [] as unknown[],
+  departments: [] as { id: string; name: string }[],
+  twoStepShow: false,
+  extraGroups: [] as unknown[],
 }));
 
 vi.mock("../../../../behavior/organization-api.ts", () => {
@@ -82,11 +85,21 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
     "team.getTeamsWithGrants": [],
   };
 
+  const answerFor = (path: string): unknown => {
+    if (path === "departments.list") return state.departments;
+    if (path === "group.listAll") return [...(answers[path] as unknown[]), ...state.extraGroups];
+    return answers[path] ?? [];
+  };
   const endpoint = (path: string) => ({
     useQuery: () =>
       path === "organization.getMemberProvenance" && state.provenanceFails
         ? { data: undefined, isError: true, isLoading: false, refetch: vi.fn() }
-        : { data: answers[path] ?? [], isError: false, isLoading: false, refetch: vi.fn() },
+        : {
+            data: answerFor(path),
+            isError: false,
+            isLoading: false,
+            refetch: vi.fn(),
+          },
     useMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
     invalidate: vi.fn(),
     fetch: vi.fn(),
@@ -108,7 +121,7 @@ vi.mock("../../../../behavior/use-join-requests.ts", () => ({
   useJoinRequests: () => ({
     requests: state.requests,
     answeringId: null,
-    joining: { domainJoin: "request", joinDomains: [] },
+    joining: { domainJoin: "request", joinDomains: [], joinerRole: "MEMBER" },
     savingJoining: false,
     setJoining: vi.fn(),
     approve: vi.fn(),
@@ -118,7 +131,7 @@ vi.mock("../../../../behavior/use-join-requests.ts", () => ({
 }));
 
 vi.mock("../../../../behavior/use-two-step-requirement.ts", () => ({
-  useTwoStepRequirement: () => ({ show: false, mfaRequired: false, byUser: new Map() }),
+  useTwoStepRequirement: () => ({ show: state.twoStepShow, mfaRequired: false, byUser: new Map() }),
 }));
 
 vi.mock("../../../../behavior/use-public-env.ts", () => ({
@@ -138,22 +151,35 @@ function StatusBand({ organizationId, canReadMembership }: UiDirectorySummaryPro
 }
 
 const ADMIN = new Set(["organization:manage", "sso:view"]);
+const GOVERNANCE_READER = new Set([...ADMIN, "governance:view"]);
+const GOVERNANCE_FLAG = "release_ui_ai_governance_enabled";
 
 const renderDirectory = ({
   query = {},
   grants = ADMIN,
+  flags,
 }: {
   query?: Record<string, string>;
   grants?: ReadonlySet<string>;
+  flags?: ReadonlySet<string>;
 } = {}) =>
   renderWithOrganizationHost(
     <DirectoryScreen />,
-    new FakeOrganizationHost({ grants, query, isEnterprise: true, directorySummary: StatusBand }),
+    new FakeOrganizationHost({
+      grants,
+      query,
+      flags,
+      isEnterprise: true,
+      directorySummary: StatusBand,
+    }),
   );
 
 beforeEach(() => {
   state.provenanceFails = false;
   state.requests = [];
+  state.departments = [];
+  state.twoStepShow = false;
+  state.extraGroups = [];
 });
 
 afterEach(() => {
@@ -244,6 +270,25 @@ describe("the directory page", () => {
     });
   });
 
+  describe("when the directory that sent a group names no product", () => {
+    beforeEach(() => {
+      state.extraGroups = [
+        { id: "g3", name: "Protocol-only", scimSource: "scim", grants: [], memberCount: 2 },
+      ];
+    });
+
+    /** @scenario A directory that names no product is still not called by its protocol */
+    it("marks the group as coming from the directory, never under the protocol's name", () => {
+      renderDirectory({ query: { tab: "groups" } });
+
+      const row = screen.getAllByTestId("group-row")[2];
+      expect(row).toHaveTextContent("Protocol-only");
+      expect(row).toContainElement(screen.getAllByTestId("group-directory-chip")[1] ?? null);
+      expect(screen.getAllByTestId("group-directory-chip")[1]).toHaveTextContent("Directory");
+      expect(row).not.toHaveTextContent(/SCIM/i);
+    });
+  });
+
   describe("when the groups tab lists what each group grants", () => {
     /** @scenario The groups the directory sent say what they grant */
     it("names the roles a directory group carries and says so for one that grants nothing", () => {
@@ -252,6 +297,70 @@ describe("the directory page", () => {
       const rows = screen.getAllByTestId("group-row");
       expect(rows[0]).toHaveTextContent("ADMIN");
       expect(rows[1]).toHaveTextContent("No access configured");
+    });
+  });
+
+  describe("when the organization has departments and its reader may view governance", () => {
+    beforeEach(() => {
+      state.departments = [
+        { id: "dep_eng", name: "Engineering" },
+        { id: "dep_sales", name: "Sales" },
+      ];
+    });
+
+    /** @scenario "The departments tab joins only where there is anything to put on it" */
+    it("offers a departments tab carrying how many there are", () => {
+      renderDirectory({ grants: GOVERNANCE_READER, flags: new Set([GOVERNANCE_FLAG]) });
+
+      expect(screen.getByRole("tab", { name: /Departments/ })).toHaveTextContent("Departments 2");
+    });
+
+    /** @scenario "The departments tab references what Governance manages" */
+    it("opens on the departments, which are managed under Governance, when the address names them", () => {
+      renderDirectory({
+        query: { tab: "departments" },
+        grants: GOVERNANCE_READER,
+        flags: new Set([GOVERNANCE_FLAG]),
+      });
+
+      expect(screen.getByRole("tab", { name: /Departments/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(screen.getAllByTestId("department-row")).toHaveLength(2);
+      expect(screen.getByRole("link", { name: /manage in governance/i })).toHaveAttribute(
+        "href",
+        "/governance/people",
+      );
+    });
+  });
+
+  describe("when the organization has no departments", () => {
+    /** @scenario "The departments tab joins only where there is anything to put on it" */
+    it("offers no departments tab even to a reader who may view governance", () => {
+      renderDirectory({ grants: GOVERNANCE_READER, flags: new Set([GOVERNANCE_FLAG]) });
+
+      expect(screen.queryByRole("tab", { name: /Departments/ })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the sign-in rules are switched on for the organization", () => {
+    /**
+     * @scenario "The rules are not on the page about the people they admit"
+     * @scenario "Who may join is asked beside the connection whose domains it reads"
+     */
+    it("draws neither the who-may-join policy nor the second-factor requirement on any tab", () => {
+      state.twoStepShow = true;
+
+      const queries: Record<string, string>[] = [{}, { tab: "teams" }, { tab: "groups" }];
+      for (const query of queries) {
+        renderDirectory({ query });
+
+        expect(screen.queryByTestId("join-policy-card")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("organization-policy")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("two-step-requirement-card")).not.toBeInTheDocument();
+        cleanup();
+      }
     });
   });
 

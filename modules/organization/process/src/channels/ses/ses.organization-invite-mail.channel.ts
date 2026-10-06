@@ -2,7 +2,7 @@ import { sendInviteEmail, sendInviteReRequestEmail, type MailSender } from "@lan
 import type { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationCapabilityUnavailableError } from "@langwatch/organization-contract";
 
-import type { OrganizationInviteMail } from "../../app/organization.members.ts";
+import type { OrganizationInviteMail } from "../organization-invite-mail.channel.ts";
 import { OrganizationInviteMailChannel } from "../organization-invite-mail.channel.ts";
 
 type Input<Name extends keyof OrganizationInviteMail> = Parameters<OrganizationInviteMail[Name]>[0];

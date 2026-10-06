@@ -30,7 +30,7 @@ import { heldLwqlGates, publishedLwqlGates, type LwqlGate } from "./lwql-gate.ru
  * One worked trace filter query, as the filter language publishes it. Structural
  * rather than imported while `TRACE_FILTER_EXAMPLES` is trace's to publish.
  */
-export interface QueryReferenceTraceFilterExample {
+interface QueryReferenceTraceFilterExample {
   readonly id: string;
   readonly title: string;
   readonly intent: QueryExampleIntent;
@@ -143,7 +143,7 @@ const PREFIX_ALIASES: Readonly<Record<string, readonly string[]>> = {
   "event.attribute.": ["event."],
 };
 
-export function describeFilterFields(): readonly QueryReferenceFilterField[] {
+function describeFilterFields(): readonly QueryReferenceFilterField[] {
   return Object.entries(SEARCH_FIELDS).map(([name, meta]) => ({
     name,
     label: meta.label,
@@ -154,7 +154,7 @@ export function describeFilterFields(): readonly QueryReferenceFilterField[] {
   }));
 }
 
-export function describeDynamicPrefixes(): readonly QueryReferenceDynamicPrefix[] {
+function describeDynamicPrefixes(): readonly QueryReferenceDynamicPrefix[] {
   return DYNAMIC_PREFIXES.map((prefix) => ({
     prefix: prefix.prefix,
     label: prefix.label,

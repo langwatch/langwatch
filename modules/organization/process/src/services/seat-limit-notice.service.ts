@@ -2,8 +2,8 @@ import type { EventingCommandSender } from "@langwatch/eventing";
 import type { LimitType } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { OrganizationSignals } from "../app/organization.members.ts";
 import type { RecordSeatLimitReachedCommandData } from "../eventing/seat-limit.events.ts";
+import type { OrganizationSignals } from "./organization-signals.service.ts";
 
 export type SeatLimitReached = Readonly<{
   organizationId: string;

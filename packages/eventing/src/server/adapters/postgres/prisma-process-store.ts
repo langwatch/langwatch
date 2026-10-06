@@ -13,6 +13,7 @@ import type { ProcessRef } from "../../../process-manager/processManager.types.t
 import { deriveInboxKey } from "../../../process-manager/stores/inboxKey.ts";
 import type {
   AppendIntentsResult,
+  CallerTransaction,
   CommitResult,
   DueWake,
   FailedOutboxAttempt,
@@ -45,6 +46,16 @@ function isProcessPersistencePrismaClient(
     hasObject("processManagerInstance") &&
     hasObject("processManagerOutbox") &&
     hasObject("processManagerOutboxAttempt")
+  );
+}
+
+/** A Prisma client over the process tables; under extensions a transaction has `$transaction`. */
+function isPrismaTransactionClient(
+  transaction: CallerTransaction,
+): transaction is Prisma.TransactionClient {
+  return (
+    typeof Reflect.get(transaction, "processManagerOutbox") === "object" &&
+    typeof Reflect.get(transaction, "$executeRaw") === "function"
   );
 }
 
@@ -430,9 +441,9 @@ export class PrismaProcessStore implements ProcessStore {
   }
 
   /**
-   * The transient path: one idempotent multi-row insert, no transaction, no advisory lock, no
-   * instance row and no inbox row. See {@link AppendIntentsResult} for the reasoning.
-   * `skipDuplicates` is what makes the absent transaction safe.
+   * The transient path: one idempotent multi-row insert, no advisory lock, no instance row and no
+   * inbox row (see {@link AppendIntentsResult}). `skipDuplicates` makes the absent transaction
+   * safe; given the caller's transaction, the rows are written through it and share its fate.
    */
   async appendIntents(params: {
     ref: ProcessRef;
@@ -441,12 +452,14 @@ export class PrismaProcessStore implements ProcessStore {
     sourceEventId: string | null;
     messages: NewOutboxMessage[];
     now: number;
+    transaction?: CallerTransaction;
   }): Promise<AppendIntentsResult> {
+    const client = this.#appendClient(params.transaction);
     if (params.messages.length === 0) {
       return { insertedMessageKeys: [], duplicateMessageKeys: [] };
     }
     const at = asDate(params.now);
-    const inserted = await this.#prisma.processManagerOutbox.createMany({
+    const inserted = await client.processManagerOutbox.createMany({
       data: params.messages.map((message) => ({
         id: generate(PROCESS_MANAGER_OUTBOX_KSUID_RESOURCE).toString(),
         ...refWhere(params.ref),
@@ -477,7 +490,7 @@ export class PrismaProcessStore implements ProcessStore {
     if (inserted.count === keys.length) {
       return { insertedMessageKeys: keys, duplicateMessageKeys: [] };
     }
-    const preexisting = await this.#prisma.processManagerOutbox.findMany({
+    const preexisting = await client.processManagerOutbox.findMany({
       where: {
         projectId: params.ref.projectId,
         processName: params.ref.processName,
@@ -491,6 +504,15 @@ export class PrismaProcessStore implements ProcessStore {
       insertedMessageKeys: keys.filter((key) => !duplicates.has(key)),
       duplicateMessageKeys: keys.filter((key) => duplicates.has(key)),
     };
+  }
+
+  /** The client an append writes through: the caller's transaction when it passed one. */
+  #appendClient(transaction: CallerTransaction | undefined): Prisma.TransactionClient {
+    if (transaction === undefined) return this.#prisma;
+    if (!isPrismaTransactionClient(transaction)) {
+      throw new Error("appendIntents joins only a Prisma transaction over the process tables.");
+    }
+    return transaction;
   }
 
   async findMessagesByRef(params: { ref: ProcessRef }): Promise<OutboxMessageRecord[]> {
@@ -682,8 +704,9 @@ export class PrismaProcessStore implements ProcessStore {
     const processNameFilter = params.processNames
       ? Prisma.sql`AND "processName" IN (${Prisma.join([...params.processNames])})`
       : Prisma.empty;
-    // Wake scanning is intentionally cross-project worker infrastructure;
-    // every returned row still carries its project-scoped process identity.
+    // Cross-project worker infrastructure by design. A plain read: it never
+    // waits on a row lock, and the revision fence decides a wake two replicas
+    // both handle, so row locks here would only add writes.
     const rows = await this.#prisma.$queryRaw<ProcessManagerInstance[]>(
       Prisma.sql`
         SELECT *

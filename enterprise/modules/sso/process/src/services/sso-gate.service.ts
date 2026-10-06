@@ -6,13 +6,20 @@ import {
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 
-import type { SsoGateLogger } from "../app/sso.members.ts";
+/**
+ * Where the gate says what it decided. An operator whose single sign-on is off
+ * reads these lines to learn why, so the module supplies its own logger.
+ */
+export interface SsoGateLogger {
+  info(context: object, message: string): void;
+  warn(context: object, message: string): void;
+}
 
 export abstract class SsoProviderMountInspector {
   abstract isMounted(configuration: SsoConfiguration): boolean;
 }
 
-export interface SsoGateServiceOptions {
+interface SsoGateServiceOptions {
   configuration: SsoConfiguration;
   licensing: LicensingApi;
   logger: SsoGateLogger;

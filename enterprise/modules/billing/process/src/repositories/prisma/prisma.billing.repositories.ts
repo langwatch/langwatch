@@ -13,7 +13,6 @@ import { PrismaDuplicateSubscriptionsReportRepository } from "./prisma.duplicate
 import { PrismaOrganizationPricingRepository } from "./prisma.organization-pricing.repository.ts";
 import { PrismaSeatEventSubscriptionRepository } from "./prisma.seat-event-subscription.repository.ts";
 import { PrismaBillingSubscriptionRepository } from "./prisma.subscription.repository.ts";
-import { PrismaBillingTenantOrganizationRepository } from "./prisma.tenant-organization.repository.ts";
 
 /**
  * The live tier: every billing row this module owns, read and written
@@ -38,7 +37,6 @@ export class PostgresBillingRepositories {
       reportOrganizations: PrismaBillingReportOrganizationRepository.create(prisma),
       seatEventSubscriptions: PrismaSeatEventSubscriptionRepository.create(prisma),
       subscriptions,
-      tenantOrganizations: PrismaBillingTenantOrganizationRepository.create(prisma),
       webhookOrganizations: PrismaBillingWebhookOrganizationRepository.create({ database: prisma }),
       webhookSubscriptions: PrismaBillingWebhookSubscriptionRepository.create({
         subscriptions,

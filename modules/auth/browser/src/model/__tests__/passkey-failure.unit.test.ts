@@ -1,3 +1,4 @@
+import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -94,4 +95,36 @@ describe("given a way to tell an abandoned ceremony from a refusal", () => {
       expect(isCeremonyAbandoned({})).toBe(false);
     });
   });
+});
+
+describe("given every code a passkey ceremony can name", () => {
+  const NAMED_CODES = [
+    passkeyFailure(400).error,
+    passkeyFailure(void 0).error,
+    "identity_passkey_already_registered",
+  ];
+
+  /** @scenario Every named failure has copy a first-time reader understands */
+  it.each(NAMED_CODES)(
+    "%s has registered words that never show the code or an internal",
+    (code) => {
+      const explained = explainHandledError({
+        code,
+        meta: {},
+        httpStatus: 400,
+        fault: "customer",
+        retryable: false,
+        tips: [],
+        docsUrl: undefined,
+        traceId: undefined,
+        reasons: [],
+      });
+
+      expect(explained.isRegistered).toBe(true);
+      expect(explained.title.length).toBeGreaterThan(0);
+      const spoken = `${explained.title} ${explained.description}`;
+      expect(spoken).not.toContain(code);
+      expect(spoken).not.toMatch(/credential id|credentialId|table|service|prisma|better-auth/i);
+    },
+  );
 });

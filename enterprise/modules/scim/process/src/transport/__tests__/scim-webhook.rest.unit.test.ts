@@ -216,10 +216,11 @@ describe("given the Auth0 SCIM webhook declaration", () => {
         "post /api/webhooks/auth0-scim",
       ]);
       expect(declaration.routes[0]?.access?.kind).toBe("public");
-      // The HMAC is computed over these exact characters.
+      // The HMAC is computed over these exact characters, read under any media type as on main.
       expect(declaration.routes[0]?.rawBody).toEqual({
         form: "text",
         mediaType: "application/json",
+        mismatch: "accepted",
       });
     });
   });

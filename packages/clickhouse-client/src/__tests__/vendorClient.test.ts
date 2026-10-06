@@ -341,7 +341,7 @@ describe("VendorClientResilience", () => {
     });
   });
 
-  // The rule these pin is stated on ../observability.ts: a port that only
+  // The rule these pin is stated on ../resilience.ts: a port that only
   // describes the work must not be able to change it. Every one of these
   // reporting calls runs inside the `catch` of the wrapped statement, so an
   // unguarded throw does not merely lose a metric — it replaces the ClickHouse

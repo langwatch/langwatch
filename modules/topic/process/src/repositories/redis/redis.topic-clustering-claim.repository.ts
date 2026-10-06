@@ -1,14 +1,14 @@
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { TopicClusteringClaimRepository } from "../topic-clustering-claim.repository.ts";
 
 /** The Redis tier: `SET NX EX` claims and plain keys, as main's gate and seeds wrote them. */
 export class RedisTopicClusteringClaimRepository implements TopicClusteringClaimRepository {
-  static create(redis: ProcessMembers["redis"]): RedisTopicClusteringClaimRepository {
+  static create(redis: RedisConnection): RedisTopicClusteringClaimRepository {
     return new RedisTopicClusteringClaimRepository(redis);
   }
 
-  private constructor(private readonly redis: ProcessMembers["redis"]) {}
+  private constructor(private readonly redis: RedisConnection) {}
 
   async claim(input: { key: string; ttlSeconds: number }): Promise<boolean> {
     const result = await this.redis.set(input.key, "1", "EX", input.ttlSeconds, "NX");

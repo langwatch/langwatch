@@ -99,13 +99,19 @@ Feature: Guided onboarding tour
     And the path is reported as having no tour
 
   # A tour step or a Langy page name pointing at an address the router does
-  # not know lands the demo on the 404 page. The route table is the check.
+  # not know lands the demo on the 404 page. The shell's route-pattern list is
+  # the check; each module binds the clause for the addresses it owns.
   @unit
   Scenario: every address the guided onboarding navigates to is a registered route
-    Given the application's route table
+    Given the shell's list of route patterns
     Then each path's landing after the sign-up and the page Langy starts from match a route of their own
     And every address a tour step navigates to matches a route of its own
-    And every page name Langy's navigate command opens matches a route of its own, under the project slug for a project page and at the top level for an organization page
+    And none of them falls through to the 404 catch-all
+
+  @unit
+  Scenario: every page name Langy's navigate command opens is a registered route
+    Given the shell's list of route patterns
+    Then every page name Langy's navigate command opens matches a route of its own, under the project slug for a project page and at the top level for an organization page
     And none of them falls through to the 404 catch-all
 
   @unit
@@ -247,6 +253,13 @@ Feature: Guided onboarding tour
     Given the virtual keys page registers "openVirtualKeyCreate"
     When the page unmounts
     Then the action is no longer registered
+
+  @unit
+  Scenario: a page outside onboarding registers its tour actions through the guided tour lend
+    Given onboarding lends the guided tour and the virtual keys page reads it
+    When the page registers "openVirtualKeyCreate" through the lend
+    Then the tour can call it while the page is mounted
+    And a composition without onboarding gives the page a lend that registers nothing
 
   @unit
   Scenario: the gateway tour opens the real create drawer, types the name and submits it

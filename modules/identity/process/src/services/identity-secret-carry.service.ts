@@ -24,6 +24,9 @@ export interface IdentitySecretCarryRepository {
   /** Every `Account` row of this user, with its credential row's timestamp
    *  beside it. Reads only; the decision is this service's. */
   findAccountSecretPairs(args: { userId: string }): Promise<AccountSecretPair[]>;
+  /** Users after `cursor` holding an `Account` row whose credential row is missing or
+   *  older than it: the only users a heal pass can change. */
+  findDriftedUserIdsAfter(args: { cursor: string | null; limit: number }): Promise<string[]>;
   /**
    * Create the credential row for an account that has none, PRESERVING the
    * `Account` row's own timestamps rather than stamping `now()`. Idempotent:
@@ -63,6 +66,11 @@ export class IdentitySecretCarryService {
   }
 
   private constructor(private readonly reads: IdentitySecretCarryRepository) {}
+
+  /** The heal pass's cohort: only users whose secrets could have drifted (Q64). */
+  findDriftedUserIdsAfter(args: { cursor: string | null; limit: number }): Promise<string[]> {
+    return this.reads.findDriftedUserIdsAfter(args);
+  }
 
   async carryForUser({ userId }: { userId: string }): Promise<IdentitySecretCarryOutcome> {
     const outcome: IdentitySecretCarryOutcome = { carried: 0, healed: 0 };

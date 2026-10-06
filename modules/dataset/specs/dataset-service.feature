@@ -1,6 +1,7 @@
 Feature: Shared Dataset service
   Dataset and Dataset Record behaviour is one process-owned capability.
 
+  @unit
   Scenario: A dataset is created with a portable contract
     Given the process has one Dataset service
     When a caller creates a dataset for a project with columns and records
@@ -8,34 +9,40 @@ Feature: Shared Dataset service
     And it returns a portable Dataset value
     And the records are written through the Dataset record repository
 
+  @unit
   Scenario: Dataset names remain unique within a project
     Given a dataset already exists with the slug "golden-set"
     When a caller validates the name "Golden Set"
     Then the result reports the name as unavailable
     And it identifies the conflicting dataset
 
+  @unit
   Scenario: A dataset lookup is tenant-scoped
     When a caller looks up a dataset using another project id
     Then the service throws DatasetNotFoundError
     And it does not return the other project's dataset
 
+  @unit
   Scenario: Records use the Dataset boundary
     When a caller creates, updates, lists, or deletes records
     Then the service checks that the Dataset is ready
     And it delegates persistence to the Dataset record repository
     And it does not expose Prisma records
 
+  @unit
   Scenario: Dataset copy remains a Dataset operation
     When a caller copies a dataset to another project
     Then the service creates the target through its own repository
     And it copies records through the Dataset record repository
     And it does not construct a Dataset Record feature
 
+  @unit
   Scenario: Compatibility transports share one service
     When the tRPC or REST Dataset transport handles a request
     Then it reads the process-owned Dataset service
     And it does not construct a service or repository per request
 
+  @unit
   Scenario: Upload storage remains an injected Dataset seam
     When an upload is normalized or S3 JSONL chunks are rewritten
     Then the Dataset service uses injected storage and queue capabilities
@@ -115,6 +122,12 @@ Feature: Shared Dataset service
     Given an import request whose storedObjectId contains a NUL character
     When it is validated at the contract
     Then it is refused before any dataset or store is queried
+
+  @unit @regression
+  Scenario: A dataset prepared from an uploaded file opens in the browser
+    Given a dataset whose rows were prepared from an uploaded file, so its stored size is recorded
+    When the browser reads that dataset
+    Then the answer carries the size as a plain number the response can hold
 
   Rule: The Datasets pages are served from the browser application
 

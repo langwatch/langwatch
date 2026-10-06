@@ -77,12 +77,11 @@ There is exactly one and it lives at the root. `apps/ui`'s Vite config loads
 `--env-file-if-exists`, and there is no per-application dotenv any more. Start
 from `.env.example`.
 
-`packages/secrets/keys.json` classifies the 40 variables that carry a
-credential: 29 `secret`, 10 `composite` (a connection string, so shape and
-password in one value) and 1 `pointer` (it names a credential on disk).
-Everything else is `config` and stays as free to print, log and paste into an
-issue as it is today. One file, parsed by TypeScript with Zod and read by haven
-in Go, so a key added once is masked in both languages.
+A credential is declared where it is used, as a `Secret.load("ID")` handle in
+a module contract or a framework package (ARCHITECTURE.md §6); there is no
+central key list. haven finds every such call to know what to mask
+(`tools/thuishaven/domain/secretkeys.go`). Everything else is `config` and
+stays as free to print, log and paste into an issue as it is today.
 
 Each application resolves the classified keys through an ordered chain before
 its Zod parse: shell environment and `.env` first, then 1Password if you opted
@@ -172,12 +171,12 @@ package: each application and each feature package owns its own
 
 All of those go through a machine-wide queue, and it is worth knowing why. One
 typecheck holds a 2.3 to 3.5 GiB working set and uses every core, which is fine
-once and ruinous four times over. `dev/scripts/check-queue.mjs` counts the runs
-live across every worktree, terminal and agent on the machine against a single
-counter, and a run past the limit waits its turn instead of piling on. With a
-slot free it prints nothing. Queued, it says so on stderr, which is the thing
-that tells you a slow run was waiting rather than hung. `node
-dev/scripts/check-queue.mjs --explain` shows the limit and who holds a slot.
+once and ruinous four times over. haven's machine-wide slot (`haven slot`,
+`tools/thuishaven/README.md`) counts the runs live across every worktree,
+terminal and agent on the machine, and a run past the limit waits its turn
+instead of piling on. With a slot free it prints nothing. Queued, it says so on
+stderr, which is the thing that tells you a slow run was waiting rather than
+hung. `haven slot explain` shows the limit and who holds a slot.
 Never set `CHECK_SLOTS` yourself.
 
 ## How work starts here

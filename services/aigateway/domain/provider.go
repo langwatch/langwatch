@@ -161,6 +161,16 @@ func (c Credential) DeclaresCatalog() bool {
 	return len(c.Models) > 0 || len(c.DeploymentMap) > 0
 }
 
+// ServesBareModels reports whether a model name with no provider prefix may
+// be routed to this credential. The LangWatch-managed models slot is reached
+// only through an explicit "langwatch/<model>" prefix: a bare name never
+// lands there, neither by catalog match, by the no-catalog step, as the lone
+// credential, nor as a fallback, so prompts leave the install only when the
+// caller named LangWatch.
+func (c Credential) ServesBareModels() bool {
+	return c.ProviderID != ProviderLangWatch
+}
+
 // WithDeploymentSelfMap ensures Azure / Bedrock / Vertex credentials carry a
 // deployment entry for bareModel, so every dispatch lane can read the
 // deployment for a model out of one place instead of each rediscovering the

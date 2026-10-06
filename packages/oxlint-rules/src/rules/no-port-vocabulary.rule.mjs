@@ -39,13 +39,15 @@ export const noPortVocabularyRule = defineRule({
   messages: {
     portVocabulary: {
       what: "`{{name}}` names a port.",
+      why: "Ports gave way to named roles; the old word hides whether a thing owns state, sends messages or behaves.",
       fix:
         "Name the role instead. Owned state is a repository, messages to something the module " +
         "does not own are a channel, a client the process supplies is a member of the module's " +
-        "Infrastructure, behaviour is a service.",
+        "Infrastructure, behaviour is a service. Read the `process-module` skill.",
     },
     portFile: {
       what: "`{{name}}` is a port file.",
+      why: "Ports gave way to named roles; the old word hides whether a thing owns state, sends messages or behaves.",
       fix:
         "Move it to `repositories/` if it owns state, `channels/` if it exchanges messages with " +
         "something the module does not own, `services/` if it's behaviour, or the module's " +

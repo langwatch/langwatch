@@ -1,5 +1,5 @@
 import { BillingApi } from "@langwatch/enterprise-billing-contract";
-import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { applyPlanTypeEntitlements, LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import {
   entitlementConfig,
   EntitlementApi,
@@ -27,12 +27,14 @@ import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import {
+  deriveDatasetBounds,
+  effectiveDatasetAttachmentMaxBytes,
+  isDatasetDerivedBoundKey,
   resolveRequestBound,
   type RequestBoundKey,
   type RequestBoundsOverrides,
 } from "@langwatch/plans";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -40,12 +42,14 @@ import { UserApi } from "@langwatch/user-contract";
 
 import { buildUsageWarningPipeline } from "../eventing/entitlement-usage-warning.pipeline.ts";
 import type { EntitlementRepositories } from "../repositories/entitlement.repositories.ts";
+import { coreBaselinePlan } from "../rules/plan-baseline.rules.ts";
 import { EntitlementService } from "../services/entitlement.service.ts";
 import { PlanNextStepService } from "../services/plan-next-step.service.ts";
 import { SelfServePlanCatalogueService } from "../services/self-serve-plan-catalogue.service.ts";
+import { SubscriptionPlanService } from "../services/subscription-plan.service.ts";
+import { UsageService, type UsageCounter } from "../services/usage-enforcement.service.ts";
 import { UsageStatsService } from "../services/usage-stats.service.ts";
-import { buildEntitlementInfrastructure } from "./entitlement-composition.build.ts";
-import type { UsageCounter, UsageWarning } from "./entitlement.members.ts";
+import { UsageWarningService, type UsageWarning } from "../services/usage-warning.service.ts";
 
 /**
  * One plan on the purchase ladder. Annual and monthly variants of one tier
@@ -99,14 +103,9 @@ const logger = createLogger("langwatch:usage");
 /** How recent an end date has to be for the rollup to read it as "up to now". */
 const RECENT_SPEND_WINDOW_MS = 1000 * 60 * 60;
 
-/** `isSaas` (out of scope, see the handoff) and `processName` (a process
- * fact) are unclassified facts this module could not turn into env config. */
-type EntitlementMembers = MembersRead<readonly ["logger"]> &
-  Readonly<{ isSaas: boolean; processName: string }>;
-
 type EntitlementSetup = FeatureSetup<
   typeof EntitlementModule.dependencies,
-  EntitlementMembers,
+  never,
   EntitlementConfig,
   EntitlementRepositories
 >;
@@ -133,9 +132,6 @@ export class EntitlementModule implements EntitlementApiContract {
     projects: ProjectApi,
   };
   static readonly config = entitlementConfig;
-  /** `logger` is the closed member; `isSaas`/`processName` are named raw so
-   * `withMember`/`withMembers` can answer them (see {@link EntitlementMembers}). */
-  static readonly reads = ["logger", "isSaas", "processName"] as const;
 
   #plans: EntitlementService;
   #usage: UsageStatsService;
@@ -144,47 +140,71 @@ export class EntitlementModule implements EntitlementApiContract {
   #warnings: UsageWarning;
   #spend: EntitlementRepositories["spend"];
   #users: UserApi;
+  #organizations: OrganizationApi;
   #requestBoundOverrides: RequestBoundsOverrides;
 
   private constructor({
     repositories,
-    members,
+    infrastructure,
     dependencies,
     config,
   }: {
     repositories: EntitlementRepositories;
-    members: EntitlementInfrastructure;
+    infrastructure: EntitlementInfrastructure;
     dependencies: EntitlementCallerLookup;
-    config: EntitlementConfig;
+    config: Pick<EntitlementConfig, "requestBounds">;
   }) {
-    this.#plans = EntitlementService.create(members);
+    this.#plans = EntitlementService.create(infrastructure);
     this.#usage = UsageStatsService.create({
       membership: repositories.membership,
       seats: dependencies.organizations,
-      counter: members.counter,
+      counter: infrastructure.counter,
       plans: this.#plans,
     });
-    this.#counter = members.counter;
+    this.#counter = infrastructure.counter;
     this.#nextStep = PlanNextStepService.create({
       catalogue: SelfServePlanCatalogueService.create(),
     });
-    this.#warnings = members.warnings;
+    this.#warnings = infrastructure.warnings;
     this.#spend = repositories.spend;
     this.#users = dependencies.users;
+    this.#organizations = dependencies.organizations;
     this.#requestBoundOverrides = config.requestBounds ?? {};
   }
 
-  static create({ repositories, members, dependencies, config }: EntitlementSetup): EntitlementModule {
-    const infrastructure = buildEntitlementInfrastructure({
-      logger: members.logger,
-      isSaas: members.isSaas,
-      processName: members.processName,
+  static create({ repositories, dependencies, config }: EntitlementSetup): EntitlementModule {
+    // Main composed the subscription provider on Cloud only; self-hosted resolves licences alone.
+    const subscription = config.isSaas
+      ? SubscriptionPlanService.create(dependencies.billing)
+      : undefined;
+    const sources = {
+      baseline: subscription ?? coreBaselinePlan({ isSaas: config.isSaas }),
       license: dependencies.license,
+      subscription: subscription?.asGrantSource(),
+      // Main's PlanProviderService: every leg's plan gets the entitlements its tier grants.
+      enrichers: [{ enrich: applyPlanTypeEntitlements }],
+    };
+    const plans = EntitlementService.create(sources);
+    const counter = UsageService.overPeers({
+      isSaas: config.isSaas,
+      planResolver: (organizationId) => plans.getActivePlan({ organizationId }),
+      peers: dependencies,
+    });
+    const warnings = UsageWarningService.create({
       billing: dependencies.billing,
-      usage: dependencies,
+      counter,
+      plans,
+      peers: dependencies,
+      isSaas: config.isSaas,
+      logger: createLogger("langwatch:entitlement:usage-warning"),
     });
 
-    return new EntitlementModule({ repositories, members: infrastructure, dependencies, config });
+    return new EntitlementModule({
+      repositories,
+      infrastructure: { ...sources, counter, warnings },
+      dependencies,
+      config,
+    });
   }
 
   /**
@@ -194,13 +214,13 @@ export class EntitlementModule implements EntitlementApiContract {
    */
   static createForTesting(setup: {
     repositories: EntitlementRepositories;
-    members: EntitlementInfrastructure;
+    infrastructure: EntitlementInfrastructure;
     dependencies: EntitlementCallerLookup;
-    config?: EntitlementConfig;
+    config?: Pick<EntitlementConfig, "requestBounds">;
   }): EntitlementModule {
     return new EntitlementModule({
       repositories: setup.repositories,
-      members: setup.members,
+      infrastructure: setup.infrastructure,
       dependencies: setup.dependencies,
       config: { requestBounds: setup.config?.requestBounds },
     });
@@ -214,11 +234,33 @@ export class EntitlementModule implements EntitlementApiContract {
   }
 
   /**
+   * The deployment's bound, except that an organization with its own per-file
+   * limit answers the larger of that and what its limit derives, for the
+   * dataset size bounds only. See specs/dataset-bounds-override.feature.
+   */
+  async requestBound(input: { key: RequestBoundKey; organizationId: string }): Promise<number> {
+    const deploymentBound = await this.#deploymentRequestBound(input);
+    if (!isDatasetDerivedBoundKey(input.key)) return deploymentBound;
+
+    const { attachmentMaxBytes } = await this.#organizations.getDatasetLimits({
+      organizationId: input.organizationId,
+    });
+    if (attachmentMaxBytes === null) return deploymentBound;
+
+    const raised = deriveDatasetBounds(effectiveDatasetAttachmentMaxBytes(attachmentMaxBytes));
+
+    return Math.max(deploymentBound, raised[input.key]);
+  }
+
+  /**
    * A plain-number override answers on every tier without a plan lookup;
    * otherwise the active plan resolves through the same path `getActivePlan`
    * uses, and its tier's bound answers — per-tier overrides included.
    */
-  async requestBound(input: { key: RequestBoundKey; organizationId: string }): Promise<number> {
+  async #deploymentRequestBound(input: {
+    key: RequestBoundKey;
+    organizationId: string;
+  }): Promise<number> {
     const override = this.#requestBoundOverrides[input.key];
     if (typeof override === "number") return override;
 
@@ -227,10 +269,14 @@ export class EntitlementModule implements EntitlementApiContract {
     return resolveRequestBound(input.key, plan.type, this.#requestBoundOverrides);
   }
 
-  resolvePlanNextStep(
-    input: Readonly<{ plan: Plan; pricingModel: PricingModel | null; currency?: "USD" | "EUR" }>,
+  async resolvePlanNextStep(
+    input: Readonly<{ plan: Plan; organizationId: string }>,
   ): Promise<PlanNextStep> {
-    return this.#nextStep.resolve(input);
+    const { pricingModel, currency } = await this.#organizations.getPricing({
+      organizationId: input.organizationId,
+    });
+
+    return this.#nextStep.resolve({ plan: input.plan, pricingModel, currency });
   }
 
   async getUsage(input: GetUsageInput): Promise<UsageStats> {

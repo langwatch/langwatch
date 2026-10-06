@@ -10,7 +10,7 @@ Record: `dev/docs/ARCHITECTURE.md` section 9 (eventing), 9.1 (purge, erase, rete
 reads" paragraph of 10, section 4 for the roles. Rulings are there; this skill points and warns.
 
 Not here: how modules are installed, how a pipeline gets its stores, peers or secrets, and how `boot()`
-wires roles. Those are §3.3, §4 and §5, taught by `backend`. Do not
+wires roles. Those are §3.3, §4 and §5, taught by `process-composition` and `module-dependencies`. Do not
 hand-wire a consumer into the api role; the types refuse it.
 
 ## The model in five lines
@@ -21,8 +21,9 @@ hand-wire a consumer into the api role; the types refuse it.
   `packages/eventing/src/pipeline/staticBuilder.ts`; the record's section 9 sketch uses the target
   spellings (section 16 maps them).
 - **Commands** validate and append. They run in every role.
-- **Projections, subscribers, process managers and scheduled work** are worker-only. The api role never
-  constructs them: "api produces, worker consumes, tasks produces".
+- **Projections, subscribers, process managers and scheduled work** are worker-only. The api role
+  describes them for ops introspection and never starts them (§4): "api produces, worker consumes,
+  tasks produces".
 - Delivery is **at least once**. Ordering is **per aggregate** (group queue). One poisoned aggregate
   retries with backoff and does not block its neighbours.
 - The hand-off from append to reactions is durable (outbox). Nothing is logged and dropped.
@@ -124,6 +125,7 @@ Run by the `tasks` app. Recurring work is a scheduled process manager instead.
 | renaming an event, aggregate or pipeline string born before this drive | leave it; new ones may change             |
 | a projection touching another module's table                           | the owner exposes an event or `*Api` read |
 | polling a run's status from the UI on a timer                          | read hints plus the fold                  |
+| a PostHog or Customer.io call, channel or key outside nurturing        | record a fact; nurturing subscribes       |
 
 ## Tests
 

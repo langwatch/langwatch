@@ -1,6 +1,6 @@
 /**
  * The words, shapes and lookups the settings list, the connection drawer and the automation's
- * Slack step share. Spec: specs/automations/slack-connections.feature.
+ * Slack step share. Spec: modules/slack/specs/slack-connections.feature.
  */
 import type {
   SlackConnectionKind,

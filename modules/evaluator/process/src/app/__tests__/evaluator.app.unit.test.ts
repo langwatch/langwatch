@@ -155,6 +155,7 @@ describe("EvaluatorModule", () => {
      * a failure — unlike the default model's.
      */
     /** @scenario A type whose settings carry no embeddings_model asks for no embeddings model */
+    /** @scenario A faithfulness evaluator is created with no embeddings default configured */
     it("creates the evaluator with a null embeddings model", async () => {
       const { app, repository } = harness({
         modelProviders: {

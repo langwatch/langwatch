@@ -219,6 +219,7 @@ describe("createProjectMetadataHandler()", () => {
      * @scenario First trace tracks the PostHog integration milestone against the org admin
      * @scenario The milestone is attributed to the person the browser knows
      * @scenario The first-trace milestone is recorded through a sink, not a function
+     * @scenario "A project's first trace claims its topic clustering"
      */
     it("tracks first_trace_integrated against the org admin", async () => {
       const subscriber = createProjectMetadataHandler(deps);
@@ -257,6 +258,28 @@ describe("createProjectMetadataHandler()", () => {
         id: tenantId,
         data: expect.objectContaining({ integrated: true }),
       });
+    });
+
+    /** @scenario "the first signal of the day tracks the project's active day" */
+    it("passes the organization's creation time and onboarding variant to the first-trace record", async () => {
+      mockProjects.resolveOrgAdmin.mockResolvedValue({
+        userId: "admin-user-1",
+        organizationId: "org-1",
+        firstMessage: false,
+        onboardingVariant: "guided",
+        organizationCreatedAt: { epochMilliseconds: 1_700_000_000_000 },
+      });
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
+
+      expect(mockRecordSignal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recorded: "firstTrace",
+          organizationCreatedAt: 1_700_000_000_000,
+          onboardingVariant: "guided",
+        }),
+      );
     });
 
     /** @scenario PostHog integration milestone reports unknown when SDK attributes are absent */
@@ -409,6 +432,35 @@ describe("createProjectMetadataHandler()", () => {
     });
   });
 
+  describe("when a later trace resolves an org admin with a signup time and variant", () => {
+    /** @scenario "the first signal of the day tracks the project's active day" */
+    it("passes both to the trace-received record", async () => {
+      mockProjects.findById.mockResolvedValue({
+        id: tenantId,
+        firstMessage: true,
+        integrated: true,
+      });
+      mockProjects.resolveOrgAdmin.mockResolvedValue({
+        userId: "admin-user-1",
+        organizationId: "org-1",
+        firstMessage: true,
+        onboardingVariant: "classic",
+        organizationCreatedAt: { epochMilliseconds: 1_700_000_000_000 },
+      });
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
+
+      expect(mockRecordSignal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recorded: "traceReceived",
+          organizationCreatedAt: 1_700_000_000_000,
+          onboardingVariant: "classic",
+        }),
+      );
+    });
+  });
+
   describe("when a later trace resolves no org admin", () => {
     beforeEach(() => {
       mockProjects.findById.mockResolvedValue({
@@ -537,6 +589,7 @@ describe("createProjectMetadataHandler()", () => {
     });
 
     describe("when a topic clustering bootstrap is wired", () => {
+      /** @scenario "A project's first trace claims its topic clustering" */
       it("bootstraps the project's clustering schedule exactly once", async () => {
         const subscriber = createProjectMetadataHandler(deps);
 
@@ -742,63 +795,6 @@ describe("createProjectMetadataHandler()", () => {
         expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
         expect(mockRecordSignal).not.toHaveBeenCalled();
       });
-    });
-  });
-
-  describe("given an injected active-day tracker", () => {
-    beforeEach(() => {
-      mockProjects.findById.mockResolvedValue({
-        id: tenantId,
-        firstMessage: true,
-        integrated: true,
-      });
-    });
-
-    it("marks the project's active day before reading the project", async () => {
-      const calls: string[] = [];
-      const trackActiveDay = vi.fn(async () => {
-        calls.push("activeDay");
-      });
-      mockProjects.findById.mockImplementation(async () => {
-        calls.push("findById");
-        return { id: tenantId, firstMessage: true, integrated: true };
-      });
-      const subscriber = createProjectMetadataHandler({
-        ...deps,
-        trackActiveDay,
-      });
-      const event = createEvent(tenantId);
-
-      await subscriber(event, createContext(tenantId, createFoldState()));
-
-      expect(trackActiveDay).toHaveBeenCalledWith({
-        projectId: tenantId,
-        occurredAt: event.occurredAt,
-      });
-      expect(calls).toEqual(["activeDay", "findById"]);
-    });
-
-    it("marks no active day for a seeded sample trace", async () => {
-      const trackActiveDay = vi.fn(async () => undefined);
-      const subscriber = createProjectMetadataHandler({
-        ...deps,
-        trackActiveDay,
-      });
-
-      await subscriber(
-        createEvent(tenantId),
-        createContext(tenantId, createFoldState({ attributes: { "langwatch.origin": "sample" } })),
-      );
-
-      expect(trackActiveDay).not.toHaveBeenCalled();
-    });
-
-    it("completes without error when no tracker is wired", async () => {
-      const subscriber = createProjectMetadataHandler(deps);
-
-      await expect(
-        subscriber(createEvent(tenantId), createContext(tenantId, createFoldState())),
-      ).resolves.toBeUndefined();
     });
   });
 });

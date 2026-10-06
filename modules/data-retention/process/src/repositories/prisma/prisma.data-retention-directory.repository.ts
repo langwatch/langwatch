@@ -13,10 +13,7 @@ import {
 } from "../../app/data-retention.app.ts";
 
 /** Only what this repository touches. */
-export type DataRetentionDirectoryDatabase = Pick<
-  PrismaClient,
-  "project" | "team" | "organization"
->;
+type DataRetentionDirectoryDatabase = Pick<PrismaClient, "project" | "team" | "organization">;
 
 function projectsInScopeWhere({
   scope,

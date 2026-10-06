@@ -4,9 +4,14 @@
  * fails. ADR-045 makes an unhandled cause generic.
  */
 import { createRestRuntime } from "@langwatch/api/rest";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import {
+  type EvaluationApi,
+  EvaluationLogResultsTooLargeError,
+} from "@langwatch/evaluation-contract";
+import { HandledError } from "@langwatch/handled-error";
 import type * as observabilityModule from "@langwatch/observability";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { Context } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { evaluationsLegacyRest } from "../evaluations-legacy.rest.ts";
@@ -28,7 +33,15 @@ const DRIVER_MESSAGE =
 const PROJECT_ID = "project-1";
 
 /** No route here is expected to throw, so a failure must be legible. */
-function mount(logBatchEvaluation: EvaluationApi["logBatchEvaluation"]) {
+function mount(
+  logBatchEvaluation: EvaluationApi["logBatchEvaluation"],
+  options: {
+    assertBatchLogWithinLimit?: EvaluationApi["assertBatchLogWithinLimit"];
+    /** What the family's boundary was handed, for a refusal the route does not write itself. */
+    refused?: unknown[];
+  } = {},
+) {
+  const assertBatchLogWithinLimit = options.assertBatchLogWithinLimit ?? (async () => undefined);
   const runtime = createRestRuntime({
     identity: {
       authenticate: () => ({
@@ -39,21 +52,57 @@ function mount(logBatchEvaluation: EvaluationApi["logBatchEvaluation"]) {
   });
 
   const app = runtime.mount(evaluationsLegacyRest.router(), {
-    app: () => createApiFixture<EvaluationApi>({ logBatchEvaluation }),
-    onError: (error, context) => context.json({ error: String(error) }, 500),
+    app: () => createApiFixture<EvaluationApi>({ logBatchEvaluation, assertBatchLogWithinLimit }),
+    onError: (error, context) => {
+      options.refused?.push(error);
+
+      return context.json({ error: String(error) }, 500);
+    },
   });
 
-  return (body: unknown) =>
+  return (body: unknown, sent: { contentType?: string; raw?: string } = {}) =>
     app.fetch(
       new Request("http://api.test/api/evaluations/batch/log_results", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+        headers: { "content-type": sent.contentType ?? "application/json" },
+        body: sent.raw ?? JSON.stringify(body),
       }),
     );
 }
 
+/** Main's `c.json({ message: "Invalid body, expecting json" }, 400)`, byte for byte. */
+const MAIN_NOT_JSON_BODY = '{"message":"Invalid body, expecting json"}';
+
 describe("given the legacy evaluation batch log", () => {
+  describe("when the body is larger than the organization accepts", () => {
+    /** @scenario "A batch of results above the organization's limit is refused by name" */
+    it("hands the boundary the batch log's own refusal before the body is parsed or written", async () => {
+      const written = vi.fn(async () => undefined);
+      const sizes: number[] = [];
+      const refused: unknown[] = [];
+      const raw = JSON.stringify({ experiment_slug: "my-experiment", run_id: "run-1" });
+      const post = mount(written, {
+        refused,
+        assertBatchLogWithinLimit: async ({ payloadBytes }) => {
+          sizes.push(payloadBytes);
+          throw new EvaluationLogResultsTooLargeError({ maxBytes: 8 });
+        },
+      });
+
+      await post(undefined, { raw });
+
+      expect(refused).toEqual([
+        expect.objectContaining({
+          code: "evaluation_log_results_too_large",
+          httpStatus: 413,
+          meta: { maxBytes: 8 },
+        }),
+      ]);
+      expect(sizes).toEqual([Buffer.byteLength(raw)]);
+      expect(written).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the write fails with a driver diagnostic", () => {
     /** @scenario "A legacy evaluation batch failure returns no driver diagnostic" */
     it("answers a generic 500 rather than the store's own message", async () => {
@@ -122,5 +171,150 @@ describe("given the legacy evaluation batch log", () => {
       expect(logged).toHaveLength(1);
       expect((logged[0] as { projectId: string }).projectId).toBe(PROJECT_ID);
     });
+  });
+
+  describe("when the body is not sent as json", () => {
+    it("answers main's 400 body byte for byte", async () => {
+      const post = mount(() => Promise.reject(new Error("the write must not be reached")));
+
+      const response = await post(undefined, { contentType: "text/plain", raw: "{}" });
+
+      expect(response.status).toBe(400);
+      expect(response.headers.get("content-type")).toMatch(/^application\/json/);
+      await expect(response.text()).resolves.toBe(MAIN_NOT_JSON_BODY);
+    });
+  });
+
+  describe("when the body does not parse as json", () => {
+    it("answers main's 400 body byte for byte", async () => {
+      const post = mount(() => Promise.reject(new Error("the write must not be reached")));
+
+      const response = await post(undefined, { raw: "{not json" });
+
+      expect(response.status).toBe(400);
+      await expect(response.text()).resolves.toBe(MAIN_NOT_JSON_BODY);
+    });
+  });
+});
+
+/** Main's `c.json({ message: "Bad request" }, 400)` on the evaluate doors, byte for byte. */
+const MAIN_EVALUATE_BAD_REQUEST = '{"message":"Bad request"}';
+
+describe("given an evaluate door", () => {
+  describe("when the body is not sent as json", () => {
+    it.each([
+      "/api/evaluations/basic/evaluate",
+      "/api/evaluations/langevals/valid_format/evaluate",
+      "/api/guardrails/basic/evaluate",
+      "/api/dataset/evaluate",
+    ])("answers %s with main's 400 body before the handler", async (path) => {
+      const runtime = createRestRuntime({
+        identity: {
+          authenticate: () => ({
+            actor: { type: "user", id: "user-1" },
+            scope: { tier: "project", id: PROJECT_ID },
+          }),
+        },
+      });
+      const app = runtime.mount(evaluationsLegacyRest.router(), {
+        // "{}" parses, so a handler reached here would call the empty fixture and 500.
+        app: () => createApiFixture<EvaluationApi>({}),
+        onError: (error, context) => context.json({ error: String(error) }, 500),
+      });
+
+      const response = await app.fetch(
+        new Request(`http://api.test${path}`, {
+          method: "POST",
+          headers: { "content-type": "text/plain" },
+          body: "{}",
+        }),
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.headers.get("content-type")).toMatch(/^application\/json/);
+      await expect(response.text()).resolves.toBe(MAIN_EVALUATE_BAD_REQUEST);
+    });
+  });
+});
+
+describe("given an evaluate door and a body that is JSON but not an evaluation", () => {
+  const sendBody = (path: string, body: unknown) => {
+    const runtime = createRestRuntime({
+      identity: {
+        authenticate: () => ({
+          actor: { type: "user", id: "user-1" },
+          scope: { tier: "project", id: PROJECT_ID },
+        }),
+      },
+    });
+    const app = runtime.mount(evaluationsLegacyRest.router(), {
+      app: () =>
+        createApiFixture<EvaluationApi>({
+          findMonitorBySlug: () => Promise.resolve(null),
+          listCustomEvaluators: () => Promise.resolve([]),
+        }),
+      onError: (error, context) => context.json({ error: String(error) }, 500),
+    });
+
+    return app.fetch(
+      new Request(`http://api.test${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    );
+  };
+
+  describe("when the body omits the data the evaluator scores", () => {
+    /** @scenario "An evaluate request that fails validation answers 400 with the sentence" */
+    it("answers 400 with the validation sentence under error", async () => {
+      loggerSpies.error.mockClear();
+
+      const response = await sendBody("/api/evaluations/langevals/valid_format/evaluate", {
+        settings: {},
+      });
+
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { error?: unknown };
+      expect(typeof body.error).toBe("string");
+      expect(body.error).toContain("data");
+      expect(loggerSpies.error).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("given the legacy evaluation batch log behind a door that refuses the caller", () => {
+  it("leaves the refusal to the family's boundary, not main's 400 sentence", async () => {
+    class DoorRefusedError extends HandledError {
+      constructor() {
+        super("unauthorized", "No credential", { httpStatus: 401 });
+      }
+    }
+    const runtime = createRestRuntime({
+      identity: {
+        authenticate: () => {
+          throw new DoorRefusedError();
+        },
+      },
+    });
+    const boundary = vi.fn((_error: Error, context: Context) =>
+      context.json({ boundary: true }, 401),
+    );
+    const app = runtime.mount(evaluationsLegacyRest.router(), {
+      app: () => createApiFixture<EvaluationApi>({}),
+      onError: boundary,
+    });
+
+    const response = await app.fetch(
+      new Request("http://api.test/api/evaluations/batch/log_results", {
+        method: "POST",
+        headers: { "content-type": "text/plain" },
+        body: "{}",
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ boundary: true });
+    expect(boundary).toHaveBeenCalledWith(expect.any(DoorRefusedError), expect.anything());
   });
 });

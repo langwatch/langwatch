@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   gatewaySpendEventsQuerySchema,
-  gatewaySpendReplayBodySchema,
   gatewaySpendSummariesQuerySchema,
   spendFilterQueryShape,
 } from "../gateway-spend-rest.schemas.ts";
@@ -23,15 +22,6 @@ describe("an inverted window", () => {
     expect(summaries(INVERTED).success).toBe(false);
     expect(gatewaySpendEventsQuerySchema.validate(INVERTED)).toBe(false);
     expect(gatewaySpendEventsQuerySchema.validate(WINDOW)).toBe(true);
-  });
-
-  it("is refused by a replay, as is a window past seven days", () => {
-    const base = { endpoint_id: "we_1" };
-
-    expect(gatewaySpendReplayBodySchema.validate({ ...base, from: 2000, to: 1000 })).toBe(false);
-    expect(
-      gatewaySpendReplayBodySchema.validate({ ...base, from: 1000, to: 1000 + 8 * 86_400_000 }),
-    ).toBe(false);
   });
 });
 

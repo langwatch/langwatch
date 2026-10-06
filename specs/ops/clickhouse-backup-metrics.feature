@@ -15,22 +15,26 @@ Feature: ClickHouse backup status metrics are opt-out
   absence of configuration keeps the existing behaviour and only a deliberate
   opt-out stops collection.
 
+  @unit
   Scenario: a deployment that says nothing keeps collecting backup status
     Given CLICKHOUSE_BACKUP_METRICS_ENABLED is not set
     When the storage stats collector ticks
     Then backup status is collected from the ClickHouse backup log
 
+  @unit
   Scenario: a deployment with backups collects backup status
     Given backup metrics collection is enabled for the deployment
     When the storage stats collector ticks
     Then backup status is collected from the ClickHouse backup log
 
+  @unit
   Scenario: a deployment without backups opts out of the backup log query
     Given backup metrics collection is explicitly disabled
     When the storage stats collector ticks
     Then the ClickHouse backup log is never queried
     And table and disk storage stats are still collected
 
+  @unit
   Scenario: an unrecognised value is treated as enabled
     Given CLICKHOUSE_BACKUP_METRICS_ENABLED is set to an unparseable value
     When the storage stats collector ticks
@@ -44,6 +48,7 @@ Feature: ClickHouse backup status metrics are opt-out
     Then the missing backup log is named once, as information rather than a warning
     And no failure warning is logged for it
 
+  @unit
   Scenario: transient backup-log failure warns once until recovery
     Given backup metrics collection is enabled
     When the backup log query fails on consecutive ticks
@@ -52,22 +57,26 @@ Feature: ClickHouse backup status metrics are opt-out
 
   # The Helm chart states the toggle explicitly in both directions, coupled to
   # the backup config, so a chart deployment never depends on the app's default.
+  @e2e
   Scenario: the Helm chart enables backup metrics wherever it runs backups
     Given the langwatch chart is deployed with clickhouse.backup.enabled true
     When the app and worker deployments are rendered
     Then CLICKHOUSE_BACKUP_METRICS_ENABLED is set to true on them
 
+  @e2e
   Scenario: an operator forces backup metrics for out-of-band backups
     Given the langwatch chart is deployed with clickhouse.backup.metricsEnabled true
     And chart-managed backups are disabled
     When the app and worker deployments are rendered
     Then CLICKHOUSE_BACKUP_METRICS_ENABLED is set to true on them
 
+  @e2e
   Scenario: the Helm chart opts out where it knows there are no backups
     Given the langwatch chart is deployed with clickhouse backups disabled
     When the app and worker deployments are rendered
     Then CLICKHOUSE_BACKUP_METRICS_ENABLED is set to false on them
 
+  @unit
   Scenario: haven opts local worktrees out
     Given a haven stack manages its own ClickHouse
     When the portless overlay is rendered

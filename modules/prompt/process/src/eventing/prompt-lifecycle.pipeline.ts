@@ -12,13 +12,11 @@ import type { PromptRepositories } from "../repositories/prompt.repositories.ts"
 import {
   RecordPromptCreatedCommand,
   type RecordPromptCreatedCommandData,
-} from "./prompt-lifecycle.commands.ts";
-import {
   PROMPT_AGGREGATE_TYPE,
   PROMPT_LIFECYCLE_PIPELINE_NAME,
   promptCreatedEventSchema,
   type PromptLifecycleEvent,
-} from "./prompt-lifecycle.events.ts";
+} from "./prompt-lifecycle.commands.ts";
 
 export type PromptLifecyclePipeline = StaticPipelineDefinition<
   PromptLifecycleEvent,

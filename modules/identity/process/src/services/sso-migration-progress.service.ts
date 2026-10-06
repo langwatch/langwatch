@@ -1,6 +1,7 @@
 import type { LegacySsoAccessQuery } from "@langwatch/auth-contract";
 import {
   breakGlassIsLive,
+  type BreakGlassBinding,
   SsoConnectionInvalidTransitionError,
   ssoMigrationRouteOf,
   type SsoConnectionLifecycleState,
@@ -48,7 +49,7 @@ export interface SsoMigrationMemberships {
  * Unanswered means this installation provisions nobody, which is what
  * `not-applicable` says.
  */
-export interface SsoMigrationDirectoryReads {
+interface SsoMigrationDirectoryReads {
   readSyncStatus(args: {
     organizationId: string;
     legacyConnectionId: string;
@@ -76,10 +77,12 @@ export interface SsoMigrationFinalizationEvidence {
   legacyAccessRetired: boolean;
 }
 
-export interface SsoMigrationProgressServiceDeps {
+interface SsoMigrationProgressServiceDeps {
   connections: SsoConnectionReadRepository;
   evidence: SsoMigrationEvidenceRepository;
   breakGlass: SsoBreakGlassRepository;
+  /** Whether a grant's holder could actually sign in with a password. */
+  holderCanWalkIn: (args: { organizationId: string; userId: string }) => Promise<boolean>;
   memberships: SsoMigrationMemberships;
   legacyAccess: SsoLegacyAccessReads;
   directory?: SsoMigrationDirectoryReads;
@@ -94,7 +97,7 @@ export interface SsoMigrationReading {
 }
 
 /** The pair, and the page size the journey asks for. */
-export interface SsoMigrationProgressRequest {
+interface SsoMigrationProgressRequest {
   organizationId: string;
   /** Which replacement, when the caller names one; the newest otherwise. */
   connectionId?: string;
@@ -134,47 +137,11 @@ export class SsoMigrationProgressService {
 
     const { replacement, legacy } = pair;
     const phase = replacement.migrationPhase ?? "SETUP";
-    const members = await this.deps.memberships.listActiveMembers({ organizationId });
-    const holdings = await this.deps.evidence.findLiveIdentifierHoldings({
-      userIds: members.map((member) => member.userId),
-    });
-    const linkedUserIds = new Set(
-      holdings
-        .filter((holding) =>
-          identifierBelongsToMigrationConnection({ identifier: holding, connection: replacement }),
-        )
-        .map((holding) => holding.userId),
-    );
-    const stragglerIds = members
-      .map((member) => member.userId)
-      .filter((userId) => !linkedUserIds.has(userId))
-      .toSorted()
-      .filter((userId) => cursor === null || userId > cursor);
-    const pageIds = stragglerIds.slice(0, limit);
-    const byId = new Map(members.map((member) => [member.userId, member]));
-    const notYetMoved = members.filter((member) => !linkedUserIds.has(member.userId));
+    const { members, linkedUserIds, stragglerIds, pageIds, byId, notYetMoved } =
+      await this.readMemberStanding({ organizationId, replacement, cursor, limit });
 
-    const [replacementLast, legacyLast, legacyActivityByUser, bindings, scimStatus, holders] =
-      await Promise.all([
-        this.deps.evidence.findLastAuthenticationAtMs({
-          organizationId,
-          connectionId: replacement.connectionId,
-        }),
-        this.deps.evidence.findLastAuthenticationAtMs({
-          organizationId,
-          connectionId: legacy.connectionId,
-        }),
-        this.deps.evidence.findLastAuthenticationByUser({
-          organizationId,
-          connectionId: legacy.connectionId,
-          userIds: pageIds,
-        }),
-        this.deps.breakGlass.findAllForOrganization({ organizationId }),
-        this.readScimStatus(pair),
-        this.deps.evidence.countAddressHolders({
-          addresses: notYetMoved.flatMap((member) => (member.email ? [member.email] : [])),
-        }),
-      ]);
+    const { replacementLast, legacyLast, legacyActivityByUser, bindings, scimStatus, holders } =
+      await this.readEvidence({ organizationId, pair, pageIds, notYetMoved });
 
     const nowMs = this.now();
     const linkedCount = members.filter((member) => linkedUserIds.has(member.userId)).length;
@@ -196,7 +163,7 @@ export class SsoMigrationProgressService {
     const blockers = migrationBlockers({
       selectedRoute,
       testSignInDone: testSignIn.done,
-      liveRecoveryCount: bindings.filter((binding) => breakGlassIsLive({ binding, nowMs })).length,
+      liveRecoveryCount: await this.countWalkableWaysBackIn({ organizationId, bindings, nowMs }),
       quietComplete: quiet.complete,
       scimStatus,
       sharedLegacyIdentifiers: false,
@@ -269,6 +236,76 @@ export class SsoMigrationProgressService {
     };
   }
 
+  /** Active members split into those already linked to the replacement and the stragglers. */
+  private async readMemberStanding({
+    organizationId,
+    replacement,
+    cursor,
+    limit,
+  }: {
+    organizationId: string;
+    replacement: SsoConnectionState;
+    cursor: SsoMigrationProgressRequest["cursor"];
+    limit: SsoMigrationProgressRequest["limit"];
+  }) {
+    const members = await this.deps.memberships.listActiveMembers({ organizationId });
+    const holdings = await this.deps.evidence.findLiveIdentifierHoldings({
+      userIds: members.map((member) => member.userId),
+    });
+    const linkedUserIds = new Set(
+      holdings
+        .filter((holding) =>
+          identifierBelongsToMigrationConnection({ identifier: holding, connection: replacement }),
+        )
+        .map((holding) => holding.userId),
+    );
+    const stragglerIds = members
+      .map((member) => member.userId)
+      .filter((userId) => !linkedUserIds.has(userId))
+      .toSorted()
+      .filter((userId) => cursor === null || userId > cursor);
+    const pageIds = stragglerIds.slice(0, limit);
+    const byId = new Map(members.map((member) => [member.userId, member]));
+    const notYetMoved = members.filter((member) => !linkedUserIds.has(member.userId));
+    return { members, linkedUserIds, stragglerIds, pageIds, byId, notYetMoved };
+  }
+
+  private async readEvidence({
+    organizationId,
+    pair,
+    pageIds,
+    notYetMoved,
+  }: {
+    organizationId: string;
+    pair: MigrationPair;
+    pageIds: string[];
+    notYetMoved: SsoMigrationMember[];
+  }) {
+    const { replacement, legacy } = pair;
+    const [replacementLast, legacyLast, legacyActivityByUser, bindings, scimStatus, holders] =
+      await Promise.all([
+        this.deps.evidence.findLastAuthenticationAtMs({
+          organizationId,
+          connectionId: replacement.connectionId,
+        }),
+        this.deps.evidence.findLastAuthenticationAtMs({
+          organizationId,
+          connectionId: legacy.connectionId,
+        }),
+        this.deps.evidence.findLastAuthenticationByUser({
+          organizationId,
+          connectionId: legacy.connectionId,
+          userIds: pageIds,
+        }),
+        this.deps.breakGlass.findAllForOrganization({ organizationId }),
+        this.readScimStatus(pair),
+        this.deps.evidence.countAddressHolders({
+          addresses: notYetMoved.flatMap((member) => (member.email ? [member.email] : [])),
+        }),
+      ]);
+    return { replacementLast, legacyLast, legacyActivityByUser, bindings, scimStatus, holders };
+  }
+
   /** Both halves of "nothing lets anybody in through the old connection any
    *  more": identity's live identifiers, and auth's account rows. */
   private async legacyAccessRetired(legacy: SsoConnectionState): Promise<boolean> {
@@ -291,6 +328,25 @@ export class SsoMigrationProgressService {
     });
 
     return accounts === 0;
+  }
+
+  /** A grant held by somebody who holds no password is not a way back in. */
+  private async countWalkableWaysBackIn({
+    organizationId,
+    bindings,
+    nowMs,
+  }: {
+    organizationId: string;
+    bindings: readonly BreakGlassBinding[];
+    nowMs: number;
+  }): Promise<number> {
+    let walkable = 0;
+    for (const binding of bindings) {
+      if (!breakGlassIsLive({ binding, nowMs })) continue;
+      if (await this.deps.holderCanWalkIn({ organizationId, userId: binding.userId }))
+        walkable += 1;
+    }
+    return walkable;
   }
 
   private async readScimStatus(pair: MigrationPair): Promise<SsoMigrationScimStatus> {

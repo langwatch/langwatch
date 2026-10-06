@@ -57,11 +57,11 @@ export interface ClusteringStoreSummary {
 }
 
 /** What a clustering call answered: its result, or that no clustering service is configured. */
-export type TopicClusteringFetch =
+type TopicClusteringFetch =
   | { kind: "clustered"; response: TopicClusteringResponse }
   | { kind: "not_configured" };
 
-export type ClusteringRunOutcome =
+type ClusteringRunOutcome =
   | { kind: "stored"; summary: ClusteringStoreSummary }
   | { kind: "not_configured" };
 

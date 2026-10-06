@@ -11,13 +11,13 @@ export const anomalyDetectionSchema = z.object({
 export const anomalyDetectionStateSchema = z.object({
   lastDetectionAt: z.number().nullable(),
 });
-export type AnomalyDetectionState = z.infer<typeof anomalyDetectionStateSchema>;
+type AnomalyDetectionState = z.infer<typeof anomalyDetectionStateSchema>;
 
 export const ANOMALY_DETECTION_INITIAL_STATE: AnomalyDetectionState = {
   lastDetectionAt: null,
 };
 
-export type AnomalyDetectionIntents = {
+type AnomalyDetectionIntents = {
   detect: IntentSpec<typeof anomalyDetectionSchema>;
 };
 

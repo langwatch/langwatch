@@ -125,4 +125,12 @@ export abstract class ScenarioRepository {
     projectId: string;
     id: string;
   }): Promise<{ id: string }>;
+
+  /** A run's secret parameter in the form it travels in; called only where a run is resolved. */
+  abstract sealRunSecret(input: { plain: string }): string;
+  /** A run's secret parameter in the clear; called only where the run's child is prepared. */
+  abstract openRunSecret(input: { sealed: string }): string;
 }
+
+/** The two secret operations, for a service that seals or opens a run's secret parameters. */
+export type ScenarioRunSecretSeal = Pick<ScenarioRepository, "sealRunSecret" | "openRunSecret">;

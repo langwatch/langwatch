@@ -4,9 +4,9 @@
  * annotation and project mount today.
  */
 
+import { defineBrowserModule } from "@langwatch/browser";
 import { planTrpc } from "@langwatch/entitlement-contract";
 import { organizationTrpc } from "@langwatch/organization-contract";
-import { defineBrowserModule } from "@langwatch/browser";
 
 import { organizationApi } from "./behavior/organization-api.ts";
 

@@ -49,7 +49,7 @@ Feature: An organization can lock accounts after repeated failed sign-ins
       When "ana" opens the sign-in security card
       Then the attempt threshold is offered starting at five
       And the lock-out period is offered starting at thirty minutes
-      And both say plainly that nobody is locked out until she saves them
+      And nothing is applied until she saves them, and saving says it applies to new sign-ins
 
   Rule: failures are counted against the account, not against the door
 

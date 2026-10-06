@@ -1,3 +1,4 @@
+import type { TimeseriesBucket } from "@langwatch/analytics-contract";
 import {
   aggregateSeriesValues,
   extractSeriesPoints,
@@ -5,14 +6,8 @@ import {
 } from "@langwatch/analytics-contract";
 import type { GraphTriggerEvaluationResult } from "@langwatch/automation-contract";
 
-import { GRAPH_TRIGGER_MAX_RESULT_ROWS } from "../app/automation.members.ts";
-import type {
-  GraphEvaluationPlan,
-  GraphSeries,
-  GraphSeriesEvaluation,
-  TimeseriesResult,
-} from "../app/automation.members.ts";
 import { skippedGraphEvaluation } from "../rules/trigger-evaluator.rules.ts";
+import type { GraphEvaluationPlan, GraphSeries } from "./graph-trigger-evaluation-plan.service.ts";
 
 /** ClickHouse's "too many rows or bytes", however the client spelled it. */
 function isTimeseriesResultTooLarge(error: unknown): boolean {
@@ -79,7 +74,6 @@ export class GraphTriggerSeriesEvaluationService {
           projectId: plan.request.projectId,
           triggerId: plan.request.triggerId,
           reason: plan.request.reason,
-          groupBy: plan.graph.groupBy,
           timePeriodMinutes: plan.timePeriod,
           maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
         },
@@ -121,8 +115,8 @@ export class GraphTriggerSeriesEvaluationService {
 
   private values(plan: GraphEvaluationPlan, result: TimeseriesResult): GraphSeriesEvaluation {
     const key = graphSeriesName(plan.timeseriesInput.series[0]!, 0);
-    const currentPoints = extractSeriesPoints(result.currentPeriod, key, plan.graph.groupBy);
-    const previousPoints = extractSeriesPoints(result.previousPeriod, key, plan.graph.groupBy);
+    const currentPoints = extractSeriesPoints(result.currentPeriod, key);
+    const previousPoints = extractSeriesPoints(result.previousPeriod, key);
 
     return {
       currentPoints,
@@ -147,3 +141,17 @@ export class GraphTriggerSeriesEvaluationService {
     );
   }
 }
+
+export type TimeseriesResult = {
+  previousPeriod: TimeseriesBucket[];
+  currentPeriod: TimeseriesBucket[];
+};
+
+export type GraphSeriesEvaluation = {
+  currentValue: number;
+  previousValue: number | null;
+  currentPoints: { timestamp: string; value: number }[];
+  previousPoints: { timestamp: string; value: number }[];
+};
+
+export const GRAPH_TRIGGER_MAX_RESULT_ROWS = 10_000;

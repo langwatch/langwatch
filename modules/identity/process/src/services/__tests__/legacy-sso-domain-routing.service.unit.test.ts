@@ -45,6 +45,7 @@ function build({ projected }: { projected: RoutableConnection | null }) {
 
 describe("LegacySsoDomainRoutingService behind the sign-in router", () => {
   describe("when no projected connection holds the domain", () => {
+    /** @scenario A connection carried over from an earlier configuration keeps routing */
     it("routes through the organization's legacy columns", async () => {
       const decision = await build({ projected: null }).route({ identifier: "sam@acme.com" });
 

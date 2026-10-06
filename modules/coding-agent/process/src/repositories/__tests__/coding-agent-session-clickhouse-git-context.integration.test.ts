@@ -10,7 +10,7 @@ import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-c
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { session } from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import type { CodingAgentClock } from "../../app/coding-agent.members.ts";
+import type { CodingAgentClock } from "../../services/coding-agent-clock.service.ts";
 import { NoopCodingAgentReadMetricsService } from "../../services/coding-agent-read-metrics-noop.service.ts";
 import {
   createTestClickHouseClient,

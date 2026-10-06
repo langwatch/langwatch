@@ -27,6 +27,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@monaco-editor/react": "catalog:",
     "lucide-react": "catalog:",

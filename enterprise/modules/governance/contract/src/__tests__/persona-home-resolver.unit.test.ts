@@ -59,6 +59,7 @@ describe("resolvePersonaHome", () => {
   });
 
   describe("given a project-only LLMOps persona (persona 3, must not regress)", () => {
+    /** @scenario "Governance owns its persona-home decision" */
     it("returns /<projectSlug> when user has project but no personal VK", () => {
       const result = resolvePersonaHome({
         ...baseInput,
@@ -89,6 +90,7 @@ describe("resolvePersonaHome", () => {
   });
 
   describe("given a governance-admin persona (persona 4)", () => {
+    /** @scenario "Governance owns its persona-home decision" */
     it("returns /governance when admin + Enterprise + hasIngestionSources all true", () => {
       const result = resolvePersonaHome({
         ...baseInput,

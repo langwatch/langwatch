@@ -68,19 +68,18 @@ nobody made — it is what happens when the migration path becomes the design.
 
 ## The signals, and what finds them
 
-| Signal                                                            | Found by                     | Where                                               |
-| ----------------------------------------------------------------- | ---------------------------- | --------------------------------------------------- |
-| A named function that returns its own argument                    | `no-identity-function-ts`    | `dev/lint/ast-grep/rules/`                          |
-| A method forwarding to the same name on a collaborator            | `no-same-name-delegation-ts` | `dev/lint/ast-grep/rules/`                          |
-| A class that forwards most of its methods to **one** collaborator | `pass-through-class`         | `packages/oxlint-rules/grammar/overengineering.mjs` |
-| A type alias nesting conditional types past 3                     | `conditional-type-depth`     | same                                                |
-| Overloads differing only by a boolean literal                     | `overload-by-literal`        | same                                                |
-| A comment block over 60 lines                                     | `comment-block-size`         | `src/comment-blocks.ts`                             |
-| A service module over its size ceiling                            | `service-ceilings`           | `src/service-ceilings.ts`                           |
+| Signal                                                            | Found by                 | Where                                                                     |
+| ----------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------- |
+| A named function that returns its own argument                    | review (no rule today)   |                                                                           |
+| A method forwarding to the same name on a collaborator            | review (no rule today)   |                                                                           |
+| A class that forwards most of its methods to **one** collaborator | `pass-through-class`     | `packages/oxlint-rules/grammar/overengineering.mjs`                       |
+| A type alias nesting conditional types past 3                     | `conditional-type-depth` | same                                                                      |
+| Overloads differing only by a boolean literal                     | `overload-by-literal`    | same                                                                      |
+| A comment block over five lines                                   | `comment-block-size`     | `packages/oxlint-rules/grammar/comment-block-policy.mjs`                  |
+| A service module over its size ceiling                            | `service-ceilings`       | `packages/architecture-enforcer/src/policies/quality/service-ceilings.ts` |
 
-The ast-grep rules run from `make lint-rules` and are proved against fixtures
-by `make lint-rules-test`. The architecture-enforcer policies run from
-`pnpm --filter @langwatch/architecture-enforcer lint`.
+The oxlint rules run with `pnpm lint` (scoped: `pnpm lint:changed`). The
+architecture-enforcer policies run from `pnpm lint:architecture`.
 
 None of them is a verdict. `pass-through-class` exempts `app/<feature>.app.ts` and
 routed repositories because both are supposed to delegate; the others fire on a
@@ -126,10 +125,10 @@ Before adding an abstraction, and when reviewing one:
 ## What this is not
 
 It is not an argument for fewer files, or for putting everything in one class.
-`services/canonicalisation/` is sixteen files, one per vendor, and that is
-correct: the set is open and its members vary independently. `DatasetStorage`
-has three implementations and earns its interface. The trace `ports/` directory
-is 26 one-method files because `strict-port-module` requires it.
+Trace's canonicalisers (`modules/trace/process/src/services/*-canonicaliser.service.ts`)
+are sixteen files, one per vendor, and that is correct: the set is open and its
+members vary independently. `DatasetStorage` has three implementations and earns
+its interface.
 
 The target is code that does what it does well and does not try to do more —
 not code with the fewest lines.

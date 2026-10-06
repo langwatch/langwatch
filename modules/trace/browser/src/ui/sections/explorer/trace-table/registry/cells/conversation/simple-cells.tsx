@@ -3,6 +3,7 @@ import { chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 
+import { formatRelativeTime } from "../../../../../../../model/display-formatters.ts";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
 import type { TraceStatus } from "../../../../types/trace.ts";
@@ -221,4 +222,30 @@ export const PullRequestCell: CellDef<ConversationGroup> = {
         {dash}
       </Text>
     ),
+};
+
+export const LastTurnCell: CellDef<ConversationGroup> = {
+  id: "lastTurn",
+  label: "Last Activity",
+  render: ({ row }) => (
+    <MonoCell color="fg.muted">{formatRelativeTime(row.latestTimestamp)}</MonoCell>
+  ),
+  renderComfortable: ({ row }) => (
+    <Text textStyle="xs" color="fg">
+      {formatRelativeTime(row.latestTimestamp)}
+    </Text>
+  ),
+};
+
+export const StartedCell: CellDef<ConversationGroup> = {
+  id: "started",
+  label: "Started",
+  render: ({ row }) => (
+    <MonoCell color="fg.subtle">{formatRelativeTime(row.earliestTimestamp)}</MonoCell>
+  ),
+  renderComfortable: ({ row }) => (
+    <Text textStyle="sm" color="fg.muted">
+      {formatRelativeTime(row.earliestTimestamp)}
+    </Text>
+  ),
 };

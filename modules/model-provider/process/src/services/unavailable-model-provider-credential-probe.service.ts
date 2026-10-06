@@ -3,7 +3,7 @@ import type {
   ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 
-import { ModelProviderCredentialProbe } from "../app/model-provider.members.ts";
+import { ModelProviderCredentialProbe } from "./http-model-provider-credential-probe.service.ts";
 
 /**
  * The probe a deployment with no guarded egress composes.

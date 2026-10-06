@@ -19,7 +19,7 @@ import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 /**
  * The lookup twin. Identifiers and connections come off the shared store;
  * names, memberships, invitations and activity have no shared-store home
- * yet, so whatever composes this repository seeds them directly.
+ * yet, so whatever composes this repository seeds them directly (`activity` is newest first).
  */
 export class MemoryIdentityLookupRepository implements IdentityLookupRepository {
   static create(store: MemoryIdentityStore): MemoryIdentityLookupRepository {
@@ -32,11 +32,6 @@ export class MemoryIdentityLookupRepository implements IdentityLookupRepository 
   readonly memberships = new Map<string, LookupMembershipRow[]>();
   readonly invitations: LookupInvitationRow[] = [];
   readonly activity: LookupOperatorActivityRow[] = [];
-
-  /** Pushed to by whatever bridges the audit-log write port in tests. */
-  record(row: LookupOperatorActivityRow): void {
-    this.activity.unshift(row);
-  }
 
   async findIdentifiersByValue({
     value,

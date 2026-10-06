@@ -1445,3 +1445,71 @@ describe("guardOrganizationId — OrganizationUser", () => {
     });
   });
 });
+
+describe("guardOrganizationId — organizationId as an operator or a composite key", () => {
+  const runOrganizationGuard = (params: GuardParams) =>
+    guardOrganizationId(
+      params,
+      vi.fn(async () => "ok"),
+    );
+
+  describe("when organizationId carries an operator that names no finite set", () => {
+    it.each([
+      ["OrganizationUser", { organizationId: { not: "org_acme" } }],
+      ["OrganizationUser", { organizationId: { in: [] } }],
+      ["OrganizationUser", { organizationId: { in: ["org_acme", 7] } }],
+      ["OrganizationUser", { organizationId: { in: ["org_acme", "  "] } }],
+      ["OrganizationUser", { organizationId: { in: ["org_acme"], not: "org_globex" } }],
+      ["CustomRole", { organizationId: { not: "org_acme" } }],
+      ["CustomRole", { organizationId: { in: ["org_acme"], mode: "insensitive" } }],
+      ["CustomRole", { organizationId: "  " }],
+    ])("refuses %s read bounded by %o", async (model, where) => {
+      await expect(
+        runOrganizationGuard({ model, action: "findMany", args: { where } }),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
+
+  describe("when organizationId names a finite set of organizations", () => {
+    it.each([
+      ["OrganizationUser", { organizationId: { in: ["org_acme", "org_globex"] } }],
+      ["CustomRole", { organizationId: { in: ["org_acme"] } }],
+    ])("permits %s read bounded by %o", async (model, where) => {
+      await expect(
+        runOrganizationGuard({ model, action: "findMany", args: { where } }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when a compound key does not carry a usable organizationId", () => {
+    it.each([
+      ["OrganizationUser", { userId_organizationId: { userId: "user-1" } }],
+      [
+        "OrganizationUser",
+        { userId_organizationId: { userId: "user-1", organizationId: { not: "org_acme" } } },
+      ],
+      ["OrganizationUser", { userId_organizationId: { userId: "user-1", organizationId: "" } }],
+      ["OrganizationUser", { userId_organizationId: { userId: "user-1", organizationId: "  " } }],
+      ["CustomRole", { organizationId_name: { name: "Admin" } }],
+      ["CustomRole", { organizationId_name: { name: "Admin", organizationId: { in: ["a"] } } }],
+    ])("refuses %s read keyed on %o", async (model, where) => {
+      await expect(
+        runOrganizationGuard({ model, action: "findUnique", args: { where } }),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
+
+  describe("when a compound key names one organization", () => {
+    it.each([
+      [
+        "OrganizationUser",
+        { userId_organizationId: { userId: "user-1", organizationId: "org_a" } },
+      ],
+      ["CustomRole", { organizationId_name: { organizationId: "org_a", name: "Admin" } }],
+    ])("permits %s read keyed on %o", async (model, where) => {
+      await expect(
+        runOrganizationGuard({ model, action: "findUnique", args: { where } }),
+      ).resolves.toBe("ok");
+    });
+  });
+});

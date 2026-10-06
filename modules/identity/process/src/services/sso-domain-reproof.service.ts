@@ -17,7 +17,7 @@ import { safeEqual, sha256Hex } from "../rules/pkce.rules.ts";
 import { newSsoConnectionCommandId } from "../rules/sso-connection-id.rules.ts";
 import type { SsoConnectionService } from "./sso-connection.service.ts";
 
-export interface SsoDomainReproofServiceDeps {
+interface SsoDomainReproofServiceDeps {
   connections: () => SsoConnectionService;
   targets: SsoDomainReproofTargetRepository;
   proofs: SsoDomainProofChannel;

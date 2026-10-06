@@ -23,13 +23,13 @@ import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { nowInstant } from "@langwatch/time";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
-import type { ExperimentRunEventStream } from "../channels/experiment-run-event-stream.channel.ts";
 import {
   comparisonSkipMessage,
   type ComparisonSkipReason,
 } from "../eventing/experiment-comparison-skip.process.ts";
 import { buildStripScoreEvaluatorIds } from "../eventing/experiment-evaluator-score-filter.process.ts";
 import type { CellFinishedEventData } from "../eventing/experiment-run-events.process.ts";
+import type { ExperimentRunEventStreamRepository } from "../repositories/experiment-run-event-stream.repository.ts";
 import type {
   ExperimentRunFoldRepository,
   ExperimentRunProgressState,
@@ -117,7 +117,7 @@ const failedToLoad = (error: unknown): ExperimentCellExecution => {
 type ExperimentRunCellDeps = {
   folds: ExperimentRunFoldRepository;
   /** Where a cell's start is announced, ephemeral as main's `cell_started` was. */
-  stream: ExperimentRunEventStream;
+  stream: ExperimentRunEventStreamRepository;
   collaborators: ExperimentRunCollaborators;
   services: ExecutionDataServices;
   workflows: WorkflowApi;
@@ -129,7 +129,7 @@ export class ExperimentRunCellService {
   }
 
   private readonly folds: ExperimentRunFoldRepository;
-  private readonly stream: ExperimentRunEventStream;
+  private readonly stream: ExperimentRunEventStreamRepository;
   private readonly collaborators: ExperimentRunCollaborators;
   private readonly services: ExecutionDataServices;
   private readonly workflows: WorkflowApi;

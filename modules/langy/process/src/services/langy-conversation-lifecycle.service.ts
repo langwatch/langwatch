@@ -6,7 +6,7 @@ import {
 } from "@langwatch/langy-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 
-import type { LangyConversationCommands } from "../app/langy.members.ts";
+import type { LangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
 import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";
 import {
   type LangyMessageRepository,

@@ -76,9 +76,4 @@ export class PrismaLangySessionKeyRepository extends LangySessionKeyRepository {
   revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
     return this.reap.revokeExpiredByName(input);
   }
-
-  /** Same sweep, positional args, for the App's tenancy-guard suite call shape. */
-  reapExpired(revokedAt: Date, name: string): Promise<number> {
-    return this.revokeExpiredByName({ name, now: fromDate(revokedAt) });
-  }
 }

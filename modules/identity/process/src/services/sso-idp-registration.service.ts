@@ -22,7 +22,7 @@ import {
   withoutTrailingSlashes,
 } from "../rules/sso-idp-registration.rules.ts";
 
-export interface SsoIdpRegistrationServiceDeps {
+interface SsoIdpRegistrationServiceDeps {
   discovery: SsoIssuerDiscoveryChannel;
 }
 

@@ -4,8 +4,8 @@ import type {
   DemoDataRunInput,
   SeedRunReport,
 } from "@langwatch/enterprise-demo-data-contract";
+import type { Logger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { MembersRead } from "@langwatch/process-stores/members";
 import type { Instant } from "@langwatch/time";
 
 import { assertDemoOrgAllowed, parseDemoOrgIds } from "../rules/demo-org-scope.rules.ts";
@@ -29,7 +29,7 @@ const ACTIONS: readonly SeedAction[] = [
 export class DemoDataService {
   readonly #organizations: Pick<OrganizationApi, "findProvisioningSummary">;
   readonly #demoOrgIds: string | undefined;
-  readonly #logger: MembersRead<["logger"]>["logger"];
+  readonly #logger: Logger;
   readonly #now: () => Instant;
 
   private constructor(deps: Parameters<typeof DemoDataService.create>[0]) {
@@ -42,7 +42,7 @@ export class DemoDataService {
   static create(deps: {
     organizations: Pick<OrganizationApi, "findProvisioningSummary">;
     demoOrgIds: string | undefined;
-    logger: MembersRead<["logger"]>["logger"];
+    logger: Logger;
     now: () => Instant;
   }): DemoDataService {
     return new DemoDataService(deps);

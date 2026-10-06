@@ -6,10 +6,11 @@ import {
 import type { WorkbenchCredential } from "@langwatch/experiment-contract";
 import { defineProcessModule } from "@langwatch/process";
 
-import { ExperimentModule, type ExperimentAppDependencies } from "#app/experiment.app";
+import { ExperimentModule } from "#app/experiment.app";
 
 import { experimentLifecycleEventing } from "./eventing/experiment-lifecycle.pipeline.ts";
 import { experimentRunProcessingEventing } from "./eventing/experiment-run-processing.pipeline.ts";
+import { experimentRepositories } from "./repositories/experiment-repositories.registry.ts";
 import { experimentDspyStepsRest } from "./transport/experiment-dspy-steps.rest.ts";
 import { experimentInitRest } from "./transport/experiment-init.rest.ts";
 import {
@@ -21,9 +22,8 @@ import { experimentWorkbenchRunRest } from "./transport/experiment-workbench-run
 import { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
 import { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 
-export type { ExperimentAppDependencies };
-
 export const experimentProcessModule = defineProcessModule("experiment")
+  .withRepositories(experimentRepositories)
   .withApi(ExperimentModule)
   .withTransports(
     // The workbench's project-keyed family and the two doors a browser opens.

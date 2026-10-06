@@ -1,4 +1,11 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import {
+  Config,
+  type ConfigOf,
+  isSaas,
+  otelResourceAttributes,
+  outboundProxy,
+  serviceVersion,
+} from "@langwatch/config";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
@@ -59,6 +66,13 @@ export const licensingConfig = Config.define((c) => ({
       .optional()
       .transform((value) => value?.trim() || void 0),
   ),
+  /** The hosted product: plan resolution reads cloud, and no configured code is redeemed. */
+  isSaas,
+  /** The release this install reports to Connect, read through `releaseVersionOf`. */
+  serviceVersion,
+  otelResourceAttributes,
+  /** The proxy spellings (the shared leaf); hosted calls follow them. */
+  outboundProxy,
 }));
 
 export type LicensingServerConfig = ConfigOf<typeof licensingConfig>;

@@ -4,6 +4,7 @@
  */
 import type {
   ApiKeyApi,
+  ApiKeyProject,
   ApiKeyTokenResolutionInput,
   OrganizationApiKeyResolution,
   ResolvedApiKeyCredential,
@@ -29,19 +30,30 @@ const PROJECT = {
 /** An in-memory key store: tokens it knows resolve, everything else is unusable. */
 class KeyStore implements Pick<
   ApiKeyApi,
-  "findResolvedToken" | "resolveOrganizationToken" | "markUsed"
+  "findResolvedToken" | "resolveOrganizationToken" | "markUsed" | "getOrgProjects"
 > {
   readonly used: string[] = [];
 
   constructor(
     private readonly projectTokens: ReadonlyMap<string, ResolvedApiKeyCredential>,
     private readonly organizationTokens: ReadonlyMap<string, OrganizationApiKeyResolution>,
+    /** An organization's projects, and what a token resolves to when it names one (`token@id`). */
+    private readonly organizations: Readonly<{
+      projects: ReadonlyMap<string, ApiKeyProject[]>;
+      named: ReadonlyMap<string, ResolvedApiKeyCredential>;
+    }> = { projects: new Map(), named: new Map() },
   ) {}
 
   findResolvedToken({
     token,
+    projectId,
   }: ApiKeyTokenResolutionInput): Promise<ResolvedApiKeyCredential | null> {
-    return Promise.resolve(this.projectTokens.get(token) ?? null);
+    const named = projectId ? this.organizations.named.get(`${token}@${projectId}`) : undefined;
+    return Promise.resolve(named ?? this.projectTokens.get(token) ?? null);
+  }
+
+  getOrgProjects({ organizationId }: { organizationId: string }): Promise<ApiKeyProject[]> {
+    return Promise.resolve(this.organizations.projects.get(organizationId) ?? []);
   }
 
   resolveOrganizationToken({ token }: { token: string }): Promise<OrganizationApiKeyResolution> {
@@ -62,6 +74,8 @@ function doorOver(store: KeyStore): ApiRestCredentialsService {
       hasApiKeyPermission: () => Promise.reject(new Error("the key door asks no permission")),
       getApiKeyProjectDecision: () => Promise.reject(new Error("the key door asks no permission")),
       hasProjectPermission: () => Promise.reject(new Error("the key door asks no permission")),
+      listApiKeyBindings: () => Promise.reject(new Error("the key door asks no permission")),
+      getScope: () => Promise.reject(new Error("the key door reads no scope")),
     },
     cliProjects: {
       getCliAccessProject: () => Promise.reject(new Error("the key door reads no CLI session")),
@@ -95,6 +109,7 @@ const store = new KeyStore(
     ],
   ]),
   new Map<string, OrganizationApiKeyResolution>([
+    ["sk-lw-project", { ok: false, reason: "wrong_credential_class" }],
     [
       "sk-lw-org",
       {
@@ -110,6 +125,10 @@ const store = new KeyStore(
   ]),
 );
 const door = doorOver(store);
+const ORG_KEY: OrganizationApiKeyResolution = {
+  ok: true,
+  resolved: { type: "apiKey-org", apiKeyId: "key-org", userId: null, organizationId: "org-2" },
+};
 
 async function refusalCode(attempt: Promise<unknown>): Promise<string> {
   const error = await attempt.then(
@@ -122,6 +141,8 @@ async function refusalCode(attempt: Promise<unknown>): Promise<string> {
 
 describe("the key door", () => {
   describe("given a legacy project key", () => {
+    /** @scenario "A legacy prefix-less project key with no session still authenticates" */
+    /** @scenario "API key authentication via X-Auth-Token header" */
     it("resolves the key to exactly its own project, in that project's organization", async () => {
       const credential = await door.identifyKey({
         request: request({ "x-auth-token": "legacy-key" }),
@@ -131,6 +152,55 @@ describe("the key door", () => {
       expect(credential.organizationId).toBe("org-1");
       credential.markUsed();
       expect(store.used).not.toContain("legacy-key");
+    });
+  });
+
+  describe("given a legacy project key in the Authorization Bearer header", () => {
+    /** @scenario "API key authentication via Authorization Bearer header" */
+    it("resolves the key to exactly its own project", async () => {
+      const credential = await door.identifyKey({
+        request: request({ authorization: "Bearer legacy-key" }),
+      });
+
+      expect(credential.principal).toEqual({ kind: "project", projectId: "project-1" });
+      expect(credential.organizationId).toBe("org-1");
+    });
+  });
+
+  describe("given an empty or whitespace-only Bearer token beside an X-Auth-Token", () => {
+    /** @scenario Empty or whitespace-only Bearer token does not poison X-Auth-Token fallback */
+    it.each(["Bearer ", "Bearer    ", "Bearer"])(
+      "falls through to the X-Auth-Token credential when Authorization is %j",
+      async (authorization) => {
+        const credential = await door.identifyKey({
+          request: request({ authorization, "x-auth-token": "legacy-key" }),
+        });
+
+        expect(credential.principal).toEqual({ kind: "project", projectId: "project-1" });
+      },
+    );
+  });
+
+  describe("given an Authorization: Basic header beside an X-Auth-Token", () => {
+    /** @scenario Authorization header from a proxy does not poison X-Auth-Token fallback */
+    it("uses the X-Auth-Token, which wins over Basic", async () => {
+      const credential = await door.identifyKey({
+        request: request({
+          authorization: `Basic ${btoa("proxy-user:proxy-password")}`,
+          "x-auth-token": "legacy-key",
+        }),
+      });
+
+      expect(credential.principal).toEqual({ kind: "project", projectId: "project-1" });
+    });
+
+    /** @scenario Authorization Basic is read when no X-Auth-Token is sent */
+    it("reads the Basic credential when no X-Auth-Token is sent", async () => {
+      const credential = await door.identifyKey({
+        request: request({ authorization: `Basic ${btoa("project-1:legacy-key")}` }),
+      });
+
+      expect(credential.principal).toEqual({ kind: "project", projectId: "project-1" });
     });
   });
 
@@ -171,6 +241,7 @@ describe("the key door", () => {
   });
 
   describe("given a request with no credential", () => {
+    /** @scenario "A request with neither credential is refused" */
     it("is refused as missing credentials", async () => {
       expect(await refusalCode(door.identifyKey({ request: request({}) }))).toBe(
         "missing_credentials",
@@ -179,6 +250,7 @@ describe("the key door", () => {
   });
 
   describe("given a token that resolves to neither a project nor an organization", () => {
+    /** @scenario "An invalid API key is refused without falling back to the session" */
     it("is refused as invalid credentials", async () => {
       expect(
         await refusalCode(
@@ -190,6 +262,37 @@ describe("the key door", () => {
 });
 
 /** @see specs/security/api-endpoint-authorization.feature */
+describe("the organization door", () => {
+  describe("given a token that matches no key at all", () => {
+    /** @scenario "A credential that resolves to nothing is not blamed on its class" */
+    it("is refused as invalid credentials, naming no credential class", async () => {
+      const refusal = await door
+        .identifyOrganization({ request: request({ authorization: "Bearer sk-lw-typo" }) })
+        .then(
+          () => new Error("the door admitted the request"),
+          (error: unknown) => error,
+        );
+
+      expect(refusal).toMatchObject({ code: "invalid_credentials", httpStatus: 401 });
+      expect((refusal as Error).message).not.toMatch(/project|organization/i);
+    });
+
+    /** @scenario "A project key on an organization endpoint is told exactly that" */
+    it("tells a project key from it, naming the class the endpoint needs and the one presented", async () => {
+      const refusal = await door
+        .identifyOrganization({ request: request({ authorization: "Bearer sk-lw-project" }) })
+        .then(
+          () => new Error("the door admitted the request"),
+          (error: unknown) => error,
+        );
+
+      expect(refusal).toMatchObject({ code: "credential_class_mismatch", httpStatus: 401 });
+      expect((refusal as Error).message).toMatch(/requires an organization API key/);
+      expect((refusal as Error).message).toMatch(/a project key was presented/);
+    });
+  });
+});
+
 describe("the project door", () => {
   describe("given a live key that reaches several projects and names none", () => {
     /** @scenario "A key that reaches several projects and names none is told to name one" */
@@ -199,17 +302,159 @@ describe("the project door", () => {
     ] as const)("is told to name a project, %s", async (_name, method) => {
       const asked = request({ authorization: "Bearer sk-lw-org" });
 
-      expect(await refusalCode(door[method]({ request: asked, permission: "traces:view" }))).toBe(
-        "project_required",
+      expect(
+        await refusalCode(door[method]({ request: asked, permissions: ["traces:view"] })),
+      ).toBe("project_required");
+    });
+  });
+
+  describe("given a live key that reaches several projects, holding the route's permission in some", () => {
+    const projectOf = (id: string) => ({
+      ...PROJECT,
+      id,
+      name: `Project ${id}`,
+      organizationId: "org-2",
+    });
+    const keyAt = (id: string): ResolvedApiKeyCredential => ({
+      type: "apiKey",
+      apiKeyId: "key-org",
+      userId: null,
+      organizationId: "org-2",
+      ingestSourceType: null,
+      ingestionTemplateId: null,
+      project: projectOf(id),
+    });
+    const reaching = new KeyStore(new Map(), new Map([["sk-lw-org", ORG_KEY]]), {
+      projects: new Map([
+        [
+          "org-2",
+          ["project-a", "project-b", "project-c"].map((id) => ({
+            id,
+            name: `Project ${id}`,
+            teamId: "team-1",
+          })),
+        ],
+      ]),
+      // The key resolves project-a and project-b; project-c is outside its bindings.
+      named: new Map([
+        ["sk-lw-org@project-a", keyAt("project-a")],
+        ["sk-lw-org@project-b", keyAt("project-b")],
+      ]),
+    });
+    const holdsAt = new Set(["project-a"]);
+    const reachingDoor = ApiRestCredentialsService.create({
+      apiKeys: reaching,
+      authz: {
+        hasApiKeyPermission: ({ scope }) => Promise.resolve(holdsAt.has(scope.id)),
+        getApiKeyProjectDecision: () => Promise.reject(new Error("asked through the ceiling")),
+        hasProjectPermission: () => Promise.reject(new Error("no person is asked")),
+        listApiKeyBindings: () => Promise.reject(new Error("no bindings are listed")),
+        getScope: () => Promise.reject(new Error("no scope is read")),
+      },
+      cliProjects: {
+        getCliAccessProject: () => Promise.reject(new Error("no CLI session is read")),
+      },
+      organizations: { getSettings: () => Promise.reject(new Error("no organization is read")) },
+    });
+
+    async function refusalOf(attempt: Promise<unknown>): Promise<HandledError> {
+      const error = await attempt.then(
+        () => new Error("the door admitted the request"),
+        (refusal: unknown) => refusal,
       );
+      if (!HandledError.isHandled(error)) throw error;
+      return error;
+    }
+
+    /** @scenario "A key that names no project is told the projects it may name for the route" */
+    /** @scenario "Project discovery excludes projects outside the key bindings" */
+    it("lists only the projects the key reaches and holds the route's permission in", async () => {
+      const refusal = await refusalOf(
+        reachingDoor.authenticate({
+          request: request({ authorization: "Bearer sk-lw-org" }),
+          permissions: ["scenarios:manage"],
+        }),
+      );
+
+      expect(refusal).toMatchObject({ code: "project_required", httpStatus: 400 });
+      expect(refusal.meta).toEqual({ projects: [{ id: "project-a", name: "Project project-a" }] });
+    });
+
+    /** @scenario "Project discovery applies the key owner's effective permission" */
+    it("lists no project when the key's effective permission holds in none", async () => {
+      holdsAt.delete("project-a");
+      try {
+        const refusal = await refusalOf(
+          reachingDoor.authenticate({
+            request: request({ authorization: "Bearer sk-lw-org" }),
+            permissions: ["scenarios:manage"],
+          }),
+        );
+
+        expect(refusal).toMatchObject({ code: "project_required", httpStatus: 400 });
+        expect(refusal.meta).toEqual({ projects: [] });
+      } finally {
+        holdsAt.add("project-a");
+      }
+    });
+
+    /** @scenario "A key asked no permission is told every project it reaches" */
+    it("lists every project the key resolves when the route asks nothing of it", async () => {
+      const refusal = await refusalOf(
+        reachingDoor.identify({ request: request({ authorization: "Bearer sk-lw-org" }) }),
+      );
+
+      expect(refusal.meta).toEqual({
+        projects: [
+          { id: "project-a", name: "Project project-a" },
+          { id: "project-b", name: "Project project-b" },
+        ],
+      });
     });
   });
 
   describe("given a live key that names a project it does not resolve", () => {
+    /** @scenario "A key for one organization cannot resolve another organization's project" */
     it("stays an invalid credential, saying nothing about the project", async () => {
       const asked = request({ authorization: "Bearer sk-lw-org", "x-project-id": "project-9" });
 
       expect(await refusalCode(door.identify({ request: asked }))).toBe("invalid_credentials");
+    });
+  });
+
+  describe("given an ingestion key that names no project", () => {
+    /** @scenario "Unsupported credentials cannot discover projects" */
+    it("resolves as its own project's key and enumerates no organization projects", async () => {
+      let listed = 0;
+      const ingestion = new (class extends KeyStore {
+        override getOrgProjects(input: { organizationId: string }) {
+          listed += 1;
+          return super.getOrgProjects(input);
+        }
+      })(
+        new Map<string, ResolvedApiKeyCredential>([
+          [
+            "sk-lw-ingest",
+            {
+              type: "apiKey",
+              apiKeyId: "key-ingest",
+              userId: null,
+              organizationId: "org-1",
+              ingestSourceType: "otel",
+              ingestionTemplateId: "template-1",
+              project: PROJECT,
+            },
+          ],
+        ]),
+        new Map(),
+      );
+
+      const credential = await doorOver(ingestion).identify({
+        request: request({ authorization: "Bearer sk-lw-ingest" }),
+      });
+
+      expect(credential.project.id).toBe("project-1");
+      expect(listed).toBe(0);
     });
   });
 
@@ -232,6 +477,8 @@ describe("a project-bound CLI access token", () => {
       authz: {
         hasApiKeyPermission: () => Promise.reject(new Error("an access token asks no key grant")),
         getApiKeyProjectDecision: () => Promise.reject(new Error("an access token asks no key")),
+        listApiKeyBindings: () => Promise.reject(new Error("an access token lists no grants")),
+        getScope: () => Promise.reject(new Error("an access token reads no scope")),
         hasProjectPermission: (input) => {
           asked.push(input);
           return Promise.resolve(holds);
@@ -251,7 +498,7 @@ describe("a project-bound CLI access token", () => {
     it("authenticates as that person on that project, asking their own access", async () => {
       const credential = await tokenDoor(true).authenticate({
         request: bearer,
-        permission: "traces:view",
+        permissions: ["traces:view"],
       });
 
       expect(credential.project.id).toBe("project-1");
@@ -273,7 +520,7 @@ describe("a project-bound CLI access token", () => {
     it("authenticates as that person on the bound project", async () => {
       const credential = await tokenDoor(true).authenticate({
         request: request({ "x-auth-token": "lw_at_session" }),
-        permission: "traces:view",
+        permissions: ["traces:view"],
       });
 
       expect(credential.actsAsPerson).toEqual({ userId: "user-9" });
@@ -300,7 +547,7 @@ describe("a project-bound CLI access token", () => {
     it("is refused as a permission denial", async () => {
       expect(
         await refusalCode(
-          tokenDoor(false).authenticate({ request: bearer, permission: "traces:view" }),
+          tokenDoor(false).authenticate({ request: bearer, permissions: ["traces:view"] }),
         ),
       ).toBe("api_key_permission_denied");
     });

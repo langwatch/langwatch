@@ -4,7 +4,7 @@
  */
 import {
   DatasetRecordNotFoundError,
-  DatasetTooLargeToSearchError,
+  DatasetTooLargeToExportError,
   createDatasetRecordsInputSchema,
   datasetLookupInputSchema,
   datasetPageInputSchema,
@@ -26,21 +26,28 @@ import {
   type UpdateDatasetRecordInput,
 } from "@langwatch/dataset-contract";
 
+import { onceMaxBytes } from "../rules/dataset-inline-file.rules.ts";
 import {
-  DATASET_SEARCH_MAX_BYTES,
-  DATASET_SEARCH_MAX_ROWS,
-  DATASET_SEARCH_SCAN_BATCH,
-  matchesDatasetSearch,
-  normalizeDatasetSearch,
-} from "../rules/dataset-search.rules.ts";
+  assertPageWithinLimit,
+  assertWholeReadWithinLimits,
+  entryBytesOf,
+} from "../rules/dataset-row-limits.rules.ts";
+import { normalizeDatasetSearch } from "../rules/dataset-search.rules.ts";
 import {
   isDatasetRecordNotFound,
   limitDatasetRecordsByBytes,
   sanitizedEntry,
   selectDatasetRecords,
 } from "../rules/dataset-selection.rules.ts";
+import type { InlineAttachmentScope } from "./dataset-inline-attachment.service.ts";
+import { DatasetRecordSearchService } from "./dataset-record-search.service.ts";
 import type { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
 import type { DatasetServiceOptions } from "./dataset.service.ts";
+
+const MIB = 1024 * 1024;
+
+/** How many postgres-backed rows a whole read asks for at a time. */
+const WHOLE_READ_PAGE_ROWS = 200;
 
 type DatasetRecordServiceOptions = {
   options: DatasetServiceOptions;
@@ -53,7 +60,7 @@ type DatasetRecordServiceOptions = {
     entries: readonly Record<string, unknown>[];
   }) => void;
   generateId: () => string;
-  /** The tier-aware batch bound the writes refuse above. */
+  /** The bounds the project's organization answers for writes and reads. */
   requestBounds: DatasetRequestBoundsService;
 };
 
@@ -62,7 +69,15 @@ export class DatasetRecordService {
     return new DatasetRecordService(deps);
   }
 
-  private constructor(private readonly deps: DatasetRecordServiceOptions) {}
+  private readonly search: DatasetRecordSearchService;
+
+  private constructor(private readonly deps: DatasetRecordServiceOptions) {
+    this.search = DatasetRecordSearchService.create({
+      records: deps.options.records,
+      content: deps.options.content,
+      requestBounds: deps.requestBounds,
+    });
+  }
 
   private get options(): DatasetServiceOptions {
     return this.deps.options;
@@ -72,24 +87,41 @@ export class DatasetRecordService {
     return this.deps.getBySlugOrId(input);
   }
 
-  private assertReady(dataset: Dataset): void {
-    this.deps.assertReady(dataset);
-  }
-
-  private generateId(): string {
-    return this.deps.generateId();
-  }
-
+  /**
+   * One page of records, refused when it is larger than one response carries.
+   * A page of one record is always served.
+   */
   async listRecords(input: DatasetPageInput): Promise<DatasetRecordPage> {
     const parsed = datasetPageInputSchema.parse(input);
     const dataset = await this.getBySlugOrId({
       slugOrId: parsed.slugOrId,
       projectId: parsed.projectId,
     });
-    this.assertReady(dataset);
+    const page = await this.readRecordsPage(parsed, dataset);
+    assertPageWithinLimit({
+      records: page.data,
+      page: page.pagination.page,
+      limit: page.pagination.limit,
+      maxBytes: await this.deps.requestBounds.limit(parsed.projectId, "inlineReadBytes"),
+    });
+
+    return { ...page, dataset };
+  }
+
+  private async readRecordsPage(
+    parsed: ReturnType<typeof datasetPageInputSchema.parse>,
+    known?: Dataset,
+  ): Promise<DatasetRecordPage> {
+    const dataset =
+      known ??
+      (await this.getBySlugOrId({
+        slugOrId: parsed.slugOrId,
+        projectId: parsed.projectId,
+      }));
+    this.deps.assertReady(dataset);
     const search = normalizeDatasetSearch(parsed.search);
     if (search) {
-      return this.searchRecords({ dataset, input: parsed, search });
+      return this.search.searchRecords({ dataset, input: parsed, search });
     }
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.listRecords({ dataset, input: parsed });
@@ -115,115 +147,16 @@ export class DatasetRecordService {
     };
   }
 
-  private async searchRecords({
-    dataset,
-    input,
-    search,
-  }: {
-    dataset: Dataset;
-    input: ReturnType<typeof datasetPageInputSchema.parse>;
-    search: string;
-  }): Promise<DatasetRecordPage> {
-    const recordedRows = dataset.rowCount ?? 0;
-    if (recordedRows > DATASET_SEARCH_MAX_ROWS) {
-      throw new DatasetTooLargeToSearchError({
-        rowCount: recordedRows,
-        maxRows: DATASET_SEARCH_MAX_ROWS,
-      });
-    }
-    if (dataset.sizeBytes !== null && dataset.sizeBytes > BigInt(DATASET_SEARCH_MAX_BYTES)) {
-      throw new DatasetTooLargeToSearchError({
-        sizeBytes: Number(dataset.sizeBytes),
-        maxBytes: DATASET_SEARCH_MAX_BYTES,
-      });
-    }
-
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.searchRecords({
-        dataset,
-        projectId: input.projectId,
-        page: input.page,
-        limit: input.limit,
-        search,
-      });
-    }
-
-    const storedRows = await this.options.records.count({
-      datasetId: dataset.id,
-      projectId: input.projectId,
-    });
-    if (storedRows > DATASET_SEARCH_MAX_ROWS) {
-      throw new DatasetTooLargeToSearchError({
-        rowCount: storedRows,
-        maxRows: DATASET_SEARCH_MAX_ROWS,
-      });
-    }
-
-    const page = input.page;
-    const limit = input.limit;
-    const windowStart = (page - 1) * limit;
-    const windowEnd = windowStart + limit;
-    const matches: DatasetRecord[] = [];
-    let matched = 0;
-    await this.scanPostgresRecords({
-      dataset,
-      projectId: input.projectId,
-      collect: (record) => {
-        if (!matchesDatasetSearch({ entry: record.entry, search })) return;
-        if (matched >= windowStart && matched < windowEnd) matches.push(record);
-        matched++;
-      },
-    });
-
-    return {
-      data: matches,
-      pagination: {
-        page,
-        limit,
-        total: matched,
-        totalPages: matched === 0 ? 0 : Math.ceil(matched / limit),
-      },
-    };
-  }
-
-  private async scanPostgresRecords(input: {
-    dataset: Dataset;
-    projectId: string;
-    collect: (record: DatasetRecord) => void;
-  }): Promise<void> {
-    let rowsRead = 0;
-    let cursorId: string | undefined;
-    while (rowsRead <= DATASET_SEARCH_MAX_ROWS) {
-      const records = await this.options.records.findPage({
-        datasetId: input.dataset.id,
-        projectId: input.projectId,
-        limit: DATASET_SEARCH_SCAN_BATCH,
-        cursorId,
-      });
-      rowsRead += records.length;
-      if (rowsRead > DATASET_SEARCH_MAX_ROWS) {
-        throw new DatasetTooLargeToSearchError({
-          rowCount: rowsRead,
-          maxRows: DATASET_SEARCH_MAX_ROWS,
-        });
-      }
-      records.forEach(input.collect);
-      if (records.length < DATASET_SEARCH_SCAN_BATCH) return;
-      cursorId = records.at(-1)?.id;
-      if (!cursorId) return;
-    }
-  }
-
   async getDatasetPage(input: DatasetPageInput): Promise<DatasetPage> {
     const parsed = datasetPageInputSchema.parse(input);
     const dataset = await this.getBySlugOrId({
       slugOrId: parsed.slugOrId,
       projectId: parsed.projectId,
     });
-    this.assertReady(dataset);
+    this.deps.assertReady(dataset);
     const search = normalizeDatasetSearch(parsed.search);
     if (search) {
-      const matches = await this.searchRecords({ dataset, input: parsed, search });
+      const matches = await this.search.searchRecords({ dataset, input: parsed, search });
       return {
         id: dataset.id,
         name: dataset.name,
@@ -258,6 +191,11 @@ export class DatasetRecordService {
     };
   }
 
+  /**
+   * A dataset and its rows up to a byte budget: what the organization answers
+   * inline in one response when none is named. `null` asks for every row, and
+   * is refused past the organization's whole-read limits. Rows are never skipped.
+   */
   async getDatasetWithRecords(
     input: DatasetLookupInput & {
       limitMb?: number | null;
@@ -269,37 +207,89 @@ export class DatasetRecordService {
       slugOrId: parsed.slugOrId,
       projectId: parsed.projectId,
     });
+    if (parsed.limitMb !== null) {
+      const limitBytes = await this.readBudget(parsed.projectId, parsed.limitMb);
+
+      return this.readWithinBudget({ parsed, dataset, limitBytes });
+    }
+
+    const { requestBounds } = this.deps;
+    const [maxRows, maxBytes] = await Promise.all([
+      requestBounds.limit(parsed.projectId, "rowsMax"),
+      requestBounds.limit(parsed.projectId, "wholeReadBytes"),
+    ]);
+    assertWholeReadWithinLimits({ dataset, maxRows, maxBytes });
+    const read = await this.readWithinBudget({ parsed, dataset, limitBytes: maxBytes });
+    if (read.truncated) throw new DatasetTooLargeToExportError({ maxBytes });
+    assertWholeReadWithinLimits({ rowCount: read.totalRows, maxRows, maxBytes });
+
+    return read;
+  }
+
+  private async readWithinBudget(input: {
+    parsed: ReturnType<typeof datasetWithRecordsInputSchema.parse>;
+    dataset: Dataset;
+    limitBytes: number;
+  }): Promise<DatasetWithRecords> {
+    const { parsed, dataset, limitBytes } = input;
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.getDatasetWithRecords({
         dataset,
         projectId: parsed.projectId,
         entrySelection: parsed.entrySelection,
-        limitMb: parsed.limitMb ?? 5,
+        limitBytes,
       });
     }
 
+    // Only a read of every row can stop early; picking one row needs them all.
+    const stopAtBytes = parsed.entrySelection === "all" ? limitBytes : null;
     const records: DatasetRecord[] = [];
+    let bytes = 0;
+    let total = 0;
     let page = 1;
     let hasMoreRecords = true;
     while (hasMoreRecords) {
-      const result = await this.listRecords({
+      const result = await this.readRecordsPage({
         slugOrId: parsed.slugOrId,
         projectId: parsed.projectId,
         page,
-        limit: 200,
+        limit: WHOLE_READ_PAGE_ROWS,
       });
-      records.push(...result.data);
-      const lastPage = result.data.length < 200;
-      const readAllRecords = records.length >= result.pagination.total;
+      total = result.pagination.total;
+      for (const record of result.data) {
+        bytes += entryBytesOf(record.entry);
+        if (stopAtBytes !== null && bytes > stopAtBytes) {
+          return {
+            dataset,
+            records,
+            truncated: true,
+            totalRows: Math.max(total, records.length + 1),
+          };
+        }
+        records.push(record);
+      }
+      const lastPage = result.data.length < WHOLE_READ_PAGE_ROWS;
+      const readAllRecords = records.length >= total;
       hasMoreRecords = !lastPage && !readAllRecords;
 
       page += 1;
     }
 
     const selected = selectDatasetRecords(records, parsed.entrySelection);
-    const limited = limitDatasetRecordsByBytes(selected, parsed.limitMb ?? 5);
+    const limited = limitDatasetRecordsByBytes(selected, limitBytes);
 
-    return { dataset, records: limited.records, truncated: limited.truncated };
+    return {
+      dataset,
+      records: limited.records,
+      truncated: limited.truncated,
+      totalRows: selected.length,
+    };
+  }
+
+  private async readBudget(projectId: string, limitMb: number | undefined): Promise<number> {
+    if (limitMb !== undefined) return limitMb * MIB;
+
+    return this.deps.requestBounds.limit(projectId, "inlineReadBytes");
   }
 
   async getDatasetHead(input: DatasetLookupInput): Promise<DatasetHead> {
@@ -308,12 +298,12 @@ export class DatasetRecordService {
       slugOrId: parsed.slugOrId,
       projectId: parsed.projectId,
     });
-    this.assertReady(dataset);
+    this.deps.assertReady(dataset);
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.getDatasetHead({ dataset });
     }
 
-    const page = await this.listRecords({
+    const page = await this.readRecordsPage({
       slugOrId: parsed.slugOrId,
       projectId: parsed.projectId,
       page: 1,
@@ -331,12 +321,15 @@ export class DatasetRecordService {
       slugOrId: parsed.slugOrId,
       projectId: parsed.projectId,
     });
-    this.assertReady(dataset);
+    this.deps.assertReady(dataset);
+    const scope = this.inlineScope(parsed.projectId, dataset);
+    parsed.updatedRecord = await this.options.inlineAttachments.store(scope, parsed.updatedRecord);
     await this.options.attachments.assertAccepted({
       projectId: parsed.projectId,
       columnTypes: dataset.columnTypes,
       entries: [parsed.updatedRecord],
       findHeld: () => this.findHeldEntries(dataset, parsed.projectId, parsed.recordId),
+      maxBytes: scope.maxBytes,
     });
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.upsertRecord({ dataset, input: parsed });
@@ -370,6 +363,16 @@ export class DatasetRecordService {
     return { record, created: true };
   }
 
+  /** The dataset's image and file columns, read for files a row carries inline. */
+  private inlineScope(projectId: string, dataset: Dataset): InlineAttachmentScope {
+    return {
+      projectId,
+      datasetId: dataset.id,
+      columns: { kind: "typed", columnTypes: dataset.columnTypes },
+      maxBytes: onceMaxBytes(() => this.deps.requestBounds.limit(projectId, "attachmentBytes")),
+    };
+  }
+
   private async findHeldEntries(
     dataset: Dataset,
     projectId: string,
@@ -394,17 +397,20 @@ export class DatasetRecordService {
       slugOrId: parsed.slugOrId,
       projectId: parsed.projectId,
     });
-    this.assertReady(dataset);
+    this.deps.assertReady(dataset);
     const columns = dataset.columnTypes.map((column) => column.name);
     this.deps.assertKnownColumns({
       datasetName: dataset.name,
       columns,
       entries: parsed.entries,
     });
+    const scope = this.inlineScope(parsed.projectId, dataset);
+    parsed.entries = await this.options.inlineAttachments.storeAll(scope, parsed.entries);
     await this.options.attachments.assertAccepted({
       projectId: parsed.projectId,
       columnTypes: dataset.columnTypes,
       entries: parsed.entries,
+      maxBytes: scope.maxBytes,
     });
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.batchCreateRecords({ dataset, input: parsed });
@@ -414,7 +420,7 @@ export class DatasetRecordService {
       datasetId: dataset.id,
       projectId: parsed.projectId,
       entries: parsed.entries.map((entry) => ({
-        id: entry.id ?? this.generateId(),
+        id: entry.id ?? this.deps.generateId(),
         ...sanitizedEntry(Object.fromEntries(columns.map((c) => [c, entry[c] ?? null]))),
       })),
     });
@@ -432,12 +438,15 @@ export class DatasetRecordService {
       slugOrId: parsed.slugOrId,
       projectId: parsed.projectId,
     });
-    this.assertReady(dataset);
+    this.deps.assertReady(dataset);
+    const scope = this.inlineScope(parsed.projectId, dataset);
+    parsed.updatedRecord = await this.options.inlineAttachments.store(scope, parsed.updatedRecord);
     await this.options.attachments.assertAccepted({
       projectId: parsed.projectId,
       columnTypes: dataset.columnTypes,
       entries: [parsed.updatedRecord],
       findHeld: () => this.findHeldEntries(dataset, parsed.projectId, parsed.recordId),
+      maxBytes: scope.maxBytes,
     });
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       const result = await this.options.content.upsertRecord({
@@ -471,7 +480,7 @@ export class DatasetRecordService {
       slugOrId: parsed.slugOrId,
       projectId: parsed.projectId,
     });
-    this.assertReady(dataset);
+    this.deps.assertReady(dataset);
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.deleteRecords({ dataset, input: parsed });
     }

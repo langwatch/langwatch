@@ -1,4 +1,8 @@
-import { agentConnectCredentialsSchema, relayPayloadCaps } from "@langwatch/agent-contract";
+import {
+  type AgentConnectCaller,
+  agentConnectHeadersSchema,
+  relayPayloadCaps,
+} from "@langwatch/agent-contract";
 import { WebSocketProtocol, type ConnectUpgradeRouter } from "@langwatch/api";
 
 import { ConnectedAgentConnectionService } from "../../services/connected-agent-connection.service.ts";
@@ -8,17 +12,28 @@ import {
 } from "../../services/connected-agent-session.service.ts";
 import { CONNECT_PATH } from "../agent-connect.ws.ts";
 
+/** The caller stands in for the door's answer: the door itself is packages/api's to test. */
+type GatewayOptions = SessionCoreOptions & {
+  caller?: AgentConnectCaller;
+  pingIntervalMs?: number;
+  pongWaitMs?: number;
+};
+
+const DEFAULT_CALLER: AgentConnectCaller = {
+  project: { id: "proj_1", slug: "proj-one" },
+  principalId: "key:test",
+  userId: null,
+};
+
 export class ConnectGatewayFixture {
   readonly #connections;
   readonly #protocol;
 
-  static create(options: SessionCoreOptions & { pingIntervalMs?: number; pongWaitMs?: number }) {
+  static create(options: GatewayOptions) {
     return new ConnectGatewayFixture(options);
   }
 
-  private constructor(
-    options: SessionCoreOptions & { pingIntervalMs?: number; pongWaitMs?: number },
-  ) {
+  private constructor(options: GatewayOptions) {
     this.#connections = ConnectedAgentConnectionService.create({
       session: AgentSessionService.create(options),
       pingIntervalMs: options.pingIntervalMs,
@@ -27,14 +42,14 @@ export class ConnectGatewayFixture {
     this.#protocol = WebSocketProtocol.create({
       path: CONNECT_PATH,
       maxPayloadBytes: relayPayloadCaps(options.relayMaxPayloadMb).frameBytes,
-      facts: agentConnectCredentialsSchema,
-      headers: {
-        authorization: "authorization",
-        projectId: "x-project-id",
-        instanceToken: "x-agent-instance-token",
+      facts: agentConnectHeadersSchema,
+      headers: { instanceToken: "x-agent-instance-token" },
+      handle: (connections: ConnectedAgentConnectionService, socket, facts) => {
+        connections.accept(socket, {
+          admitted: { ...facts, caller: options.caller ?? DEFAULT_CALLER },
+        });
+        return Promise.resolve();
       },
-      handle: (connections: ConnectedAgentConnectionService, socket, credentials) =>
-        connections.accept(socket, credentials),
     });
   }
 

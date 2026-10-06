@@ -96,6 +96,7 @@ function serviceWith(fakes: Fakes = {}) {
 describe("ApiKeyTokenResolutionService", () => {
   describe("findVerifiedToken()", () => {
     describe("given a revoked key", () => {
+      /** @scenario A revoked key is refused at every door */
       it("refuses it", async () => {
         const { service } = serviceWith({ row: storedKey({ revokedAt: new Date() }) });
 
@@ -104,6 +105,8 @@ describe("ApiKeyTokenResolutionService", () => {
     });
 
     describe("given an expired key", () => {
+      /** @scenario "A revoked or expired key cannot authenticate" */
+      /** @scenario "The run's key stops working after the run ends" */
       it("refuses it", async () => {
         const { service } = serviceWith({
           row: storedKey({ expiresAt: new Date(Date.now() - 1000) }),
@@ -162,7 +165,7 @@ describe("ApiKeyTokenResolutionService", () => {
 
     describe("given a key minted under a CLI login session", () => {
       /** @scenario "A key minted as its session is being retired does not outlive it" */
-      /** @scenario A key whose session is gone does not authenticate */
+      /** @scenario "A key whose session is gone does not authenticate" */
       it("refuses it once the parent login key is revoked", async () => {
         const { service } = serviceWith({
           row: storedKey({ parentApiKeyId: "login-key-1" }),
@@ -173,7 +176,7 @@ describe("ApiKeyTokenResolutionService", () => {
       });
 
       /** @scenario "A key minted as its session is being retired does not outlive it" */
-      /** @scenario A key whose session is gone does not authenticate */
+      /** @scenario "A key whose session is gone does not authenticate" */
       it("refuses it once the parent login key's session has expired", async () => {
         const { service } = serviceWith({
           row: storedKey({ parentApiKeyId: "login-key-1" }),
@@ -183,7 +186,7 @@ describe("ApiKeyTokenResolutionService", () => {
         await expect(service.findVerifiedToken({ token: CURRENT_TOKEN })).resolves.toBeNull();
       });
 
-      /** @scenario A key whose session is gone does not authenticate */
+      /** @scenario "A key whose session is gone does not authenticate" */
       it("refuses it once the parent login key row is gone", async () => {
         const { service } = serviceWith({
           row: storedKey({ parentApiKeyId: "login-key-1" }),

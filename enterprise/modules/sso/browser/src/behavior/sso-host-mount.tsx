@@ -16,7 +16,9 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { useLentOperations } from "@langwatch/browser-host/lent";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -46,6 +48,7 @@ class CapabilitySsoHost extends SsoHostApi {
       route: UiRoute;
       session: UiSession;
       testSignIn: SsoTestSignIn;
+      openOverlay: <Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>) => void;
     },
   ) {
     super();
@@ -85,6 +88,10 @@ class CapabilitySsoHost extends SsoHostApi {
   normalizeSignInErrorCode(code: string): string {
     return normalizeSignInErrorCode(code) ?? code;
   }
+
+  openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+    this.deps.openOverlay(drawer, props);
+  }
 }
 
 /**
@@ -95,6 +102,7 @@ export default function SsoHostMount({ children }: { children?: ReactNode }) {
   const { feedback, route, session } = useUiCapabilities();
   const { organizationId } = useUiScope().activeScope();
   const loadSignIn = useLentOperations(SsoTestSignInToken);
+  const { openDrawer } = useDrawer();
 
   const host = useMemo(
     () =>
@@ -107,8 +115,9 @@ export default function SsoHostMount({ children }: { children?: ReactNode }) {
           loadSignIn === undefined
             ? INERT_TEST_SIGN_IN
             : async (options) => (await loadSignIn()).testSignIn(options),
+        openOverlay: (drawer, props) => openDrawer(drawer, props),
       }),
-    [organizationId, feedback, route, session, loadSignIn],
+    [organizationId, feedback, route, session, loadSignIn, openDrawer],
   );
 
   return <SsoHostProvider value={host}>{children}</SsoHostProvider>;

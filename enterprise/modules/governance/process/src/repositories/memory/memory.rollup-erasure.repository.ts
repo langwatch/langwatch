@@ -3,7 +3,7 @@
 import { type ErasedRollupDay, RollupErasureRepository } from "../rollup-erasure.repository.ts";
 
 /** One rollup or restatement-index row, as far as erasure can see it. */
-export type MemoryRollupActorRow = { tenantId: string; day: string; rawActorId: string };
+type MemoryRollupActorRow = { tenantId: string; day: string; rawActorId: string };
 
 export class MemoryRollupErasureRepository extends RollupErasureRepository {
   readonly rollupRows: MemoryRollupActorRow[] = [];

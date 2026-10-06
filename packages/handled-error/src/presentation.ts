@@ -43,6 +43,11 @@ import {
 export interface ErrorPresentation {
   title: string;
   /**
+   * A headline for one variant of the code, when a single code covers
+   * failures with different fixes. Returning nothing keeps `title`.
+   */
+  titleFor?: (error: HandledErrorShape) => string | undefined;
+  /**
    * Optional body copy. Receives the error so it can use `meta` — but only
    * where this registry knows the shape of that meta, which is the whole
    * point: `meta` is a contract per code, not a bag to rummage through.
@@ -213,6 +218,20 @@ const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * What a provider slot is missing when the gateway answers
+ * `provider_config_invalid`, as `meta.problem` (ConfigProblem in
+ * services/aigateway/domain/errors.go). A closed set: the sentence is picked
+ * by matching it, and a value outside it reads as the remainder.
+ */
+export const PROVIDER_CONFIG_PROBLEMS: ReadonlySet<string> = new Set([
+  "api_key_missing",
+  "endpoint_missing",
+  "deployment_missing",
+  "operation_unsupported",
+  "model_not_served",
+]);
+
+/**
  * The upstream-HTTP-status fallback reasons (llmproxy.go's
  * upstreamReasonCodes), used when the provider's own body carried no
  * discriminant of its own. Grouped the same way PROVIDER_ALLOWANCE_REASONS
@@ -232,6 +251,15 @@ export const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   "permission_error",
   "invalid_api_key",
   "AccessDeniedException",
+  // A wrong AWS secret, an unknown or expired AWS access key.
+  "InvalidSignatureException",
+  "UnrecognizedClientException",
+  "ExpiredTokenException",
+  "InvalidClientTokenId",
+  "SignatureDoesNotMatch",
+  // Google's statuses for the same two refusals.
+  "UNAUTHENTICATED",
+  "PERMISSION_DENIED",
 ]);
 
 /**
@@ -309,6 +337,10 @@ const label = (map: Record<string, string>, key: string): string | undefined => 
 
 const presentations = {
   // ---- traces & spans ----
+  annotation_not_found: {
+    title: "Annotation not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
   trace_not_found: {
     title: "Trace not found",
     describe: () =>
@@ -373,6 +405,13 @@ const presentations = {
       return field ? `There's no field called "${field}".` : "";
     },
   },
+  filter_value_refused: {
+    title: "This filter can't be answered here",
+    describe: (error) => {
+      const field = str(error, "field", "");
+      return field ? `Ask about "${field}" with a statement instead.` : "";
+    },
+  },
   lwql_unknown_identifier: {
     title: "This query names a column that doesn't exist",
     // The name is the whole value of this message, so it is quoted back when
@@ -389,6 +428,10 @@ const presentations = {
   lwql_unparseable: {
     title: "This query couldn't be read",
     describe: () => "Check the SQL syntax and try again.",
+  },
+  lwql_busy: {
+    title: "Queries are queued up right now",
+    describe: () => "Too many queries were running at once. Try again in a few seconds.",
   },
   lwql_not_permitted: {
     title: "This query isn't allowed here",
@@ -626,6 +669,17 @@ const presentations = {
     title: "That published version is missing",
     describe: () => "Publish the workflow again, then run it.",
   },
+  workflow_dataset_too_large_to_run: {
+    title: "This dataset is too large to run",
+    describe: (error) => {
+      const maxBytes = error.meta.maxBytes;
+      const limit =
+        typeof maxBytes === "number"
+          ? `Its rows total more than the ${Math.floor(maxBytes / 1024 / 1024)} MB one run reads. `
+          : "";
+      return `${limit}Store images and files as attachments in image or file columns instead of pasting their data into cells, or split the dataset.`;
+    },
+  },
   workflow_execution_failed: {
     // fault: platform. The execution engine is our own infra, so this is an
     // incident on our side — never dressed up as something the customer
@@ -774,6 +828,11 @@ const presentations = {
     describe: () =>
       "Pick an existing evaluator or create one first, then attach it to the evaluation.",
   },
+  monitor_parameters_unused: {
+    title: "These settings belong to the evaluator",
+    describe: () =>
+      "This evaluation runs with its evaluator's settings. Change them on the evaluator instead.",
+  },
   monitor_not_found: {
     title: "Online evaluation not found",
     describe: () => "It may have been deleted. Reload the list and pick another one.",
@@ -887,9 +946,33 @@ const presentations = {
       "The dataset or workflow version it names may have been deleted. Check the ids you sent, then try again.",
   },
   experiment_evaluation_too_many_rows: {
-    title: "Too many rows for one evaluation",
+    title: "Too many rows sent with this run",
     describe: () =>
-      "Your plan limits how many rows one run can evaluate. Send fewer rows, or run against a saved dataset.",
+      "Your plan limits how many rows one request can carry. Send fewer rows, or save them as a dataset and run against it.",
+  },
+  experiment_dataset_too_many_rows: {
+    title: "This dataset has too many rows for one run",
+    describe: (error) => {
+      const maxRows = error.meta.maxRows;
+      return typeof maxRows === "number"
+        ? `One run reads at most ${maxRows.toLocaleString("en-US")} rows. Split the dataset into smaller ones and run each.`
+        : "Split the dataset into smaller ones and run each.";
+    },
+  },
+  experiment_dataset_too_large_to_run: {
+    title: "This dataset is too large to run",
+    describe: (error) => {
+      const maxBytes = error.meta.maxBytes;
+      const limit =
+        typeof maxBytes === "number"
+          ? `Its rows total more than the ${Math.floor(maxBytes / 1024 / 1024)} MB one run reads. `
+          : "";
+      return `${limit}Store images and files as attachments in image or file columns instead of pasting their data into cells, or split the dataset.`;
+    },
+  },
+  experiment_dataset_changed_during_read: {
+    title: "The dataset changed while the run was starting",
+    describe: () => "Wait until the dataset is no longer being edited, then start the run again.",
   },
   experiment_workflow_not_found: {
     title: "This evaluation's workflow is gone",
@@ -2217,6 +2300,17 @@ const presentations = {
       "Your organization's plan doesn't include this. Talk to your account team about upgrading.",
   },
   evaluation_not_found: { title: "Evaluation not found" },
+  evaluation_log_results_too_large: {
+    title: "That batch of results is too large",
+    describe: (error) => {
+      const maxBytes = error.meta.maxBytes;
+      const limit =
+        typeof maxBytes === "number"
+          ? `One batch carries at most ${Math.floor(maxBytes / 1024 / 1024)} MB. `
+          : "";
+      return `${limit}Send fewer results per batch, and send images as links or dataset attachments instead of inline data.`;
+    },
+  },
   project_permission_denied: {
     // Names the permission when the server sent one: "ask an admin for access"
     // is an errand with no address, whereas "ask an admin for `datasets:manage`"
@@ -2786,12 +2880,6 @@ const presentations = {
     describe: () =>
       "The service asked for a secret it never declared. This is a fault on our side.",
   },
-  secret_unreadable: {
-    title: "A project secret cannot be read",
-    describe: (error) =>
-      `The stored value of "${safeProse(str(error, "name", "")) || "this secret"}" cannot be ` +
-      "decrypted on this deployment. Save the secret again with its value.",
-  },
   secrets_preflight_failed: {
     title: "The service isn't configured correctly",
     describe: () =>
@@ -3282,11 +3370,16 @@ const presentations = {
   instant_eval_not_enabled: {
     title: "Instant Evals aren't available yet",
     describe: () =>
-      "This project can't run Instant Evals. Ask us to turn them on for your workspace.",
+      "Instant Evals are off for this organization. Ask an organization admin how to switch them on, or contact us.",
   },
   instant_eval_not_found: {
     title: "That run doesn't exist",
     describe: () => "The run may have been deleted, or the id may belong to another project.",
+  },
+  instant_eval_opt_in_not_offered: {
+    title: "Ask us to switch Instant Evals on",
+    describe: () =>
+      "LangWatch turns on Instant Evals for enterprise plans and self-hosted installs. Contact us to get them.",
   },
   instant_eval_query_budget_exceeded: {
     title: "That's too much text to judge in one query",
@@ -3414,11 +3507,6 @@ const presentations = {
     title: "No such subsystem",
     describe: () =>
       "Ask for one of the subsystems this platform reports on, or drop the name to get the whole platform.",
-  },
-  platform_health_unauthorized: {
-    title: "That platform health key was not accepted",
-    describe: () =>
-      "Send the monitoring key this deployment was configured with as a bearer token. Check it is current and copied in full.",
   },
   platform_health_unhealthy: {
     title: "The platform is not healthy",
@@ -3591,6 +3679,39 @@ const presentations = {
         : "Pick a smaller file.";
     },
   },
+  dataset_inline_file_unreadable: {
+    title: "A file in this row could not be read",
+    describe: (error) => {
+      const column = str(error, "column", "");
+      return column
+        ? `The content in "${column}" is not a readable file. Upload the file again, or put a link in the cell.`
+        : "The content is not a readable file. Upload the file again, or put a link in the cell.";
+    },
+  },
+  dataset_page_too_large: {
+    title: "That page is too large to load",
+    describe: (error) => {
+      const suggestedLimit = error.meta.suggestedLimit;
+      return typeof suggestedLimit === "number"
+        ? `Ask for ${suggestedLimit} rows per page instead.`
+        : "Ask for fewer rows per page.";
+    },
+  },
+  dataset_row_too_large: {
+    title: "A row is too large",
+    describe: (error) => {
+      const maxBytes = error.meta.maxBytes;
+      const limit =
+        typeof maxBytes === "number" ? ` over ${Math.floor(maxBytes / 1024 / 1024)} MB` : "";
+      return error.meta.measure === "uploaded"
+        ? `One row in the file is${limit || " too large"}. Split the row, or attach its files instead of writing them into the row.`
+        : `One row is${limit || " too large"}. Set the column type to image or file so its files are stored beside the row.`;
+    },
+  },
+  dataset_too_large_to_read_inline: {
+    title: "This dataset is too large to load at once",
+    describe: () => "Read it page by page, or download it as a file.",
+  },
   dataset_attachment_type_refused: {
     // `meta.refused` is our own list of media types, not customer input. The
     // copy names the kinds of file someone recognises rather than the list,
@@ -3629,6 +3750,23 @@ const presentations = {
   dataset_name_taken: {
     title: "That name is taken",
     describe: () => "Pick a different name for this dataset.",
+  },
+  developer_seat_no_shared_access: {
+    // Not a field to correct: the seat sets the ceiling. The scope can be a
+    // team, a project or the organization, so the copy names the seat.
+    title: "A Developer seat has no shared access",
+    describe: (error) => {
+      const scopeName = str(error, "scopeName", "");
+      const scope = scopeName ? ` on "${scopeName}"` : "";
+      return `A Developer seat works in its own project only, so no role can be given${scope}. Move them to a Member seat to give them shared access.`;
+    },
+  },
+  developer_seat_restricted: {
+    // A Developer seat reaches its own project only (ADR-143). No admin can
+    // grant a role here, so the copy names the seat rather than a permission.
+    title: "This is outside your Developer seat",
+    describe: () =>
+      "A Developer seat works in your own project only. Ask an admin for a Member seat if you need shared projects.",
   },
   dataset_column_type_change_unsupported: {
     // Customer fault in the ADR-045 sense: they asked for something the format
@@ -4162,6 +4300,13 @@ const presentations = {
     },
   },
 
+  trigger_graph_immutable: {
+    title: "This alert stays on its graph",
+    describe: () =>
+      "An alert keeps the graph it was created on. Create an alert on the " +
+      "graph you want and delete this one.",
+  },
+
   trigger_kind_immutable: {
     title: "This cannot become a different kind of automation",
     describe: () =>
@@ -4207,13 +4352,6 @@ const presentations = {
     describe: () =>
       "Say what it sends — a dashboard, a graph or a trace query — and the " +
       "schedule it sends on.",
-  },
-
-  web_push_endpoint_refused: {
-    title: "This browser cannot receive push notifications",
-    describe: () =>
-      "Its push service is not one LangWatch sends to. Notifications still " +
-      "appear in the open tab.",
   },
 
   webhook_header_values_required: {
@@ -4666,6 +4804,10 @@ const presentations = {
     title: "That request couldn't be read",
     describe: () => "Check the format of what was sent, then try again.",
   },
+  unsupported_media_type: {
+    title: "That request was sent in the wrong format",
+    describe: () => "Send the body with the Content-Type this endpoint reads, then try again.",
+  },
   // ==========================================================================
   // Codes raised by the Go services (generated into `goErrorCodes` by
   // cmd/herrgen). They reach the browser whenever the control plane proxies a
@@ -4835,8 +4977,37 @@ const presentations = {
   },
   provider_config_invalid: {
     title: "This provider is not set up to serve that model",
+    // The body names the gap, so the headline has to name the same one.
+    titleFor: (error) => {
+      switch (str(error, "problem", "")) {
+        case "api_key_missing":
+          return "This provider has no API key saved";
+        case "endpoint_missing":
+          return "This provider has no endpoint URL saved";
+        case "deployment_missing":
+          return "This provider has no deployment for that model";
+        case "operation_unsupported":
+          return "This provider does not support this kind of request";
+      }
+      return undefined;
+    },
     describe: (error) => {
       const model = str(error, "model", "");
+      // One code, several different things to change. Telling a customer whose
+      // provider was saved with no API key to "add the model" sends them to the
+      // wrong field, so the gateway names the gap and each gets its sentence.
+      switch (str(error, "problem", "")) {
+        case "api_key_missing":
+          return "This model provider is enabled with no API key saved, so the request never reached it. Add the API key in Settings → Model Providers.";
+        case "endpoint_missing":
+          return "This model provider has no endpoint URL saved, so there was nowhere to send the request. Add the endpoint in Settings → Model Providers.";
+        case "deployment_missing":
+          return model
+            ? `This model provider has no deployment mapped for ${model}. Add the deployment mapping in Settings → Model Providers.`
+            : "This model provider has no deployment mapped for that model. Add the deployment mapping in Settings → Model Providers.";
+        case "operation_unsupported":
+          return "This model provider does not support this kind of request. Pick a model from a provider that does.";
+      }
       if (model) {
         return `No provider on this project is configured for ${model}. Add it to one in Settings → Model Providers.`;
       }
@@ -5696,13 +5867,28 @@ const presentations = {
     title: "This key can no longer be shown",
     describe: () => "Create a new key if you did not save it.",
   },
+  secret_unreadable: {
+    title: "Something went wrong on our side",
+    describe: () =>
+      "A project secret is stored but cannot be read on this deployment. An operator needs to check its encryption key.",
+  },
+  web_push_endpoint_refused: {
+    title: "Push notifications aren't available in this browser",
+    describe: () =>
+      "This browser's push service is not one LangWatch sends to, so notifications stay in the open tab.",
+  },
   unsupported_parameter: {
     title: "That provider can't honor one of your parameters",
     describe: () => "Remove the parameter named in the message, or pick a model that supports it.",
   },
   connect_budget_above_contract_maximum: {
     title: "Cap above the agreed maximum",
-    describe: () => "Choose a hosted usage cap at or below the maximum agreed for this license.",
+    describe: (error) => {
+      const maximum = num(error, "maximumUsd", 0);
+      return maximum > 0
+        ? `The highest cap you can set is ${maximum.toFixed(2)} USD. Contact LangWatch to raise it.`
+        : "Contact LangWatch to raise the maximum.";
+    },
   },
   connect_budget_not_set: {
     title: "No hosted usage budget yet",
@@ -5958,6 +6144,7 @@ const FAULT_TITLES: Record<HandledErrorFault, string> = {
   customer: "Check your input",
   platform: "Something went wrong on our end",
   provider: "A connected service didn't respond",
+  presumed_platform: "Something went wrong on our end",
 };
 
 /**
@@ -6033,7 +6220,7 @@ export function explainHandledError(error: HandledErrorShape): ErrorExplanation 
   }
 
   return {
-    title: presentation.title,
+    title: presentation.titleFor?.(error) ?? presentation.title,
     description: presentation.describe?.(error) ?? "",
     isRegistered: true,
   };

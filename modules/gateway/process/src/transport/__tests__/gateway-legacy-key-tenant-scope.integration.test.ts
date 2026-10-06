@@ -21,6 +21,7 @@ import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis"
 import { describe, expect, it, vi } from "vitest";
 
 import { GatewayModule } from "../../app/gateway.app.ts";
+import { LiveGatewayRepositories } from "../../repositories/live/live.gateway.repositories.ts";
 import {
   gatewayKeyCaller,
   gatewayVirtualKeyCaller,
@@ -181,8 +182,6 @@ async function mountAsLegacyProjectKey() {
 
   const app = await GatewayModule.create({
     dependencies: {
-      webhooks: createApiFixture({}),
-      entitlement: createApiFixture({}),
       authz: createApiFixture<AuthzApi>({}),
       projects,
       evaluators: createApiFixture({}),
@@ -203,17 +202,17 @@ async function mountAsLegacyProjectKey() {
       oneTimeReveals: createApiFixture({}),
       apiKeys: createApiFixture({}),
     },
-    members: {
+    repositories: LiveGatewayRepositories.create({
       prisma,
       clickhouse: createApiFixture<ClickHouseQueryClient>({}),
       encryption: reversible,
       redis: memoryRedisDouble(),
-      publicBaseUrl: "https://app.acme.example",
-    },
+    }),
     config: {
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,
+      publicBaseUrl: "https://app.acme.example",
       baseUrl: void 0,
       publicUrl: void 0,
       isSaas: false,

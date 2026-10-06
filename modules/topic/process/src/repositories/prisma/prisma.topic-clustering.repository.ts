@@ -2,7 +2,6 @@ import { generate } from "@langwatch/ksuid";
 import { CostReferenceType, CostType, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate } from "@langwatch/time";
 
-import { TOPIC_CLUSTERING_PROCESS_NAME } from "../../rules/topic-clustering-process.rules.ts";
 import {
   TopicClusteringRepository,
   type TopicClusteringModelRow,
@@ -164,18 +163,5 @@ export class PrismaTopicClusteringRepository extends TopicClusteringRepository {
       select: { projectId: true },
     });
     return rows.map((row) => row.projectId);
-  }
-
-  async findAlreadyScheduledProjectIds(projectIds: string[]): Promise<string[]> {
-    // Bounded by `projectId: { in }`, which the tenancy guard accepts.
-    const instances = await this.prisma.processManagerInstance.findMany({
-      where: {
-        processName: TOPIC_CLUSTERING_PROCESS_NAME,
-        projectId: { in: projectIds },
-        nextWakeAt: { not: null },
-      },
-      select: { projectId: true },
-    });
-    return instances.map((instance) => instance.projectId);
   }
 }

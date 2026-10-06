@@ -11,6 +11,7 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
 import { NotificationService } from "@langwatch/notification-contract";
+import { createLogger } from "@langwatch/observability";
 import type {
   GuidedOnboardingRecord,
   OnboardingInitializeOrganizationInput,
@@ -37,6 +38,7 @@ import {
   type OrganizationInviteAccepted,
   type OrganizationPendingInviteApplied,
   type JoinRequestMine,
+  type JoinRequestApiOrigin,
   type JoinRequestFiled,
   type JoinRequestPending,
   type JoinRequestJoiningChanged,
@@ -117,12 +119,13 @@ import {
   type ScopeGraphOrganization,
   organizationServerConfig,
   type OrganizationServerConfig,
+  type PricingModel,
   type PendingInvitationForCaller,
+  type PendingInvitationsForCaller,
   type SignUpVerdict,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi, type PaginatedProjects, type Project } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
@@ -130,6 +133,7 @@ import { ShareApi } from "@langwatch/share-contract";
 import type { Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
+import { organizationInviteMailChannels } from "../channels/organization-invite-mail-channels.registry.ts";
 import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
 import {
   buildOrganizationLifecyclePipeline,
@@ -145,52 +149,58 @@ import type { OrganizationRepositories } from "../repositories/organization.repo
 import { grantCallerOf } from "../rules/grant-caller.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
-import type { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
+import { GroupIdentityService } from "../services/group-identity.service.ts";
+import type { GroupIdentity } from "../services/group-identity.service.ts";
+import { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
+import { InviteSeatCensusService } from "../services/invite-seat-census.service.ts";
+import { InviteSendThrottleService } from "../services/invite-send-throttle.service.ts";
+import { InviteService } from "../services/invite.service.ts";
 import { LicenseLimitService } from "../services/license-limit.service.ts";
 import { MemberProvenanceService } from "../services/member-provenance.service.ts";
+import { OrganizationCeremonyService } from "../services/organization-ceremony.service.ts";
+import type { OrganizationCeremony } from "../services/organization-ceremony.service.ts";
+import { OrganizationDirectoryService } from "../services/organization-directory.service.ts";
+import type { OrganizationDirectory } from "../services/organization-directory.service.ts";
 import { OrganizationGrantCeilingService } from "../services/organization-grant-ceiling.service.ts";
 import { OrganizationGroupScopeService } from "../services/organization-group-scope.service.ts";
 import { OrganizationInitializationService } from "../services/organization-initialization.service.ts";
 import { OrganizationInvitationDoorService } from "../services/organization-invitation-door.service.ts";
+import { OrganizationInvitationsService } from "../services/organization-invitations.service.ts";
+import type { OrganizationInvitations } from "../services/organization-invitations.service.ts";
 import { OrganizationJoinDoorService } from "../services/organization-join-door.service.ts";
+import { OrganizationJoinRequestsService } from "../services/organization-join-requests.service.ts";
+import type { OrganizationJoinRequests } from "../services/organization-join-requests.service.ts";
+import { OrganizationLifecycleNoticeService } from "../services/organization-lifecycle-notice.service.ts";
+import type { OrganizationLifecycleSenders } from "../services/organization-lifecycle-notice.service.ts";
 import type {
-  OrganizationLifecycleNoticeService,
-  OrganizationLifecycleSenders,
-} from "../services/organization-lifecycle-notice.service.ts";
+  OrganizationGrantCache,
+  OrganizationSessionRevocation,
+} from "../services/organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
-import {
-  OrganizationScopeGraphService,
-  type OrganizationScopeGraphReader,
-} from "../services/organization-scope-graph.service.ts";
+import { OrganizationPromptSeedService } from "../services/organization-prompt-seed.service.ts";
+import type { OrganizationPromptSeed } from "../services/organization-prompt-seed.service.ts";
+import { OrganizationScopeGraphService } from "../services/organization-scope-graph.service.ts";
+import { OrganizationSeatLicenseService } from "../services/organization-seat-license.service.ts";
+import type {
+  OrganizationSeatLicense,
+  OrganizationPlanUser,
+} from "../services/organization-seat-license.service.ts";
+import { OrganizationSignalsService } from "../services/organization-signals.service.ts";
+import type { OrganizationSignals } from "../services/organization-signals.service.ts";
 import { OrganizationVisibilityService } from "../services/organization-visibility.service.ts";
+import type { OrganizationDemoProject } from "../services/organization-visibility.service.ts";
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
-import {
-  PersonalTeamScopeService,
-  type PersonalTeamScopeReader,
-} from "../services/personal-team-scope.service.ts";
-import type { SeatLimitNoticeService } from "../services/seat-limit-notice.service.ts";
+import { PersonalTeamScopeService } from "../services/personal-team-scope.service.ts";
+import { PersonalWorkspaceDiagnosticsService } from "../services/personal-workspace-diagnostics.service.ts";
+import type { PersonalWorkspaceDiagnostics } from "../services/personal-workspace-diagnostics.service.ts";
+import { PersonalWorkspaceIdentityService } from "../services/personal-workspace-identity.service.ts";
+import type { PersonalWorkspaceIdentity } from "../services/personal-workspace-identity.service.ts";
+import { SeatLimitNoticeService } from "../services/seat-limit-notice.service.ts";
 import { SignUpPolicyService } from "../services/sign-up-policy.service.ts";
 import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
+import { TeamIdentityService } from "../services/team-identity.service.ts";
+import type { TeamIdentity } from "../services/team-identity.service.ts";
 import type { TeamManagementApi } from "../transport/team.rest.ts";
-import { buildOrganizationInfrastructure } from "./organization-composition.build.ts";
-import type {
-  GroupIdentity,
-  OrganizationGrantCache,
-  OrganizationPromptSeed,
-  OrganizationSeatLicense,
-  OrganizationSessionRevocation,
-  OrganizationSettingsSecret,
-  PersonalWorkspaceDiagnostics,
-  PersonalWorkspaceIdentity,
-  TeamIdentity,
-  OrganizationCeremony,
-  OrganizationDemoProject,
-  OrganizationDirectory,
-  OrganizationInvitations,
-  OrganizationJoinRequests,
-  OrganizationPlanUser,
-  OrganizationSignals,
-} from "./organization.members.ts";
 
 // ---------------------------------------------------------------------------
 // The rows this application hands back — restated from the composed service's own generated
@@ -251,19 +261,12 @@ export interface ServerOrganizationAppDependencies {
   apiKeys: ApiKeyApi;
 }
 
-/**
- * `publicBaseUrl`/`processName` are the process's own facts. The demo project is `authz`'s: its env
- * leaves have one owner, so this module asks that peer.
- */
-type OrganizationMembers = MembersRead<readonly ["prisma", "encryption", "logger", "redis"]> &
-  Readonly<{
-    publicBaseUrl: string | undefined;
-    processName: string;
-  }>;
+/** The module's own logger; a part names itself after the colon. */
+const logger = createLogger("langwatch:organization");
 
 type OrganizationSetup = FeatureSetup<
   typeof OrganizationModule.dependencies,
-  OrganizationMembers,
+  never,
   OrganizationServerConfig,
   OrganizationRepositories
 >;
@@ -272,7 +275,6 @@ export type OrganizationInfrastructure = Readonly<{
   identities: PersonalWorkspaceIdentity;
   teamIdentities: TeamIdentity;
   groupIdentities: GroupIdentity;
-  settingsSecrets: OrganizationSettingsSecret;
   diagnostics?: PersonalWorkspaceDiagnostics;
   prompts: OrganizationPromptSeed;
   seats: OrganizationSeatLicense;
@@ -336,16 +338,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     /** Sends the invitation mails; notification owns the gateway. */
     notifications: NotificationService,
   };
-  /** Named raw: the process answers these two, no store carries them. */
-  static readonly reads = [
-    "prisma",
-    "encryption",
-    "logger",
-    "redis",
-    "publicBaseUrl",
-    "processName",
-  ] as const;
-  /** The sign-up policy's settings (specs/auth/sign-up-restriction.feature). */
+  /** Sign-up policy settings (specs/auth/sign-up-restriction.feature) and the public origin. */
   static readonly config = organizationServerConfig;
   /** LangWatch's own sign-ups Slack webhook, shared with billing, auth and identity (ADR-132). */
   static readonly secrets = { internalSlackSignupsWebhook } as const;
@@ -357,55 +350,32 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       (webhookUrl) =>
         SignupAnnouncementService.create({
           channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
-          publicBaseUrl: setup.members.publicBaseUrl,
-          logger: setup.members.logger,
+          publicBaseUrl: setup.config.publicBaseUrl,
+          logger,
         }),
     );
-    const members = buildOrganizationInfrastructure({
-      prisma: setup.members.prisma,
-      encryption: setup.members.encryption,
-      logger: setup.members.logger,
-      inviteRateLimit: setup.repositories.inviteRateLimit,
-      publicBaseUrl: setup.members.publicBaseUrl,
-      processName: setup.members.processName,
+    const infrastructure = OrganizationModule.#composeInfrastructure({
+      setup,
       signupAnnouncements,
-      // The peer reference is stored now and called on first read, which is
-      // after boot: a peer API refuses while the process is still constructing.
-      demoProject: {
-        get userId() {
-          return setup.dependencies.permissions.demoProject().userId;
-        },
-        get projectId() {
-          return setup.dependencies.permissions.demoProject().projectId;
-        },
-      },
-      dependencies: {
-        projects: setup.dependencies.projects,
-        identity: setup.dependencies.identity,
-        entitlement: setup.dependencies.entitlement,
-        permissions: setup.dependencies.permissions,
-        roles: setup.dependencies.roles,
-        notifications: setup.dependencies.notifications,
-      },
     });
     const organizations = OrganizationEntityService.create({
       repository: setup.repositories.organization,
       teams: setup.repositories.team,
       groups: setup.repositories.group,
-      identities: members.identities,
-      teamIdentities: members.teamIdentities,
-      groupIdentities: members.groupIdentities,
+      identities: infrastructure.identities,
+      teamIdentities: infrastructure.teamIdentities,
+      groupIdentities: infrastructure.groupIdentities,
       authz: setup.dependencies.permissions,
       grants: setup.dependencies.permissions,
-      settingsSecrets: members.settingsSecrets,
-      diagnostics: members.diagnostics,
-      notices: members.lifecycle,
+      diagnostics: infrastructure.diagnostics,
+      notices: infrastructure.lifecycle,
+      settingsNotices: infrastructure.lifecycle,
     });
     const membershipRepository = setup.repositories.membership(setup.dependencies.permissions);
     const membership = OrganizationMembershipService.create({
       repository: membershipRepository,
-      prompts: members.prompts,
-      seats: members.seats,
+      prompts: infrastructure.prompts,
+      seats: infrastructure.seats,
       sessions: UserApiOrganizationSessionRevocation.create(setup.dependencies.users),
       grantCache: AuthzApiOrganizationGrantCache.create(setup.dependencies.permissions),
       admissions: setup.dependencies.permissions,
@@ -429,10 +399,10 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       apiKeys: setup.dependencies.apiKeys,
     });
 
-    application.#members = members;
+    application.#infrastructure = infrastructure;
     application.#licenseLimits = LicenseLimitService.create({
-      seats: members.seats,
-      notices: members.seatLimits,
+      seats: infrastructure.seats,
+      notices: infrastructure.seatLimits,
     });
     application.#memberProvenance = MemberProvenanceService.create({
       members: membershipRepository,
@@ -447,8 +417,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         findMemberById: (input) => membership.findMemberById(input),
       },
       permissions: setup.dependencies.permissions,
-      secrets: members.settingsSecrets,
-      demoProject: members.demoProject,
+      demoProject: infrastructure.demoProject,
     });
     application.#scopeGraph = OrganizationScopeGraphService.create({
       reader: setup.repositories.scopeGraph,
@@ -457,27 +426,28 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     application.#personalTeamScope = PersonalTeamScopeService.create(
       setup.repositories.personalTeamScope,
     );
-    application.#invitationDoor = members.invitations
+    application.#invitationDoor = infrastructure.invitations
       ? OrganizationInvitationDoorService.create({
-          invitations: members.invitations,
-          joinRequests: members.joinRequests,
-          signals: members.signals,
-          lifecycle: members.lifecycle,
-          creationThrottle: members.inviteCreationThrottle,
+          invitations: infrastructure.invitations,
+          directory: infrastructure.directory,
+          joinRequests: infrastructure.joinRequests,
+          signals: infrastructure.signals,
+          lifecycle: infrastructure.lifecycle,
+          creationThrottle: infrastructure.inviteCreationThrottle,
           ceiling: OrganizationGrantCeilingService.create(setup.dependencies.permissions),
           ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
         })
       : null;
-    application.#joinDoor = members.joinRequests
+    application.#joinDoor = infrastructure.joinRequests
       ? OrganizationJoinDoorService.create({
-          joinRequests: members.joinRequests,
-          directory: members.directory,
+          joinRequests: infrastructure.joinRequests,
+          directory: infrastructure.directory,
         })
       : null;
     application.#initialization = OrganizationInitializationService.create({
-      ceremony: members.ceremony,
-      signals: members.signals,
-      lifecycle: members.lifecycle,
+      ceremony: infrastructure.ceremony,
+      signals: infrastructure.signals,
+      lifecycle: infrastructure.lifecycle,
       createAndAssign: (input, by) => application.createAndAssign(input, by),
       ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
     });
@@ -496,87 +466,85 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return application;
   }
 
-  /**
-   * Test-only construction over stub services, wired the way `create` wires
-   * a booted one (door services close over the application). Every member is
-   * supplied: a suite names what it leaves unconfigured.
-   */
-  static createForTesting(setup: {
-    dependencies: Omit<ServerOrganizationAppDependencies, "groups"> & {
-      groups?: OrganizationGroupService;
+  /** The collaborators the doors and services share, built from the setup and its peers. */
+  static #composeInfrastructure({
+    setup,
+    signupAnnouncements,
+  }: {
+    setup: OrganizationSetup;
+    signupAnnouncements: SignupAnnouncementService;
+  }): OrganizationInfrastructure {
+    const { dependencies } = setup;
+    const baseHost = setup.config.publicBaseUrl ?? "";
+    const seatCounts = setup.repositories.seats;
+    const userDirectory = setup.repositories.userDirectory;
+    const signals = OrganizationSignalsService.create({ logger, signupAnnouncements });
+    const seatLimits = SeatLimitNoticeService.create({ signals });
+    const invites = setup.repositories.invite;
+    const throttle = InviteSendThrottleService.create(setup.repositories.inviteRateLimit);
+    const inviteService = InviteService.create({
+      invites,
+      seats: InviteSeatCensusService.create(seatCounts),
+      plans: dependencies.entitlement,
+      grants: dependencies.permissions,
+      roles: dependencies.roles,
+      throttle,
+      baseHost,
+      mail: organizationInviteMailChannels.ses.create({
+        notifications: dependencies.notifications,
+      }),
+    });
+
+    return {
+      identities: PersonalWorkspaceIdentityService.create(),
+      teamIdentities: TeamIdentityService.create(),
+      groupIdentities: GroupIdentityService.create(),
+      diagnostics: PersonalWorkspaceDiagnosticsService.create(logger),
+      prompts: OrganizationPromptSeedService.create({ role: setup.role ?? "unknown role", logger }),
+      seats: OrganizationSeatLicenseService.create({
+        plans: dependencies.entitlement,
+        memberships: seatCounts,
+        notices: seatLimits,
+      }),
+      seatCounts,
+      invitations: OrganizationInvitationsService.create({
+        invites: inviteService,
+        repository: invites,
+        throttle,
+        baseHost,
+        identity: dependencies.identity,
+        userDirectory,
+        notices: seatLimits,
+      }),
+      // The sender-scoped creation counter spends the same fixed-window
+      // repository as the resend throttle, so both invite limits share one counter.
+      inviteCreationThrottle: InviteCreationThrottleService.create({
+        rateLimit: setup.repositories.inviteRateLimit,
+        plans: dependencies.entitlement,
+      }),
+      // Identity owns the join-request ledger; this feature serves its door.
+      joinRequests: OrganizationJoinRequestsService.create(dependencies.identity),
+      signals,
+      seatLimits,
+      lifecycle: OrganizationLifecycleNoticeService.create({
+        reportError: (error) => signals.reportError(error),
+      }),
+      ceremony: OrganizationCeremonyService.create({ projects: dependencies.projects }),
+      directory: OrganizationDirectoryService.create({
+        identity: dependencies.identity,
+        userDirectory,
+      }),
+      // The peer reference is stored now and called on first read, which is
+      // after boot: a peer API refuses while the process is still constructing.
+      demoProject: {
+        get userId() {
+          return dependencies.permissions.demoProject().userId;
+        },
+        get projectId() {
+          return dependencies.permissions.demoProject().projectId;
+        },
+      },
     };
-    members: OrganizationInfrastructure;
-    /** Defaults to a reader that finds no personal team in any scope. */
-    personalTeamScope?: PersonalTeamScopeReader;
-    /** Defaults to a reader that finds no organizations. */
-    scopeGraph?: OrganizationScopeGraphReader;
-    memberProvenance: MemberProvenanceService;
-  }): OrganizationModule {
-    const { groups, ...dependencies } = setup.dependencies;
-    const application = new OrganizationModule({
-      ...dependencies,
-      groups:
-        groups ??
-        OrganizationGroupScopeService.create({
-          organizations: dependencies.organizations,
-          projects: dependencies.projects,
-        }),
-    });
-    const { members } = setup;
-
-    application.#members = members;
-    application.#licenseLimits = LicenseLimitService.create({
-      seats: members.seats,
-      notices: members.seatLimits,
-    });
-    application.#memberProvenance = setup.memberProvenance;
-    application.#visibility = OrganizationVisibilityService.create({
-      reader: {
-        getAllForUser: (input) => dependencies.membership.getAllForUser(input),
-        findOrganizationWithMembers: (input) =>
-          dependencies.membership.findOrganizationWithMembers(input),
-        findMemberById: (input) => dependencies.membership.findMemberById(input),
-      },
-      permissions: dependencies.permissions,
-      secrets: members.settingsSecrets,
-      demoProject: members.demoProject,
-    });
-    application.#scopeGraph = OrganizationScopeGraphService.create({
-      reader: setup.scopeGraph ?? { findScopeGraphForUser: async () => [] },
-      permissions: dependencies.permissions,
-    });
-    application.#personalTeamScope = PersonalTeamScopeService.create(
-      setup.personalTeamScope ?? {
-        findPersonalTeamsInScopes: async () => [],
-        findForeignPersonalTeamsInScopes: async () => [],
-      },
-    );
-    application.#invitationDoor = members.invitations
-      ? OrganizationInvitationDoorService.create({
-          invitations: members.invitations,
-          joinRequests: members.joinRequests,
-          signals: members.signals,
-          lifecycle: members.lifecycle,
-          creationThrottle: members.inviteCreationThrottle,
-          ceiling: OrganizationGrantCeilingService.create(dependencies.permissions),
-          ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
-        })
-      : null;
-    application.#joinDoor = members.joinRequests
-      ? OrganizationJoinDoorService.create({
-          joinRequests: members.joinRequests,
-          directory: members.directory,
-        })
-      : null;
-    application.#initialization = OrganizationInitializationService.create({
-      ceremony: members.ceremony,
-      signals: members.signals,
-      lifecycle: members.lifecycle,
-      createAndAssign: (input, by) => application.createAndAssign(input, by),
-      ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
-    });
-
-    return application;
   }
 
   private constructor(dependencies: ServerOrganizationAppDependencies) {
@@ -586,7 +554,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   // Assigned once by `create`, immediately after the constructor: the door
   // services close over the application itself, which the constructor cannot
   // hand them.
-  #members!: OrganizationInfrastructure;
+  #infrastructure!: OrganizationInfrastructure;
   #memberProvenance!: MemberProvenanceService;
   #licenseLimits!: LicenseLimitService;
   /** The peer the worker's seat-limit subscriber tells; absent only in a test's app. */
@@ -649,6 +617,13 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   /** Whether this address may create a new account here. */
   async checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict> {
     return this.#signUpPolicy?.checkSignUp(input) ?? { allowed: true, via: "open" };
+  }
+
+  /** Every invitation waiting on the caller's proven addresses, in any organization. */
+  async listPendingInvitationsForCaller(
+    by: OrganizationCaller,
+  ): Promise<PendingInvitationsForCaller> {
+    return this.#invitations().listPendingForCaller({ userId: by.id });
   }
 
   /** The invitation waiting for a caller who belongs to no organization yet. */
@@ -725,6 +700,26 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.organizations.saveSessionPolicy(input);
   }
 
+  getPricing(input: {
+    organizationId: string;
+  }): Promise<{ pricingModel: PricingModel | null; currency: "USD" | "EUR" }> {
+    return this.#dependencies.organizations.getPricing(input);
+  }
+
+  getDatasetLimits(input: {
+    organizationId: string;
+  }): Promise<{ attachmentMaxBytes: number | null }> {
+    return this.#dependencies.organizations.getDatasetLimits(input);
+  }
+
+  isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean> {
+    return this.#dependencies.organizations.isInstantEvalsOptedIn(input);
+  }
+
+  recordInstantEvalsOptIn(input: { organizationId: string; userId: string }): Promise<void> {
+    return this.#dependencies.organizations.recordInstantEvalsOptIn(input);
+  }
+
   readGuidedOnboardingState(input: { organizationId: string }): Promise<GuidedOnboardingRecord> {
     return this.#dependencies.organizations.readGuidedOnboardingState(input);
   }
@@ -738,8 +733,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   async updateSettings(
     input: UpdateOrganizationSettingsInput,
+    by: Readonly<{ id: string }> | null,
   ): Promise<UpdateOrganizationSettingsResult> {
-    const result = await this.#dependencies.organizations.updateSettings(input);
+    const result = await this.#dependencies.organizations.updateSettings(input, by);
     await this.#revokeTraceSharesIfRequired(input.organizationId, result);
 
     return result;
@@ -891,7 +887,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       try {
         await this.deleteProvisionedOrganization({ organizationId: created.organization.id });
       } catch (compensationError) {
-        this.#members.signals.reportError(
+        this.#infrastructure.signals.reportError(
           compensationError instanceof Error
             ? compensationError
             : new Error(String(compensationError)),
@@ -936,8 +932,10 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       organizationId: string;
       userId: string;
       admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
+      seat?: "MEMBER" | "DEVELOPER";
+      origin?: JoinRequestApiOrigin;
     }>,
-  ): Promise<"created" | "already-present"> {
+  ): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
     return this.#dependencies.membership.createMembership(input);
   }
 
@@ -1579,11 +1577,12 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   async countMemberSeats(
     input: Readonly<{ organizationId: string }>,
   ): Promise<OrganizationMemberSeats> {
-    const [fullMembers, liteMembers] = await Promise.all([
-      this.#members.seatCounts.getMemberCount(input.organizationId),
-      this.#members.seatCounts.getMembersLiteCount(input.organizationId),
+    const [fullMembers, liteMembers, developers] = await Promise.all([
+      this.#infrastructure.seatCounts.getMemberCount(input.organizationId),
+      this.#infrastructure.seatCounts.getMembersLiteCount(input.organizationId),
+      this.#infrastructure.seatCounts.getMembersDeveloperCount(input.organizationId),
     ]);
-    return { fullMembers, liteMembers };
+    return { fullMembers, liteMembers, developers };
   }
 
   /** organization_seat_limit: organization records the fact, billing subscribes (§9). */
@@ -1596,8 +1595,13 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return buildOrganizationLifecyclePipeline();
   }
 
+  /** Records one organization's stored presence switch, for the backfill task. */
+  recordStoredPresenceSetting(input: { organizationId: string }): Promise<boolean> {
+    return this.#dependencies.organizations.recordStoredPresenceSetting(input);
+  }
+
   connectLifecycle(senders: OrganizationLifecycleSenders): void {
-    this.#members.lifecycle.connect(senders);
+    this.#infrastructure.lifecycle.connect(senders);
   }
 
   connectSeatLimit(
@@ -1605,7 +1609,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       recordSeatLimitReached: EventingCommandSender<RecordSeatLimitReachedCommandData>;
     }>,
   ): void {
-    this.#members.seatLimits.connect(commands.recordSeatLimitReached);
+    this.#infrastructure.seatLimits.connect(commands.recordSeatLimitReached);
   }
 
   async checkLimit(
@@ -1898,7 +1902,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   }
 
   async fileJoinRequest(
-    input: Readonly<{ userId: string; organizationId: string }>,
+    input: Readonly<{ userId: string; organizationId: string; origin?: JoinRequestApiOrigin }>,
   ): Promise<JoinRequestFiled> {
     return this.#joinRequests().file(input);
   }
@@ -1938,6 +1942,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       organizationId: string;
       domainJoin: JoinRequestJoining["domainJoin"];
       domains: readonly string[];
+      joinerRole?: JoinRequestJoining["joinerRole"];
       actorUserId: string;
     }>,
   ): Promise<JoinRequestJoiningChanged> {
@@ -1952,7 +1957,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#joinRequests().dismissOffer(input);
   }
 
-  async admitAutomatically(input: Readonly<{ userId: string }>): Promise<JoinRequestAdmitted> {
+  async admitAutomatically(
+    input: Readonly<{ userId: string; origin?: JoinRequestApiOrigin }>,
+  ): Promise<JoinRequestAdmitted> {
     return this.#joinRequests().admitAutomatically(input);
   }
 

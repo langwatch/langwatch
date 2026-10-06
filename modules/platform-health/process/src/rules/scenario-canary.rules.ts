@@ -24,7 +24,7 @@ export const SCENARIO_CANARY_POLL_INTERVAL_MS = 2_000;
 /** Neither an id nor a slug is ever this long; a longer one is refused before any read. */
 export const MAX_CANARY_QUERY_PARAM_LENGTH = 128;
 
-export type CanaryReason = "timeout" | "run_failed" | "judge_failed";
+type CanaryReason = "timeout" | "run_failed" | "judge_failed";
 
 export type CanaryVerdict =
   | { healthy: true }
@@ -34,7 +34,7 @@ export type CanaryOutcome = CanaryVerdict & { scenarioRunId?: string; durationMs
 
 export type CanaryResult = CanaryOutcome | { busy: true };
 
-export type ScenarioRunSnapshot = Pick<SimulationRunData, "status" | "results">;
+type ScenarioRunSnapshot = Pick<SimulationRunData, "status" | "results">;
 
 /** The one scenario and target a valid run plan names, keyed by the plan's own id. */
 export type CanaryConfig = Readonly<{

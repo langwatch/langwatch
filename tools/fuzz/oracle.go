@@ -105,13 +105,19 @@ func tenantIDs(value any, found []string) []string {
 			found = tenantIDs(element, found)
 		}
 	case map[string]any:
-		for key, field := range typed {
-			if id, isString := field.(string); isString && (key == "projectId" || key == "organizationId") {
-				found = append(found, id)
-				continue
-			}
-			found = tenantIDs(field, found)
+		found = tenantIDsInObject(typed, found)
+	}
+	return found
+}
+
+// tenantIDsInObject appends an object's own tenant ids and those beneath it.
+func tenantIDsInObject(object map[string]any, found []string) []string {
+	for key, field := range object {
+		if id, isString := field.(string); isString && (key == "projectId" || key == "organizationId") {
+			found = append(found, id)
+			continue
 		}
+		found = tenantIDs(field, found)
 	}
 	return found
 }
@@ -127,21 +133,29 @@ func emptyList(body []byte) bool {
 	case []any:
 		return len(typed) == 0
 	case map[string]any:
-		if _, hasID := typed["id"]; hasID {
-			return false
-		}
-		arrays := 0
-		for _, field := range typed {
-			if list, isList := field.([]any); isList {
-				if len(list) > 0 {
-					return false
-				}
-				arrays++
-			}
-		}
-		return arrays > 0
+		return emptyListObject(typed)
 	}
 	return false
+}
+
+// emptyListObject reports a wrapper with no id whose arrays are all empty,
+// with at least one array.
+func emptyListObject(object map[string]any) bool {
+	if _, hasID := object["id"]; hasID {
+		return false
+	}
+	arrays := 0
+	for _, field := range object {
+		list, isList := field.([]any)
+		if !isList {
+			continue
+		}
+		if len(list) > 0 {
+			return false
+		}
+		arrays++
+	}
+	return arrays > 0
 }
 
 func excerpt(body []byte) string {

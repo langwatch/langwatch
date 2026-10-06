@@ -13,12 +13,10 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  GroupIdentity,
-  PersonalWorkspaceIdentity,
-  TeamIdentity,
-} from "../../app/organization.members.ts";
+import type { GroupIdentity } from "../../services/group-identity.service.ts";
 import { OrganizationService } from "../../services/organization.service.ts";
+import type { PersonalWorkspaceIdentity } from "../../services/personal-workspace-identity.service.ts";
+import type { TeamIdentity } from "../../services/team-identity.service.ts";
 import type { GroupRepository } from "../group.repository.ts";
 import type { OrganizationRepository } from "../organization.repository.ts";
 import type { TeamRepository } from "../team.repository.ts";
@@ -147,7 +145,6 @@ function buildService(options?: {
     } as GroupIdentity,
     authz: authzApi,
     grants: authzApi,
-    settingsSecrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
   });
 
   return { service, groupRepository, teamRepository, authz, grants };
@@ -293,6 +290,33 @@ describe("OrganizationService groups", () => {
 
       expect(grants.attachBindings).not.toHaveBeenCalled();
     });
+  });
+
+  /** @scenario "A group receives scoped access" */
+  it("writes a user-created role at a scope of its organization through the AuthZ grants service", async () => {
+    const { service, grants, groupRepository } = buildService();
+
+    await service.addGroupGrant({
+      organizationId: "org_1",
+      groupId: "group_1",
+      grant: { role: "CUSTOM", customRoleId: "role_1", scopeType: "TEAM", scopeId: "team_1" },
+      caller: { type: "user", id: "actor_1" },
+      actor: { type: "user", id: "actor_1" },
+    });
+
+    expect(grants.attachBindings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bindings: [
+          expect.objectContaining({
+            principal: { groupId: "group_1" },
+            customRoleId: "role_1",
+            scopeType: "TEAM",
+            scopeId: "team_1",
+          }),
+        ],
+      }),
+    );
+    expect(Object.keys(groupRepository).filter((name) => /binding/i.test(name))).toEqual([]);
   });
 
   /** @scenario "A group bound twice to the same role and scope holds both bindings" */
@@ -555,6 +579,63 @@ describe("OrganizationService groups", () => {
         }),
       );
       expect(order).toEqual(["revoke", "applyEdits"]);
+    });
+  });
+
+  describe("when an edit removes a binding, changes membership and adds a binding", () => {
+    const edit = {
+      organizationId: "org_1",
+      groupId: "group_1",
+      rename: null,
+      grantIdsToRevoke: ["binding_1"],
+      grantsToCreate: [{ role: "MEMBER" as const, scopeType: "TEAM" as const, scopeId: "team_1" }],
+      memberUserIdsToAdd: [],
+      memberUserIdsToRemove: ["user_removed"],
+      caller: { type: "user" as const, id: "actor_1" },
+      actor: { type: "user" as const, id: "actor_1" },
+    };
+    const heldBinding = {
+      id: "binding_1",
+      groupId: "group_1",
+      role: "MEMBER",
+      customRoleId: null,
+      customRole: null,
+      scopeType: "TEAM",
+      scopeId: "team_1",
+    };
+
+    /** @scenario "A group batch edit partially fails" */
+    it("revokes access, then changes membership, and attaches new access last", async () => {
+      const { service, groupRepository, authz, grants } = buildService();
+      (authz.listGroupBindings as ReturnType<typeof vi.fn>).mockResolvedValue([heldBinding]);
+      const order: string[] = [];
+      (grants.revokeBindings as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+        order.push("revoke");
+      });
+      (groupRepository.applyEdits as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+        order.push("applyEdits");
+      });
+      (grants.attachBindings as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+        order.push("attach");
+      });
+
+      await service.applyGroupEdits(edit);
+
+      expect(order).toEqual(["revoke", "applyEdits", "attach"]);
+    });
+
+    /** @scenario "A group batch edit partially fails" */
+    it("attaches nothing when the membership edit fails after the revocation", async () => {
+      const { service, groupRepository, authz, grants } = buildService();
+      (authz.listGroupBindings as ReturnType<typeof vi.fn>).mockResolvedValue([heldBinding]);
+      (groupRepository.applyEdits as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error("the membership write failed"),
+      );
+
+      await expect(service.applyGroupEdits(edit)).rejects.toThrow("the membership write failed");
+
+      expect(grants.revokeBindings).toHaveBeenCalledTimes(1);
+      expect(grants.attachBindings).not.toHaveBeenCalled();
     });
   });
 });

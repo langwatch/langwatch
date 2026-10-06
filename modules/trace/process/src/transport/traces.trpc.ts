@@ -622,13 +622,6 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
           row,
           protections,
           visibilityCutoffMs: protections.visibilityCutoffMs ?? null,
-          codingAgents: {
-            logContentKeys: (eventName) =>
-              app.codingAgentLogContentKeys(eventName).map((entry) => ({
-                key: entry.key,
-                category: entry.category,
-              })),
-          },
           derivedAttrPrefixes: traceDerivedAttrPrefixes,
         }),
       );

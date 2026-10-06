@@ -28,9 +28,9 @@ import {
   platformOperatorSeedWake,
 } from "./ops-platform-operator-seed.process.ts";
 
-export const PLATFORM_OPERATOR_SEED_PIPELINE_NAME = "ops_platform_operator_seed";
+const PLATFORM_OPERATOR_SEED_PIPELINE_NAME = "ops_platform_operator_seed";
 
-export type PlatformOperatorSeedPipelineDefinition = StaticPipelineDefinition<
+type PlatformOperatorSeedPipelineDefinition = StaticPipelineDefinition<
   PlatformOperatorSeedRecordedEvent,
   Record<string, Projection>,
   {
@@ -44,7 +44,7 @@ export type PlatformOperatorSeedPipelineDefinition = StaticPipelineDefinition<
  * attempt until the seed records its decision as ops's own event, which sets the marker for good
  * and asks for the grants that decision names.
  */
-export function buildPlatformOperatorSeed({
+function buildPlatformOperatorSeed({
   app,
 }: EventingSetup<
   unknown,

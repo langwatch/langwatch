@@ -44,10 +44,12 @@ function echoHeaders(req: http.IncomingMessage, res: http.ServerResponse) {
 
 let origin: http.Server;
 let other: http.Server;
+let originHits = 0;
 
 beforeAll(async () => {
   other = await listen(echoHeaders);
   origin = await listen((req, res) => {
+    originHits += 1;
     if (req.url === "/echo") return echoHeaders(req, res);
     const location =
       req.url === "/elsewhere" ? `http://127.0.0.1:${portOf(other)}/landed` : "/echo";
@@ -119,9 +121,11 @@ describe("the pinned fetch", () => {
     /** @scenario "A destination the validator could not resolve is checked when it connects" */
     it("fails without connecting when the name resolves to a metadata address", async () => {
       lookupGives("169.254.169.254");
+      originHits = 0;
       await expect(
         fetchValidatedDestination(unresolved(portOf(origin)), undefined, tls),
       ).rejects.toThrow(/metadata/i);
+      expect(originHits).toBe(0);
     });
 
     /** @scenario "A destination the validator could not resolve is checked when it connects" */

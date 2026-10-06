@@ -1,5 +1,6 @@
 import {
   ConnectLicenseRequiredError,
+  connectUsageAnswerSchema,
   ConnectServiceNotEntitledError,
   type ContractTerms,
   type HostedCaller,
@@ -9,11 +10,12 @@ import type { InstantEvalJudgement } from "@langwatch/instant-eval-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type { HostedBudgetUsage, HostedJudge } from "../../app/licensing.members.ts";
 import type { IssuedLicenseRecord } from "../../repositories/issued-license.repository.ts";
 import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
 import type { ConnectSpendEntry } from "../connect-spend-buffer.service.ts";
+import type { HostedJudge } from "../hosted-services.service.ts";
 import { HostedServicesService } from "../hosted-services.service.ts";
+import type { HostedBudgetUsage } from "../hosted-usage-reader.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 
@@ -77,11 +79,16 @@ const TERMS: ContractTerms = {
 
 class RecordingJudge implements HostedJudge {
   readonly seen: { projectId: string; text: string }[] = [];
+  readonly signals: (AbortSignal | undefined)[] = [];
 
   constructor(private readonly judgement: InstantEvalJudgement) {}
 
-  async classify(input: { projectId: string; text: string }): Promise<InstantEvalJudgement> {
+  async classify(
+    input: { projectId: string; text: string },
+    signal?: AbortSignal,
+  ): Promise<InstantEvalJudgement> {
     this.seen.push({ projectId: input.projectId, text: input.text });
+    this.signals.push(signal);
     return this.judgement;
   }
 
@@ -156,6 +163,54 @@ describe("HostedServicesService.classify", () => {
     expect(spend[0]?.priceUsd).toBeCloseTo(0.042 * 1.3, 10);
   });
 
+  /** @scenario "A connected customer is governed by its contract budget, not the free allowance" */
+  it("judges for a customer far past any free allowance while its contract budget has headroom", async () => {
+    const { service, judge } = harness({ budgets: [budget({ spentUsd: 900, limitUsd: 1000 })] });
+
+    await expect(
+      service.classify({ caller: CALLER, payload: { text: "hello", questions: [QUESTION] } }),
+    ).resolves.toMatchObject({ input_tokens: 1_000_000 });
+    expect(judge.seen).toHaveLength(1);
+  });
+
+  /** @scenario A hosted judgement stops when the calling install hangs up */
+  it("hands the judge the signal of the call it was given", async () => {
+    const { service, judge } = harness({});
+    const hangUp = new AbortController();
+
+    await service.classify({
+      caller: CALLER,
+      payload: { text: "hello", questions: [QUESTION] },
+      signal: hangUp.signal,
+    });
+
+    expect(judge.signals).toEqual([hangUp.signal]);
+  });
+
+  /** @scenario Each license gets its own managed key */
+  it("meters each install's spend under its own managed key, both on the one organization", async () => {
+    const { service, spend } = harness({
+      rows: [
+        rowFor(),
+        rowFor({
+          id: "license-2",
+          licenseId: "lic-2",
+          tokenHash: "hash-2",
+          virtualKeyId: "vk-second",
+          instanceId: "instance-2",
+        }),
+      ],
+    });
+    const second: HostedCaller = { ...CALLER, virtualKeyId: "vk-second" };
+
+    for (const caller of [CALLER, second]) {
+      await service.classify({ caller, payload: { text: "hello", questions: [QUESTION] } });
+    }
+
+    expect(spend.map((entry) => entry.virtualKeyId)).toEqual(["vk-managed", "vk-second"]);
+    expect(new Set(spend.map((entry) => entry.projectId))).toEqual(new Set(["project-hidden"]));
+  });
+
   /** @scenario "A license without the entitlement is refused" */
   it("refuses a license the service is not part of, judging nothing", async () => {
     const { service, spend, judge } = harness({ rows: [rowFor({ services: ["managed_models"] })] });
@@ -226,6 +281,18 @@ describe("HostedServicesService.classify", () => {
 });
 
 describe("HostedServicesService.usage", () => {
+  /** @scenario The install parses the usage answer it is given */
+  it("answers a body the install's own usage schema parses, contract and budgets included", async () => {
+    const { service } = harness({});
+
+    const answer = await service.usage({ caller: CALLER });
+    const parsed = connectUsageAnswerSchema.safeParse(answer);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.contract).not.toBeNull();
+    expect(parsed.data?.budgets).not.toEqual([]);
+  });
+
   /** @scenario "A connected install reads its usage" */
   it("states what was spent, the cap, what remains and the entitled services", async () => {
     const { service } = harness({});

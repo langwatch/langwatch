@@ -28,7 +28,7 @@ import {
 const logger = createLogger("langwatch:billing:connectedSeatChange");
 
 /** What one pass did: changes it decided, invoices it raised, and what failed. */
-export type SeatInvoicingSummary = { decided: number; invoiced: number; failed: number };
+type SeatInvoicingSummary = { decided: number; invoiced: number; failed: number };
 
 export class ConnectedSeatChangeService {
   private constructor(

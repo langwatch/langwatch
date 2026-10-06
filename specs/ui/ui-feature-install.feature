@@ -1,6 +1,6 @@
 # Implementation:
-#   apps/ui/src/behavior/ui-feature.ts
-#   apps/ui/src/features/installed-ui-features.ts
+#   packages/browser/src/ui-feature.ts
+#   apps/ui/src/browser-modules.generated.ts
 # Plan:
 #   dev/docs/plans/ui-install-surface-2026-09-05.md
 
@@ -11,13 +11,13 @@ Feature: One install surface per feature
   screen or a drawer could be left out of by hand.
 
   Background:
-    Given the feature directories under apps/ui/src/features
+    Given the module directories that ship a browser half
 
   @unit
-  Scenario: A new feature cannot be half-registered
-    Given every directory with an index.ts exports one or more "*Feature" values
-    When the installed feature list is composed
-    Then every exported feature value appears in the installed list
+  Scenario: A new module cannot be half-registered
+    Given every module directory that ships a browser half
+    When the installed browser module list is composed
+    Then every such module appears in the installed list
 
   @unit
   Scenario: Two features serving the same page key are refused by name

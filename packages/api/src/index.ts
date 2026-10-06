@@ -25,13 +25,24 @@ export {
   formatError,
   ProjectInputMismatchError,
   InvalidApiVersionError,
+  KeyKindRefusedError,
+  MediaTypeMalformedRequestError,
   PayloadTooLargeError,
+  PlatformPermissionDeniedError,
+  PlatformSurfaceHiddenError,
   ScopeInputMismatchError,
+  UnsupportedMediaTypeError,
 } from "./errors.ts";
 
 export type { RateLimiter, ResponseCache, UpgradeHandler } from "./ports.ts";
 export { ConnectUpgradeRouter } from "./ports.ts";
-export { WebSocketHost, WebSocketProtocol, type ProtocolConnection } from "./websocket.ts";
+export {
+  WebSocketHost,
+  WebSocketProtocol,
+  type ProtocolConnection,
+  type WebSocketCaller,
+  type WebSocketDoor,
+} from "./websocket.ts";
 export {
   RAW_SOCKET_LIVENESS_PATH,
   RawSocketHost,

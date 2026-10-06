@@ -259,6 +259,92 @@ const grantBody = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+// First in the file: the runtime reports a deprecated route once per process, on its first call.
+describe("given the deprecated /api/role-bindings family", () => {
+  describe("when the family is listed twice", () => {
+    /** @scenario The first call to a deprecated operation is logged once */
+    it("reports the deprecated operation to the log once, naming the successor", async () => {
+      const deprecatedRouteCalled = vi.fn();
+      const { send } = world({ deprecationLog: { deprecatedRouteCalled } });
+
+      await send("/api/role-bindings");
+      await send("/api/role-bindings");
+
+      expect(deprecatedRouteCalled).toHaveBeenCalledOnce();
+      expect(deprecatedRouteCalled).toHaveBeenCalledWith(
+        expect.objectContaining({
+          family: "role-bindings",
+          operation: "listRoleBindings",
+          successor: "/api/grants",
+        }),
+      );
+    });
+  });
+
+  describe("when each operation is called", () => {
+    /** @scenario Every role bindings operation answers as before and carries the deprecation headers */
+    it("answers as before with Deprecation and a successor Link naming /api/grants", async () => {
+      const { send } = world({ rows: [row({ id: "rb_0", userId: "user-1" })] });
+
+      const answers = [
+        await send("/api/role-bindings"),
+        await send("/api/role-bindings", {
+          method: "POST",
+          body: { userId: "user-2", role: "MEMBER", scopeType: "TEAM", scopeId: "team-a" },
+        }),
+        await send("/api/role-bindings/rb_0", { method: "PATCH", body: { role: "VIEWER" } }),
+        await send("/api/role-bindings/rb_0", { method: "DELETE" }),
+      ];
+
+      expect(answers.map((response) => response.status)).toEqual([200, 201, 200, 200]);
+      for (const response of answers) {
+        expect(response.headers.get("Deprecation")).toBeTruthy();
+        expect(response.headers.get("Link")).toContain("/api/grants");
+      }
+    });
+  });
+
+  describe("when the OpenAPI document is generated", () => {
+    /** @scenario The published document marks the role bindings operations deprecated */
+    it("marks every role bindings operation deprecated and no grants operation", () => {
+      const bindings = authzRoleBindingRest.router();
+      const grants = authzGrantRest.router();
+
+      const bindingDocs = bindings.routes.map((route) =>
+        restRouteDocumentation({
+          route,
+          deprecated: bindings.deprecated,
+          credential: bindings.credential,
+        }),
+      );
+      const grantDocs = grants.routes.map((route) =>
+        restRouteDocumentation({
+          route,
+          deprecated: grants.deprecated,
+          credential: grants.credential,
+        }),
+      );
+
+      expect(bindingDocs.map((doc) => doc.operationId)).toEqual([
+        "listRoleBindings",
+        "createRoleBinding",
+        "updateRoleBinding",
+        "deleteRoleBinding",
+      ]);
+      expect(bindingDocs.every((doc) => doc.deprecated === true)).toBe(true);
+      expect(bindingDocs.every((doc) => doc.description?.includes("/api/grants"))).toBe(true);
+      expect(grantDocs.map((doc) => doc.operationId)).toEqual([
+        "listGrants",
+        "createGrant",
+        "getGrant",
+        "updateGrant",
+        "revokeGrant",
+      ]);
+      expect(grantDocs.some((doc) => doc.deprecated === true)).toBe(false);
+    });
+  });
+});
+
 describe("given the /api/grants family", () => {
   describe("when a built-in role is granted to a user on a team", () => {
     /** @scenario Granting a built-in role to a user on a team */
@@ -440,6 +526,7 @@ describe("given the /api/grants family", () => {
 
   describe("when the organization is below Enterprise", () => {
     /** @scenario Both grant families answer 402 below Enterprise, naming the management API */
+    /** @scenario "The role bindings API requires an Enterprise plan" */
     it("refuses every grant route with enterprise_plan_required naming MANAGEMENT_API", async () => {
       const { send, created } = world({ enterprise: false });
 
@@ -450,6 +537,7 @@ describe("given the /api/grants family", () => {
       ]);
 
       for (const answer of answers) {
+        expect(answer.status).toBe(402);
         expect(await answer.json()).toMatchObject({
           code: "enterprise_plan_required",
           meta: { feature: "MANAGEMENT_API" },
@@ -705,91 +793,6 @@ describe("given the /api/grants family", () => {
         });
       }
       expect(created).not.toHaveBeenCalled();
-    });
-  });
-});
-
-describe("given the deprecated /api/role-bindings family", () => {
-  describe("when the family is listed twice", () => {
-    /** @scenario The first call to a deprecated operation is logged once */
-    it("reports the deprecated operation to the log once, naming the successor", async () => {
-      const deprecatedRouteCalled = vi.fn();
-      const { send } = world({ deprecationLog: { deprecatedRouteCalled } });
-
-      await send("/api/role-bindings");
-      await send("/api/role-bindings");
-
-      expect(deprecatedRouteCalled).toHaveBeenCalledOnce();
-      expect(deprecatedRouteCalled).toHaveBeenCalledWith(
-        expect.objectContaining({
-          family: "role-bindings",
-          operation: "listRoleBindings",
-          successor: "/api/grants",
-        }),
-      );
-    });
-  });
-
-  describe("when each operation is called", () => {
-    /** @scenario Every role bindings operation answers as before and carries the deprecation headers */
-    it("answers as before with Deprecation and a successor Link naming /api/grants", async () => {
-      const { send } = world({ rows: [row({ id: "rb_0", userId: "user-1" })] });
-
-      const answers = [
-        await send("/api/role-bindings"),
-        await send("/api/role-bindings", {
-          method: "POST",
-          body: { userId: "user-2", role: "MEMBER", scopeType: "TEAM", scopeId: "team-a" },
-        }),
-        await send("/api/role-bindings/rb_0", { method: "PATCH", body: { role: "VIEWER" } }),
-        await send("/api/role-bindings/rb_0", { method: "DELETE" }),
-      ];
-
-      expect(answers.map((response) => response.status)).toEqual([200, 201, 200, 200]);
-      for (const response of answers) {
-        expect(response.headers.get("Deprecation")).toBeTruthy();
-        expect(response.headers.get("Link")).toContain("/api/grants");
-      }
-    });
-  });
-
-  describe("when the OpenAPI document is generated", () => {
-    /** @scenario The published document marks the role bindings operations deprecated */
-    it("marks every role bindings operation deprecated and no grants operation", () => {
-      const bindings = authzRoleBindingRest.router();
-      const grants = authzGrantRest.router();
-
-      const bindingDocs = bindings.routes.map((route) =>
-        restRouteDocumentation({
-          route,
-          deprecated: bindings.deprecated,
-          credential: bindings.credential,
-        }),
-      );
-      const grantDocs = grants.routes.map((route) =>
-        restRouteDocumentation({
-          route,
-          deprecated: grants.deprecated,
-          credential: grants.credential,
-        }),
-      );
-
-      expect(bindingDocs.map((doc) => doc.operationId)).toEqual([
-        "listRoleBindings",
-        "createRoleBinding",
-        "updateRoleBinding",
-        "deleteRoleBinding",
-      ]);
-      expect(bindingDocs.every((doc) => doc.deprecated === true)).toBe(true);
-      expect(bindingDocs.every((doc) => doc.description?.includes("/api/grants"))).toBe(true);
-      expect(grantDocs.map((doc) => doc.operationId)).toEqual([
-        "listGrants",
-        "createGrant",
-        "getGrant",
-        "updateGrant",
-        "revokeGrant",
-      ]);
-      expect(grantDocs.some((doc) => doc.deprecated === true)).toBe(false);
     });
   });
 });

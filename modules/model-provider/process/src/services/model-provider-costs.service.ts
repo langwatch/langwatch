@@ -13,14 +13,12 @@ import {
 } from "@langwatch/model-provider-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
-import type {
-  ModelProviderCatalog,
-  ModelProviderIdService,
-} from "../app/model-provider.members.ts";
 import type { ModelCostRepository } from "../repositories/model-cost.repository.ts";
 import { ModelCostCatalogService } from "./model-cost-catalog.service.ts";
 import type { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
+import type { ModelProviderIdService } from "./prefixed-model-provider-id.service.ts";
+import type { ModelProviderCatalog } from "./registry-model-provider-catalog.service.ts";
 
 type ModelProviderCostsOptions = {
   costs: ModelCostRepository;

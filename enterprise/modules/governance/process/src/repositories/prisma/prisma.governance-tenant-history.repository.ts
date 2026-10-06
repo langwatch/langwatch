@@ -8,7 +8,7 @@ import {
   type GovernanceTenantRow,
 } from "../governance-tenant-history.repository.ts";
 
-export type GovernanceTenantHistoryDatabase = Pick<PrismaClient, "governanceTenantHistory">;
+type GovernanceTenantHistoryDatabase = Pick<PrismaClient, "governanceTenantHistory">;
 
 export class PrismaGovernanceTenantHistoryRepository extends GovernanceTenantHistoryRepository {
   private constructor(private readonly prisma: GovernanceTenantHistoryDatabase) {

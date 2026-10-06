@@ -5,14 +5,17 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import { EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
+import type { EventingParticipation, OwnEventStore } from "@langwatch/eventing";
 import {
   type AccountIdentifier,
   type EmailIdentifierAdded,
   IdentityApi,
   IdentityCapabilityUnavailableError,
   identityConfig,
-  sealedProviderConfigCipher,
   type IdentityEmailResolution,
+  IDENTITY_PIPELINE_NAME,
+  JOIN_REQUEST_PIPELINE_NAME,
+  SSO_CONNECTION_PIPELINE_NAME,
   type IdentityLookupAnswer,
   type IdentityLookupApi,
   type IdentityLookupOperator,
@@ -25,6 +28,8 @@ import {
   type IdentityServerConfig,
   type MethodsLastUsed,
   type RoutingDecision,
+  type SessionClaims,
+  type SessionClaimsMintInput,
   SignInMethodPolicyService,
   type OrganizationMemberFactor,
   type OrganizationMfaRequirement,
@@ -46,7 +51,6 @@ import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { Temporal, nowInstant } from "@langwatch/time";
@@ -65,6 +69,10 @@ import {
 import { SSO_DOMAIN_PROOF_PUBLIC_EGRESS } from "../channels/sso-domain-proof-file.channel.ts";
 import { ssoDomainProofMailChannels } from "../channels/sso-domain-proof-mail-channels.registry.ts";
 import { ssoIssuerDiscoveryChannels } from "../channels/sso-issuer-discovery-channels.registry.ts";
+import { ConnectedIdentityEventing } from "../eventing/identity-command-senders.store.ts";
+import { IdentityEventStores } from "../eventing/identity-event-stores.store.ts";
+import { IdentityLedgerStore } from "../eventing/identity-ledger.store.ts";
+import { JoinRequestLedgerStore } from "../eventing/join-request-ledger.store.ts";
 import {
   composeJoinRequestPipeline,
   type JoinRequestPipeline,
@@ -77,9 +85,15 @@ import {
   composeIdentityPipeline,
   type IdentityPipeline,
 } from "../eventing/user-identity.pipeline.ts";
+import { EventingIdentityHistoryRepository } from "../repositories/eventing/eventing.identity-history.repository.ts";
+import { EventingSsoConnectionHistoryRepository } from "../repositories/eventing/eventing.sso-connection-history.repository.ts";
+import type { IdentityRateLimitRepository } from "../repositories/identity-rate-limit.repository.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
-import { breakGlassHolderEligibility } from "../rules/break-glass-eligibility.rules.ts";
+import {
+  breakGlassHolderEligibility,
+  passwordDoorMounted,
+} from "../rules/break-glass-eligibility.rules.ts";
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import type {
   JoinMembership,
@@ -119,7 +133,13 @@ import { MicrosoftAccountRekeyService } from "../services/microsoft-account-reke
 import { OrganizationMfaNotifierService } from "../services/organization-mfa-notifier.service.ts";
 import { OrganizationMfaService } from "../services/organization-mfa.service.ts";
 import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
-import { CachedIdentityLatchService } from "../services/per-subject-cached-latch.service.ts";
+import {
+  CachedIdentityLatchService,
+  IDENTITY_LATCH_CACHE_MAX_USERS,
+  IDENTITY_LATCH_CACHE_TTL_MS,
+} from "../services/per-subject-cached-latch.service.ts";
+import { SessionClaimsService } from "../services/session-claims.service.ts";
+import { SignUpIdentifierService } from "../services/sign-up-identifier.service.ts";
 import { SignInAccountLookupService } from "../services/signin-account-lookup.service.ts";
 import { SignInRouterService } from "../services/signin-router.service.ts";
 import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
@@ -135,6 +155,7 @@ import {
 } from "../services/sso-break-glass.service.ts";
 import { SsoConnectionBackofficeService } from "../services/sso-connection-backoffice.service.ts";
 import { SsoConnectionDirectoryMoveService } from "../services/sso-connection-directory-move.service.ts";
+import { SsoConnectionGrandfatherService } from "../services/sso-connection-grandfather.service.ts";
 import type { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { SsoConnectionHistoryService } from "../services/sso-connection-history.service.ts";
 import { SsoConnectionRoutingService } from "../services/sso-connection-routing.service.ts";
@@ -143,6 +164,7 @@ import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.servic
 import { SsoDomainOwnershipBackfillService } from "../services/sso-domain-ownership-backfill.service.ts";
 import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
 import { SsoEngineProviderService } from "../services/sso-engine-provider.service.ts";
+import { SsoIdpCredentialsService } from "../services/sso-idp-credentials.service.ts";
 import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
 import { SsoIssuerDirectoryService } from "../services/sso-issuer-directory.service.ts";
 import { SsoIssuerEndpointOriginsService } from "../services/sso-issuer-endpoint-origins.service.ts";
@@ -163,35 +185,19 @@ import {
   type SsoTestArrivalMemberships,
 } from "../services/sso-test-arrival.service.ts";
 import { SsoUserResolutionService } from "../services/sso-user-resolution.service.ts";
+import { IdentityConnectionGrandfatherMigrationService } from "../services/system-migration-identity-connection-grandfather.service.ts";
 import { IdentityIdentifierBackfillMigrationService } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationService } from "../services/system-migration-identity-secret-heal.service.ts";
 import { SsoDomainOwnershipMigrationService } from "../services/system-migration-sso-domain-ownership.service.ts";
 import { TwoStepAccountService } from "../services/two-step-account.service.ts";
 import { VerificationCeremonyService } from "../services/verification-ceremony.service.ts";
-import {
-  buildIdentityInfrastructure,
-  ConnectedIdentityEventing,
-} from "./identity-composition.build.ts";
 /**
  * The boundary `reservations().reapOrphans()` call takes no args, so it bounds
  * itself per pass the same way `IdentityNewbornReconciliationService`'s own
  * internal reap of this exact repository call does.
  */
 const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
-type IdentityMembers = MembersRead<readonly ["prisma", "eventing", "encryption", "rateLimiter"]> &
-  Readonly<{
-    /** LangWatch's own cloud: what licenses federation, and so automatic joining. */
-    isSaas: boolean;
-    /** Where this deployment answers, which is what a SAML identity provider
-     *  is told LangWatch is called. A process fact, not one of the fourteen. */
-    publicBaseUrl: string | undefined;
-  }>;
-
-type IdentitySetup = FeatureSetup<
-  typeof IdentityModule.dependencies,
-  IdentityMembers,
-  IdentityServerConfig
-> &
+type IdentitySetup = FeatureSetup<typeof IdentityModule.dependencies, never, IdentityServerConfig> &
   Readonly<{ repositories: IdentityRepositories }>;
 
 type IdentityAppParts = {
@@ -203,16 +209,19 @@ type IdentityAppParts = {
   identity: IdentityService;
   verification: VerificationCeremonyService;
   accountIdentifiers: AccountIdentifiersService;
+  sessionClaims: SessionClaimsService;
   microsoftAccountRekey: MicrosoftAccountRekeyService;
   newbornSweep: IdentityNewbornReconciliationService;
+  signUpIdentifiers: SignUpIdentifierService;
   backfill: IdentityBackfillService;
   secrets: IdentitySecretCarryService;
   ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService;
+  ssoConnectionGrandfather: SsoConnectionGrandfatherService | null;
   joinRequestGuards: JoinRequestGuardsService;
   ssoConnections: SsoConnectionService | null;
   ssoConnectionGuards: SsoConnectionGuardsService;
   ssoBackoffice: SsoConnectionBackofficeService | null;
-  ssoConnectionHistory: SsoConnectionHistoryService | null;
+  ssoConnectionHistory: SsoConnectionHistoryService;
   ssoConnectionReads: OrganizationSsoConnectionsService;
   ssoIssuers: SsoIssuerDirectoryService;
   ssoDomainCeremony: SsoDomainCeremonyService | null;
@@ -237,6 +246,8 @@ type IdentityAppParts = {
 /** The three pipelines' definitions over the module's own rows, in every role (2026-09-27). */
 type IdentityPipelineBuilders = {
   eventing: ConnectedIdentityEventing;
+  /** Each pipeline's own event store, kept as the process builds it (record §7). */
+  stores: IdentityEventStores;
   identity: () => IdentityPipeline;
   joinRequests: () => JoinRequestPipeline;
   ssoConnections: () => SsoConnectionPipeline;
@@ -334,10 +345,19 @@ function joinMemberships(organizations: OrganizationApi): JoinMembership {
     isMember: (args) => organizations.isMember(args),
     memberOrganizationIds: (args) => organizations.memberOrganizationIds(args),
     // The approving admin, or the policy that approved: the grant is audited to them.
-    attachDefaultMembership: async ({ userId, organizationId, commandId, approvedByUserId }) => {
+    attachDefaultMembership: async ({
+      userId,
+      organizationId,
+      commandId,
+      approvedByUserId,
+      role,
+      origin,
+    }) => {
       await organizations.createMembership({
         userId,
         organizationId,
+        seat: role,
+        origin,
         admittedBy: {
           actor: approvedByUserId
             ? { type: "user", id: approvedByUserId }
@@ -353,8 +373,11 @@ function joinMemberships(organizations: OrganizationApi): JoinMembership {
 function joinSettings(organizations: OrganizationApi): JoinSetting {
   return {
     read: (args) => organizations.getJoinSetting(args),
-    write: ({ organizationId, domainJoin, joinDomains }) =>
-      organizations.saveJoinSetting({ organizationId, setting: { domainJoin, joinDomains } }),
+    write: ({ organizationId, domainJoin, joinDomains, joinerRole }) =>
+      organizations.saveJoinSetting({
+        organizationId,
+        setting: { domainJoin, joinDomains, joinerRole },
+      }),
   };
 }
 
@@ -379,6 +402,8 @@ function joinSettingAudit(auditLog: AuditLogApi): JoinSettingAudit {
           to: change.next,
           fromDomains: [...change.previousDomains],
           toDomains: [...change.nextDomains],
+          fromJoinerRole: change.previousJoinerRole,
+          toJoinerRole: change.nextJoinerRole,
         },
         targetKind: "organization",
         targetId: organizationId,
@@ -388,7 +413,7 @@ function joinSettingAudit(auditLog: AuditLogApi): JoinSettingAudit {
 }
 
 /** The process's one counter, in the window and allowance the join throttles name. */
-function joinRateLimit(limiter: RateLimiter): JoinRequestsServiceDeps["rateLimit"] {
+function joinRateLimit(limiter: IdentityRateLimitRepository): JoinRequestsServiceDeps["rateLimit"] {
   return async ({ key, windowSeconds, max }) => {
     const decision = await limiter.check(key, { requests: max, seconds: windowSeconds });
     const retryAfterMs = (decision.retryAfterSeconds ?? windowSeconds) * 1000;
@@ -421,14 +446,6 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     /** Where every mail identity sends goes out; notification owns the gateway. */
     notifications: NotificationService,
   };
-  static readonly reads = [
-    "prisma",
-    "eventing",
-    "encryption",
-    "rateLimiter",
-    "isSaas",
-    "publicBaseUrl",
-  ] as const;
   /** LangWatch's own sign-ups Slack webhook, shared with organization, billing and auth. */
   static readonly secrets = { internalSlackSignupsWebhook } as const;
 
@@ -441,21 +458,28 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       (webhookUrl) =>
         SignupAnnouncementService.create({
           channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
-          publicBaseUrl: setup.members.publicBaseUrl,
+          publicBaseUrl: setup.config.publicBaseUrl,
           logger: createLogger("langwatch:identity:signup-announcement"),
         }),
     );
     const engineProviders = SsoEngineProviderService.create({
       credentials: setup.repositories.ssoCredentials,
       rows: setup.repositories.ssoEngineProviders,
-      baseUrl: setup.members.publicBaseUrl ?? "",
-      providerConfig: sealedProviderConfigCipher(setup.members.encryption),
+      baseUrl: setup.config.publicBaseUrl ?? "",
     });
     const identityEventing = ConnectedIdentityEventing.create();
-    const infrastructure = buildIdentityInfrastructure({
-      repositories: setup.repositories,
-      eventing: setup.members.eventing,
-      identityEventing,
+    const eventStores = IdentityEventStores.create();
+    // Read through user_identity's own store: the lookup, the link proposals and the pipeline.
+    const identityHistory = EventingIdentityHistoryRepository.create({
+      eventStore: eventStores.of({ pipeline: IDENTITY_PIPELINE_NAME }),
+    });
+    const ledger = IdentityLedgerStore.create({
+      projectionStore: setup.repositories.identityProjection,
+      eventing: identityEventing,
+    });
+    const joinRequestLedger = JoinRequestLedgerStore.create({
+      projectionStore: setup.repositories.joinRequestProjection,
+      eventing: identityEventing,
     });
     const reservations = setup.repositories.reservations;
     const identityGuards = IdentityGuardsService.create({
@@ -467,13 +491,13 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     const mfaGuards = MfaGuardsService.create(setup.repositories.mfaEnrollment);
     const latch = CachedIdentityLatchService.create({
       repository: setup.repositories.latch,
-      ttlMs: infrastructure.latch.ttlMs,
-      maxUsers: infrastructure.latch.maxUsers,
-      now: infrastructure.latch.now,
+      ttlMs: IDENTITY_LATCH_CACHE_TTL_MS,
+      maxUsers: IDENTITY_LATCH_CACHE_MAX_USERS,
+      now: () => nowInstant().epochMilliseconds,
     });
     const isLatched = latch.gate();
     const emails = IdentityEmailService.create(setup.repositories.heads, isLatched);
-    const identity = IdentityService.create(identityGuards, infrastructure.ledger);
+    const identity = IdentityService.create(identityGuards, ledger);
     const verification = VerificationCeremonyService.create({
       store: setup.repositories.verification,
       heads: setup.repositories.heads,
@@ -488,7 +512,8 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       clock: { now: () => nowInstant().epochMilliseconds, newCommandId: newIdentityCommandId },
     });
     const newbornSweep = IdentityNewbornReconciliationService.create({ reservations });
-    const secrets = IdentitySecretCarryService.create(infrastructure.secrets);
+    const signUpIdentifiers = SignUpIdentifierService.create({ identity });
+    const secrets = IdentitySecretCarryService.create(setup.repositories.secretCarry);
     const backfill = IdentityBackfillService.create({
       reads: setup.repositories.backfill,
       users: setup.repositories.users,
@@ -499,19 +524,37 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     const joinRequestGuards = JoinRequestGuardsService.create({
       requests: setup.repositories.joinRequests,
     });
+    const signInMethodPolicy = SignInMethodPolicyService.create({
+      resolveAuthProvider: () => setup.dependencies.auth.resolveAuthProvider(),
+      federationLicensed: () => setup.dependencies.licensing.isPlatformSsoLicensed(),
+      offersPasskeys: () => setup.dependencies.auth.offersPasskeys(),
+      issuesOwnPasswords: () => setup.dependencies.auth.issuesOwnPasswords(),
+      selfHosted: () => !setup.config.isSaas,
+      mountedSocialMethodIds: () => setup.dependencies.auth.findMountedSocialMethodIds(),
+    });
+    const passwordDoor = passwordDoorMounted(signInMethodPolicy);
+    const holderCanWalkIn = breakGlassEligibility(
+      setup.dependencies.organizations,
+      setup.dependencies.users,
+    );
     // One answer to "is there a way back in", shared: activation's second
     // precondition and the setup sign-in exemption must not disagree.
     const breakGlass = RequiresLocalDoorAndBinding.create({
-      localDoor: LocalDoorBreakGlassBindingRepository.create(),
-      bindings: SsoBreakGlassRecoveryService.create({ bindings: setup.repositories.ssoBreakGlass }),
+      localDoor: LocalDoorBreakGlassBindingRepository.create({ passwordDoor }),
+      bindings: SsoBreakGlassRecoveryService.create({
+        bindings: setup.repositories.ssoBreakGlass,
+        holderCanWalkIn,
+      }),
     });
     const ssoConnectionReads = OrganizationSsoConnectionsService.create({
       connections: setup.repositories.ssoConnections,
     });
     // One connection service: the back office, the setup journey and the teardown timer share it.
     const ssoConnectionGraph = composeSsoConnectionGraph({
+      breakGlass,
       repositories: setup.repositories,
-      eventSourcing: setup.members.eventing,
+      eventStore: eventStores.of({ pipeline: SSO_CONNECTION_PIPELINE_NAME }),
+      commands: identityEventing,
       directoryMove: SsoConnectionDirectoryMoveService.create({
         connections: ssoConnectionReads,
         scim: setup.dependencies.scim,
@@ -519,24 +562,27 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       engineProvider: engineProviders,
       mail: ssoDomainProofMailChannels.ses.create({
         mailer,
-        baseUrl: setup.members.publicBaseUrl ?? "",
+        baseUrl: setup.config.publicBaseUrl ?? "",
       }),
       licensing: setup.dependencies.licensing,
       authorization: setup.dependencies.permissions,
     });
     const ssoConnectionGuards = ssoConnectionGraph.guards;
     const ssoConnections: SsoConnectionService | null = ssoConnectionGraph.connections;
-    const ssoConnectionHistory = infrastructure.ssoConnectionHistory
-      ? SsoConnectionHistoryService.create({ history: infrastructure.ssoConnectionHistory })
+    // Answered only once sso_connection is built here (see ssoConnectionHistory()): an absent
+    // log refuses by name rather than reading as a connection nothing ever happened to.
+    const ssoConnectionHistory = SsoConnectionHistoryService.create({
+      history: EventingSsoConnectionHistoryRepository.create({
+        eventStore: eventStores.of({ pipeline: SSO_CONNECTION_PIPELINE_NAME }),
+      }),
+    });
+    const ssoBackoffice = ssoConnections
+      ? SsoConnectionBackofficeService.create({
+          reads: setup.repositories.ssoBackoffice,
+          connections: () => ssoConnections,
+          history: () => ssoConnectionHistory,
+        })
       : null;
-    const ssoBackoffice =
-      ssoConnections && ssoConnectionHistory
-        ? SsoConnectionBackofficeService.create({
-            reads: setup.repositories.ssoBackoffice,
-            connections: () => ssoConnections,
-            history: () => ssoConnectionHistory,
-          })
-        : null;
     // Auth owns the operator's IdP allowlist; asked per discovery, not at boot.
     const dialableIdpOrigins = () => setup.dependencies.auth.findDialableIdentityProviderOrigins();
     // The same fence the published-proof reads go through: an issuer is a
@@ -595,11 +641,11 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
         connections: setup.repositories.ssoConnections,
         directory: setup.dependencies.scim,
         memberships: setup.dependencies.organizations,
-        isHosted: setup.members.isSaas,
+        isHosted: setup.config.isSaas,
       }),
     });
     const joinRequests = JoinRequestsService.create({
-      requests: JoinRequestService.create(joinRequestGuards, infrastructure.joinRequestLedger),
+      requests: JoinRequestService.create(joinRequestGuards, joinRequestLedger),
       reads: setup.repositories.joinRequests,
       candidates: setup.repositories.joinCandidates,
       membership: joinMemberships(setup.dependencies.organizations),
@@ -611,7 +657,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
         isEnterpriseTier(
           (await setup.dependencies.entitlements.getActivePlan({ organizationId })).type,
         ),
-      rateLimit: joinRateLimit(setup.members.rateLimiter),
+      rateLimit: joinRateLimit(setup.repositories.rateLimits),
     });
     // `notifications` is unanswered on purpose: an automatic admission's
     // durable notice needs a mail this process does not compose.
@@ -620,7 +666,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       connections: setup.repositories.ssoConnections,
       memberships: arrivalMemberships(setup.dependencies.organizations),
       authz: setup.dependencies.permissions,
-      adoption: SsoArrivalAdoptionService.create(backfill),
+      adoption: SsoArrivalAdoptionService.create({
+        backfill,
+        latch: setup.repositories.latch,
+      }),
       signups: signupAnnouncements,
     });
     const ssoTestArrival = SsoTestArrivalService.create({
@@ -647,6 +696,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       connections: setup.repositories.ssoConnections,
       evidence: setup.repositories.ssoMigrationEvidence,
       breakGlass: setup.repositories.ssoBreakGlass,
+      holderCanWalkIn,
       memberships,
       legacyAccess,
     });
@@ -657,9 +707,12 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
           connections: () => ssoConnections,
           reads: setup.repositories.ssoConnections,
           activity: setup.repositories.ssoMigrationEvidence,
-          credentials: setup.repositories.ssoCredentials,
+          idpCredentials: SsoIdpCredentialsService.create({
+            credentials: setup.repositories.ssoCredentials,
+            registrations: SsoIdpRegistrationService.create({ discovery: issuerDiscovery }),
+          }),
           breakGlass,
-          registrations: SsoIdpRegistrationService.create({ discovery: issuerDiscovery }),
+          passwordDoor,
           finalization: SsoMigrationFinalizationService.create({
             connections: () => ssoConnections,
             evidence: ssoMigrationProgress,
@@ -678,16 +731,17 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       warnings: ssoBreakGlassWarningChannels.live.create(),
       newBindingId: newSsoBreakGlassBindingId,
       directory: breakGlassDirectory(setup.dependencies.organizations),
-      holderIsEligible: breakGlassEligibility(
-        setup.dependencies.organizations,
-        setup.dependencies.users,
-      ),
+      holderIsEligible: holderCanWalkIn,
     });
     const ssoSetup = SsoSetupService.create({
       connections: setup.repositories.ssoConnections,
       breakGlass: setup.repositories.ssoBreakGlass,
       activity: setup.repositories.ssoMigrationEvidence,
       migrations: ssoMigrationProgress,
+      entitled: async ({ organizationId }) =>
+        isEnterpriseTier(
+          (await setup.dependencies.entitlements.getActivePlan({ organizationId })).type,
+        ),
     });
     const auth = setup.dependencies.auth;
     const resolveAuthProvider = () => auth.resolveAuthProvider();
@@ -695,26 +749,39 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       SignInMethodPolicyService.findFederatedMethods(resolveAuthProvider);
     // Main's router (identity/runtime.ts): projected connections first, the legacy columns
     // when none decides, the method policy, one break-glass budget, the account lookup.
+    const legacyDomainRouting = LegacySsoDomainRoutingService.create({
+      organizations: setup.repositories.legacySsoOrganizations,
+      mountedMethods,
+    });
+    const connectionDomainRouting = SsoConnectionRoutingService.create({
+      connections: setup.repositories.ssoConnectionRouting,
+      dial: ssoMethodDialWith({
+        mountedMethods: async () => (await mountedMethods()).map((method) => method.id),
+        engineHoldsProvider: (args) =>
+          setup.repositories.ssoEngineProviders.findRegisteredProvider(args),
+      }),
+    });
+    // D04: its proof reads through the two routing ports that decide sign-in, never the store.
+    const ssoConnectionGrandfather = ssoConnections
+      ? SsoConnectionGrandfatherService.create({
+          connections: ssoConnections,
+          legacy: setup.repositories.legacySsoOrganizations,
+          legacyRouting: legacyDomainRouting,
+          connectionRouting: connectionDomainRouting,
+          // The legacy columns name a provider and nothing else: a reference to the mounted one.
+          idpMetadataFor: ({ ssoProvider }) => ({
+            issuer: null,
+            providerId: ssoProvider,
+            clientIdRef: null,
+            secretRef: null,
+            certRefs: [],
+          }),
+        })
+      : null;
     const signInRouter = SignInRouterService.create({
-      legacy: LegacySsoDomainRoutingService.create({
-        organizations: setup.repositories.legacySsoOrganizations,
-        mountedMethods,
-      }),
-      domains: SsoConnectionRoutingService.create({
-        connections: setup.repositories.ssoConnectionRouting,
-        dial: ssoMethodDialWith({
-          mountedMethods: async () => (await mountedMethods()).map((method) => method.id),
-          engineHoldsProvider: (args) =>
-            setup.repositories.ssoEngineProviders.findRegisteredProvider(args),
-        }),
-      }),
-      policy: SignInMethodPolicyService.create({
-        resolveAuthProvider,
-        federationLicensed: () => setup.dependencies.licensing.isPlatformSsoLicensed(),
-        offersPasskeys: () => auth.offersPasskeys(),
-        issuesOwnPasswords: () => auth.issuesOwnPasswords(),
-        selfHosted: () => !setup.members.isSaas,
-      }),
+      legacy: legacyDomainRouting,
+      domains: connectionDomainRouting,
+      policy: signInMethodPolicy,
       breakGlass: InProcessBreakGlassLimiterService.create(),
       accounts: SignInAccountLookupService.create({
         heads: setup.repositories.heads,
@@ -731,15 +798,19 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       reservations,
       identity,
       verification,
+      sessionClaims: SessionClaimsService.create({
+        heads: setup.repositories.heads,
+        identifiers: CryptoIdentifierIdentityService.create(),
+      }),
       accountIdentifiers: AccountIdentifiersService.create({
         heads: setup.repositories.heads,
         identity,
         ceremony: verification,
         mail: addressConfirmationMailChannels.ses.create({
           mailer,
-          baseUrl: setup.members.publicBaseUrl ?? "",
+          baseUrl: setup.config.publicBaseUrl ?? "",
         }),
-        rateLimiter: setup.members.rateLimiter,
+        rateLimiter: setup.repositories.rateLimits,
         sessions: setup.dependencies.auth,
         accountAddress: async ({ userId }) => {
           const user = await setup.dependencies.users.findById({ id: userId });
@@ -752,11 +823,13 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
         accounts: setup.repositories.accountRekey,
       }),
       newbornSweep,
+      signUpIdentifiers,
       backfill,
       secrets,
       ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService.create(
         setup.repositories.ssoDomainOwnership,
       ),
+      ssoConnectionGrandfather,
       joinRequestGuards,
       ssoConnections,
       ssoConnectionGuards,
@@ -778,20 +851,19 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       ssoSetupCommands,
       lookup: IdentityLookupService.create({
         reads: setup.repositories.identityLookup,
-        history: setup.repositories.identityHistory,
+        history: identityHistory,
         router: setup.dependencies.auth,
         identity: () => identity,
         links: LinkProposalService.create({
           guards: LinkProposalGuardsService.create({
-            proposals: setup.repositories.identityHistory,
+            proposals: identityHistory,
           }),
-          ledger: infrastructure.ledger,
-          proposals: setup.repositories.identityHistory,
+          ledger,
+          proposals: identityHistory,
           accounts: setup.dependencies.auth,
         }),
-        authorization: setup.dependencies.permissions,
         auditLog: setup.dependencies.auditLog,
-        rateLimiter: setup.members.rateLimiter,
+        rateLimiter: setup.repositories.rateLimits,
         sessions: setup.dependencies.auth,
         invitations: setup.dependencies.organizations,
       }),
@@ -816,19 +888,22 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       signInRouter,
       pipelines: {
         eventing: identityEventing,
-        identity: () => composeIdentityPipeline({ repositories: setup.repositories }),
+        stores: eventStores,
+        identity: () =>
+          composeIdentityPipeline({ repositories: setup.repositories, history: identityHistory }),
         joinRequests: () =>
           composeJoinRequestPipeline({
             repositories: setup.repositories,
-            eventSourcing: setup.members.eventing,
+            eventStore: eventStores.of({ pipeline: JOIN_REQUEST_PIPELINE_NAME }),
+            commands: identityEventing,
             notifier: JoinRequestNotifierService.create({
               audience: setup.repositories.joinRequestAudience,
               context: setup.repositories.joinRequestNotificationContext,
               mail: joinRequestNotificationMailChannels.ses.create({
                 mailer,
-                baseUrl: setup.members.publicBaseUrl ?? "",
+                baseUrl: setup.config.publicBaseUrl ?? "",
               }),
-              baseHost: setup.members.publicBaseUrl ?? "",
+              baseHost: setup.config.publicBaseUrl ?? "",
               plans: setup.dependencies.entitlements,
             }),
           }),
@@ -847,6 +922,15 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
 
   ssoConnectionPipeline(): SsoConnectionPipeline {
     return this.#parts.pipelines.ssoConnections();
+  }
+
+  /** Keeps a built pipeline's own event store; a build only to be listed keeps nothing. */
+  keepEventStore(input: {
+    pipeline: string;
+    participation: EventingParticipation;
+    eventStore: OwnEventStore | undefined;
+  }): void {
+    this.#parts.pipelines.stores.keep(input);
   }
 
   /** Hands identity a registered pipeline's senders; a missing verb fails the install. */
@@ -920,6 +1004,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
   ): Promise<RoutingDecision> {
     return this.#parts.signInRouter.route(input);
+  }
+
+  claimsForMint(input: SessionClaimsMintInput): Promise<SessionClaims> {
+    return this.#parts.sessionClaims.claimsForMint(input);
   }
 
   getMethodsLastUsed(input: { userId: string }): Promise<MethodsLastUsed> {
@@ -1011,6 +1099,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     return this.#parts.newbornSweep;
   }
 
+  signUpIdentifiers(): SignUpIdentifierService {
+    return this.#parts.signUpIdentifiers;
+  }
+
   userMigrations(): readonly SystemMigration[] {
     return [
       IdentityIdentifierBackfillMigrationService.create(this.#parts.backfill),
@@ -1019,7 +1111,14 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
   }
 
   registeredMigrations(): readonly SystemMigration[] {
-    return [SsoDomainOwnershipMigrationService.create(this.#parts.ssoDomainOwnershipBackfill)];
+    const { ssoConnectionGrandfather, ssoDomainOwnershipBackfill } = this.#parts;
+
+    return [
+      ...(ssoConnectionGrandfather
+        ? [IdentityConnectionGrandfatherMigrationService.create(ssoConnectionGrandfather)]
+        : []),
+      SsoDomainOwnershipMigrationService.create(ssoDomainOwnershipBackfill),
+    ];
   }
 
   joinRequestGuards(): JoinRequestGuardsService {
@@ -1038,17 +1137,22 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
   }
 
   ssoBackoffice(): SsoConnectionBackofficeService {
-    if (!this.#parts.ssoBackoffice) {
+    if (!this.#parts.ssoBackoffice || !this.#holdsSsoConnectionLog()) {
       throw new IdentityCapabilityUnavailableError("SSO connection backoffice");
     }
     return this.#parts.ssoBackoffice;
   }
 
   ssoConnectionHistory(): SsoConnectionHistoryService {
-    if (!this.#parts.ssoConnectionHistory) {
+    if (!this.#holdsSsoConnectionLog()) {
       throw new IdentityCapabilityUnavailableError("SSO connection history");
     }
     return this.#parts.ssoConnectionHistory;
+  }
+
+  /** Whether this process built sso_connection over a store: without it there is no log to read. */
+  #holdsSsoConnectionLog(): boolean {
+    return this.#parts.pipelines.stores.holds({ pipeline: SSO_CONNECTION_PIPELINE_NAME });
   }
 
   ssoConnectionReads(): OrganizationSsoConnectionsService {
@@ -1196,5 +1300,13 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     operator: IdentityLookupOperator;
   }): Promise<LookupInvitationExpiry> {
     return this.#parts.lookup.extendLookupInvitation(input);
+  }
+
+  recordRefusedLookup(input: {
+    operator: IdentityLookupOperator;
+    action: string;
+    args: Readonly<Record<string, string | null>>;
+  }): Promise<void> {
+    return this.#parts.lookup.recordRefusedLookup(input);
   }
 }

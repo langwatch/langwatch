@@ -31,11 +31,12 @@ describe("given a strict feature server module", () => {
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("unboundedLoop");
       expect(found[0].message).toBe(
-        "This `for (;;)` loop states no exit condition in its header." +
+        "This `for (;;)` loop states no exit condition in its header. When the exit lives in the body the reader has to find every return, break and throw to know when the loop ends." +
           " State whichever bound this loop already tracks directly in its header — a deadline" +
           " (`while (now() < deadline)`) or an attempt counter" +
           " (`for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++)`) — or, if it tracks no such" +
-          " bound yet, move it into a function whose signature takes one as a parameter.",
+          " bound yet, move it into a function whose signature takes one as a parameter." +
+          " Read the `backend` skill.",
       );
     });
 

@@ -17,13 +17,13 @@ export const cliLoginKeyReapSchema = z.object({
 export const cliLoginKeyReapStateSchema = z.object({
   lastReapAt: z.number().nullable(),
 });
-export type CliLoginKeyReapState = z.infer<typeof cliLoginKeyReapStateSchema>;
+type CliLoginKeyReapState = z.infer<typeof cliLoginKeyReapStateSchema>;
 
 export const CLI_LOGIN_KEY_REAP_INITIAL_STATE: CliLoginKeyReapState = {
   lastReapAt: null,
 };
 
-export type CliLoginKeyReapIntents = {
+type CliLoginKeyReapIntents = {
   reap: IntentSpec<typeof cliLoginKeyReapSchema>;
 };
 

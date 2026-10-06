@@ -4,7 +4,6 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
@@ -15,7 +14,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { LwqlProvisioningDatabase } from "../../tasks/lwql-provision.task.ts";
+import { ClickHouseAnalyticsSessionsRepository } from "../../repositories/clickhouse/clickhouse.analytics-sessions.repository.ts";
+import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { AnalyticsModule } from "../analytics.app.ts";
 
 type Setup = Parameters<typeof AnalyticsModule.create>[0];
@@ -43,13 +43,9 @@ async function appOver() {
       traces: createApiFixture<TraceApi>({ translateLegacyFilters }),
       retention: createApiFixture<DataRetentionApi>(),
     },
-    members: {
-      clickhouse,
-      rateLimiter: { check: () => Promise.resolve({ allowed: true }) } satisfies RateLimiter,
-      publicBaseUrl: "https://app.langwatch.test",
-      clickhouseAdmin: { configured: false },
-      databaseTarget: { configured: false },
-      prisma: createApiFixture<LwqlProvisioningDatabase>({}, "prisma"),
+    repositories: {
+      ...MemoryAnalyticsRepositories.create(),
+      sessions: ClickHouseAnalyticsSessionsRepository.create(clickhouse),
     },
     config: {
       langwatchQl: {
@@ -61,6 +57,7 @@ async function appOver() {
         accessModelMode: void 0,
         sqlSingleNode: void 0,
       },
+      publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: createApiFixture<Setup["secrets"]>(),

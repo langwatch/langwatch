@@ -2,7 +2,7 @@
  * A page of extracted texts and what judging it produces: the requests it
  * sends, the ceiling it may not send past, and the cells the answers fill.
  * One request per distinct text of a row, and it carries every question asked.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {
@@ -147,13 +147,10 @@ export function assertInstantEvalPageBudget({
  * present with no verdict was asked and declined, which is a null cell the
  * page explains; an absent one was never asked at all.
  */
-export type InstantEvalPageCells = ReadonlyMap<
-  number,
-  ReadonlyMap<string, InstantEvalVerdict | null>
->;
+type InstantEvalPageCells = ReadonlyMap<number, ReadonlyMap<string, InstantEvalVerdict | null>>;
 
 /** A page's rows with their texts replaced by the verdicts on them. */
-export interface InstantEvalJudgedRows {
+interface InstantEvalJudgedRows {
   readonly rows: readonly Record<string, unknown>[];
   /** Rows a stop reached before every question about them was answered. */
   readonly unjudgedRows: readonly number[];

@@ -1,5 +1,5 @@
 import { PermissionDeniedError } from "@langwatch/authorization";
-import { AuthzApi } from "@langwatch/authz-contract";
+import { AuthzApi, scopeOrganizationId } from "@langwatch/authz-contract";
 import {
   FEATURE_FLAG_REGISTRY,
   FeatureFlagApi,
@@ -28,8 +28,6 @@ import {
 } from "@langwatch/feature-flag-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
-import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { FeatureFlagRepositories } from "../repositories/feature-flag.repositories.ts";
@@ -63,7 +61,7 @@ export interface FeatureFlagCache {
 
 type FeatureFlagSetup = FeatureSetup<
   typeof FeatureFlagModule.dependencies,
-  MembersRead<typeof FeatureFlagModule.reads>,
+  never,
   FeatureFlagServerConfig,
   FeatureFlagRepositories
 >;
@@ -72,26 +70,17 @@ export class FeatureFlagModule implements FeatureFlagApiContract {
   static readonly contract = FeatureFlagApi;
   static readonly dependencies = {
     permissions: AuthzApi,
-    projects: ProjectApi,
     organizations: OrganizationApi,
   };
   static readonly config = featureFlagConfig;
-  /**
-   * No process member: the cache tier `installApiFeatureFlag` used to read
-   * was always an uncached stub in every deployment, so `create` builds
-   * that same no-op itself rather than reading a member nothing populated.
-   */
-  static readonly reads = [] as const;
 
   readonly #flags: FeatureFlagService;
   readonly #permissions: AuthzApi;
-  readonly #projects: ProjectApi;
   readonly #organizations: OrganizationApi;
 
   private constructor(flags: FeatureFlagService, dependencies: FeatureFlagSetup["dependencies"]) {
     this.#flags = flags;
     this.#permissions = dependencies.permissions;
-    this.#projects = dependencies.projects;
     this.#organizations = dependencies.organizations;
   }
 
@@ -256,12 +245,16 @@ export class FeatureFlagModule implements FeatureFlagApiContract {
     }
 
     await this.authorizeProjectView(userId, target.projectId);
-    const organizationId = await this.#projects.getOrganizationId(target.projectId);
+    const organizationId = await this.getProjectOrganizationId(target.projectId);
     if (organizationId !== target.organizationId) {
       throw this.projectOrganizationMismatch(target.projectId);
     }
 
     return { kind: "project", userId, projectId: target.projectId, organizationId };
+  }
+
+  private async getProjectOrganizationId(projectId: string): Promise<string> {
+    return scopeOrganizationId(await this.#permissions.getScope({ projectId }));
   }
 
   /** The compatibility target shape: optional ids rather than a tagged union. */
@@ -270,7 +263,7 @@ export class FeatureFlagModule implements FeatureFlagApiContract {
   ): Promise<AuthenticatedExperimentTarget> {
     if (input.projectId) {
       await this.authorizeProjectView(input.userId, input.projectId);
-      const organizationId = await this.#projects.getOrganizationId(input.projectId);
+      const organizationId = await this.getProjectOrganizationId(input.projectId);
       if (input.organizationId && organizationId !== input.organizationId) {
         throw this.projectOrganizationMismatch(input.projectId);
       }

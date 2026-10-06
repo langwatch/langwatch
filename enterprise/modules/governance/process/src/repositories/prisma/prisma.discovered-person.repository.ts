@@ -9,7 +9,7 @@ import {
   type DiscoveredPersonRow,
 } from "../discovered-person.repository.ts";
 
-export type DiscoveredPersonDatabase = Pick<PrismaClient, "discoveredPerson">;
+type DiscoveredPersonDatabase = Pick<PrismaClient, "discoveredPerson">;
 
 type StoredDiscoveredPerson = Prisma.DiscoveredPersonGetPayload<object>;
 

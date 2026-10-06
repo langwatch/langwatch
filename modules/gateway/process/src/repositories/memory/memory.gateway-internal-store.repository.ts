@@ -8,7 +8,7 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import { GatewayInternalStoreRepository } from "../gateway-internal-store.repository.ts";
 
 /** The rows a memory-tier install seeds the internal store with. */
-export interface MemoryGatewayInternalStoreSeed {
+interface MemoryGatewayInternalStoreSeed {
   virtualKeys?: readonly VirtualKeyWithScopes[];
   budgets?: readonly GatewayBudget[];
   bucketBoundaries?: readonly Pick<

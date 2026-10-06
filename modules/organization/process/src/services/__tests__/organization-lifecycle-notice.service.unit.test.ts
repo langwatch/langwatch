@@ -22,6 +22,7 @@ function notices(
     recordInviteAccepted: idle,
     recordIntegrationMethodChosen,
     recordPersonalWorkspaceProvisioned,
+    recordPresenceSettingChanged: idle,
   });
   return { service, reportError };
 }

@@ -137,6 +137,7 @@ const roleIdsOf = (body: unknown) =>
 describe("given the /api/roles family", () => {
   describe("when the organization is below Enterprise", () => {
     /** @scenario The roles family answers 402 below Enterprise, naming RBAC */
+    /** @scenario "The roles API requires an Enterprise plan" */
     it("refuses reading and defining roles with enterprise_plan_required naming RBAC", async () => {
       const { send, ledger } = world({ enterprise: false });
 
@@ -149,6 +150,7 @@ describe("given the /api/roles family", () => {
       ]);
 
       for (const answer of answers) {
+        expect(answer.status).toBe(402);
         expect(await answer.json()).toMatchObject({
           code: "enterprise_plan_required",
           meta: { feature: "RBAC" },

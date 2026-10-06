@@ -11,7 +11,7 @@ import type {
   GovernanceClickHouseClient,
   GovernanceClickHouseResult,
   GovernanceClickHouseResolver,
-} from "../../../app/governance.members.ts";
+} from "../../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 
 type ClickHouseQuery = {
   query: string;

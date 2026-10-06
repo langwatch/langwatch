@@ -10,7 +10,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { LangyCanaryService } from "../../services/langy-canary.service.ts";
-import { platformHealthLangyProbeRest } from "../platform-health-probe.rest.ts";
+import {
+  platformHealthLangyProbeRest,
+  platformHealthProbeRest,
+} from "../platform-health-probe.rest.ts";
 
 const PROJECT_ID = "project-1";
 const KEY = "sk-lw-known";
@@ -126,6 +129,19 @@ describe("GET /api/health/langy", () => {
 
       expect(response.status).toBe(200);
       expect(api.turnsStarted).toHaveLength(1);
+    });
+  });
+
+  describe("when its declaration is read", () => {
+    /** @scenario "The Langy probe is declared behind the project key door, unlike its public sibling probes" */
+    it("asks the project key door for langy:create, where the siblings are public", () => {
+      const langy = platformHealthLangyProbeRest.router();
+      const sibling = platformHealthProbeRest.router();
+
+      expect(langy.credential).toBe("project");
+      expect(langy.routes.map((route) => route.permission)).toEqual(["langy:create"]);
+      expect(sibling.routes.length).toBeGreaterThan(0);
+      expect(sibling.routes.every((route) => route.permission === undefined)).toBe(true);
     });
   });
 });

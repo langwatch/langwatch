@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { createUi } from "@langwatch/browser";
+import { HeroAskFieldToken, ProjectSwitcherToken } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import { projectWeb } from "../project.web.ts";
@@ -38,6 +39,28 @@ describe("given a browser that installs project", () => {
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
+    });
+  });
+
+  describe("when a peer asks for the project switcher", () => {
+    it("lends the switcher component by project's token", async () => {
+      const lend = projectWeb.installation.lends.find(
+        (lent) => lent.token.key === ProjectSwitcherToken.key,
+      );
+      const loaded = lend && "load" in lend ? await lend.load() : undefined;
+
+      expect(loaded).toHaveProperty("default", expect.any(Function));
+    });
+  });
+
+  describe("when governance's hero asks for the ask field", () => {
+    it("lends the inline command palette by project's token", async () => {
+      const lend = projectWeb.installation.lends.find(
+        (lent) => lent.token.key === HeroAskFieldToken.key,
+      );
+      const loaded = lend && "load" in lend ? await lend.load() : undefined;
+
+      expect(loaded).toHaveProperty("default", expect.any(Function));
     });
   });
 });

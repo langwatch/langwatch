@@ -21,6 +21,11 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
+import {
+  CreateProjectDrawerToken,
+  CreateTeamDrawerToken,
+  EditProjectDrawerToken,
+} from "@langwatch/organization-contract";
 import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -164,6 +169,9 @@ function AddToTeamDialog({
     () =>
       (orgMembers.data?.members ?? [])
         .filter((m) => !existingMemberIds.includes(m.userId))
+        // A Developer seat (ADR-171) cannot be added to a team, so the seat
+        // is not offered; the service refuses it by name if it is asked anyway.
+        .filter((m) => m.role !== OrganizationUserRole.DEVELOPER)
         .map((m) => ({
           label: `${m.user.name ?? m.user.email} (${m.user.email})`,
           value: m.userId,
@@ -507,7 +515,7 @@ function ProjectSection({
               color="gray.400"
               onClick={(e) => {
                 e.stopPropagation();
-                openDrawer("editProject", {
+                openDrawer(EditProjectDrawerToken, {
                   projectId: project.id,
                   projectName: project.name,
                   currentTeamId: teamId,
@@ -979,7 +987,7 @@ function TeamCard({
                     variant="outline"
                     onClick={(e) => {
                       e.stopPropagation();
-                      openDrawer("createProject", {
+                      openDrawer(CreateProjectDrawerToken, {
                         defaultTeamId: team.id,
                       });
                     }}
@@ -1053,7 +1061,7 @@ export default function TeamsScreen() {
         <Spacer />
         {hasPermission("project:create") && (
           <PageLayout.HeaderButton
-            onClick={() => openDrawer("createProject")}
+            onClick={() => openDrawer(CreateProjectDrawerToken)}
             data-testid="teams-project-add"
           >
             <Plus size={16} />
@@ -1063,7 +1071,7 @@ export default function TeamsScreen() {
         {canManage && (
           <PageLayout.HeaderButton
             primary
-            onClick={() => openDrawer("createTeam")}
+            onClick={() => openDrawer(CreateTeamDrawerToken)}
             data-testid="teams-team-new"
           >
             <Plus size={16} />

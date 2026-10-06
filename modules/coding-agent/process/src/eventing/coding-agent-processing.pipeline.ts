@@ -27,27 +27,24 @@ import {
 import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { CodingAgentModule } from "../app/coding-agent.app.ts";
-import type {
-  CodingAgentClock,
-  CodingAgentCostEstimator,
-  CodingAgentCostMetrics,
-  CodingAgentProjectActivity,
-  CodingAgentPullRequestMapping,
-} from "../app/coding-agent.members.ts";
 import type { CodingAgentSessionFoldCacheRepository } from "../repositories/coding-agent-session-fold-cache.repository.ts";
 import type { CodingAgentRepositories } from "../repositories/coding-agent.repositories.ts";
 import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
+import type { CodingAgentClock } from "../services/coding-agent-clock.service.ts";
+import type { CodingAgentCostMetrics } from "../services/coding-agent-cost-metrics.service.ts";
 import {
   EventingCodingAgentSessionEventsAppendService,
   EventingCodingAgentTraceSessionAppendService,
   EventingSessionMetricSeriesAppendService,
 } from "../services/coding-agent-projection-append.service.ts";
 import type { CodingAgentReceivedFactsService } from "../services/coding-agent-received-facts.service.ts";
+import type { CodingAgentProjectActivity } from "../services/coding-agent-session-seen.service.ts";
 import { CodingAgentSessionSeenService } from "../services/coding-agent-session-seen.service.ts";
 import { EventingCodingAgentSessionStoreService } from "../services/coding-agent-session-store.service.ts";
 import { EventingContributeLogFactsService } from "../services/contribute-log-facts.service.ts";
 import { EventingContributeMetricFactsService } from "../services/contribute-metric-facts.service.ts";
 import { EventingContributeSpanFactsService } from "../services/contribute-span-facts.service.ts";
+import type { CodingAgentCostEstimator } from "../services/model-catalog-cost-estimator.service.ts";
 import { createCodingAgentCostDriftSubscriber } from "./coding-agent-cost-drift.subscriber.ts";
 import { CodingAgentSessionEventsMapProjection } from "./coding-agent-session-events.projection.ts";
 import {
@@ -55,6 +52,7 @@ import {
   type CodingAgentSessionState,
 } from "./coding-agent-session.projection.ts";
 import { CodingAgentTraceSessionsMapProjection } from "./coding-agent-trace-sessions.projection.ts";
+import type { CodingAgentPullRequestMapping } from "./pull-request-mapping.subscriber.ts";
 import { createPullRequestMappingSubscriber } from "./pull-request-mapping.subscriber.ts";
 import { SessionMetricSeriesMapProjection } from "./session-metric-series.projection.ts";
 

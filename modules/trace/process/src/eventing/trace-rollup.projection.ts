@@ -12,9 +12,9 @@ import {
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
 
-import { type TraceSpanNormalization } from "../app/trace.members.ts";
 import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
 import type { SpanCostService } from "../services/span-cost.service.ts";
+import type { TraceSpanNormalization } from "../services/span-normalization.service.ts";
 
 /**
  * One row emitted to `trace_analytics_rollup` per SpanReceivedEvent. Field

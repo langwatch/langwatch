@@ -12,7 +12,7 @@ import type {
 
 const RETIRED_CONNECTION_STATES = ["DISCARDED", "TORN_DOWN"];
 
-export type PrismaTwoStepVerificationDatabase = Pick<
+type PrismaTwoStepVerificationDatabase = Pick<
   PrismaClient,
   "user" | "passkey" | "organizationUser" | "organization" | "ssoConnection" | "identifier"
 >;

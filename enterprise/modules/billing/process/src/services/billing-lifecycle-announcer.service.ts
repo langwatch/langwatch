@@ -11,7 +11,7 @@ import {
 
 const logger = createLogger("langwatch:billing:lifecycle");
 
-export type BillingLifecycleAnnouncerDeps = Readonly<{
+type BillingLifecycleAnnouncerDeps = Readonly<{
   /** The webhook subscription repository, read only for whether a live subscription remains. */
   subscriptions: { findLastNonCancelled(organizationId: string): Promise<unknown> };
   /** The organization's members, read only for their ids. */
@@ -20,11 +20,13 @@ export type BillingLifecycleAnnouncerDeps = Readonly<{
   };
   /** The ops alert a peer's seat-limit event ends in, subscribed on the lifecycle pipeline. */
   resourceLimitAlerts: BuildBillingLifecyclePipelineInput["alerts"];
+  /** The ops alert usage's limit-reached fact ends in, subscribed on the same pipeline. */
+  planLimitAlerts: BuildBillingLifecyclePipelineInput["planLimitAlerts"];
 }>;
 
 /**
  * Records billing's own lifecycle facts on its pipeline: that an organization gained or lost its
- * subscription, and that a checkout completed. Never throws: a Stripe delivery is answered 200
+ * subscription, that a subscription became active, and that a checkout completed. Never throws: a Stripe delivery is answered 200
  * whatever becomes of the record, as main's fire-and-forget hooks were.
  */
 export class BillingLifecycleAnnouncerService {
@@ -36,7 +38,10 @@ export class BillingLifecycleAnnouncerService {
   }
 
   private constructor(private readonly deps: BillingLifecycleAnnouncerDeps) {
-    this.pipeline = buildBillingLifecyclePipeline({ alerts: deps.resourceLimitAlerts });
+    this.pipeline = buildBillingLifecyclePipeline({
+      alerts: deps.resourceLimitAlerts,
+      planLimitAlerts: deps.planLimitAlerts,
+    });
   }
 
   /** Binds the lifecycle pipeline's own senders. */
@@ -44,8 +49,26 @@ export class BillingLifecycleAnnouncerService {
     this.#commands = commands;
   }
 
-  subscriptionActivated(input: { organizationId: string }): Promise<void> {
-    return this.#subscriptionChanged({ ...input, hasSubscription: () => Promise.resolve(true) });
+  /** A subscription that was not active became active on `plan`; a renewal never reaches this. */
+  async subscriptionActivated(input: {
+    organizationId: string;
+    subscriptionId: string;
+    plan: string;
+  }): Promise<void> {
+    const { organizationId } = input;
+    await this.#subscriptionChanged({
+      organizationId,
+      hasSubscription: () => Promise.resolve(true),
+    });
+    await this.#record(organizationId, async (commands) => {
+      const members = await this.deps.organizations.getAllMembers({ organizationId });
+      await commands.recordSubscriptionStarted.send({
+        tenantId: organizationId,
+        occurredAt: nowInstant().epochMilliseconds,
+        ...input,
+        memberUserIds: members.map((member) => member.id),
+      });
+    });
   }
 
   /** Whether the organization still holds another live subscription is read after the cancel. */

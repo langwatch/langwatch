@@ -30,7 +30,7 @@ import { Temporal } from "@langwatch/time";
 import type { LangWatchQLParameter } from "../rules/langwatch-ql-validation-shape.rules.ts";
 
 /** What a statement's reserved names mean for the request about to be made. */
-export interface LangWatchQLTimeWindowResolution {
+interface LangWatchQLTimeWindowResolution {
   /**
    * The values to run with: the caller's, plus the window this surface
    * injected. Absent when there are none, so an unparameterised query keeps the
@@ -87,7 +87,7 @@ export { LWQL_GRANULARITY_MAX_BUCKETS };
 /**
  * What an overflowing period does to the step that overflowed it.
  */
-export type LangWatchQLBudgetOverflowMode = "refuse" | "coarsen";
+type LangWatchQLBudgetOverflowMode = "refuse" | "coarsen";
 
 /** What a statement's granularity declaration means for one request. */
 export interface LangWatchQLGranularityResolution {

@@ -5,7 +5,10 @@ import type {
 } from "@langwatch/automation-contract";
 import { toDate } from "@langwatch/time";
 
-import type { GraphEvaluationPlan, GraphTriggerEvaluationDeps } from "../app/automation.members.ts";
+import type {
+  GraphEvaluationPlan,
+  GraphTriggerEvaluationDeps,
+} from "./graph-trigger-evaluation-plan.service.ts";
 import { GraphTriggerEvaluationPlanService } from "./graph-trigger-evaluation-plan.service.ts";
 import { GraphTriggerIncidentService } from "./graph-trigger-incident.service.ts";
 import { GraphTriggerSeriesEvaluationService } from "./graph-trigger-series-evaluation.service.ts";

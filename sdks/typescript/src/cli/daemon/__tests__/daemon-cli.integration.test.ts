@@ -143,6 +143,7 @@ describe("the CLI served by a daemon", () => {
 
   describe("given no daemon is running", () => {
     describe("when a command runs with the daemon path enabled", () => {
+      /** @scenario "No daemon is running" */
       it("behaves exactly as it does today", async () => {
         const inProcess = await run(["trace", "search", "--format", "json"]);
         const withDaemonEnabled = await runViaDaemon(["trace", "search", "--format", "json"]);
@@ -152,6 +153,7 @@ describe("the CLI served by a daemon", () => {
         expect(withDaemonEnabled.stderr).toBe(inProcess.stderr);
       });
 
+      /** @scenario "No daemon is running" */
       it("does not mention the daemon to a user who never asked for one", async () => {
         const result = await runViaDaemon(["trace", "search"]);
         expect(result.stderr).not.toContain("daemon");
@@ -161,6 +163,7 @@ describe("the CLI served by a daemon", () => {
 
   describe("given a running daemon", () => {
     describe("when a command succeeds", () => {
+      /** @scenario "Byte-identical stdout" */
       it("produces byte-identical stdout, stderr and exit code", async () => {
         const inProcess = await run(["trace", "search", "--format", "json"]);
 
@@ -172,6 +175,7 @@ describe("the CLI served by a daemon", () => {
         expect(served.stderr).toBe(inProcess.stderr);
       });
 
+      /** @scenario "An agent pipes the CLI output" */
       it("actually serves it from the daemon", async () => {
         await startDaemon();
         await runViaDaemon(["trace", "search"]);
@@ -192,6 +196,7 @@ describe("the CLI served by a daemon", () => {
     });
 
     describe("when a command exits non-zero", () => {
+      /** @scenario "Non-zero exit codes propagate" */
       it("reproduces the exit code and stderr of the in-process run", async () => {
         // No API key: resolveCredentials() prints and calls process.exit(1) — the exact
         // mid-flight-exit path that a warm process has to reproduce.
@@ -223,6 +228,7 @@ describe("the CLI served by a daemon", () => {
     });
 
     describe("when commands are fanned out concurrently", () => {
+      /** @scenario "Concurrent commands" */
       it("serves them all correctly", async () => {
         await startDaemon();
 
@@ -242,6 +248,7 @@ describe("the CLI served by a daemon", () => {
     });
 
     describe("when the caller runs from its own working directory", () => {
+      /** @scenario "Commands run in the caller's working directory" */
       it("resolves local files against the CALLER's cwd, not the daemon's", async () => {
         await startDaemon();
 
@@ -294,6 +301,7 @@ describe("the CLI served by a daemon", () => {
 
   describe("given the user opted out", () => {
     describe("when LANGWATCH_NO_DAEMON is set", () => {
+      /** @scenario "The user opts out" */
       it("never contacts a running daemon", async () => {
         await startDaemon();
         const before = (await daemonStatus()).served ?? 0;
@@ -322,6 +330,7 @@ describe("the CLI served by a daemon", () => {
     });
 
     describe("when the CLI is called repeatedly, as an agent does", () => {
+      /** @scenario "Auto-spawn on first use" */
       it("runs each command in-process and leaves a daemon behind for the next one", async () => {
         const first = await run(["trace", "search", "--format", "json"], autoSpawn);
         const second = await run(["trace", "search", "--format", "json"], autoSpawn);

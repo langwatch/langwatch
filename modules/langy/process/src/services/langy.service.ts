@@ -16,14 +16,8 @@ import {
   type LangyUsageCount,
 } from "@langwatch/langy-contract";
 
-import type { LangyConversationCommands } from "../app/langy.members.ts";
-import {
-  ADOPTABLE_CONVERSATION_ID,
-  type ConversationDetail,
-  type ConversationListItem,
-  type ConversationListPage,
-} from "../rules/langy-conversation-shape.rules.ts";
-import type { LatestControlRequest } from "../rules/langy-local-control-request-state.rules.ts";
+import type { LangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
+import type { LatestControlRequestReading } from "../rules/langy-local-control-request-state.rules.ts";
 import {
   type LangyConversationService,
   type LangyConversationEventsReader,
@@ -31,10 +25,7 @@ import {
 } from "./langy-conversation.service.ts";
 import type { LangyCredentialService } from "./langy-credential.service.ts";
 import type { LangyFeedbackPromptService } from "./langy-feedback-prompt.service.ts";
-import {
-  type LangyMessageService,
-  type LangyTrustedMessageReader,
-} from "./langy-message.service.ts";
+import type { LangyMessageService } from "./langy-message.service.ts";
 import type { LangyTurnService } from "./langy-turn.service.ts";
 
 /**
@@ -42,14 +33,7 @@ import type { LangyTurnService } from "./langy-turn.service.ts";
  */
 export type OpenLangyRelay = (conversations: LangyService) => LangyRelayConnection;
 
-export type {
-  LangyConversationCommands,
-  LangyConversationEventsReader,
-  LangyConversationRuntime,
-  LangyTrustedMessageReader,
-};
-export type { ConversationDetail, ConversationListItem, ConversationListPage };
-export { ADOPTABLE_CONVERSATION_ID };
+export type { LangyConversationCommands, LangyConversationEventsReader, LangyConversationRuntime };
 
 /**
  * The Langy feature's own conversation-and-turn service: the full surface
@@ -62,7 +46,7 @@ export class LangyService {
   private readonly turns: LangyTurnService;
   private readonly messages: LangyMessageService;
   private readonly credentials: LangyCredentialService;
-  private readonly openRelay: OpenLangyRelay | null;
+  private readonly openRelay: OpenLangyRelay;
 
   private constructor({
     feedbackPrompt,
@@ -70,14 +54,14 @@ export class LangyService {
     turns,
     messages,
     credentials,
-    openRelay = null,
+    openRelay,
   }: {
     feedbackPrompt: LangyFeedbackPromptService;
     conversations: LangyConversationService;
     turns: LangyTurnService;
     messages: LangyMessageService;
     credentials: LangyCredentialService;
-    openRelay?: OpenLangyRelay | null;
+    openRelay: OpenLangyRelay;
   }) {
     this.feedbackPrompt = feedbackPrompt;
     this.conversations = conversations;
@@ -94,7 +78,7 @@ export class LangyService {
     messages: LangyMessageService;
     credentials: LangyCredentialService;
     feedbackPrompt: LangyFeedbackPromptService;
-    openRelay?: OpenLangyRelay;
+    openRelay: OpenLangyRelay;
   }): LangyService {
     return new LangyService({
       feedbackPrompt: options.feedbackPrompt,
@@ -102,15 +86,11 @@ export class LangyService {
       turns: options.turns,
       messages: options.messages,
       credentials: options.credentials,
-      openRelay: options.openRelay ?? null,
+      openRelay: options.openRelay,
     });
   }
 
   openRelayConnection(): LangyRelayConnection {
-    if (!this.openRelay) {
-      throw new Error("Langy relay is not configured");
-    }
-
     return this.openRelay(this);
   }
 
@@ -176,7 +156,7 @@ export class LangyService {
   getLatestLocalControlRequest(input: {
     projectId: string;
     conversationId: string;
-  }): Promise<LatestControlRequest | null> {
+  }): Promise<LatestControlRequestReading> {
     return this.conversations.getLatestLocalControlRequest(input);
   }
 

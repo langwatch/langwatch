@@ -11,14 +11,16 @@ import type {
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type {
-  AppendGatewayChangeEventInput,
-  BudgetDebitRow,
-  GatewayBudgetSpend,
-  GatewayChangeEvents,
-} from "../../app/gateway.members.ts";
 import { writeGatewayDebitsSchema } from "../../eventing/gateway-debit.intent.ts";
 import { GatewayBudgetChangeDedupeRepository } from "../../repositories/gateway-budget-change-dedupe.repository.ts";
+import type {
+  BudgetDebitRow,
+  GatewayBudgetSpendRepository,
+} from "../../repositories/gateway-budget-spend.repository.ts";
+import type {
+  AppendGatewayChangeEventInput,
+  GatewayChangeEventsRepository,
+} from "../../repositories/gateway-change-event.repository.ts";
 import { GatewayBudgetChangeDedupeService } from "../gateway-budget-change-dedupe.service.ts";
 import type { GatewayBudgetCrossingService } from "../gateway-budget-crossing.service.ts";
 import { GatewaySpendDebitService } from "../gateway-spend-debit.service.ts";
@@ -83,7 +85,7 @@ class StaticBudgets implements Pick<GatewayService, "resolveApplicableBudgets"> 
   }
 }
 
-class RecordingLedger implements Pick<GatewayBudgetSpend, "insertDebitsForBudgets"> {
+class RecordingLedger implements Pick<GatewayBudgetSpendRepository, "insertDebitsForBudgets"> {
   readonly batches: BudgetDebitRow[][] = [];
 
   constructor(private readonly refusal?: Error) {}
@@ -117,7 +119,7 @@ class RecordingCrossings implements Pick<GatewayBudgetCrossingService, "detect">
   }
 }
 
-class RecordingChanges implements Pick<GatewayChangeEvents, "append"> {
+class RecordingChanges implements Pick<GatewayChangeEventsRepository, "append"> {
   readonly appended: AppendGatewayChangeEventInput[] = [];
 
   async append(input: AppendGatewayChangeEventInput): Promise<{ revision: bigint }> {
@@ -270,6 +272,74 @@ describe("GatewaySpendDebitService", () => {
 
       expect(ledger.batches).toEqual([]);
       expect(changes.appended).toEqual([]);
+    });
+  });
+
+  describe("given an outcome with no virtual key and no provider", () => {
+    /** @scenario "A project budget sees an Instant Eval outcome" */
+    it("debits the organization, team and project budgets that apply", async () => {
+      const { debits, resolver, ledger } = harness({
+        budgets: [
+          resolved({ id: "b-org", scopeType: "ORGANIZATION" }),
+          resolved({ id: "b-team", scopeType: "TEAM" }),
+          resolved({ id: "b-project", scopeType: "PROJECT" }),
+          resolved({ id: "b-openai", scopeType: "PROJECT", providerKey: "openai" }),
+        ],
+      });
+
+      await debits.write(
+        payload({
+          gateway_request_id: "instant-eval:run-1",
+          virtual_key_id: "",
+          model_provider_id: "",
+          principal_user_id: "",
+        }),
+      );
+
+      expect(resolver.asked[0]).toMatchObject({
+        organizationId: "org-1",
+        teamId: "team-1",
+        projectId: "project-1",
+      });
+      const rows = ledger.batches.flat();
+      expect(rows.map((row) => row.budgetId)).toEqual(["b-org", "b-team", "b-project"]);
+      expect(new Set(rows.map((row) => row.gatewayRequestId))).toEqual(
+        new Set(["instant-eval:run-1"]),
+      );
+      expect(rows[0]).toMatchObject({ providerKey: null, amountNanoUsd: 420_000_000 });
+    });
+  });
+
+  describe("given a forwarded call and an Instant Eval outcome under one managed key", () => {
+    /** @scenario Forwarded calls are metered under the customer organization */
+    it("debits the same budgets, each row naming the customer organization", async () => {
+      const { debits, resolver, ledger } = harness({
+        budgets: [
+          resolved({ id: "b-org", scopeType: "ORGANIZATION" }),
+          resolved({ id: "b-key", scopeType: "VIRTUAL_KEY" }),
+        ],
+      });
+      const managed = { organization_id: "org-customer", virtual_key_id: "vk-managed" };
+
+      await debits.write(payload({ ...managed, gateway_request_id: "forwarded-1" }));
+      await debits.write(
+        payload({
+          ...managed,
+          gateway_request_id: "instant-eval:run-1",
+          model: "jev",
+          model_provider_id: "",
+        }),
+      );
+
+      expect(resolver.asked).toHaveLength(2);
+      expect(resolver.asked[0]).toMatchObject({
+        organizationId: "org-customer",
+        virtualKeyId: "vk-managed",
+      });
+      expect(resolver.asked[1]).toEqual(resolver.asked[0]);
+      const [forwarded, instantEval] = ledger.batches;
+      expect(forwarded?.map((row) => row.budgetId)).toEqual(["b-org", "b-key"]);
+      expect(instantEval?.map((row) => row.budgetId)).toEqual(["b-org", "b-key"]);
     });
   });
 

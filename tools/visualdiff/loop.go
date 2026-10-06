@@ -46,7 +46,9 @@ func LoopOptions(flags loopFlags, config *Config) Options {
 
 // loopCommand is `visualdiff flow <id>` and `visualdiff route <path>`: one
 // section against main's cached baseline on the loop's kept candidate stack.
-func loopCommand(ctx context.Context, kind string, args []string, streams Streams) int {
+// args[0] is the kind, flow or route; the rest are its flags.
+func loopCommand(ctx context.Context, args []string, streams Streams) int {
+	kind, args := args[0], args[1:]
 	parsed, err := parseLoopFlags(kind, args, streams.Err)
 	if err == nil && !havenOnPath() {
 		err = errors.New(kind + ": the fix loop keeps a haven stack up, and haven is not installed")

@@ -13,12 +13,12 @@ import { percentile } from "../rules/ops-anomaly-percentile.rules.ts";
 
 const logger = createLogger("langwatch:observability:anomalyDetector");
 
-export const SURFACE_TIER_MULTIPLIER = 10;
-export const HARD_TIER_MULTIPLIER = 100;
+const SURFACE_TIER_MULTIPLIER = 10;
+const HARD_TIER_MULTIPLIER = 100;
 export const SURFACE_TIER_SUSTAIN_MINUTES = 5;
 export const HARD_TIER_SUSTAIN_MINUTES = 15;
-export const BASELINE_LOOKBACK_SECONDS = 7 * 24 * 60 * 60;
-export const MIN_BASELINE_RATE = 5;
+const BASELINE_LOOKBACK_SECONDS = 7 * 24 * 60 * 60;
+const MIN_BASELINE_RATE = 5;
 export const INSUFFICIENT_DATA_RECHECK_SECONDS = 10 * 60;
 
 export class AnomalyDetectorService {

@@ -3,6 +3,7 @@ import {
   HandledError,
   isZodLikeError,
   remediation,
+  remediationFor,
   serializedHandledErrorSchema,
   ValidationError,
   type ZodLikeError,
@@ -118,6 +119,77 @@ export class PayloadTooLargeError extends HandledError {
     });
 
     this.name = "PayloadTooLargeError";
+  }
+}
+
+/** What a raw-body route that declared its media type was sent under, against what it reads. */
+type MediaTypeRefusal = Readonly<{ received: string | null; expected: string }>;
+
+function mediaTypeMeta({ received, expected }: MediaTypeRefusal): Record<string, string> {
+  return received === null ? { expected } : { received, expected };
+}
+
+/** A raw body sent under a media type its route does not read (Alex, 2026-10-05, E9). */
+export class UnsupportedMediaTypeError extends HandledError {
+  constructor(refusal: MediaTypeRefusal) {
+    super(
+      "unsupported_media_type",
+      `This endpoint reads ${refusal.expected}, and the body was sent as ${refusal.received ?? "no media type"}`,
+      {
+        httpStatus: 415,
+        fault: "customer",
+        meta: mediaTypeMeta(refusal),
+        ...remediationFor("unsupported_media_type"),
+      },
+    );
+
+    this.name = "UnsupportedMediaTypeError";
+  }
+}
+
+/** The same refusal where the route keeps main's 400: the legacy family and the collector. */
+export class MediaTypeMalformedRequestError extends HandledError {
+  constructor(refusal: MediaTypeRefusal) {
+    super("malformed_request", `The request body could not be read as ${refusal.expected}`, {
+      httpStatus: 400,
+      fault: "customer",
+      meta: mediaTypeMeta(refusal),
+      ...remediation("malformed_request"),
+    });
+
+    this.name = "MediaTypeMalformedRequestError";
+  }
+}
+
+/** A caller lacking a platform-tier permission a route asks at the platform (E4). */
+export class PlatformPermissionDeniedError extends HandledError {
+  constructor(permission: AuthzPermission) {
+    super("permission_denied", "This is an operator-only surface.", {
+      httpStatus: 403,
+      fault: "customer",
+      meta: { permission },
+    });
+    this.name = "PlatformPermissionDeniedError";
+  }
+}
+
+/** The hidden family's answer to every caller a platform route refuses (record §8, E4). */
+export class PlatformSurfaceHiddenError extends HandledError {
+  constructor() {
+    super("not_found", "Not found", { httpStatus: 404, fault: "customer" });
+    this.name = "PlatformSurfaceHiddenError";
+  }
+}
+
+/** A key of a kind the route does not admit (E7); `kind` names the kind, never the key. */
+export class KeyKindRefusedError extends HandledError {
+  constructor(kind: string) {
+    super("key_type_not_allowed", `This endpoint does not accept a key of kind ${kind}`, {
+      httpStatus: 403,
+      fault: "customer",
+      meta: { kind },
+    });
+    this.name = "KeyKindRefusedError";
   }
 }
 
@@ -445,11 +517,16 @@ export class ProjectInvalidCredentialsError extends HandledError {
 export class ProjectRequiredError extends HandledError {
   declare readonly code: "project_required";
 
-  constructor() {
+  /** `projects`: the ones the key reaches, so a caller can pick one (Q30). */
+  constructor(input: { projects?: readonly { id: string; name: string }[] } = {}) {
     super(
       "project_required",
       "This API key is not bound to a single project, so the request has to name one. Send the project id in the X-Project-Id header, or pass --project <id|slug> to the CLI.",
-      { httpStatus: 400, fault: "customer" },
+      {
+        httpStatus: 400,
+        fault: "customer",
+        ...(input.projects ? { meta: { projects: input.projects } } : {}),
+      },
     );
 
     this.name = "ProjectRequiredError";

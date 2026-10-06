@@ -1,5 +1,5 @@
 import { defineRepositories } from "@langwatch/process";
-import type { ObjectStorage } from "@langwatch/process-stores/members";
+import type { ObjectStorage } from "@langwatch/process-stores";
 
 import type { NlpLambdaArnCache } from "../app/workflow.app.ts";
 import type { NlpPayloadStaging } from "../channels/nlp-lambda.channel.ts";

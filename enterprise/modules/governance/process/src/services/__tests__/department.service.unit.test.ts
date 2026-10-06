@@ -49,6 +49,7 @@ async function harness(options: { targetExists?: boolean } = {}) {
 }
 
 describe("DepartmentService", () => {
+  /** @scenario "Department assignments are organization scoped" */
   it("rejects a department owned by another organization before assignment", async () => {
     const { service, department, writes } = await harness();
 
@@ -70,6 +71,7 @@ describe("DepartmentService", () => {
     expect(writes).toEqual(["team:team-1"]);
   });
 
+  /** @scenario "Department assignments are organization scoped" */
   it("does not report a missing assignment target as success", async () => {
     const { service, department } = await harness({ targetExists: false });
 

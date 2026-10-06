@@ -304,30 +304,59 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 			fmt.Fprintf(streams.Err, "phases: %v\n", err)
 		}
 	}()
+	execution := &execution{request: request, streams: streams, clock: clock}
+	if err := execution.planRun(ctx); err != nil || execution.request.Options.DryRun {
+		return execution.result, err
+	}
+	return execution.captureRun(ctx)
+}
+
+// execution is one Execute after its run directory is open: the request as
+// pinned, the plan, the baselines and the result so far.
+type execution struct {
+	request   Request
+	streams   Streams
+	clock     *phaseClock
+	plan      Plan
+	baselines map[Edition]Baseline
+	result    Result
+}
+
+// planRun pins the base, plans the run and its baselines, and on a dry run
+// prints the plan.
+func (execution *execution) planRun(ctx context.Context) error {
+	request, streams := &execution.request, execution.streams
 	if request.Options.PinMain {
-		request.Options.BaseRef = pinMain(ctx, request, streams.Err)
+		request.Options.BaseRef = pinMain(ctx, *request, streams.Err)
 	}
 	options, config, deps := request.Options, request.Config, request.Deps
 	if options.SkipWorks {
-		request.Done = append(request.Done, skipWorks(ctx, request, streams)...)
+		request.Done = append(request.Done, skipWorks(ctx, *request, streams)...)
 	}
 	plan := buildPlan(options, config)
-	result := Result{Plan: plan, Coverage: runCoverage(ctx, request, streams.Err)}
+	execution.result = Result{Plan: plan, Coverage: runCoverage(ctx, *request, streams.Err)}
 	baselines, err := planBaselines(ctx, baselineInputs{options: options, config: config, deps: deps, done: request.Done}, streams.Err)
 	if err != nil {
-		return result, err
+		return err
 	}
 	plan.ReplayBase = !needsLiveBase(options.Editions, baselines)
-	result.Plan = plan
+	execution.plan, execution.baselines, execution.result.Plan = plan, baselines, plan
 
 	if options.DryRun {
 		writePlan(streams.Out, plan, options.RoutesOnly)
 		request.Done.writeSkips(streams.Out, config, options.Editions)
 		writeBaselinePlan(streams.Out, options.Editions, baselines)
-		return result, nil
 	}
+	return nil
+}
+
+// captureRun readies the ports and worktrees, boots both stacks, captures
+// every edition and writes the report. Teardown runs on every exit.
+func (execution *execution) captureRun(ctx context.Context) (Result, error) {
+	request, streams, clock := execution.request, execution.streams, execution.clock
+	options, deps, baselines, plan, result := request.Options, request.Deps, execution.baselines, execution.plan, execution.result
 	writeBaselinePlan(streams.Err, options.Editions, baselines)
-	request.Done.writeSkips(streams.Err, config, options.Editions)
+	request.Done.writeSkips(streams.Err, request.Config, options.Editions)
 	if err := prepareInfra(ctx, portInfraInputs{plan: &plan, deps: deps, stderr: streams.Err}, options); err != nil {
 		return result, diffkit.SetupFailed(err)
 	}
@@ -644,7 +673,7 @@ func (run *session) seedStacks(ctx context.Context, options Options, deps Deps) 
 	for _, stack := range stacks {
 		seed := SeedRequest{
 			APIURL: stack.APIURL(), Identity: options.Identity, TraceCount: options.TraceCount, Flows: run.request.Config.Flows,
-			ScimToken: stackScimToken(ctx, deps.Run, deps.Environ, *stack, run.request.Config.Flows),
+			ScimToken: stackScimToken(ctx, scimTokenRequest{run: deps.Run, environ: deps.Environ, stack: *stack, flows: run.request.Config.Flows}),
 		}
 		result, err := deps.Seed(ctx, seed)
 		if err != nil {
@@ -1084,15 +1113,8 @@ const runnerWaitDelay = 30 * time.Second
 // output buffered until the process exits) is what makes OnCapture/OnDiff a
 // real live callback rather than one that only fires once capture is over.
 func RunRunner(ctx context.Context, plan RunnerPlan, options CaptureOptions) (RunnerStream, error) {
-	planPath := filepath.Join(plan.OutDir, "plan.json")
-	if err := os.MkdirAll(plan.OutDir, 0o750); err != nil {
-		return RunnerStream{}, err
-	}
-	encoded, err := json.MarshalIndent(plan, "", " ")
+	planPath, err := writeRunnerPlan(plan)
 	if err != nil {
-		return RunnerStream{}, err
-	}
-	if err := os.WriteFile(planPath, encoded, 0o600); err != nil {
 		return RunnerStream{}, err
 	}
 	// #nosec G204 -- constant executable and constant args but for the plan
@@ -1109,20 +1131,7 @@ func RunRunner(ctx context.Context, plan RunnerPlan, options CaptureOptions) (Ru
 	if err := command.Start(); err != nil {
 		return RunnerStream{}, err
 	}
-	var stopped atomic.Pointer[diffkit.Stopped]
-	streaks, onCapture := newCaptureStreaks(options.MaxConsecutiveErrors), options.OnCapture
-	options.OnCapture = func(capture Capture) {
-		if stopped.Load() != nil {
-			return
-		}
-		if onCapture != nil {
-			onCapture(capture)
-		}
-		if reason := streaks.file(capture); reason != nil {
-			stopped.Store(reason)
-			killTree(command.Process.Pid)
-		}
-	}
+	stopped := stopOnErrorStreak(&options, command)
 	stream, parseErr := ParseRunnerStreamLive(stdout, options)
 	// Parsing stops at the runner's error line; unread, its last writes block it from exiting.
 	_, _ = io.Copy(io.Discard, stdout)
@@ -1137,6 +1146,40 @@ func RunRunner(ctx context.Context, plan RunnerPlan, options CaptureOptions) (Ru
 		return stream, fmt.Errorf("runner: %w", runErr)
 	}
 	return stream, nil
+}
+
+// writeRunnerPlan writes the plan as plan.json under its output directory.
+func writeRunnerPlan(plan RunnerPlan) (string, error) {
+	planPath := filepath.Join(plan.OutDir, "plan.json")
+	if err := os.MkdirAll(plan.OutDir, 0o750); err != nil {
+		return "", err
+	}
+	encoded, err := json.MarshalIndent(plan, "", " ")
+	if err != nil {
+		return "", err
+	}
+	return planPath, os.WriteFile(planPath, encoded, 0o600)
+}
+
+// stopOnErrorStreak wraps options.OnCapture so a streak of harness or stack
+// errors kills the runner, and answers where the reason it stopped is kept.
+// Captures after the stop are dropped.
+func stopOnErrorStreak(options *CaptureOptions, command *exec.Cmd) *atomic.Pointer[diffkit.Stopped] {
+	var stopped atomic.Pointer[diffkit.Stopped]
+	streaks, onCapture := newCaptureStreaks(options.MaxConsecutiveErrors), options.OnCapture
+	options.OnCapture = func(capture Capture) {
+		if stopped.Load() != nil {
+			return
+		}
+		if onCapture != nil {
+			onCapture(capture)
+		}
+		if reason := streaks.file(capture); reason != nil {
+			stopped.Store(reason)
+			killTree(command.Process.Pid)
+		}
+	}
+	return &stopped
 }
 
 // RunnerPreflight launches and closes the runner's browser; its stderr names

@@ -1,9 +1,9 @@
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { TraceHeader } from "@langwatch/trace-contract";
 
-import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { useFocusSectionStore } from "../../../../behavior/focus-section.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import type { SdkInfo } from "../../../../model/sdk-info.ts";
 import { parseSdkInfo } from "../../../../model/sdk-info.ts";
 import { type ScenarioChipData, useScenarioChipData } from "../trace-drawer/scenario-chip.tsx";

@@ -1,5 +1,4 @@
 import {
-  DATASET_ATTACHMENT_MAX_BYTES,
   DatasetAttachmentTooLargeError,
   DatasetAttachmentUnavailableError,
   attachmentDisplayName,
@@ -20,10 +19,10 @@ import type { ExperimentAttachmentLinkChannel } from "../experiment-attachment-l
 const logger = createLogger("langwatch:experiment:attachment-link");
 
 /** How long the run waits for an address on the public internet. */
-export const ATTACHMENT_LINK_TIMEOUT_MS = 30_000;
+const ATTACHMENT_LINK_TIMEOUT_MS = 30_000;
 
 /** The address policy a deployment fences a run's attachment reads with. */
-export type ExperimentAttachmentEgressPolicy = Readonly<{
+type ExperimentAttachmentEgressPolicy = Readonly<{
   blockLocal: boolean;
   allowedHosts: readonly string[];
   verifyTls: boolean;
@@ -42,7 +41,7 @@ interface AttachmentLinkBodyReader {
 }
 
 /** The fenced fetch seam, injected so a test never opens a socket. */
-export type FencedAttachmentFetch = (
+type FencedAttachmentFetch = (
   validated: SsrfValidationResult,
   init: FencedFetchOptions,
   tls: EgressTlsPolicy,
@@ -50,8 +49,8 @@ export type FencedAttachmentFetch = (
 
 /**
  * The address belongs to whoever wrote the cell, so its answer is never trusted:
- * a declared size over the ceiling is refused unread, the body is cut at the
- * ceiling, and an image column only takes a picture. Every hop is fenced.
+ * a declared size over the caller's limit is refused unread, the body is cut at
+ * the limit, and an image column only takes a picture. Every hop is fenced.
  */
 export class HttpExperimentAttachmentLinkChannel implements ExperimentAttachmentLinkChannel {
   private constructor(
@@ -79,9 +78,11 @@ export class HttpExperimentAttachmentLinkChannel implements ExperimentAttachment
   async fetchAttachment({
     url,
     columnType,
+    maxBytes,
   }: {
     url: string;
     columnType?: string;
+    maxBytes: number;
   }): Promise<AttachmentBytes> {
     const name = attachmentDisplayName(url);
     const controller = new AbortController();
@@ -100,8 +101,8 @@ export class HttpExperimentAttachmentLinkChannel implements ExperimentAttachment
       if (!response.ok) throw new DatasetAttachmentUnavailableError(name);
 
       const declaredLength = Number(response.headers.get("content-length"));
-      if (Number.isFinite(declaredLength) && declaredLength > DATASET_ATTACHMENT_MAX_BYTES) {
-        throw new DatasetAttachmentTooLargeError(DATASET_ATTACHMENT_MAX_BYTES);
+      if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+        throw new DatasetAttachmentTooLargeError(maxBytes);
       }
 
       const mediaType =
@@ -115,22 +116,22 @@ export class HttpExperimentAttachmentLinkChannel implements ExperimentAttachment
       }
       if (!response.body) throw new DatasetAttachmentUnavailableError(name);
 
-      return { mediaType, bytes: await readCapped(response.body.getReader()), name };
+      return { mediaType, bytes: await readCapped(response.body.getReader(), maxBytes), name };
     } finally {
       clearTimeout(timer);
     }
   }
 }
 
-async function readCapped(reader: AttachmentLinkBodyReader): Promise<Buffer> {
+async function readCapped(reader: AttachmentLinkBodyReader, maxBytes: number): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let total = 0;
-  while (total <= DATASET_ATTACHMENT_MAX_BYTES) {
+  while (total <= maxBytes) {
     const { done, value } = await reader.read();
     if (done || !value) return Buffer.concat(chunks);
     total += value.byteLength;
     chunks.push(Buffer.from(value));
   }
   await reader.cancel();
-  throw new DatasetAttachmentTooLargeError(DATASET_ATTACHMENT_MAX_BYTES);
+  throw new DatasetAttachmentTooLargeError(maxBytes);
 }

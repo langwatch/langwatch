@@ -8,19 +8,12 @@ import {
 } from "@langwatch/eventing/server";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { ModuleApiToken } from "@langwatch/module";
-import {
-  bootInstalledProcess,
-  type InstallableServerFeature,
-  processConfig,
-  storesBackedMembers,
-  withMemoryRepositories,
-} from "@langwatch/process";
+import { type BootedRuntime, createApp, processConfig } from "@langwatch/process";
 import {
   aesEncryption,
   memoryStores,
   resolvedSecrets,
   systemClock,
-  type ProcessMembers,
 } from "@langwatch/process-stores";
 import {
   refuseDoubleClaims,
@@ -54,8 +47,17 @@ function unreachable<Client extends object>(name: string): Client {
   return createApiFixture<Client>({}, `${name} (no raw client over memory stores)`);
 }
 
-function overMemory(module: InstallableServerFeature<never>): InstallableServerFeature<never> {
-  return module.repositoryRegistry === void 0 ? module : withMemoryRepositories(module);
+/**
+ * The supply chain over the whole installed list: its per-module type check does not close over
+ * thirty modules, so this names only the calls the harness makes.
+ */
+interface WholeListSupply {
+  withModules(modules: readonly unknown[]): WholeListSupply;
+  withConfig(config: unknown): WholeListSupply;
+  withStores(stores: ReturnType<typeof memoryStores>): WholeListSupply;
+  withMembers(members: Readonly<Record<string, unknown>>): WholeListSupply;
+  withEventing(eventing: EventSourcing): WholeListSupply;
+  boot(): Promise<BootedRuntime<Record<string, unknown>, unknown, unknown>>;
 }
 
 /** A SaaS deployment: the flag and a synthetic, never-called Stripe key its reports need. */
@@ -76,7 +78,6 @@ async function bootWorker({ live = false, saas = false }: { live?: boolean; saas
   );
   await resolver.preflight(declared);
 
-  const prisma = unreachable<ProcessMembers["prisma"]>("prisma");
   const eventing = new EventSourcing({
     ...(live ? { eventStore: EventStoreMemory.createForTesting() } : { enabled: false }),
     participation: "consume",
@@ -88,67 +89,78 @@ async function bootWorker({ live = false, saas = false }: { live?: boolean; saas
       }),
     ],
   });
-  const stores: Partial<ProcessMembers> = {
-    logger: createTestLogger().logger,
-    clock: systemClock(),
-    secrets: resolvedSecrets({}),
-    encryption: aesEncryption(new Uint8Array(32)),
-    telemetry: unreachable<ProcessMembers["telemetry"]>("telemetry"),
-    prisma,
-    clickhouse: unreachable<ProcessMembers["clickhouse"]>("clickhouse"),
-    objectStorage: unreachable<ProcessMembers["objectStorage"]>("objectStorage"),
-    cache: unreachable<ProcessMembers["cache"]>("cache"),
-    idempotency: { claim: async () => true },
-    rateLimiter: { check: async () => ({ allowed: true }) },
-    eventing,
-  };
-  const runtime = await bootInstalledProcess({
+  const supply: WholeListSupply = createApp({
     role: ROLE,
-    modules: processModules.map(overMemory),
-    config,
-    secrets: (owner, declared) => resolver.scopeTo(owner, declared),
-    members: {
-      ...storesBackedMembers(memoryStores(), {
-        ...stores,
-        // The memory answer for Redis is none: every Redis-backed member has a twin.
-        redis: null,
-        publicBaseUrl: config.process.baseHost,
-        serviceVersion: "test",
-        // No collector: rum answers not configured unless the test names one.
-        telemetryExporter: {
-          endpoint: void 0,
-          withHeaders: <Out>(build: (headers: Readonly<Record<string, string>>) => Out): Out =>
-            build({}),
-        },
-        nodeEnvironment: config.process.nodeEnvironment,
-        isSaas: config.process.isSaas ?? false,
-        nlpServiceUrl: config.process.nlpServiceUrl,
-        nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
-        nlpInternalSecret: void 0,
-        outboundProxy: config.process.outboundProxy,
-        processName: "langwatch-worker",
-        storageResolver: void 0,
-        storage: void 0,
-        queue: void 0,
-        content: void 0,
-        connectJudge: null,
-        rawSocketPort: 0,
-        monitor: void 0,
-        langwatchQl: {
-          admin: { configured: false },
-          postgres: { configured: false },
-          database: () => prisma,
-        },
-      }),
-      close: async () => void 0,
-    },
+    secrets: (owner, handles) => resolver.scopeTo(owner, handles),
   });
+  const runtime = await supply
+    .withModules(processModules)
+    .withConfig(config)
+    .withStores(memoryStores())
+    .withMembers({
+      logger: createTestLogger().logger,
+      clock: systemClock(),
+      secrets: resolvedSecrets({}),
+      encryption: aesEncryption(new Uint8Array(32)),
+      telemetry: unreachable<object>("telemetry"),
+      prisma: unreachable<object>("prisma"),
+      clickhouse: unreachable<object>("clickhouse"),
+      objectStorage: unreachable<object>("objectStorage"),
+      cache: unreachable<object>("cache"),
+      idempotency: { claim: async () => true },
+      rateLimiter: { check: async () => ({ allowed: true }) },
+      // The memory answer for Redis is none: every Redis-backed member has a twin.
+      redis: null,
+      publicBaseUrl: config.process.baseHost,
+      serviceVersion: "test",
+      // No collector: rum answers not configured unless the test names one.
+      telemetryExporter: {
+        endpoint: void 0,
+        withHeaders: <Out>(build: (headers: Readonly<Record<string, string>>) => Out): Out =>
+          build({}),
+      },
+      nodeEnvironment: config.process.nodeEnvironment,
+      isSaas: config.process.isSaas ?? false,
+      nlpServiceUrl: config.process.nlpServiceUrl,
+      nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
+      nlpInternalSecret: void 0,
+      outboundProxy: config.process.outboundProxy,
+      processName: "langwatch-worker",
+      storageResolver: void 0,
+      storage: void 0,
+      queue: void 0,
+      content: void 0,
+      connectJudge: null,
+      monitor: void 0,
+      langwatchQl: {
+        admin: { configured: false },
+        postgres: { configured: false },
+        database: () => unreachable<object>("langwatchQl database"),
+      },
+    })
+    .withEventing(eventing)
+    .boot();
   return { runtime, eventing };
 }
 
 const moduleApis = processModules.flatMap((module) =>
   module.apiContract instanceof ModuleApiToken ? [module.apiContract] : [],
 );
+
+const TENANCY_AND_GATEWAY = ["organization", "project", "authz", "model-provider"] as const;
+
+function apiNamed(name: string): ModuleApiToken<unknown> {
+  const token = moduleApis.find((candidate) => candidate.name === name);
+  if (token === undefined) throw new Error(`no installed module serves the ${name} API`);
+  return token;
+}
+
+/** The installed modules whose declared dependencies include `token`. */
+function dependentsOf(token: ModuleApiToken<unknown>): string[] {
+  return processModules.flatMap((module) =>
+    Object.values(module.dependencies ?? {}).includes(token) ? [module.name] : [],
+  );
+}
 
 describe("the worker process installation", () => {
   /** @scenario "Every installed module boots in the worker role over memory stores" */
@@ -290,40 +302,183 @@ describe("the worker process installation", () => {
   });
 
   /** @scenario "The worker hands gateway's governance facts to webhook delivery" */
-  it("hosts gateway's governance subscriber and webhook's governance delivery under main's names", async () => {
+  it("hosts webhook's subscribers on gateway's governance facts and its governance delivery", async () => {
     const { runtime, eventing } = await bootWorker();
 
     try {
-      const pipeline = (name: string) =>
-        eventing.definitions.find((definition) => definition.metadata.name === name);
-      expect(
-        pipeline("governance_events_processing")?.open((definition) =>
-          definition.eventSubscribers.has("webhookGovernanceDelivery"),
-        ),
-      ).toBe(true);
-      expect(pipeline("webhook_delivery")?.processManagers.has("governanceEventsDelivery")).toBe(
-        true,
+      const webhook = eventing.definitions.find(
+        (definition) => definition.metadata.name === "webhook_delivery",
       );
+      expect(
+        webhook?.open((definition) => (definition.globalProjections ?? []).map(({ name }) => name)),
+      ).toEqual(
+        expect.arrayContaining([
+          "webhook_delivery.gatewayBudgetCrossingDelivery",
+          "webhook_delivery.gatewayVkLifecycleDelivery",
+        ]),
+      );
+      expect(webhook?.processManagers.has("governanceEventsDelivery")).toBe(true);
     } finally {
       await runtime.stop();
     }
   });
 
   /** @scenario "A SaaS worker registers the billable-events meter" */
-  it("declares the billable-events meter on the usage pipeline of a SaaS worker", async () => {
+  it("declares the billable-events and trace meters on the usage pipeline of a SaaS worker", async () => {
     const { runtime, eventing } = await bootWorker({ saas: true });
 
     try {
       const usage = eventing.definitions.find((definition) => definition.metadata.name === "usage");
       expect(
         usage?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
-      ).toEqual(["orgBillableEventsMeter"]);
+      ).toEqual(["orgBillableEventsMeter", "usageTraceMeter"]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "the pipeline is composed from packages alone" */
+  it("hosts the trace processing pipeline and routes every command and projection it declares", async () => {
+    const { runtime, eventing } = await bootWorker({ live: true });
+
+    try {
+      const trace = eventing.definitions.find(
+        ({ metadata }) => metadata.name === "trace_processing",
+      );
+      if (trace === undefined) throw new Error("the worker hosts no trace_processing pipeline");
+      const routed = [
+        ...trace.open((definition) => definition.commands.map(({ definition }) => definition.name)),
+      ].map((name) => `trace_processing:command:${name}`);
+      const projected = trace
+        .open((definition) => [...definition.foldProjections.keys()])
+        .map((name) => `trace_processing:projection:${name}`);
+
+      expect(routed).not.toEqual([]);
+      expect(projected).not.toEqual([]);
+      for (const key of [...routed, ...projected]) {
+        expect(eventing.globalJobRegistry.has(key), key).toBe(true);
+      }
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "A worker routes every key the installed pipelines declare" */
+  /** @scenario "The worker mounts every trace routing key" */
+  it("routes exactly the command and projection keys its installed pipelines declare", async () => {
+    const { runtime, eventing } = await bootWorker({ live: true });
+
+    try {
+      const declared = eventing.definitions.flatMap((pipeline) => {
+        const name = pipeline.metadata.name;
+        return pipeline.open((definition) => [
+          ...definition.commands.map((command) => `${name}:command:${command.definition.name}`),
+          ...[...definition.foldProjections.keys()].map((key) => `${name}:projection:${key}`),
+        ]);
+      });
+      const routed = [...eventing.globalJobRegistry.keys()];
+      const stray = routed.filter(
+        (key) => !declared.includes(key) && /:(command|projection):/.test(key),
+      );
+
+      expect(declared).not.toEqual([]);
+      expect(declared.filter((key) => !routed.includes(key))).toEqual([]);
+      expect(stray).toEqual([]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The worker claims every routing key the langy conversation pipeline declares" */
+  it("routes every command and projection key langy's conversation pipeline declares", async () => {
+    const { runtime, eventing } = await bootWorker({ live: true });
+
+    try {
+      const langy = eventing.definitions.find(
+        ({ metadata }) => metadata.name === "langy_conversation_processing",
+      );
+      if (langy === undefined) throw new Error("the worker hosts no langy conversation pipeline");
+      const declared = langy.open((definition) => [
+        ...definition.commands.map(({ definition: command }) => `command:${command.name}`),
+        ...[...definition.foldProjections.keys()].map((key) => `projection:${key}`),
+      ]);
+
+      expect(declared).not.toEqual([]);
+      for (const key of declared) {
+        expect(eventing.globalJobRegistry.has(`langy_conversation_processing:${key}`), key).toBe(
+          true,
+        );
+      }
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The worker hosts the queue's blob sweep and the process retention sweep" */
+  it("hosts the blob and process-retention maintenance pipelines, each on a schedule", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      for (const name of ["blob_maintenance", "process_manager_maintenance"]) {
+        const pipeline = eventing.definitions.find(({ metadata }) => metadata.name === name);
+        const schedules = [...(pipeline?.processManagers.values() ?? [])].flatMap((manager) =>
+          manager.config.schedule ? [manager.config.schedule] : [],
+        );
+
+        expect(pipeline, name).toBeDefined();
+        expect(schedules, name).not.toEqual([]);
+      }
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The worker serves the organization, project and authorization capabilities together" */
+  /** @scenario "The worker installs the model gateway beside the tenancy graph" */
+  it("serves the tenancy and model-provider capabilities from the booted graph", async () => {
+    const { runtime } = await bootWorker();
+
+    try {
+      for (const name of TENANCY_AND_GATEWAY) {
+        expect(runtime.service(apiNamed(name)), name).toBeDefined();
+      }
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The tenancy graph is the one the module graph booted" */
+  it("serves each tenancy capability as one instance that installed modules declare as a dependency", async () => {
+    const { runtime } = await bootWorker();
+
+    try {
+      for (const name of ["organization", "project", "authz"]) {
+        const token = apiNamed(name);
+
+        expect(runtime.service(token)).toBe(runtime.service(token));
+        expect(dependentsOf(token).length, name).toBeGreaterThan(0);
+      }
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "Topic clustering and evaluation resolve through one gateway" */
+  it("hands topic and evaluation the one model-provider instance the graph serves", async () => {
+    const { runtime } = await bootWorker();
+
+    try {
+      const gateway = apiNamed("model-provider");
+
+      expect(dependentsOf(gateway)).toEqual(expect.arrayContaining(["topic", "evaluation"]));
+      expect(runtime.service(gateway)).toBe(runtime.service(gateway));
     } finally {
       await runtime.stop();
     }
   });
 
   /** @scenario "The worker routes span recording to the trace pipeline" */
+  /** @scenario "The record command composes from a database and a configuration" */
   it("registers the trace pipeline's recordSpan handler in the job registry it consumes", async () => {
     const { runtime, eventing } = await bootWorker({ live: true });
 

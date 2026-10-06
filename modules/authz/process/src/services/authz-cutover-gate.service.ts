@@ -1,7 +1,7 @@
 import type { MigrationTenantStatus } from "@langwatch/authz-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
-import { Counter } from "prom-client";
+import { Counter, register } from "prom-client";
 
 import type { AuthzCutoverRepository } from "../repositories/authz-cutover.repository.ts";
 import { PerOrganizationCachedGateService } from "./per-organization-cached-gate.service.ts";
@@ -9,14 +9,16 @@ import { PerOrganizationCachedGateService } from "./per-organization-cached-gate
 export const ENGINE_GATE_CACHE_TTL_MS = 60_000;
 
 /** The metric name is an external interface; dashboards and alerts read it. */
-export const authzEngineGateReadFailuresTotal = new Counter({
-  name: "authz_engine_gate_read_failures_total",
-  help: "Failed reads of an organization's AuthZ migration state; the organization stays on the legacy path for the cache TTL.",
-});
+export const authzEngineGateReadFailuresTotal =
+  (register.getSingleMetric("authz_engine_gate_read_failures_total") as Counter | undefined) ??
+  new Counter({
+    name: "authz_engine_gate_read_failures_total",
+    help: "Failed reads of an organization's AuthZ migration state; the organization stays on the legacy path for the cache TTL.",
+  });
 
 const ON_ENGINE_STATUSES: readonly MigrationTenantStatus[] = ["finalized"];
 
-export type AuthzCutoverGateOptions = {
+type AuthzCutoverGateOptions = {
   repository: AuthzCutoverRepository;
   logger?: Logger;
   cache?: PerOrganizationCachedGateService;

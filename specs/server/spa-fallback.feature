@@ -22,6 +22,7 @@ Feature: Production HTTP server — static asset and SPA fallback behavior
     And dist/client/index.html exists
     And dist/client/assets/index-abc123.js exists with JavaScript content
 
+  @unit
   Scenario: Existing asset is served with the correct MIME type and immutable cache
     When a client requests /assets/index-abc123.js
     Then the response status is 200
@@ -29,12 +30,14 @@ Feature: Production HTTP server — static asset and SPA fallback behavior
     And the Cache-Control header is "public, max-age=31536000, immutable"
     And the response body is the on-disk JavaScript content
 
+  @unit
   Scenario: Missing asset returns a real 404 with no-cache headers
     When a client requests /assets/does-not-exist-xyz.js
     Then the response status is 404
     And the response is not the index.html document
     And the Cache-Control header instructs caches not to store the response
 
+  @unit
   Scenario: Missing asset returns 404 even though Accept includes text/html
     When a client requests /assets/foo-stale.js with Accept "text/html,*/*"
     Then the response status is 404
@@ -50,6 +53,8 @@ Feature: Production HTTP server — static asset and SPA fallback behavior
     And the Content-Type header is text/html
     And the response body is the index.html document (with the asset-base resolver injected)
 
+  # Gap: behaviour question. URL parsing resolves dot segments, so a Request never carries .. and BrowserBundle's 400 guard is not reachable by this address.
+  @unimplemented
   Scenario: Asset path traversal is rejected before touching the filesystem
     When a client requests /assets/../../etc/passwd
     Then the response status is 400

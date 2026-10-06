@@ -3,23 +3,23 @@ export * from "./coding-agent.api.ts";
 export * from "./coding-agent.trpc.ts";
 export * from "./coding-agent-trpc.schemas.ts";
 export * from "./coding-agent-processing.ts";
-export * from "./coding-agent-processing.commands.ts";
-export * from "./coding-agent-processing.constants.ts";
 export * from "./coding-agent-processing.events.ts";
+export * from "./coding-agent-processing.constants.ts";
 export * from "./coding-agent-trace-pull-request.ts";
 export * from "./coding-agent-projection-persistence.ts";
 export * from "./telemetry/index.ts";
 export * from "./telemetry/coding-agent-normalization.ts";
 export * from "./telemetry/session-context.ts";
-// The pure derivations `CodingAgentApi`'s implementation answers directly, with no
-// session store read: content-key lookups, transcript building and span filtering.
+// The pure derivations a peer imports directly, with no session store read:
+// content-key lookups, transcript building and span filtering.
 export * from "./coding-agent-log-content.ts";
 export {
   AUXILIARY_SESSION_FACT,
   codexAuxiliarySessionFacts,
   HELPER_THREAD_ID_ATTR,
   isCodexTemporaryStructuredRequestSpan,
-  queuedThreadIdOf,
+  queuedThreadOf,
+  type QueuedThread,
   REQUEST_QUEUE_SPAN_NAME,
 } from "./telemetry/codex-helper-thread.ts";
 export {
@@ -40,3 +40,4 @@ export type {
 export * from "./injected-notice.ts";
 export * from "./leading-context.ts";
 export * from "./coding-agent-span-admission.ts";
+export * from "./coding-agent-lent-components.ts";

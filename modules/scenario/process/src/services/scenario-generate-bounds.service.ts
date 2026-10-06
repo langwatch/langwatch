@@ -1,7 +1,8 @@
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScenarioGenerateRateLimitedError } from "@langwatch/scenario-contract";
+
+import type { ScenarioRateLimitRepository } from "../repositories/scenario-rate-limit.repository.ts";
 
 /**
  * The tier-effective window the author-assist generates under: one generation
@@ -12,7 +13,7 @@ export class ScenarioGenerateBoundsService {
   static create(deps: {
     entitlement: Pick<EntitlementApi, "requestBound">;
     projects: Pick<ProjectApi, "getOrganizationId">;
-    rateLimiter: RateLimiter;
+    rateLimiter: ScenarioRateLimitRepository;
   }): ScenarioGenerateBoundsService {
     return new ScenarioGenerateBoundsService(deps);
   }
@@ -21,7 +22,7 @@ export class ScenarioGenerateBoundsService {
     private readonly deps: Readonly<{
       entitlement: Pick<EntitlementApi, "requestBound">;
       projects: Pick<ProjectApi, "getOrganizationId">;
-      rateLimiter: RateLimiter;
+      rateLimiter: ScenarioRateLimitRepository;
     }>,
   ) {}
 

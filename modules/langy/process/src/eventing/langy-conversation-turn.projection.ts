@@ -1,5 +1,4 @@
 import {
-  type Projection,
   type StateProjectionStore,
   AbstractFoldProjection,
   type FoldEventHandlers,
@@ -35,10 +34,6 @@ import {
   LangyUserWaitEndedEventSchema,
   LangyUserWaitStartedEventSchema,
 } from "./langy-conversation-state.projection.ts";
-
-export interface LangyConversationTurn extends Projection<LangyConversationTurnData> {
-  data: LangyConversationTurnData;
-}
 
 const langyConversationTurnEvents = [
   LangyAgentTurnAcceptedEventSchema,

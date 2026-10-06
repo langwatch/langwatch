@@ -15,6 +15,8 @@ export type WriteInviteInput = {
   teamIds: string;
   teamAssignments?: unknown;
   role: OrganizationUserRole;
+  /** The user who sent it; null for an invitation a service created. */
+  requestedBy?: string | null;
 };
 
 /** One listed invitation, with the admin who asked for it. */
@@ -116,6 +118,16 @@ export abstract class OrganizationInviteRepository {
     email: string;
   }): Promise<OrganizationInvite>;
   /**
+   * The oldest pending, unexpired invite on ONE address, in any organization
+   * (ADR-171 v6). One address per read: the tenancy guard admits a
+   * subject-bounded read on invitations only as a single-address `findFirst`.
+   */
+  abstract findOldestPendingInviteForAddress(input: { address: string }): Promise<{
+    inviteCode: string;
+    organizationName: string;
+    role: OrganizationUserRole;
+  } | null>;
+  /**
    * Claims a pending invite for one acceptor, conditional on the (status,
    * code, expiry) the caller read. Answers how many rows moved; zero means
    * somebody else's accept won the race.
@@ -127,10 +139,12 @@ export abstract class OrganizationInviteRepository {
     acceptedByUserId: string;
     acceptedViaIdentifierId: string | null;
   }): Promise<number>;
+  /** A Developer row also writes its admission audit row, in the same write (ADR-171). */
   abstract addMembership(input: {
     userId: string;
     organizationId: string;
     role: OrganizationUserRole;
+    admission?: { inviteId: string; actorUserId: string | null };
   }): Promise<void>;
   /** Throws `InviteNotFoundError`. */
   abstract getInviteStatus(input: { inviteId: string }): Promise<{ status: string }>;

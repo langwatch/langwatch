@@ -1,6 +1,6 @@
 import { type AddressConfirmation, EmailSendingUnavailableError } from "@langwatch/auth-contract";
 
-export interface AddressConfirmationServiceDeps {
+interface AddressConfirmationServiceDeps {
   /** Whether the account holding this address has confirmed it; false where none holds it. */
   isConfirmed(input: { email: string }): Promise<boolean>;
   /** Whether this installation names a way to send email at all. */

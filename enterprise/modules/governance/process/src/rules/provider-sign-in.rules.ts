@@ -5,7 +5,7 @@ import { ProviderSignInError } from "@langwatch/enterprise-governance-contract";
 import { type ListingRefusal, refusalFromThrown } from "./provider-listing.rules.ts";
 
 /** A sign-in verdict as a listing refusal: a wrong secret reads as unauthorized, not the network. */
-export function refusalFromSignIn(error: ProviderSignInError): ListingRefusal {
+function refusalFromSignIn(error: ProviderSignInError): ListingRefusal {
   if (error.reason === "not_configured") return { reason: "not_configured", status: null };
   if (error.reason === "malformed_response") {
     return { reason: "malformed_response", status: null };

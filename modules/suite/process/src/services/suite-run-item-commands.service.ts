@@ -8,7 +8,7 @@ import type {
 type CommandSender<Payload> = { send(payload: Payload): Promise<unknown> };
 
 /** Suite's run and run-item commands, bound once the pipeline registered them. */
-export type SuiteRunItemCommandSenders = {
+type SuiteRunItemCommandSenders = {
   startSuiteRun: CommandSender<StartSuiteRunCommandData>;
   recordSuiteRunItemStarted: CommandSender<RecordSuiteRunItemStartedCommandData>;
   completeSuiteRunItem: CommandSender<CompleteSuiteRunItemCommandData>;

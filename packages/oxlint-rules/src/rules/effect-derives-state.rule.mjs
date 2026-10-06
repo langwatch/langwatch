@@ -71,7 +71,7 @@ export const effectDerivesStateRule = defineRule({
     effectDerivesState: {
       what: "This effect only copies a value derived from its dependencies into `{{setter}}`.",
       why: "The component renders stale, then renders again; state that follows props or state is not state.",
-      fix: "Delete the effect and the state, and compute the value during render (`useMemo` only if it is measurably slow).",
+      fix: "Delete the effect and the state, and compute the value during render (`useMemo` only if it is measurably slow). Read the `browser-module` skill.",
     },
   },
   create(context) {

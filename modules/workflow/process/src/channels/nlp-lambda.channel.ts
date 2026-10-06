@@ -9,6 +9,8 @@ export type NlpLambdaArnEntry = Readonly<{
   arn: string;
   /** The deployment image it was resolved under; a change invalidates it. */
   imageUri: string;
+  /** The function configuration it was reconciled to; a change invalidates it. */
+  configFingerprint: string;
 }>;
 
 /** The AWS flow that finds, creates or updates the project's function. */
@@ -60,7 +62,12 @@ export type NlpLambdaInvokeResult = Readonly<{
 }>;
 
 export interface NlpLambdaInvoke {
-  invoke(input: { functionArn: string; payload: string }): Promise<NlpLambdaInvokeResult>;
+  invoke(input: {
+    functionArn: string;
+    payload: string;
+    /** Aborts the invoke and any wait between attempts. */
+    signal?: AbortSignal | undefined;
+  }): Promise<NlpLambdaInvokeResult>;
 }
 
 /** One parked payload, as the caller needs it back to reference and discard. */

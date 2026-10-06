@@ -20,7 +20,7 @@ const SUBSCRIPTION_SELECT = {
  * delegate, one method, so a typed `PrismaClient` satisfies it with no cast
  * and this stays visibly a SELECT and nothing else.
  */
-export type DuplicateSubscriptionsDatabase = {
+type DuplicateSubscriptionsDatabase = {
   subscription: Pick<PrismaClient["subscription"], "findMany">;
 };
 

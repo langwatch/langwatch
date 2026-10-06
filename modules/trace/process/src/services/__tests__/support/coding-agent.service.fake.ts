@@ -1,32 +1,9 @@
-import {
-  buildCodingAgentTranscript,
-  contentAttrKeys,
-  logContentKeys,
-  shouldFilterCodingAgentSpan,
-  type CodingAgentApi,
-  type CodingAgentSpanFilterInput,
-} from "@langwatch/coding-agent-contract";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 
-/** A `CodingAgentApi` double: the pure derivations answer for real, everything else refuses. */
+/** A `CodingAgentApi` double: every capability refuses. */
 export class TestCodingAgentService implements CodingAgentApi {
   private unused(): Promise<never> {
     return Promise.reject(new Error("unused coding agent capability"));
-  }
-
-  logContentKeys(eventName: string) {
-    return logContentKeys(eventName);
-  }
-
-  contentAttrKeys(eventName: string) {
-    return contentAttrKeys(eventName);
-  }
-
-  shouldFilterSpan(input: CodingAgentSpanFilterInput): boolean {
-    return shouldFilterCodingAgentSpan(input);
-  }
-
-  buildTranscript(input: Parameters<CodingAgentApi["buildTranscript"]>[0]) {
-    return buildCodingAgentTranscript(input);
   }
 
   getSessionEvents(): Promise<never> {

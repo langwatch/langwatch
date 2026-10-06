@@ -1,7 +1,9 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import type { UserOrganizationDirectoryRepository } from "../user-organization-directory.repository.ts";
+
 /** Only what this repository touches, so composition names the slice it needs. */
-export type UserOrganizationDirectoryDatabase = Pick<
+type UserOrganizationDirectoryDatabase = Pick<
   PrismaClient,
   "organization" | "organizationUser" | "project"
 >;
@@ -11,11 +13,13 @@ export type UserOrganizationDirectoryDatabase = Pick<
  * these tables belong to this module, but the reads are narrow, local to
  * what `/me` renders, and read through this module's own repository.
  */
-export class PrismaUserOrganizationDirectoryRepository {
-  static create(
-    database: UserOrganizationDirectoryDatabase,
-  ): PrismaUserOrganizationDirectoryRepository {
-    return new PrismaUserOrganizationDirectoryRepository(database);
+export class PrismaUserOrganizationDirectoryRepository implements UserOrganizationDirectoryRepository {
+  static create({
+    prisma,
+  }: {
+    prisma: UserOrganizationDirectoryDatabase;
+  }): PrismaUserOrganizationDirectoryRepository {
+    return new PrismaUserOrganizationDirectoryRepository(prisma);
   }
 
   private constructor(private readonly database: UserOrganizationDirectoryDatabase) {}

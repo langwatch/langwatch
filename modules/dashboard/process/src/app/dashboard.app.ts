@@ -10,6 +10,7 @@ import {
   type DashboardWidget,
   type DashboardWidgetDefinitionInput,
   type LangWatchQLBudgetOverflowMode,
+  type LangWatchQLCaller,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLTimeWindow,
@@ -21,6 +22,7 @@ import {
 } from "@langwatch/automation-contract";
 import {
   DashboardApi,
+  dashboardConfig,
   type Dashboard,
   type DashboardGraphCountScope,
   type DashboardSummary,
@@ -32,6 +34,7 @@ import {
   type SavedWorkbenchChart,
   type SavedWorkbenchChartDefinitionUpdate,
   type DashboardUsageCount,
+  type DashboardServerConfig,
 } from "@langwatch/dashboard-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
@@ -39,11 +42,10 @@ import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/pr
 import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";
 import { dashboardPlatformUrl } from "../rules/dashboard-platform-url.rules.ts";
 import { DashboardWidgetService } from "../services/dashboard-widget.service.ts";
-import { DashboardService } from "../services/dashboard.service.ts";
+import { DashboardService, type WorkbenchAccess } from "../services/dashboard.service.ts";
 import { SavedViewService } from "../services/saved-view.service.ts";
 import { SavedWorkbenchChartPolicyService } from "../services/saved-workbench-chart-policy.service.ts";
 import { SavedWorkbenchChartService } from "../services/saved-workbench-chart.service.ts";
-import type { WorkbenchAccess, WorkbenchCaller } from "./dashboard.members.ts";
 
 type DashboardDependencies = Readonly<{
   analytics: typeof AnalyticsApi;
@@ -51,19 +53,24 @@ type DashboardDependencies = Readonly<{
   projects: typeof ProjectApi;
 }>;
 
-/**
- * Shapes restated rather than imported: a module depends on contracts.
- * `publicBaseUrl` is the process's own fact, drilled in — absent where the
- * deployment named no `BASE_HOST`.
- */
-type DashboardMembers = Readonly<{ publicBaseUrl: string | undefined }>;
-
 type DashboardSetup = FeatureSetup<
   DashboardDependencies,
-  DashboardMembers,
-  undefined,
+  never,
+  DashboardServerConfig,
   DashboardRepositories
 >;
+
+/** The member's own content protections, and the identity a session-authenticated run uses. */
+interface WorkbenchCaller {
+  resolveProtections(input: {
+    actorId: string;
+    projectId: string;
+  }): Promise<LangWatchQLProtections>;
+  resolveRunCaller(input: {
+    actorId: string;
+    projectId: string;
+  }): Promise<Readonly<{ project: LangWatchQLCaller; protections: LangWatchQLProtections }>>;
+}
 
 /**
  * Thin adapter to AnalyticsApi: forwards rollout gate and RBAC checks while
@@ -102,7 +109,8 @@ export class DashboardModule implements DashboardApi {
     automation: AutomationApi,
     projects: ProjectApi,
   };
-  static readonly reads = ["publicBaseUrl"] as const;
+  /** The shared deployment origin, absent where the deployment named no `BASE_HOST`. */
+  static readonly config = dashboardConfig;
 
   #dashboards: DashboardService;
   #charts: SavedWorkbenchChartService;
@@ -175,7 +183,7 @@ export class DashboardModule implements DashboardApi {
         projects: setup.dependencies.projects,
       },
       workbench: { access: workbenchAccess, caller: workbenchCaller },
-      publicBaseUrl: setup.members.publicBaseUrl,
+      publicBaseUrl: setup.config.publicBaseUrl,
     });
   }
 
@@ -436,15 +444,19 @@ export class DashboardModule implements DashboardApi {
   }
 
   /** Every saved chart in the project. */
-  listSavedWorkbenchCharts(input: { projectId: string }): Promise<SavedWorkbenchChart[]> {
+  async listSavedWorkbenchCharts(input: { projectId: string }): Promise<SavedWorkbenchChart[]> {
+    await this.#requireWorkbench(input.projectId);
+
     return this.#charts.getAll(input);
   }
 
   /** One saved chart, with its query, parameters and specification. */
-  getSavedWorkbenchChart(input: {
+  async getSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
   }): Promise<SavedWorkbenchChart> {
+    await this.#requireWorkbench(input.projectId);
+
     return this.#charts.getById(input);
   }
 

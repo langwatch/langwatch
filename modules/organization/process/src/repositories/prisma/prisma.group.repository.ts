@@ -6,7 +6,11 @@ import {
   type OrganizationGroup,
   type OrganizationGroupMember,
 } from "@langwatch/organization-contract";
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import {
+  OrganizationUserRole,
+  Prisma,
+  type PrismaClient,
+} from "@langwatch/prisma-client/generated";
 
 import { GroupRepository, type OrganizationGroupWithMemberCount } from "../group.repository.ts";
 
@@ -140,8 +144,14 @@ export class PrismaGroupRepository extends GroupRepository {
       where: {
         groupId: { in: input.groupIds },
         group: { organizationId: input.organizationId },
+        // A Developer seat gets nothing through a group (ADR-171).
         user: {
-          orgMemberships: { some: { organizationId: input.organizationId } },
+          orgMemberships: {
+            some: {
+              organizationId: input.organizationId,
+              role: { not: OrganizationUserRole.DEVELOPER },
+            },
+          },
         },
       },
       select: {

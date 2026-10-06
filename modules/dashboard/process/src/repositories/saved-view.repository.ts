@@ -21,7 +21,7 @@ export type CreateSavedViewInput = {
 };
 
 /** The fields a saved view may be edited through, in portable terms. */
-export type SavedViewUpdate = {
+type SavedViewUpdate = {
   name?: string;
   filters?: SavedViewJson;
   query?: string | null;

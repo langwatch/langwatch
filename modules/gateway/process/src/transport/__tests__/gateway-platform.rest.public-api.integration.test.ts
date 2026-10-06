@@ -12,7 +12,9 @@ import {
   canonicalErrorResponse,
   createRestRuntime,
   type IdempotentRunner,
+  type RestPermissionReach,
 } from "@langwatch/api/rest";
+import { PermissionDeniedError } from "@langwatch/authorization";
 import {
   type GatewayApi,
   GatewayBudgetCycleAnchorInvalidError,
@@ -69,6 +71,7 @@ const virtualKeyDto: GatewayVirtualKeySnakeDto = {
 const wireBody = z.object({
   type: z.string().optional(),
   code: z.string().optional(),
+  fault: z.string().optional(),
   message: z.string().optional(),
   meta: z.record(z.string(), z.unknown()).optional(),
   spent_usd: z.string().optional(),
@@ -83,19 +86,31 @@ const passthroughIdempotency: IdempotentRunner = async ({ handler }) => {
   return { isReplayed: false, status: response.status, response };
 };
 
-function mount(overrides: Partial<GatewayApi> = {}, refuse?: () => never) {
+/** What the key door was asked for one request: the route's permission and its declared reach. */
+type KeyDoorQuestion = Readonly<{
+  permission: string;
+  reach: RestPermissionReach["at"] | undefined;
+}>;
+
+type KeyDoorInput = { request: Request; permission: string; reach?: RestPermissionReach["at"] };
+
+function mount(
+  overrides: Partial<GatewayApi> = {},
+  refuse?: (question: KeyDoorQuestion) => void,
+  asked: KeyDoorQuestion[] = [],
+) {
   const app = createApiFixture<GatewayApi>({
     organizationIdForProject: async () => ORGANIZATION_ID,
     actorForCredential: ({ projectId }) => ({
       actor: { kind: "legacyProjectKey" },
       actorUserId: `svc_${projectId}`,
     }),
-    authorizeKeyCaller: async () => ({
+    getKeyCaller: async () => ({
       organizationId: ORGANIZATION_ID,
       actor: { kind: "legacyProjectKey" },
       actorUserId: `svc_${PROJECT_ID}`,
     }),
-    authorizeVirtualKeyCaller: async () => ({
+    getVirtualKeyCaller: async () => ({
       organizationId: ORGANIZATION_ID,
       actor: { kind: "legacyProjectKey" },
       actorUserId: `svc_${PROJECT_ID}`,
@@ -105,19 +120,25 @@ function mount(overrides: Partial<GatewayApi> = {}, refuse?: () => never) {
   });
   const door = ({ request }: { request: Request }) => {
     if (!request.headers.get("Authorization")) throw new ProjectMissingCredentialsError();
-    if (refuse) refuse();
     return {
       actor: { type: "api_key" as const, id: "gateway-key" },
       scope: { tier: "project" as const, id: PROJECT_ID },
     };
   };
-  const keyDoor = ({ request }: { request: Request }) => ({
+  const identifyKey = ({ request }: { request: Request }) => ({
     ...door({ request }),
     scope: { tier: "organization" as const, id: ORGANIZATION_ID },
   });
+  /** The key door reads the credential first, then answers the permission the route declared. */
+  const authenticateKey = ({ request, permission, reach }: KeyDoorInput) => {
+    const caller = identifyKey({ request });
+    asked.push({ permission, reach });
+    if (refuse) refuse({ permission, reach });
+    return caller;
+  };
   const runtime = createRestRuntime({
     identity: { authenticate: door, identify: door },
-    doors: { api_key: { authenticate: keyDoor, identify: keyDoor } },
+    doors: { api_key: { authenticate: authenticateKey, identify: identifyKey } },
     idempotency: passthroughIdempotency,
   });
   const hono = runtime.mount(gatewayPlatformRest.router(), {
@@ -159,6 +180,7 @@ describe("the gateway platform family's public wire", () => {
   describe("given a request with no credential", () => {
     /** @scenario Reject unauthenticated gateway REST calls */
     /** @scenario An unauthenticated request answers the canonical error envelope */
+    /** @scenario A canonical family refuses unauthenticated calls canonically */
     it("answers 401 with the canonical unauthenticated envelope", async () => {
       const answer = await mount()("GET", "/virtual-keys", { anonymous: true });
 
@@ -179,7 +201,87 @@ describe("the gateway platform family's public wire", () => {
       expect(answer.body).toMatchObject({
         type: "permission_denied",
         code: "api_key_permission_denied",
+        fault: "customer",
       });
+    });
+  });
+
+  describe("given a key the door refuses for the route's permission", () => {
+    const refuseByPermission = ({ permission }: KeyDoorQuestion): never => {
+      throw new PermissionDeniedError({
+        permission,
+        scope: { type: "organization", id: ORGANIZATION_ID },
+        denialReason: "no-binding",
+      });
+    };
+
+    it("answers 403 permission_denied on a virtual key route, asked at the key's grants", async () => {
+      const asked: KeyDoorQuestion[] = [];
+      const createVirtualKey = vi.fn();
+      const call = mount({ createVirtualKey }, refuseByPermission, asked);
+
+      const answer = await call("POST", "/virtual-keys", { body: { name: "ci-key" } });
+
+      expect([answer.status, answer.body.code]).toEqual([403, "permission_denied"]);
+      expect(answer.body.type).toBe("permission_denied");
+      expect(asked).toEqual([{ permission: "virtualKeys:create", reach: "grants" }]);
+      expect(createVirtualKey).not.toHaveBeenCalled();
+    });
+
+    it("answers 403 permission_denied on a budget write, asked at the organization", async () => {
+      const asked: KeyDoorQuestion[] = [];
+      const archiveBudget = vi.fn();
+      const call = mount({ archiveBudget }, refuseByPermission, asked);
+
+      const answer = await call("DELETE", "/budgets/bgt_1");
+
+      expect([answer.status, answer.body.code]).toEqual([403, "permission_denied"]);
+      expect(asked).toEqual([{ permission: "gatewayBudgets:delete", reach: "organization" }]);
+      expect(archiveBudget).not.toHaveBeenCalled();
+    });
+
+    it("answers 403 permission_denied on a budget read, asked with no reach", async () => {
+      const asked: KeyDoorQuestion[] = [];
+      const listBudgetPageWithHealth = vi.fn();
+      const call = mount({ listBudgetPageWithHealth }, refuseByPermission, asked);
+
+      const answer = await call("GET", "/budgets");
+
+      expect([answer.status, answer.body.code]).toEqual([403, "permission_denied"]);
+      expect(asked).toStrictEqual([{ permission: "gatewayBudgets:view", reach: undefined }]);
+      expect(listBudgetPageWithHealth).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a key whose grants are view only", () => {
+    const viewerOnly = ({ permission }: KeyDoorQuestion): void => {
+      if (permission === "virtualKeys:view") return;
+      throw new PermissionDeniedError({
+        permission,
+        scope: { type: "project", id: PROJECT_ID },
+        denialReason: "no-binding",
+      });
+    };
+
+    /** @scenario A viewer-scoped API key can list but not create virtual keys */
+    it("lists the keys with 200 and refuses to create one with 403", async () => {
+      const createVirtualKey = vi.fn();
+      const call = mount(
+        {
+          createVirtualKey,
+          getVirtualKeyPage: async () => [],
+          visibleToVirtualKeyCaller: async ({ virtualKeys }) => [...virtualKeys],
+          toVirtualKeySnakeDtos: async () => [],
+        },
+        viewerOnly,
+      );
+
+      const listed = await call("GET", "/virtual-keys");
+      const created = await call("POST", "/virtual-keys", { body: { name: "ci-key" } });
+
+      expect(listed.status).toBe(200);
+      expect([created.status, created.body.code]).toEqual([403, "permission_denied"]);
+      expect(createVirtualKey).not.toHaveBeenCalled();
     });
   });
 
@@ -336,6 +438,72 @@ describe("the gateway platform family's public wire", () => {
     });
   });
 
+  describe("given the virtual-key, budget and cache-rule lists", () => {
+    const lists = ["/virtual-keys", "/budgets", "/cache-rules"] as const;
+
+    /** The three paged reads, each recording the page size it was asked for. */
+    function pagedReads() {
+      const getVirtualKeyPage = vi.fn().mockResolvedValue([]);
+      const listBudgetPageWithHealth = vi
+        .fn()
+        .mockResolvedValue({ budgets: [], spendAvailable: true, scopeReach: new Map() });
+      const listCacheRulePage = vi.fn().mockResolvedValue([]);
+      const call = mount({
+        getVirtualKeyPage,
+        listBudgetPageWithHealth,
+        listCacheRulePage,
+        visibleToVirtualKeyCaller: async ({ virtualKeys }) => [...virtualKeys],
+        toVirtualKeySnakeDtos: async () => [],
+        groupMemberCounts: async () => new Map(),
+      });
+      const limitsAsked = () =>
+        [getVirtualKeyPage, listBudgetPageWithHealth, listCacheRulePage].flatMap((read) =>
+          read.mock.calls.map(([input]) => (input as { limit: number }).limit),
+        );
+      return {
+        call,
+        limitsAsked,
+        reads: [getVirtualKeyPage, listBudgetPageWithHealth, listCacheRulePage],
+      };
+    }
+
+    /** @scenario Every paged list refuses a page past the cap */
+    it("answers 422 validation_error for ?limit=201 and reads no row", async () => {
+      const { call, reads } = pagedReads();
+
+      const answers = await Promise.all(lists.map((path) => call("GET", `${path}?limit=201`)));
+
+      expect(answers.map((a) => [a.status, a.body.code])).toEqual(
+        lists.map(() => [422, "validation_error"]),
+      );
+      expect(reads.some((read) => read.mock.calls.length > 0)).toBe(false);
+    });
+
+    /** @scenario Every paged list refuses a page of no rows */
+    it("answers 422 validation_error for ?limit=0", async () => {
+      const { call } = pagedReads();
+
+      const answers = await Promise.all(lists.map((path) => call("GET", `${path}?limit=0`)));
+
+      expect(answers.map((a) => [a.status, a.body.code])).toEqual(
+        lists.map(() => [422, "validation_error"]),
+      );
+    });
+
+    /** @scenario A list that names no page size reads the default page */
+    it("reads 50 rows with no limit and 200 rows for the cap", async () => {
+      const unnamed = pagedReads();
+      await Promise.all(lists.map((path) => unnamed.call("GET", path)));
+      const capped = pagedReads();
+      await Promise.all(lists.map((path) => capped.call("GET", `${path}?limit=200`)));
+
+      expect([unnamed.limitsAsked(), capped.limitsAsked()]).toEqual([
+        [50, 50, 50],
+        [200, 200, 200],
+      ]);
+    });
+  });
+
   describe("given more virtual keys than fit in one page", () => {
     const rows = ["vk_5", "vk_4", "vk_3", "vk_2", "vk_1"].map(
       (id, index): GatewayVirtualKeyRecord => ({
@@ -397,7 +565,7 @@ describe("the gateway platform family's public wire", () => {
         scopeReach: new Map(),
       });
       const answer = await mount({
-        authorizeKeyCaller: async () => ({
+        getKeyCaller: async () => ({
           organizationId: ORGANIZATION_ID,
           actor: { kind: "legacyProjectKey" },
           actorUserId: `svc_${PROJECT_ID}`,

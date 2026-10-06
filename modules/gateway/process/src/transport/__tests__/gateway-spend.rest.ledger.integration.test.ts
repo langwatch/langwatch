@@ -1,5 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { createRestRuntime } from "@langwatch/api/rest";
 import type { SpendEventRow } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
@@ -11,9 +11,9 @@ import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { GatewayEndUserCapsAdapter } from "../../__tests__/support/postgres.gateway-service.ts";
 import { createTraceDestinationProjects } from "../../__tests__/support/trace-destination-project-service.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
-import { GatewayEndUserCapsAdapter } from "../../app/gateway-composition.build.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -28,11 +28,7 @@ import {
   GatewaySpendReconciliationService,
 } from "../../services/gateway-spend-reconciliation.service.ts";
 import { GatewaySpendScopeService } from "../../services/gateway-spend-scope.service.ts";
-import {
-  type GatewaySpendDoorApi,
-  gatewaySpendBillingPlanGate,
-  gatewaySpendRest,
-} from "../gateway-spend.rest.ts";
+import { type GatewaySpendDoorApi, gatewaySpendRest } from "../gateway-spend.rest.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();
@@ -93,6 +89,8 @@ function mountSpendFamily(spend: GatewaySpendApp) {
         scope: { tier: "organization", id: ORG_ID } as const,
       }),
     },
+    // Every route asks the plan; this suite is about the ledger behind it, not the gate in front.
+    entitlements: { holds: async () => true },
   });
 
   const answers = GatewaySpendReconciliationService.create({ collaborators: spend });
@@ -100,7 +98,6 @@ function mountSpendFamily(spend: GatewaySpendApp) {
     answerSpendSummaries: (input) => answers.answerSpendSummaries(input),
     answerSpendEvents: (input) => answers.answerSpendEvents(input),
     answerEndUserSpend: (input) => answers.answerEndUserSpend(input),
-    answerSpendReplay: (input) => answers.answerSpendReplay(input),
   };
 
   return runtime.mount(gatewaySpendRest.router(), {
@@ -110,9 +107,6 @@ function mountSpendFamily(spend: GatewaySpendApp) {
         { error: { type: "internal_error", code: "internal_error", message: String(error) } },
         500,
       ),
-    // The plan gate the deployment binds; every route declares it, and this
-    // suite is about the ledger behind it rather than the entitlement in front.
-    facts: [bindRestMiddleware(gatewaySpendBillingPlanGate, () => ({}))],
   });
 }
 
@@ -123,17 +117,10 @@ function buildApp(): void {
     projects: createTraceDestinationProjects(prisma),
     virtualKeys: PrismaGatewaySpendScopeRepository.create({ database: prisma }),
   });
-  const refuse = () => {
-    throw new Error("the replay path is not under test here");
-  };
   const spend: GatewaySpendApp = {
     getSpendEvents: () => GatewaySpendEventsService.create(repo),
     getBudgetSpend: () => budgets,
-    webhookEndpoints: () => ({ findDeliverable: refuse }),
-    webhookEvents: refuse,
-    webhookDelivery: refuse,
     spendEventEnvelope: testEnvelope,
-    endpointAcceptsEvent: () => true,
     settlementPolicy: () => FixedGatewaySettlementPolicyService.create(15 * 60_000),
     resolveSpendScope: (input) => {
       scope.clearCache();

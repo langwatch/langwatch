@@ -164,11 +164,11 @@ func FromBody(body ErrorBody) E {
 	return e
 }
 
-// validFaults is the shared three-value fault contract — the TS side
+// validFaults is the shared fault contract — the TS side
 // (HandledErrorFault, and the nlpgo envelope schema) accepts exactly these.
 // Anything else in Meta["fault"] is dropped rather than emitted, so a typo
 // can't fail parsing downstream.
-var validFaults = map[string]bool{"customer": true, "platform": true, "provider": true}
+var validFaults = map[string]bool{"customer": true, "platform": true, "provider": true, "presumed_platform": true}
 
 // reservedMetaKeys are promoted to first-class ErrorBody fields and stripped
 // from the exposed Meta.

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -39,14 +40,8 @@ type RecaptureResult struct {
 // done recapturing (see README "A triage loop").
 func Recapture(ctx context.Context, request RecaptureRequest, streams Streams) (RecaptureResult, error) {
 	request.Deps.fill()
-	if request.RunID == "" {
-		return RecaptureResult{}, fmt.Errorf("recapture: -run is required")
-	}
-	if len(request.Routes) == 0 && len(request.Flows) == 0 {
-		return RecaptureResult{}, fmt.Errorf("recapture: -routes or -flows is required")
-	}
-	if request.Edition == "" {
-		request.Edition = EditionEnterprise
+	if err := request.validate(); err != nil {
+		return RecaptureResult{}, err
 	}
 	runDir := filepath.Join(request.Root, ".visualdiff", request.RunID)
 	planPath := filepath.Join(runDir, "shots", string(request.Edition), "plan.json")
@@ -57,16 +52,10 @@ func Recapture(ctx context.Context, request RecaptureRequest, streams Streams) (
 	plan.Routes = request.Routes
 	plan.Flows = selectFlows(plan.Flows, request.Flows)
 	plan.FailFast = false
-	if len(plan.Stacks) > 0 {
-		switcher := newEditionSwitch(request.Deps.Run, request.Deps.Environ, "")
-		defer func() {
-			if err := switcher.Restore(context.WithoutCancel(ctx), plan.Stacks); err != nil {
-				fmt.Fprintf(streams.Err, "recapture: enterprise not restored: %v\n", err)
-			}
-		}()
-		if err := switcher.Set(ctx, request.Edition, plan.Stacks); err != nil {
-			return RecaptureResult{}, fmt.Errorf("recapture: %w", err)
-		}
+	restore, err := setRecaptureEdition(ctx, request, plan.Stacks)
+	defer restore(streams.Err)
+	if err != nil {
+		return RecaptureResult{}, fmt.Errorf("recapture: %w", err)
 	}
 	fmt.Fprintf(streams.Err, "recapture: %d route(s), %d flow(s) against run %s (%s)\n", len(plan.Routes), len(plan.Flows), request.RunID, request.Edition)
 	findingsPath := filepath.Join(runDir, FindingsFile)
@@ -76,16 +65,51 @@ func Recapture(ctx context.Context, request RecaptureRequest, streams Streams) (
 		Out: streams.Out, BatchSize: DefaultBatchSize,
 	})
 	if err != nil {
-		var stopped *diffkit.Stopped
-		if errors.As(err, &stopped) {
-			return RecaptureResult{}, stopped
-		}
-		return RecaptureResult{}, fmt.Errorf("recapture: %w", err)
+		return RecaptureResult{}, recaptureError(err)
 	}
 	rows := BuildRows(stream.Captures, stream.Diffs)
 	result := RecaptureResult{Findings: CountFindings(rows), FindingsPath: findingsPath}
 	fmt.Fprintf(streams.Out, "recapture: routes=%d flows=%d findings=%d findings_file=%s\n", len(plan.Routes), len(plan.Flows), result.Findings, findingsPath)
 	return result, nil
+}
+
+// validate requires a run and something to capture, and defaults the edition.
+func (request *RecaptureRequest) validate() error {
+	if request.RunID == "" {
+		return fmt.Errorf("recapture: -run is required")
+	}
+	if len(request.Routes) == 0 && len(request.Flows) == 0 {
+		return fmt.Errorf("recapture: -routes or -flows is required")
+	}
+	if request.Edition == "" {
+		request.Edition = EditionEnterprise
+	}
+	return nil
+}
+
+// setRecaptureEdition switches the run's kept stacks to the request's
+// edition. The returned restore puts enterprise back, reporting a failure to
+// the writer it is given; it is safe to call whether or not the switch worked.
+func setRecaptureEdition(ctx context.Context, request RecaptureRequest, stacks []EditionStack) (func(io.Writer), error) {
+	if len(stacks) == 0 {
+		return func(io.Writer) {}, nil
+	}
+	switcher := newEditionSwitch(request.Deps.Run, request.Deps.Environ, "")
+	restore := func(stderr io.Writer) {
+		if err := switcher.Restore(context.WithoutCancel(ctx), stacks); err != nil {
+			fmt.Fprintf(stderr, "recapture: enterprise not restored: %v\n", err)
+		}
+	}
+	return restore, switcher.Set(ctx, request.Edition, stacks)
+}
+
+// recaptureError answers a stop as itself and any other failure as recapture's.
+func recaptureError(err error) error {
+	var stopped *diffkit.Stopped
+	if errors.As(err, &stopped) {
+		return stopped
+	}
+	return fmt.Errorf("recapture: %w", err)
 }
 
 // selectFlows keeps the run's own flows whose ids were asked for.

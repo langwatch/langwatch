@@ -8,6 +8,7 @@ import type { AddressInfo } from "node:net";
 import type { Duplex } from "node:stream";
 
 import { PROTOCOL_VERSION, relayPayloadCaps } from "@langwatch/agent-contract";
+import type { AgentConnectCaller } from "@langwatch/agent-contract";
 import type { ConnectUpgradeRouter, UpgradeHandler } from "@langwatch/api";
 import { memorySessionState } from "@langwatch/process-stores";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -17,7 +18,6 @@ import { createConnectedAgentFixture } from "../../__tests__/connected-agent.fix
 import { detectResultCapViolation } from "../../rules/connected-agent-caps.rules.ts";
 import { UNREADABLE_RESULT_MESSAGE } from "../../rules/connected-agent-frame.rules.ts";
 import type { AgentService } from "../../services/agent.service.ts";
-import type { ConnectedAgentCredentials } from "../../services/connected-agent-credential.service.ts";
 import { ConnectedAgentRuntimeService } from "../../services/connected-agent-runtime.service.ts";
 import { AgentSessionService } from "../../services/connected-agent-session.service.ts";
 import { CONNECT_PATH } from "../agent-connect.ws.ts";
@@ -53,10 +53,10 @@ function createUpgradeRouter(server: Server): ConnectUpgradeRouter {
 }
 
 const fakeAgents = createConnectedAgentFixture();
-const fakeCredentials: ConnectedAgentCredentials = {
-  resolve: async () => {
-    throw new Error("Credential lookup is not configured for this test");
-  },
+const fakeCredentials: AgentConnectCaller = {
+  project: { id: "proj_1", slug: "proj-one" },
+  principalId: "key:test",
+  userId: null,
 };
 
 describe("detectResultCapViolation", () => {
@@ -107,7 +107,7 @@ describe("ConnectGateway without Redis", () => {
       runtime,
       // Never reached: the replica check refuses before any credential read.
       agents: fakeAgents,
-      credentials: fakeCredentials,
+      caller: fakeCredentials,
       publicBaseUrl: "https://example.test",
       replicaCount: 3,
     });
@@ -158,12 +158,10 @@ function registeringAgentService(): AgentService {
   return createConnectedAgentFixture();
 }
 
-const resolvingCredentials: ConnectedAgentCredentials = {
-  resolve: async () => ({
-    project: { id: "proj_1", slug: "proj-one" },
-    principalId: "key:test",
-    userId: null,
-  }),
+const resolvingCredentials: AgentConnectCaller = {
+  project: { id: "proj_1", slug: "proj-one" },
+  principalId: "key:test",
+  userId: null,
 };
 
 function registerFrame(
@@ -199,7 +197,7 @@ async function startPod({
 }: {
   pingIntervalMs?: number;
   pongWaitMs?: number;
-  credentials?: ConnectedAgentCredentials;
+  credentials?: AgentConnectCaller;
 } = {}) {
   const runtime = ConnectedAgentRuntimeService.create({
     podId: `pod_${Math.random().toString(36).slice(2)}`,
@@ -212,7 +210,7 @@ async function startPod({
   const gateway = ConnectGatewayFixture.create({
     runtime,
     agents: registeringAgentService(),
-    credentials,
+    caller: credentials,
     publicBaseUrl: "https://example.test",
     replicaCount: 1,
     pingIntervalMs,
@@ -266,11 +264,9 @@ describe("ConnectGateway registered frame", () => {
     it("says in the registered frame that the agent is scoped to its owner", async () => {
       const pod = await startPod({
         credentials: {
-          resolve: async () => ({
-            project: { id: "proj_1", slug: "proj-one" },
-            principalId: "user:user_1",
-            userId: "user_1",
-          }),
+          project: { id: "proj_1", slug: "proj-one" },
+          principalId: "user:user_1",
+          userId: "user_1",
         },
       });
       const { socket, registered } = connectAndRegister(
@@ -375,7 +371,7 @@ describe("ConnectGateway socket lifecycle", () => {
       const gateway = ConnectGatewayFixture.create({
         runtime,
         agents: slowAgents,
-        credentials: resolvingCredentials,
+        caller: resolvingCredentials,
         publicBaseUrl: "https://example.test",
         replicaCount: 1,
       });
@@ -503,7 +499,6 @@ describe("AgentSessionService.findCallForSession", () => {
       const core = AgentSessionService.create({
         runtime,
         agents: registeringAgentService(),
-        credentials: resolvingCredentials,
         publicBaseUrl: "https://example.test",
         replicaCount: 1,
       });

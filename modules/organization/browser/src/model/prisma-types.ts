@@ -4,6 +4,7 @@ export const OrganizationUserRole = {
   ADMIN: "ADMIN",
   MEMBER: "MEMBER",
   EXTERNAL: "EXTERNAL",
+  DEVELOPER: "DEVELOPER",
 } as const;
 export type OrganizationUserRole = (typeof OrganizationUserRole)[keyof typeof OrganizationUserRole];
 

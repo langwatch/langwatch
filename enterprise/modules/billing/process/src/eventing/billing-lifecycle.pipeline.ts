@@ -14,46 +14,65 @@ import {
 
 import type { BillingModule } from "../app/billing.app.ts";
 import {
-  BILLING_SEAT_LIMIT_REACHED_SUBSCRIBER_NAME,
-  seatLimitReachedSubscriber,
-} from "./seat-limit-reached.subscriber.ts";
-import {
   RecordCheckoutCompletedCommand,
   RecordSubscriptionChangedCommand,
+  RecordSubscriptionStartedCommand,
 } from "./billing-lifecycle.commands.ts";
 import {
   checkoutCompletedEventSchema,
   subscriptionChangedEventSchema,
+  subscriptionStartedEventSchema,
   type BillingLifecycleEvent,
   type RecordCheckoutCompletedCommandData,
   type RecordSubscriptionChangedCommandData,
+  type RecordSubscriptionStartedCommandData,
 } from "./billing-lifecycle.events.ts";
+import {
+  BILLING_PLAN_LIMIT_REACHED_SUBSCRIBER_NAME,
+  planLimitReachedSubscriber,
+} from "./plan-limit-reached.subscriber.ts";
+import {
+  BILLING_SEAT_LIMIT_REACHED_SUBSCRIBER_NAME,
+  seatLimitReachedSubscriber,
+} from "./seat-limit-reached.subscriber.ts";
 
 export type BillingLifecyclePipeline = StaticPipelineDefinition<
   BillingLifecycleEvent,
   Record<string, Projection>,
   | { name: "recordSubscriptionChanged"; payload: RecordSubscriptionChangedCommandData }
+  | { name: "recordSubscriptionStarted"; payload: RecordSubscriptionStartedCommandData }
   | { name: "recordCheckoutCompleted"; payload: RecordCheckoutCompletedCommandData }
 >;
 
 /** billing_lifecycle: billing records its facts; peers react from their own side (§9). */
 export type BuildBillingLifecyclePipelineInput = Readonly<{
   alerts: Parameters<typeof seatLimitReachedSubscriber>[0]["alerts"];
+  planLimitAlerts: Parameters<typeof planLimitReachedSubscriber>[0]["alerts"];
 }>;
 
 export function buildBillingLifecyclePipeline({
   alerts,
+  planLimitAlerts,
 }: BuildBillingLifecyclePipelineInput): BillingLifecyclePipeline {
   return definePipeline({
     name: BILLING_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: BILLING_LIFECYCLE_AGGREGATE_TYPE }),
   })
-    .withEvents([subscriptionChangedEventSchema, checkoutCompletedEventSchema])
+    .withEvents([
+      subscriptionChangedEventSchema,
+      subscriptionStartedEventSchema,
+      checkoutCompletedEventSchema,
+    ])
     .withCommand("recordSubscriptionChanged", RecordSubscriptionChangedCommand)
+    .withCommand("recordSubscriptionStarted", RecordSubscriptionStartedCommand)
     .withCommand("recordCheckoutCompleted", RecordCheckoutCompletedCommand)
     .withPeerSubscriber(
       BILLING_SEAT_LIMIT_REACHED_SUBSCRIBER_NAME,
       seatLimitReachedSubscriber({ alerts }),
+    )
+    .withPeerSubscriber(
+      BILLING_PLAN_LIMIT_REACHED_SUBSCRIBER_NAME,
+      planLimitReachedSubscriber({ alerts: planLimitAlerts }),
     )
     .build();
 }

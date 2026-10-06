@@ -7,11 +7,11 @@ import { isValidTimestamp } from "./span-timing.rules.ts";
 
 // Max future skew for producer-supplied business time; freezing the anchor makes
 // the value permanent, so bound belongs to the freeze
-export const MAX_ANCHOR_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
+const MAX_ANCHOR_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
 
 // Usable storage anchor: valid timestamp not implausibly far in future.
 // Injected now for testability; narrowing is load-bearing at call sites.
-export function isUsableAnchorMs(value: number | undefined, now: number): value is number {
+function isUsableAnchorMs(value: number | undefined, now: number): value is number {
   return isValidTimestamp(value) && value <= now + MAX_ANCHOR_FUTURE_SKEW_MS;
 }
 

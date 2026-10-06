@@ -2,6 +2,7 @@
  * Live tier combining Postgres and ClickHouse; hand-written to span two stores coexisting.
  */
 import { generate } from "@langwatch/ksuid";
+import type { RateLimiter } from "@langwatch/process-stores";
 
 import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
 import { webhookEndpointConfiguration } from "../../rules/webhook-endpoint-policy.rules.ts";
@@ -13,6 +14,7 @@ import {
   RedisWebhookDispatchCapRepository,
   type WebhookDispatchCounter,
 } from "../redis/redis.webhook-dispatch-cap.repository.ts";
+import { RedisWebhookRateLimitRepository } from "../redis/redis.webhook-rate-limit.repository.ts";
 import type { WebhookRepositories } from "../webhook.repositories.ts";
 import {
   PrismaWebhookEndpointRepository,
@@ -53,7 +55,13 @@ class CipherWebhookSecrets implements WebhookSecret {
 }
 
 export class PostgresWebhookRepositories {
-  static readonly requires = ["prisma", "clickhouse", "encryption", "redis"] as const;
+  static readonly requires = [
+    "prisma",
+    "clickhouse",
+    "encryption",
+    "redis",
+    "rateLimiter",
+  ] as const;
 
   static create(
     members: Readonly<{
@@ -61,6 +69,7 @@ export class PostgresWebhookRepositories {
       clickhouse: WebhookRoutedClickHouse;
       encryption: WebhookSecret;
       redis: WebhookDispatchCounter;
+      rateLimiter: RateLimiter;
     }>,
   ): WebhookRepositories {
     return {
@@ -73,6 +82,7 @@ export class PostgresWebhookRepositories {
       }),
       events: WebhookEventsClickHouseRepository.forRoutedClickHouse(members.clickhouse),
       retention: PrismaWebhookRetentionRepository.create({ prisma: members.prisma }),
+      rateLimits: RedisWebhookRateLimitRepository.create(members.rateLimiter),
     };
   }
 }

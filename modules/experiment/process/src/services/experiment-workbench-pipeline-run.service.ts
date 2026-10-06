@@ -11,18 +11,18 @@ import type {
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { RunActor } from "@langwatch/scenario-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type {
-  ExperimentRunEventStream,
-  ExperimentRunStreamMessage,
-} from "../channels/experiment-run-event-stream.channel.ts";
 import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.process.ts";
 import type { ExperimentRunStartedEventData } from "../eventing/experiment-run-events.process.ts";
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
+import type {
+  ExperimentRunEventStreamRepository,
+  ExperimentRunStreamMessage,
+} from "../repositories/experiment-run-event-stream.repository.ts";
 import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
 import type { ExperimentRunRefusals } from "../rules/experiment-run-availability.rules.ts";
+import type { ExperimentAgentOwnershipService } from "./experiment-agent-ownership.service.ts";
 import { ExperimentCarriedBoardService } from "./experiment-carried-board.service.ts";
 import type {
   ExecutionDataServices,
@@ -41,7 +41,7 @@ export type WorkbenchRunPipeline = Readonly<{
     ExperimentRunCommandDispatcherService,
     "startExperimentRun" | "completeExperimentRun" | "abortExperimentRun"
   >;
-  stream: ExperimentRunEventStream;
+  stream: ExperimentRunEventStreamRepository;
   folds: ExperimentRunFoldRepository;
   abort: ExperimentRunAbortRepository;
   /** This deployment's public origin, for the link a polled run answers with. */
@@ -49,7 +49,7 @@ export type WorkbenchRunPipeline = Readonly<{
   /** The peers a run's execution data is loaded through before it is planned. */
   services: ExecutionDataServices;
   /** Refuses a run against someone else's personal development agent before it starts. */
-  ownership: Pick<SuiteApi, "assertConnectedAgentsRunnable">;
+  ownership: Pick<ExperimentAgentOwnershipService, "assertConnectedAgentsRunnable">;
   /** Cells in flight at once when a run names no limit of its own. */
   concurrency: number;
   /** What this process refuses of a run, for want of Redis or a public address. */

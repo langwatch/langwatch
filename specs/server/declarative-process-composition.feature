@@ -46,11 +46,12 @@ Feature: Composing a process declaratively
     Then the peer arrives through the module graph
     And the pool holds no api
 
-  @unimplemented
+  @unit
   Scenario: A missing peer refuses by name
     Given a module whose app names a peer no installed module provides
     When the process boots
     Then boot refuses naming the peer
+    And the module's app is never constructed
 
   @unit
   Scenario: A role reads only the declarations addressed to it
@@ -93,6 +94,13 @@ Feature: Composing a process declaratively
     When one of its commands reads a run's earlier events through its eventing setup
     Then the process's event log is read for that run under the simulation_run aggregate type only
     And only the events the command's guard accepts come back
+
+  @unit
+  Scenario: A pipeline is handed its own event store
+    Given a module whose pipeline declares the simulation_run aggregate
+    When the process boots with an eventing runtime on its pool
+    Then the pipeline's setup carries an event store bound to the simulation_run aggregate
+    And an append through it of another aggregate type's event is refused
 
   @unit
   Scenario: The draining role installs the framework's maintenance pipelines

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // The Explorer's side of the UI-action channel, run against the real store.
 // Spec: specs/langy/langy-trace-explorer-actions.feature
 import { useExplorerStore } from "../../explorer.store.ts";
+import { registerInstantEvalRoute } from "../instant-eval-route.bridge.ts";
 import {
   type ExplorerLangyActionHandlers,
   useExplorerLangyActions,
@@ -13,6 +14,11 @@ import {
 function handlers(): ExplorerLangyActionHandlers {
   return renderHook(() => useExplorerLangyActions()).result.current;
 }
+
+vi.mock("../../trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useOptionalTraceHost: () => ({ project: () => ({ id: "project-1" }) }),
+}));
 
 /** Runs one handler the way the agent's executor does: schema first. */
 async function call(kind: string, payload: unknown): Promise<unknown> {
@@ -106,6 +112,52 @@ describe("given the Trace Explorer is open", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+});
+
+describe("given the Trace Explorer is open and Langy asks an Instant Eval question", () => {
+  describe("when the search bar's route is mounted", () => {
+    /** @scenario "explorer.runInstantEval starts under the same cost rule as the search bar" */
+    it("hands the question, the other chips and the window to that route", async () => {
+      const route = vi.fn();
+      const unregister = registerInstantEvalRoute(route);
+      try {
+        await call("explorer.setFilter", { query: "status:error" });
+        const { timeRange } = useExplorerStore.getState();
+
+        const result = await call("explorer.runInstantEval", {
+          instructions: "Does the user sound annoyed?",
+          criteria: ["Complains or repeats a request", "Stays neutral"],
+        });
+
+        expect(result).toEqual({ status: "requested", target: "traces" });
+        expect(route).toHaveBeenCalledWith({
+          projectId: "project-1",
+          sentence: "Does the user sound annoyed?",
+          question: {
+            instructions: "Does the user sound annoyed?",
+            criteria: ["Complains or repeats a request", "Stays neutral"],
+          },
+          target: "traces",
+          otherQuery: "status:error",
+          fallbackQuery: "status:error",
+          timeRange: { from: timeRange.from, to: timeRange.to },
+        });
+      } finally {
+        unregister();
+      }
+    });
+  });
+
+  describe("when no search bar is on screen", () => {
+    it("refuses with explorer_search_unavailable", async () => {
+      await expect(
+        call("explorer.runInstantEval", {
+          instructions: "Annoyed?",
+          criteria: ["Complains", "Stays neutral"],
+        }),
+      ).rejects.toMatchObject({ code: "explorer_search_unavailable" });
     });
   });
 });

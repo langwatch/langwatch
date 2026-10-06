@@ -333,6 +333,27 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
     expect(alpha.input).toBe("latest alpha prompt");
   });
 
+  /** @scenario Conversations sorted by most recent activity */
+  it("lists conversations by most recent message timestamp, newest first", async () => {
+    const page = await repository.listSessionGroups(query());
+
+    const activities = page.rows.map((row) => row.lastActivityMs);
+    expect(activities).toEqual([...activities].toSorted((a, b) => b - a));
+    const ids = page.rows.map((row) => row.conversationId);
+    // Beta's last message (baseMs - 50s) is newer than alpha's (baseMs - 100s).
+    expect(ids.indexOf(SESSION_BETA)).toBeLessThan(ids.indexOf(SESSION_ALPHA));
+  });
+
+  /** @scenario Traces without conversation ID are excluded */
+  it("never lists a trace that carries no conversation id", async () => {
+    const page = await repository.listSessionGroups(query());
+
+    expect(page.rows.map((row) => row.conversationId)).not.toContain("");
+    expect(page.rows.map((row) => row.lastTraceId)).not.toContain(`${tag}-loose`);
+    // The loose trace costs 100; no session row may have absorbed it.
+    expect(Math.max(...page.rows.map((row) => row.totalCost))).toBeLessThan(100);
+  });
+
   /** @scenario The rollup names each session's most recent trace */
   it("names the latest trace of every session row", async () => {
     const page = await repository.listSessionGroups(query());

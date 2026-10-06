@@ -37,7 +37,7 @@ func TestSimulatorDataSurvivesForceRestartPerSlug(t *testing.T) {
 	o.cfg.Home = t.TempDir()
 	o.cfg.SimulatorArgv = []string{"/bin/haven", "simulator"}
 	opts := PlanOptions{Selection: domain.DefaultSelection()}
-	plan := o.planChildren(stack, opts, t.TempDir(), "")
+	plan := o.planChildren(stack, opts, t.TempDir())
 	idpDir := simulatorDataDir(t, plan, "idp", "IDPSIM_DATA_DIR")
 	mailDir := simulatorDataDir(t, plan, "mail", "MAILSIM_DATA_DIR")
 	assert.Equal(t, filepath.Join(o.cfg.Home, "idp", stack.Slug), idpDir)
@@ -58,7 +58,7 @@ func TestSimulatorDataSurvivesForceRestartPerSlug(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, proceed)
 	assert.Contains(t, sys.terminated, stack.LauncherPID)
-	plan = o.planChildren(stack, opts, t.TempDir(), "")
+	plan = o.planChildren(stack, opts, t.TempDir())
 	restartedIDP, err := idpsim.NewServer(idpsim.Config{
 		DataDir: simulatorDataDir(t, plan, "idp", "IDPSIM_DATA_DIR"), Tenants: 1, BaseURL: "https://idp.example",
 	})
@@ -73,7 +73,7 @@ func TestSimulatorDataSurvivesForceRestartPerSlug(t *testing.T) {
 	assert.Equal(t, message, got)
 
 	stack.Slug = "another-slug"
-	otherPlan := o.planChildren(stack, opts, t.TempDir(), "")
+	otherPlan := o.planChildren(stack, opts, t.TempDir())
 	otherIDP, err := idpsim.NewServer(idpsim.Config{
 		DataDir: simulatorDataDir(t, otherPlan, "idp", "IDPSIM_DATA_DIR"), Tenants: 1, BaseURL: "https://other.example",
 	})

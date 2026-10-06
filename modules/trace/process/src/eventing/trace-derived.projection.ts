@@ -81,7 +81,7 @@ export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-07-29" as const;
  * How far OccurredAt (frozen anchor, ADR-071 step 3) may sit from a read's
  * business time: ±7 days, since a late annotation can arrive days later.
  */
-export const TRACE_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const TRACE_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * How many same-trace events one cycle may coalesce. Lower than the

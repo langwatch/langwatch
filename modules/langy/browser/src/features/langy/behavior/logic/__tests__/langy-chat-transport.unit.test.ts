@@ -228,6 +228,7 @@ describe("createLangyChatTransport", () => {
   });
 
   describe("when per-send context (model override + composer chips)", () => {
+    /** @scenario "The captured context rides along with the turn I send" */
     it("threads only the present fields onto the turn input", async () => {
       const { transport } = makeTransport({
         conversationId: null,

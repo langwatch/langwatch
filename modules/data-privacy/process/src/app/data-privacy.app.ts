@@ -16,16 +16,15 @@ import {
   type ResolvedDataPrivacy,
   type SpanContentDropResult,
 } from "@langwatch/data-privacy-contract";
-import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
 import { googleDlpChannels } from "../channels/google-dlp-channels.registry.ts";
+import { presidioChannels } from "../channels/presidio-channels.registry.ts";
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
 import { DataPrivacyPermissionsService } from "../services/data-privacy-permissions.service.ts";
@@ -83,7 +82,7 @@ const PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
 
 type DataPrivacySetup = FeatureSetup<
   typeof DataPrivacyModule.dependencies,
-  Readonly<{ nodeEnvironment: string | undefined }>,
+  never,
   DataPrivacyServerConfig,
   DataPrivacyRepositories
 >;
@@ -96,12 +95,9 @@ export class DataPrivacyModule implements DataPrivacyApi {
   static readonly contract = DataPrivacyApi;
   static readonly dependencies = {
     projects: ProjectApi,
-    organizations: OrganizationApi,
     featureFlags: FeatureFlagApi,
     permissions: AuthzApi,
-    evaluation: EvaluationApi,
   };
-  static readonly reads = ["nodeEnvironment"] as const;
   static readonly config = dataPrivacyConfig;
   /** The DLP service account's key; model-provider's Vertex dispatch borrows it. */
   static readonly secrets = {
@@ -139,7 +135,6 @@ export class DataPrivacyModule implements DataPrivacyApi {
 
   static async create({
     repositories,
-    members: supplied,
     dependencies,
     config,
     secrets,
@@ -152,7 +147,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     );
     const metrics = PiiAnalysisMetricsOtelService.create();
     const presidio = PresidioRedactionService.create({
-      evaluation: dependencies.evaluation,
+      presidio: presidioChannels.live.create({ endpoint: config.langevalsEndpoint }),
       metrics,
       timeoutMs: DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
     });
@@ -167,7 +162,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     const privacy = DataPrivacyService.create({
       repository: repositories.policies,
       projects: dependencies.projects,
-      organizations: dependencies.organizations,
+      lineage: dependencies.permissions,
     });
     const permissions = DataPrivacyPermissionsService.create({ authz: dependencies.permissions });
 
@@ -176,7 +171,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
       redaction: OtlpSpanPiiRedactionService.create({
         transport: analysis,
         isLangevalsConfigured: () => analysis.isPresidioConfigured(),
-        isProduction: supplied.nodeEnvironment === "production",
+        isProduction: config.nodeEnvironment === "production",
         piiRedactionMaxAttributeLength: PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
         nativePolicyEnforced: config.enforcement !== "off",
         dataPrivacy: privacy,

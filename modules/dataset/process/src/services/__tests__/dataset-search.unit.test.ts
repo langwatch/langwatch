@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  DATASET_SEARCH_MAX_ROWS,
   matchesDatasetSearch,
   measureRowsBytes,
   normalizeDatasetSearch,
@@ -126,14 +125,5 @@ describe("measureRowsBytes()", () => {
     cyclic.self = cyclic;
 
     expect(measureRowsBytes([cyclic, cyclic])).toBe(2);
-  });
-});
-
-describe("DATASET_SEARCH_MAX_ROWS", () => {
-  it("caps how many rows one search will read", () => {
-    // Rows rather than bytes: legacy postgres-backed datasets carry a null
-    // `sizeBytes`, so a byte cap would never fire for them, and the real cost
-    // of an s3_jsonl search is chunk reads, not heap.
-    expect(DATASET_SEARCH_MAX_ROWS).toBe(50_000);
   });
 });

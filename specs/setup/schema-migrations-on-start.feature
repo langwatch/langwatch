@@ -8,8 +8,9 @@
 # on a missing column.
 #
 # The step belongs to the API process when a process is DEPLOYED, because the
-# API is the one process that owns the schema: the worker and the browser
-# application never migrate, so a deployment has exactly one migrator. Locally
+# API is the one process that owns the schema. The browser application never
+# migrates; the worker runs the same preflight chain (main's behaviour, and the
+# system-migrations start order) so it never consumes jobs on an old schema. Locally
 # it belongs to whoever starts the stack, once, because a lane that reloads and
 # restarts would otherwise migrate again every time it came back.
 #
@@ -65,11 +66,11 @@ Feature: Schema migrations run before the API serves
     Then the step it names does nothing and the boot continues
 
   @unit
-  Scenario: The worker and the browser application never migrate
+  Scenario: The browser application never migrates and the worker runs the API's preflight
     Given a stack running all three Node applications
     When the worker process and the browser application start
-    Then neither of them applies migrations
-    And the stack has exactly one migrator
+    Then the browser application applies no migrations
+    And the worker runs the same preflight chain as the API before it consumes jobs
 
   @unit
   Scenario: The image migrates once, through the same script

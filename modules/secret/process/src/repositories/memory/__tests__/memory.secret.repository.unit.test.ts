@@ -4,12 +4,12 @@ import { describe, expect, it } from "vitest";
 import { MemorySecretRepository } from "../memory.secret.repository.ts";
 
 function stored(name: string, projectId = "project-1") {
-  return { projectId, name, encryptedValue: `encrypted(${name})`, actorId: "user-1" };
+  return { projectId, name, value: `value(${name})`, actorId: "user-1" };
 }
 
 describe("MemorySecretRepository", () => {
   describe("when a project holds several secrets", () => {
-    it("answers metadata by name, carrying no ciphertext", async () => {
+    it("answers metadata by name, carrying no value", async () => {
       const repository = MemorySecretRepository.create();
       await repository.create(stored("OPENAI_API_KEY"));
       await repository.create(stored("ANTHROPIC_API_KEY"));
@@ -18,16 +18,16 @@ describe("MemorySecretRepository", () => {
       const rows = await repository.findAll({ projectId: "project-1" });
 
       expect(rows.map((row) => row.name)).toEqual(["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]);
-      expect(rows[0]).not.toHaveProperty("encryptedValue");
+      expect(rows[0]).not.toHaveProperty("value");
       await expect(repository.count({ projectId: "project-1" })).resolves.toBe(2);
     });
 
-    it("hands the ciphertext out only through the value read", async () => {
+    it("hands the value out only through the value read", async () => {
       const repository = MemorySecretRepository.create();
       await repository.create(stored("OPENAI_API_KEY"));
 
       await expect(repository.findAllValues({ projectId: "project-1" })).resolves.toEqual([
-        { name: "OPENAI_API_KEY", encryptedValue: "encrypted(OPENAI_API_KEY)" },
+        { name: "OPENAI_API_KEY", readable: true, value: "value(OPENAI_API_KEY)" },
       ]);
     });
   });
@@ -54,26 +54,26 @@ describe("MemorySecretRepository", () => {
 
       await expect(repository.findById(elsewhere)).resolves.toBeUndefined();
       await expect(
-        repository.update({ ...elsewhere, encryptedValue: "encrypted(x)", actorId: "user-1" }),
+        repository.update({ ...elsewhere, value: "x", actorId: "user-1" }),
       ).rejects.toBeInstanceOf(SecretNotFoundError);
       await expect(repository.delete(elsewhere)).rejects.toBeInstanceOf(SecretNotFoundError);
     });
   });
 
   describe("when a value is replaced", () => {
-    it("keeps the metadata and swaps the ciphertext", async () => {
+    it("keeps the metadata and swaps the value", async () => {
       const repository = MemorySecretRepository.create();
       const created = await repository.create(stored("OPENAI_API_KEY"));
 
       await repository.update({
         projectId: "project-1",
         id: created.id,
-        encryptedValue: "encrypted(rotated)",
+        value: "rotated",
         actorId: "user-2",
       });
 
       await expect(repository.findAllValues({ projectId: "project-1" })).resolves.toEqual([
-        { name: "OPENAI_API_KEY", encryptedValue: "encrypted(rotated)" },
+        { name: "OPENAI_API_KEY", readable: true, value: "rotated" },
       ]);
     });
   });

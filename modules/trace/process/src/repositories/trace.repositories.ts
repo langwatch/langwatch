@@ -1,5 +1,6 @@
 import type { TraceListRepository } from "@langwatch/trace-contract";
 
+import type { TraceClickHouse } from "./clickhouse/clickhouse.trace-member-client.repository.ts";
 import type { LogRecordStorageRepository } from "./log-record-storage.repository.ts";
 import type { SessionGroupsRepository } from "./session-groups.repository.ts";
 import type { SpanStorageRepository } from "./span-storage.repository.ts";
@@ -11,8 +12,12 @@ import type { TraceClusteringSampleRepository } from "./trace-clustering-sample.
 import type { TraceDerivationSpanReaderRepository } from "./trace-derivation-span-reader.repository.ts";
 import type { TraceEditOverlayRepository } from "./trace-edit-overlay.repository.ts";
 import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
+import type { TraceExportSlotRepository } from "./trace-export-slot.repository.ts";
+import type { TraceIngestSourceBillingRepository } from "./trace-ingest-source-billing.repository.ts";
 import type { TraceModelSpendRepository } from "./trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "./trace-payload-reader.repository.ts";
+import type { TraceRateLimitRepository } from "./trace-rate-limit.repository.ts";
+import type { TraceSpanDedupRepository } from "./trace-span-dedup.repository.ts";
 import type { TraceSummaryFoldCacheRepository } from "./trace-summary-fold-cache.repository.ts";
 import type { TraceSummaryProjectionRepository } from "./trace-summary-projection.repository.ts";
 import type { TraceSummaryRepository } from "./trace-summary.repository.ts";
@@ -25,6 +30,8 @@ import type { TraceUsageCountRepository } from "./trace-usage-count.repository.t
  */
 export interface TraceRepositories {
   readonly editOverlay: TraceEditOverlayRepository;
+  /** Governance's coding-assistant billing fact as trace folded it; read at OTLP ingest. */
+  readonly ingestSourceBilling: TraceIngestSourceBillingRepository;
   readonly summaryProjection: TraceSummaryProjectionRepository;
   readonly analyticsProjection: TraceAnalyticsProjectionRepository;
   readonly analyticsRollup: TraceAnalyticsRollupRepository;
@@ -44,4 +51,12 @@ export interface TraceRepositories {
   readonly usageCount: TraceUsageCountRepository;
   readonly modelSpend: TraceModelSpendRepository;
   readonly attributeSpend: TraceAttributeSpendRepository;
+  /** The ingestion doors' duplicate claim, so an SDK's retry is not a second span. */
+  readonly spanDedup: TraceSpanDedupRepository;
+  /** The export door's in-flight slots. */
+  readonly exportSlots: TraceExportSlotRepository;
+  /** The export door's and the anonymous share read's rate windows. */
+  readonly rateLimits: TraceRateLimitRepository;
+  /** A raw tenant client, for the reads not yet behind a named repository. */
+  readonly clickhouseClients: TraceClickHouse;
 }

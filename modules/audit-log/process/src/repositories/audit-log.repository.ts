@@ -8,6 +8,12 @@ import type {
 
 export interface AuditLogRepository {
   create(entry: AuditLogEntry): Promise<RecordedAuditLogEntry>;
+  /** Writes the row unless one holds `idempotencyKey`; either way answers the stored row. */
+  createOnce(keyed: {
+    entry: AuditLogEntry;
+    idempotencyKey: string;
+    occurredAt: number;
+  }): Promise<RecordedAuditLogEntry>;
   findEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]>;
   hasRecordedSince(input: RecordedSinceInput): Promise<boolean>;
 }

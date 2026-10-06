@@ -1,7 +1,11 @@
 import type { TraceQueryClassification } from "@langwatch/trace-contract";
 
-import { type TraceQueryClassifier } from "../app/trace.members.ts";
 import { traceQueryFieldNeeds } from "../rules/trace-query-evaluation.rules.ts";
+
+/** Composition port for the canonical Trace query grammar during its migration. */
+export interface TraceQueryClassifier {
+  classify(query: string): TraceQueryClassification;
+}
 
 export class TraceQueryClassificationService implements TraceQueryClassifier {
   private constructor() {}

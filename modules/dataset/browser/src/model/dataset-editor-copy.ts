@@ -46,11 +46,3 @@ export const searchFailedMessage = (search: string): string =>
  * needs to see which search this belongs to.
  */
 export const noSearchMatchesMessage = (search: string): string => `No records match “${search}”.`;
-
-/**
- * Tooltip on the truncated-read count chip: a large dataset loads up to a
- * byte budget, so only the first rows show. Explains nothing is lost,
- * editing a visible row is safe, and how to get the complete data.
- */
-export const truncatedReadTooltip = ({ shown, total }: { shown: number; total: number }): string =>
-  `This dataset is too large to display in full here — showing ${formatRecordCount(shown)} out of ${formatRecordCount(total)} rows. Editing a visible row saves just that row; use Download as CSV for the complete dataset.`;

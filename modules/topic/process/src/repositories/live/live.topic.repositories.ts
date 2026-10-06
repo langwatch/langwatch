@@ -1,4 +1,4 @@
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import {
   PostgresTopicRepositories,
@@ -16,7 +16,7 @@ export class LiveTopicRepositories {
     redis,
   }: {
     prisma: TopicRepositoriesDatabase;
-    redis: ProcessMembers["redis"];
+    redis: RedisConnection;
   }): TopicRepositories {
     return {
       ...PostgresTopicRepositories.create({ prisma }),

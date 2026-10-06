@@ -1,5 +1,6 @@
 import { GrantScopeTier } from "@langwatch/authz-contract";
 import { NotFoundError } from "@langwatch/handled-error";
+import { readJoinerRole } from "@langwatch/identity-contract";
 import {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
@@ -10,7 +11,6 @@ import {
   OrganizationSlugTakenError,
   OrganizationUserRole,
   TeamNotFoundError,
-  type Organization,
   type OrganizationFounding,
   type OrganizationIntent,
   type TeamUserRole,
@@ -18,6 +18,7 @@ import {
 } from "@langwatch/organization-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
+import type { DeveloperAdmissionVia } from "../../rules/admission-audit.rules.ts";
 import { isCustomRole } from "../../rules/custom-role-naming.rules.ts";
 import {
   isActiveAdmin,
@@ -44,53 +45,14 @@ import type {
   UpdateMemberRoleResult,
   UpdateTeamMemberRoleInput,
 } from "../organization-membership.repository.ts";
-import type {
-  MemoryAuditLogRow,
-  MemoryOrganizationDatabase,
-  MemoryOrganizationRow,
-  MemoryTeamRow,
-  MemoryUserRow,
+import {
+  organizationOfRow,
+  type MemoryAuditLogRow,
+  type MemoryOrganizationDatabase,
+  type MemoryOrganizationRow,
+  type MemoryTeamRow,
+  type MemoryUserRow,
 } from "./memory.organization.database.ts";
-
-function toOrganization(row: MemoryOrganizationRow): Organization {
-  return {
-    id: row.id,
-    name: row.name,
-    phoneNumber: null,
-    slug: row.slug,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    usageSpendingMaxLimit: null,
-    maxSessionDurationDays: 30,
-    mfaRequired: false,
-    signupData: null,
-    signedDPA: false,
-    elasticsearchNodeUrl: null,
-    elasticsearchApiKey: null,
-    useCustomElasticsearch: false,
-    s3Endpoint: row.s3Endpoint,
-    s3AccessKeyId: row.s3AccessKeyId,
-    s3SecretAccessKey: row.s3SecretAccessKey,
-    s3Bucket: row.s3Bucket,
-    useCustomS3: false,
-    sentPlanLimitAlert: null,
-    ssoDomain: null,
-    ssoProvider: null,
-    domainJoin: "invite_only",
-    joinDomains: [],
-    presenceEnabled: row.presenceEnabled,
-    traceSharingEnabled: row.traceSharingEnabled,
-    supportContact: row.supportContact,
-    primaryIntent: row.primaryIntent,
-    promoCode: null,
-    stripeCustomerId: row.stripeCustomerId,
-    currency: "USD",
-    pricingModel: "SEAT_EVENT",
-    license: null,
-    licenseExpiresAt: null,
-    licenseLastValidatedAt: null,
-  };
-}
 
 function toUser(row: MemoryUserRow): User {
   return {
@@ -173,6 +135,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       s3SecretAccessKey: null,
       s3Bucket: null,
       stripeCustomerId: null,
+      pricingModel: input.pricingModel,
       createdAt: now,
       updatedAt: now,
     });
@@ -223,6 +186,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       s3SecretAccessKey: null,
       s3Bucket: null,
       stripeCustomerId: null,
+      pricingModel: input.pricingModel,
       createdAt: now,
       updatedAt: now,
     });
@@ -376,7 +340,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       })
       .map((row) => this.memberWithUser(row));
 
-    return { ...toOrganization(organization), members };
+    return { ...organizationOfRow(organization), members };
   }
 
   async findMemberById(params: {
@@ -567,21 +531,32 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     organizationId: string;
     userId: string;
     pendingAdmissionId: string;
-  }): Promise<"created" | "already-present"> {
+    via: DeveloperAdmissionVia;
+    /** The seat a caller decided (ADR-171 v6); absent reads the joiner seat. */
+    seat?: "MEMBER" | "DEVELOPER";
+    /** Where a join request was made, for the Developer admission audit row. */
+    origin?: "web" | "cli";
+  }): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
     const { organizationId, userId, pendingAdmissionId } = input;
-    if (this.membershipRow({ organizationId, userId })) return "already-present";
+    const existing = this.membershipRow({ organizationId, userId });
+    if (existing) {
+      const seat = existing.role === OrganizationUserRole.DEVELOPER ? "DEVELOPER" : "MEMBER";
+      return { outcome: "already-present", seat };
+    }
 
+    const seat =
+      input.seat ?? readJoinerRole(this.memory.organizations.get(organizationId)?.joinerRole);
     const now = nowInstant();
     this.memory.organizationUsers.push({
       userId,
       organizationId,
-      role: OrganizationUserRole.MEMBER,
+      role: seat,
       disabledAt: null,
       createdAt: now,
       updatedAt: now,
-      pendingSsoGrantId: pendingAdmissionId,
+      pendingSsoGrantId: seat === "MEMBER" ? pendingAdmissionId : null,
     });
-    return "created";
+    return { outcome: "created", seat };
   }
 
   async deleteMember(input: DeleteMemberInput): Promise<void> {
@@ -702,6 +677,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     }
     row.role = role;
     row.updatedAt = nowInstant();
+    this.applyDeveloperSeat({ organizationId, userId, role });
 
     const teamsLeftWithoutAdmin: { id: string; name: string }[] = [];
     for (const update of effectiveTeamRoleUpdates) {
@@ -719,6 +695,25 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     }
 
     return { teamsLeftWithoutAdmin };
+  }
+
+  /** A move onto the Developer seat (ADR-171) keeps the personal team, leaves every shared one. */
+  private applyDeveloperSeat({
+    organizationId,
+    userId,
+    role,
+  }: {
+    organizationId: string;
+    userId: string;
+    role: OrganizationUserRole;
+  }): void {
+    if (role !== "DEVELOPER") return;
+    for (let index = this.memory.teamUsers.length - 1; index >= 0; index -= 1) {
+      const teamUser = this.memory.teamUsers[index];
+      const team = teamUser ? this.memory.teams.get(teamUser.teamId) : undefined;
+      if (teamUser?.userId !== userId || team?.organizationId !== organizationId) continue;
+      if (!team.isPersonal) this.memory.teamUsers.splice(index, 1);
+    }
   }
 
   async updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void> {
@@ -884,7 +879,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
         };
       });
 
-    return { ...toOrganization(organization), members, teams };
+    return { ...organizationOfRow(organization), members, teams };
   }
 
   private memberSummaryAsOrganizationUser(row: {

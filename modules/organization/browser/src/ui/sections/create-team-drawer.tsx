@@ -1,4 +1,5 @@
 import { Drawer } from "@langwatch/design-system/drawer";
+import type { UiCreateTeamDrawerProps } from "@langwatch/organization-contract";
 import type React from "react";
 import { useCallback } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
@@ -12,7 +13,7 @@ import { TeamUserRole } from "../../model/prisma-types.ts";
 import { TeamForm, type TeamFormData } from "./team-form.tsx";
 import { teamRolesOptions } from "./team-user-role-field.tsx";
 
-export function CreateTeamDrawer({ open = true }: { open?: boolean }): React.ReactElement {
+export function CreateTeamDrawer({ open = true }: UiCreateTeamDrawerProps): React.ReactElement {
   const toaster = useOrganizationToaster();
   const { organization } = useOrganizationTeamProject();
   const { data: session } = useRequiredSession();

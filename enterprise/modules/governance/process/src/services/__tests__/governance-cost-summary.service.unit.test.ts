@@ -46,6 +46,7 @@ describe("GovernanceCostSummaryService.summary", () => {
   describe("given a lane mixing dollar usage with usage billed elsewhere", () => {
     /** @scenario "A lane with usage we cannot state in US dollars holds no total" */
     /** @scenario "A currency total is withheld when part of what it covers holds no amount" */
+    /** @scenario "A cell priced in another currency is not a cell we hold no amount for" */
     it("withholds the dollar figure over an unpriced cell and totals the euros on their own line", async () => {
       const { costRollup, read } = setup();
       costRollup.seed(cell({}));

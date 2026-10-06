@@ -7,6 +7,7 @@ describe("admin contract", () => {
     expect(adminIdentitySchema.parse({ email: null })).toEqual({ email: null });
   });
 
+  /** @scenario Starting an impersonation still takes a reason */
   it("requires a non-empty impersonation reason", () => {
     expect(
       startImpersonationInputSchema.validate({

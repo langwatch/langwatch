@@ -30,3 +30,4 @@ export * from "./gateway-internal.schemas.ts";
 export * from "./gateway-spend-event.trpc.ts";
 export * from "./gateway-principal-spend.ts";
 export * from "./gateway.governance-events.ts";
+export * from "./gateway.spend-events.ts";

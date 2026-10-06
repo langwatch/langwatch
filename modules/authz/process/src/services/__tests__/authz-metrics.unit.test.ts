@@ -6,14 +6,14 @@ import { register } from "prom-client";
 import { describe, expect, it } from "vitest";
 
 import {
+  type AuthzRevocationReason,
+  authzDirectProjectionWriteTotal,
+} from "../../repositories/authz-revocation.repository.ts";
+import {
   type AuthzCutoverDatabase,
   PrismaAuthzCutoverRepository,
 } from "../../repositories/prisma/prisma.authz-cutover.repository.ts";
-import {
-  type AuthzRevocationReason,
-  authzDirectProjectionWriteTotal,
-  PrismaAuthzRevocationRepository,
-} from "../../repositories/prisma/prisma.authz-revocation.repository.ts";
+import { PrismaAuthzRevocationRepository } from "../../repositories/prisma/prisma.authz-revocation.repository.ts";
 import {
   AuthzCutoverGateService,
   authzEngineGateReadFailuresTotal,

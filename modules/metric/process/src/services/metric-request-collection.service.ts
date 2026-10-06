@@ -11,7 +11,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
-export interface MetricRequestCollectionDeps {
+interface MetricRequestCollectionDeps {
   /** Trace's share of a metric: the exemplar correlations it folds. */
   traces: Pick<TraceApi, "recordMetricCorrelations">;
   /** Only the preparation half of `MetricApi`: this collector sends its own batch, itself. */

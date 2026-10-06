@@ -5,14 +5,13 @@ import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-con
  * `POST /api/collector` against the COMPOSITION-built app and MODULE-declared
  * transports — proves neither is stubbed. Spec: specs/traces/trace-ingestion-door.feature
  */
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/process";
@@ -22,17 +21,15 @@ import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it } from "vitest";
 
-import { composeTraceAppDependencies } from "../../app/trace-composition.build.ts";
 import { TraceModule } from "../../app/trace.app.ts";
-import type { TraceProcessingCommands } from "../../app/trace.members.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import type { TraceProcessingCommands } from "../../services/trace-processing-commands.service.ts";
 import { traceProcessModule } from "../../trace.module.ts";
 import { CollectorApi, collectorRest } from "../collector.rest.ts";
 
@@ -126,20 +123,6 @@ function apiKeyDirectory(
   };
 }
 
-/** The flat body this deployment's boundary publishes for a handled refusal. */
-const renderRefusal: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    const serialized = error.serialize();
-
-    return c.json(
-      { error: serialized.code, message: error.message },
-      serialized.httpStatus as ContentfulStatusCode,
-    );
-  }
-
-  return c.json({ error: "Internal server error" }, 500);
-};
-
 /**
  * The whole trace REST surface this module declares, mounted the way boot
  * mounts it: every declared REST transport, in declaration order, over ONE
@@ -161,8 +144,8 @@ function deployment(access: CollectorAccess = {}) {
   };
 
   const canonicalisation = TraceCanonicalisationService.create();
-  const app = TraceModule.create(
-    composeTraceAppDependencies({
+  const app = TraceModule.fromDependencies(
+    TraceModule.composeDependencies({
       repositories: MemoryTraceRepositories.create(),
       storedObjects: createApiFixture<StoredObjectApi>(),
       canonicalisation,
@@ -192,7 +175,6 @@ function deployment(access: CollectorAccess = {}) {
         plans: peers.plans,
         dataPrivacy: peers.dataPrivacy,
         fallbackVisibilityDays: 14,
-        processName: "langwatch-api",
       },
       projects: peers.projects,
       topics: peers.topics,
@@ -234,7 +216,7 @@ function deployment(access: CollectorAccess = {}) {
           // The collector binds NO transport fact: it is declared public and
           // resolves the project credential inside its handler.
           credential: "public",
-          onError: renderRefusal,
+          onError: canonicalErrorResponse,
         }),
       ]
     : [];

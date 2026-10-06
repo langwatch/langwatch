@@ -95,6 +95,22 @@ describe("given a caller writing a retention override", () => {
     });
   });
 
+  describe("when they hold only the project's permission and aim at the organization", () => {
+    /** @scenario "A project admin cannot set an organization-wide override" */
+    it("refuses by name, asking for organization:manage", async () => {
+      await expect(
+        policy({ allow: false }).assertCanWriteScope({
+          actor: ACTOR,
+          scope: { scopeType: "ORGANIZATION", scopeId: "org_1" },
+        }),
+      ).rejects.toMatchObject({
+        code: "data_retention_scope_write_forbidden",
+        httpStatus: 403,
+        meta: { requiredPermission: "organization:manage" },
+      });
+    });
+  });
+
   describe("when they do not", () => {
     /** @scenario "A retention rule a caller has no standing to write is refused by name" */
     it("refuses by name, carrying the permission the scope needs", async () => {
@@ -155,7 +171,10 @@ describe("given a plan-gated write", () => {
 });
 
 describe("given a value a plan may or may not persist", () => {
-  /** @scenario "A retention length the plan does not offer is refused by name" */
+  /**
+   * @scenario "A retention length the plan does not offer is refused by name"
+   * @scenario "A paid organization cannot save an off-menu retention value"
+   */
   it("allows only the fixed presets on a capped plan", () => {
     const capped = { free: false, uncapped: false };
     expect(() =>
@@ -169,7 +188,10 @@ describe("given a value a plan may or may not persist", () => {
     ).toMatchObject({ code: "data_retention_length_not_on_plan", httpStatus: 403 });
   });
 
-  /** @scenario "A retention length under the plan's floor is told the floor" */
+  /**
+   * @scenario "A retention length under the plan's floor is told the floor"
+   * @scenario "An enterprise organization gets the full menu and a custom value"
+   */
   it("allows any whole-week value at or above the floor on an uncapped plan", () => {
     const uncapped = { free: false, uncapped: true };
     expect(() =>
@@ -202,7 +224,11 @@ describe("given a value a plan may or may not persist", () => {
 
 describe("given a request to disable retention entirely", () => {
   describe("when the caller is not a platform administrator", () => {
-    /** @scenario "A request to keep data forever is refused by name" */
+    /**
+     * @scenario "A request to keep data forever is refused by name"
+     * @scenario "Keep-forever stays a platform-admin capability on every plan"
+     * @scenario "An organization admin who is not a platform admin cannot disable retention"
+     */
     it("refuses by name", async () => {
       await expect(
         policy({ admin: false }).assertCanDisableRetention({ actor: ACTOR }),
@@ -211,6 +237,7 @@ describe("given a request to disable retention entirely", () => {
   });
 
   describe("when the caller is one", () => {
+    /** @scenario "A platform admin can disable retention for a scope" */
     it("allows it", async () => {
       await expect(
         policy({ admin: true }).assertCanDisableRetention({ actor: ACTOR }),

@@ -80,6 +80,7 @@ describe("given an admin on the Inventory page", () => {
     });
 
     /** @scenario "A failed read raises no alert while sample mode is on" */
+    /** @scenario "No error alerts are rendered while sample mode is on" */
     it("raises no error alert when the source read failed", async () => {
       window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
       harness.sources = {

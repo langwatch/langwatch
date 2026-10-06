@@ -27,7 +27,7 @@ interface IdentityTrailSweep {
 }
 
 /** What one erasure did, for the audit trail and the caller. */
-export interface ErasureOutcome extends IdentityTrailSweep {
+interface ErasureOutcome extends IdentityTrailSweep {
   discoveredPersonId: string;
   pseudonym: string;
   suppressionRowsRecorded: number;
@@ -39,7 +39,7 @@ export interface ErasureOutcome extends IdentityTrailSweep {
   resumed: boolean;
 }
 
-export interface IdentityErasureDependencies {
+interface IdentityErasureDependencies {
   discoveredPeople: DiscoveredPersonRepository;
   suppressions: ErasedIdentifierSuppressionRepository;
   identityMatches: IdentityMatchRepository;

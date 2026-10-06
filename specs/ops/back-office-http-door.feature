@@ -23,16 +23,18 @@ Feature: The back office answers over HTTP
   # to.
 
   @integration
-  Scenario: The back office is reachable on a deployment that composed it
-    Given the deployment composed an operator application and a browser-session transport
-    When the process mounts its REST families
+  Scenario: The back office is reachable by instance staff
+    Given the process mounted its REST families with the operator application
+    And a signed-in member of instance staff
+    When they ask `/api/admin` for a resource
     Then `/api/admin` answers
 
   @integration
-  Scenario: A deployment with no browser session leaves the door off
-    Given the deployment composed no browser-session transport
-    When the process mounts its REST families
-    Then `/api/admin` is not mounted at all rather than mounted refusing
+  Scenario: A caller with no browser session still answers no one
+    Given a caller with no browser session
+    When they ask `/api/admin` for a resource
+    Then the answer is the hidden not-found
+    And nobody can be identified as instance staff
 
   @integration
   Scenario: An impersonating admin stays the acting person
@@ -54,10 +56,10 @@ Feature: The back office answers over HTTP
   Scenario: A signed-in person who is not staff cannot tell the door exists
     Given a signed-in person who holds no platform-operator grant
     When they ask the back office for a resource
-    Then the answer is the same nothing an unmounted door would give
+    Then the answer is a not-found that names no door, resource or grant
 
   @integration
-  Scenario: Every back-office resource the console lists answers
+  Scenario: Every instance admin resource the console lists answers
     Given a signed-in member of instance staff
     When the console reads users, organizations, projects and subscriptions
     Then each one answers with the list the console renders

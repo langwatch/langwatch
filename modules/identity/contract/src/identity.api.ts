@@ -47,7 +47,12 @@ import type {
 } from "./facts.ts";
 import type { IdentityEmailResolution } from "./identity-email.service.ts";
 import type { VerifiedUserDomain } from "./identity-lookup.ts";
-import type { DomainJoinSetting, JoinLookupDecision, JoinOffer } from "./join-matching.ts";
+import type {
+  DomainJoinSetting,
+  JoinerRole,
+  JoinLookupDecision,
+  JoinOffer,
+} from "./join-matching.ts";
 import type {
   ApproveJoinCommandData,
   ExpireJoinCommandData,
@@ -55,7 +60,11 @@ import type {
   RequestJoinCommandData,
   WithdrawJoinCommandData,
 } from "./join-request-commands.ts";
-import type { JoinRequestAggregateState, JoinRequestFactInput } from "./join-request.ts";
+import type {
+  JoinRequestAggregateState,
+  JoinRequestFactInput,
+  JoinRequestOrigin,
+} from "./join-request.ts";
 import type { VerifiedEmailsResolution } from "./matchable-emails.ts";
 import type {
   ConfirmMfaCommandData,
@@ -67,6 +76,7 @@ import type {
   RegenerateBackupCodesCommandData,
   MfaFactInput,
 } from "./mfa.ts";
+import type { SessionClaims, SessionClaimsMintInput } from "./session-claims.ts";
 import type { RoutingDecision } from "./signin-routing.ts";
 import type {
   SsoArrivingUser,
@@ -95,6 +105,7 @@ import type {
   SsoMigrationView,
 } from "./sso-migration.ts";
 import type { SsoConnectionRemoval, SsoSetupCommand, SsoSetupView } from "./sso-setup.ts";
+import type { OrganizationMfaStanding } from "./two-step-verification.ts";
 
 /** One address-lock reaper pass (ADR-116 §6). */
 export interface IdentityNewbornSweepSummary {
@@ -617,6 +628,8 @@ export interface JoinSettingChange {
   next: DomainJoinSetting;
   previousDomains: readonly string[];
   nextDomains: readonly string[];
+  previousJoinerRole: JoinerRole;
+  nextJoinerRole: JoinerRole;
 }
 
 /**
@@ -633,11 +646,15 @@ export interface JoinRequestsApi {
   joinAutomaticallyIfAdmitted(args: {
     userId: string;
     verifiedEmail: string | null;
+    /** Where the arrival was made (ADR-171 v6); absent is `web`. */
+    origin?: JoinRequestOrigin;
   }): Promise<{ organization: JoinOffer | null }>;
   request(args: {
     userId: string;
     verifiedEmail: string | null;
     organizationId: string;
+    /** Where the ask was made (ADR-171 v6); absent is `web`. */
+    origin?: JoinRequestOrigin;
   }): Promise<{ joinRequestId: string; state: "PENDING" | "APPROVED" }>;
   withdraw(args: { joinRequestId: string; userId: string }): Promise<void>;
   approve(args: {
@@ -661,11 +678,13 @@ export interface JoinRequestsApi {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     domains: readonly string[];
+    /** Absent keeps the seat already set (ADR-171). */
+    joinerRole?: JoinerRole;
     actorUserId: string;
   }): Promise<JoinSettingChange>;
   readJoining(args: {
     organizationId: string;
-  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }>;
+  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[]; joinerRole: JoinerRole }>;
   pendingForOrganization(args: { organizationId: string }): Promise<JoinRequestAggregateState[]>;
   automaticJoinsForOrganization(args: {
     organizationId: string;
@@ -705,6 +724,12 @@ export interface IdentityReservationsApi {
  * reconciliation, user-migration registry, SSO backoffice connection writer.
  */
 export interface IdentityApi {
+  /** Where one person stands with one organization's second-factor requirement, on this session. */
+  getOrganizationMfaStanding(input: {
+    userId: string;
+    organizationId: string;
+    sessionId: string | null;
+  }): Promise<OrganizationMfaStanding>;
   /** Every domain these people proved, one row per person and domain. An address nobody
    *  confirmed is not evidence of who somebody works for. */
   findVerifiedDomainsByUserIds(input: {
@@ -754,6 +779,11 @@ export interface IdentityApi {
   moveLegacyMicrosoftAccountKey(input: {
     profile: Readonly<Record<string, unknown>>;
   }): Promise<void>;
+  /**
+   * What a session records at mint (D06): the live identifier of the way in that minted it, or
+   * the id the callback's one native account derives before projection; never a guess.
+   */
+  claimsForMint(input: SessionClaimsMintInput): Promise<SessionClaims>;
   /** When each sign-in method last minted a session, read from the user's sessions. */
   getMethodsLastUsed(input: { userId: string }): Promise<MethodsLastUsed>;
   /** Where an address signs in; `breakGlass` asks for the rate-limited local door (ADR-117). */

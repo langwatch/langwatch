@@ -1,10 +1,14 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { DATASET_LIMIT_BOUND_KEYS, type DatasetLimits } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Experiment, ExperimentApi } from "@langwatch/experiment-contract";
-import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
+import {
+  deriveDatasetBounds,
+  isDatasetDerivedBoundKey,
+  resolveRequestBound,
+  type RequestBoundKey,
+} from "@langwatch/plans";
 import { ResourceScope } from "@langwatch/process";
-import { memoryObjectStorage } from "@langwatch/process-stores";
-import type { ObjectStorage } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -13,6 +17,8 @@ import { vi } from "vitest";
 import type { DatasetRepositories } from "../../repositories/dataset.repositories.ts";
 import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
 import { DatasetAttachmentReferenceService } from "../../services/dataset-attachment-reference.service.ts";
+import { DatasetAttachmentUploadService } from "../../services/dataset-attachment-upload.service.ts";
+import { DatasetInlineAttachmentService } from "../../services/dataset-inline-attachment.service.ts";
 import { DatasetRequestBoundsService } from "../../services/dataset-request-bounds.service.ts";
 import { DatasetModule } from "../dataset.app.ts";
 
@@ -91,6 +97,53 @@ export function createDatasetTestRequestBounds(
   });
 }
 
+/**
+ * The entitlement peer of an organization whose dataset limits differ from the
+ * defaults, so a suite can reach a limit with a small file.
+ */
+export function createDatasetTestEntitlementWith(limits: Partial<DatasetLimits>): EntitlementApi {
+  const named: Partial<Record<RequestBoundKey, number>> = Object.fromEntries(
+    Object.entries(limits).map(([name, value]) => [
+      DATASET_LIMIT_BOUND_KEYS[name as keyof DatasetLimits],
+      value,
+    ]),
+  );
+
+  return createApiFixture<EntitlementApi>({
+    requestBound: ({ key }: { key: RequestBoundKey; organizationId: string }) =>
+      Promise.resolve(named[key] ?? resolveRequestBound(key, "FREE")),
+  });
+}
+
+/** The request bounds a service test constructs with, on limits that differ from the defaults. */
+export function createDatasetTestRequestBoundsWith(
+  limits: Partial<DatasetLimits>,
+): DatasetRequestBoundsService {
+  return DatasetRequestBoundsService.create({
+    entitlement: createDatasetTestEntitlementWith(limits),
+    projects: createDatasetTestProjects(),
+  });
+}
+
+/**
+ * The entitlement peer of an installation where some organizations hold a
+ * raised per-file limit, each answering the bounds derived from its own.
+ */
+export function createDatasetTestEntitlementPerOrganization(
+  raised: Readonly<Record<string, number>>,
+): EntitlementApi {
+  return createApiFixture<EntitlementApi>({
+    requestBound: ({ key, organizationId }: { key: RequestBoundKey; organizationId: string }) => {
+      const attachmentBytes = raised[organizationId];
+      if (attachmentBytes === undefined || !isDatasetDerivedBoundKey(key)) {
+        return Promise.resolve(resolveRequestBound(key, "FREE"));
+      }
+
+      return Promise.resolve(deriveDatasetBounds(attachmentBytes)[key]);
+    },
+  });
+}
+
 /** The reference check a `DatasetService` test constructs with; unscripted reads throw by name. */
 export function createDatasetTestAttachments(
   storedObjects: StoredObjectApi = createApiFixture<StoredObjectApi>({}, "storedObjects"),
@@ -98,10 +151,19 @@ export function createDatasetTestAttachments(
   return DatasetAttachmentReferenceService.create({ storedObjects });
 }
 
+/** The inline-file store a `DatasetService` test constructs with; unscripted stores throw. */
+export function createDatasetTestInlineAttachments(
+  storedObjects: StoredObjectApi = createApiFixture<StoredObjectApi>({}, "storedObjects"),
+  requestBounds: Pick<DatasetRequestBoundsService, "limit"> = createDatasetTestRequestBounds(),
+): DatasetInlineAttachmentService {
+  return DatasetInlineAttachmentService.create({
+    uploads: DatasetAttachmentUploadService.create({ storedObjects, requestBounds }),
+  });
+}
+
 export function createDatasetTestApp(
   input: Readonly<{
     repositories?: DatasetRepositories;
-    objectStorage?: ObjectStorage;
     publicBaseUrl?: string;
     dependencies?: Partial<{
       experiments: ExperimentApi;
@@ -122,11 +184,7 @@ export function createDatasetTestApp(
       storedObjects:
         input.dependencies?.storedObjects ?? createApiFixture<StoredObjectApi>({}, "storedObjects"),
     },
-    members: {
-      objectStorage: input.objectStorage ?? memoryObjectStorage(),
-      publicBaseUrl: input.publicBaseUrl,
-    },
-    config: undefined,
+    config: { publicBaseUrl: input.publicBaseUrl },
     resources: new ResourceScope(),
     secrets: {} as never,
   });

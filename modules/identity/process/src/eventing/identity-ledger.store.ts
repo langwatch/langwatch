@@ -23,8 +23,8 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { Counter, Histogram, register } from "prom-client";
 
-import { type IdentityEventing } from "../app/identity.members.ts";
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
+import type { IdentityEventing } from "./identity-command-senders.store.ts";
 import { identityEventsFor } from "./identity-events.intent.ts";
 import type { IdentityEvent, IdentityFoldState } from "./identity-state.projection.ts";
 
@@ -50,7 +50,7 @@ export const identityProjectionConvergenceTimeoutsTotal = new Counter({
 });
 
 /** End-to-end cost of one identity commit: append, stage, and the wait. */
-export const identityCommitDurationSeconds = new Histogram({
+const identityCommitDurationSeconds = new Histogram({
   name: "identity_commit_duration_seconds",
   help: "Duration of an identity ledger commit: durable append, queue staging, and the read-your-writes wait.",
   buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],

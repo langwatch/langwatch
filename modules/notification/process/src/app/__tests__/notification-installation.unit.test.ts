@@ -1,5 +1,6 @@
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
@@ -11,9 +12,8 @@ function process(
   resolver = SecretsResolver.over(SecretsChain.start({ environment: {} })),
 ) {
   return createApp({ role, secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(notificationProcessModule)])
-    .withMember("publicBaseUrl", "https://app.langwatch.test")
-    .withMember("outboundProxy", {})
+    .withModules([notificationProcessModule])
+    .withStores(memoryStores())
     .withEventing(testEventing())
     .withConfig({
       notification: {
@@ -21,6 +21,15 @@ function process(
         provider: undefined,
         ses: { enabled: undefined, region: undefined, endpoint: undefined },
         smtp: { host: undefined, port: undefined, user: undefined, secure: undefined },
+        publicBaseUrl: "https://app.langwatch.test",
+        outboundProxy: {
+          HTTPS_PROXY: undefined,
+          https_proxy: undefined,
+          HTTP_PROXY: undefined,
+          http_proxy: undefined,
+          NO_PROXY: undefined,
+          no_proxy: undefined,
+        },
       },
     });
 }

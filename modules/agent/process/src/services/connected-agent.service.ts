@@ -1,6 +1,7 @@
 import {
   type AgentCallSignal,
   type AgentConnection,
+  type AgentConnectAdmission,
   type AgentConnectCredentials,
   type AgentConnectFramesInput,
   type AgentConnectPollInput,
@@ -12,24 +13,17 @@ import {
   type DispatchAgent,
   type DispatchCall,
 } from "@langwatch/agent-contract";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 
 import type { AgentService } from "./agent.service.ts";
 import { ConnectedAgentConnectionService } from "./connected-agent-connection.service.ts";
-import { ConnectedAgentCredentialService } from "./connected-agent-credential.service.ts";
 import { LongPollTransportService } from "./connected-agent-long-poll.service.ts";
 import { ConnectedAgentPresenceService } from "./connected-agent-presence.service.ts";
 import { ConnectedAgentRuntimeService } from "./connected-agent-runtime.service.ts";
 import { AgentSessionService } from "./connected-agent-session.service.ts";
 
-export type ConnectedAgentOptions = {
+type ConnectedAgentOptions = {
   agents: AgentService;
-  apiKeys: ApiKeyApi;
-  authz: AuthzApi;
-  projects: ProjectApi;
   sessionState: SessionStateStore;
   config: AgentServerConfig;
   publicBaseUrl: string;
@@ -52,7 +46,6 @@ export class ConnectedAgentService {
     const session = AgentSessionService.create({
       runtime: this.#runtime,
       agents: options.agents,
-      credentials: ConnectedAgentCredentialService.create(options),
       publicBaseUrl: options.publicBaseUrl,
       replicaCount: options.config.replicaCount,
       relayMaxPayloadMb: options.config.relayMaxPayloadMb,
@@ -65,11 +58,8 @@ export class ConnectedAgentService {
     return this.#runtime.dispatcher.start();
   }
 
-  acceptConnection(
-    connection: AgentConnection,
-    credentials: AgentConnectCredentials,
-  ): Promise<void> {
-    return this.#connections.accept(connection, credentials);
+  acceptConnection(connection: AgentConnection, admission: AgentConnectAdmission): void {
+    this.#connections.accept(connection, admission);
   }
 
   async connectRegister(

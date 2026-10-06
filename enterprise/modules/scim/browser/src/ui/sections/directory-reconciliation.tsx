@@ -36,6 +36,9 @@ import { isRunningConnection } from "../../model/connection-lifecycle.ts";
 import { readableDate } from "../../model/display-formatters.ts";
 import { RecentDirectoryActivity } from "./recent-directory-activity.tsx";
 
+/** The connection's own page: its identity provider, its domains and its event log. */
+const CONNECTION_PAGE = "/settings/authentication/provider";
+
 /**
  * Colour tracks whether the reader has something to do, not how far along the
  * lifecycle is: a connection waiting for its first push is not a problem and
@@ -102,7 +105,7 @@ export function DirectoryReconciliation({
       <RecentDirectoryChanges changes={recentChanges} />
       <Text fontSize="sm" color="fg.muted" data-testid="directory-event-log-pointer">
         Changes to the connection itself (who set it up, proved a domain or turned it on) are in its{" "}
-        <Link href="/settings/authentication/provider">event log</Link>.
+        <Link href={CONNECTION_PAGE}>event log</Link>.
       </Text>
     </VStack>
   );
@@ -223,7 +226,9 @@ function ConnectionCard({
         <VStack align="stretch" gap={4}>
           <HStack align="start">
             <VStack align="start" gap={0}>
-              <Text fontWeight="600">{connection.providerId}</Text>
+              <Link href={CONNECTION_PAGE} fontWeight="600" data-testid="directory-connection-name">
+                {connection.providerId}
+              </Link>
               {connection.verifiedDomains.length > 0 && (
                 <Text fontSize="xs" color="fg.muted" data-testid="directory-connection-domains">
                   {connection.verifiedDomains.join(", ")}

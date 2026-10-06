@@ -127,15 +127,6 @@ export const presenceUpdateRequestSchema = z
   .strict();
 export type PresenceUpdateRequest = z.infer<typeof presenceUpdateRequestSchema>;
 
-export const presenceHeartbeatInputSchema = z
-  .object({
-    ...presenceUpdateRequestSchema.shape,
-    /** Who is publishing, as the boundary authenticated them. */
-    userId: z.string().min(1),
-  })
-  .strict();
-export type PresenceHeartbeatInput = z.infer<typeof presenceHeartbeatInputSchema>;
-
 export const presenceLeaveRequestSchema = z
   .object({
     projectId: z.string().min(1),
@@ -176,15 +167,6 @@ export const presenceCursorRequestSchema = z
   .strict();
 export type PresenceCursorRequest = z.infer<typeof presenceCursorRequestSchema>;
 
-export const presenceCursorTickInputSchema = z
-  .object({
-    ...presenceCursorRequestSchema.shape,
-    /** Who is publishing, as the boundary authenticated them. */
-    userId: z.string().min(1),
-  })
-  .strict();
-export type PresenceCursorTickInput = z.infer<typeof presenceCursorTickInputSchema>;
-
 /** The cursors of one anchor, minus the subscriber's own. */
 export const presenceCursorSubscriptionSchema = z
   .object({
@@ -198,3 +180,24 @@ export type PresenceCursorSubscription = z.infer<typeof presenceCursorSubscripti
 /** What the presence writes answer with: the tick was accepted. */
 export const presenceAcknowledgedSchema = z.object({ ok: z.literal(true) }).strict();
 export type PresenceAcknowledged = z.infer<typeof presenceAcknowledgedSchema>;
+
+export type PresenceDisabledScope = "organization" | "project" | null;
+
+export interface PresenceAvailability {
+  /** True when presence is allowed for the current project. */
+  enabled: boolean;
+  /** Which level disabled it (organization wins over project), or null. */
+  disabledAt: PresenceDisabledScope;
+}
+
+export function resolvePresenceAvailability({
+  organizationPresenceEnabled,
+  projectPresenceEnabled,
+}: {
+  organizationPresenceEnabled?: boolean | undefined;
+  projectPresenceEnabled?: boolean | undefined;
+}): PresenceAvailability {
+  if (organizationPresenceEnabled === false) return { enabled: false, disabledAt: "organization" };
+  if (projectPresenceEnabled === false) return { enabled: false, disabledAt: "project" };
+  return { enabled: true, disabledAt: null };
+}

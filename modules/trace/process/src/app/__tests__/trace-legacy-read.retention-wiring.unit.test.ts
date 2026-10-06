@@ -22,7 +22,7 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-const { composeTraceLegacyRead } = await import("../trace-composition.build.ts");
+const { TraceModule } = await import("../trace.app.ts");
 const { TraceLegacyReadClickHouseRepository } =
   await import("../../repositories/clickhouse/trace-legacy-read.repository.ts");
 const traceCanonicalisation = TraceCanonicalisationService.create();
@@ -43,7 +43,7 @@ describe("the production trace-service factory", () => {
     describe("when the service is created", () => {
       /** @scenario "The floor follows the tenant's own retention policy" */
       it("still wires a live retention cascade, so the floor is tenant-aware", () => {
-        const service = composeTraceLegacyRead({
+        const service = TraceModule.composeLegacyRead({
           retentionResolver: retentionResolver as never,
           traceCanonicalisation,
         });
@@ -53,7 +53,7 @@ describe("the production trace-service factory", () => {
 
       /** @scenario "The floor follows the tenant's own retention policy" */
       it("wires the policy cascade itself, not some other provider", () => {
-        const service = composeTraceLegacyRead({
+        const service = TraceModule.composeLegacyRead({
           retentionResolver: retentionResolver as never,
           traceCanonicalisation,
         });
@@ -67,7 +67,7 @@ describe("the production trace-service factory", () => {
 
       it("keeps the annotation service supplied to the factory", () => {
         const annotations = {} as never;
-        const service = composeTraceLegacyRead({
+        const service = TraceModule.composeLegacyRead({
           annotations,
           traceCanonicalisation,
         });

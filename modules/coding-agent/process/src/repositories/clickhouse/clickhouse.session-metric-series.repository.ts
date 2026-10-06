@@ -12,7 +12,7 @@ const TABLE_NAME = "session_metric_series" as const;
 const logger = createLogger("langwatch:app-layer:coding-agent:session-metric-series-repository");
 
 /** One converged total: a metric's bucket (`type` attribute) per session. */
-export interface SessionMetricTotal {
+interface SessionMetricTotal {
   sessionId: string;
   metricName: string;
   /** The `type` point attribute (`input`, `added`, `user`, …), or "". */

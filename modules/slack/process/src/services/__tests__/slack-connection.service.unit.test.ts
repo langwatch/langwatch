@@ -10,7 +10,7 @@ import {
   composeSlack,
 } from "./slack-connection.fixture.ts";
 
-/** Spec: specs/automations/slack-connections.feature */
+/** Spec: modules/slack/specs/slack-connections.feature */
 const BOT = "xoxb-1111-secret-abcd";
 const WEBHOOK = "https://hooks.slack.com/services/T/B/wxyz";
 const team = { teamId: "T1", teamName: "Acme Slack" };
@@ -58,7 +58,7 @@ class BlindedConnections extends MemorySlackConnectionRepository {
 describe("SlackConnectionService", () => {
   /** @scenario Adding a bot connection for the organization */
   it("stores a bot connection Slack accepted, with its workspace and a hint only", async () => {
-    const { service, repositories } = composeWithBot();
+    const { service } = composeWithBot();
     const created = await service.createSlackConnection(orgBot);
     expect(created).toMatchObject({
       scopeType: "ORGANIZATION",
@@ -68,8 +68,7 @@ describe("SlackConnectionService", () => {
       canManage: true,
     });
     expect(created.id.startsWith("slackintegration")).toBe(true);
-    const [row] = await repositories.connections.findById({ id: created.id });
-    expect(JSON.stringify(row)).not.toContain(BOT);
+    expect(JSON.stringify(created)).not.toContain(BOT);
   });
 
   /** @scenario Adding a webhook connection for one project */

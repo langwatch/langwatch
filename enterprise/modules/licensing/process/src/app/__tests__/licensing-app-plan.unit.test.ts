@@ -1,45 +1,48 @@
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { ResourceScope } from "@langwatch/process";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { ScopedSecrets } from "@langwatch/secrets";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
+  createTestLicensingApp,
   ENTERPRISE_LICENSE_KEY,
   TAMPERED_LICENSE_KEY,
-  TEST_LICENSING_CONFIG,
 } from "../../__tests__/testing.ts";
-import { LicensingModule, type LicensingInfrastructure } from "../licensing.app.ts";
-import type { LicenseStorage } from "../licensing.members.ts";
+import { MemoryOrganizationLicenseRepository } from "../../repositories/memory/memory.organization-license.repository.ts";
+import type { OrganizationLicenseRepository } from "../../repositories/organization-license.repository.ts";
+
+/** The licence rows, recording each organization whose key was read. */
+function recordingLicenses(rows: MemoryOrganizationLicenseRepository): {
+  read: string[];
+  licenses: OrganizationLicenseRepository;
+} {
+  const read: string[] = [];
+  return {
+    read,
+    licenses: {
+      getOrganizationLicense: (organizationId) => {
+        read.push(organizationId);
+        return rows.getOrganizationLicense(organizationId);
+      },
+      findOrganizationsWithLicense: () => rows.findOrganizationsWithLicense(),
+      organizationExists: (organizationId) => rows.organizationExists(organizationId),
+      storeLicense: (organizationId, license) => rows.storeLicense(organizationId, license),
+      removeLicense: (organizationId) => rows.removeLicense(organizationId),
+    },
+  };
+}
 
 describe("the installed licensing application's plan operation", () => {
   it("checks each organization's stored signature and preserves the unlicensed result", async () => {
-    const keys = new Map([
-      ["paid", ENTERPRISE_LICENSE_KEY],
-      ["tampered", TAMPERED_LICENSE_KEY],
-    ]);
-    const getOrganizationLicense = vi.fn(async (organizationId: string) => ({
-      licenseKey: keys.get(organizationId) ?? null,
-    }));
-    const repository = createApiFixture<LicenseStorage>({ getOrganizationLicense });
-    const app = await LicensingModule.create({
-      dependencies: {
-        instantEval: createApiFixture<InstantEvalApi>(),
-        projects: createApiFixture<ProjectApi>(),
-        gateway: createApiFixture<GatewayApi>(),
-        organizations: createApiFixture<OrganizationApi>(),
-      },
-      members: {
-        infrastructure: createApiFixture<LicensingInfrastructure>({ repository }),
-        isSaas: true,
-        serviceVersion: "test",
-      },
-      config: TEST_LICENSING_CONFIG,
-      resources: new ResourceScope(),
-      secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
+    const { read, licenses } = recordingLicenses(
+      MemoryOrganizationLicenseRepository.create(
+        new Map([
+          ["paid", ENTERPRISE_LICENSE_KEY],
+          ["tampered", TAMPERED_LICENSE_KEY],
+          ["unlicensed", null],
+        ]),
+      ),
+    );
+    const app = await createTestLicensingApp({
+      repositories: { organizationLicenses: licenses },
+      config: { isSaas: true },
     });
     expect(await app.resolve({ organizationId: "paid" })).toMatchObject({
       granted: true,
@@ -53,6 +56,6 @@ describe("the installed licensing application's plan operation", () => {
       granted: true,
       plan: { free: true },
     });
-    expect(getOrganizationLicense.mock.calls).toEqual([["paid"], ["unlicensed"], ["tampered"]]);
+    expect(read).toEqual(["paid", "unlicensed", "tampered"]);
   });
 });

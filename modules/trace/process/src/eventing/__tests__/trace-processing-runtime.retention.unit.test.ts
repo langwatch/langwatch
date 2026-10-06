@@ -26,7 +26,7 @@ describe("TraceProcessingRuntimeAdapter", () => {
         }),
       });
       const pipeline = TraceProcessingRuntimeAdapter.create({
-        processName: "langwatch-test",
+        role: "worker",
         tokenizer: createApiFixture<TraceProcessingPipelineInput["tokenizer"]>(),
         peers,
         repositories: MemoryTraceRepositories.create(),

@@ -1,7 +1,7 @@
 /** SDK-declared configuration; runtime presence is stored separately (ADR-128). */
 import { z } from "zod";
 
-import { baseAgentConfigSchema } from "./base.ts";
+import { baseAgentConfigSchema } from "./code.ts";
 
 const connectedParameterValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 

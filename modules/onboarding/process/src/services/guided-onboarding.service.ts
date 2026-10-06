@@ -12,17 +12,13 @@ import {
   isGuidedPath,
   type GuidedOnboardingRecord,
   type GuidedOnboardingRecordedEventData,
+  type GuidedOnboardingRecordedEventName,
   type GuidedOnboardingState,
   type GuidedPath,
 } from "@langwatch/onboarding-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { PostHogEventsChannel } from "../channels/posthog-events.channel.ts";
-import {
-  guidedOnboardingTrackedEvent,
-  type GuidedOnboardingEvent,
-} from "../rules/guided-onboarding-analytics.rules.ts";
 import { definedGuidedPayload } from "../rules/guided-onboarding-record.rules.ts";
 
 const logger = createLogger("langwatch:onboarding:guided");
@@ -32,9 +28,15 @@ export type GuidedOnboardingAnnouncer = (
   input: Omit<GuidedOnboardingRecordedEventData, "tenantId" | "occurredAt">,
 ) => Promise<void>;
 
-export type TourStatus = "completed" | "skipped" | "replayed";
+/** Every guided write: the steps a peer hears of, and the two that are only bookkeeping. */
+type GuidedOnboardingEvent =
+  | GuidedOnboardingRecordedEventName
+  | "conversation_attached"
+  | "virtual_key_minted";
 
-export interface GuidedOnboardingActor {
+type TourStatus = "completed" | "skipped" | "replayed";
+
+interface GuidedOnboardingActor {
   readonly organizationId: string;
   /** Absent when the write came through a project credential with no user. */
   readonly userId: string | undefined;
@@ -56,25 +58,21 @@ function assertGuidedPaths(paths: readonly string[]): GuidedPath[] {
 
 export class GuidedOnboardingService {
   private readonly organizations: OrganizationApi;
-  private readonly events: PostHogEventsChannel;
   private readonly announce: GuidedOnboardingAnnouncer;
   private readonly now: () => string;
 
   private constructor(options: {
     organizations: OrganizationApi;
-    events: PostHogEventsChannel;
     announce: GuidedOnboardingAnnouncer;
     now: () => string;
   }) {
     this.organizations = options.organizations;
-    this.events = options.events;
     this.announce = options.announce;
     this.now = options.now;
   }
 
   static create(options: {
     organizations: OrganizationApi;
-    events: PostHogEventsChannel;
     announce: GuidedOnboardingAnnouncer;
     now?: () => string;
   }): GuidedOnboardingService {
@@ -99,25 +97,6 @@ export class GuidedOnboardingService {
   }): Promise<GuidedOnboardingState & { variant: GuidedOnboardingRecord["variant"] }> {
     const record = await this.record(actor.organizationId);
     return { ...record.state, variant: record.variant };
-  }
-
-  /** Tracks one event a peer's reaction names, never failing that reaction. */
-  trackEvent(input: {
-    userId: string;
-    event: string;
-    projectId: string | undefined;
-    properties: Readonly<Record<string, unknown>>;
-    uuid: string | undefined;
-  }): void {
-    this.events.track({
-      userId: input.userId,
-      event: input.event,
-      properties:
-        input.projectId === undefined
-          ? input.properties
-          : { ...input.properties, projectId: input.projectId },
-      ...(input.uuid === undefined ? {} : { uuid: input.uuid }),
-    });
   }
 
   /** The picks from the value screen, in order. The first one starts now. */
@@ -294,7 +273,7 @@ export class GuidedOnboardingService {
   /**
    * Never fails the write. A write through a project credential has no user, so the
    * organization's admin stands in, the same person the other onboarding milestones
-   * are tracked against; an organization without one tracks and announces nothing.
+   * are tracked against; an organization without one announces nothing.
    */
   private async publish({
     organizationId,
@@ -311,19 +290,10 @@ export class GuidedOnboardingService {
     state: GuidedOnboardingState;
     previousPaths: GuidedPath[];
   }): Promise<void> {
-    const tracked = guidedOnboardingTrackedEvent({ event, payload, state, organizationId });
     const signalled = guidedOnboardingRecordedEventNameSchema.safeParse(event);
-    if (!tracked.tracked && !signalled.success) return;
+    if (!signalled.success) return;
     const attributed = userId ?? (await this.findAdminUserIds(organizationId))[0];
     if (!attributed) return;
-    if (tracked.tracked) {
-      this.events.track({
-        userId: attributed,
-        event: tracked.name,
-        properties: tracked.properties,
-      });
-    }
-    if (!signalled.success) return;
     await this.announce({
       organizationId,
       userId: attributed,

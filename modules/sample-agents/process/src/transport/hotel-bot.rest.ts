@@ -1,5 +1,8 @@
-/** `POST /api/demo/hotel_bot` - the scripted demo agent behind the sample project. */
-import { publicRoute } from "@langwatch/api/access";
+/**
+ * `POST /api/demo/hotel_bot` - the scripted demo agent behind the sample project. LangWatch
+ * staff only (ruling 2026-10-05): the browser door asks `ops:manage` at the platform tier and
+ * hides the route from everyone else; the X-Auth-Token is the project key the traces post with.
+ */
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
   hotelBotHeadersSchema,
@@ -8,11 +11,6 @@ import {
   SampleAgentsApi,
 } from "@langwatch/sample-agents-contract";
 
-const HOTEL_BOT_DOOR = publicRoute({
-  reason:
-    "the caller's X-Auth-Token is forwarded unread to /api/collector, which authenticates it, as main's demo door did",
-});
-
 export const hotelBotRest = defineRestRouter(SampleAgentsApi)
   .withNamespace("demo")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -20,7 +18,8 @@ export const hotelBotRest = defineRestRouter(SampleAgentsApi)
 
   .post("/api/demo/hotel_bot", "runHotelBot")
   .withInput(hotelBotRequestSchema)
-  .withAccess(HOTEL_BOT_DOOR)
+  .withCredential("browser")
+  .withPermission("ops:manage", { at: "platform", refusal: "hidden" })
   .withHeaders(hotelBotHeadersSchema)
   .withOutput(hotelBotReplySchema)
   .withDocs({ hide: true })

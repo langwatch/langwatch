@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   type Amr,
   isAmr,
@@ -143,3 +145,32 @@ export function signInMethodLabelFor({
 }): string {
   return SIGN_IN_METHOD_LABELS[signedInWithFor({ amr })];
 }
+
+/**
+ * What this request's callback proved about the provider account behind the session
+ * being minted (D06). Absent: there is no callback evidence, so nothing is inferred.
+ */
+export const sessionCallbackEvidenceSchema = z.object({
+  providerAccountId: z.string().min(1),
+  assertedFactors: z.array(z.string()),
+  verifiedTokenClaims: z.boolean(),
+  /** The one native `Account` row for that subject, read inside the callback's own
+   *  transaction; absent when there is none, several, or no transaction. */
+  account: z
+    .object({ accountId: z.string(), createdAtMs: z.number(), email: z.string() })
+    .optional(),
+});
+export type SessionCallbackEvidence = z.infer<typeof sessionCallbackEvidenceSchema>;
+
+export const sessionClaimsMintInputSchema = z.object({
+  userId: z.string(),
+  path: z.string(),
+  callback: sessionCallbackEvidenceSchema.optional(),
+});
+export type SessionClaimsMintInput = z.infer<typeof sessionClaimsMintInputSchema>;
+
+/** What a session records when it is minted: the identifier that minted it and its proofs. */
+export type SessionClaims = Readonly<{ identifierId: string | null; amr: readonly Amr[] }>;
+
+/** What a session that could not be attributed records: nothing at all. */
+export const NO_SESSION_CLAIMS: SessionClaims = { identifierId: null, amr: [] };

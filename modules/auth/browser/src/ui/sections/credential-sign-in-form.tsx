@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "@langwatch/browser-host/link";
 import { Alert, Box, Button, Input, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 
 import { attemptCredentialSignIn } from "../../behavior/attempt-credential-sign-in.ts";
@@ -39,6 +39,25 @@ const breakGlassSchema = credentialSchema.safeExtend({
 });
 
 type CredentialValues = z.infer<typeof credentialSchema>;
+
+/** The password field, judged on leaving once typed into and cleared, never rejected, on typing. */
+function registerJudgedPassword(form: UseFormReturn<CredentialValues>) {
+  return form.register("password", {
+    onBlur: () => {
+      const value = form.getValues("password");
+      if (value) void form.trigger("password");
+      else form.clearErrors("password");
+    },
+    onChange: () => {
+      // Clearing only: typing can lift a rejection, never earn one.
+      if (!form.formState.errors.password) return;
+      const parsed = credentialSchema.safeParse({
+        password: form.getValues("password"),
+      });
+      if (parsed.success) form.clearErrors("password");
+    },
+  });
+}
 
 /**
  * Sign in with password for already-asked address; stays on form for password manager
@@ -77,21 +96,7 @@ export function CredentialSignInForm({
   // reach the reveal toggle, "Forgot password?" or a password manager is not
   // a mistake, and answering it with "required" is the screen telling somebody
   // off for looking around.
-  const passwordRegistration = form.register("password", {
-    onBlur: () => {
-      const value = form.getValues("password");
-      if (value) void form.trigger("password");
-      else form.clearErrors("password");
-    },
-    onChange: () => {
-      // Clearing only: typing can lift a rejection, never earn one.
-      if (!form.formState.errors.password) return;
-      const parsed = credentialSchema.safeParse({
-        password: form.getValues("password"),
-      });
-      if (parsed.success) form.clearErrors("password");
-    },
-  });
+  const passwordRegistration = registerJudgedPassword(form);
   // Does anybody hold this address? Asked of the ROUTER, which sends nothing:
   // asking by requesting a link mailed a stranger on every mistyped address.
   const route = api.auth.route.useMutation();

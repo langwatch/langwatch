@@ -13,11 +13,6 @@ import { describe, expect, it, vi } from "vitest";
 import { MemoryGatewayTraceExportKeyRepository } from "../../repositories/memory/memory.gateway-trace-export-key.repository.ts";
 import { GatewayTraceExportKeyService } from "../gateway-trace-export-key.service.ts";
 
-const cipher = {
-  encrypt: (plaintext: string) => `sealed(${plaintext})`,
-  decrypt: (ciphertext: string) => ciphertext.replace(/^sealed\((.*)\)$/, "$1"),
-};
-
 function harness() {
   const minted: CreateApiKeyInput[] = [];
   const create = vi.fn();
@@ -27,7 +22,7 @@ function harness() {
   });
   const apiKeys = createApiFixture<ApiKeyApi>({ create });
   const repository = MemoryGatewayTraceExportKeyRepository.create();
-  const service = GatewayTraceExportKeyService.create({ repository, cipher, apiKeys });
+  const service = GatewayTraceExportKeyService.create({ repository, apiKeys });
   return { minted, repository, service };
 }
 
@@ -54,15 +49,16 @@ describe("the gateway trace export key", () => {
   });
 
   /** @scenario "The bundle exports spans with a trace-export key, never the project key" */
-  it("is minted once and rests encrypted", async () => {
+  it("is minted once and stored with its token", async () => {
     const { minted, repository, service } = harness();
 
     await service.tokenFor(project);
     expect(await service.tokenFor(project)).toBe("sk-lw-key-1");
 
     expect(minted).toHaveLength(1);
-    const [stored] = await repository.findForProject("proj-1");
-    expect(stored?.encryptedToken).toBe(cipher.encrypt("sk-lw-key-1"));
+    expect(await repository.findForProject("proj-1")).toEqual([
+      { projectId: "proj-1", apiKeyId: "key-1", token: "sk-lw-key-1" },
+    ]);
   });
 
   /** @scenario "The trace-export key moves the bundle's version token" */
@@ -80,7 +76,7 @@ describe("the gateway trace export key", () => {
     await repository.saveFirst({
       projectId: "proj-1",
       apiKeyId: "key-elsewhere",
-      encryptedToken: cipher.encrypt("sk-lw-elsewhere"),
+      token: "sk-lw-elsewhere",
     });
 
     expect(await service.tokenFor(project)).toBe("sk-lw-elsewhere");

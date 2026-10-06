@@ -9,7 +9,6 @@ import {
 } from "@langwatch/feature-flag-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Instant } from "@langwatch/time";
@@ -114,12 +113,19 @@ export class TestOrganizations {
   }
 }
 
-export function createFeatureFlagTestProjects(organizationId = "organization-1"): ProjectApi {
-  return createApiFixture<ProjectApi>({ getOrganizationId: async () => organizationId });
-}
-
-export function createFeatureFlagTestAuthz(permitted = true): AuthzApi {
-  return createApiFixture<AuthzApi>({ hasPermission: async () => permitted });
+export function createFeatureFlagTestAuthz(
+  permitted = true,
+  organizationId = "organization-1",
+): AuthzApi {
+  return createApiFixture<AuthzApi>({
+    hasPermission: async () => permitted,
+    getScope: async ({ projectId }) => ({
+      type: "project",
+      id: projectId ?? "project-1",
+      teamId: "team-1",
+      organizationId,
+    }),
+  });
 }
 
 /**
@@ -163,7 +169,6 @@ export function createFeatureFlagTestApp(
     config?: FeatureFlagServerConfig;
     dependencies?: Partial<{
       permissions: AuthzApi;
-      projects: ProjectApi;
       organizations: OrganizationApi;
     }>;
   }> = {},
@@ -172,12 +177,10 @@ export function createFeatureFlagTestApp(
     repositories: input.repositories ?? MemoryFeatureFlagRepositories.create(),
     dependencies: {
       permissions: input.dependencies?.permissions ?? createFeatureFlagTestAuthz(),
-      projects: input.dependencies?.projects ?? createFeatureFlagTestProjects(),
       organizations: input.dependencies?.organizations ?? TestOrganizations.create().api(),
     },
     config: input.config ?? resolveTestFeatureFlagServerConfig(),
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
-    members: {},
   });
 }

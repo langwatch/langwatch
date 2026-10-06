@@ -9,14 +9,14 @@ import type { Instant } from "@langwatch/time";
 import type { AnalyticsMetricSource } from "../graph-trigger-sent.repository.ts";
 
 /** One claimed send: the row `claimSend` writes once per trigger and trace. */
-export interface StoredTriggerSend {
+interface StoredTriggerSend {
   triggerId: string;
   traceId: string;
   projectId: string;
 }
 
 /** One graph-alert incident, open until it is resolved or the claim is dropped. */
-export interface StoredGraphTriggerSent {
+interface StoredGraphTriggerSent {
   id: string;
   triggerId: string;
   projectId: string;

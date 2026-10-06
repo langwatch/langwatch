@@ -59,9 +59,6 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../ops/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../organization/contract/tsconfig.build.json"
     },
     {

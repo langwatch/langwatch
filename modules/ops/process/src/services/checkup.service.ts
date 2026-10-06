@@ -26,12 +26,12 @@ export type ProviderTestOutcome =
   | { readonly outcome: "unchecked"; readonly reason: string };
 
 /** What a canary route answered. */
-export interface CanaryAnswer {
+interface CanaryAnswer {
   readonly status: number;
   readonly body: unknown;
 }
 
-export type CanaryName = "collector" | "processor" | "evaluations" | "scenarios" | "langy";
+type CanaryName = "collector" | "processor" | "evaluations" | "scenarios" | "langy";
 
 /** Where the daily license sync stands, as the connect settings report it. */
 export interface CheckupConnectView {
@@ -55,7 +55,7 @@ export interface CheckupLicenseView {
   readonly maxMembers?: number;
 }
 
-export interface CheckupGatewayFacts {
+interface CheckupGatewayFacts {
   readonly baseUrl: string | undefined;
   /**
    * Every address this app is reached at, its public address first. The
@@ -67,7 +67,7 @@ export interface CheckupGatewayFacts {
   readonly probeControlPlane: () => Promise<ControlPlaneProbe>;
 }
 
-export interface CheckupEmailFacts {
+interface CheckupEmailFacts {
   readonly provider: string | undefined;
   readonly smtpConfigured: boolean;
   /** The transport logs in to the relay; an internal relay often takes none. */
@@ -581,9 +581,9 @@ export class CheckupService {
   private async paid(id: CheckId, input: ExplicitCheckInput): Promise<CheckVerdict> {
     switch (id) {
       case "reach_connect_host":
-        return this.reach((await this.facts.connect()).licenseHost);
+        return this.reachLangWatch("licenseHost");
       case "reach_gateway_host":
-        return this.reach((await this.facts.connect()).gatewayHost);
+        return this.reachLangWatch("gatewayHost");
       case "gateway_control_plane":
         return this.gatewayControlPlane();
       case "storage_probe":
@@ -611,6 +611,19 @@ export class CheckupService {
       default:
         return NOT_ASKED_FOR;
     }
+  }
+
+  /** A LangWatch host is probed only while Connect is allowed; a probe is a connection too. */
+  private async reachLangWatch(which: "licenseHost" | "gatewayHost"): Promise<CheckVerdict> {
+    const connect = await this.facts.connect();
+    if (connect.deployment === "off") {
+      return {
+        outcome: "unchecked",
+        detail:
+          "Not run. LANGWATCH_CONNECT_DISABLED is set, so this install opens no connection to LangWatch.",
+      };
+    }
+    return this.reach(connect[which]);
   }
 
   private async reach(host: string): Promise<CheckVerdict> {

@@ -10,7 +10,7 @@ import type {
  * Structural, not the generated model type — also the contract a test
  * writes rows against, so an ungained column here is one this mapping drops.
  */
-export interface MfaEnrollmentRow {
+interface MfaEnrollmentRow {
   userId: string;
   enrollmentId: string | null;
   method: string | null;

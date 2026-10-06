@@ -19,7 +19,8 @@ const langevalsShell = `command -v uv >/dev/null 2>&1 || { echo "langevals needs
 // seconds rather than after importing every model.
 // ponytail: no memory cap on the host process (compose caps the container at
 // 4 GiB); run it in colima like langy if a runaway evaluator bites.
-func langevalsChild(repoDir string, port int, base []string, logPath string) Child {
+func (p *childPlan) langevalsChild() Child {
+	repoDir, port, base, logPath := p.repoDir, p.port(domain.LangevalsService), p.base, p.logPath(domain.LangevalsService)
 	return Child{
 		Name: domain.LangevalsService, Dir: filepath.Join(repoDir, "services", "langevals"),
 		Color: palette[3], LogPath: logPath, Shell: langevalsShell,

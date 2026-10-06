@@ -23,6 +23,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -6,15 +6,19 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
 import { LangyPanelAccessService } from "../langy-panel-access.service.ts";
 import {
   LangyPanelConversationService,
   type LangyPanelConversationMembers,
 } from "../langy-panel-conversation.service.ts";
+import { LangyPanelEgressService } from "../langy-panel-egress.service.ts";
 import {
   LangyPanelLocalService,
   type LangyPanelLocalMembers,
 } from "../langy-panel-local.service.ts";
+import { LangyUiActionPageService } from "../langy-ui-action-page.service.ts";
+import type { LangyService } from "../langy.service.ts";
 
 type UiActions = NonNullable<LangyPanelConversationMembers["uiActions"]>;
 
@@ -32,15 +36,16 @@ function access({ enabled = true, demo = false } = {}): LangyPanelAccessService 
 function panel(
   overrides: Partial<LangyPanelConversationMembers> = {},
 ): LangyPanelConversationService {
+  const repositories = MemoryLangyRepositories.create();
   return LangyPanelConversationService.create({
     access: access(),
     langy: createApiFixture<LangyPanelConversationMembers["langy"]>(),
     turnBounds: createApiFixture<LangyPanelConversationMembers["turnBounds"]>(),
-    rateLimiter: { check: async () => ({ allowed: true }) },
+    rateLimits: { check: async () => ({ allowed: true }) },
     presence: createApiFixture<PresenceApi>(),
-    turnAccess: null,
-    openBuffer: null,
-    uiActions: null,
+    turnAccess: repositories.turnAccess,
+    openBuffer: () => repositories.tokenBuffer.openBlocking(),
+    uiActions: LangyUiActionPageService.create({ uiActions: repositories.uiActions }),
     ...overrides,
   });
 }
@@ -62,6 +67,23 @@ describe("LangyPanelConversationService", () => {
     await expect(service.listConversations({ caller, projectId, limit: 30 })).rejects.toMatchObject(
       { code: "langy_not_enabled" },
     );
+  });
+
+  /** @scenario "The demo project refuses Langy on every surface" */
+  it("refuses the panel and the egress allow-list read on the demo project", async () => {
+    const demoAccess = access({ demo: true });
+    const conversations = panel({ access: demoAccess });
+    const egress = LangyPanelEgressService.create({
+      access: demoAccess,
+      langy: createApiFixture<Pick<LangyService, "findEgressAllowlist" | "setEgressAllowlist">>(),
+    });
+
+    await expect(
+      conversations.listConversations({ caller, projectId, limit: 30 }),
+    ).rejects.toMatchObject({ code: "langy_not_enabled" });
+    await expect(egress.getEgressState({ caller, projectId })).rejects.toMatchObject({
+      code: "langy_not_enabled",
+    });
   });
 
   /** @scenario "The conversation list reaches the browser as epoch-millisecond rows" */
@@ -113,7 +135,7 @@ describe("LangyPanelConversationService", () => {
 
   /** @scenario "A person over the message budget is refused before a turn dispatches" */
   it("refuses a send over the message budget before any turn starts", async () => {
-    const service = panel({ rateLimiter: { check: async () => ({ allowed: false }) } });
+    const service = panel({ rateLimits: { check: async () => ({ allowed: false }) } });
 
     await expect(
       service.continueConversationTurn({
@@ -128,7 +150,7 @@ describe("LangyPanelConversationService", () => {
 
   /** @scenario "A panel-open warm over its budget is a cold start, never an error" */
   it("answers an over-budget warm as a cold start", async () => {
-    const service = panel({ rateLimiter: { check: async () => ({ allowed: false }) } });
+    const service = panel({ rateLimits: { check: async () => ({ allowed: false }) } });
 
     await expect(
       service.warmPanelWorker({ caller, projectId, conversationId: "conversation_1" }),

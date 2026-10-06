@@ -14,7 +14,7 @@ Feature: API framework boundary and package authoring
       code or Prisma
     And their runtime dependencies are the framework's declared contracts
 
-  @architecture @typecheck
+  @architecture @typecheck @unit
   Scenario: Consumers import only the sealed public API
     Given an application API family
     When it imports from @langwatch/api
@@ -50,7 +50,7 @@ Feature: API framework boundary and package authoring
     When it declares no public access policy
     Then the service build fails for an unclassified route
 
-  @architecture @security
+  @architecture @security @unit
   Scenario: The authorization engine and ledger remain application-owned
     Given an endpoint that changes authorization facts
     When its handler calls the application service with the request actor

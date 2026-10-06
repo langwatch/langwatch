@@ -17,6 +17,9 @@
       "path": "../../analytics/contract/tsconfig.build.json"
     },
     {
+      "path": "../../analytics/filters/tsconfig.build.json"
+    },
+    {
       "path": "../../annotation/contract/tsconfig.build.json"
     },
     {
@@ -45,6 +48,9 @@
     },
     {
       "path": "../../dataset/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/governance/contract/tsconfig.build.json"
     },
     {
       "path": "../../entitlement/contract/tsconfig.build.json"
@@ -114,6 +120,9 @@
     },
     {
       "path": "../../../packages/redaction/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
       "path": "../../share/contract/tsconfig.build.json"

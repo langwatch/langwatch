@@ -37,7 +37,6 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -45,6 +44,7 @@ import {
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import * as budgetDtos from "../rules/gateway-budget-dto.rules.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
+import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -180,7 +180,10 @@ async function createBudget(input: {
 /** What the repository says one budget has spent, in both units. */
 async function spendFor(budgetId: string): Promise<{ spentNanoUsd: number; spentUsd: string }> {
   const budget = await prisma.gatewayBudget.findUniqueOrThrow({ where: { id: budgetId } });
-  const [spend] = await chRepo.getSpendForBudgetsAcrossTenants([PROJECT_ID], [toBudgetRow(budget)]);
+  const [spend] = await chRepo.findSpendForBudgetsAcrossTenants(
+    [PROJECT_ID],
+    [toBudgetRow(budget)],
+  );
   if (!spend) throw new Error(`no spend row for ${budgetId}`);
   return { spentNanoUsd: spend.spentNanoUsd, spentUsd: spend.spentUsd };
 }

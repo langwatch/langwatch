@@ -4,8 +4,6 @@
  * report can land on any replica, and the per-key cap must be counted where every replica sees it.
  */
 
-import { createHash } from "crypto";
-
 import type {
   GatewayBudgetCheckInput,
   GatewayBudgetCheckResult,
@@ -18,19 +16,20 @@ import type {
 } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
-import { ATTR_KEYS as ATTR, DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
+import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 
-import type {
-  GatewaySpanIngestion,
-  GatewaySpendConfirmation,
-  GatewaySpendRating,
-} from "../app/gateway.members.ts";
+import type { ConfirmSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
 import type {
   GatewayRealtimeSessionRepository,
   ReserveResult,
 } from "../repositories/gateway-realtime-session.repository.ts";
 import { sumRealtimeUsage } from "../rules/gateway-realtime-session-metering.rules.ts";
+import {
+  settlementSpanAttributes,
+  settlementSpanId,
+} from "../rules/gateway-realtime-settlement-span.rules.ts";
 import { EMPTY_SPEND_USAGE } from "../rules/gateway-spend-projection.rules.ts";
+import type { GatewaySpendRating } from "./model-catalog-gateway-spend-rating.service.ts";
 
 const logger = createLogger("langwatch:gateway:realtime-session");
 
@@ -410,26 +409,6 @@ export class GatewayRealtimeSessionService {
 const SPAN_NAME = "realtime.session.settled";
 
 /**
- * A span id derived from the session id rather than random. Settlement can be delivered more than
- * once — a resent webhook, a retried usage report, a cost-unknown settlement later confirmed — and
- * a stable id means each of those writes the same span, so a replay cannot inflate the cost.
- */
-function settlementSpanId(sessionId: string): string {
-  return createHash("sha256").update(`realtime-settlement:${sessionId}`).digest("hex").slice(0, 16);
-}
-
-function attr(
-  key: string,
-  value: string | number,
-):
-  | { key: string; value: { doubleValue: number } }
-  | { key: string; value: { stringValue: string } } {
-  return typeof value === "number"
-    ? { key, value: { doubleValue: value } }
-    : { key, value: { stringValue: value } };
-}
-
-/**
  * Records what a voice session used, in the trace the mint opened. Never throws: the money is
  * already on the spend record by the time this runs, so a failure here costs a visible number
  * rather than a charge, and raising would roll back an already-accepted settlement.
@@ -457,30 +436,11 @@ async function recordRealtimeSessionSpan(params: {
 
   const endMs = params.occurredAt.epochMilliseconds;
   const startMs = Math.max(0, endMs - Math.max(0, params.durationMs));
-  // The canonical attribute names, the same ones the gateway's mint span
-  // writes. The trace fold reads cost from `langwatch.span.cost` and tokens
-  // from the `gen_ai.usage.*` keys; a name of our own would store fine and
-  // then be ignored, leaving the span visible at no cost, which is the
-  // failure this whole change exists to remove.
-  const attributes = [
-    attr(ATTR.SPAN_TYPE, "llm"),
-    // The model the mint's span recorded, so one call is one model on the
-    // trace surface. Falling back to the billing id keeps a session minted
-    // before this was carried from losing its model entirely.
-    attr(ATTR.GEN_AI_REQUEST_MODEL, session.requestedModel || session.model),
-    attr(ATTR.GEN_AI_PROVIDER_NAME, session.vendor),
-    // Priority 2 in the cost cascade: a cost the emitter worked out itself
-    // wins over the registry estimate. This is the figure the spend record
-    // carries, so the two surfaces state one number.
-    attr(ATTR.LANGWATCH_SPAN_COST, params.costNanoUsd / 1_000_000_000),
-    attr(ATTR.GEN_AI_USAGE_INPUT_TOKENS, params.usage.input_tokens ?? 0),
-    attr(ATTR.GEN_AI_USAGE_OUTPUT_TOKENS, params.usage.output_tokens ?? 0),
-    attr(ATTR.GEN_AI_USAGE_INPUT_AUDIO_TOKENS, params.usage.input_audio_tokens ?? 0),
-    attr(ATTR.GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS, params.usage.output_audio_tokens ?? 0),
-    attr(ATTR.GEN_AI_USAGE_AUDIO_SECONDS, (params.usage.audio_ms ?? 0) / 1000),
-    attr("langwatch.virtual_key_id", session.virtualKeyId),
-    attr("langwatch.gateway_request_id", session.id),
-  ];
+  const attributes = settlementSpanAttributes({
+    session,
+    usage: params.usage,
+    costNanoUsd: params.costNanoUsd,
+  });
 
   try {
     // ingestNormalizedSpan, not the raw command — the seam both OTLP and REST
@@ -519,4 +479,42 @@ async function recordRealtimeSessionSpan(params: {
       "a voice session settled but its cost was not written to the trace; the spend record is unaffected",
     );
   }
+}
+
+/**
+ * Writes one already-normalized span (the gateway's voice-settlement span)
+ * through the same seam OTLP and REST route through, so its dedup gate makes
+ * a resent webhook write the span once rather than adding a second cost.
+ */
+export interface GatewaySpanIngestion {
+  ingestNormalizedSpan(input: {
+    tenantId: string;
+    span: {
+      traceId: string;
+      spanId: string;
+      name: string;
+      kind: number;
+      startTimeUnixNano: string;
+      endTimeUnixNano: string;
+      attributes: unknown[];
+      events: unknown[];
+      links: unknown[];
+      status: { message: string | null; code: number | null };
+      droppedAttributesCount: number;
+      droppedEventsCount: number;
+      droppedLinksCount: number;
+    };
+    resource: null;
+    instrumentationScope: null;
+    piiRedactionLevel: string;
+  }): Promise<void>;
+}
+
+/**
+ * Hands a confirmation to the gateway spend pipeline. The port exists so
+ * voice settlement reaches the SAME pipeline the drainer sends to. No
+ * pipeline registered refuses by name — a dropped one settles as unknown.
+ */
+export interface GatewaySpendConfirmation {
+  confirmSpend(data: ConfirmSpendCommandData): Promise<void>;
 }

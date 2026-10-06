@@ -4,9 +4,13 @@
  * and runs inside the query client's limiter so a retry keeps its slot.
  */
 
-import { quietly } from "./observability.ts";
 import type { AbortSignalLike, QueryRequest } from "./query.ts";
-import { isTransientClickHouseError, jitteredBackoffMs, retryNoticeLevel } from "./resilience.ts";
+import {
+  isTransientClickHouseError,
+  jitteredBackoffMs,
+  quietly,
+  retryNoticeLevel,
+} from "./resilience.ts";
 
 export interface RetryNotice {
   /**

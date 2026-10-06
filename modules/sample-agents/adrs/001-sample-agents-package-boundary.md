@@ -29,7 +29,10 @@ None. A run's output is traces sent to the collector.
 
 ## Runtime and registration
 
-`sampleAgentsProcessModule` registers the Api and the REST transport. The
+`sampleAgentsProcessModule` registers the Api; the REST transport is kept but
+unmounted, refused to every caller until the platform-operator door lands
+(`.claude/coordinator/rulings-2026-10-05.md`, hotel_bot; E4 in
+`dev/docs/plans/api-framework-bypass-2026-10-05.md`). The
 OpenAI chat and trace collector are channels with HTTP and memory twins.
 
 ## Environment and configuration

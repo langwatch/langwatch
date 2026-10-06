@@ -5,13 +5,16 @@ import { PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   DatasetApi,
+  datasetConfig,
   DatasetNotFoundError,
+  type DatasetServerConfig,
   type DatasetNormalizePayload,
   type AppendStoredObjectToDatasetInput,
   type BatchEvaluationEntry,
   type BatchEvaluationRecord,
   type BatchEvaluationSummary,
   type CopyDatasetInput,
+  type CreateDatasetAttachmentUploadInput,
   type CreateDatasetFromStoredObjectInput,
   type CreateDatasetFromUploadInput,
   type CreateDatasetFromUploadResult,
@@ -24,6 +27,7 @@ import {
   type DatasetHead,
   type DatasetImportAppended,
   type DatasetImportStarted,
+  type DatasetLimits,
   type DatasetListResult,
   type DatasetLookupInput,
   type DatasetNameInput,
@@ -48,20 +52,22 @@ import type { EventingCommandSender } from "@langwatch/eventing";
 import { ExperimentApi, ExperimentNotFoundError } from "@langwatch/experiment-contract";
 import { generate } from "@langwatch/ksuid";
 import type { FeatureSetup } from "@langwatch/process";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
-import { StoredObjectApi } from "@langwatch/stored-object-contract";
+import {
+  StoredObjectApi,
+  type StoredObjectsCreateUploadOutput,
+} from "@langwatch/stored-object-contract";
 
 import {
   buildDatasetNormalizationPipeline,
   type DatasetNormalizationDefinition,
 } from "../eventing/dataset-normalization.pipeline.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
-import { ObjectStorageDatasetChunkRepository } from "../repositories/object-storage/object-storage.dataset-chunk.repository.ts";
 import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
 import { DatasetAttachmentReferenceService } from "../services/dataset-attachment-reference.service.ts";
 import { DatasetAttachmentUploadService } from "../services/dataset-attachment-upload.service.ts";
 import { DatasetContentService } from "../services/dataset-content.service.ts";
+import { DatasetInlineAttachmentService } from "../services/dataset-inline-attachment.service.ts";
 import { DatasetNormalizeService } from "../services/dataset-normalize.service.ts";
 import { DatasetRequestBoundsService } from "../services/dataset-request-bounds.service.ts";
 import { DatasetUploadService } from "../services/dataset-upload.service.ts";
@@ -70,18 +76,10 @@ import { DatasetService } from "../services/dataset.service.ts";
 /** The KSUID resource a new dataset record's id is minted under. */
 const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";
 
-/**
- * Shapes restated rather than imported: a module depends on contracts.
- * `publicBaseUrl` is the process's own fact, drilled in — absent where the
- * deployment named no `BASE_HOST`. `platformUrl` refuses by name when it is.
- */
-type DatasetMembers = Pick<ProcessMembers, "objectStorage"> &
-  Readonly<{ publicBaseUrl: string | undefined }>;
-
 type DatasetSetup = FeatureSetup<
   typeof DatasetModule.dependencies,
-  DatasetMembers,
-  undefined,
+  never,
+  DatasetServerConfig,
   DatasetRepositories
 >;
 
@@ -90,7 +88,7 @@ type DatasetSetup = FeatureSetup<
  * naming an experiment instead of a name, and possibly missing name and
  * columns when only patching what already exists.
  */
-export interface DatasetUpsertInput {
+interface DatasetUpsertInput {
   projectId: string;
   /** The dataset being replaced, by id. */
   datasetId?: string;
@@ -113,19 +111,20 @@ export class DatasetModule implements DatasetApi {
     permissions: AuthzApi,
     /** The directory that answers which organization a project belongs to. */
     projects: ProjectApi,
-    /** The tier-effective bounds the record writes refuse above. */
+    /** The bounds the project's organization answers for writes, reads and files. */
     entitlement: EntitlementApi,
     /** Reads the confirmed files a dataset is imported from (ADR-158 §6). */
     storedObjects: StoredObjectApi,
   };
-  /** `publicBaseUrl` is the process's own fact; `objectStorage` is the process's client. */
-  static readonly reads = ["publicBaseUrl", "objectStorage"] as const;
+  /** The shared deployment origin; `platformUrl` refuses by name where no `BASE_HOST` was named. */
+  static readonly config = datasetConfig;
 
   #datasets: DatasetService;
   #attachmentUploads: DatasetAttachmentUploadService;
+  #requestBounds: DatasetRequestBoundsService;
   #normalization: DatasetNormalizeService;
   #batchEvaluations: DatasetRepositories["batchEvaluations"];
-  #usage: DatasetRepositories["usage"];
+  #count: DatasetRepositories["count"];
   #experiments: ExperimentApi;
   #permissions: AuthzApi;
   readonly #publicBaseUrl: string | undefined;
@@ -133,16 +132,28 @@ export class DatasetModule implements DatasetApi {
   private constructor(
     repositories: DatasetRepositories,
     dependencies: DatasetSetup["dependencies"],
-    members: DatasetMembers,
+    config: DatasetServerConfig,
   ) {
-    const chunks = ObjectStorageDatasetChunkRepository.create({
-      objectStorage: members.objectStorage,
+    const chunks = repositories.chunks;
+
+    this.#requestBounds = DatasetRequestBoundsService.create({
+      entitlement: dependencies.entitlement,
+      projects: dependencies.projects,
+    });
+    this.#attachmentUploads = DatasetAttachmentUploadService.create({
+      storedObjects: dependencies.storedObjects,
+      requestBounds: this.#requestBounds,
+    });
+    const inlineAttachments = DatasetInlineAttachmentService.create({
+      uploads: this.#attachmentUploads,
     });
 
     this.#normalization = DatasetNormalizeService.create({
       repository: repositories.content,
       chunks,
       storedObjects: dependencies.storedObjects,
+      requestBounds: this.#requestBounds,
+      inlineAttachments,
     });
 
     this.#datasets = DatasetService.create({
@@ -153,6 +164,8 @@ export class DatasetModule implements DatasetApi {
         records: repositories.recordContent,
         chunks,
         storedObjects: dependencies.storedObjects,
+        requestBounds: this.#requestBounds,
+        inlineAttachments,
       }),
       queue: this.#normalization,
       content: DatasetContentService.create({ datasets: repositories.content, storage: chunks }),
@@ -162,27 +175,22 @@ export class DatasetModule implements DatasetApi {
       // fallback DatasetService would otherwise reach for (`nanoid`) is not
       // this feature's own choice to make on its behalf.
       generateId: () => generate(DATASET_RECORD_KSUID_RESOURCE).toString(),
-      requestBounds: DatasetRequestBoundsService.create({
-        entitlement: dependencies.entitlement,
-        projects: dependencies.projects,
-      }),
+      requestBounds: this.#requestBounds,
       attachments: DatasetAttachmentReferenceService.create({
         storedObjects: dependencies.storedObjects,
       }),
+      inlineAttachments,
     });
 
-    this.#attachmentUploads = DatasetAttachmentUploadService.create({
-      storedObjects: dependencies.storedObjects,
-    });
     this.#batchEvaluations = repositories.batchEvaluations;
-    this.#usage = repositories.usage;
+    this.#count = repositories.count;
     this.#experiments = dependencies.experiments;
     this.#permissions = dependencies.permissions;
-    this.#publicBaseUrl = members.publicBaseUrl;
+    this.#publicBaseUrl = config.publicBaseUrl;
   }
 
-  static create({ repositories, dependencies, members }: DatasetSetup): DatasetModule {
-    return new DatasetModule(repositories, dependencies, members);
+  static create({ repositories, dependencies, config }: DatasetSetup): DatasetModule {
+    return new DatasetModule(repositories, dependencies, config);
   }
 
   // ── Datasets ─────────────────────────────────────────────────────────────
@@ -296,11 +304,21 @@ export class DatasetModule implements DatasetApi {
     return this.#datasets.archiveOrRestoreDataset(input);
   }
 
-  /** The whole dataset inline, refused rather than truncated past `limitMb`. */
-  getDatasetWithinLimit(
-    input: DatasetLookupInput & { limitMb: number },
-  ): Promise<DatasetWithRecords> {
+  /** The whole dataset in one answer, refused rather than truncated when too large for one. */
+  getDatasetWithinLimit(input: DatasetLookupInput): Promise<DatasetWithRecords> {
     return this.#datasets.getDatasetWithinLimit(input);
+  }
+
+  /** The size limits the project's organization answers. */
+  getLimits(input: { projectId: string }): Promise<DatasetLimits> {
+    return this.#requestBounds.limits(input.projectId);
+  }
+
+  /** The signed upload a file for an image or file cell is sent to. */
+  createAttachmentUpload(
+    input: CreateDatasetAttachmentUploadInput,
+  ): Promise<StoredObjectsCreateUploadOutput> {
+    return this.#attachmentUploads.createUpload(input);
   }
 
   /** Entries removed by id, refused when none matched. */
@@ -348,9 +366,9 @@ export class DatasetModule implements DatasetApi {
   // ── Records ──────────────────────────────────────────────────────────────
 
   /**
-   * A dataset and its records, up to the byte budget the CALLER named, in
-   * the slice it asked for. Both stay arguments: the editor, an export and
-   * an evaluation run all want a different budget and a different slice.
+   * A dataset and its records in the slice the caller asked for. With no
+   * `limitMb` the read is held to what the organization answers inline in one
+   * response and reports `truncated`; `null` reads every row or is refused.
    */
   getDatasetWithRecords(
     input: DatasetLookupInput & {
@@ -488,7 +506,7 @@ export class DatasetModule implements DatasetApi {
    * serves this family but named no public origin refuses by name.
    */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<DatasetUsageCount> {
-    return this.#usage.countUsage(input);
+    return this.#count.countUsage(input);
   }
 
   platformUrl(input: { projectSlug: string; path: string }): string {
@@ -557,6 +575,8 @@ export abstract class DatasetContent {
     page: number;
     limit: number;
     search: string;
+    /** The rows and bytes one search may read. */
+    caps: { maxRows: number; maxBytes: number };
   }): Promise<DatasetRecordPage>;
   abstract listRecords(input: {
     dataset: Dataset;
@@ -570,7 +590,8 @@ export abstract class DatasetContent {
     dataset: Dataset;
     projectId: string;
     entrySelection: DatasetEntrySelection;
-    limitMb: number | null;
+    /** The byte budget of the read. */
+    limitBytes: number;
   }): Promise<DatasetWithRecords>;
   abstract getDatasetHead(input: { dataset: Dataset }): Promise<DatasetHead>;
   abstract findEntries(input: {

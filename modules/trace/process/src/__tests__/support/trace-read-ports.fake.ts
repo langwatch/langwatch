@@ -6,9 +6,9 @@ import {
   type TraceFullThreadReadInput,
 } from "@langwatch/trace-contract";
 
-import { type TraceEventDerivation } from "../../app/trace.members.ts";
 import { TraceFullRecordRepository } from "../../repositories/trace-full-record.repository.ts";
 import { TraceRecordRepository } from "../../repositories/trace-record.repository.ts";
+import type { TraceEventDerivation } from "../../services/trace.service.ts";
 
 class MissingTraceRecords extends TraceRecordRepository {
   async getById(input: TraceByIdInput): Promise<never> {

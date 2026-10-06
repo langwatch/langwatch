@@ -12,7 +12,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
-import type { GovernanceOcsfEventWriter } from "../app/governance.members.ts";
+import type { GovernanceOcsfEventWriter } from "../repositories/governance.repositories.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
@@ -51,9 +51,14 @@ const projects = createApiFixture<ProjectApi>({
 
 /** Audit-log's write and dedup, answered over the same table this suite asserts on. */
 const auditLog = createApiFixture<AuditLogApi>({
-  record: async ({ metadata, args: _args, ...entry }) => {
+  record: async ({ metadata, before, after, args: _args, ...entry }) => {
     const row = await prisma.auditLog.create({
-      data: { ...entry, metadata: metadata ?? undefined },
+      data: {
+        ...entry,
+        metadata: metadata ?? undefined,
+        before: before ?? undefined,
+        after: after ?? undefined,
+      },
       select: { id: true, createdAt: true },
     });
     return { id: row.id, occurredAt: row.createdAt.getTime() };

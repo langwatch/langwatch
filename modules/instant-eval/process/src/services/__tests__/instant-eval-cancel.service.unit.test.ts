@@ -1,17 +1,17 @@
 /**
  * Stopping a run: the command is the record, the hint only saves a page.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { MemoryInstantEvalCancellationChannel } from "../../channels/memory/memory.instant-eval-cancellation.channel.ts";
 import type {
   InstantEvalJudgmentPage,
   InstantEvalJudgmentsRepository,
 } from "../../repositories/instant-eval-judgments.repository.ts";
 import { MemoryInstantEvalRunRepository } from "../../repositories/memory/memory.instant-eval-run.repository.ts";
+import { MemoryInstantEvalCancellationRepository } from "../../repositories/memory/memory.instant-eval.repositories.ts";
 import type { InstantEvalStoredStatus } from "../../rules/instant-eval-run-status.rules.ts";
 import {
   InstantEvalCancelService,
@@ -70,7 +70,7 @@ async function harness(options: { status?: InstantEvalStoredStatus; failure?: Er
   });
   if (options.status) await runs.write({ ...row, status: options.status });
   const commands = new RecordingCommands(options.failure);
-  const cancellations = MemoryInstantEvalCancellationChannel.create();
+  const cancellations = MemoryInstantEvalCancellationRepository.create();
 
   return {
     runs,

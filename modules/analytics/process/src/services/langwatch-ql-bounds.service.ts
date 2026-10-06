@@ -1,7 +1,8 @@
 import { LangWatchQLRateLimitedError } from "@langwatch/analytics-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
+
+import type { AnalyticsRateLimitRepository } from "../repositories/analytics-rate-limit.repository.ts";
 
 /**
  * The tier-effective window every LangWatchQL execution runs under: a query
@@ -12,7 +13,7 @@ export class LangWatchQLBoundsService {
   static create(deps: {
     entitlement: Pick<EntitlementApi, "requestBound">;
     projects: Pick<ProjectApi, "getOrganizationId">;
-    rateLimiter: RateLimiter;
+    rateLimits: AnalyticsRateLimitRepository;
   }): LangWatchQLBoundsService {
     return new LangWatchQLBoundsService(deps);
   }
@@ -21,7 +22,7 @@ export class LangWatchQLBoundsService {
     private readonly deps: Readonly<{
       entitlement: Pick<EntitlementApi, "requestBound">;
       projects: Pick<ProjectApi, "getOrganizationId">;
-      rateLimiter: RateLimiter;
+      rateLimits: AnalyticsRateLimitRepository;
     }>,
   ) {}
 
@@ -33,7 +34,7 @@ export class LangWatchQLBoundsService {
       key: "lwqlPerMinute",
       organizationId,
     });
-    const decision = await this.deps.rateLimiter.check(`lwql:${input.projectId}`, {
+    const decision = await this.deps.rateLimits.check(`lwql:${input.projectId}`, {
       requests,
       seconds: 60,
     });

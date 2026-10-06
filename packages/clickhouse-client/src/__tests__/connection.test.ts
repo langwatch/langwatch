@@ -8,8 +8,8 @@ import {
   ClickHouseNotConfiguredError,
   type ClickHouseClientCreationInput,
   type ClickHouseCloseableClient,
+  ClickHouseShutdownService,
 } from "../connection.ts";
-import { ClickHouseShutdownService } from "../shutdown.ts";
 
 interface TestClient extends ClickHouseCloseableClient {
   input: ClickHouseClientCreationInput;
@@ -36,6 +36,84 @@ const configuration = () =>
     ],
     poolSizing: { override: 7 },
   });
+
+describe("routing the three accessors by the id each was given", () => {
+  function connect() {
+    const factory = new RecordingClientFactory();
+    const organizationForTenant = vi.fn(async () => "org-1");
+    const connection = ClickHouseConnectionService.create({
+      directory: { organizationForTenant },
+      clientFactory: factory,
+    }).connect(configuration());
+    return { connection, factory, organizationForTenant };
+  }
+
+  /** @scenario "An organization on its own endpoint is routed there without a tenant lookup" */
+  it("reaches the organization's own endpoint and never asks the tenant directory", () => {
+    const { connection, organizationForTenant } = connect();
+
+    const client = connection.resolveOrganization("org-1");
+
+    expect(client.input).toMatchObject({ instance: "org-1", cluster: "acme" });
+    expect(organizationForTenant).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "An organization with no private route reads the shared endpoint" */
+  it("answers the shared endpoint for an organization with no route of its own", () => {
+    const { connection } = connect();
+
+    expect(connection.resolveOrganization("org-unrouted").input).toMatchObject({
+      instance: "shared",
+      cluster: "shared",
+    });
+  });
+
+  /** @scenario "A project is still routed through the tenant directory" */
+  it("sends a project through the directory to the endpoint its organization reaches", async () => {
+    const { connection, organizationForTenant } = connect();
+
+    const project = await connection.resolve("project-1");
+
+    expect(organizationForTenant).toHaveBeenCalledWith("project-1");
+    expect(project).toBe(connection.resolveOrganization("org-1"));
+  });
+
+  /** @scenario "The install's own shared endpoint answers the read that is nobody's tenant" */
+  it("answers the install's own shared endpoint without a tenant", () => {
+    const { connection, organizationForTenant } = connect();
+
+    expect(connection.shared().input).toMatchObject({ instance: "shared", cluster: "shared" });
+    expect(organizationForTenant).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "The three accessors share one driver per physical endpoint" */
+  it("opens one driver per endpoint across the tenant, organization and shared accessors", async () => {
+    const { connection, factory } = connect();
+
+    await connection.resolve("project-1");
+    connection.resolveOrganization("org-2");
+    connection.shared();
+    connection.shared();
+
+    expect(factory.inputs.map(({ instance }) => instance)).toEqual(["org-1", "shared"]);
+  });
+
+  /** @scenario "An install holding only private routes reports no shared endpoint" */
+  it("refuses the shared accessor by name when the install has only private routes", () => {
+    const factory = new RecordingClientFactory();
+    const connection = ClickHouseConnectionService.create({
+      directory: { organizationForTenant: async () => "org-1" },
+      clientFactory: factory,
+    }).connect(
+      ClickHouseConfigService.create().resolve({
+        privateRoutes: [{ organizationId: "org-1", url: "http://private:8123", cluster: "acme" }],
+      }),
+    );
+
+    expect(() => connection.shared()).toThrow(ClickHouseNotConfiguredError);
+    expect(factory.inputs).toEqual([]);
+  });
+});
 
 describe("explicit ClickHouse connection lifecycle", () => {
   /** @scenario Private clients are cached per organization */

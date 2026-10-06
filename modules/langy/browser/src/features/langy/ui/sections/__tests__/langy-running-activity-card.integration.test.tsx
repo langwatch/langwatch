@@ -199,6 +199,54 @@ describe("a turn's activity cards", () => {
     });
   });
 
+  describe("given a settled turn whose receipt lists finished tool calls", () => {
+    const settledBash = (output: unknown) =>
+      turnFromParts([
+        {
+          type: "tool-bash",
+          toolCallId: "call-1",
+          state: "output-available",
+          input: { command: "cat notes.md" },
+          output,
+        },
+      ]);
+
+    /** @scenario "A receipt row opens to show what the tool returned" */
+    it("opens a row with a recorded result to the result the model saw, and leaves a row without one shut", () => {
+      const { container, unmount } = renderTurn(settledBash("three findings, all in notes.md"), {
+        live: false,
+      });
+
+      expect(screen.getByRole("button", { name: /1 action completed/i })).toBeTruthy();
+      expect(container.textContent).not.toContain("three findings, all in notes.md");
+      const rowToggle = container.querySelectorAll("[aria-expanded='false']");
+      fireEvent.click(rowToggle[rowToggle.length - 1]!);
+      expect(screen.getByText("three findings, all in notes.md")).toBeTruthy();
+      unmount();
+
+      renderTurn(settledBash(""), { live: false });
+      expect(document.querySelectorAll("[aria-expanded='false']")).toHaveLength(0);
+    });
+
+    /** @scenario "An opened row shows the data a tool returned, formatted to read" */
+    it("shows a LangWatch result as its indented payload, and a shell result exactly as read", () => {
+      const envelope = JSON.stringify({ kind: "json", payload: { count: 5, items: ["a"] } });
+      const { container, unmount } = renderTurn(settledBash(envelope), { live: false });
+      const toggles = container.querySelectorAll("[aria-expanded='false']");
+      fireEvent.click(toggles[toggles.length - 1]!);
+
+      expect(container.textContent).toContain(JSON.stringify({ count: 5, items: ["a"] }, null, 2));
+      expect(container.textContent).not.toContain('"kind"');
+      unmount();
+
+      const shell = "line one\n    indented line two";
+      const second = renderTurn(settledBash(shell), { live: false });
+      const rows = second.container.querySelectorAll("[aria-expanded='false']");
+      fireEvent.click(rows[rows.length - 1]!);
+      expect(second.container.textContent).toContain(shell);
+    });
+  });
+
   describe("given the turn has settled", () => {
     it("folds every action into the receipt, the last one included", () => {
       renderTurn(turn("output-available"));

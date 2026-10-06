@@ -1,4 +1,4 @@
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import type { shouldFilterCodingAgentSpan } from "@langwatch/coding-agent-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -22,8 +22,8 @@ import {
   stampCodexHelperThread,
   type ScopedSpans,
 } from "../rules/codex-helper-thread.rules.ts";
+import { normalizeOtlpId } from "../rules/otlp-span-identity.rules.ts";
 import { storableSpanTimesOf, type UnstorableSpanTime } from "../rules/storable-span-time.rules.ts";
-import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
 import { TraceIngestionMetricsService } from "./trace-ingestion-metrics.service.ts";
 
 type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
@@ -33,7 +33,7 @@ type SpanIngestionResult = {
   error?: string;
 };
 
-export type TraceRequestCollectionResult = {
+type TraceRequestCollectionResult = {
   rejectedSpans: number;
   /**
    * The dispatch failures within `rejectedSpans`: transient, so a durable-cursor caller retries.
@@ -102,11 +102,8 @@ class SpanIngestionTally {
   }
 }
 
-/**
- * The coding-agent contract, holding only what the ingest path reads: no
- * store, no session lookup.
- */
-export type CodingAgentIngestFilter = Pick<CodingAgentApi, "shouldFilterSpan">;
+/** The ingest path's coding-agent span filter: the contract's pure rule, swappable in tests. */
+export type CodingAgentIngestFilter = { shouldFilterSpan: typeof shouldFilterCodingAgentSpan };
 
 /** What the producer is told, naming the field it has to fix. */
 function unstorableSpanTimeMessage({ field }: UnstorableSpanTime): string {
@@ -276,9 +273,7 @@ export class TraceIngestionService {
     }
 
     // The stamp is the admission: it is applied before the filter reads the span.
-    const helperThreadId = input.helperThreads?.get(
-      OtlpTraceRequestService.normalizeOtlpId(spanParseResult.data.spanId),
-    );
+    const helperThreadId = input.helperThreads?.get(normalizeOtlpId(spanParseResult.data.spanId));
     const span =
       helperThreadId === undefined
         ? spanParseResult.data
@@ -310,7 +305,7 @@ export class TraceIngestionService {
    * the pipeline want one of them.
    */
   private withHexIds(span: OtlpSpan): OtlpSpan {
-    const hex = OtlpTraceRequestService.normalizeOtlpId;
+    const hex = normalizeOtlpId;
 
     return {
       ...span,

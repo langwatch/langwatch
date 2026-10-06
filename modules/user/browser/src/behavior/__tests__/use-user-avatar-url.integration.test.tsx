@@ -76,12 +76,9 @@ describe("useUserAvatarUrl", () => {
       const { result, rerender } = renderHook<
         ReturnType<typeof useUserAvatarUrl>,
         { image: string | null }
-      >(
-        ({ image }) => useUserAvatarUrl(image),
-        {
-          initialProps: { image: stored },
-        },
-      );
+      >(({ image }) => useUserAvatarUrl(image), {
+        initialProps: { image: stored },
+      });
       expect(result.current).toBe(MINTED);
 
       rerender({ image: null });

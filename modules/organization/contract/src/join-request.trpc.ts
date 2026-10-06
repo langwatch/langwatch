@@ -8,6 +8,7 @@ import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  joinerRoleSchema,
   joinRequestAdmittedSchema,
   joinRequestAutomaticJoinsSchema,
   joinRequestFiledSchema,
@@ -18,6 +19,7 @@ import {
   joinRequestWriteAckSchema,
 } from "./join-request.responses.ts";
 import {
+  joinRequestApiAdmitInputSchema,
   joinRequestApiDecisionInputSchema,
   joinRequestApiOrganizationScopeSchema,
   joinRequestApiRequestInputSchema,
@@ -36,6 +38,7 @@ export const joinRequestApiSetJoiningInputSchema = z.object({
   organizationId: z.string().min(1),
   domainJoin: joinRequestApiDomainJoinSchema,
   domains: z.array(z.string().min(1)).default([]),
+  joinerRole: joinerRoleSchema.optional(),
 });
 export type JoinRequestApiSetJoiningInput = z.infer<typeof joinRequestApiSetJoiningInputSchema>;
 
@@ -67,7 +70,7 @@ export const joinRequestTrpc = defineTrpcContract("joinRequests")
 
   /** Walk in, where the organization asked for that; null organization when nothing admits. */
   .mutation("admitAutomatically")
-  .withInput(z.object({}))
+  .withInput(joinRequestApiAdmitInputSchema)
   .withOutput(joinRequestAdmittedSchema)
 
   /** Everything this person is waiting on, so a screen can say so. */

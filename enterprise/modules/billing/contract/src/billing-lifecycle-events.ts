@@ -5,6 +5,7 @@ import { z } from "zod";
 export const BILLING_LIFECYCLE_PIPELINE_NAME = "billing_lifecycle" as const;
 export const BILLING_LIFECYCLE_AGGREGATE_TYPE = "billing_lifecycle" as const;
 export const SUBSCRIPTION_CHANGED_EVENT_TYPE = "lw.billing.subscription_changed" as const;
+export const SUBSCRIPTION_STARTED_EVENT_TYPE = "lw.billing.subscription_started" as const;
 export const CHECKOUT_COMPLETED_EVENT_TYPE = "lw.billing.checkout_completed" as const;
 export const BILLING_LIFECYCLE_EVENT_VERSION = "2026-09-30" as const;
 
@@ -17,6 +18,17 @@ export const subscriptionChangedEventDataSchema = z.object({
   hasSubscription: z.boolean(),
 });
 export type SubscriptionChangedEventData = z.infer<typeof subscriptionChangedEventDataSchema>;
+
+/** A subscription that was not active became active on a plan; a renewal records none. */
+export const subscriptionStartedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+  subscriptionId: z.string().min(1),
+  plan: z.string().min(1),
+  memberUserIds: z.array(z.string().min(1)),
+});
+export type SubscriptionStartedEventData = z.infer<typeof subscriptionStartedEventDataSchema>;
 
 /** A Stripe checkout for an organization's subscription completed. */
 export const checkoutCompletedEventDataSchema = z.object({

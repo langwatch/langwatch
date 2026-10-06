@@ -1,8 +1,5 @@
-/**
- * The seam between a module and the event-sourced half of a process (ADR-144):
- * what a process hands a module's eventing declaration, and what it declares.
- * `Resources` is the process's resource owner, supplied by the composing package.
- */
+import type { Event as StoredEvent } from "../domain/types.ts";
+
 /**
  * Whether this process only sends on a pipeline, or also drains it: the api produces, the
  * worker folds, maps, subscribes and runs process managers. "describe" builds the consume
@@ -10,7 +7,11 @@
  */
 export type EventingParticipation = "produce" | "consume" | "describe";
 
-/** What a module's eventing declaration is handed when a process installs it. */
+/**
+ * The seam between a module and the event-sourced half of a process (ADR-144): what a module's
+ * eventing declaration is handed when a process installs it. `Resources` is the process's resource
+ * owner, supplied by the composing package.
+ */
 export interface FeatureEventingSetup<Repositories, App, ProcessStore, Resources = unknown> {
   readonly participation: EventingParticipation;
   /** The module's own repositories, on the backend this process selected. */
@@ -22,8 +23,12 @@ export interface FeatureEventingSetup<Repositories, App, ProcessStore, Resources
   readonly processStore: ProcessStore;
   /** Earlier events of this pipeline's own aggregate; absent only in a hand-built test setup. */
   readonly priorEvents?: PriorEventsRead;
+  /** This pipeline's own streams, appended and read; absent only in a hand-built test setup. */
+  readonly eventStore?: OwnEventStore;
   /** The module's resource owner: what a consumer builds, it drains on shutdown here. */
   readonly resources?: Resources;
+  /** Wakes the named process manager's outbox worker in this process; a no-op where none runs. */
+  readonly notifyOutbox?: (processName: string) => void;
 }
 
 /** One aggregate of the reading pipeline's own type; `accepts` keeps the events it declared. */
@@ -35,6 +40,22 @@ export interface PriorEventsQuery<Event> {
 
 /** A command's read of its own aggregate's earlier events, oldest first (WP-5 ruling 2). */
 export type PriorEventsRead = <Event>(query: PriorEventsQuery<Event>) => Promise<readonly Event[]>;
+
+/** Events for one tenant, each of the appending pipeline's own aggregate type. */
+export interface OwnEventsAppend {
+  readonly tenantId: string;
+  readonly events: readonly StoredEvent[];
+}
+
+/**
+ * A pipeline's own event store (Alex, 2026-10-05): it appends to and reads the aggregate its
+ * definition declares and nothing else, so no module holds the shared runtime to reach its log.
+ * Spec: packages/eventing/specs/own-event-store.feature.
+ */
+export interface OwnEventStore {
+  readonly append: (input: OwnEventsAppend) => Promise<void>;
+  readonly read: PriorEventsRead;
+}
 
 /**
  * A module's eventing declaration, with its pipeline's own types erased.

@@ -17,7 +17,7 @@ export abstract class LangyPrompt {
   }): Promise<{ prompt: string } | null>;
 }
 
-export interface ResolveLangyPromptParams {
+interface ResolveLangyPromptParams {
   /** The project that HOLDS the Langy registry rows (the internal system project). */
   projectId: string;
   /** One of `LANGY_PROMPT_HANDLES`. */
@@ -28,7 +28,7 @@ export interface ResolveLangyPromptParams {
   tag?: string;
 }
 
-export interface ResolvedLangyPrompt {
+interface ResolvedLangyPrompt {
   text: string;
   /**
    * Which path produced `text`: - `registry` — a promoted row was read. - `fallback` — a GENUINE

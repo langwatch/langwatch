@@ -45,11 +45,7 @@ export type UngatedViewDefinition = Omit<LangWatchQLViewDefinition, "gates" | "c
  * The gates a catalogue column carries: its content, then its permissions. A gate list is allOf,
  * so a column access of anyOf more than one permission refuses rather than fail open.
  */
-export function catalogueColumnGatesOf({
-  column,
-}: {
-  column: LwqlExposedColumn;
-}): readonly LwqlGate[] {
+function catalogueColumnGatesOf({ column }: { column: LwqlExposedColumn }): readonly LwqlGate[] {
   const content = column.content === undefined ? [] : [column.content].flat();
   if (column.access === undefined) return content;
   if ("anyOf" in column.access && column.access.anyOf.length > 1) {

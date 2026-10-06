@@ -4,7 +4,7 @@
  * changing it would re-ingest every span an SDK retries mid-rollout.
  */
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import {
   type SpanDedupClaim,
@@ -27,7 +27,7 @@ const dedupKey = (span: SpanDedupRef): string =>
  */
 export class RedisTraceSpanDedupRepository extends TraceSpanDedupRepository {
   static create(input: {
-    connection: ProcessMembers["redis"];
+    connection: RedisConnection;
     logger?: Pick<Logger, "warn"> | undefined;
   }): RedisTraceSpanDedupRepository {
     return new RedisTraceSpanDedupRepository(
@@ -36,10 +36,10 @@ export class RedisTraceSpanDedupRepository extends TraceSpanDedupRepository {
     );
   }
 
-  #connection: ProcessMembers["redis"];
+  #connection: RedisConnection;
   #logger: Pick<Logger, "warn">;
 
-  private constructor(connection: ProcessMembers["redis"], logger: Pick<Logger, "warn">) {
+  private constructor(connection: RedisConnection, logger: Pick<Logger, "warn">) {
     super();
     this.#connection = connection;
     this.#logger = logger;

@@ -6,6 +6,7 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import type { ScimDepartmentAssignment } from "../scim-cost-center.service.ts";
@@ -139,6 +140,7 @@ describe("SCIM PATCH operation casing parity", () => {
       })),
     });
     const service = ScimService.create({
+      connections: HeldConnectionsFake.of(),
       prisma: repo,
       writer: new GrantsFake(),
       users: userService(),
@@ -157,10 +159,8 @@ describe("SCIM PATCH operation casing parity", () => {
     expect(repo.saveUserResource).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "user-1", active: false }),
     );
-    expect(repo.removeMembership).toHaveBeenCalledWith({
-      userId: "user-1",
-      organizationId: "org-1",
-    });
+    // A leaver stays a member holding nothing (scim-connection-sync.feature).
+    expect(repo.removeMembership).not.toHaveBeenCalled();
   });
 
   it("applies a capitalized Replace to group renaming", async () => {

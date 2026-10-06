@@ -112,8 +112,8 @@ Move to an ADR: incident narratives, superseded designs, rollout notes,
 fleet-capacity arithmetic, "the analogue of X one aggregate over".
 
 Delete: anything restating the signature, and any comment naming a file path —
-those rot. `identity-command-id.ts` still points at
-`packages/authz-server/src/ledger/grant-identity.ts`, which no longer exists.
+those rot: a comment that names a file outlives the file and then points
+nowhere.
 
 A comment must be true of the code beneath it. If it is not, the comment is the
 bug.

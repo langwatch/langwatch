@@ -6,8 +6,6 @@
 import { visitContentPart } from "./trace-content-part.dispatcher.ts";
 import { parseBase64DataUri } from "./trace-content-part.file-decoder.ts";
 import type { ContentSource } from "./trace-content-part.types.ts";
-import { containsMediaMarkers } from "./trace-media-markers.ts";
-import { isMediaPartRole, type MediaPartRole } from "./trace-media-role.ts";
 import { convertRawPcmBase64ToWavBase64, detectRawPcmFormat } from "./trace-pcm-to-wav.ts";
 
 /**
@@ -347,4 +345,44 @@ function collectInto(walk: CollectWalk): void {
   if (typeof value === "object") {
     collectFromObject(walk, value);
   }
+}
+
+/**
+ * FROZEN TWIN: platform/app/src/shared/content-parts/media-markers.ts. Cheap gate
+ * for detecting inline media. Bare substrings handle JSON-inside-JSON escaping.
+ */
+const MEDIA_MARKERS = [
+  ";base64,",
+  "input_audio",
+  "file_data",
+  "mediaType",
+  "mimeType",
+  "media_type",
+  "mime_type",
+] as const;
+
+export function containsMediaMarkers(value: string): boolean {
+  return MEDIA_MARKERS.some((marker) => value.includes(marker));
+}
+
+/**
+ * Chat roles for media parts. Vocabulary matches transcript parser; unknown roles
+ * show like pre-role.
+ */
+export const MEDIA_PART_ROLES = [
+  "system",
+  "user",
+  "assistant",
+  "tool",
+  "developer",
+  "function",
+] as const;
+
+export type MediaPartRole = (typeof MEDIA_PART_ROLES)[number];
+
+const MEDIA_PART_ROLE_SET: ReadonlySet<string> = new Set(MEDIA_PART_ROLES);
+
+/** True for a role string the walk is willing to attribute a part to. */
+export function isMediaPartRole(value: unknown): value is MediaPartRole {
+  return typeof value === "string" && MEDIA_PART_ROLE_SET.has(value);
 }

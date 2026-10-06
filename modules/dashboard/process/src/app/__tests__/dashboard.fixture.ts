@@ -84,13 +84,12 @@ export function createDashboardTestApp(
 ): DashboardModule {
   return DashboardModule.create({
     repositories: input.repositories ?? MemoryDashboardRepositories.create(),
-    members: { publicBaseUrl: input.publicBaseUrl },
     dependencies: {
       analytics: input.dependencies?.analytics ?? createDashboardTestAnalytics(),
       automation: input.dependencies?.automation ?? createDashboardTestAutomation(),
       projects: input.dependencies?.projects ?? createDashboardTestProjects(),
     },
-    config: undefined,
+    config: { publicBaseUrl: input.publicBaseUrl },
     resources: new ResourceScope(),
     secrets: {} as never,
   });

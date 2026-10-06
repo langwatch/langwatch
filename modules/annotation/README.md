@@ -1,29 +1,50 @@
-# Annotation
+# annotation
 
-Annotation owns the portable annotation record, anchor vocabulary, handled
-errors, one callable `AnnotationApi`, and reusable browser presentation.
-Its server package owns separate repository interfaces and Postgres and memory
-implementations; its web package owns cards, editor bodies, diffs and
-score controls.
+Annotations on traces: comments, scores and reviews, and the annotation queues reviewers work through.
 
-## Journey
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-1. The feature installer constructs one app per process, with private comment,
-   score and queue services. The queue service owns two repositories. Startup selects the registered Postgres
-   or memory repositories; the app receives repository interfaces.
-2. A transport calls the contract API for validated writes, tenant-scoped
-   reads, projection reads, or queue-reference checks.
-3. The private repository preserves ordering, maps persistence values and
-   validates uncertain JSON fields before returning domain values.
+## At a glance
 
-The app coordinates user and trace enrichment, review effects and queue
-workflows. REST and tRPC use the shared API framework for parsing, exact-target
-authorization and responses. The UI application composes queries, mutations,
-draft stores and trace navigation into
-the web components through narrow props and callbacks. Process presets install
-one annotation app; requests do not construct repositories or services.
+|                |                                                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Classification | core (`modules/catalogue.json`)                                                                                    |
+| Subjects       | annotation                                                                                                         |
+| Halves         | [contract](contract) · [process](process) · [browser](browser)                                                     |
+| Api token      | `AnnotationApi` = `moduleApi<AnnotationApi>()("annotation")`, `contract/src/annotation.api.ts:118` (32 operations) |
+| Installed by   | api, worker, tasks (process); ui (browser)                                                                         |
 
-See [ADR-001](./adrs/001-annotation-service-boundary.md) and the
-[service contract](./specs/annotation-service.feature). Browser journeys live
-in the [queue workflow](./specs/annotation-queue-workflow.feature) and
-[annotation list](./specs/annotations-list-selection.feature) specifications.
+## What annotation owns
+
+| Kind           | Name                     | Declared at                                                                      |
+| -------------- | ------------------------ | -------------------------------------------------------------------------------- |
+| Postgres table | `Annotation`             | `process/src/repositories/prisma/prisma.annotation-count.repository.ts:8`        |
+| Postgres table | `AnnotationQueue`        | `process/src/repositories/prisma/prisma.annotation-count.repository.ts:8`        |
+| Postgres table | `AnnotationQueueItem`    | `process/src/repositories/prisma/prisma.annotation-count.repository.ts:8`        |
+| Postgres table | `AnnotationScore`        | `process/src/repositories/prisma/prisma.annotation-count.repository.ts:8`        |
+| Postgres table | `AnnotationQueue`        | `process/src/repositories/prisma/prisma.annotation-queue-item.repository.ts:141` |
+| Postgres table | `AnnotationQueueItem`    | `process/src/repositories/prisma/prisma.annotation-queue-item.repository.ts:141` |
+| Postgres table | `AnnotationQueue`        | `process/src/repositories/prisma/prisma.annotation-queue.repository.ts:33`       |
+| Postgres table | `AnnotationQueueMembers` | `process/src/repositories/prisma/prisma.annotation-queue.repository.ts:33`       |
+| Postgres table | `AnnotationQueueScores`  | `process/src/repositories/prisma/prisma.annotation-queue.repository.ts:33`       |
+| Postgres table | `AnnotationScore`        | `process/src/repositories/prisma/prisma.annotation-score.repository.ts:33`       |
+| Postgres table | `Annotation`             | `process/src/repositories/prisma/prisma.annotation.repository.ts:74`             |
+
+Anything else annotation needs belongs to another module and is reached through its `*Api`.
+
+## Peers (static dependencies)
+
+| Name            | Token             | Module                                    |
+| --------------- | ----------------- | ----------------------------------------- |
+| `entitlement`   | `EntitlementApi`  | [entitlement](../entitlement/README.md)   |
+| `organizations` | `OrganizationApi` | [organization](../organization/README.md) |
+| `permissions`   | `AuthzApi`        | [authz](../authz/README.md)               |
+| `projects`      | `ProjectApi`      | [project](../project/README.md)           |
+| `traces`        | `TraceApi`        | [trace](../trace/README.md)               |
+| `users`         | `UserApi`         | [user](../user/README.md)                 |
+
+## Who depends on annotation
+
+[audit-log](../audit-log/README.md), [automation](../automation/README.md), [ops](../ops/README.md), [trace](../trace/README.md) (as a peer).
+
+<!-- readme:generated:end -->

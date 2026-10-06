@@ -4,7 +4,12 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { workflowOptimizationTrpc, workflowTrpc } from "@langwatch/workflow-contract";
+import {
+  RunExperimentViaApiDialogToken,
+  VersionBoxToken,
+  workflowOptimizationTrpc,
+  workflowTrpc,
+} from "@langwatch/workflow-contract";
 
 import { workflowApi } from "./behavior/workflow-api.ts";
 
@@ -38,15 +43,15 @@ export const workflowWeb = defineBrowserModule("workflow")
         default: (await import("./ui/sections/redacted-field.tsx")).RedactedField,
       }),
     },
-    runExperimentViaApiDialog: {
-      load: async () => ({
-        default: (await import("./ui/sections/run-via-api/run-experiment-via-api-dialog.tsx"))
-          .RunExperimentViaApiDialog,
-      }),
-    },
-    versionBox: {
-      load: async () => ({
-        default: (await import("./ui/sections/optimization_studio/history.tsx")).VersionBox,
-      }),
-    },
+  })
+  .lends(VersionBoxToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/optimization_studio/history.tsx")).VersionBox,
+    }),
+  })
+  .lends(RunExperimentViaApiDialogToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/run-via-api/run-experiment-via-api-dialog.tsx"))
+        .RunExperimentViaApiDialog,
+    }),
   });

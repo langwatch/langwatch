@@ -50,7 +50,7 @@ import { WorkflowVersionHistoryService } from "./workflow-version-history.servic
 const WORKFLOW_KSUID_RESOURCE = "workflow";
 const WORKFLOW_VERSION_KSUID_RESOURCE = "workflowversion";
 
-export type WorkflowServiceOptions = {
+type WorkflowServiceOptions = {
   repository: WorkflowRepository;
   datasets: DatasetApi;
   execution: WorkflowExecution;

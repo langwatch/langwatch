@@ -15,19 +15,25 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
     Scenario: Minting a key answers its token once
       When "ada" mints a service key "ci" on project "alpha"
       Then the answer carries a token starting with "sk-lw-"
-      And the answer carries the key's id, name, masked hint, grants, created and expiry
+      And the answer carries the key's identity beside it: its id, name and creation time
 
     @integration
     Scenario: No read after the mint carries the token
       Given "ada" minted a key "ci" and kept its token
-      When the key is read through the tRPC list, the REST list, the REST get and the organization graph
+      When the key is read through the tRPC list, the REST list and the REST get
       Then no response body contains the token or its secret half
-      And each response shows only the masked hint "sk-lw-<first five of the lookup id>..."
+
+    # Gap: no masked hint exists on the key row; main carried none either.
+    @integration @unimplemented
+    Scenario: A key is shown by a masked hint of its lookup id
+      Given "ada" minted a key "ci" and kept its token
+      When the key is read through the tRPC list, the REST list, the REST get and the organization graph
+      Then each response shows only the masked hint "sk-lw-<first five of the lookup id>..."
 
     @integration
     Scenario: No project read carries a project key or the LangWatchQL key
       Given project "alpha" has a legacy project key
-      When "max" reads the organization graph, the teams with their projects, and project "alpha"
+      When "max" reads the organizations payload, with its teams and their projects
       Then no response body contains the legacy key, the LangWatchQL key or the storage secret
       And the same holds for "ada"
 
@@ -45,14 +51,13 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
   Rule: a legacy project key keeps working until it is revoked, and nobody can find it
 
     @integration
-    Scenario: A legacy project key still authenticates after the backfill
-      Given project "alpha" had the legacy key "sk-lw-<48 characters>" before the backfill
-      When the backfill runs
-      And a trace is sent with that key in X-Auth-Token
-      Then the trace is accepted for project "alpha"
-      And the key's last-used time moves forward
+    Scenario: A legacy project key still authenticates
+      Given project "alpha" holds the legacy key "sk-lw-<48 characters>" on the project itself
+      When a trace is sent with that key in X-Auth-Token
+      Then the key resolves to project "alpha"
 
-    @unit
+    # Alex 2026-10-06: never built. The legacy key still lives on Project.apiKey; no ApiKey row is backfilled.
+    @unit @unimplemented
     Scenario: The backfill stores no plaintext and is safe to run twice
       Given two projects with legacy keys
       When the backfill runs twice
@@ -60,17 +65,16 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And the row holds a hash of the key and a masked hint, never the key itself
 
     @integration
-    Scenario: The legacy key is listed and can only be revoked
+    Scenario: The legacy key is not listed on the keys page
       When "ada" opens the API keys of project "alpha"
-      Then a row "Project key (legacy)" shows its masked hint, created and last used
-      And its row menu offers "Revoke" and nothing else
+      Then no row shows the legacy project key
+      And no control copies or rotates it
 
     @integration
     Scenario: A revoked legacy key is refused
       Given "ada" revoked the legacy key of project "alpha"
-      When a trace is sent with that key
-      Then the answer is 401
-      And no other key of project "alpha" is affected
+      Then the project's stored key is replaced by a value that never authenticates
+      And a trace sent with the old key is refused
 
     @integration
     Scenario: A banner tells an admin that legacy project keys are going away
@@ -137,17 +141,10 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
   Rule: a revoked or expired key is refused everywhere, within the cache bound
 
     @integration
-    Scenario Outline: A revoked key is refused at every door
+    Scenario: A revoked key is refused at every door
       Given "ada" minted a key and then revoked it
-      When the key is presented at <door>
-      Then the request is refused with 401
-
-      Examples:
-        | door                          |
-        | the OTLP traces endpoint      |
-        | the collector                 |
-        | the REST management API       |
-        | the hosted MCP endpoint       |
+      When the key is presented to token resolution, which every door asks
+      Then the key does not resolve and the door answers 401
 
     @unit
     Scenario: A revoke made on another process reaches this one within five seconds
@@ -161,25 +158,37 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       When three seconds pass
       Then the key is refused
 
-    @unit
+    # Alex 2026-10-06: never built. A revoked key resolves to nothing, so every refusal is the plain invalid-key answer.
+    @unit @unimplemented
     Scenario: A revoked key's refusal names the revocation only to its holder
       Given a revoked key
       When it is presented with its correct secret
       Then the 401 says the key was revoked
       And when it is presented with a wrong secret the 401 is the plain invalid-key answer
 
-  Rule: nobody mints a key beyond what they hold, and a key expires unless told otherwise
+  Rule: nobody mints a key beyond what they hold, and the minter chooses when it expires
 
     @integration
-    Scenario: A new key expires in 90 days unless "never" is chosen
-      When "ada" mints a key without changing the expiry
-      Then the key expires 90 days from now
-      And when she chooses "never" the key has no expiry
+    Scenario: Create stays unavailable until an expiry is chosen
+      Given "ada" has named a new key and has not chosen an expiry
+      Then the expiry field asks her to choose one
+      And Create is unavailable
+      And when she chooses an expiry Create becomes available
 
     @integration
-    Scenario: A key row offers Revoke and nothing else
-      When "ada" opens the row menu of any key
-      Then the only action is "Revoke"
+    Scenario: Choosing no expiration mints a key with no expiry
+      When "ada" names a new key and chooses "No expiration"
+      Then the key is minted with no expiry
+
+    @integration
+    Scenario: Choosing a preset mints a key that expires that many days from now
+      When "ada" names a new key and chooses "30 days"
+      Then the key expires 30 days from now
+
+    @integration
+    Scenario: A key row offers Edit and Revoke
+      When "ada" opens the row menu of a key she may change
+      Then its actions are "Edit" and "Revoke", and nothing else
 
     @integration
     Scenario: A member mints a personal key within their own grants
@@ -207,12 +216,13 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
     Scenario: A key never exceeds its owner after the owner loses a grant
       Given "max" minted a personal key with the Member role on project "alpha"
       When "max" loses his grant on project "alpha"
-      Then the key is refused on project "alpha" within the cache bound
+      Then the key is refused on project "alpha" at its next permission check
 
     @integration
-    Scenario: The mint dialog greys out roles beyond the reader
+    Scenario: The mint drawer offers no role chooser
       When "vic" opens "Create a key" on project "alpha"
-      Then the Admin and Member roles are shown but cannot be chosen
+      Then no role can be chosen
+      And the key is minted with the role of "vic"'s own binding
 
   Rule: a key in another organization does not exist for the caller
 
@@ -286,15 +296,16 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
     @integration
     Scenario: The secret panel shows the token once with ready-to-copy snippets
       Given "ada" minted a key from the mint drawer
-      Then the panel shows the token in a highlighted snippet for .env, Python, TypeScript, curl and OTLP headers
-      And each snippet has a copy button that says "Copied" after a copy
-      And "Done" stays disabled until "I've stored this key" is ticked
+      Then the "Token Created" panel shows the token in highlighted .env, Bearer and Basic Auth snippets
+      And a tab for each coding assistant carries its own command
+      And each snippet's copy button copies the real token even while it is masked
 
     @integration
-    Scenario: Closing the secret panel early asks first
-      Given the secret panel is open and "I've stored this key" is not ticked
-      When "ada" closes the drawer
-      Then she is asked to confirm that the key will not be shown again
+    Scenario: Closing the secret panel needs no confirmation
+      Given the "Token Created" panel is open
+      When "ada" closes it
+      Then it closes at once, with no checkbox or confirmation gating it
+      And the panel warned her beforehand to copy the token now
 
   Rule: a setup token holds the least its screen needs (Alex, 2026-10-01)
 
@@ -333,12 +344,11 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
   Rule: the CLI and MCP flows mint a key rather than hand out the project key
 
     @integration
-    Scenario: A CLI project login writes a freshly minted key
+    Scenario: A CLI project login answers a session, never a minted key
       Given "ada" approves a "project_api_key" device login for project "alpha"
       When the CLI exchanges the device code
-      Then the answer's "api_key" is a new key scoped to project "alpha"
-      And the device record never held a key
-      And the legacy project key is unchanged
+      Then the answer is a project-locked session with an access token and a refresh token
+      And the answer carries no "api_key" and no legacy project key
 
     @unit
     Scenario: A second CLI login from the same device replaces the first key
@@ -348,20 +358,23 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And a key for another device is untouched
 
     @integration
-    Scenario: A hosted MCP authorization seals a dedicated key
-      When "ada" authorizes an MCP client for project "alpha"
-      Then the MCP session holds a key minted for that client
-      And revoking that key ends the MCP session
+    Scenario: A hosted MCP authorization yields a person-bound session, never a project key
+      When "ada" authorizes an MCP client for project "alpha" and the client exchanges its code
+      Then the answer is an access token bound to "ada" and project "alpha", with a refresh token
+      And once her grant is revoked the MCP call is refused with "mcp_grant_revoked"
 
   Rule: keys are audited and their use is recorded without a write per call
 
     @integration
     Scenario: Minting and revoking are audited
       When "ada" mints and then revokes a key
-      Then the audit log has "api-key.created" and "api-key.revoked" entries naming the key id and the actor
+      Then the audit log has an "apiKey.create" entry naming the actor, the key's name and its type
+      And an "apiKey.revoke" entry naming the actor and the key id
       And neither entry carries the token
 
     @unit
     Scenario: Last used is written at most once a minute per key per process
       Given a key used 100 times within one minute
       Then its last-used time is written once
+      And a use after the minute writes it again
+      And a write that fails lets the next use try again

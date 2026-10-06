@@ -33,11 +33,10 @@ Feature: An experiment run executes on its pipeline
     Then the project's rates are handed to the price cascade as the custom rate
 
   @unit
-  Scenario: A run lends its code a per-run key holding only the agent cache
-    Given a run started by a member, or by nobody
+  Scenario: A run lends its code the project's shared sandbox key
+    Given a project whose code agent runs share a sandbox key
     When the run executes code
-    Then the run lends its code a key minted for that run, acting as the member or the system
-    And the key holds agentCache:manage alone and is never shared across the project's runs
+    Then the run lends its code that key, which holds agentCache:manage alone
 
   @unit
   Scenario: A run whose sandbox key cannot be minted still runs without one

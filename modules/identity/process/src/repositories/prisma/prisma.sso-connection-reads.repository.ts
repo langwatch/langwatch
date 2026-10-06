@@ -19,13 +19,10 @@ import type {
 import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository.ts";
 
 /** The connection heads the guards read, and the ownership rows beside them. */
-export type PrismaSsoConnectionReadDatabase = Pick<
-  PrismaClient,
-  "ssoConnection" | "ssoVerifiedDomain"
->;
+type PrismaSsoConnectionReadDatabase = Pick<PrismaClient, "ssoConnection" | "ssoVerifiedDomain">;
 
 /** The identity heads a teardown's stranding check is answered from. */
-export type PrismaSsoConnectionStrandingDatabase = Pick<
+type PrismaSsoConnectionStrandingDatabase = Pick<
   PrismaClient,
   "identifier" | "ssoConnection" | "organizationUser"
 >;

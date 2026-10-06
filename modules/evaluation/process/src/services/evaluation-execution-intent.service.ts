@@ -84,8 +84,6 @@ export class EvaluationExecutionIntentService {
   }
 }
 
-export { EvaluationExecutionIntentService as ExecuteEvaluationCommand };
-
 export interface ExecuteEvaluationCommandDeps {
   /** Throws `MonitorNotFoundError` when the monitor was deleted after the command was queued. */
   monitors: Pick<MonitorApi, "getById">;

@@ -19,6 +19,7 @@ const renderCard = (card: React.ReactNode) =>
 
 describe("the account lockout card", () => {
   describe("given lockout is off", () => {
+    /** @scenario The threshold is offered with the numbers the control asks for */
     it("offers the lock and saves the offered threshold", async () => {
       const onSave = vi.fn();
       renderCard(
@@ -28,6 +29,10 @@ describe("the account lockout card", () => {
       expect(screen.queryByTestId("sign-in-lockout-save")).toBeNull();
       // userEvent, not fireEvent: Chakra's radio group only hears a real click.
       await userEvent.click(screen.getByText("Temporary lockout"));
+      expect((screen.getByTestId("sign-in-lockout-attempts") as HTMLInputElement).value).toBe("5");
+      expect((screen.getByTestId("sign-in-lockout-minutes") as HTMLInputElement).value).toBe("30");
+      expect(screen.getByText("Applies to new sign-ins.")).toBeTruthy();
+      expect(onSave).not.toHaveBeenCalled();
       await userEvent.click(screen.getByTestId("sign-in-lockout-save"));
 
       expect(onSave).toHaveBeenCalledWith({
@@ -40,6 +45,24 @@ describe("the account lockout card", () => {
 });
 
 describe("the session limits card", () => {
+  describe("given session limits are off and custom limits are chosen", () => {
+    /** @scenario "The window is offered with the numbers the control asks for" */
+    it("offers an idle timeout of one day, a maximum left unset, and says saving signs out the idle", async () => {
+      renderCard(
+        <SessionLimitCard settings={SIGN_IN_SECURITY_OFF} saving={false} onSave={vi.fn()} />,
+      );
+
+      await userEvent.click(screen.getByText("Custom session limits"));
+
+      expect((screen.getByTestId("session-limit-idle") as HTMLInputElement).value).toBe("1440");
+      expect((screen.getByTestId("session-limit-maximum") as HTMLInputElement).value).toBe("");
+      expect(screen.getByTestId("session-limit-save")).toBeTruthy();
+      expect(
+        screen.getByText("Saving signs out sessions already past the new limit."),
+      ).toBeTruthy();
+    });
+  });
+
   describe("given a maximum shorter than the idle timeout", () => {
     it("warns that it would never be reached and offers no save", () => {
       renderCard(

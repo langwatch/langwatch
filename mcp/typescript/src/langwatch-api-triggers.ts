@@ -19,10 +19,9 @@ import {
 } from "./schemas/triggers.ts";
 
 /**
- * The `/api/v1/triggers` calls, each answering with the shape `schemas/triggers`
- * declares. Responses are read through that schema rather than cast to it, so
- * a deployment that stops sending something a tool renders is a loud failure
- * rather than an `undefined` in the middle of a message to an agent.
+ * The `/api/v1/triggers` calls, each answering with the shape `schemas/triggers` declares.
+ * Responses are read through that schema, not cast, so a deployment that stops sending something
+ * a tool renders fails loudly instead of leaving an `undefined` in an agent's message.
  */
 
 export interface CreateTriggerInput {

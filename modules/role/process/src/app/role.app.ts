@@ -6,20 +6,18 @@
 import { ledgerActorFor, type LedgerActor, PermissionDeniedError } from "@langwatch/authorization";
 import {
   AuthzApi,
+  AuthzScopeNotFoundError,
   bindingScopeCanGrantPermission,
   builtInRoleIdSchema,
   builtinRolePermissions,
   newAuthzGrantId,
   type AuthzPrincipalRef,
+  type AuthzScopeRef,
   type BuiltInRoleId,
 } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { generate } from "@langwatch/ksuid";
-import {
-  OrganizationApi,
-  PersonalWorkspaceNotManagedHereError,
-  OrganizationNotFoundForTeamError,
-} from "@langwatch/organization-contract";
+import { PersonalWorkspaceNotManagedHereError } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import {
   OrgExclusivePermissionScopeError,
@@ -57,13 +55,11 @@ export class RoleModule implements RoleApi {
   static readonly contract = RoleApi;
   static readonly dependencies = {
     permissions: AuthzApi,
-    organizations: OrganizationApi,
     entitlement: EntitlementApi,
   };
 
   #roles: RoleService;
   #permissions: AuthzApi;
-  #organizations: OrganizationApi;
 
   private constructor(repositories: RoleRepositories, dependencies: RoleSetup["dependencies"]) {
     this.#roles = RoleService.create({
@@ -71,7 +67,6 @@ export class RoleModule implements RoleApi {
       entitlement: dependencies.entitlement,
     });
     this.#permissions = dependencies.permissions;
-    this.#organizations = dependencies.organizations;
   }
 
   static create({ repositories, dependencies }: RoleSetup): RoleModule {
@@ -270,12 +265,19 @@ export class RoleModule implements RoleApi {
 
   /** The organization a team assignment lands in. */
   async getAssignmentOrganization(input: { teamId: string }): Promise<string> {
-    try {
-      return await this.#organizations.getOrganizationIdByTeamId(input);
-    } catch (error) {
-      if (OrganizationNotFoundForTeamError.is(error)) throw new RoleTeamNotFoundError(input.teamId);
+    return (await this.#getTeamScope(input)).organizationId;
+  }
+
+  async #getTeamScope(input: {
+    teamId: string;
+  }): Promise<Extract<AuthzScopeRef, { type: "team" }>> {
+    const scope = await this.#permissions.getScope(input).catch((error: unknown) => {
+      if (AuthzScopeNotFoundError.is(error)) throw new RoleTeamNotFoundError(input.teamId);
       throw error;
-    }
+    });
+    if (scope.type !== "team") throw new RoleTeamNotFoundError(input.teamId);
+
+    return scope;
   }
 
   /** Of the listed ids, the ones this organization may actually assign. */
@@ -302,7 +304,7 @@ export class RoleModule implements RoleApi {
 
   /** The personal-workspace fence a team binding is refused at; the team is the organization's. */
   async #assertNotPersonalTeam(input: { teamId: string }): Promise<void> {
-    const team = await this.#organizations.getTeamById(input);
+    const team = await this.#getTeamScope(input);
     if (team.isPersonal) throw new PersonalWorkspaceNotManagedHereError(team.name);
   }
 

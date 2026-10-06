@@ -71,7 +71,7 @@ func TestMailListPrintsEachMessage(t *testing.T) {
 	full := testMessage()
 	srv := stubMailSink(t, []mailSummary{full.mailSummary}, full)
 	out := captureStdout(t, func() {
-		if err := runMailSubcommand(context.Background(), invocation{args: []string{"list"}}, false, srv.URL); err != nil {
+		if err := runMailSubcommand(context.Background(), invocation{args: []string{"list"}}, mailSink{baseURL: srv.URL}); err != nil {
 			t.Fatalf("runMailSubcommand(list): %v", err)
 		}
 	})
@@ -85,7 +85,7 @@ func TestMailListJSON(t *testing.T) {
 	full := testMessage()
 	srv := stubMailSink(t, []mailSummary{full.mailSummary}, full)
 	out := captureStdout(t, func() {
-		if err := runMailSubcommand(context.Background(), invocation{args: []string{"list"}}, true, srv.URL); err != nil {
+		if err := runMailSubcommand(context.Background(), invocation{args: []string{"list"}}, mailSink{baseURL: srv.URL, asJSON: true}); err != nil {
 			t.Fatalf("runMailSubcommand(list --json): %v", err)
 		}
 	})
@@ -103,7 +103,7 @@ func TestMailGetPrintsHeadersTextAndLinks(t *testing.T) {
 	full := testMessage()
 	srv := stubMailSink(t, nil, full)
 	out := captureStdout(t, func() {
-		if err := runMailSubcommand(context.Background(), invocation{args: []string{"get", "msg-1"}}, false, srv.URL); err != nil {
+		if err := runMailSubcommand(context.Background(), invocation{args: []string{"get", "msg-1"}}, mailSink{baseURL: srv.URL}); err != nil {
 			t.Fatalf("runMailSubcommand(get): %v", err)
 		}
 	})
@@ -120,7 +120,7 @@ func TestMailGetHTML(t *testing.T) {
 	full := testMessage()
 	srv := stubMailSink(t, nil, full)
 	out := captureStdout(t, func() {
-		if err := runMailSubcommand(context.Background(), invocation{args: []string{"get", "msg-1"}, flags: map[string]string{"--html": ""}}, false, srv.URL); err != nil {
+		if err := runMailSubcommand(context.Background(), invocation{args: []string{"get", "msg-1"}, flags: map[string]string{"--html": ""}}, mailSink{baseURL: srv.URL}); err != nil {
 			t.Fatalf("runMailSubcommand(get --html): %v", err)
 		}
 	})
@@ -133,7 +133,7 @@ func TestMailGetHTML(t *testing.T) {
 func TestMailGetMissingIDRefuses(t *testing.T) {
 	full := testMessage()
 	srv := stubMailSink(t, nil, full)
-	err := runMailSubcommand(context.Background(), invocation{args: []string{"get", "missing"}}, false, srv.URL)
+	err := runMailSubcommand(context.Background(), invocation{args: []string{"get", "missing"}}, mailSink{baseURL: srv.URL})
 	if err == nil {
 		t.Fatal("get on a missing id succeeded")
 	}
@@ -147,7 +147,7 @@ func TestMailWaitPrintsTheMatch(t *testing.T) {
 	full := testMessage()
 	srv := stubMailSink(t, nil, full)
 	out := captureStdout(t, func() {
-		if err := runMailSubcommand(context.Background(), invocation{args: []string{"wait"}}, false, srv.URL); err != nil {
+		if err := runMailSubcommand(context.Background(), invocation{args: []string{"wait"}}, mailSink{baseURL: srv.URL}); err != nil {
 			t.Fatalf("runMailSubcommand(wait): %v", err)
 		}
 	})
@@ -162,7 +162,7 @@ func TestMailWaitExitsNonZeroOnTimeout(t *testing.T) {
 	srv := stubMailSink(t, nil, full)
 	err := runMailSubcommand(context.Background(),
 		invocation{args: []string{"wait"}, flags: map[string]string{"--subject": "no-match", "--timeout": "1ms"}},
-		false, srv.URL)
+		mailSink{baseURL: srv.URL})
 	if err == nil {
 		t.Fatal("wait succeeded although nothing matched")
 	}
@@ -176,7 +176,7 @@ func TestMailClear(t *testing.T) {
 	full := testMessage()
 	srv := stubMailSink(t, nil, full)
 	out := captureStdout(t, func() {
-		if err := runMailSubcommand(context.Background(), invocation{args: []string{"clear"}}, false, srv.URL); err != nil {
+		if err := runMailSubcommand(context.Background(), invocation{args: []string{"clear"}}, mailSink{baseURL: srv.URL}); err != nil {
 			t.Fatalf("runMailSubcommand(clear): %v", err)
 		}
 	})
@@ -190,7 +190,7 @@ func TestMailClearJSON(t *testing.T) {
 	full := testMessage()
 	srv := stubMailSink(t, nil, full)
 	out := captureStdout(t, func() {
-		if err := runMailSubcommand(context.Background(), invocation{args: []string{"clear"}}, true, srv.URL); err != nil {
+		if err := runMailSubcommand(context.Background(), invocation{args: []string{"clear"}}, mailSink{baseURL: srv.URL, asJSON: true}); err != nil {
 			t.Fatalf("runMailSubcommand(clear --json): %v", err)
 		}
 	})
@@ -204,7 +204,7 @@ func TestMailClearJSON(t *testing.T) {
 }
 
 func TestMailUnknownSubcommandRefusesByName(t *testing.T) {
-	err := runMailSubcommand(context.Background(), invocation{args: []string{"bogus"}}, false, "http://127.0.0.1:0")
+	err := runMailSubcommand(context.Background(), invocation{args: []string{"bogus"}}, mailSink{baseURL: "http://127.0.0.1:0"})
 	if err == nil || !strings.Contains(err.Error(), `"bogus"`) {
 		t.Errorf("error = %v, want it to name the unknown subcommand", err)
 	}

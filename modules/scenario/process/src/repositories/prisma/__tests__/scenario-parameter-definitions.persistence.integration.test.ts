@@ -141,12 +141,11 @@ describe.skipIf(!databaseUrl)("Scenario parameter definition persistence", () =>
     } satisfies SimulationService;
 
     scenarios = ScenarioService.create({
-      repository: PrismaScenarioRepository.create(db),
+      repository: PrismaScenarioRepository.create(db, new TestSecretCipher()),
       simulations: mockSimulations,
       ids: new ScenarioIds(),
       testSuiteIds: new TestSuiteIds(),
       clock: new TestClock(),
-      secretCipher: new TestSecretCipher(),
     });
   });
 

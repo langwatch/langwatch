@@ -146,7 +146,7 @@ export const teamsRest: Readonly<{
   )
 
   .get("/:teamId", "getTeam")
-  .withPermission("team:view")
+  .withPermission("team:view", { at: "route", param: "teamId" })
   .withParams(organizationTeamRestParamsSchema)
   .withOutput(organizationTeamRestSchema)
   .withDocs({
@@ -164,7 +164,7 @@ export const teamsRest: Readonly<{
   )
 
   .patch("/:teamId", "updateTeam")
-  .withPermission("team:manage")
+  .withPermission("team:manage", { at: "route", param: "teamId" })
   .withParams(organizationTeamRestParamsSchema)
   .withInput(organizationTeamRestUpdateSchema)
   .withOutput(organizationTeamRestSchema)
@@ -184,7 +184,7 @@ export const teamsRest: Readonly<{
   )
 
   .delete("/:teamId", "archiveTeam")
-  .withPermission("team:manage")
+  .withPermission("team:manage", { at: "route", param: "teamId" })
   .withParams(organizationTeamRestParamsSchema)
   .withOutput(organizationTeamRestArchivedSchema)
   .withDocs({
@@ -206,7 +206,7 @@ export const teamsRest: Readonly<{
   })
 
   .get("/:teamId/members", "listTeamMembers")
-  .withPermission("team:view")
+  .withPermission("team:view", { at: "route", param: "teamId" })
   .withParams(organizationTeamRestParamsSchema)
   .withOutput(organizationTeamRestMemberListSchema)
   .withDocs({
@@ -233,7 +233,7 @@ export const teamsRest: Readonly<{
   })
 
   .post("/:teamId/members", "addTeamMember")
-  .withPermission("team:manage")
+  .withPermission("team:manage", { at: "route", param: "teamId" })
   .withParams(organizationTeamRestParamsSchema)
   .withInput(organizationTeamRestAddMemberSchema)
   .withOutput(organizationTeamRestSuccessSchema)
@@ -264,7 +264,7 @@ export const teamsRest: Readonly<{
   })
 
   .delete("/:teamId/members/:userId", "removeTeamMember")
-  .withPermission("team:manage")
+  .withPermission("team:manage", { at: "route", param: "teamId" })
   .withParams(organizationTeamRestMemberParamsSchema)
   .withOutput(organizationTeamRestSuccessSchema)
   .withDocs({
@@ -287,7 +287,7 @@ export const teamsRest: Readonly<{
   })
 
   .get("/:teamId/projects", "listTeamProjects")
-  .withPermission("team:view")
+  .withPermission("team:view", { at: "route", param: "teamId" })
   .withParams(organizationTeamRestParamsSchema)
   .withOutput(organizationTeamRestProjectListSchema)
   .withDocs({

@@ -1,3 +1,5 @@
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
  * The metadata seam ingestion composes from a database alone.
@@ -8,8 +10,10 @@ import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaProjectRepository } from "../../repositories/prisma/prisma.project.repository.ts";
+import type { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
+import type { ProjectCredentials } from "../project-credentials.service.ts";
 import { ProjectMetadataService } from "../project-metadata.service.ts";
-import type { ProjectDiagnostics } from "../project.service.ts";
+import { type ProjectDiagnostics, ProjectService } from "../project.service.ts";
 
 type ProjectDatabase = Parameters<typeof PrismaProjectRepository.create>[0]["prisma"];
 
@@ -63,6 +67,38 @@ describe("the project metadata seam", () => {
         onboardingVariant: "classic",
         organizationCreatedAt: fromDate(new Date("2026-01-01T00:00:00Z")),
       });
+    });
+  });
+
+  describe("given the project service and the seam over the same client", () => {
+    /** @scenario The wide service and the seam answer from one implementation */
+    it("answers the same organization admin resolution", async () => {
+      const row = {
+        firstMessage: false,
+        team: {
+          organization: {
+            id: "org_1",
+            createdAt: new Date("2026-01-01T00:00:00Z"),
+            signupData: null,
+            members: [{ userId: "admin_1" }],
+          },
+        },
+      };
+      const database: ProjectDatabase = prismaDouble({
+        project: { findUnique: async () => row },
+      });
+      const repository = PrismaProjectRepository.create({ prisma: database });
+      const seam = ProjectMetadataService.create({ repository });
+      const service = ProjectService.create({
+        repository,
+        credentials: createApiFixture<ProjectCredentials>({}),
+        organizations: createApiFixture<OrganizationApi>({}),
+        created: createApiFixture<ProjectCreatedNoticeService>({}),
+      });
+
+      await expect(service.resolveOrgAdmin("project_1")).resolves.toEqual(
+        await seam.resolveOrgAdmin("project_1"),
+      );
     });
   });
 

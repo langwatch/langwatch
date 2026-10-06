@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/module";
+import { moduleApi, uiTokens } from "@langwatch/module";
 import { z } from "zod";
 
 export const MANAGED_PROVIDER_FEATURE_ID = "managed-provider" as const;
@@ -38,3 +38,12 @@ export interface ManagedProviderApi {
 }
 
 export const ManagedProviderApi = moduleApi<ManagedProviderApi>()(MANAGED_PROVIDER_FEATURE_ID);
+
+/** What managed-provider lends to model-provider's credentials form (§11). */
+
+/** Said above a provider's credentials when the credentials are not the customer's. */
+export type ManagedModelProviderAlertProps = { provider: ManagedModelProvider; error?: string };
+
+export const ManagedModelProviderAlertToken = uiTokens(
+  "managed-provider",
+).component<ManagedModelProviderAlertProps>("managedModelProviderAlert");

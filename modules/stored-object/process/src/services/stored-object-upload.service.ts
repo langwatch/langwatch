@@ -16,6 +16,7 @@ import {
   UploadTokenInvalidError,
   UploadTooLargeError,
   isRefusedUploadMediaType,
+  purposeByteLimitOf,
   purposePolicyOf,
   type ConfirmStoredObjectUploadInput,
   type CreateStoredObjectUploadInput,
@@ -30,9 +31,9 @@ import {
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 
 import type {
-  StoredObjectStorage,
+  StoredObjectBytesRepository,
   StoredObjectStorageAddress,
-} from "../app/stored-object.members.ts";
+} from "../repositories/stored-object-bytes.repository.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
@@ -40,9 +41,9 @@ import type {
 import { storedObjectReferenceOf } from "../rules/stored-object-view.rules.ts";
 import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
 
-export type StoredObjectUploadServiceOptions = Readonly<{
+type StoredObjectUploadServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
-  storage: StoredObjectStorage;
+  storage: StoredObjectBytesRepository;
   signer: StoredObjectUploadSignerService;
   maximumUploadBytes: number;
   uploadExpiryMs: number;
@@ -95,7 +96,11 @@ export class StoredObjectUploadService {
   async storeFromBytes(
     input: StoreStoredObjectFromBytesInput,
   ): Promise<StoreStoredObjectFromBytesResult> {
-    const { chunks, byteLength } = await this.measured(input.bytes);
+    const ceiling =
+      input.maxBytes === undefined
+        ? this.options.maximumUploadBytes
+        : purposeByteLimitOf(purposePolicyOf(input.purpose), input.maxBytes);
+    const { chunks, byteLength } = await this.measured(input.bytes, ceiling);
     const id = this.options.newId();
     const { address } = await StoredObjectUploadService.storageCall(() =>
       this.options.storage.place({ projectId: input.projectId, objectId: id }),
@@ -153,7 +158,10 @@ export class StoredObjectUploadService {
     const placement = await StoredObjectUploadService.storageCall(() =>
       this.options.storage.place({ projectId: input.projectId, objectId: id }),
     );
-    const limit = Math.min(policy.maxBytes, placement.maxSinglePutBytes);
+    const limit = Math.min(
+      purposeByteLimitOf(policy, input.maxBytes),
+      placement.maxSinglePutBytes,
+    );
     if (input.byteLength > limit) throw new UploadTooLargeError(input.byteLength, limit);
 
     const now = this.options.now();
@@ -269,9 +277,10 @@ export class StoredObjectUploadService {
   /** In-process bytes: a buffer is written as it is; a stream is counted within the ceiling. */
   private async measured(
     source: StoreStoredObjectFromBytesInput["bytes"],
+    ceiling: number,
   ): Promise<{ chunks: readonly Uint8Array[]; byteLength: number }> {
     if (source instanceof Uint8Array) {
-      this.assertWithinCeiling(source.byteLength);
+      assertWithinCeiling(source.byteLength, ceiling);
 
       return { chunks: [source], byteLength: source.byteLength };
     }
@@ -280,17 +289,11 @@ export class StoredObjectUploadService {
     let byteLength = 0;
     for await (const chunk of source) {
       byteLength += chunk.byteLength;
-      this.assertWithinCeiling(byteLength);
+      assertWithinCeiling(byteLength, ceiling);
       chunks.push(chunk);
     }
 
     return { chunks, byteLength };
-  }
-
-  private assertWithinCeiling(byteLength: number): void {
-    if (byteLength > this.options.maximumUploadBytes) {
-      throw new UploadTooLargeError(byteLength, this.options.maximumUploadBytes);
-    }
   }
 
   private async recordOrDiscard(
@@ -307,6 +310,10 @@ export class StoredObjectUploadService {
       throw error;
     }
   }
+}
+
+function assertWithinCeiling(byteLength: number, ceiling: number): void {
+  if (byteLength > ceiling) throw new UploadTooLargeError(byteLength, ceiling);
 }
 
 function refusedField(field: "purpose" | "mediaType", message: string): ValidationError {

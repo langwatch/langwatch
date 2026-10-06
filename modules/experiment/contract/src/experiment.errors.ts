@@ -1,3 +1,4 @@
+import { formatDatasetByteLimit, formatDatasetRowLimit } from "@langwatch/dataset-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 
 export class ExperimentNotFoundError extends NotFoundError {
@@ -253,5 +254,50 @@ export class ExperimentEvaluationInputError extends HandledError {
       fault: "customer",
     });
     this.name = "ExperimentEvaluationInputError";
+  }
+}
+
+/** A saved dataset has more rows than one run reads. */
+export class ExperimentDatasetTooManyRowsError extends HandledError {
+  declare readonly code: "experiment_dataset_too_many_rows";
+
+  constructor({ rowCount, maxRows }: { rowCount: number; maxRows: number }) {
+    super(
+      "experiment_dataset_too_many_rows",
+      `The dataset has ${formatDatasetRowLimit(rowCount)} rows; one run reads at most ${formatDatasetRowLimit(maxRows)}. ` +
+        "Split the dataset, or run a selection of its rows from a smaller dataset.",
+      { httpStatus: 422, fault: "customer", meta: { rowCount, maxRows } },
+    );
+    this.name = "ExperimentDatasetTooManyRowsError";
+  }
+}
+
+/** A saved dataset's rows total more bytes than one run holds. */
+export class ExperimentDatasetTooLargeToRunError extends HandledError {
+  declare readonly code: "experiment_dataset_too_large_to_run";
+
+  constructor({ maxBytes }: { maxBytes: number }) {
+    super(
+      "experiment_dataset_too_large_to_run",
+      `The dataset's rows total more than the ${formatDatasetByteLimit(maxBytes)} one run reads. ` +
+        "Store images and files as attachments in image or file columns instead of inline data, or split the dataset.",
+      { httpStatus: 413, fault: "customer", meta: { maxBytes } },
+    );
+    this.name = "ExperimentDatasetTooLargeToRunError";
+  }
+}
+
+/** The dataset's row count moved while the run was reading it, so the run would be short. */
+export class ExperimentDatasetChangedDuringReadError extends HandledError {
+  declare readonly code: "experiment_dataset_changed_during_read";
+
+  constructor({ rowCount, rowsRead }: { rowCount: number; rowsRead: number }) {
+    super(
+      "experiment_dataset_changed_during_read",
+      `The dataset changed while the run was reading it: ${formatDatasetRowLimit(rowsRead)} of ${formatDatasetRowLimit(rowCount)} rows were read. ` +
+        "Start the run again once the dataset is no longer being edited.",
+      { httpStatus: 409, fault: "customer", meta: { rowCount, rowsRead } },
+    );
+    this.name = "ExperimentDatasetChangedDuringReadError";
   }
 }

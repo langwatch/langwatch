@@ -5,9 +5,9 @@ import { useState } from "react";
 
 /**
  * The platform's own code for a failure, verbatim and selectable, with the whole
- * failure one click away.
+ * failure one click away. A failure with no code still discloses its raw text.
  */
-export function LangyFailureReference({ code, raw }: { code: string; raw?: string }) {
+export function LangyFailureReference({ code, raw }: { code?: string | undefined; raw?: string }) {
   const { copied, copy } = useCopyToClipboard();
   const [isOpen, setIsOpen] = useState(false);
 

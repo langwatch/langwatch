@@ -9,7 +9,10 @@ export type ExperimentUpdateEmitters = Pick<
   "getTenantEmitter" | "cleanupTenantEmitter"
 >;
 
-/** A project's `experiment_updated` pushes off presence's fan-out, read as trace's stream reads them. */
+/**
+ * A project's `experiment_updated` pushes off presence's fan-out, read as trace's stream reads
+ * them.
+ */
 export class ExperimentUpdateStreamService {
   static create({
     emitters,

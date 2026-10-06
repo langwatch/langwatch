@@ -4,8 +4,13 @@
  * surfaces evaluator, langy and trace mount today.
  */
 
-import { modelProviderTrpc } from "@langwatch/model-provider-contract";
 import { defineBrowserModule } from "@langwatch/browser";
+import {
+  EditModelProviderFormToken,
+  ModelDisplayToken,
+  ModelSelectorToken,
+  modelProviderTrpc,
+} from "@langwatch/model-provider-contract";
 
 import { modelProviderApi } from "./behavior/model-provider-api.ts";
 import { reportModelFailure } from "./ui/sections/model-failure-interceptor/index.ts";
@@ -56,21 +61,18 @@ export const modelProviderWeb = defineBrowserModule("model-provider")
       }),
     },
   })
-  /** Lent, not kitted: each reads this module's providers (§3.4 rule 7). */
-  .withCapabilities({
-    editModelProviderForm: {
-      load: async () => ({
-        default: (await import("./ui/sections/model-provider-form.tsx")).EditModelProviderForm,
-      }),
-    },
-    modelDisplay: {
-      load: async () => ({
-        default: (await import("./ui/elements/llm-model-display.tsx")).LLMModelDisplay,
-      }),
-    },
-    modelSelector: {
-      load: async () => ({
-        default: (await import("./ui/elements/model-selector.tsx")).ModelSelector,
-      }),
-    },
+  .lends(EditModelProviderFormToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/model-provider-form.tsx")).EditModelProviderForm,
+    }),
+  })
+  .lends(ModelDisplayToken, {
+    load: async () => ({
+      default: (await import("./ui/elements/llm-model-display.tsx")).LLMModelDisplay,
+    }),
+  })
+  .lends(ModelSelectorToken, {
+    load: async () => ({
+      default: (await import("./ui/elements/model-selector.tsx")).ModelSelector,
+    }),
   });

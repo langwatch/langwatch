@@ -297,15 +297,12 @@ policy, one verb.
 ## Credential arbitration
 
 Before any permission is checked, exactly one credential must have decided
-who the request is. Surfaces that accept more than one credential kind
-(API key, session cookie) arbitrate with `arbitrateClaims` from
-`@langwatch/authz-contract` instead of trying kinds in precedence order: every kind
-that is in play claims the request, one claim proceeds, zero claims is
-structurally unauthenticated, and two claims are refused as contested. A
-claimed credential that fails to resolve is that kind's own refusal — never
-a fall-through to the next kind, because masking one credential's failure
-with another identity is how a caller ends up acting as someone they did
-not mean to be.
+who the request is. The byte routes (`/api/files`, `/api/user-avatar`) are
+API-key routes: the UI reads media through a URL tRPC mints, never by sending
+a session to them. A claimed credential that fails to resolve is that kind's
+own refusal, never a fall-through to another identity, because masking one
+credential's failure with another is how a caller ends up acting as someone
+they did not mean to be.
 
 The same rule fails the permission gate closed: `requireApiKeyPermission`
 mounted without the unified auth middleware in front of it refuses the

@@ -22,6 +22,8 @@ export function completeDatasetApi(overrides: Partial<DatasetApi> = {}): Dataset
     restoreDataset: unused,
     archiveOrRestoreDataset: unused,
     getDatasetWithinLimit: unused,
+    getLimits: unused,
+    createAttachmentUpload: unused,
     deleteMatchingRecords: unused,
     copyDataset: unused,
     copyDatasetForActor: unused,

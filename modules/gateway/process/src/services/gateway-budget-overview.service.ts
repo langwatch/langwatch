@@ -11,8 +11,8 @@ import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization
 import { nowInstant, Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import { type GatewayBudgetSpend } from "../app/gateway.members.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
+import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
 import type { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
 import { budgetSpendTargetsFor } from "../rules/gateway-budget-spend-targets.rules.ts";
 import {
@@ -26,7 +26,7 @@ import type { GatewayService } from "./gateway.service.ts";
  * surfaces with only a few lines. `satisfies` over the Prisma enum keeps the map exhaustive: a new
  * scope kind fails to compile rather than silently sorting last.
  */
-export const BUDGET_SCOPE_RANK = {
+const BUDGET_SCOPE_RANK = {
   PRINCIPAL: 0,
   VIRTUAL_KEY: 1,
   GROUP: 2,
@@ -41,7 +41,7 @@ export const BUDGET_SCOPE_RANK = {
  * honest answer for a scope kind this module has no wording for: surfaces
  * then name the target instead of claiming a scope.
  */
-export type BudgetOverviewScopeClass =
+type BudgetOverviewScopeClass =
   | "organization"
   | "team"
   | "project"
@@ -50,7 +50,7 @@ export type BudgetOverviewScopeClass =
   | "department"
   | "other";
 
-export type BudgetOverviewItem = ApplicableBudget & {
+type BudgetOverviewItem = ApplicableBudget & {
   scopeClass: BudgetOverviewScopeClass;
   /**
    * The parenthetical every surface renders after the numbers:
@@ -72,7 +72,7 @@ export type BudgetOverviewItem = ApplicableBudget & {
   topModels?: { model: string; spentUsd: number }[];
 };
 
-export type BudgetOverviewForUser = {
+type BudgetOverviewForUser = {
   /**
    * False when this org gives the user no member-facing gateway path at
    * all: the governance flag is off, or they are not a member. Consumers
@@ -98,7 +98,7 @@ export class BudgetOverviewService {
   private readonly modelSpend: Pick<TraceApi, "findModelSpend">;
   private readonly budgetDecisions: GatewayService;
   private readonly providerLabels: GatewayProviderLabelRepository;
-  private readonly chRepo?: GatewayBudgetSpend;
+  private readonly chRepo?: GatewayBudgetSpendRepository;
 
   private constructor({
     repository,
@@ -117,7 +117,7 @@ export class BudgetOverviewService {
     modelSpend: Pick<TraceApi, "findModelSpend">;
     budgetDecisions: GatewayService;
     providerLabels: GatewayProviderLabelRepository;
-    chRepo?: GatewayBudgetSpend;
+    chRepo?: GatewayBudgetSpendRepository;
   }) {
     this.repository = repository;
     this.organizations = organizations;
@@ -144,7 +144,7 @@ export class BudgetOverviewService {
     budgetDecisions: GatewayService;
     providerLabels: GatewayProviderLabelRepository;
     modelSpend: Pick<TraceApi, "findModelSpend">;
-    budgetRepository?: GatewayBudgetSpend;
+    budgetRepository?: GatewayBudgetSpendRepository;
   }): BudgetOverviewService {
     return new BudgetOverviewService({
       repository: options.repository,
@@ -302,7 +302,7 @@ export class BudgetOverviewService {
 
     const now = nowInstant();
     try {
-      const spends = await this.chRepo.getSpendForTargetsAcrossTenants(
+      const spends = await this.chRepo.findSpendForTargetsAcrossTenants(
         tenantIds,
         budgetSpendTargetsFor({ budgets: [budget], now }),
         now,

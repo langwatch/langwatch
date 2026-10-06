@@ -9,7 +9,6 @@ import type { RateLimiter } from "@langwatch/process-stores";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { StubPlatformOperators } from "../../__tests__/support/in-memory-connections.ts";
 import { IdentityHistoryRepository } from "../../repositories/identity-history.repository.ts";
 import { MemoryIdentityLookupRepository } from "../../repositories/memory/memory.identity-lookup.repository.ts";
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
@@ -44,7 +43,7 @@ class FakeAuditLog implements AuditLogApi {
 
   private async write(command: RecordAuditLogCommand): Promise<void> {
     this.rows.unshift(command);
-    this.reads.record({
+    this.reads.activity.unshift({
       auditId: `audit_${this.rows.length}`,
       operatorUserId: command.userId ?? null,
       operatorName: null,
@@ -93,10 +92,7 @@ let store: MemoryIdentityStore;
 let reads: MemoryIdentityLookupRepository;
 let auditLog: FakeAuditLog;
 
-function serviceFor({
-  operatorIds = new Set([OLIVE.userId]),
-  budget = 10,
-}: { operatorIds?: Set<string>; budget?: number } = {}): IdentityLookupService {
+function serviceFor({ budget = 10 }: { budget?: number } = {}): IdentityLookupService {
   return IdentityLookupService.create({
     reads,
     router: fakeRouter(),
@@ -107,7 +103,6 @@ function serviceFor({
       listBrowserSessions: async () => [],
     }),
     invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
-    authorization: new StubPlatformOperators([...operatorIds]),
     auditLog,
     rateLimiter: fakeRateLimiter(budget),
   });
@@ -134,30 +129,20 @@ describe("IdentityLookupService", () => {
     });
   });
 
-  describe("when a stranger has no platform operator access", () => {
-    /** @scenario "A stranger cannot fill the trail with their own attempts" */
-    it("records only up to the shared budget, then refuses without adding to the trail", async () => {
-      const service = serviceFor({ operatorIds: new Set(), budget: 2 });
+  describe("when the door refuses a stranger over and over", () => {
+    it("records only up to the shared budget, then drops the attempt without throwing", async () => {
+      const service = serviceFor({ budget: 2 });
 
       for (let attempt = 0; attempt < 4; attempt++) {
-        await expect(
-          service.lookupAddress({ address: "sam@acme.com", operator: MALLORY }),
-        ).rejects.toMatchObject({ code: "not_found" });
+        await service.recordRefusedLookup({
+          operator: MALLORY,
+          action: "resolve",
+          args: { address: "sam@acme.com" },
+        });
       }
 
       expect(auditLog.rows).toHaveLength(2);
-    });
-
-    /** @scenario "Without platform operator access the surface is not there at all" */
-    it("refuses with nothing about the address, every time", async () => {
-      const service = serviceFor({ operatorIds: new Set() });
-
-      await expect(
-        service.lookupAddress({ address: "sam@acme.com", operator: MALLORY }),
-      ).rejects.toMatchObject({ code: "not_found" });
-      await expect(
-        service.lookupAddress({ address: "sam@acme.com", operator: MALLORY }),
-      ).rejects.toMatchObject({ code: "not_found" });
+      expect(auditLog.rows.every((row) => row.userId === MALLORY.userId)).toBe(true);
     });
   });
 

@@ -1,4 +1,4 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, outboundProxy, publicBaseUrl, type ConfigOf } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { z } from "zod";
 
@@ -23,6 +23,10 @@ export const notificationConfig = Config.define((c) => ({
     user: c.env("SMTP_USER", z.string().optional()),
     secure: c.env("SMTP_SECURE", z.string().optional()),
   },
+  /** The deployment's public origin (the shared leaf): an unnamed sender derives from it. */
+  publicBaseUrl,
+  /** The proxy spellings (the shared leaf); the SES and Resend calls follow them. */
+  outboundProxy,
 }));
 
 export type NotificationServerConfig = ConfigOf<typeof notificationConfig>;

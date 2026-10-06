@@ -16,7 +16,7 @@ import {
   createStoredObjectTestSigner,
 } from "../../app/__tests__/stored-object.fixture.ts";
 import { MemoryStoredObjectRecordRepository } from "../../repositories/memory/memory.stored-object-record.repository.ts";
-import { StoredObjectStorageService } from "../stored-object-storage.service.ts";
+import { ObjectStorageStoredObjectBytesRepository } from "../../repositories/object-storage/object-storage.stored-object-bytes.repository.ts";
 import { StoredObjectService } from "../stored-object.service.ts";
 
 const PROJECT_ID = "project_1";
@@ -56,7 +56,7 @@ function fixture() {
   const service = StoredObjectService.create({
     records: MemoryStoredObjectRecordRepository.create(),
     permissions: new GrantedStoredObjectPermissions(),
-    storage: StoredObjectStorageService.create({ objectStorage }),
+    storage: ObjectStorageStoredObjectBytesRepository.create({ objectStorage }),
     signer: createStoredObjectTestSigner(),
     legacy: new MemoryStoredObjectFiles(),
     delivery: new FixedStoredObjectDelivery(),

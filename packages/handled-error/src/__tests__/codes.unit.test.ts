@@ -276,7 +276,6 @@ const DEAD_COPY_BACKLOG = new Set<string>([
   "cache_rule_not_found",
   "contested_credentials",
   "gateway_provider_bindings_gone",
-  "health_check_failed",
   "prompt_playground_chat_unavailable",
   "saved_workbench_charts_disabled_for_playground",
   "model_default_user_key_required",

@@ -129,13 +129,14 @@ describe("the secret REST family", () => {
       const team = teamWithMembers(["user-first", "user-second"]);
       const asked: AuthzListTeamMemberBindingsInput[] = [];
       const permissions = createApiFixture<AuthzApi>({
+        getScope: async (input) => team.permissions.getScope(input),
         listTeamMemberBindings: async (input) => {
           asked.push(input);
 
           return team.permissions.listTeamMemberBindings(input);
         },
       });
-      const app = mount({ actor: null, peers: { projects: team.projects, permissions } });
+      const app = mount({ actor: null, peers: { permissions } });
 
       const created = await create(app, { name: "OPENAI_API_KEY", value: "sk-live" });
       const { id } = secretPublicSchema.parse(await created.json());

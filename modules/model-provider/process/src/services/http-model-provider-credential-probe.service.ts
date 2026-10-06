@@ -15,11 +15,33 @@ import {
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 
-import {
-  ModelProviderCredentialProbe,
-  type ModelProviderEgress,
-  type ModelProviderEgressResponse,
-} from "../app/model-provider.members.ts";
+import type {
+  ModelProviderEgress,
+  ModelProviderEgressResponse,
+} from "./ssrf-model-provider-egress.service.ts";
+
+/**
+ * The stored-credential probe, separated from {@link ModelProviderCatalog}
+ * because it's the one answer that leaves the process: a deployment with no
+ * egress can refuse it by name, rather than reporting an unchecked credential as working.
+ */
+export abstract class ModelProviderCredentialProbe {
+  abstract probe(input: {
+    provider: string;
+    customKeys: Record<string, string>;
+  }): Promise<ModelProviderCredentialVerdict>;
+  /**
+   * The stored (or this deployment's own environment) credential, probed
+   * against a caller-overridable base URL. The gateway is passed in, not
+   * held: which rows this probe reads is the application's, not the fence's.
+   */
+  abstract probeStored(input: {
+    projectId: string;
+    provider: string;
+    customBaseUrl: string | undefined;
+    modelProviders: Pick<ModelProviderApi, "findProviderForProject">;
+  }): Promise<ModelProviderCredentialVerdict>;
+}
 
 /**
  * The documented API root and default endpoint of every provider the probe
@@ -129,6 +151,43 @@ function buildModelsEndpointUrl(baseUrl: string, defaultBaseUrl: string): string
   const normalized = endpoint.replace(/\/$/, "");
 
   return normalized.endsWith("/models") ? normalized : `${normalized}/models`;
+}
+
+/**
+ * Providers whose base URL the gateway rewrites before calling it: trailing
+ * "/v1" and slashes dropped, "/v1/..." appended (normalizeOpenAICompatBaseURL
+ * in services/aigateway/adapters/providers/bifrost.go).
+ */
+const GATEWAY_NORMALISED_BASE_URL_PROVIDERS: ReadonlySet<string> = new Set([
+  "openai",
+  "custom",
+  "anthropic",
+]);
+
+/** The models route the gateway's own normalisation of this base URL leads to. */
+function gatewayModelsEndpointUrl(baseUrl: string): string {
+  const root = baseUrl.replace(/\/+$/, "").replace(/\/v1$/, "").replace(/\/+$/, "");
+  return `${root}/v1/models`;
+}
+
+/**
+ * The models URL to ask for one credential. Where the gateway normalises the
+ * base URL, only the address it will call is asked: a key answering only at
+ * the as-typed address would pass here and fail on every request.
+ */
+function modelsEndpointUrl({
+  provider,
+  baseUrl,
+  defaultBaseUrl,
+}: {
+  provider: string;
+  baseUrl: string;
+  defaultBaseUrl: string;
+}): string {
+  if (!baseUrl || !GATEWAY_NORMALISED_BASE_URL_PROVIDERS.has(provider)) {
+    return buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
+  }
+  return gatewayModelsEndpointUrl(baseUrl);
 }
 
 const logger = createLogger("langwatch:api:providerValidation");
@@ -401,6 +460,7 @@ type ProbeRequest = {
  * Every way a provider's credential can legitimately prove itself.
  */
 function buildProbeCandidates({
+  provider,
   strategy,
   apiKey,
   baseUrl,
@@ -408,6 +468,8 @@ function buildProbeCandidates({
   apiRoot,
   agentPlatform,
 }: {
+  /** The registry key, which decides how the gateway reads the base URL. */
+  provider: string;
   strategy: AuthStrategy;
   apiKey: string;
   baseUrl: string;
@@ -418,6 +480,7 @@ function buildProbeCandidates({
   agentPlatform?: { project: string; location: string };
 }): ProbeRequest[] {
   const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
+  const normalisedUrl = modelsEndpointUrl({ provider, baseUrl, defaultBaseUrl });
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -426,7 +489,7 @@ function buildProbeCandidates({
     case "anthropic":
       return [
         {
-          url,
+          url: normalisedUrl,
           headers: {
             ...headers,
             "x-api-key": apiKey,
@@ -490,7 +553,7 @@ function buildProbeCandidates({
     default:
       return [
         {
-          url,
+          url: normalisedUrl,
           headers: { ...headers, Authorization: `Bearer ${apiKey}` },
         },
       ];
@@ -909,6 +972,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
 
     return runProbeChain({
       candidates: buildProbeCandidates({
+        provider,
         strategy: authStrategy,
         apiKey,
         baseUrl,

@@ -28,6 +28,17 @@ const harness = vi.hoisted(() => ({
   inputs: {} as Record<string, unknown>,
   calls: [] as { path: string; input: unknown }[],
   invalidated: [] as string[],
+  openDrawer: vi.fn(),
+  closeDrawer: vi.fn(),
+}));
+
+vi.mock("@langwatch/browser-host/drawer", async () => ({
+  ...(await vi.importActual("@langwatch/browser-host/drawer")),
+  useDrawer: () => ({
+    openDrawer: harness.openDrawer,
+    closeDrawer: harness.closeDrawer,
+    goBack: vi.fn(),
+  }),
 }));
 
 vi.mock("../../../../behavior/governance-api.ts", () => {
@@ -78,6 +89,7 @@ vi.mock("../../../../behavior/governance-api.ts", () => {
   return { api: node([]) };
 });
 
+import { CreateDepartmentDrawer } from "../../../../features/people/ui/create-department-drawer.tsx";
 import PeoplePage from "../governance-people.screen.tsx";
 
 const ADMIN = ["activityMonitor:view", "governance:manage", "ingestionSources:view"];
@@ -139,6 +151,18 @@ const pick = async ({ chipLabel, option }: { chipLabel: string; option: string }
   await userEvent.click(chip(chipLabel));
   await userEvent.click(await screen.findByRole("menuitem", { name: option }));
 };
+/** The resolved base rule of a Chakra control's emotion class: what it paints, as authored. */
+const rulesOf = (button: HTMLElement): string => {
+  const emotionClass = button.className.split(" ").pop() ?? "";
+  const rule = Array.from(document.querySelectorAll("style"))
+    .flatMap((sheet) => Array.from(sheet.sheet?.cssRules ?? []))
+    .flatMap((group) => (group instanceof CSSGroupingRule ? Array.from(group.cssRules) : [group]))
+    .find(
+      (candidate) =>
+        candidate.cssText.startsWith(`.${emotionClass} {`) && /display/.test(candidate.cssText),
+    );
+  return rule?.cssText ?? "";
+};
 const rowOf = (name: RegExp) => screen.getByRole("row", { name });
 const figure = (key: string) => screen.getByTestId(`people-summary-strip-${key}`);
 const toggle = () => screen.getByRole("button", { name: /sample data/i });
@@ -158,6 +182,8 @@ beforeEach(() => {
   harness.inputs = {};
   harness.calls = [];
   harness.invalidated = [];
+  harness.openDrawer.mockReset();
+  harness.closeDrawer.mockReset();
 });
 
 afterEach(() => cleanup());
@@ -272,7 +298,7 @@ describe("given sam, a delegated viewer, opens the People page", () => {
 
       expect(screen.getAllByRole("row")).toHaveLength(3);
       const row = rowOf(/Nobody Metered/);
-      expect(within(row).getAllByLabelText("not measured")).toHaveLength(2);
+      expect(within(row).getAllByLabelText("not measured")).toHaveLength(3);
       expect(within(row).queryByText(/\$/)).toBeNull();
     });
   });
@@ -290,6 +316,52 @@ describe("given sam, a delegated viewer, opens the People page", () => {
       expect(rows).toHaveLength(1);
       expect(within(rows[0] ?? document.body).getByText("$12.50")).toBeInTheDocument();
       expect(within(rows[0] ?? document.body).getByText(/Copilot/)).toBeInTheDocument();
+    });
+  });
+
+  describe("when a provider named a linked person and a service account", () => {
+    /** @scenario "The list shows what a provider said and what the engine decided" */
+    it("shows identifier, provider, kind, first and last seen and the link proof in the row", () => {
+      harness.data["governancePeople.list"] = [
+        person({
+          displayText: "Linked Lin",
+          rawActorId: "lin@ext.test",
+          firstSeenAt: new Date(Date.now() - 9 * 86_400_000).toISOString(),
+          lastSeenAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+          link: {
+            userId: "u_1",
+            evidenceKind: "verified_email",
+            memberName: "Lin",
+            departmentName: null,
+          },
+        }),
+        person({
+          displayText: "Build bot",
+          rawActorId: "bot-7",
+          kind: "service_account",
+          lastSeenAt: "2026-08-02T00:00:00.000Z",
+        }),
+      ];
+      renderPage();
+
+      const headers = screen.getAllByRole("columnheader").map((header) => header.textContent);
+      expect(headers).toEqual(
+        expect.arrayContaining(["Provider", "Kind", "First seen", "Last seen", "Link proof"]),
+      );
+
+      const linked = rowOf(/Linked Lin/);
+      expect(within(linked).getByText("lin@ext.test")).toBeInTheDocument();
+      expect(within(linked).getByText(/Copilot/)).toBeInTheDocument();
+      expect(within(linked).getByText("Person")).toBeInTheDocument();
+      expect(within(linked).getByText("9 days ago")).toBeInTheDocument();
+      expect(within(linked).getAllByText("2 hours ago")).toHaveLength(2);
+      expect(within(linked).getByText("Matched")).toBeInTheDocument();
+      expect(within(linked).getByText("confirmed address")).toBeInTheDocument();
+
+      const bot = rowOf(/Build bot/);
+      expect(within(bot).getByText("Service account")).toBeInTheDocument();
+      expect(within(bot).getByText("Unmatched")).toBeInTheDocument();
+      expect(within(bot).queryByText("confirmed address")).toBeNull();
     });
   });
 
@@ -569,6 +641,31 @@ describe("given alice, an organization admin, on the People page", () => {
     });
   });
 
+  describe("when alice opens the People page", () => {
+    /** @scenario "The page's actions sit top-right in the header" */
+    it("draws Add department outlined with a plus and Run match pass ghost, nothing solid", () => {
+      harness.data["activityMonitor.spendByUser"] = [spend({})];
+      renderPage({ permissions: ADMIN });
+
+      const header = within(screen.getByTestId("people-page-header"));
+      const add = header.getByRole("button", { name: /Add department/ });
+      const run = header.getByRole("button", { name: /Run match pass/ });
+      const sample = header.getByRole("button", { name: /sample data/i });
+
+      expect(add.querySelector("svg")).not.toBeNull();
+      expect(rulesOf(add)).toContain("border-color: var(--chakra-colors-border-emphasized)");
+      expect(rulesOf(add)).not.toMatch(/[ ;]background(-color)?:/);
+      for (const ghost of [run, sample]) {
+        expect(rulesOf(ghost)).toContain("border-color: var(--chakra-colors-transparent)");
+        expect(rulesOf(ghost)).toContain("background: var(--chakra-colors-transparent)");
+      }
+      for (const button of [add, run, sample]) {
+        expect(rulesOf(button)).not.toMatch(/orange|palette-solid|bg-inverted/);
+        expect(rulesOf(button)).toContain("height: var(--chakra-sizes-8)");
+      }
+    });
+  });
+
   describe("when a person linked to a member has an actions menu", () => {
     /** @scenario "Assigning a department to a person uses the app's own select" */
     it("opens the assign-department dialog with no native select element on the page", async () => {
@@ -595,10 +692,46 @@ describe("given alice, an organization admin, on the People page", () => {
     });
   });
 
-  describe("when she opens the create-department drawer from the header", () => {
-    const openDrawer = async () => {
-      const host = renderPage({ permissions: ADMIN }).host;
+  describe("when she presses Add department", () => {
+    /** @scenario "Adding a department opens the create-department drawer" */
+    it("navigates to the drawer by name and mounts no dialog of its own", async () => {
+      renderPage({ permissions: ADMIN });
       await userEvent.click(screen.getByRole("button", { name: /Add department/ }));
+
+      expect(harness.openDrawer).toHaveBeenCalledWith("addDepartment");
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    /** @scenario "The departments address can ask for the create-department drawer" */
+    it("selects the Departments tab and navigates to the drawer when the address asks", async () => {
+      renderPage({ permissions: ADMIN, query: { tab: "departments", add: "1" } });
+
+      expect(screen.getByRole("tab", { name: /Departments/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      await waitFor(() => expect(harness.openDrawer).toHaveBeenCalledWith("addDepartment"));
+    });
+
+    /** @scenario "The request to add a department leaves the address once the drawer has it" */
+    it("takes the add request out of the address, keeps the rest and asks for no second drawer", () => {
+      const { host } = renderPage({
+        permissions: ADMIN,
+        query: { tab: "departments", add: "1", "drawer.open": "addDepartment" },
+      });
+
+      expect(host.recording.queries.at(-1)?.next).toEqual({
+        tab: "departments",
+        "drawer.open": "addDepartment",
+      });
+      expect(harness.openDrawer).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when she opens the create-department drawer", () => {
+    const openDrawer = async () => {
+      const host = FakeGovernanceHost.create({ permissions: ADMIN });
+      renderWithGovernanceHost(<CreateDepartmentDrawer />, { host });
       return { host, drawer: await screen.findByRole("dialog") };
     };
 
@@ -621,7 +754,7 @@ describe("given alice, an organization admin, on the People page", () => {
       );
       await userEvent.click(within(drawer).getByRole("button", { name: "Create" }));
 
-      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      await waitFor(() => expect(harness.closeDrawer).toHaveBeenCalled());
       expect(harness.calls).toEqual([
         { path: "departments.create", input: { organizationId: "org-1", name: "Legal" } },
       ]);
@@ -636,7 +769,19 @@ describe("given alice, an organization admin, on the People page", () => {
 
       expect(within(drawer).getByText("Give the department a name.")).toBeInTheDocument();
       expect(harness.calls).toEqual([]);
+      expect(harness.closeDrawer).not.toHaveBeenCalled();
     });
+  });
+
+  /** @scenario "A viewer who reaches the create-department drawer is told which grant it needs" */
+  it("names the governance:manage grant and offers no name field or Create action by address", async () => {
+    const host = FakeGovernanceHost.create({ permissions: VIEWER });
+    renderWithGovernanceHost(<CreateDepartmentDrawer />, { host });
+    const drawer = await screen.findByRole("dialog");
+
+    expect(within(drawer).getByText(/governance:manage/)).toBeInTheDocument();
+    expect(within(drawer).queryByRole("textbox")).toBeNull();
+    expect(within(drawer).queryByRole("button", { name: "Create" })).toBeNull();
   });
 });
 
@@ -646,6 +791,7 @@ describe("given sam, a viewer without the manage grant", () => {
     const { host } = renderPage({ query: { tab: "departments", add: "1" } });
 
     expect(host.recording.queries.at(-1)?.next).toEqual({ tab: "departments" });
+    expect(harness.openDrawer).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

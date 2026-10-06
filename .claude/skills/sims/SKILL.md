@@ -11,19 +11,19 @@ and for free. Code is `services/<name>` and each console is a React app, `apps/<
 built by Vite into the Go package's `web/dist` and embedded (ADR-160,
 `dev/docs/adr/160-internal-consoles-are-go-served-react.md`).
 
-| Sim | Stands in for | haven | Skill | Seed env |
-| --- | --- | --- | --- | --- |
-| `llmsim` | OpenAI, Anthropic | `+llm` | `llmsim` | none (built-in corpus) |
-| `mailsim` | SMTP | default | `mailsim` | `MAILSIM_SEED` |
-| `storagesim` | S3 | default | `storagesim` | `STORAGESIM_SEED` |
-| `analyticssim` | PostHog, Customer.io | `+analytics` | `analyticssim` | `ANALYTICSSIM_SEED` |
-| `idpsim` | OIDC, SAML, SCIM IdP | default | `idpsim` | none (seeded tenants) |
-| `voicesim` | ElevenLabs voice, OpenAI audio | `+voice` | `voicesim` | `VOICESIM_SEED` |
+| Sim            | Stands in for                  | haven        | Skill          | Seed env               |
+| -------------- | ------------------------------ | ------------ | -------------- | ---------------------- |
+| `llmsim`       | OpenAI, Anthropic              | `+llm`       | `llmsim`       | none (built-in corpus) |
+| `mailsim`      | SMTP                           | default      | `mailsim`      | `MAILSIM_SEED`         |
+| `storagesim`   | S3                             | default      | `storagesim`   | `STORAGESIM_SEED`      |
+| `analyticssim` | PostHog, Customer.io           | `+analytics` | `analyticssim` | `ANALYTICSSIM_SEED`    |
+| `idpsim`       | OIDC, SAML, SCIM IdP           | default      | `idpsim`       | none (seeded tenants)  |
+| `voicesim`     | ElevenLabs voice, OpenAI audio | `+voice`     | `voicesim`     | `VOICESIM_SEED`        |
 
 Each has a console at `<name>.<slug>.langwatch.localhost` (names: `llm`, `mail`, `storage`,
 `analytics`, `idp`, `voice`) and logs via `haven logs <name>`. `haven up +llm +analytics`
-selects (sticky); `-mail` deselects. haven sets every `*_SEED=1`. A shared console kit,
-`@langwatch/design-system-internal` with `@langwatch/sim-console`, draws all of them; no
+selects (sticky); `-mail` deselects. haven sets every `*_SEED=1`. Two shared console packages,
+`@langwatch/design-system-internal` and `@langwatch/sim-console`, draw all of them; no
 Chakra, no product design system.
 
 ## Where they run: one Go mono-binary
@@ -55,4 +55,5 @@ Chakra, no product design system.
 ## Deeper
 
 `dev/docs/LOCAL_STACK.md` (simulators and the sims lane), `tools/thuishaven/README.md`
-(hostname scheme), each `services/<name>/README.md`.
+(hostname scheme), and `services/<name>/README.md` where one exists (llmsim, mailsim,
+storagesim, idpsim).

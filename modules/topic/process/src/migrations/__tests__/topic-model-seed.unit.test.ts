@@ -165,6 +165,7 @@ function makeMigration(prisma: PrismaClient, recordTopics = vi.fn().mockResolved
       recordTopics,
       requestClustering: vi.fn().mockResolvedValue(undefined),
     },
+    schedule: { findNextWakeAt: vi.fn().mockResolvedValue(null) },
   });
   return { migration, recordTopics };
 }

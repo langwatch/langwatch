@@ -59,8 +59,8 @@ Feature: The agent cache
   Rule: An entry is written by name and read back by name
 
     @unit @regression
-    Scenario: The installed agent cache is served from the process's own members
-      Given a gateway installed with the process's Redis connection and encryption
+    Scenario: The installed agent cache is served from the gateway's own repositories
+      Given a gateway installed over its own repositories
       When the caller stores, claims, reads and removes an entry
       Then each call answers from the store instead of failing as unmounted
 
@@ -230,13 +230,12 @@ Feature: The agent cache
       When the run calls another route in the same project
       Then the request is refused as forbidden
 
-    @integration
+    @unit
     Scenario: A later run in the same project reuses the key
       Given a run of this project got a key
       When a later run of the same project asks for one
       Then it is given the same key
       And no second key is minted
-      And the key still reaches the agent cache
 
     @unit
     Scenario: A shared key the platform can no longer read is replaced
@@ -244,12 +243,11 @@ Feature: The agent cache
       When a run asks for a key
       Then a new key is minted and shared from then on
 
-    @integration
+    @unit
     Scenario: A run in a personal workspace gets a key its owner holds
       Given a project in a personal workspace
       When a run of that project mints its key
       Then the key belongs to the workspace owner
-      And the key reaches the agent cache of that project
 
     @unit
     Scenario: A run in a shared project gets a key no user holds

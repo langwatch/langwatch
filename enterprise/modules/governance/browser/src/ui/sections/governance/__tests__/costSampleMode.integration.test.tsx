@@ -17,6 +17,7 @@ const harness = vi.hoisted(() => ({
   // The headline summary is part of the decision under test: a pulled bill
   // with no activity behind it must keep the invented panels off.
   costSummary: undefined as unknown,
+  costReadFailed: false,
   activity: {
     summary: undefined as unknown,
     spendByDepartment: undefined as unknown,
@@ -36,9 +37,9 @@ vi.mock("../../../../behavior/governance-api.ts", () => ({
       spendByModel: { useQuery: () => ({ data: undefined }) },
       summary: {
         useQuery: () => ({
-          data: harness.costSummary,
+          data: harness.costReadFailed ? undefined : harness.costSummary,
           isLoading: false,
-          isError: false,
+          isError: harness.costReadFailed,
         }),
       },
     },
@@ -153,6 +154,7 @@ beforeEach(() => {
   // answer to every test after it.
   window.sessionStorage.clear();
   harness.costSummary = undefined;
+  harness.costReadFailed = false;
   harness.activity = {
     summary: undefined,
     spendByDepartment: undefined,
@@ -263,14 +265,41 @@ describe("the sample panels on the cost screen", () => {
   describe("given the reader turns the sample panels on", () => {
     beforeEach(withRealFigures);
 
+    /** @scenario "Sample mode replaces real cost figures and restores them when disabled" */
+    it("replaces every real figure with sample ones and restores the real ones when turned off", () => {
+      harness.activity.spendByDepartment = [
+        { departmentId: "dep-9", departmentName: "Zed Holdings", spendUsd: "310.50" },
+      ];
+      renderScreen();
+      expect(screen.getByText("Zed Holdings")).toBeInTheDocument();
+      expect(screen.getByText("$123.45", { exact: false })).toBeInTheDocument();
+      expect(screen.getByText("42")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "See sample data" }));
+
+      expect(screen.getAllByText(A_SAMPLE_FIGURE).length).toBeGreaterThan(0);
+      expect(screen.queryByText("Zed Holdings")).toBeNull();
+      expect(screen.queryByText("$123.45", { exact: false })).toBeNull();
+      expect(screen.queryByText("42")).toBeNull();
+      expect(screen.getByRole("button", { name: "Hide sample data" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Hide sample data" }));
+
+      expect(screen.queryAllByText(A_SAMPLE_FIGURE)).toHaveLength(0);
+      expect(screen.getByText("Zed Holdings")).toBeInTheDocument();
+      expect(screen.getByText("$123.45", { exact: false })).toBeInTheDocument();
+    });
+
     /** @scenario "The reader's own choice outlives the data underneath it" */
-    it("shows them alongside the real ones", () => {
+    it("keeps the sample choice while real figures are present", () => {
       renderScreen();
 
       fireEvent.click(screen.getByRole("button", { name: "See sample data" }));
 
       expect(screen.getAllByText(A_SAMPLE_FIGURE).length).toBeGreaterThan(0);
-      expect(screen.getByText("Engineering")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Hide sample data" })).toHaveAttribute(
         "aria-pressed",
         "true",
@@ -330,11 +359,49 @@ describe("given sample mode is on with nothing measured", () => {
     window.sessionStorage.setItem("governance.sample", "true");
   });
 
+  /** @scenario "A panel with nothing in it shows sample data instead of Not available" */
+  it("fills the empty panels with sample figures and never reads Not available", () => {
+    renderScreen();
+
+    expect(screen.getAllByText(A_SAMPLE_FIGURE).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/not available/i)).toBeNull();
+  });
+
   /** @scenario "The screen says figures are invented once, not once per panel" */
   it("says so in one banner and repeats it in no panel badge", () => {
     renderScreen();
 
     expect(screen.getAllByText(/nothing here is real/i)).toHaveLength(1);
     expect(screen.queryAllByText(/^sample$/i)).toHaveLength(0);
+  });
+});
+
+describe("given the cost read failed", () => {
+  beforeEach(() => {
+    withNothingMeasured();
+    harness.costReadFailed = true;
+  });
+
+  describe("when the reader has not asked for sample data", () => {
+    it("renders an error alert", () => {
+      renderScreen();
+
+      expect(screen.getByTestId("cost-lanes-error")).toHaveTextContent(/could not be loaded/i);
+    });
+  });
+
+  describe("when sample mode is on", () => {
+    beforeEach(() => window.sessionStorage.setItem("governance.sample", "true"));
+
+    /** @scenario No error alert is rendered while sample mode is on */
+    /** @scenario "No error alerts are rendered while sample mode is on" */
+    it("renders no error alert and shows invented figures under the sample banner", () => {
+      renderScreen();
+
+      expect(screen.queryByTestId("cost-lanes-error")).toBeNull();
+      expect(screen.queryAllByRole("alert")).toHaveLength(0);
+      expect(screen.getAllByText(A_SAMPLE_FIGURE).length).toBeGreaterThan(0);
+      expect(screen.getByRole("status")).toHaveTextContent(/nothing here is real/i);
+    });
   });
 });

@@ -64,21 +64,9 @@ func (c *wsConn) close() { _ = c.conn.Close() }
 func (c *wsConn) readMessage() ([]byte, error) {
 	var message []byte
 	for {
-		fin, op, payload, err := c.readFrame()
+		fin, payload, err := c.nextDataFrame()
 		if err != nil {
 			return nil, err
-		}
-		switch op {
-		case opClose:
-			_ = c.writeFrame(opClose, nil)
-			return nil, io.EOF
-		case opPing:
-			if err := c.writeFrame(opPong, payload); err != nil {
-				return nil, err
-			}
-			continue
-		case opPong:
-			continue
 		}
 		message = append(message, payload...)
 		if len(message) > maxMessageBytes {
@@ -88,6 +76,35 @@ func (c *wsConn) readMessage() ([]byte, error) {
 			return message, nil
 		}
 	}
+}
+
+// nextDataFrame reads frames until one carries data, answering control frames.
+func (c *wsConn) nextDataFrame() (fin bool, payload []byte, err error) {
+	for {
+		fin, op, payload, err := c.readFrame()
+		if err != nil {
+			return false, nil, err
+		}
+		isControl, err := c.answerControl(op, payload)
+		if err != nil || !isControl {
+			return fin, payload, err
+		}
+	}
+}
+
+// answerControl answers a close or a ping, reporting whether op was a control
+// frame; a close ends the read with io.EOF.
+func (c *wsConn) answerControl(op byte, payload []byte) (bool, error) {
+	switch op {
+	case opClose:
+		_ = c.writeFrame(opClose, nil)
+		return true, io.EOF
+	case opPing:
+		return true, c.writeFrame(opPong, payload)
+	case opPong:
+		return true, nil
+	}
+	return false, nil
 }
 
 func (c *wsConn) readFrame() (fin bool, op byte, payload []byte, err error) {

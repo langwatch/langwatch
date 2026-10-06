@@ -51,12 +51,12 @@ let switchWrites: { optionalMetricsOptOut?: boolean; hostnameOptOut?: boolean }[
 
 function checkupService(): OpsCheckupService {
   return OpsCheckupService.create({
-    members: {
+    facts: {
       isSaas: false,
       serviceVersion: "3.17.0",
       publicBaseUrl: "https://langwatch.acme.test",
       nodeEnvironment: "production",
-      processName: "langwatch-api",
+      processRole: "web",
     },
     config: {
       apiKey: undefined,
@@ -65,8 +65,14 @@ function checkupService(): OpsCheckupService {
       usageStats: { disabled: false, installMethod: undefined, chartVersion: undefined },
       collectClickHouseBackupMetrics: true,
       productAnalytics: { key: undefined, host: undefined },
+      bugReportSlackChannel: undefined,
       cloudOps: false,
       adminEmails: [],
+      nodeEnvironment: "production",
+      isSaas: false,
+      publicBaseUrl: "https://langwatch.acme.test",
+      serviceVersion: "3.17.0",
+      otelResourceAttributes: undefined,
     },
     peers: {
       ...world.peers(),
@@ -187,7 +193,7 @@ describe("given the caller holds the platform-operator grant", () => {
 
       expect(rows.find((row) => row.id === "app")?.verdict).toEqual({
         outcome: "verified",
-        detail: "Release 3.17.0, running as the langwatch-api process, production environment.",
+        detail: "Release 3.17.0, running as the web process, production environment.",
       });
       expect(rows.every((row) => typeof row.verdict.detail === "string")).toBe(true);
     });

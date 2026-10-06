@@ -9,15 +9,30 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { MemoryPostHogEventsChannel } from "../../channels/memory/memory.posthog-events.channel.ts";
-import { GuidedOnboardingService } from "../guided-onboarding.service.ts";
+import {
+  GuidedOnboardingService,
+  type GuidedOnboardingAnnouncer,
+} from "../guided-onboarding.service.ts";
 
 function createService(): GuidedOnboardingService {
   return GuidedOnboardingService.create({
     organizations: createApiFixture<OrganizationApi>({}),
-    events: MemoryPostHogEventsChannel.create(),
     announce: async () => {},
   });
+}
+
+/** The facts the service announces, in order: what the lifecycle pipeline would record. */
+function collectAnnouncements(): {
+  events: Parameters<GuidedOnboardingAnnouncer>[0][];
+  announce: GuidedOnboardingAnnouncer;
+} {
+  const events: Parameters<GuidedOnboardingAnnouncer>[0][] = [];
+  return {
+    events,
+    announce: async (input) => {
+      events.push(input);
+    },
+  };
 }
 
 /**
@@ -77,7 +92,6 @@ describe("GuidedOnboardingService path guards", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
 
@@ -100,7 +114,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
 
@@ -120,7 +133,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
 
@@ -132,6 +144,30 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     expect(state.providerSkippedAt).toEqual(expect.any(String));
   });
 
+  /** @scenario "Skip anyway skips the tour as well" */
+  it("records the tour as skipped in the same call and announces both skips", async () => {
+    const { api, records } = createOrganizations({
+      org_1: { state: { paths: [], donePaths: [] }, variant: "guided" },
+    });
+    const announced = collectAnnouncements();
+    const service = GuidedOnboardingService.create({
+      organizations: api,
+      announce: announced.announce,
+    });
+
+    await service.recordProviderSkipped({ organizationId: "org_1", userId: "user_1" });
+
+    expect(records.get("org_1")?.state).toMatchObject({
+      providerSkippedAt: expect.any(String),
+      tourSkippedAt: expect.any(String),
+    });
+    expect(announced.events.map((announcement) => announcement.event)).toEqual([
+      "provider_skipped",
+      "tour_skipped",
+    ]);
+    expect(announced.events.every((announcement) => announcement.userId === "user_1")).toBe(true);
+  });
+
   /** @scenario "completing, skipping and replaying the tour are recorded" */
   it("records completing, then skipping, then two replays of the tour", async () => {
     const { api } = createOrganizations({
@@ -139,7 +175,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
     const actor = { organizationId: "org_1", userId: "user_1" };
@@ -162,7 +197,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
 
@@ -182,7 +216,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
 
@@ -205,7 +238,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
     const actor = { organizationId: "org_1", userId: "user_1" };
@@ -224,7 +256,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
 
@@ -238,15 +269,14 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
 
   /** @scenario "every guided state write reaches the onboarding event hook" */
   /** @scenario "a guided state write reaches PostHog through the service" */
-  it("tracks a paths_selected event for the organization and user", async () => {
+  it("announces a paths_selected fact for the organization and user", async () => {
     const { api } = createOrganizations({
       org_1: { state: { paths: [], donePaths: [] }, variant: "guided" },
     });
-    const events = MemoryPostHogEventsChannel.create();
+    const announced = collectAnnouncements();
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events,
-      announce: async () => {},
+      announce: announced.announce,
     });
 
     await service.recordPaths(
@@ -254,12 +284,33 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
       { paths: ["gateway", "llmops"] },
     );
 
-    expect(events.tracked).toHaveLength(1);
-    expect(events.tracked[0]).toMatchObject({
+    expect(announced.events).toHaveLength(1);
+    expect(announced.events[0]).toMatchObject({
+      organizationId: "org_1",
       userId: "user_1",
-      event: "guided_onboarding_paths_selected",
-      properties: expect.objectContaining({ organization_id: "org_1", primary_path: "gateway" }),
+      event: "paths_selected",
+      previousPaths: [],
+      state: { paths: ["gateway", "llmops"] },
     });
+  });
+
+  /** @scenario "attaching a conversation tracks nothing" */
+  it("announces nothing for a conversation attached", async () => {
+    const { api } = createOrganizations({
+      org_1: { state: { paths: [], donePaths: [] }, variant: "guided" },
+    });
+    const announced = collectAnnouncements();
+    const service = GuidedOnboardingService.create({
+      organizations: api,
+      announce: announced.announce,
+    });
+
+    await service.attachConversation(
+      { organizationId: "org_1", userId: "user_1" },
+      { conversationId: "conv_1" },
+    );
+
+    expect(announced.events).toEqual([]);
   });
 });
 
@@ -279,46 +330,45 @@ describe("GuidedOnboardingService attribution of a write with no user", () => {
       },
       findAdministrators,
     });
-    const events = MemoryPostHogEventsChannel.create();
+    const announced = collectAnnouncements();
     const service = GuidedOnboardingService.create({
       organizations,
-      events,
-      announce: async () => {},
+      announce: announced.announce,
     });
-    return { service, events, records };
+    return { service, announced, records };
   }
 
   /** @scenario "a write through a project credential is tracked against the organization admin" */
-  it("tracks the event against the organization's admin", async () => {
-    const { service, events } = serviceWithAdministrators(() =>
+  it("announces the event against the organization's admin", async () => {
+    const { service, announced } = serviceWithAdministrators(() =>
       Promise.resolve([{ userId: "user_admin", name: "Ada", email: "ada@acme.test" }]),
     );
 
     await service.completePath({ organizationId: "org_1", userId: undefined }, { path: "llmops" });
 
-    expect(events.tracked).toHaveLength(1);
-    expect(events.tracked[0]).toMatchObject({ userId: "user_admin" });
+    expect(announced.events).toHaveLength(1);
+    expect(announced.events[0]).toMatchObject({ userId: "user_admin", event: "path_completed" });
   });
 
   /** @scenario "a write through a project credential of an organization without an admin tracks nothing" */
-  it("tracks nothing when the organization has no admin", async () => {
-    const { service, events, records } = serviceWithAdministrators(() => Promise.resolve([]));
+  it("announces nothing when the organization has no admin", async () => {
+    const { service, announced, records } = serviceWithAdministrators(() => Promise.resolve([]));
 
     await service.completePath({ organizationId: "org_1", userId: undefined }, { path: "llmops" });
 
-    expect(events.tracked).toEqual([]);
+    expect(announced.events).toEqual([]);
     expect(records.get("org_1")?.state.donePaths).toEqual(["llmops"]);
   });
 
-  it("keeps the write when the admin lookup fails, and tracks nothing", async () => {
-    const { service, events, records } = serviceWithAdministrators(() =>
+  it("keeps the write when the admin lookup fails, and announces nothing", async () => {
+    const { service, announced, records } = serviceWithAdministrators(() =>
       Promise.reject(new Error("directory unavailable")),
     );
 
     await expect(
       service.completePath({ organizationId: "org_1", userId: undefined }, { path: "llmops" }),
     ).resolves.toMatchObject({ donePaths: ["llmops"] });
-    expect(events.tracked).toEqual([]);
+    expect(announced.events).toEqual([]);
     expect(records.get("org_1")?.state.donePaths).toEqual(["llmops"]);
   });
 });

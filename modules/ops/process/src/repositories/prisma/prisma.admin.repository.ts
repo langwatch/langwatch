@@ -1,14 +1,8 @@
-import { browserSessionImpersonationSchema } from "@langwatch/auth-contract";
 import { UserToImpersonateNotFoundError } from "@langwatch/ops-contract";
-import { Prisma } from "@langwatch/prisma-client/generated";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { fromDate, toDate } from "@langwatch/time";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate } from "@langwatch/time";
 
-import {
-  ImpersonationRepository,
-  type ImpersonationTarget,
-  type ImpersonationWindow,
-} from "../impersonation.repository.ts";
+import { ImpersonationRepository, type ImpersonationTarget } from "../impersonation.repository.ts";
 
 export type AdminDatabase = PrismaClient;
 
@@ -60,42 +54,6 @@ export class PrismaImpersonationRepository extends ImpersonationRepository {
     });
     return operator?.twoFactorEnabled === true;
   }
-
-  async findWindow(sessionId: string): Promise<ImpersonationWindow | null> {
-    const row = await this.database.session.findUnique({
-      where: { id: sessionId },
-      select: { impersonating: true },
-    });
-    const stored = browserSessionImpersonationSchema.safeParse(row?.impersonating);
-    if (!stored.success) return null;
-
-    return {
-      id: stored.data.id,
-      name: stored.data.name ?? null,
-      email: stored.data.email ?? null,
-      image: stored.data.image ?? null,
-      expires: fromDate(stored.data.expires),
-    };
-  }
-
-  async setWindow(sessionId: string, window: ImpersonationWindow): Promise<void> {
-    await this.database.session.update({
-      where: { id: sessionId },
-      data: {
-        impersonating: {
-          ...window,
-          expires: toDate(window.expires).toISOString(),
-        },
-      },
-    });
-  }
-
-  async clearWindow(sessionId: string): Promise<void> {
-    await this.database.session.update({
-      where: { id: sessionId },
-      data: { impersonating: Prisma.DbNull },
-    });
-  }
 }
 
 export const ORGANIZATION_SAFE_SELECT = {
@@ -106,6 +64,7 @@ export const ORGANIZATION_SAFE_SELECT = {
   createdAt: true,
   updatedAt: true,
   usageSpendingMaxLimit: true,
+  datasetAttachmentMaxMb: true,
   signupData: true,
   signedDPA: true,
   useCustomS3: true,

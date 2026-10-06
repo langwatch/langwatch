@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 /**
  * @vitest-environment node
  * The installation flow's routes and their `/github-langy/*` aliases.
- * @see specs/integrations/github-connection.feature
+ * @see modules/integration/specs/github-connection.feature
  */
 import { createRestRuntime, HttpError, UnauthorizedError } from "@langwatch/api/rest";
 import type {
@@ -17,9 +17,9 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
+import { readGithubWebhook } from "../../rules/github-webhook.rules.ts";
 import { GithubInstallStateService } from "../../services/github-install-state.service.ts";
 import { githubInstallRest, type GithubInstallApi } from "../github-install.rest.ts";
-import { readGithubWebhook } from "../../rules/github-webhook.rules.ts";
 
 const SIGNING_KEY = "x".repeat(64);
 const WEBHOOK_SECRET = "whsecret";

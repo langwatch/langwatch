@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Spec: specs/navigation/navigation-v2-product-memory.feature
+ * Spec: modules/navigation/specs/navigation-v2-product-memory.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

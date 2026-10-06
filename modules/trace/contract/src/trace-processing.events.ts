@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { piiRedactionLevelSchema } from "./trace-ingress.commands.ts";
 import {
   isSpanReceivedEvent,
   spanReceivedEventDataSchema,
@@ -11,8 +10,11 @@ import {
   type SpanReceivedEventMetadata,
 } from "./trace-ingress.events.ts";
 import { logTraceContributionSchema } from "./trace-log-contribution.ts";
-import { metricCorrelationFields } from "./trace-metric-correlation.ts";
-import { recordTraceSpanEventDataSchema } from "./trace-processing.commands.ts";
+import {
+  metricCorrelationFields,
+  piiRedactionLevelSchema,
+  recordTraceSpanEventDataSchema,
+} from "./trace-processing.commands.ts";
 import {
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_REMOVED_EVENT_TYPE,

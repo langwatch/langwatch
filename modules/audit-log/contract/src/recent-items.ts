@@ -1,3 +1,4 @@
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 export const recentItemTypeSchema = z.enum([
@@ -28,3 +29,11 @@ export const recentItemSchema = z
   })
   .strict();
 export type RecentItem = z.infer<typeof recentItemSchema>;
+
+/** The `home.*` namespace: the recent-items strip, read from the caller's own audit trail. */
+
+export const homeTrpc = defineTrpcContract("home")
+  .query("getRecentItems")
+  .withInput(recentItemsInputSchema)
+  .withOutput(recentItemSchema.array())
+  .build();

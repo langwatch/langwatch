@@ -111,7 +111,10 @@ describe("the browser application on the door", () => {
     });
   }
 
-  /** @scenario "The browser application answers an unclaimed address" */
+  /**
+   * @scenario "The browser application answers an unclaimed address"
+   * @scenario "The production API serves the built UI artifact"
+   */
   it("serves the shell at an address no transport claimed, for the single page application to route", async () => {
     const response = await bundleOver(await fixture()).fetch(
       new Request("http://localhost/projects/one/settings"),
@@ -119,6 +122,18 @@ describe("the browser application on the door", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("text/html");
+    expect(await response.text()).toContain("<body>app</body>");
+  });
+
+  /** @scenario The HTML shell is served with a revalidate cache so reloads pick up new hashes */
+  it("serves the shell requested by its own name as html that caches must revalidate", async () => {
+    const response = await bundleOver(await fixture()).fetch(
+      new Request("http://localhost/index.html"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/html");
+    expect(response.headers.get("cache-control")).toBe("no-cache");
     expect(await response.text()).toContain("<body>app</body>");
   });
 

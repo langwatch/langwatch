@@ -43,7 +43,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       pods land on the same Secret with zero operator config).
   Used by app/secrets.yaml, app/deployment.yaml, the gateway subchart
   bridge, the preflight Job, and NOTES.txt so every site agrees on the
-  one Secret that holds credentialsEncryptionKey + cronApiKey +
+  one Secret that holds credentialsEncryptionKey +
   nextAuthSecret + virtualKeyPepper + LW_GATEWAY_INTERNAL_SECRET +
   LW_GATEWAY_JWT_SECRET. this release collapsed the older split (separate
   langwatch-gateway-auth Secret) into this one because there was no
@@ -163,18 +163,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
-{{- if .Values.app.cronApiKey.secretKeyRef.name }}
-  {{- if empty .Values.app.cronApiKey.secretKeyRef.key }}
-    {{- $errors = append $errors "app.cronApiKey.secretKeyRef.name is set but key is empty" }}
-  {{- end }}
-{{- else if empty .Values.app.cronApiKey.value }}
-  {{- if not .Values.autogen.enabled }}
-    {{- if empty .Values.secrets.existingSecret }}
-      {{- $errors = append $errors "app.cronApiKey must have either value, secretKeyRef, or autogen must be enabled" }}
-    {{- end }}
-  {{- end }}
-{{- end }}
-
 {{/* Validate NextAuth secret */}}
 {{- if .Values.app.nextAuth.secret.secretKeyRef.name }}
   {{- if empty .Values.app.nextAuth.secret.secretKeyRef.key }}
@@ -201,25 +189,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
-{{/* Validate evaluators secrets */}}
-{{- if .Values.app.evaluators.azureOpenAI.enabled }}
-  {{- if .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.name }}
-    {{- if empty .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.key }}
-      {{- $errors = append $errors "app.evaluators.azureOpenAI.endpoint.secretKeyRef.name is set but key is empty" }}
-    {{- end }}
-  {{- else if empty .Values.app.evaluators.azureOpenAI.endpoint.value }}
-    {{- $errors = append $errors "app.evaluators.azureOpenAI.enabled is true but endpoint is not configured" }}
-  {{- end }}
-  
-  {{- if .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.name }}
-    {{- if empty .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.key }}
-      {{- $errors = append $errors "app.evaluators.azureOpenAI.apiKey.secretKeyRef.name is set but key is empty" }}
-    {{- end }}
-  {{- else if empty .Values.app.evaluators.azureOpenAI.apiKey.value }}
-    {{- $errors = append $errors "app.evaluators.azureOpenAI.enabled is true but apiKey is not configured" }}
-  {{- end }}
+{{/* The previous credentials key is optional. Only a half-written secret
+     reference is an error: it names a Secret but no key inside it. */}}
+{{- $credsPrevious := (.Values.app.credentialsEncryptionKey).previous | default dict }}
+{{- if and (($credsPrevious.secretKeyRef).name) (empty ($credsPrevious.secretKeyRef).key) }}
+  {{- $errors = append $errors "app.credentialsEncryptionKey.previous.secretKeyRef.name is set but key is empty" }}
 {{- end }}
 
+{{/* Validate evaluators secrets */}}
 {{- if .Values.app.evaluators.google.enabled }}
   {{- if .Values.app.evaluators.google.credentials.secretKeyRef.name }}
     {{- if empty .Values.app.evaluators.google.credentials.secretKeyRef.key }}
@@ -535,7 +512,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      this release collapsed the separate langwatch-gateway-auth Secret into
      the umbrella's app Secret: both langwatch-app and the gateway pod
      mount LW_GATEWAY_INTERNAL_SECRET + LW_GATEWAY_JWT_SECRET from the
-     same Secret that holds credentialsEncryptionKey / cronApiKey /
+     same Secret that holds credentialsEncryptionKey /
      nextAuthSecret / virtualKeyPepper. So the existing
      `autogen is disabled but no existingSecret is provided` check
      above already covers the gateway case — when chartManaged is on,
@@ -611,7 +588,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      the NLP credential. Refuse, for the same reason the Langy check does:
      these credentials have separate blast radii on purpose. */}}
 {{- $nlpKey := include "langwatch.nlpInternalSecretKey" . }}
-{{- $nlpReserved := list "credentialsEncryptionKey" "cronApiKey" "nextAuthSecret" "virtualKeyPepper" }}
+{{- $nlpReserved := list "credentialsEncryptionKey" "nextAuthSecret" "virtualKeyPepper" }}
 {{- if (.Values.gateway).chartManaged }}
   {{- $nlpReserved = concat $nlpReserved (list (include "langwatch.gatewayInternalSecretKey" .) (include "langwatch.gatewayJwtSecretKey" .)) }}
 {{- end }}
@@ -640,7 +617,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
        radii are meant to be separate. Only when both live in the same Secret;
        an operator-owned Secret elsewhere may name its key whatever it likes. */}}
   {{- if eq $langySecretName (include "langwatch.appSecretName" .) }}
-    {{- $reserved := list "credentialsEncryptionKey" "cronApiKey" "nextAuthSecret" "virtualKeyPepper" }}
+    {{- $reserved := list "credentialsEncryptionKey" "nextAuthSecret" "virtualKeyPepper" }}
     {{- if (.Values.gateway).chartManaged }}
       {{- $reserved = concat $reserved (list (include "langwatch.gatewayInternalSecretKey" .) (include "langwatch.gatewayJwtSecretKey" .)) }}
     {{- end }}
@@ -1052,10 +1029,31 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       key: credentialsEncryptionKey
 {{- end }}
 
-# Evaluators - Azure OpenAI Integration
-{{- if .Values.app.evaluators.azureOpenAI.enabled }}
-{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_OPENAI_ENDPOINT" "fieldValues" .Values.app.evaluators.azureOpenAI.endpoint) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_OPENAI_KEY" "fieldValues" .Values.app.evaluators.azureOpenAI.apiKey) }}
+{{/* Previous credentials key, set only during a rotation. Every process that
+     gets CREDENTIALS_SECRET gets this too, so data written under the old key
+     stays readable while it is re-encrypted. Never generated: an install that
+     names no previous key renders no variable.
+
+     Precedence: an explicit secretKeyRef, then an inline value, then the key
+     secrets.secretKeys.credentialsEncryptionKeyPrevious names inside
+     secrets.existingSecret. */}}
+{{- $credsPrevious := (.Values.app.credentialsEncryptionKey).previous | default dict }}
+{{- $credsPreviousKey := (.Values.secrets.secretKeys).credentialsEncryptionKeyPrevious | default "" }}
+{{- if ($credsPrevious.secretKeyRef).name }}
+- name: CREDENTIALS_SECRET_PREVIOUS
+  valueFrom:
+    secretKeyRef:
+      name: {{ $credsPrevious.secretKeyRef.name }}
+      key: {{ $credsPrevious.secretKeyRef.key }}
+{{- else if $credsPrevious.value }}
+- name: CREDENTIALS_SECRET_PREVIOUS
+  value: {{ $credsPrevious.value | quote }}
+{{- else if and .Values.secrets.existingSecret $credsPreviousKey }}
+- name: CREDENTIALS_SECRET_PREVIOUS
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.secrets.existingSecret }}
+      key: {{ $credsPreviousKey }}
 {{- end }}
 
 # Evaluators - Google AI Integration
@@ -1102,8 +1100,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- else }}
 - name: STORED_OBJECTS_BACKEND
   value: "s3"
-- name: USE_S3_STORAGE
-  value: "true"
 # Emit S3_BUCKET_NAME — the app/server reads this name across all
 # storage code paths (storage.ts, stored-objects.service.ts,
 # env-create.mjs). The legacy `S3_BUCKET` env was a no-op for every
@@ -1922,27 +1918,6 @@ here, once, by name, so both consuming templates agree.
   value: {{ .Values.app.assetBase | quote }}
 {{- end }}
 
-# Cron API key
-{{- if .Values.app.cronApiKey.secretKeyRef.name }}
-- name: CRON_API_KEY
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.app.cronApiKey.secretKeyRef.name }}
-      key: {{ .Values.app.cronApiKey.secretKeyRef.key }}
-{{- else if .Values.secrets.existingSecret }}
-- name: CRON_API_KEY
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.secrets.existingSecret }}
-      key: {{ .Values.secrets.secretKeys.cronApiKey | default "cronApiKey" }}
-{{- else if .Values.autogen.enabled }}
-- name: CRON_API_KEY
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "langwatch.appSecretName" . }}
-      key: cronApiKey
-{{- end }}
-
 # AI Gateway virtual-key pepper (control-plane only).
 # The gateway pod must NEVER receive this value — it is used here
 # by @langwatch/gateway-process to hash incoming virtual-key
@@ -2230,3 +2205,25 @@ Usage: {{ include "langwatch.pdbPods" (dict "value" $v "replicas" $replicas) | i
 {{- end -}}
 {{- end -}}
 
+{{/* Offline defaults: environment variables that switch off a third-party
+     call a library would otherwise make at runtime (Prisma's checkpoint, the
+     voice cloudflared quick tunnel, RAGAS analytics), so a default install
+     calls LangWatch only for the license sync and the usage report. They live
+     in one ConfigMap that each workload lists FIRST in envFrom. Kubernetes
+     lets a later envFrom source beat an earlier one and any env entry beat
+     every envFrom source, so a value an operator sets in extraEnvs or
+     extraEnvFrom (a Secret or ConfigMap) always wins over the default. */}}
+{{- define "langwatch.offlineDefaultsName" -}}
+{{ include "langwatch.fullname" . }}-offline-defaults
+{{- end }}
+
+{{/* The envFrom block for a workload: the offline defaults, then the
+     operator's own sources. Takes (dict "root" $ "extraEnvFrom" <list>). */}}
+{{- define "langwatch.envFromWithOfflineDefaults" -}}
+envFrom:
+  - configMapRef:
+      name: {{ include "langwatch.offlineDefaultsName" .root }}
+{{- with .extraEnvFrom }}
+{{ toYaml . | indent 2 }}
+{{- end }}
+{{- end }}

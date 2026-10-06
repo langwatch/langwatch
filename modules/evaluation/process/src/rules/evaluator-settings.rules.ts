@@ -1,7 +1,7 @@
 import type { z } from "zod";
 
 /** The generation parameters an evaluator's judge model may carry: main's whitelist. */
-export const GENERATION_PARAM_KEYS = [
+const GENERATION_PARAM_KEYS = [
   "temperature",
   "max_tokens",
   "top_p",

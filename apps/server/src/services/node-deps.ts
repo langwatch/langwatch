@@ -55,7 +55,7 @@ export function workspaceInstallArgs(rootDir: string, { prod }: { prod: boolean 
 export async function ensureLangwatchDeps(
   ctx: { paths: LangwatchPaths },
   bus: EventBus,
-): Promise<void> {
+): Promise<string> {
   const apiDir = locateApiDir();
   if (!apiDir) throw new Error("langwatch api dir not found");
   const uiDir = locateUiDir();
@@ -88,7 +88,7 @@ export async function ensureLangwatchDeps(
   const installFresh = topLevelLinksOk && cachedHash === installKey;
 
   if (installFresh && prismaClientGenerated(rootNodeModules, nodeModulesPath) && distAlreadyBuilt) {
-    return;
+    return rootDir;
   }
 
   bus.emit({ type: "starting", service: "prepare:langwatch" as never });
@@ -206,9 +206,10 @@ export async function ensureLangwatchDeps(
     service: "prepare:langwatch" as never,
     durationMs: nowInstant().epochMilliseconds - start,
   });
+  return rootDir;
 }
 
-// Link external members' peerDependencies to app-resolved instances; idempotent.
+// Link external members'' peerDependencies to app-resolved instances; idempotent.
 export function linkExternalMemberPeers(appRootDir: string): string[] {
   const appNodeModules = join(appRootDir, "apps", "api", "node_modules");
   const memberDirs = [

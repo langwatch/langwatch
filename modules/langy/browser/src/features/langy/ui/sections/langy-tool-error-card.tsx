@@ -98,7 +98,7 @@ export function LangyToolErrorCard({ presentation }: { presentation: LangyToolEr
               ))}
             </VStack>
           ) : null}
-          {presentation.code ? (
+          {presentation.code || presentation.raw ? (
             <LangyFailureReference code={presentation.code} raw={presentation.raw} />
           ) : null}
           {presentation.traceId ? (

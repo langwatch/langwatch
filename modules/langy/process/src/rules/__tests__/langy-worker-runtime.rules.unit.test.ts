@@ -12,6 +12,7 @@ const config = (overrides: Partial<LangyServerConfig>): LangyServerConfig => ({
   gatewayInternalUrl: undefined,
   gatewayPublicUrl: undefined,
   gatewayLegacyUrl: undefined,
+  publicBaseUrl: undefined,
   ...overrides,
 });
 

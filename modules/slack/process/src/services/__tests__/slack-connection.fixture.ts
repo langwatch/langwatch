@@ -51,14 +51,16 @@ function settings({ organizationId }: { organizationId: string }): OrganizationS
   };
 }
 
-/** Hex, not a cipher: a stored row that spells out the plaintext fails the tests. */
-const hexCipher = {
-  encrypt: (value: string) => Buffer.from(value, "utf8").toString("hex"),
-  decrypt: (value: string) => Buffer.from(value, "hex").toString("utf8"),
-};
-
 /** The service over memory twins; MANAGER holds every permission, VIEWER none. */
-export function composeSlack({ connections }: { connections?: SlackConnectionRepository } = {}) {
+export function composeSlack({
+  connections,
+  fingerprintKey = "test-key",
+  previousFingerprintKey,
+}: {
+  connections?: SlackConnectionRepository;
+  fingerprintKey?: string;
+  previousFingerprintKey?: string;
+} = {}) {
   const memory = MemorySlackRepositories.create();
   const repositories = connections ? { ...memory, connections } : memory;
   const webApi = MemorySlackWebApiChannel.create();
@@ -75,8 +77,8 @@ export function composeSlack({ connections }: { connections?: SlackConnectionRep
         Promise.resolve(userId === MANAGER),
     },
     webApi,
-    cipher: hexCipher,
-    fingerprintKey: "test-key",
+    fingerprintKey,
+    previousFingerprintKey,
   });
   const claims = SlackConnectionClaimService.create({
     claims: repositories.claims,

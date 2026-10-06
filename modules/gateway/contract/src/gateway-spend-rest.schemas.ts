@@ -257,13 +257,6 @@ export const gatewayEndUserSpendSchema = z.object({
   caps: z.array(gatewayEndUserCapSchema),
 });
 
-export const gatewaySpendReplayResultSchema = z.object({
-  endpoint_id: z.string(),
-  replay_id: z.string(),
-  replayed: z.number().int(),
-  window: z.object({ from: z.string(), to: z.string() }),
-});
-
 /** The refusals every route here documents; the 200 comes from its output. */
 
 /** Validated in the transform, not an array schema, so a refusal names group_by, not group_by.0. */
@@ -363,25 +356,6 @@ export const gatewaySpendSummariesQuerySchema = z
     message: "from must be less than or equal to to",
   });
 
-export const GATEWAY_SPEND_REPLAY_MAX_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-export const GATEWAY_SPEND_REPLAY_MAX_ENVELOPES = 10_000;
-export const GATEWAY_SPEND_REPLAY_PAGE_SIZE = 200;
-/** Salts the batch and inbox-source ids a replay writes; never read back by kind. */
-export const GATEWAY_SPEND_REPLAY_KSUID_RESOURCE = "replay";
-
-export const gatewaySpendReplayBodySchema = z
-  .object({
-    from: z.number().int().positive().safe(),
-    to: z.number().int().positive().safe(),
-    endpoint_id: z.string().min(1).max(200),
-  })
-  .refine((b) => b.from <= b.to, {
-    message: "from must be less than or equal to to",
-  })
-  .refine((b) => b.to - b.from <= GATEWAY_SPEND_REPLAY_MAX_WINDOW_MS, {
-    message: "the replay window is capped at 7 days per call",
-  });
-
 /** A page of spend rollups; follow `next_cursor` until it comes back null. */
 export const gatewaySpendSummariesPageSchema = z.object({
   data: z.array(gatewaySpendSummaryRowSchema),
@@ -399,11 +373,7 @@ export type GatewaySpendEventsPage = z.infer<typeof gatewaySpendEventsPageSchema
 export const gatewayEndUserSpendResponseSchema = z.object({ data: gatewayEndUserSpendSchema });
 export type GatewayEndUserSpendResponse = z.infer<typeof gatewayEndUserSpendResponseSchema>;
 
-export const gatewaySpendReplayResponseSchema = z.object({ data: gatewaySpendReplayResultSchema });
-export type GatewaySpendReplayResponse = z.infer<typeof gatewaySpendReplayResponseSchema>;
-
 export type GatewaySpendSummariesQuery = z.output<typeof gatewaySpendSummariesQuerySchema>;
 export type GatewaySpendEventsQuery = z.output<typeof gatewaySpendEventsQuerySchema>;
 export type GatewayEndUserSpendQuery = z.output<typeof gatewayEndUserSpendQuerySchema> &
   z.output<typeof gatewayEndUserSpendParamsSchema>;
-export type GatewaySpendReplayBody = z.output<typeof gatewaySpendReplayBodySchema>;

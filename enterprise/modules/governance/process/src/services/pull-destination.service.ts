@@ -8,7 +8,7 @@ import {
  * three, so a customer cannot register a lookalike inside them and no config can name one that
  * is not theirs.
  */
-export const DATABRICKS_WORKSPACE_HOST_SUFFIXES = [
+const DATABRICKS_WORKSPACE_HOST_SUFFIXES = [
   ".azuredatabricks.net",
   ".cloud.databricks.com",
   ".gcp.databricks.com",

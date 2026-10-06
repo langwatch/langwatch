@@ -18,10 +18,16 @@ import type { ProjectRepositories } from "../repositories/project.repositories.t
 import {
   RecordProjectCreatedCommand,
   RecordProjectLegacyKeyRevokedCommand,
+  RecordProjectPresenceSettingChangedCommand,
+  RecordProjectMovedCommand,
+  RecordProjectArchivedCommand,
 } from "./project-lifecycle.commands.ts";
 import {
   projectCreatedEventSchema,
   projectLegacyKeyRevokedEventSchema,
+  projectPresenceSettingChangedEventSchema,
+  projectMovedEventSchema,
+  projectArchivedEventSchema,
 } from "./project-lifecycle.events.ts";
 
 function lifecycleCommands() {
@@ -29,12 +35,21 @@ function lifecycleCommands() {
     name: PROJECT_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: PROJECT_AGGREGATE_TYPE }),
   })
-    .withEvents([projectCreatedEventSchema, projectLegacyKeyRevokedEventSchema])
+    .withEvents([
+      projectCreatedEventSchema,
+      projectLegacyKeyRevokedEventSchema,
+      projectPresenceSettingChangedEventSchema,
+      projectMovedEventSchema,
+      projectArchivedEventSchema,
+    ])
     .withCommand("recordProjectCreated", RecordProjectCreatedCommand)
-    .withCommand("recordProjectLegacyKeyRevoked", RecordProjectLegacyKeyRevokedCommand);
+    .withCommand("recordProjectLegacyKeyRevoked", RecordProjectLegacyKeyRevokedCommand)
+    .withCommand("recordPresenceSettingChanged", RecordProjectPresenceSettingChangedCommand)
+    .withCommand("recordProjectMoved", RecordProjectMovedCommand)
+    .withCommand("recordProjectArchived", RecordProjectArchivedCommand);
 }
 
-export type ProjectLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;
+type ProjectLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;
 
 /**
  * project_lifecycle: project records its facts; peers react from their own side (§9). Organization

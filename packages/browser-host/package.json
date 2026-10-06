@@ -22,10 +22,6 @@
       "types": "./dist/compat/next-dynamic.d.ts",
       "default": "./src/compat/next-dynamic.ts"
     },
-    "./slots": {
-      "types": "./dist/slots.d.ts",
-      "default": "./src/slots.tsx"
-    },
     "./declarations": {
       "types": "./dist/declarations.d.ts",
       "default": "./src/declarations.ts"

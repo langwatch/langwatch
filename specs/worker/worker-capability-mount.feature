@@ -1,42 +1,40 @@
 @unit
-Feature: The worker composes every capability for itself
+Feature: The worker is the installed module list in the worker role
 
-  The background worker used to receive five capabilities pre-built from the
-  application: the Eventing substrate's two sweeps, Evaluation's processing
-  definition, Topic's whole runtime, Enterprise Governance's ingestion runtime
-  and the SSO connection definition. Each arrived as an object the worker could
-  not inspect, so a graph that merely passed one through was indistinguishable
-  from a graph that composed one.
+  The background worker holds no capability of its own. It boots every
+  installed module in the worker role, and each capability another module reads
+  (the substrate's sweeps, tenancy, the model gateway) arrives as that module's
+  API from the one graph, so a process that wires one differently would answer
+  differently from the interactive process.
 
   Background:
-    Given a worker composed from its own configuration and substrates
+    Given the worker booted over the installed module list
     And no capability is handed to it by an application
 
   @unit
-  Scenario: A worker routes every key the frozen registry names
+  Scenario: A worker routes every key the installed pipelines declare
     When every feature installs
-    Then the routed job keys are exactly the keys the frozen job registry names
-    And a capability that stopped composing removes its own keys from that set
+    Then the routed command and projection keys are exactly the keys the installed pipelines declare
+    And a pipeline that stopped installing removes its own keys from that set
 
   @unit
-  Scenario: The blob sweep walks the queue's own keyspace
-    When the substrate maintenance sweep runs
-    Then it reads the queue registry through the same Redis connection the
-      Group Queue offloads payloads onto
-    And a sweep on a second connection reports an empty keyspace forever
+  Scenario: The worker hosts the queue's blob sweep and the process retention sweep
+    When every feature installs
+    Then the blob maintenance pipeline and the process manager maintenance pipeline are hosted
+    And each one's process manager runs on a schedule
 
   @unit
-  Scenario: Online evaluation refuses by name rather than reporting a result
-    Given the process cannot resolve a customer's model provider
-    When an evaluation the platform would run itself is dispatched
-    Then the command is still routed
-    And the run refuses by name instead of reporting a skipped evaluation
+  Scenario: Online evaluation reports a skipped run when its provider is not configured
+    Given an evaluation names a model provider the project has not configured
+    When the evaluation the platform would run itself is dispatched
+    Then the run is reported as skipped, not as an error
+    And the reason is carried so the customer can act on it
 
   @unit
-  Scenario: Topic clustering refuses by name rather than inventing a model
-    Given the process cannot resolve a project's clustering model
-    When a clustering page runs
-    Then every model resolution refuses by name
+  Scenario: Topic clustering names the provider it cannot use rather than inventing a model
+    Given the project's embeddings model names a provider that is missing or disabled
+    When a clustering page resolves its embeddings model
+    Then the resolution refuses naming that provider
     And no topic is named with a provider the customer did not choose
 
   @unit
@@ -45,26 +43,28 @@ Feature: The worker composes every capability for itself
     When a clustering page is sent
     Then the page body is posted to that endpoint as JSON
 
-  Rule: The tenancy graph is this process's own, or it is nothing
+  Rule: The tenancy graph is the booted module graph, or it is nothing
 
-    Organizations, projects and permission reads are one graph over one Prisma
-    client. A process that composed half of it would answer some tenancy
-    questions and silently refuse others, which reads from the outside like a
-    permission decision rather than a missing capability.
+    Organizations, projects and permission reads are each a module's API. A
+    process that held only some of them would answer some tenancy questions and
+    silently refuse others, which reads from the outside like a permission
+    decision rather than a missing capability.
 
     @unit
-    Scenario: The worker composes the tenancy graph from its own client
-      Given the one Prisma client this process opened
-      When the worker composes its tenancy
-      Then it holds the organization, project, authorization and grant capabilities together
+    Scenario: The worker serves the organization, project and authorization capabilities together
+      Given the worker booted over the installed module list
+      When the worker reads its tenancy
+      Then the organization, project and authorization capabilities are all served
 
     @unit
     Scenario: An organization's stored settings are read with this process's cipher
       Given an organization whose stored settings hold encrypted values
-      When the worker reads those settings through its composed tenancy
+      When the settings are read through the organization repository
       Then they come back decrypted with the cipher this process was given
 
-    @unit
+    # Alex 2026-10-06: never built. No half of the tenancy graph is left out of
+    # the worker, so no absence is reported for it at composition.
+    @unit @unimplemented
     Scenario: The worker names the half of the tenancy graph it does not serve
       Given the worker serves no grant write path
       When it composes its tenancy
@@ -73,53 +73,55 @@ Feature: The worker composes every capability for itself
     @unit
     Scenario: The tenancy graph is the one the module graph booted
       Given the one graph this process boots over the installed module list
-      When the worker reads its tenancy
-      Then every capability comes from that graph rather than a second reading
+      When the worker reads its tenancy twice
+      Then each capability is the same instance both times
+      And an installed module declares it as a dependency
 
-  Rule: One model gateway, over that graph, or none
+  Rule: One model gateway, over that graph
 
     Two gateways would be two decryptions of the same stored credential and two
-    answers to which model a project uses. A gateway composed without the
-    deployment's cipher is worse than none: every provider reads as configured
-    and fails at the call with the customer's own key blamed.
+    answers to which model a project uses. A cipher without a key refuses at
+    its use rather than reading every provider as configured and failing at the
+    call with the customer's own key blamed.
 
     @unit
-    Scenario: A worker holding the tenancy graph composes the model gateway
-      Given the tenancy the booted module graph holds and the deployment's cipher
-      When the worker composes its model providers
-      Then the gateway is composed and no absence is reported for it
+    Scenario: The worker installs the model gateway beside the tenancy graph
+      Given the booted module graph
+      When the worker reads its model providers
+      Then the model provider capability is served
 
     @unit
-    Scenario: A worker with no credentials key composes no model gateway
+    Scenario: A deployment with no stored-secret key refuses each use of the cipher by name
       Given a deployment that named no stored-secret key
-      When the worker tries to compose its model providers
-      Then nothing is composed
-      And the absence names the missing cipher
+      When the worker opens its stores
+      Then the boot is not refused
+      And each encrypt and decrypt refuses as the unconfigured encryption member
 
     @unit
     Scenario: The gateway decrypts a stored credential with the deployment's own cipher
       Given a project with a saved provider credential
-      When the composed gateway resolves that project's execution providers
+      When the credential is read
       Then the customer's key is handed on decrypted, never as the stored ciphertext
 
     @unit
-    Scenario: A worker with no Redis names the uncountable connection window
+    Scenario: A worker with no Redis counts its connection windows in process memory
       Given a deployment that configured no Redis
-      When the worker composes its model providers
-      Then it reports that the shared connection-test window cannot be counted here
-      And it reports the absent translation beside it
+      When connection tests are counted
+      Then the windows are counted in this process's own memory
+      And a test past the ceiling is refused with the seconds until the window reopens
 
     @unit
     Scenario: A worker holding Redis counts its connection windows
       Given a deployment that configured Redis
-      When the worker composes its model providers
-      Then it says nothing about uncountable connection windows
+      When connection tests are counted
+      Then the windows are counted in Redis, shared by every replica
 
     @unit
     Scenario: Topic clustering and evaluation resolve through one gateway
-      Given a worker that composed a model gateway
-      When both topic clustering and the evaluator environment resolve a model
-      Then both reach the same gateway instance
+      Given the booted module graph
+      When both topic clustering and evaluation need a model provider
+      Then both declare the model provider capability as their dependency
+      And the graph serves one instance of it
 
     @unit
     Scenario: Topic clustering resolves its models through the composed gateway

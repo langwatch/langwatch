@@ -2,8 +2,8 @@
  * What a browser installs when it installs prompt: the Prompt Studio screen.
  */
 
-import { promptTagTrpc, promptTrpc } from "@langwatch/prompt-contract";
 import { defineBrowserModule } from "@langwatch/browser";
+import { promptTagTrpc, promptTrpc } from "@langwatch/prompt-contract";
 
 import { promptApi } from "./behavior/prompt-api.ts";
 

@@ -104,6 +104,7 @@ type Setup = {
   cached?: unknown;
   refuseKey?: string;
   canSeeCosts?: boolean;
+  visibilityCutoffMs?: number;
 };
 
 function setup(options: Setup = {}) {
@@ -112,20 +113,25 @@ function setup(options: Setup = {}) {
     protections: [] as { userId: string | undefined; publiclyShared: boolean }[],
     limitKeys: [] as string[],
     cached: [] as unknown[],
+    cutoffs: [] as (number | null | undefined)[],
   };
   const protections: Protections = {
     canSeeCosts: options.canSeeCosts ?? false,
     canSeeCapturedInput: true,
     canSeeCapturedOutput: true,
-    visibilityCutoffMs: null,
+    visibilityCutoffMs: options.visibilityCutoffMs ?? null,
   };
   const reads = createApiFixture<TraceApi>({
-    readTraceSummary: async () => {
+    readTraceSummary: async (input) => {
+      calls.cutoffs.push(input.visibilityCutoffMs);
       if (options.missingTrace) throw new TraceNotFoundError(TRACE_ID);
       return summary();
     },
     readSpanSummaries: async () => [],
-    readSpans: async () => options.spans ?? [],
+    readSpans: async (input) => {
+      calls.cutoffs.push(input.visibilityCutoffMs);
+      return options.spans ?? [];
+    },
     readLangwatchSignals: async () => [],
     readSpanResources: async () => [],
     readTraceEvents: async () => [],
@@ -179,7 +185,10 @@ const ANONYMOUS = { token: "token-1", viewerUserId: null, clientIp: "10.0.0.1", 
 
 describe("TraceSharedReadService", () => {
   describe("when the link is opened too often", () => {
-    /** @scenario Opening a shared link too often is refused for a moment */
+    /**
+     * @scenario Opening a shared link too often is refused for a moment
+     * @scenario A share link read past its ceiling is refused with the code its copy is written for
+     */
     it("refuses once the token's window is spent, before the link is resolved", async () => {
       const { service, calls } = setup({ refuseKey: "sharedTrace:token:token-1" });
 
@@ -187,6 +196,20 @@ describe("TraceSharedReadService", () => {
         code: "share_read_rate_limited",
       });
       expect(calls.resolve).toHaveLength(0);
+    });
+
+    /** @scenario A share link read past its ceiling is refused with the code its copy is written for */
+    it("still answers a different token while one token's window is spent", async () => {
+      const { service, calls } = setup({ refuseKey: "sharedTrace:token:token-1" });
+
+      await expect(service.getSharedTrace(ANONYMOUS)).rejects.toMatchObject({
+        code: "share_read_rate_limited",
+      });
+      await expect(
+        service.getSharedTrace({ ...ANONYMOUS, token: "token-2", clientIp: null }),
+      ).resolves.toBeDefined();
+
+      expect(calls.resolve.map((input) => input.token)).toEqual(["token-2"]);
     });
 
     it("refuses once the caller's address window is spent", async () => {
@@ -269,6 +292,26 @@ describe("TraceSharedReadService", () => {
 
       expect(hidden.header.totalCost).toBeNull();
       expect(shown.header.totalCost).toBe(1.5);
+    });
+
+    /** @scenario A shared view cannot see beyond the project's data-retention window */
+    it("bounds the summary and span reads by the viewer's visibility window", async () => {
+      const { service, calls } = setup({ visibilityCutoffMs: 1_700_000_000_000 });
+
+      await service.getSharedTrace(ANONYMOUS);
+
+      expect(calls.cutoffs).toEqual([1_700_000_000_000, 1_700_000_000_000]);
+    });
+
+    /** @scenario A shared link never reveals the surrounding conversation */
+    it("answers the trace alone for a trace that belongs to a thread", async () => {
+      const { service } = setup({ resolved: share({ threadId: "thread-1" }) });
+
+      const payload = await service.getSharedTrace(ANONYMOUS);
+
+      expect(
+        Object.keys(payload).filter((key) => /thread|conversation|session/i.test(key)),
+      ).toEqual([]);
     });
 
     /** @scenario A very large trace shares its timeline without every step's detail */

@@ -6,6 +6,10 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { safeRedirectTarget, signIn, useSession } from "../../behavior/auth-client.tsx";
 import { replaceLocation } from "../../behavior/browser-navigation.ts";
+import {
+  type PasskeyCeremonyState,
+  usePasskeyCeremony,
+} from "../../behavior/passkey-ceremony.store.ts";
 import { useExpiredSessionRecovery } from "../../behavior/use-expired-session-recovery.ts";
 import { usePasskeyAutofill } from "../../behavior/use-passkey-autofill.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
@@ -37,6 +41,7 @@ import { SecondaryActionLink } from "../elements/secondary-action-link.tsx";
 import { CredentialSignInForm } from "./credential-sign-in-form.tsx";
 import { FrontDoorFinePrint } from "./front-door-fine-print.tsx";
 import { IdentifierStepForm } from "./identifier-step-form.tsx";
+import { PasskeyCeremonyPanel, passkeyCeremonyTitle } from "./passkey-ceremony-panel.tsx";
 import { SignInError } from "./sign-in-error-screen.tsx";
 import {
   AlternativeMethods,
@@ -44,6 +49,32 @@ import {
   SignInMethodPicker,
 } from "./sign-in-method-picker.tsx";
 import { TwoStepChallengePanel, twoStepChallengeTitle } from "./two-step-challenge-panel.tsx";
+
+/** The picker's local slot: the password form for the address asked, and nothing for any other. */
+function passwordMethodRenderer({
+  email,
+  callbackUrl,
+  onUseDifferentEmail,
+  onSignUpStarted,
+}: {
+  email: string;
+  callbackUrl: string | undefined;
+  onUseDifferentEmail: () => void;
+  onSignUpStarted: (email: string) => void;
+}) {
+  return (method: SignInMethod) => {
+    if (method.kind !== "password") return null;
+    return (
+      <CredentialSignInForm
+        key={method.id}
+        email={email}
+        callbackUrl={callbackUrl}
+        onUseDifferentEmail={onUseDifferentEmail}
+        onSignUpStarted={onSignUpStarted}
+      />
+    );
+  };
+}
 
 /**
  * The identifier-first log-in screen (D13, ADR-117 §6): ask for the address,
@@ -77,6 +108,8 @@ export function IdentifierFirstSignIn() {
   const [passkeyTried, setPasskeyTried] = useState(false);
   // A correct password that owes a second factor takes the whole card.
   const twoStep = useTwoStepChallenge();
+  // A passkey ceremony somebody deliberately started, published by the button they pressed.
+  const passkeyCeremony = usePasskeyCeremony();
 
   // The recommended way in, ahead of the button in the rail below: a passkey
   // offered from the address field's own autofill, where somebody who does not
@@ -153,14 +186,9 @@ export function IdentifierFirstSignIn() {
     }),
   });
 
-  // Ahead of everything: a password has already been accepted.
-  if (twoStep) {
-    return (
-      <AuthCard title={twoStepChallengeTitle({ factor: twoStep.factor })}>
-        <TwoStepChallengePanel factor={twoStep.factor} callbackUrl={twoStep.callbackUrl} />
-      </AuthCard>
-    );
-  }
+  // Ahead of everything: a password was accepted, or a ceremony is waiting on a device.
+  const takenOver = cardTakenOver({ twoStep, passkeyCeremony });
+  if (takenOver) return takenOver;
 
   if (sentTo) {
     return (
@@ -249,18 +277,12 @@ export function IdentifierFirstSignIn() {
           })}
           onPasskeyAutoStarted={() => setPasskeyTried(true)}
           onPasskeyDeclined={() => setPasskeyTried(true)}
-          renderLocalMethod={(method) => {
-            if (method.kind !== "password") return null;
-            return (
-              <CredentialSignInForm
-                key={method.id}
-                email={submittedIdentifier ?? ""}
-                callbackUrl={callbackUrl}
-                onUseDifferentEmail={routing.clear}
-                onSignUpStarted={setSigningUpEmail}
-              />
-            );
-          }}
+          renderLocalMethod={passwordMethodRenderer({
+            email: submittedIdentifier ?? "",
+            callbackUrl,
+            onUseDifferentEmail: routing.clear,
+            onSignUpStarted: setSigningUpEmail,
+          })}
         />
         {/* The switch link is always here, carrying the address already
             typed: somebody who meant to sign up gets there in one click, and
@@ -311,6 +333,31 @@ export function IdentifierFirstSignIn() {
       />
     </AuthCard>
   );
+}
+
+/** A state that takes the whole card: a second factor owed, or a ceremony, never a spinner. */
+function cardTakenOver({
+  twoStep,
+  passkeyCeremony,
+}: {
+  twoStep: ReturnType<typeof useTwoStepChallenge>;
+  passkeyCeremony: PasskeyCeremonyState | null;
+}): ReactNode {
+  if (twoStep) {
+    return (
+      <AuthCard title={twoStepChallengeTitle({ factor: twoStep.factor })}>
+        <TwoStepChallengePanel factor={twoStep.factor} callbackUrl={twoStep.callbackUrl} />
+      </AuthCard>
+    );
+  }
+  if (passkeyCeremony) {
+    return (
+      <AuthCard title={passkeyCeremonyTitle({ ceremony: passkeyCeremony })}>
+        <PasskeyCeremonyPanel ceremony={passkeyCeremony} />
+      </AuthCard>
+    );
+  }
+  return null;
 }
 
 /**

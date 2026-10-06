@@ -1,4 +1,8 @@
-import { HandledError, type HandledErrorFault } from "@langwatch/handled-error";
+import {
+  HandledError,
+  type HandledErrorFault,
+  handledErrorFaultSchema,
+} from "@langwatch/handled-error";
 import { z } from "zod";
 
 import type { StoredObjectId, StoredObjectOperationId, StoredObjectProjectId } from "./ids.ts";
@@ -36,7 +40,7 @@ export const storedObjectProblemSchema = z
     spanId: z.string().optional(),
     traceUrl: z.string().url().optional(),
     httpStatus: z.number().int().min(400).max(599).optional(),
-    fault: z.enum(["customer", "platform", "provider"]).optional(),
+    fault: handledErrorFaultSchema.optional(),
     // Modelled exactly as `serializedHandledErrorSchema` does: every
     // `HandledError.serialize()` emits the boolean, and an envelope written by
     // a peer that omits it still parses as not-retryable.
@@ -284,19 +288,6 @@ export class StoredObjectCapabilityUnavailableError extends HandledError {
       fault: "platform",
     });
     this.name = "StoredObjectCapabilityUnavailableError";
-  }
-}
-
-export class PayloadStagingUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor() {
-    super(
-      "service_unavailable",
-      "This request carries more data than can be sent inline, and this deployment has no object storage configured to stage it through.",
-      { httpStatus: 503, fault: "platform" },
-    );
-    this.name = "PayloadStagingUnavailableError";
   }
 }
 

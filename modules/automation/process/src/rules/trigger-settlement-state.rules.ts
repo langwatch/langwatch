@@ -1,21 +1,20 @@
 import { triggerActionClassSchema } from "@langwatch/automation-contract";
 import { z } from "zod";
 
-export const pendingMatchSchema = z.object({
+const pendingMatchSchema = z.object({
   settleDueAt: z.number(),
   dispatchDueAt: z.number(),
   actionClass: triggerActionClassSchema,
   settleWindowBucket: z.string(),
 });
-export type PendingMatch = z.infer<typeof pendingMatchSchema>;
+type PendingMatch = z.infer<typeof pendingMatchSchema>;
 
 export const triggerSettlementStateSchema = z.object({
   pendingMatches: z.record(z.string(), pendingMatchSchema),
   overflowFlushed: z.number(),
 });
-export type TriggerSettlementState = z.infer<typeof triggerSettlementStateSchema>;
+type TriggerSettlementState = z.infer<typeof triggerSettlementStateSchema>;
 
-export const TRIGGER_SETTLEMENT_PROCESS_NAME = "triggerSettlement" as const;
 export const MAX_PENDING_MATCHES = 1_000;
 /**
  * Traces per persist-match outbox message, sized to stay inside the

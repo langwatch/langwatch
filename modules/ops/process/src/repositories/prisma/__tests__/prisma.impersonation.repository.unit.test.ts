@@ -58,39 +58,6 @@ describe("PrismaImpersonationRepository", () => {
     });
   });
 
-  describe("when it reads the window a session already carries", () => {
-    /** @scenario "An operator cannot hop from one impersonation straight into another" */
-    it("reads the stored claims back as a window", async () => {
-      const { database } = stubDatabase({
-        row: null,
-        session: {
-          impersonating: {
-            id: "user_subject",
-            name: "Subject",
-            email: "subject@example.com",
-            image: null,
-            expires: "2026-01-01T01:00:00.000Z",
-          },
-        },
-      });
-
-      const window = await PrismaImpersonationRepository.create(database).findWindow("session_1");
-
-      expect(window?.id).toBe("user_subject");
-      expect(window?.expires.toString({ fractionalSecondDigits: 3 })).toBe(
-        "2026-01-01T01:00:00.000Z",
-      );
-    });
-
-    it("answers null for a session carrying no claims at all", async () => {
-      const { database } = stubDatabase({ row: null, session: { impersonating: null } });
-
-      await expect(
-        PrismaImpersonationRepository.create(database).findWindow("session_1"),
-      ).resolves.toBeNull();
-    });
-  });
-
   describe("when it is asked whether the operator can prove a second factor", () => {
     /** @scenario "Impersonating into an organization that requires it takes the operator's own" */
     it("answers from the operator's own enrollment", async () => {

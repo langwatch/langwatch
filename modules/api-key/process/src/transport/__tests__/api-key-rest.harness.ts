@@ -14,6 +14,7 @@ import {
 } from "@langwatch/api/rest";
 import type { PrincipalRef } from "@langwatch/authorization";
 
+import { IngestionKeyMintService } from "../../services/ingestion-key-mint.service.ts";
 import { apiKeyIngestionCaller, apiKeyRest, apiKeyRestCredential } from "../api-key.rest.ts";
 import { TestApiKeyService } from "./support/test-api-key-service.ts";
 
@@ -54,6 +55,11 @@ export function mountApiKeyRest(
   options: { apiKeys?: Partial<TestApiKeyService>; granted?: readonly string[] } = {},
 ) {
   const apiKeys: ApiKeyApi = Object.assign(new TestApiKeyService(), options.apiKeys);
+  // The ingestion route's refusals are the real service's, minting through the test's `create`.
+  const ingestionKeys = IngestionKeyMintService.create({ apiKeys });
+  if (!options.apiKeys?.createIngestionKey) {
+    apiKeys.createIngestionKey = (input) => ingestionKeys.createIngestionKey(input);
+  }
   const granted = new Set(
     options.granted ?? [
       "organization:view",

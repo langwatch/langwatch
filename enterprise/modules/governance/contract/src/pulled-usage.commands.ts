@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  type PulledUsagePricedEventData,
   type PulledUsageRetractedEventData,
   pulledUsageObservedEventDataSchema,
 } from "./pulled-usage.events.ts";
@@ -8,6 +9,7 @@ import {
 export const PULLED_USAGE_COMMAND_TYPES = {
   RECORD: "lw.obs.pulled_usage.record",
   RETRACT: "lw.obs.pulled_usage.retract",
+  PRICE: "lw.obs.pulled_usage.price",
 } as const;
 export const PULLED_USAGE_PROCESSING_COMMAND_TYPES = Object.values(PULLED_USAGE_COMMAND_TYPES);
 
@@ -55,4 +57,9 @@ export function pulledUsageRetractionKey(data: PulledUsageRetractedEventData): s
     data.model,
     data.observedAtMs,
   ].join(":");
+}
+
+/** One priced fact per observation of a restatement key; a redelivered intent appends nothing. */
+export function pulledUsagePricedKey(data: PulledUsagePricedEventData): string {
+  return ["priced", data.restatementKey, data.observedAtMs].join(":");
 }

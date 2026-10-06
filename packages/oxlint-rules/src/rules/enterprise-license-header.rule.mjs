@@ -56,7 +56,7 @@ export const enterpriseLicenseHeaderRule = defineRule({
     enterpriseLicenseOutsideEnterprise: {
       what: "This file carries the Enterprise SPDX directive but lives outside `enterprise/`.",
       why: "Enterprise-licensed source belongs to an Enterprise module; the directive is how misplaced proprietary code is found.",
-      fix: "Move the implementation into its Enterprise module under `enterprise/modules/<name>/` and expose only its contract to the open tree; never delete the directive to pass.",
+      fix: "Move the implementation into its Enterprise module under `enterprise/modules/<name>/` and expose only its contract to the open tree; never delete the directive to pass. Read the `module-dependencies` skill.",
     },
   },
   create(context) {

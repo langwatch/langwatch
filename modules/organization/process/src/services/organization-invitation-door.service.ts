@@ -20,27 +20,29 @@ import {
   type OrganizationListedInvite,
   type OrganizationPendingInviteApplied,
   type OrganizationUserRole,
+  type PendingInvitationsForCaller,
 } from "@langwatch/organization-contract";
 import { toDate } from "@langwatch/time";
 
-import type {
-  OrganizationInvitations,
-  OrganizationJoinRequests,
-  OrganizationSignals,
-} from "../app/organization.members.ts";
 import { grantCallerOf } from "../rules/grant-caller.rules.ts";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
 import type { InviteCreationThrottleService } from "./invite-creation-throttle.service.ts";
+import type { OrganizationDirectory } from "./organization-directory.service.ts";
 import type {
   OrganizationGrantCeilingService,
   OrganizationIntendedGrant,
 } from "./organization-grant-ceiling.service.ts";
+import type { OrganizationInvitations } from "./organization-invitations.service.ts";
+import type { OrganizationJoinRequests } from "./organization-join-requests.service.ts";
 import type { OrganizationLifecycleNoticeService } from "./organization-lifecycle-notice.service.ts";
+import type { OrganizationSignals } from "./organization-signals.service.ts";
 
 /** What the ceremony needs beside the invitation service itself. */
-export interface OrganizationInvitationDoorDependencies {
+interface OrganizationInvitationDoorDependencies {
   readonly invitations: OrganizationInvitations;
+  /** The one proven-address rule the join door also reads. */
+  readonly directory: Pick<OrganizationDirectory, "findProvenAddresses">;
   readonly joinRequests: OrganizationJoinRequests | null;
   readonly signals: OrganizationSignals;
   /** Where an invitation batch and an acceptance are recorded as organization's events. */
@@ -69,6 +71,15 @@ export class OrganizationInvitationDoorService {
 
   private constructor(private readonly deps: OrganizationInvitationDoorDependencies) {}
 
+  /** The invitations waiting on the addresses this person has proven. */
+  async listPendingForCaller(
+    input: Readonly<{ userId: string }>,
+  ): Promise<PendingInvitationsForCaller> {
+    return this.deps.invitations.findPendingForAddresses({
+      addresses: await this.deps.directory.findProvenAddresses(input),
+    });
+  }
+
   /**
    * Invites a batch in the validation mode the caller chose. `strict` refuses
    * the whole batch by name on an unassignable team or role; `lenient` drops
@@ -93,7 +104,7 @@ export class OrganizationInvitationDoorService {
       grants: input.invites.flatMap((invite) => intendedGrants(input.organizationId, invite)),
     });
 
-    const created = await this.#createOrRefuse(input);
+    const created = await this.#createOrRefuse({ input, by });
     const withUrls = created.invites.map((record) => ({
       ...record,
       invite: inviteOnWire(record.invite),
@@ -264,9 +275,19 @@ export class OrganizationInvitationDoorService {
     };
   }
 
-  async #createOrRefuse(input: OrganizationApiCreateInvitationsInput) {
+  async #createOrRefuse({
+    input,
+    by,
+  }: {
+    input: OrganizationApiCreateInvitationsInput;
+    by: OrganizationCaller;
+  }) {
     try {
-      return await this.deps.invitations.create(input);
+      return await this.deps.invitations.create({
+        ...input,
+        requestedBy: by.id,
+        user: { id: by.id, name: by.name, email: by.email },
+      });
     } catch (error) {
       if (error instanceof OrganizationNotFoundError) throw error;
 

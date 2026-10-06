@@ -1,19 +1,19 @@
+import { getRoutePolicy } from "@langwatch/api";
 /**
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
 
 import { HostedMcpModule } from "../../app/hosted-mcp.app.ts";
+import { MemoryHostedMcpRepositories } from "../../repositories/memory/memory.hosted-mcp.repositories.ts";
 import { HOSTED_MCP_FAMILY, hostedMcpRoutePolicies } from "../../rules/mcp-routes.rules.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
 import { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
-import type { McpApiKeyCipher } from "../../services/mcp-oauth-token.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
 import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
-import { getRoutePolicy } from "@langwatch/api";
 
 class NoProjects implements Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey"> {
   resolveLiveProjectByApiKey(): Promise<McpLiveProjectLookup> {
@@ -27,22 +27,12 @@ class NoGrants implements Pick<AuthzMcpSessionGrantService, "stillGranted"> {
   }
 }
 
-class PlainCipher implements McpApiKeyCipher {
-  encrypt(value: string): string {
-    return value;
-  }
-  decrypt(value: string): string {
-    return value;
-  }
-}
-
 function handler() {
   return HostedMcpModule.fromDependencies({
-    redis: null,
+    repositories: MemoryHostedMcpRepositories.create(),
     projects: new NoProjects(),
     grants: new NoGrants(),
     cliSessions: new FakeCliSessions(),
-    cipher: new PlainCipher(),
     address: HeaderMcpClientAddressService.create(),
     baseHost: "https://app.langwatch.ai",
   }).createHandler();

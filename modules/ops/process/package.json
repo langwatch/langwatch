@@ -40,6 +40,7 @@
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
@@ -72,6 +73,7 @@
     "@langwatch/redaction": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/task": "workspace:*",
@@ -88,7 +90,6 @@
   "devDependencies": {
     "@langwatch/feature-flag-process": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/secrets": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",

@@ -32,13 +32,6 @@ import {
 import { nowInstant, toDate } from "@langwatch/time";
 import slugify from "slugify";
 
-import {
-  type OrganizationGrantCache,
-  type OrganizationPromptSeed,
-  type OrganizationSeatLicense,
-  type OrganizationSessionRevocation,
-  type OrganizationPlanUser,
-} from "../app/organization.members.ts";
 import type {
   AuditLogFilters,
   CreateAndAssignResult,
@@ -51,9 +44,19 @@ import type {
   OrganizationMembershipRepository,
   OrganizationWithMembersAndTheirTeams,
 } from "../repositories/organization-membership.repository.ts";
+import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
 import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
 import type { OrganizationGrantCeilingService } from "./organization-grant-ceiling.service.ts";
+import type {
+  OrganizationGrantCache,
+  OrganizationSessionRevocation,
+} from "./organization-member-role.service.ts";
 import { OrganizationMemberRoleService } from "./organization-member-role.service.ts";
+import type { OrganizationPromptSeed } from "./organization-prompt-seed.service.ts";
+import type {
+  OrganizationSeatLicense,
+  OrganizationPlanUser,
+} from "./organization-seat-license.service.ts";
 
 /**
  * Whether this person is mid-way through proving a single sign-on connection
@@ -88,7 +91,7 @@ type TeamMembershipLike = {
  * four ports.
  */
 /** The grant half of an admission, answered by the authorization peer. */
-export type OrganizationAdmissions = Pick<AuthzApi, "attachBindings" | "completeAdmission">;
+type OrganizationAdmissions = Pick<AuthzApi, "attachBindings" | "completeAdmission">;
 
 export class OrganizationMembershipService {
   static enrichTeamWithGrants<
@@ -397,8 +400,8 @@ export class OrganizationMembershipService {
   }
 
   /**
-   * Returns fully loaded organizations for a user. Returns raw (encrypted) records;
-   * the router applies decryption before sending to the client.
+   * Returns fully loaded organizations for a user, their S3 endpoint and access key opened by the
+   * repository; the visibility service redacts the rest before anything leaves.
    */
   async getAllForUser(params: {
     userId: string;
@@ -567,25 +570,34 @@ export class OrganizationMembershipService {
     });
   }
 
-  /** Makes somebody a MEMBER, minting the grant intent an unfinished
-   *  admission is resumed from into the same row, in the ledger's own
-   *  scheme because the intent's identity is the ledger's (ADR-129). */
+  /** Admits somebody on the joiner seat (ADR-171). A MEMBER row carries the
+   *  grant intent an unfinished admission resumes from, in the ledger's own
+   *  scheme (ADR-129); a DEVELOPER row is the whole admission, no grant. */
   async createMembership({
     organizationId,
     userId,
     admittedBy,
+    seat,
+    origin,
   }: {
     organizationId: string;
     userId: string;
     admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
-  }): Promise<"created" | "already-present"> {
+    seat?: "MEMBER" | "DEVELOPER";
+    origin?: "web" | "cli";
+  }): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
     const grantId = newAuthzGrantId();
-    const outcome = await this.repo.createMembership({
+    const admission = await this.repo.createMembership({
       organizationId,
       userId,
       pendingAdmissionId: grantId,
+      via: admissionVia(admittedBy),
+      ...(seat === undefined ? {} : { seat }),
+      ...(origin === undefined ? {} : { origin }),
     });
-    if (outcome !== "created" || !admittedBy) return outcome;
+    if (admission.outcome !== "created" || !admittedBy || admission.seat === "DEVELOPER") {
+      return admission;
+    }
 
     // A join lands its grant here, audited to whoever admitted it: `join-request`
     // is deliberately auditable, so an automatic join reads like a clicked one.
@@ -609,7 +621,7 @@ export class OrganizationMembershipService {
       requireProjection: true,
     });
     await this.dependencies.admissions.completeAdmission({ organizationId, userId, grantId });
-    return outcome;
+    return admission;
   }
 
   /** Refuses when taking this member out would leave the organization with no
@@ -726,4 +738,12 @@ export class OrganizationMembershipService {
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
     return this.repo.getAuditLogs(filters);
   }
+}
+
+/** The route an admission arrived by, as its audit row names it. */
+function admissionVia(
+  admittedBy: Readonly<{ actor: LedgerActor; commandId: string }> | undefined,
+): DeveloperAdmissionVia {
+  if (!admittedBy) return "sso";
+  return admittedBy.actor.type === "user" ? "join-request-approved" : "domain-join";
 }

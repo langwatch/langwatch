@@ -60,10 +60,11 @@ Feature: Langy captures what I am viewing as turn context
     Then the composer shows a context chip for the new trace
 
   @integration
-  Scenario: Starting a new chat restores dismissed context
-    Given I have removed a context chip
+  Scenario: Starting a new chat starts with no context chosen
+    Given I have chosen context chips for the current chat
     When I start a new chat
-    Then the dismissed context chips return for the fresh turn
+    Then no context chip is chosen for the fresh turn
+    And the context I assembled for the last question does not follow me into the next
 
   @unit
   Scenario: The dataset page offers its dataset by name

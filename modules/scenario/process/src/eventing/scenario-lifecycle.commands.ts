@@ -16,9 +16,7 @@ import {
 } from "@langwatch/scenario-contract";
 import type { z } from "zod";
 
-export const recordScenarioCreatedCommandDataSchema = withCommandEnvelope(
-  scenarioCreatedEventDataSchema,
-);
+const recordScenarioCreatedCommandDataSchema = withCommandEnvelope(scenarioCreatedEventDataSchema);
 export type RecordScenarioCreatedCommandData = z.infer<
   typeof recordScenarioCreatedCommandDataSchema
 >;

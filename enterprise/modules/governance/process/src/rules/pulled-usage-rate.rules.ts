@@ -2,7 +2,15 @@
 
 import { rateSpendNanoUsd, spendUsageSchema } from "@langwatch/gateway-contract";
 
-import type { PulledUsageRateInput } from "../app/governance.members.ts";
+export type PulledUsageRateInput = {
+  model: string;
+  quantities: {
+    tokensInput: number;
+    tokensOutput: number;
+    tokensCacheRead: number;
+    tokensCacheWrite: number;
+  };
+};
 
 /**
  * A pulled record's four quantities through the gateway's own rating (main

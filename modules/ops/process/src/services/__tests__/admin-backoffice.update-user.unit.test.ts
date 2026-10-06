@@ -1,7 +1,7 @@
 import type { AdminOperationInput, AdminOperationResult } from "@langwatch/ops-contract";
 import { describe, expect, it } from "vitest";
 
-import { AdminBackofficeRepository } from "../../repositories/admin-backoffice.repository.ts";
+import { AdminBackofficeRepository } from "../../repositories/instance-admin.repository.ts";
 import { AdminBackofficeService } from "../admin-backoffice.service.ts";
 import { AdminAuditSink } from "../impersonation.service.ts";
 import { backofficeOperator } from "./support/backoffice-doubles.ts";
@@ -159,16 +159,16 @@ class RefusingAudit extends AdminAuditSink {
   }
 }
 
+type AuditCase = [
+  string,
+  AdminOperationInput["resource"],
+  AdminOperationInput["method"],
+  AdminOperationInput["params"],
+];
+
 describe("AdminBackofficeService audit before write", () => {
   /** @scenario "A Back office write is audited before it is applied" */
-  it.each<
-    [
-      string,
-      AdminOperationInput["resource"],
-      AdminOperationInput["method"],
-      AdminOperationInput["params"],
-    ]
-  >([
+  it.each<AuditCase>([
     [
       "a user update with side effects",
       "user",

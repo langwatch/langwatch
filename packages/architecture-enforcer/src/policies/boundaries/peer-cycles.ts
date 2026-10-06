@@ -26,7 +26,7 @@ export type PeerEdge = { from: string; to: string; file: string; line: number };
 /** A peer edge whose peer reaches back, with the shortest way back. */
 export type PeerCycleEdge = PeerEdge & { back: readonly string[] };
 
-type Located = { literal: ts.ObjectLiteralExpression; source: ts.SourceFile };
+export type Located = { literal: ts.ObjectLiteralExpression; source: ts.SourceFile };
 
 function unwrap(expression: ts.Expression): ts.Expression {
   if (ts.isAsExpression(expression) || ts.isSatisfiesExpression(expression))
@@ -48,7 +48,7 @@ function dependencyInitialiser(node: ts.Node): ts.Expression | undefined {
 }
 
 /** The initialiser of every class's `static dependencies` in this file. */
-function dependencyInitialisers(source: ts.SourceFile): ts.Expression[] {
+export function dependencyInitialisers(source: ts.SourceFile): ts.Expression[] {
   const found: ts.Expression[] = [];
   const visit = (node: ts.Node): void => {
     const initialiser = dependencyInitialiser(node);
@@ -79,7 +79,9 @@ function topLevelConstant({
 }
 
 /** Local name -> module specifier, for every named import in the file. */
-function importedNames(source: ts.SourceFile): Map<string, { specifier: string; name: string }> {
+export function importedNames(
+  source: ts.SourceFile,
+): Map<string, { specifier: string; name: string }> {
   const names = new Map<string, { specifier: string; name: string }>();
 
   for (const statement of source.statements.filter(ts.isImportDeclaration)) {
@@ -114,7 +116,7 @@ function relativeFile({
 }
 
 /** The object literal a dependency map is, following constants and relative imports. */
-function locate({
+export function locate({
   expression,
   source,
 }: {
@@ -148,7 +150,7 @@ function rootIdentifier(expression: ts.Expression): ts.Identifier | undefined {
 }
 
 /** Every token a dependency map names, spreads followed. */
-function tokens(located: Located): { token: ts.Identifier; source: ts.SourceFile }[] {
+export function tokens(located: Located): { token: ts.Identifier; source: ts.SourceFile }[] {
   const found: { token: ts.Identifier; source: ts.SourceFile }[] = [];
 
   for (const property of located.literal.properties) {

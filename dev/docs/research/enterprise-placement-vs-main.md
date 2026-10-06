@@ -1,5 +1,8 @@
 # Enterprise placement compared with main
 
+> **Historical (marked 2026-10-05):** a dated snapshot. Owners and installer names reflect
+> 2026-09-07; the current module map is `modules/catalogue.json` and the shapes are ARCHITECTURE.md §3 and §11.
+
 Compared on 2026-09-07 against local `main` (`7fb95fe904`, August 18) and the
 newer locally available `origin/main` (`8b51631777`, September 7). No fetch was
 needed. The old root was `platform/app/ee`; the new root is
@@ -11,19 +14,19 @@ and the accepted ownership decisions. Rewritten methods and dynamic imports
 are not exhaustively resolved by symbol matching. This is a placement review,
 not proof that every old route and entitlement behaves identically.
 
-| Old Enterprise domain          | Current owner                             | Assessment                                                                                           |
-| ------------------------------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Admin/backoffice/impersonation | Core Ops                                  | Explicit change in ADR-112; not accidental                                                           |
-| Audit log writer               | Core AuditLog                             | Current requested change, ADR-134; direct history readers still need migration                       |
-| Billing                        | Enterprise Billing                        | Retained; portable plan values also live in core Entitlement                                         |
-| Enterprise event-sourcing      | Enterprise Governance                     | Pulled-usage and ingestion-pull commands, processes and projections remain Enterprise                |
-| Governance                     | Enterprise Governance                     | Policy, ingestion sources, pulls, departments and tool-catalogue ownership retained; exception below |
-| Licensing                      | Enterprise Licensing                      | Validation/signing implementation retained                                                           |
-| Managed providers              | Enterprise Managed Provider               | Retained                                                                                             |
-| SaaS                           | Enterprise SaaS                           | Browser implementation retained; no server installer needed                                          |
-| SCIM                           | Enterprise SCIM                           | Provisioning implementation retained; core Identity owns identity ledger facts                       |
-| SSO                            | Enterprise SSO plus core Auth integration | License gate service retained; path predicates and account matching moved to core Auth               |
-| Webhooks                       | Core Webhook                              | Explicit current request, ADR-134; product entitlement gates retained                                |
+| Old Enterprise domain                                             | Current owner                             | Assessment                                                                                           |
+| ----------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Admin and impersonation (main's "backoffice", a name §15 deletes) | Core Ops (Ops instance admin, §3.5)       | Explicit change in ADR-112; not accidental                                                           |
+| Audit log writer                                                  | Core AuditLog                             | Current requested change, ADR-134; direct history readers still need migration                       |
+| Billing                                                           | Enterprise Billing                        | Retained; portable plan values also live in core Entitlement                                         |
+| Enterprise event-sourcing                                         | Enterprise Governance                     | Pulled-usage and ingestion-pull commands, processes and projections remain Enterprise                |
+| Governance                                                        | Enterprise Governance                     | Policy, ingestion sources, pulls, departments and tool-catalogue ownership retained; exception below |
+| Licensing                                                         | Enterprise Licensing                      | Validation/signing implementation retained                                                           |
+| Managed providers                                                 | Enterprise Managed Provider               | Retained                                                                                             |
+| SaaS                                                              | Enterprise SaaS                           | Browser implementation retained; no server installer needed                                          |
+| SCIM                                                              | Enterprise SCIM                           | Provisioning implementation retained; core Identity owns identity ledger facts                       |
+| SSO                                                               | Enterprise SSO plus core Auth integration | License gate service retained; path predicates and account matching moved to core Auth               |
+| Webhooks                                                          | Core Webhook                              | Explicit current request, ADR-134; product entitlement gates retained                                |
 
 ## Placement correction
 
@@ -66,7 +69,7 @@ policy while migrating direct readers and transactional writes.
 ## Architecture adoption is a separate unresolved issue
 
 Billing, Governance, SCIM and SSO lack canonical `<feature>.api.ts` contracts
-and `defineFeature(...).withApp(...)` installers. Licensing has both but fails
+and `defineFeature(...).withApp(...)` installers (the spellings of 2026-09-07; §15 renamed them `XModule` and `.withApi(...)`). Licensing has both but fails
 the App-surface lint. Managed Provider has an API token/interface in its old
 service file and an installer, so its canonical contract check fails. These
 are already lint failures, not Enterprise exemptions. SaaS is browser-only.

@@ -110,6 +110,7 @@ export class JoinRequestGuardsService {
           matchedVia: data.matchedVia,
           expiresAtMs: data.expiresAtMs,
           notifyAdmins: data.notifyAdmins,
+          origin: data.origin,
           actor: data.actor,
         },
       },

@@ -1,3 +1,4 @@
+import type { LangWatchQLColumn } from "@langwatch/analytics-contract";
 /**
  * Advisory result diagnostics — what a note can say, and what the rules read.
  *
@@ -6,7 +7,6 @@
 import type { Instant } from "@langwatch/time";
 
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
-import type { LangWatchQLColumn } from "../services/langwatch-ql-executor.service.ts";
 import type {
   AcceptedLangWatchQL,
   LangWatchQLQueryBlock,
@@ -29,10 +29,7 @@ export const LWQL_DIAGNOSTIC_CODES = [
   "INCOMPLETE_COMPARISON_PERIOD",
 ] as const;
 
-export type {
-  LangWatchQLDiagnostic,
-  LangWatchQLDiagnosticCode,
-} from "@langwatch/analytics-contract";
+export type { LangWatchQLDiagnostic } from "@langwatch/analytics-contract";
 
 /**
  * What an empty diagnostics list means, in the words the API publishes.

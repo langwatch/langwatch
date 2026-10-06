@@ -20,7 +20,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import type { TraceMediaStore } from "../../app/trace.members.ts";
+import type { TraceMediaStore } from "../trace-stored-media-store.service.ts";
 
 interface StoredCall {
   mediaType: string;

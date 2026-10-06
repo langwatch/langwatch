@@ -9,7 +9,8 @@ import type { UiSessionReading, UiSessionSnapshot } from "@langwatch/browser-hos
 import type { UiScopeTeam } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, waitFor } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -31,7 +32,8 @@ type Call = { path: string; input: unknown };
 /** The two reads the scope resolves itself from, answered from memory. */
 function recordingTransport({
   teams = [PERSONAL_TEAM, SHARED_TEAM],
-}: { teams?: readonly UiScopeTeam[] } = {}) {
+  sharedTrace = "resolved",
+}: { teams?: readonly UiScopeTeam[]; sharedTrace?: "resolved" | "pending" | "failed" } = {}) {
   const calls: Call[] = [];
   const transport = createApiFixture<UiFeatureApiTransport>({
     query: (path: string, input: unknown) => {
@@ -40,6 +42,8 @@ function recordingTransport({
         case UI_ORGANIZATIONS_PROCEDURE:
           return Promise.resolve(organizationWith({ teams }));
         case UI_SHARED_TRACE_PROCEDURE:
+          if (sharedTrace === "pending") return new Promise(() => {});
+          if (sharedTrace === "failed") return Promise.reject(new Error("token refused"));
           return Promise.resolve({
             project: { id: "proj-shared", name: "Shared", slug: "shared-project" },
           });
@@ -83,12 +87,14 @@ afterEach(() => {
 function ScopeProbe({
   transport,
   session,
+  grants = [],
 }: {
   transport: UiFeatureApiTransport;
   session: UiSessionReading;
+  grants?: readonly string[];
 }) {
   const reading: UiScopeReading = useUiScopeReading({ transport, session });
-  const scope = createBrowserUiScope({ reading, session: new NoGrants(session, reading) });
+  const scope = createBrowserUiScope({ reading, session: new NoGrants(session, reading, grants) });
   const active = scope.activeScope();
   return (
     <div>
@@ -96,6 +102,9 @@ function ScopeProbe({
       <span data-testid="organization">{active.organizationId ?? "none"}</span>
       <span data-testid="project">{active.projectId ?? "none"}</span>
       <span data-testid="host">{scope.scopeHost() ? "published" : "none"}</span>
+      <span data-testid="legacy-can">
+        {String(scope.scopeHost()?.hasPermission("annotations:update") ?? false)}
+      </span>
     </div>
   );
 }
@@ -108,6 +117,7 @@ class NoGrants extends UiSession {
   constructor(
     private readonly reading: UiSessionReading,
     private readonly resolved: UiScopeReading,
+    private readonly grants: readonly string[] = [],
   ) {
     super();
   }
@@ -135,7 +145,7 @@ class NoGrants extends UiSession {
       permissions: {
         status: "ready",
         isLoading: false,
-        can: () => false,
+        can: (permission) => this.grants.includes(permission),
         canInOrganization: () => false,
       },
     };
@@ -146,10 +156,12 @@ function renderScope({
   path,
   transport,
   session = SIGNED_IN,
+  grants,
 }: {
   path: string;
   transport: UiFeatureApiTransport;
   session?: UiSessionReading;
+  grants?: readonly string[];
 }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter(
@@ -157,7 +169,7 @@ function renderScope({
       path: routePath,
       element: (
         <QueryClientProvider client={queryClient}>
-          <ScopeProbe transport={transport} session={session} />
+          <ScopeProbe transport={transport} session={session} grants={grants} />
         </QueryClientProvider>
       ),
     })),
@@ -273,5 +285,113 @@ describe("given nothing has resolved yet", () => {
     expect(view.getByTestId("status").textContent).toBe("loading");
     expect(view.getByTestId("project").textContent).toBe("none");
     expect(view.getByTestId("host").textContent).toBe("none");
+  });
+});
+
+describe("given a signed-in viewer with an active project opens a share link", () => {
+  const rememberViewersProject = () => {
+    window.localStorage.setItem(UI_SELECTED_TEAM_ID_KEY, JSON.stringify("team-shared"));
+    window.localStorage.setItem(UI_SELECTED_PROJECT_SLUG_KEY, JSON.stringify("acme-app"));
+  };
+
+  /** @scenario "A share route never falls back to the viewer's active project" */
+  it("reads loading while the shared trace query is pending, publishing no project", async () => {
+    rememberViewersProject();
+    const { transport, callsTo } = recordingTransport({ sharedTrace: "pending" });
+
+    const view = renderScope({ path: "/share/token-123", transport });
+
+    await waitFor(() => expect(callsTo(UI_SHARED_TRACE_PROCEDURE)).toHaveLength(1));
+    expect(view.getByTestId("status").textContent).toBe("loading");
+    expect(view.getByTestId("project").textContent).toBe("none");
+  });
+
+  /** @scenario "A share route never falls back to the viewer's active project" */
+  it("reads unavailable when the shared trace query fails, publishing no project", async () => {
+    rememberViewersProject();
+    const { transport } = recordingTransport({ sharedTrace: "failed" });
+
+    const view = renderScope({ path: "/share/token-123", transport });
+
+    await waitFor(() => expect(view.getByTestId("status").textContent).toBe("unavailable"));
+    expect(view.getByTestId("project").textContent).toBe("none");
+  });
+});
+
+const JOHN = "user-john";
+
+/** The scope probe with the signed-in user under the test's control. */
+function SwitchingProbe({
+  transport,
+  control,
+}: {
+  transport: UiFeatureApiTransport;
+  control: { signInAs?: (userId: string) => void };
+}) {
+  const [userId, setUserId] = useState(JANE);
+  control.signInAs = setUserId;
+  const session: UiSessionReading = {
+    status: "authenticated",
+    user: { id: userId, name: userId, email: null, image: null },
+  };
+  return <ScopeProbe transport={transport} session={session} />;
+}
+
+describe("given the first user has resolved an organization and project", () => {
+  /** @scenario "Switching users does not reuse the previous user's graph or grants" */
+  it("publishes neither of them in the first render for a user whose graph has not answered", async () => {
+    const control: { signInAs?: (userId: string) => void } = {};
+    let graphReads = 0;
+    const transport = createApiFixture<UiFeatureApiTransport>({
+      query: (path: string) => {
+        if (path !== UI_ORGANIZATIONS_PROCEDURE) return Promise.reject(new Error(path));
+        graphReads += 1;
+        return graphReads === 1
+          ? Promise.resolve(organizationWith({ teams: [PERSONAL_TEAM, SHARED_TEAM] }))
+          : new Promise(() => {});
+      },
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/:project/traces",
+          element: (
+            <QueryClientProvider client={queryClient}>
+              <SwitchingProbe transport={transport} control={control} />
+            </QueryClientProvider>
+          ),
+        },
+      ],
+      { initialEntries: ["/acme-app/traces"] },
+    );
+    const view = render(<RouterProvider router={router} />);
+    dispose = () => {
+      view.unmount();
+      router.dispose();
+    };
+    await waitFor(() => expect(view.getByTestId("project").textContent).toBe("proj-app"));
+    expect(view.getByTestId("organization").textContent).toBe("org-acme");
+
+    act(() => control.signInAs?.(JOHN));
+
+    expect(view.getByTestId("organization").textContent).toBe("none");
+    expect(view.getByTestId("project").textContent).toBe("none");
+    expect(view.getByTestId("host").textContent).toBe("none");
+  });
+});
+
+describe("given the session holds a grant once the scope has resolved", () => {
+  it("answers the legacy host's permission reader from that same grant", async () => {
+    const { transport } = recordingTransport();
+
+    const view = renderScope({
+      path: "/acme-app/traces",
+      transport,
+      grants: ["annotations:update"],
+    });
+
+    await waitFor(() => expect(view.getByTestId("project").textContent).toBe("proj-app"));
+    expect(view.getByTestId("legacy-can").textContent).toBe("true");
   });
 });

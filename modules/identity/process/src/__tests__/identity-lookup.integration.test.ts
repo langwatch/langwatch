@@ -4,9 +4,12 @@ import type {
   RecordedAuditLogEntry,
 } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
+import { explainAnyError, UNKNOWN_ERROR_PRESENTATION } from "@langwatch/handled-error/presentation";
 import {
   DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
+  DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
   DOMAIN_CLAIMED_EVENT_TYPE,
+  VERIFICATION_REQUESTED_EVENT_TYPE,
   emptySsoConnection,
   type IdentifierFact,
   type IdentityHistoryEntry,
@@ -39,7 +42,7 @@ import {
 import { IdentityService } from "../services/identity.service.ts";
 import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
 import { LinkProposalService } from "../services/link-proposal.service.ts";
-import { StubPlatformOperators } from "./support/in-memory-connections.ts";
+import { identityLookupDoor, refusalOf } from "./support/identity-lookup-door.ts";
 import { fact, headsWith, InMemoryHeads, USER } from "./support/in-memory-heads.ts";
 import { InMemoryReservations } from "./support/in-memory-reservations.ts";
 import { InMemoryUsers } from "./support/in-memory-users.ts";
@@ -73,7 +76,7 @@ class FakeAuditLog implements AuditLogApi {
 
   private async write(command: RecordAuditLogCommand): Promise<void> {
     this.rows.unshift(command);
-    this.reads.record({
+    this.reads.activity.unshift({
       auditId: `audit_${this.rows.length}`,
       operatorUserId: command.userId ?? null,
       operatorName: null,
@@ -122,7 +125,6 @@ beforeEach(() => {
       listBrowserSessions: async () => [],
     }),
     invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
-    authorization: new StubPlatformOperators([OLIVE.userId]),
     auditLog,
     rateLimiter: noopRateLimiter(),
   });
@@ -216,12 +218,24 @@ describe("identity lookup, end to end at the read surface", () => {
   describe("when mallory holds no platform operator access", () => {
     /** @scenario "A refused lookup is recorded as an attempt, and reveals nothing" */
     it("refuses the request and records only that she made an attempt", async () => {
-      await expect(
-        service.lookupAddress({ address: "sam@acme.com", operator: MALLORY }),
-      ).rejects.toMatchObject({ code: "not_found" });
+      const door = identityLookupDoor({ app: service, operators: [OLIVE.userId] });
 
+      const refusal = await door
+        .as(MALLORY.userId)
+        .resolve({ address: "sam@acme.com" })
+        .catch((error: unknown) => error);
+
+      expect(refusalOf(refusal)).toEqual({
+        trpc: "NOT_FOUND",
+        code: "not_found",
+        message: "Not found",
+      });
+      expect(JSON.stringify(refusal)).not.toContain("sam@acme.com");
       expect(auditLog.rows).toHaveLength(1);
-      expect(auditLog.rows[0]?.userId).toBe(MALLORY.userId);
+      expect(auditLog.rows[0]).toMatchObject({
+        userId: MALLORY.userId,
+        action: "identityLookup.resolve",
+      });
     });
   });
 
@@ -265,6 +279,7 @@ function identifierRow(overrides: {
 
 describe("identity lookup, the repairs and the panels main's surface serves", () => {
   const ended: string[] = [];
+  const resent: string[] = [];
 
   function repairingService(): IdentityLookupService {
     return IdentityLookupService.create({
@@ -273,7 +288,6 @@ describe("identity lookup, the repairs and the panels main's surface serves", ()
       router: { route: async () => CONNECTED_ROUTE },
       identity: () => createApiFixture<Pick<IdentityService, "detachIdentifier">>({}),
       links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
-      authorization: new StubPlatformOperators([OLIVE.userId]),
       auditLog,
       rateLimiter: noopRateLimiter(),
       sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({
@@ -296,6 +310,20 @@ describe("identity lookup, the repairs and the panels main's surface serves", ()
         extendInvitation: async ({ inviteId }: { inviteId: string }) => ({
           invite: invitationRow({ inviteId, expiration: new Date(5_000) }),
         }),
+        resendInvitation: async ({
+          organizationId,
+          inviteId,
+        }: {
+          organizationId: string;
+          inviteId: string;
+        }) => {
+          resent.push(`${organizationId}:${inviteId}`);
+          return {
+            invite: invitationRow({ inviteId, expiration: new Date(9_000) }),
+            emailNotSent: false,
+            inviteUrl: "https://app.acme.test/invite/fresh",
+          };
+        },
       }),
       now: () => 1_000,
     });
@@ -303,6 +331,7 @@ describe("identity lookup, the repairs and the panels main's surface serves", ()
 
   beforeEach(() => {
     ended.length = 0;
+    resent.length = 0;
   });
 
   describe("when olive resolves an address", () => {
@@ -336,6 +365,27 @@ describe("identity lookup, the repairs and the panels main's surface serves", ()
     });
   });
 
+  describe("when olive resends an expired invitation", () => {
+    /** @scenario "Resending an invitation from here does what resending does anywhere" */
+    it("asks the organization's own resend and records the act against the invitation", async () => {
+      const answer = await repairingService().resendLookupInvitation({
+        organizationId: "org_acme",
+        inviteId: "inv_1",
+        operator: OLIVE,
+      });
+
+      // The operator's resend IS the organization's resend: the same call an
+      // administrator's click makes, answering the fresh invitation's expiry.
+      expect(resent).toEqual(["org_acme:inv_1"]);
+      expect(answer).toEqual({ expiresAtMs: 9_000 });
+      expect(auditLog.rows[0]).toMatchObject({
+        userId: OLIVE.userId,
+        action: "identityLookup.resendInvitation",
+        targetId: "inv_1",
+      });
+    });
+  });
+
   describe("when olive extends an invitation", () => {
     /** @scenario "Extending an invitation moves its expiry and says by how much" */
     it("answers the new expiry and records the act against the invitation", async () => {
@@ -356,9 +406,17 @@ describe("identity lookup, the repairs and the panels main's surface serves", ()
 
   describe("when somebody outside the staff list asks for the claim queue", () => {
     it("refuses with the generic not_found", async () => {
-      await expect(
-        repairingService().findDomainClaimQueue({ operator: MALLORY }),
-      ).rejects.toMatchObject({ code: "not_found" });
+      const door = identityLookupDoor({
+        app: repairingService(),
+        operators: [OLIVE.userId],
+      });
+
+      const refusal = await door
+        .as(MALLORY.userId)
+        .claimQueue({})
+        .catch((error: unknown) => error);
+
+      expect(refusalOf(refusal).code).toBe("not_found");
     });
   });
 
@@ -430,7 +488,6 @@ describe("identity lookup, deciding a sign-in waiting on a human", () => {
           },
         }),
       }),
-      authorization: new StubPlatformOperators([OLIVE.userId]),
       auditLog,
       rateLimiter: noopRateLimiter(),
       sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({
@@ -553,13 +610,17 @@ describe("identity lookup, deciding a sign-in waiting on a human", () => {
 
   describe("when somebody outside the staff list tries to decide it", () => {
     it("records the attempt, refuses with the generic not_found, and decides nothing", async () => {
-      await expect(
-        decidingService().confirmProposedSignIn({
-          userId: SAM,
-          proposalId: "prop_1",
-          operator: MALLORY,
-        }),
-      ).rejects.toMatchObject({ code: "not_found" });
+      const door = identityLookupDoor({
+        app: decidingService(),
+        operators: [OLIVE.userId],
+      });
+
+      const refusal = await door
+        .as(MALLORY.userId)
+        .confirmProposedSignIn({ userId: SAM, proposalId: "prop_1" })
+        .catch((error: unknown) => error);
+
+      expect(refusalOf(refusal).code).toBe("not_found");
 
       expect(auditLog.rows[0]?.action).toBe("identityLookup.confirmProposedSignIn");
       expect(store.identityEvents.map((event) => event.type)).toEqual([LINK_PROPOSED_EVENT_TYPE]);
@@ -601,7 +662,6 @@ describe("identity lookup, what an operator sees waiting on a person", () => {
         listBrowserSessions: async () => [],
       }),
       invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
-      authorization: new StubPlatformOperators([OLIVE.userId]),
       auditLog,
       rateLimiter: noopRateLimiter(),
       now: () => 1_000,
@@ -670,7 +730,6 @@ describe("identity lookup, detaching a sign-in method", () => {
       links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
       sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({}),
       invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
-      authorization: new StubPlatformOperators([OLIVE.userId]),
       auditLog,
       rateLimiter: noopRateLimiter(),
     });
@@ -699,6 +758,46 @@ describe("identity lookup, detaching a sign-in method", () => {
     await expect(
       heads.getActiveIdentifierByValue({ normalizedValue: "sam@acme.com" }),
     ).resolves.toEqual({ userId: USER, identifierId: "idf_work" });
+  });
+
+  /** @scenario "Detaching somebody's last way in is refused" */
+  /** @scenario 'A refused repair says what to do about it, never "unknown"' */
+  it("refuses olive's detachment of their only working method, in words registered for the code", async () => {
+    const heads = new InMemoryHeads();
+    heads.heads.set(USER, headsWith(fact({ identifierId: "idf_work", value: "sam@acme.com" })));
+    const ledger = new RecordingLedger();
+    const identity = IdentityService.create(
+      IdentityGuardsService.create({
+        heads,
+        users: new InMemoryUsers(),
+        reservations: new InMemoryReservations(),
+        identifiers: CryptoIdentifierIdentityService.create(),
+      }),
+      ledger,
+    );
+    const lookup = IdentityLookupService.create({
+      reads,
+      history: new EmptyIdentityHistory(),
+      router: { route: async () => CONNECTED_ROUTE },
+      identity: () => identity,
+      links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
+      sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({}),
+      invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
+      auditLog,
+      rateLimiter: noopRateLimiter(),
+    });
+
+    const refusal = await lookup
+      .detachLookupMethod({ userId: USER, identifierId: "idf_work", operator: OLIVE })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: "identity_detach_strands_user" });
+    const copy = explainAnyError(refusal);
+    expect(copy.isRegistered).toBe(true);
+    expect(copy.title).not.toBe(UNKNOWN_ERROR_PRESENTATION.title);
+    expect(copy.description).not.toBe(UNKNOWN_ERROR_PRESENTATION.description);
+    expect(ledger.commits).toHaveLength(0);
+    expect(heads.heads.get(USER)?.identifiers.idf_work?.state).toBe("VERIFIED");
   });
 });
 
@@ -745,5 +844,109 @@ describe("identity lookup, the claims queue and how long a claim waited", () => 
     expect(decided.domainClaims).toEqual([
       expect.objectContaining({ domain: "older.example", state: "APPROVED", waitedMs: 3_000 }),
     ]);
+  });
+
+  /** @scenario "The operator queue lists disputes and nothing else" */
+  it("lists the disputed claim and leaves the one waiting for its own record to the customer", async () => {
+    store.ssoConnections.set(
+      "disputed",
+      claimedAt({ connectionId: "disputed", claimedAtMs: 4_000 }),
+    );
+    store.ssoConnections.set(
+      "own",
+      reduceSsoConnection({
+        state: { ...emptySsoConnection({ connectionId: "own" }), organizationId: "org_own" },
+        fact: {
+          type: VERIFICATION_REQUESTED_EVENT_TYPE,
+          data: {
+            connectionId: "own",
+            domain: "own.example",
+            method: "dns-txt",
+            tokenHash: "sha256:fingerprint",
+            expiresAtMs: null,
+            actor: ANA,
+            source: "self-serve",
+          },
+          occurredAt: 3_000,
+        },
+      }),
+    );
+    store.organizationNames.set("org_disputed", "Disputed Co");
+    store.organizationNames.set("org_own", "Own Co");
+
+    const queue = await service.findDomainClaimQueue({ operator: OLIVE });
+
+    expect(queue.map((claim) => claim.domain)).toEqual(["disputed.example"]);
+  });
+
+  const OPS_ACTOR = { type: "user" as const, id: "user_ops" };
+  const queuedDomains = async () =>
+    (await service.findDomainClaimQueue({ operator: OLIVE })).map((claim) => claim.domain);
+  const disputed = () => {
+    const claimed = claimedAt({ connectionId: "disputed", claimedAtMs: 4_000 });
+    store.ssoConnections.set("disputed", claimed);
+    store.organizationNames.set("org_disputed", "Disputed Co");
+    return claimed;
+  };
+  const decisionData = {
+    connectionId: "disputed",
+    domain: "disputed.example",
+    actor: OPS_ACTOR,
+    source: "self-serve" as const,
+  };
+
+  /** @scenario "An operator still decides a disputed claim, either way" */
+  it("records an operator's approval as hers and takes the claim off the queue", async () => {
+    const claimed = disputed();
+    expect(await queuedDomains()).toEqual(["disputed.example"]);
+
+    const decided = reduceSsoConnection({
+      state: claimed,
+      fact: {
+        type: DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
+        data: { ...decisionData, authority: "platform-operator" },
+        occurredAt: 6_000,
+      },
+    });
+    store.ssoConnections.set("disputed", decided);
+
+    expect(decided.domainClaims).toEqual([
+      expect.objectContaining({ decidedByActorId: OPS_ACTOR.id, authority: "platform-operator" }),
+    ]);
+    expect(await queuedDomains()).toEqual([]);
+  });
+
+  /** @scenario "An operator still decides a disputed claim, either way" */
+  it("records an operator's rejection as hers, and the domain can be claimed again", async () => {
+    const claimed = disputed();
+    expect(await queuedDomains()).toEqual(["disputed.example"]);
+
+    const decided = reduceSsoConnection({
+      state: claimed,
+      fact: {
+        type: DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
+        data: { ...decisionData, note: "Could not reach the domain owner" },
+        occurredAt: 6_000,
+      },
+    });
+    store.ssoConnections.set("disputed", decided);
+
+    expect(decided.domainClaims).toEqual([
+      expect.objectContaining({ decidedByActorId: OPS_ACTOR.id, note: expect.any(String) }),
+    ]);
+    expect(await queuedDomains()).toEqual([]);
+
+    store.ssoConnections.set(
+      "disputed",
+      reduceSsoConnection({
+        state: decided,
+        fact: {
+          type: DOMAIN_CLAIMED_EVENT_TYPE,
+          data: { ...decisionData, actor: ANA },
+          occurredAt: 8_000,
+        },
+      }),
+    );
+    expect(await queuedDomains()).toEqual(["disputed.example"]);
   });
 });

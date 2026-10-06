@@ -5,6 +5,7 @@
  * router, never browser-host directly (ARCHITECTURE.md §10.1).
  */
 import type { SignInStartRefusal } from "@langwatch/auth-contract";
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { createContext, useContext } from "react";
 
 import type { SsoQueryReading } from "./test-sign-in-callback.ts";
@@ -80,6 +81,9 @@ export abstract class SsoHostApi {
    * under more than one name. Answered by auth, which owns the list.
    */
   abstract normalizeSignInErrorCode(code: string): string;
+
+  /** Opens another module's drawer by its token, never by import. */
+  abstract openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void;
 }
 
 const SsoHostContext = createContext<SsoHostApi | undefined>(void 0);

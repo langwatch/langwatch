@@ -32,7 +32,7 @@ import {
 } from "./langwatch-ql-hydration-read.service.ts";
 
 /** The execute path a text hydration reads its rows through. */
-export interface LangWatchQLStatementRunner {
+interface LangWatchQLStatementRunner {
   executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult>;
 }
 

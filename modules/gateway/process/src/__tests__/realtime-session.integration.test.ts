@@ -9,17 +9,12 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
-import type {
-  GatewayChangeEvents,
-  GatewaySpanIngestion,
-  GatewaySpendConfirmation,
-} from "../app/gateway.members.ts";
 import { MemoryElevenLabsConversationChannel } from "../channels/memory/memory.elevenlabs-conversation.channel.ts";
 import { writeGatewayDebitsSchema } from "../eventing/gateway-debit.intent.ts";
 import type { ConfirmSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
@@ -29,6 +24,7 @@ import {
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import { GatewayBudgetChangeDedupeRepository } from "../repositories/gateway-budget-change-dedupe.repository.ts";
+import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
 import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 import { EMPTY_SPEND_USAGE } from "../rules/gateway-spend-projection.rules.ts";
 import { GatewayBudgetChangeDedupeService } from "../services/gateway-budget-change-dedupe.service.ts";
@@ -41,6 +37,8 @@ import {
 } from "../services/gateway-realtime-session-reconciliation.service.ts";
 import { GatewayRealtimeSessionSweepService } from "../services/gateway-realtime-session-sweep.service.ts";
 import {
+  type GatewaySpanIngestion,
+  type GatewaySpendConfirmation,
   GatewayRealtimeSessionService,
   REALTIME_OPEN_SESSION_WINDOW_MS,
   type GatewayRealtimeSessionCollaborators,
@@ -48,8 +46,8 @@ import {
 import { GatewaySpendDebitService } from "../services/gateway-spend-debit.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
+import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
-import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 /** The stored row, as the settlement seam reads it: the same columns, on instants. */
 function toSessionRecord<
@@ -693,7 +691,7 @@ class SilentCrossings implements Pick<GatewayBudgetCrossingService, "detect"> {
   async detect(): Promise<void> {}
 }
 
-class DiscardedChanges implements Pick<GatewayChangeEvents, "append"> {
+class DiscardedChanges implements Pick<GatewayChangeEventsRepository, "append"> {
   async append(): Promise<{ revision: bigint }> {
     return { revision: 0n };
   }

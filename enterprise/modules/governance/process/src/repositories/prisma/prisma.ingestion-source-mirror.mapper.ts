@@ -36,7 +36,7 @@ export interface IngestionPullRunStatusData {
  * what lets the fold's unit tests assert the mirror shape without booting
  * Prisma. The repository does the one-line JSON-null conversion.
  */
-export interface IngestionSourceMirror {
+interface IngestionSourceMirror {
   pollerCursor: string | null;
   errorCount: number;
   lastSuccessAt: Date | undefined;

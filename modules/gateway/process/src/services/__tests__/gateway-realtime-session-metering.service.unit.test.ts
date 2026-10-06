@@ -13,7 +13,6 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type { GatewaySpanIngestion, GatewaySpendConfirmation } from "../../app/gateway.members.ts";
 import { MemoryElevenLabsConversationChannel } from "../../channels/memory/memory.elevenlabs-conversation.channel.ts";
 import type { ConfirmSpendCommandData } from "../../eventing/gateway-spend-commands.process.ts";
 import { MemoryGatewayRealtimeSessionRepository } from "../../repositories/memory/memory.gateway-realtime-session.repository.ts";
@@ -29,6 +28,8 @@ import {
   GatewayRealtimeSessionService,
   REALTIME_OPEN_SESSION_WINDOW_MS,
   type GatewayRealtimeSessionCollaborators,
+  type GatewaySpanIngestion,
+  type GatewaySpendConfirmation,
   type ReserveInput,
 } from "../gateway-realtime-session.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../model-catalog-gateway-spend-rating.service.ts";

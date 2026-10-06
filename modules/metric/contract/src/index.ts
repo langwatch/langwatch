@@ -45,4 +45,3 @@ export {
   type MetricRollupSourcePoint,
   type MetricSequencePoint,
 } from "./metric-rollup/sequence.ts";
-export * from "./metric.config.ts";

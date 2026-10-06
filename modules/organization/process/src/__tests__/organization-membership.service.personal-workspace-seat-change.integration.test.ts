@@ -17,14 +17,14 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository.ts";
 import type {
   OrganizationGrantCache,
-  OrganizationPromptSeed,
-  OrganizationSeatLicense,
   OrganizationSessionRevocation,
-} from "../app/organization.members.ts";
-import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository.ts";
+} from "../services/organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
+import type { OrganizationPromptSeed } from "../services/organization-prompt-seed.service.ts";
+import type { OrganizationSeatLicense } from "../services/organization-seat-license.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -73,6 +73,7 @@ describe.skipIf(!DB_URL)(
     const memberships = OrganizationMembershipService.create({
       repository: PrismaOrganizationMembershipRepository.create({
         database: prisma,
+        cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
         grants: recordingGrantsWriter,
       }),
       prompts,

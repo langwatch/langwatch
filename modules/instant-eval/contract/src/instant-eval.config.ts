@@ -1,4 +1,4 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, type ConfigOf, isSaas, nodeEnvironment } from "@langwatch/config";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
@@ -44,6 +44,10 @@ export const instantEvalConfig = Config.define((c) => ({
     "INSTANT_EVAL_QUERY_TOKEN_BUDGET",
     z.coerce.number().positive().default(4_000_000),
   ),
+  /** The hosted product, which decides whether the opt-in is offered or sent to sales. */
+  isSaas,
+  /** The shared leaf: "production" refuses the memory judge. */
+  nodeEnvironment,
 }));
 
 export type InstantEvalServerConfig = ConfigOf<typeof instantEvalConfig>;

@@ -1,6 +1,7 @@
 /** OTLP receiver imports spans: rejection tally carefully counts validation
  * failures, and one bad span doesn't spoil the batch. */
 
+import { shouldFilterCodingAgentSpan } from "@langwatch/coding-agent-contract";
 import {
   createRecordingMeterProvider,
   type RecordingMeterProvider,
@@ -16,8 +17,11 @@ import {
 } from "../../repositories/trace-span-dedup.repository.ts";
 import { TraceEdgeMediaPayloadService } from "../trace-edge-media-payload.service.ts";
 import { TraceEdgeMediaTelemetryService } from "../trace-edge-media-telemetry.service.ts";
-import { TraceIngressCommand, TraceIngestionService } from "../trace-ingestion.service.ts";
-import { TestCodingAgentService } from "./support/coding-agent.service.fake.ts";
+import {
+  type CodingAgentIngestFilter,
+  TraceIngressCommand,
+  TraceIngestionService,
+} from "../trace-ingestion.service.ts";
 
 class TestTraceIngressCommand extends TraceIngressCommand {
   readonly record = vi.fn(async (_data: RecordSpanCommandData) => void 0);
@@ -46,11 +50,7 @@ class TestTraceSpanDedup extends TraceSpanDedupRepository {
 }
 
 /** Says yes to every span, so the test exercises the service's use of the filter. */
-class FilterEverythingCodingAgentService extends TestCodingAgentService {
-  shouldFilterSpan(): boolean {
-    return true;
-  }
-}
+const filterEverything: CodingAgentIngestFilter = { shouldFilterSpan: () => true };
 
 function span(over: Partial<OtlpSpan> = {}): OtlpSpan {
   const now = Date.now();
@@ -82,8 +82,8 @@ function fixture(
   const commands = new TestTraceIngressCommand();
   const service = TraceIngestionService.create({
     codingAgents: options.filterEverything
-      ? new FilterEverythingCodingAgentService()
-      : new TestCodingAgentService(),
+      ? filterEverything
+      : { shouldFilterSpan: shouldFilterCodingAgentSpan },
     codingAgentSpanFilterEnabled: options.codingAgentSpanFilterEnabled ?? false,
     dedup,
     commands,
@@ -525,7 +525,7 @@ describe("TraceIngestionService.handleOtlpTraceRequest edge media fail-open seri
         },
       ]);
       const service = TraceIngestionService.create({
-        codingAgents: new TestCodingAgentService(),
+        codingAgents: { shouldFilterSpan: shouldFilterCodingAgentSpan },
         codingAgentSpanFilterEnabled: false,
         dedup: new TestTraceSpanDedup(),
         commands,

@@ -10,8 +10,8 @@ import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
-import type { GatewaySpendRating } from "../../app/gateway.members.ts";
 import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
+import type { GatewaySpendRating } from "../../services/model-catalog-gateway-spend-rating.service.ts";
 import {
   mountGatewayInternalRest,
   signedGatewayRequest,

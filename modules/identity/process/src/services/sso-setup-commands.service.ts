@@ -11,14 +11,10 @@ import {
   SsoConnectionInvalidTransitionError,
   SsoConnectionNotFoundError,
   type SsoConnectionState,
-  type SsoCredentialKind,
-  SsoCredentialsRequiredError,
   type SsoIdentityProviderView,
-  type SsoIdpDialing,
   type SsoIdpRegistration,
   type SsoIdpUpdate,
   type SsoSetupCommand,
-  parseSamlIdpConfig,
   ssoConnectionIdpIsEditable,
   ssoDomainVouchesForNewPeople,
 } from "@langwatch/identity-contract";
@@ -27,11 +23,10 @@ import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
 } from "../repositories/sso-connection.repository.ts";
-import type { SsoCredentialRepository } from "../repositories/sso-credential.repository.ts";
 import type { SsoMigrationEvidenceRepository } from "../repositories/sso-migration-evidence.repository.ts";
 import { newSsoConnectionCommandId, newSsoConnectionId } from "../rules/sso-connection-id.rules.ts";
 import type { SsoConnectionService } from "./sso-connection.service.ts";
-import type { SsoIdpRegistrationService } from "./sso-idp-registration.service.ts";
+import type { SsoIdpCredentialsService } from "./sso-idp-credentials.service.ts";
 import type { SsoMigrationFinalizationService } from "./sso-migration-finalization.service.ts";
 
 /** The states a removal abandons outright — every one before a connection
@@ -49,15 +44,17 @@ const REMOVABLE_BY_DISCARD = new Set([
  *  trail is per connection, and a test sign-in is among its newest rows. */
 const TEST_SIGN_IN_LOOKBACK = 20;
 
-export interface SsoSetupCommandsServiceDeps {
+interface SsoSetupCommandsServiceDeps {
   connections: () => SsoConnectionService;
   reads: SsoConnectionReadRepository;
   /** The trail going live reads the test sign-in off. */
   activity: SsoMigrationEvidenceRepository;
-  credentials: SsoCredentialRepository;
+  /** The vault half: what a registration stores, keeps and shows. */
+  idpCredentials: SsoIdpCredentialsService;
   /** The same "is there a way back in" answer the sign-in exemption reads. */
   breakGlass: SsoBreakGlassBindingRepository;
-  registrations: SsoIdpRegistrationService;
+  /** Whether the deployment's resolved method policy hangs a password door. */
+  passwordDoor: () => Promise<boolean>;
   /** The cutover's last verb, which is a ceremony of its own. */
   finalization: SsoMigrationFinalizationService;
   now?: () => number;
@@ -97,7 +94,11 @@ export class SsoSetupCommandsService {
     registration: SsoIdpRegistration;
   }): Promise<{ connectionId: string }> {
     const connectionId = newSsoConnectionId();
-    const idp = await this.storeCredentials({ organizationId, connectionId, registration });
+    const idp = await this.deps.idpCredentials.storeCredentials({
+      organizationId,
+      connectionId,
+      registration,
+    });
 
     await this.deps.connections().registerConnection({
       ...this.command({ organizationId, connectionId, actor }),
@@ -138,7 +139,11 @@ export class SsoSetupCommandsService {
     if (standing) return { connectionId: standing };
 
     const connectionId = newSsoConnectionId();
-    const idp = await this.storeCredentials({ organizationId, connectionId, registration });
+    const idp = await this.deps.idpCredentials.storeCredentials({
+      organizationId,
+      connectionId,
+      registration,
+    });
     await this.deps.connections().registerReplacementConnection({
       ...this.command({ organizationId, connectionId, actor }),
       type: registration.protocol,
@@ -191,28 +196,7 @@ export class SsoSetupCommandsService {
     connectionId: string;
   }): Promise<SsoIdentityProviderView> {
     const state = await this.requireOrganizationConnection({ organizationId, connectionId });
-    if (state.source !== "self-serve") return { protocol: "grandfathered" };
-    const { idpMetadata } = state;
-    if (state.type === "oidc") {
-      return {
-        protocol: "oidc",
-        issuer: idpMetadata.issuer,
-        clientId: await this.readCredential({ organizationId, ref: idpMetadata.clientIdRef }),
-        hasClientSecret: idpMetadata.secretRef !== null,
-      };
-    }
-    const stored = await this.readCredential({
-      organizationId,
-      ref: idpMetadata.certRefs[0] ?? null,
-    });
-    const config = stored === null ? null : parseSamlIdpConfig(stored);
-    return {
-      protocol: "saml",
-      entryPoint: config?.entryPoint ?? null,
-      entityId: config?.entityId ?? idpMetadata.issuer,
-      metadataXml: config?.metadataXml ?? null,
-      certificate: config?.certificate ?? null,
-    };
+    return this.deps.idpCredentials.viewOf(state);
   }
 
   /**
@@ -241,95 +225,12 @@ export class SsoSetupCommandsService {
     }
     const dialing =
       idp.protocol === "oidc"
-        ? await this.prepareOidcUpdate({ state, idp })
-        : await this.prepareSamlUpdate({ state, idp });
+        ? await this.deps.idpCredentials.prepareOidcUpdate({ state, idp })
+        : await this.deps.idpCredentials.prepareSamlUpdate({ state, idp });
     await this.deps.connections().updateConnectionIdp({
       ...this.command({ organizationId, connectionId, actor }),
       idp: dialing,
     });
-  }
-
-  private async prepareOidcUpdate({
-    state,
-    idp,
-  }: {
-    state: SsoConnectionState;
-    idp: Extract<SsoIdpUpdate, { protocol: "oidc" }>;
-  }): Promise<SsoIdpDialing> {
-    const current = state.idpMetadata;
-    const clientSecret =
-      idp.clientSecret === null || idp.clientSecret.trim() === "" ? null : idp.clientSecret;
-    if (clientSecret === null && current.secretRef === null) {
-      throw new SsoCredentialsRequiredError("an openid connect connection needs a client secret");
-    }
-    const { issuer } = await this.deps.registrations.validateOidcRegistration({
-      ...idp,
-      // A blank secret keeps the stored one, which satisfies the presence check.
-      clientSecret: clientSecret ?? "stored",
-    });
-    const clientIdRef = await this.keptOrStoredCredential({
-      state,
-      ref: current.clientIdRef,
-      kind: "oidc-client-id",
-      value: idp.clientId,
-    });
-    const secretRef =
-      clientSecret === null
-        ? current.secretRef
-        : await this.keptOrStoredCredential({
-            state,
-            ref: current.secretRef,
-            kind: "oidc-client-secret",
-            value: clientSecret,
-          });
-    return { issuer, clientIdRef, secretRef, certRefs: [] };
-  }
-
-  private async prepareSamlUpdate({
-    state,
-    idp,
-  }: {
-    state: SsoConnectionState;
-    idp: Extract<SsoIdpUpdate, { protocol: "saml" }>;
-  }): Promise<SsoIdpDialing> {
-    const config = this.deps.registrations.validateSamlRegistration(idp);
-    const certRef = await this.keptOrStoredCredential({
-      state,
-      ref: state.idpMetadata.certRefs[0] ?? null,
-      kind: "saml-idp-config",
-      value: JSON.stringify(config),
-    });
-    return { issuer: config.entityId, clientIdRef: null, secretRef: null, certRefs: [certRef] };
-  }
-
-  /** The stored reference when it already holds this value, otherwise a new
-   *  one. A changed value always gets a new reference, so the log records
-   *  when a credential changed. */
-  private async keptOrStoredCredential({
-    state: { organizationId, connectionId },
-    ref,
-    kind,
-    value,
-  }: {
-    state: SsoConnectionState;
-    ref: string | null;
-    kind: SsoCredentialKind;
-    value: string;
-  }): Promise<string> {
-    if ((await this.readCredential({ organizationId, ref })) === value && ref !== null) return ref;
-    return this.deps.credentials.put({ organizationId, connectionId, kind, value });
-  }
-
-  private async readCredential({
-    organizationId,
-    ref,
-  }: {
-    organizationId: string;
-    ref: string | null;
-  }): Promise<string | null> {
-    if (ref === null) return null;
-    const read = await this.deps.credentials.read({ organizationId, ref });
-    return read.found ? read.value : null;
   }
 
   /** Who this connection admits (ADR-117 §3). */
@@ -353,7 +254,8 @@ export class SsoSetupCommandsService {
    */
   async activate({ organizationId, connectionId, actor }: SsoSetupCommand): Promise<void> {
     const state = await this.requireOrganizationConnection({ organizationId, connectionId });
-    if (state.state !== "ACTIVE") await this.requirePreconditionsInScreenOrder(state);
+    if (state.state === "ACTIVE") return;
+    await this.requirePreconditionsInScreenOrder(state);
     await this.deps.connections().activateConnection({
       ...this.command({ organizationId, connectionId, actor }),
       testLoginAccountId: await this.testSignInAccountOf(state),
@@ -371,12 +273,17 @@ export class SsoSetupCommandsService {
       );
     }
     await this.testSignInAccountOf(state);
+    if (!(await this.deps.passwordDoor())) {
+      throw new SsoActivationBreakGlassMissingError(
+        `organization ${state.organizationId}: the deployment has no password door for a grant to be a way in through`,
+      );
+    }
     const wayBackIn = await this.deps.breakGlass.hasLiveBinding({
       organizationId: state.organizationId,
     });
     if (!wayBackIn) {
       throw new SsoActivationBreakGlassMissingError(
-        `organization ${state.organizationId}: no live way in without the identity provider`,
+        `organization ${state.organizationId}: no live way in without the identity provider that somebody holding a password could walk`,
       );
     }
     if (state.arrivalPolicyDecidedAtMs === null) {
@@ -462,56 +369,6 @@ export class SsoSetupCommandsService {
       graceMs: carriesNobody ? 0 : graceMs,
     });
     return { removal: "teardown-requested" };
-  }
-
-  /**
-   * The vault half of a registration. OpenID Connect keeps its two values
-   * apart because they are read apart; SAML keeps one document, because half
-   * a SAML provider cannot be dialled.
-   */
-  private async storeCredentials({
-    organizationId,
-    connectionId,
-    registration,
-  }: {
-    organizationId: string;
-    connectionId: string;
-    registration: SsoIdpRegistration;
-  }): Promise<{
-    issuer: string | null;
-    clientIdRef: string | null;
-    secretRef: string | null;
-    certRefs: string[];
-  }> {
-    const vault = (kind: "oidc-client-id" | "oidc-client-secret" | "saml-idp-config") =>
-      ({ organizationId, connectionId, kind }) as const;
-
-    if (registration.protocol === "oidc") {
-      const { issuer } = await this.deps.registrations.validateOidcRegistration(registration);
-
-      return {
-        issuer,
-        clientIdRef: await this.deps.credentials.put({
-          ...vault("oidc-client-id"),
-          value: registration.clientId,
-        }),
-        secretRef: await this.deps.credentials.put({
-          ...vault("oidc-client-secret"),
-          value: registration.clientSecret,
-        }),
-        certRefs: [],
-      };
-    }
-
-    const config = this.deps.registrations.validateSamlRegistration(registration);
-    // The whole dialing document under one reference; `certRefs` is where a
-    // connection carries what it was given rather than what it was told.
-    const ref = await this.deps.credentials.put({
-      ...vault("saml-idp-config"),
-      value: JSON.stringify(config),
-    });
-
-    return { issuer: config.entityId, clientIdRef: null, secretRef: null, certRefs: [ref] };
   }
 
   /** The replacement already registered against this legacy connection and

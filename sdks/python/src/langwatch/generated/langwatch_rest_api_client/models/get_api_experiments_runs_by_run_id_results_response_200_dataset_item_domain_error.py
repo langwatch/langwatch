@@ -26,7 +26,7 @@ class GetApiExperimentsRunsByRunIdResultsResponse200DatasetItemDomainError:
         message (str | Unset):
         meta (GetApiExperimentsRunsByRunIdResultsResponse200DatasetItemDomainErrorMeta | Unset):
         http_status (float | Unset):
-        fault (str | Unset): Who the failure is attributable to: customer, platform, provider
+        fault (str | Unset): Who the failure is attributable to: customer, platform, presumed_platform, provider
         trace_id (str | Unset):
         span_id (str | Unset):
         trace_url (str | Unset):

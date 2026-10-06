@@ -3,7 +3,8 @@ import type { AnnotationApi } from "@langwatch/annotation-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -14,7 +15,8 @@ import { auditLogProcessModule } from "../../audit-log.module.ts";
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(auditLogProcessModule)])
+    .withModules([auditLogProcessModule])
+    .withStores(memoryStores())
     .withConfig({ "audit-log": { maxArgsBytes: 4 * 1024 } })
     .provide({
       project: createApiFixture<ProjectApi>({}),
@@ -55,6 +57,28 @@ describe("given a process that installed the audit log", () => {
             limit: 10,
           }),
         ).resolves.toMatchObject([{ userId: "user-1", action: "agents.create" }]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+
+    /** @scenario "An installation with no Enterprise module still records management writes" */
+    it("records and reads back with the audit log module as the only installed module", async () => {
+      const runtime = await process("api").boot();
+
+      try {
+        const app = runtime.service(AuditLogApi);
+
+        await expect(app.record(command)).resolves.toMatchObject({ id: expect.any(String) });
+        await expect(
+          app.listEntityHistory({
+            projectId: "project-1",
+            actionPrefix: "agents.",
+            entityId: "agent-1",
+            argumentNames: ["id"],
+            limit: 10,
+          }),
+        ).resolves.toHaveLength(1);
       } finally {
         await runtime.stop();
       }

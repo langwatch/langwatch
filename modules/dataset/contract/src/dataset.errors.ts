@@ -5,6 +5,8 @@
 import { HandledError } from "@langwatch/handled-error";
 import { REFUSED_ATTACHMENT_MEDIA_TYPES } from "@langwatch/stored-object-contract";
 
+import { formatDatasetByteLimit, formatDatasetRowLimit } from "./dataset-limits.ts";
+
 export type UploadRefusal =
   | "column_mismatch"
   | "file_too_large"
@@ -250,10 +252,7 @@ export class ChunkTooLargeError extends HandledError {
   }
 }
 
-/**
- * Thrown when a full (unbounded) export of an s3_jsonl dataset would have to materialize more
- * bytes than `DATASET_FULL_EXPORT_MAX_BYTES` in heap.
- */
+/** A search would read more rows or bytes than the organization's whole-read limits. */
 export class DatasetTooLargeToSearchError extends HandledError {
   declare readonly code: "dataset_too_large_to_search";
 
@@ -280,21 +279,24 @@ export class DatasetTooLargeToSearchError extends HandledError {
   }
 }
 
+/** A download of every row would hold more than the organization's whole-read limits. */
 export class DatasetTooLargeToExportError extends HandledError {
   declare readonly code: "dataset_too_large_to_export";
 
-  readonly sizeBytes: number;
-  readonly maxBytes: number;
-
-  constructor({ sizeBytes, maxBytes }: { sizeBytes: number; maxBytes: number }) {
+  constructor(
+    params: { rowCount: number; maxRows: number } | { sizeBytes?: number; maxBytes: number },
+  ) {
+    const limit =
+      "maxRows" in params
+        ? `${formatDatasetRowLimit(params.maxRows)} rows`
+        : formatDatasetByteLimit(params.maxBytes);
     super(
       "dataset_too_large_to_export",
-      "This dataset is too large to export here; streaming export is coming",
-      { httpStatus: 413, fault: "customer", meta: { sizeBytes, maxBytes } },
+      `This dataset holds more than the ${limit} one download carries. ` +
+        "Read it page by page from GET /api/dataset/{slugOrId}/records.",
+      { httpStatus: 413, fault: "customer", meta: { ...params } },
     );
     this.name = "DatasetTooLargeToExportError";
-    this.sizeBytes = sizeBytes;
-    this.maxBytes = maxBytes;
   }
 }
 
@@ -362,11 +364,15 @@ export class DatasetAttachmentTooLargeError extends HandledError {
   declare readonly code: "dataset_attachment_too_large";
 
   constructor(maxBytes: number) {
-    super("dataset_attachment_too_large", "Dataset attachment is over the size ceiling", {
-      meta: { maxBytes },
-      httpStatus: 413,
-      fault: "customer",
-    });
+    super(
+      "dataset_attachment_too_large",
+      `The file is larger than the ${formatDatasetByteLimit(maxBytes)} limit for one file`,
+      {
+        meta: { maxBytes },
+        httpStatus: 413,
+        fault: "customer",
+      },
+    );
     this.name = "DatasetAttachmentTooLargeError";
   }
 }
@@ -430,5 +436,96 @@ export class DatasetImportSourceRefusedError extends HandledError {
       meta: { reason },
     });
     this.name = "DatasetImportSourceRefusedError";
+  }
+}
+
+/**
+ * The whole dataset does not fit one response. The caller reads it page by
+ * page instead, which has no size ceiling.
+ */
+export class DatasetTooLargeToReadInlineError extends HandledError {
+  declare readonly code: "dataset_too_large_to_read_inline";
+
+  constructor({ maxBytes, totalRows }: { maxBytes: number; totalRows: number }) {
+    super(
+      "dataset_too_large_to_read_inline",
+      `This dataset is larger than the ${formatDatasetByteLimit(maxBytes)} one response carries. ` +
+        "Read it page by page from GET /api/dataset/{slugOrId}/records with the page and limit parameters.",
+      { httpStatus: 400, fault: "customer", meta: { maxBytes, totalRows } },
+    );
+    this.name = "DatasetTooLargeToReadInlineError";
+  }
+}
+
+/**
+ * One page of records does not fit one response. `meta.suggestedLimit` divides
+ * the limit the caller asked for, so the caller continues from page
+ * `(page - 1) * limit / suggestedLimit + 1` without skipping or repeating a row.
+ */
+export class DatasetPageTooLargeError extends HandledError {
+  declare readonly code: "dataset_page_too_large";
+
+  constructor({
+    maxBytes,
+    page,
+    limit,
+    suggestedLimit,
+  }: {
+    maxBytes: number;
+    page: number;
+    limit: number;
+    suggestedLimit: number;
+  }) {
+    super(
+      "dataset_page_too_large",
+      `This page of ${limit} records is larger than the ${formatDatasetByteLimit(maxBytes)} one response carries. ` +
+        `Ask again with limit=${suggestedLimit}.`,
+      {
+        httpStatus: 413,
+        fault: "customer",
+        meta: {
+          maxBytes,
+          page,
+          limit,
+          suggestedLimit,
+          suggestedPage: ((page - 1) * limit) / suggestedLimit + 1,
+        },
+      },
+    );
+    this.name = "DatasetPageTooLargeError";
+  }
+}
+
+/** Where a row was measured: as it arrived in a file, or as the dataset stores it. */
+export type DatasetRowMeasure = "uploaded" | "stored";
+
+/** One row is over the size a dataset takes; `meta.maxBytes` is the number the copy shows. */
+export class DatasetRowTooLargeError extends HandledError {
+  declare readonly code: "dataset_row_too_large";
+
+  constructor({ maxBytes, measure }: { maxBytes: number; measure: DatasetRowMeasure }) {
+    super(
+      "dataset_row_too_large",
+      measure === "uploaded"
+        ? `A row in the file is larger than the ${formatDatasetByteLimit(maxBytes)} limit for one row`
+        : `A row is larger than the ${formatDatasetByteLimit(maxBytes)} a dataset stores for one row. ` +
+            "Put files in an image or file column so they are stored beside the row.",
+      { httpStatus: 413, fault: "customer", meta: { maxBytes, measure } },
+    );
+    this.name = "DatasetRowTooLargeError";
+  }
+}
+
+/** An image or file cell held inline content that is not readable base64. */
+export class DatasetInlineFileUnreadableError extends HandledError {
+  declare readonly code: "dataset_inline_file_unreadable";
+
+  constructor(column: string) {
+    super(
+      "dataset_inline_file_unreadable",
+      `The inline file in column "${column}" is not valid base64 content`,
+      { httpStatus: 422, fault: "customer", meta: { column } },
+    );
+    this.name = "DatasetInlineFileUnreadableError";
   }
 }

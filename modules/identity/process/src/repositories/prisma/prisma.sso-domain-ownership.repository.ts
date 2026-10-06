@@ -3,7 +3,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { SsoDomainOwnershipRepository } from "../sso-domain-ownership.repository.ts";
 import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository.ts";
 
-export type PrismaSsoDomainOwnershipDatabase = Pick<PrismaClient, "ssoConnection" | "$transaction">;
+type PrismaSsoDomainOwnershipDatabase = Pick<PrismaClient, "ssoConnection" | "$transaction">;
 
 /** Re-derives the ownership rows through the fold's own transaction write. */
 export class PrismaSsoDomainOwnershipRepository extends SsoDomainOwnershipRepository {

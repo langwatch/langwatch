@@ -43,6 +43,8 @@ import {
   claudeCacheWritesLongLived,
   isConversationalQuerySource,
 } from "../rules/claude-code-call-policy.rules.ts";
+import { canonicaliseVercelCore } from "../rules/vercel-core.rules.ts";
+import { canonicaliseVercelIO } from "../rules/vercel-io.rules.ts";
 import { ClaudeCodeCanonicaliserService } from "./claude-code-canonicaliser.service.ts";
 import { ClaudeCodeRequestService } from "./claude-code-request.service.ts";
 import { ClaudeCodeResponseService } from "./claude-code-response.service.ts";
@@ -59,8 +61,25 @@ import { OpenInferenceCanonicaliserService } from "./openinference-canonicaliser
 import { SpringAICanonicaliserService } from "./spring-ai-canonicaliser.service.ts";
 import { StrandsCanonicaliserService } from "./strands-canonicaliser.service.ts";
 import { TraceloopCanonicaliserService } from "./traceloop-canonicaliser.service.ts";
-import { VercelCanonicaliserService } from "./vercel-canonicaliser.service.ts";
 import { VertexAdkCanonicaliserService } from "./vertex-adk-canonicaliser.service.ts";
+
+export class VercelCanonicaliserService implements AttributeCanonicaliser {
+  static create(): VercelCanonicaliserService {
+    return new VercelCanonicaliserService();
+  }
+
+  private constructor() {}
+
+  readonly id = "vercel";
+
+  apply(ctx: ExtractorContext): void {
+    if (!canonicaliseVercelCore(ctx)) {
+      return;
+    }
+
+    canonicaliseVercelIO(ctx);
+  }
+}
 
 const claudeCodeResponseService = ClaudeCodeResponseService.create();
 

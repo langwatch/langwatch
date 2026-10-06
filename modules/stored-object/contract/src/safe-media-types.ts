@@ -43,3 +43,15 @@ export function isRefusedUploadMediaType(mediaType: string): boolean {
   const base = mediaType.split(";")[0]?.trim().toLowerCase() ?? "";
   return (REFUSED_ATTACHMENT_MEDIA_TYPES as readonly string[]).includes(base);
 }
+
+export function hasControlCharacters(value: string): boolean {
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    const isControlCodePoint =
+      codePoint !== undefined && (codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f));
+    if (isControlCodePoint) {
+      return true;
+    }
+  }
+  return false;
+}

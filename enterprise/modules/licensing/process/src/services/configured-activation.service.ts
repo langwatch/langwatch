@@ -18,7 +18,7 @@ export type ConfiguredActivationOutcome =
   | { outcome: "refused"; code: string }
   | { outcome: "license_rejected"; error: string };
 
-export interface ConfiguredActivationLogger {
+interface ConfiguredActivationLogger {
   info(fields: Record<string, unknown>, message: string): void;
   warn(fields: Record<string, unknown>, message: string): void;
 }
@@ -122,7 +122,8 @@ export class ConfiguredActivationService {
     if (!this.deps.connectPermitted) {
       logger.warn(
         context,
-        "LANGWATCH_LICENSE_KEY holds an activation code, but LANGWATCH_CONNECT_DISABLED is set, so it cannot be redeemed; set LANGWATCH_LICENSE_KEY to the signed license key instead",
+        "LANGWATCH_LICENSE_KEY holds an activation code, but LANGWATCH_CONNECT_DISABLED is set, " +
+          "so it cannot be redeemed; set LANGWATCH_LICENSE_KEY to the signed license key instead",
       );
       return { outcome: "connect_disabled" };
     }

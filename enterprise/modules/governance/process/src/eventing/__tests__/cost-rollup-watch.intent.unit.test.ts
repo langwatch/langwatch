@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { CostRollupDayComparer, CostRollupDayLook } from "../../app/governance.members.ts";
+import type {
+  CostRollupDayComparer,
+  CostRollupDayLook,
+} from "../../services/cost-rollup-day-comparer.service.ts";
 import {
   COST_ROLLUP_WATCH_MAX_ATTEMPTS,
   CostRollupCheckUnsettledError,

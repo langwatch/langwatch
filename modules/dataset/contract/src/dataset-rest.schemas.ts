@@ -4,6 +4,11 @@ import { resolveRequestBound } from "@langwatch/plans";
  * integrator is typed against is written down once, in the package both the
  * declaration and the published document read.
  */
+import {
+  storedObjectByteLengthSchema,
+  storedObjectFilenameSchema,
+  storedObjectMediaTypeSchema,
+} from "@langwatch/stored-object-contract";
 import { z } from "zod";
 
 import {
@@ -108,6 +113,13 @@ export const datasetRestAttachmentFieldsSchema = z.object({
     .describe("The dataset that owns the file. Omit it while the dataset is still a draft."),
 });
 
+/** `POST /api/dataset/attachments/uploads`: the file about to be sent to its signed upload. */
+export const datasetRestAttachmentUploadSchema = z.object({
+  filename: storedObjectFilenameSchema.describe("The file name the reference will carry."),
+  mediaType: storedObjectMediaTypeSchema.describe("The media type of the file."),
+  byteLength: storedObjectByteLengthSchema.describe("The size of the file, in bytes."),
+});
+
 /** `POST /api/dataset/upload`: the dataset the posted file became. */
 export const datasetRestUploadCreatedSchema = z.object({
   id: z.string(),
@@ -156,6 +168,8 @@ export const datasetRestEntriesAddedSchema = z.object({ success: z.literal(true)
 export const datasetRestRecordPageSchema = z.object({
   data: z.array(datasetRecordSchema),
   pagination: datasetPaginationSchema,
+  /** The dataset the page belongs to, as the single GET answers it without its rows. */
+  dataset: datasetRestSummarySchema.optional(),
 });
 
 /** `DELETE /api/dataset/:slugOrId`: the dataset that was archived. */

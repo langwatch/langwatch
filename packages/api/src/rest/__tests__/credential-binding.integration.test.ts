@@ -3,12 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { anyAuthenticated, publicRoute } from "../../access/access.ts";
+import type { RestIdentity } from "../../hosting/api-door.ts";
 import { MANAGEMENT_API_VERSION } from "../addressing.ts";
 import { BearerIdentity } from "../bearer-identity.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { RestHost } from "../host.ts";
 import { bindRestCredential } from "../request.ts";
-import type { RestIdentity } from "../../hosting/api-door.ts";
 
 const Api = moduleApi<{ read(): { ok: boolean } }>()("langy");
 function family(namespace: string, path: string) {

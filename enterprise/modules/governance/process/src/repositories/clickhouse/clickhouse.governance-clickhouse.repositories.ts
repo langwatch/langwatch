@@ -3,22 +3,37 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 import type {
-  GovernanceClickHouseClient,
-  GovernanceClickHouseResolver,
-} from "../../app/governance.members.ts";
-import type {
   GovernanceClickHouseRepositories,
   GovernanceClickHouseTenantResolver,
 } from "../governance.repositories.ts";
 import { ClickHouseAnomalySpendRepository } from "./clickhouse.anomaly-spend.repository.ts";
 import { ClickHouseOcsfEventsRepository } from "./clickhouse.ocsf-events.repository.ts";
 
+export type GovernanceClickHouseResult = {
+  json(): Promise<unknown>;
+};
+
+export interface GovernanceClickHouseClient {
+  query(input: {
+    query: string;
+    query_params?: Record<string, unknown>;
+    format: "JSONEachRow";
+    clickhouse_settings?: Record<string, number>;
+    /** One organisation's projects a `TenantId IN (...)` read binds, exactly. */
+    tenantIds?: readonly string[];
+  }): Promise<GovernanceClickHouseResult>;
+}
+
+export interface GovernanceClickHouseResolver {
+  getClient(organizationId: string): Promise<GovernanceClickHouseClient>;
+}
+
 /**
  * The routed ClickHouse member, adapted to the vendor-shaped client every
  * ClickHouse-tier governance repository asks its resolver for. One tenant
  * per resolution, exactly as the tables' own rule requires: every statement
  * names its tenant. Same convention as `modules/trace/process`'s
- * `MemberTraceClickHouseClient` (`app/trace-composition.build.ts:220-231`).
+ * `ClickHouseTraceClientsRepository` (`repositories/clickhouse/clickhouse.trace-member-client.repository.ts`).
  */
 class MemberGovernanceClickHouseClient {
   constructor(

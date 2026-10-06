@@ -104,4 +104,7 @@ export interface SsoSetupView {
   /** Where the cutover stands, when this connection replaces a
    *  grandfathered one. Null for every connection outside a pair. */
   migration: SsoMigrationView | null;
+  /** True when the organization's plan, not the person, refuses single
+   *  sign-on: the screen says so and offers no control that would refuse. */
+  enterpriseRequired: boolean;
 }

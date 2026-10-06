@@ -1,4 +1,4 @@
-import type { DomainJoinSetting } from "@langwatch/identity-contract";
+import type { DomainJoinSetting, JoinerRole } from "@langwatch/identity-contract";
 import { useCallback, useMemo, useState } from "react";
 
 import type { AutomaticJoin, PendingJoinRequest } from "../model/pending-join-request.ts";
@@ -123,6 +123,7 @@ function usePendingJoinRequests({
         domain: request.domain,
         requestedAt: request.requestedAt,
         expiresAt: request.expiresAt,
+        seat: request.seat,
       })),
     [pending.data],
   );
@@ -133,7 +134,7 @@ function usePendingJoinRequests({
         joinRequestId,
         run: approveMutation,
         title: "Request approved",
-        description: "They are a member now, with your organization's default role.",
+        description: "They are a member now, in the seat their request showed.",
       }),
     [answer, approveMutation],
   );
@@ -172,7 +173,12 @@ function useDomainJoinSetting({
   const setJoiningMutation = api.joinRequests.setJoining.useMutation();
 
   const setJoining = useCallback(
-    (next: { domainJoin: DomainJoinSetting; domains: string[] }) => {
+    (next: {
+      domainJoin: DomainJoinSetting;
+      domains: string[];
+      /** Left out when the card hid the seat; the server keeps the one in force. */
+      joinerRole?: JoinerRole;
+    }) => {
       setJoiningMutation.mutate(
         { organizationId, ...next },
         {
@@ -203,6 +209,7 @@ function useDomainJoinSetting({
     joining: joining.data ?? {
       domainJoin: "request" as const,
       joinDomains: [],
+      joinerRole: "MEMBER" as const,
     },
     savingJoining: setJoiningMutation.isPending,
     setJoining,

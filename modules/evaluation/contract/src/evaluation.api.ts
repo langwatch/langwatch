@@ -38,12 +38,14 @@ import type {
   EvaluationRunLookup,
   EvaluationRunsByTraceQuery,
   EvaluationSummariesByTraceIdsQuery,
+  EvaluatorEffectiveSettingsQuery,
   TraceEvaluationsQuery,
 } from "./evaluation.queries.ts";
 import type {
   EvaluationRunOutcome,
   EvaluationWarmup,
   EvaluatorCatalogue,
+  EvaluatorEffectiveSettings,
 } from "./evaluation.responses.ts";
 import type {
   EvaluationExecutionResult,
@@ -85,6 +87,8 @@ export interface EvaluationApi {
   // The public evaluation doors: the SDK's batch result log and the four
   // evaluate paths reach the same capability every other caller does.
 
+  /** Refuses an SDK batch body larger than the project's organization accepts in one request. */
+  assertBatchLogWithinLimit(input: { projectId: string; payloadBytes: number }): Promise<void>;
   /** Records one SDK batch evaluation: its run, its rows and its verdicts. */
   logBatchEvaluation(input: LogBatchEvaluationInput): Promise<void>;
   /** Runs one evaluator over one input, and never rejects for a domain reason. */
@@ -93,6 +97,10 @@ export interface EvaluationApi {
   checkGuardrail(input: GuardrailCheckInput): Promise<GuardrailCheckOutcome>;
   /** One saved evaluator, ready to run; throws when no evaluator answers to it. */
   resolveSavedEvaluator(input: SavedEvaluatorLookup): Promise<SavedEvaluatorResolution>;
+  /** The settings a run would use for an evaluator and a monitor's parameters, flag included. */
+  getEvaluatorEffectiveSettings(
+    input: EvaluatorEffectiveSettingsQuery,
+  ): Promise<EvaluatorEffectiveSettings>;
   /** One monitor by slug, or null. */
   findMonitorBySlug(input: EvaluationSlugLookup): Promise<EvaluationMonitorSummary | null>;
   /** One dataset by slug, or null. */

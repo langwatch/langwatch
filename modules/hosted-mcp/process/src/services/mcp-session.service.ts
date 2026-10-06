@@ -7,13 +7,13 @@ import type { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js
 import type { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
-import type { McpSessionRelayChannel } from "../channels/mcp-session-relay.channel.ts";
+import type { McpSessionRelayRepository } from "../repositories/mcp-session-relay.repository.ts";
 import type {
+  McpSessionRecordLookup,
   McpSessionRepository,
   McpSessionTransport,
 } from "../repositories/mcp-session.repository.ts";
 import type { McpCallerLookup } from "./mcp-caller-auth.service.ts";
-import type { McpApiKeyCipher } from "./mcp-oauth-token.service.ts";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -28,7 +28,7 @@ export const MAX_SESSIONS_PER_KEY = 20;
  * authorize flow; governance tools attribute audit rows and enforce RBAC with it. `projectId`
  * is the tenant its access log lines carry.
  */
-export type McpOpenSession<T> = {
+type McpOpenSession<T> = {
   transport: T;
   apiKey: string;
   projectId: string | undefined;
@@ -39,15 +39,9 @@ export type McpOpenSession<T> = {
 export type McpStreamableSession = McpOpenSession<StreamableHTTPServerTransport>;
 export type McpSseSession = McpOpenSession<SSEServerTransport>;
 
-/** A record read: the key and project the session was opened with, or nothing to serve. */
-export type McpSessionKeyLookup =
-  | Readonly<{ kind: "found"; apiKey: string; projectId: string | undefined }>
-  | Readonly<{ kind: "missing" }>;
-
 type McpSessionCollaborators = Readonly<{
   records: McpSessionRepository;
-  relay: McpSessionRelayChannel;
-  cipher: McpApiKeyCipher;
+  relay: McpSessionRelayRepository;
   sessionTools: Pick<GovernanceRestApi, "registerMcpTools"> | undefined;
 }>;
 
@@ -127,7 +121,11 @@ export class McpSessionService {
 
     const previous = session.apiKey;
     session.apiKey = caller.apiKey;
-    void this.removeRecord({ transport: input.transport, sessionId: input.sessionId, apiKey: previous })
+    void this.removeRecord({
+      transport: input.transport,
+      sessionId: input.sessionId,
+      apiKey: previous,
+    })
       .then(() =>
         this.storeRecord({
           transport: input.transport,
@@ -152,10 +150,7 @@ export class McpSessionService {
     apiKey: string;
     projectId: string;
   }): Promise<void> {
-    await this.#collaborators.records.store({
-      ...input,
-      encryptedApiKey: this.#collaborators.cipher.encrypt(input.apiKey),
-    });
+    await this.#collaborators.records.store(input);
   }
 
   /** Streamable records are written in the background; a failure is logged, never raised. */
@@ -202,15 +197,11 @@ export class McpSessionService {
   async getRecordKey(input: {
     transport: McpSessionTransport;
     sessionId: string;
-  }): Promise<McpSessionKeyLookup> {
+  }): Promise<McpSessionRecordLookup> {
     try {
       const record = await this.#collaborators.records.getRecord(input);
       if (record.kind === "missing") return record;
-      return {
-        kind: "found",
-        apiKey: this.#collaborators.cipher.decrypt(record.encryptedApiKey),
-        projectId: record.projectId,
-      };
+      return record;
     } catch (err) {
       logger.error({ error: err, transport: input.transport }, "Redis session lookup failed");
       return { kind: "missing" };

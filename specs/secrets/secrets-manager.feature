@@ -14,6 +14,8 @@ Feature: Secrets Manager
   # and `[gone]` is deletes-only while the migration runs, so the
   # `@scenario` docblock that would bind it cannot be added. It gets its tag
   # when that suite moves into the authz or secret package.
+  # Gap: builtin-role-bags.unit.test.ts covers only the lite-member bag; the Resources enum, ADMIN, MEMBER, VIEWER, CUSTOM and the ordered-resources list are unasserted.
+  @unimplemented
   Scenario: Secrets resource is registered in the RBAC system
     Given the RBAC permission system is configured
     Then the "secrets" resource exists in the Resources enum

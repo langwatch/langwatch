@@ -14,7 +14,7 @@ export const NO_SUPPRESSION: ErasureSuppressionCheck = {
 };
 
 /** What one batch kept, and how much of it the erasure list held back. */
-export interface SuppressionPartition<T> {
+interface SuppressionPartition<T> {
   kept: T[];
   suppressedCount: number;
 }

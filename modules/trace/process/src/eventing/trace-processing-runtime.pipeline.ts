@@ -12,11 +12,6 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/trace-contract";
 
-import type {
-  TraceProcessingPipelineDefinition,
-  TraceSpanCostEnrichment,
-  TraceSpanTokenEstimation,
-} from "../app/trace.members.ts";
 import type { TraceTokenCounter } from "../channels/token-counter.channel.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import { leanForProjection } from "../rules/trace-projection-lean.rules.ts";
@@ -30,18 +25,20 @@ import type { TraceProcessingCommandsService } from "../services/trace-processin
 import { TraceSpanNormalizationAdapterService } from "../services/trace-span-normalization-adapter.service.ts";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "./coding-agent-span-facts-dispatch.subscriber.ts";
 import { createCustomEvaluationSyncHandler } from "./custom-evaluation-sync.subscriber.ts";
-import { createDeferredOriginHandler } from "./deferred-origin.process.ts";
+import { createDeferredOriginHandler } from "./deferred-origin.subscriber.ts";
 import { createEvaluationTriggerSubscriber } from "./evaluation-trigger.subscriber.ts";
 import { createExperimentMetricsSyncHandler } from "./experiment-metrics-sync.subscriber.ts";
 import {
   createProjectMetadataHandler,
   type ProjectMetadataSubscriberDeps,
 } from "./project-metadata.subscriber.ts";
+import type { TraceSpanCostEnrichment, TraceSpanTokenEstimation } from "./record-span.commands.ts";
 import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
 import { createSpanStorageBroadcastHandler } from "./span-storage-broadcast.subscriber.ts";
 import { SpanStorageStore } from "./span-storage.store.ts";
 import { TraceAnalyticsStore } from "./trace-derived.store.ts";
 import { createTraceProcessingProducerPipeline } from "./trace-processing-producer.pipeline.ts";
+import type { TraceProcessingPipelineDefinition } from "./trace-processing-projections.pipeline.ts";
 import { EventingTracePipelineAdapter } from "./trace-processing-projections.pipeline.ts";
 import { buildTraceProcessingConsumer } from "./trace-processing.pipeline.ts";
 import { TraceAnalyticsRollupStore } from "./trace-rollup.store.ts";
@@ -72,7 +69,7 @@ interface TraceProcessingPeers {
 }
 
 export interface TraceProcessingPipelineInput {
-  processName: string;
+  role: string;
   tokenizer: TraceTokenCounter;
   peers: TraceProcessingPeers;
   repositories: Pick<
@@ -105,7 +102,7 @@ export class TraceProcessingRuntimeAdapter {
   build(setup: { participation: EventingParticipation }): TraceProcessingPipelineDefinition {
     if (setup.participation === "produce") {
       return createTraceProcessingProducerPipeline({
-        processName: this.input.processName,
+        role: this.input.role,
       });
     }
     return buildTraceProcessingConsumer(this.#projections(), this.#reactions());

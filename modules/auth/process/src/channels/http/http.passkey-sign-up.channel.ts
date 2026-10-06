@@ -49,9 +49,7 @@ export type PasskeyCeremonyCaller =
   | { signedIn: true; user: { id: string; email: string } }
   | { signedIn: false };
 
-export type PasskeyCeremonySession = (
-  ctx: GenericEndpointContext,
-) => Promise<PasskeyCeremonyCaller>;
+type PasskeyCeremonySession = (ctx: GenericEndpointContext) => Promise<PasskeyCeremonyCaller>;
 
 /** What the sign-up screen bakes into the registration challenge. */
 const signUpContextSchema = z.object({
@@ -240,7 +238,7 @@ function createAfterVerification({
     }
 
     const user = await users.createPasskeyUser({ email: resolvedEmail });
-    announcements.trackServerEvent({ userId: user.id, event: "signed_up" });
+    announcements.signUpNurturing({ userId: user.id });
 
     return {
       userId: user.id,

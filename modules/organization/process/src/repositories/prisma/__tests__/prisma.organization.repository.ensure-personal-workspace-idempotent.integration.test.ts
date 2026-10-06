@@ -45,7 +45,10 @@ describe.skipIf(!DB_URL)("PrismaOrganizationRepository.ensurePersonalWorkspace",
     ),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
-  const organizationRepository = PrismaOrganizationRepository.create(prisma);
+  const organizationRepository = PrismaOrganizationRepository.create({
+    database: prisma,
+    cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+  });
 
   let organizationId: string;
   let userId: string;

@@ -2,14 +2,14 @@ import type { ShareLink, ShareWithProject } from "@langwatch/share-contract";
 import type { Instant } from "@langwatch/time";
 
 /** A project as the two memory heads see it: its organisation and both kill switches. */
-export type MemoryShareProject = Readonly<{
+type MemoryShareProject = Readonly<{
   id: string;
   organizationId: string | null;
   traceSharingEnabled: boolean;
   organizationTraceSharingEnabled: boolean;
 }>;
 
-export type MemoryShareGrant = {
+type MemoryShareGrant = {
   id: string;
   organizationId: string;
   projectId: string;
@@ -19,7 +19,7 @@ export type MemoryShareGrant = {
   revokedAt: Instant | null;
 };
 
-export type MemoryShareUsage = {
+type MemoryShareUsage = {
   grantId: string;
   organizationId: string;
   projectId: string;

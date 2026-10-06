@@ -12,7 +12,11 @@ import {
   guidedOnboardingStateSchema,
   signUpDataSchema,
 } from "./onboarding-schemas.ts";
-import { onboardingWriteAckSchema, organizationInitializedSchema } from "./onboarding.responses.ts";
+import {
+  onboardingWriteAckSchema,
+  organizationInitializedSchema,
+  integrationsCheckStatusSchema,
+} from "./onboarding.responses.ts";
 
 const organizationIdInputSchema = z.object({ organizationId: z.string() }).strict();
 
@@ -133,4 +137,15 @@ export const onboardingTrpc = defineTrpcContract("onboarding")
   .mutation("setIntegrationMethod")
   .withInput(setIntegrationMethodInputSchema)
   .withOutput(onboardingWriteAckSchema)
+  .build();
+
+/**
+ * The `integrationsChecks.*` namespace: one procedure, how far a project has
+ * been set up. Main's onboarding checks; the evidence is counted by its owners.
+ */
+
+export const integrationsChecksTrpc = defineTrpcContract("integrationsChecks")
+  .query("getCheckStatus")
+  .withInput(z.object({ projectId: z.string() }))
+  .withOutput(integrationsCheckStatusSchema)
   .build();

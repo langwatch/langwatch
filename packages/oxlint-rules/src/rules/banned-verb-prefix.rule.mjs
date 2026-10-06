@@ -157,7 +157,7 @@ export const bannedVerbPrefixRule = defineRule({
     tryPrefix: {
       what: "`{{name}}` is named for how it behaves on failure, not for what it answers.",
       why: "A caller reading the call site cannot tell a lookup from a hedge, and the two need different handling.",
-      fix: `Drop \`try\` and name it for what it answers. ${RENAME}`,
+      fix: `Drop \`try\` and name it for what it answers. ${RENAME}. Read the contract skill.`,
     },
     tryPrefixOneValue: {
       what: "`{{name}}` is named for how it behaves on failure, not for the one value it answers.",
@@ -166,18 +166,22 @@ export const bannedVerbPrefixRule = defineRule({
     },
     swallowingTry: {
       what: "`{{name}}` hedges: its catch turns a failure into null or undefined, so the caller cannot tell absence from breakage.",
+      why: "A null that means either absent or broken hides the failure from every caller and from the logs.",
       fix: `Delete the catch that answers null or undefined so the failure reaches the caller, then drop \`try\` and name it for what it answers. ${RENAME}`,
     },
     swallowingTryOneValue: {
       what: "`{{name}}` hedges: its catch turns a failure into null or undefined, so the caller cannot tell absence from breakage.",
+      why: "A null that means either absent or broken hides the failure from every caller and from the logs.",
       fix: `Delete the catch that answers null or undefined so the failure reaches the caller, then drop \`try\` and name it for what it answers. ${RENAME_ONE_VALUE}`,
     },
     requirePrefix: {
       what: "`{{name}}` carries a `require` prefix, which says how it fails rather than what it answers.",
+      why: "ADR-146 names a function for what it answers; how it fails belongs to the verb, not a prefix.",
       fix: "Name it `get{{rest}}` and leave the body as it is: ADR-146's `get` already answers exactly one thing or throws.",
     },
     requireAssertion: {
       what: "`{{name}}` carries a `require` prefix, which says how it fails rather than what it checks.",
+      why: "ADR-146 names a function for what it checks; how it fails belongs to the verb, not a prefix.",
       fix: "Name it `assert{{rest}}` and leave the body as it is: an `assert*` answers nothing and throws when the condition fails.",
     },
   },

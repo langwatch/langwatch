@@ -1,5 +1,4 @@
 import {
-  browserSessionImpersonationSchema,
   browserSessionInventoryEntrySchema,
   browserSessionSchema,
   SessionIsCurrentError,
@@ -7,6 +6,8 @@ import {
   type BrowserSession,
   type BrowserSessionResolution,
   type BrowserSessionInventoryEntry,
+  type SessionImpersonation,
+  type SessionImpersonationState,
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
 import {
@@ -17,7 +18,7 @@ import {
   type SignedInWith,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import { Temporal, fromDate, toDate, type Instant } from "@langwatch/time";
+import { toDate, type Instant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { AuthSessionCacheRepository } from "../repositories/auth-session-cache.repository.ts";
@@ -25,6 +26,7 @@ import type {
   AuthSessionRepository,
   StoredBrowserSession,
 } from "../repositories/auth-session.repository.ts";
+import { liveImpersonation } from "../rules/impersonation-claims.rules.ts";
 import type { SessionBoundService } from "./session-bound.service.ts";
 
 const CACHE_PREFIX = "better-auth:";
@@ -39,7 +41,7 @@ export const SESSION_PERSON_TTL_MS = 30_000;
 const MAX_CACHED_PEOPLE = 10_000;
 
 /** What the browser-session half of the module is built from. */
-export interface BrowserSessionDeps {
+interface BrowserSessionDeps {
   sessions: AuthSessionRepository;
   /** Absent where the deployment composed no cache: the database still answers. */
   cache: AuthSessionCacheRepository | null;
@@ -141,30 +143,28 @@ export class BrowserSessionService {
     stored: StoredBrowserSession;
     session: BrowserSession;
   }): Promise<BrowserSession> {
-    const impersonation = browserSessionImpersonationSchema.safeParse(stored.impersonating);
-    if (!impersonation.success) return session;
-    const impersonationExpired =
-      Temporal.Instant.compare(fromDate(impersonation.data.expires), this.deps.now()) <= 0;
-    if (impersonationExpired) return session;
-
-    const { user: impersonatedUser, identityEmail } = await this.person({
-      userId: impersonation.data.id,
+    const state = liveImpersonation({
+      sessionUserId: stored.userId,
+      claims: stored.impersonation,
+      now: this.deps.now(),
     });
-    if (!impersonatedUser || impersonatedUser.deactivatedAt !== null) {
-      return session;
-    }
+    if (state.kind === "none") return session;
+    const { subjectUserId } = state.impersonation;
+
+    // The subject is read fresh, never copied at start: a retired subject is not acted for.
+    const { user: subject, identityEmail } = await this.person({ userId: subjectUserId });
+    if (!subject || subject.deactivatedAt !== null) return session;
 
     return browserSessionSchema.parse({
       ...session,
       user: {
-        id: impersonation.data.id,
-        name: impersonation.data.name ?? null,
+        id: subjectUserId,
+        name: subject.name ?? null,
         email:
           (identityEmail?.kind === "resolved" ? identityEmail.email : null) ??
-          impersonatedUser.email ??
-          impersonation.data.email ??
+          subject.email ??
           null,
-        image: impersonation.data.image ?? null,
+        image: subject.image ?? null,
         pendingSsoSetup: false,
         impersonator: {
           id: session.user.id,
@@ -203,6 +203,29 @@ export class BrowserSessionService {
     }
 
     return true;
+  }
+
+  /** The live {actor, subject} claims a session carries (D06); a gone session reads as none. */
+  async getImpersonation({ sessionId }: { sessionId: string }): Promise<SessionImpersonationState> {
+    const stored = await this.deps.sessions.findById({ id: sessionId });
+    if (!stored) return { kind: "none" };
+
+    return liveImpersonation({
+      sessionUserId: stored.userId,
+      claims: stored.impersonation,
+      now: this.deps.now(),
+    });
+  }
+
+  startImpersonation({
+    sessionId,
+    ...claims
+  }: SessionImpersonation & { sessionId: string; reason: string }): Promise<void> {
+    return this.deps.sessions.writeImpersonation({ sessionId, claims });
+  }
+
+  stopImpersonation({ sessionId }: { sessionId: string }): Promise<void> {
+    return this.deps.sessions.clearImpersonation({ sessionId });
   }
 
   /**
@@ -328,16 +351,21 @@ export class BrowserSessionService {
     logger.info({ deleted, userId }, "Revoked all browser sessions for user");
   }
 
+  /** Both stores are always attempted; either failing is thrown, so a sign-out never lies. */
   async revokeBrowserSession({ sessionId }: { sessionId: string }): Promise<void> {
     const session = await this.deps.sessions.findById({ id: sessionId });
     if (!session) {
       return;
     }
 
-    const tokens = await this.tokensToClear({ userId: session.userId });
-    const deleted = await this.deps.sessions.deleteById({ id: sessionId });
-    await this.clearCachedSessions({ userId: session.userId, tokens });
-    logger.info({ deleted, sessionId, userId: session.userId }, "Revoked browser session");
+    const userId = session.userId;
+    const tokens = await this.tokensToClear({ userId });
+    const [deletion] = await Promise.allSettled([this.deps.sessions.deleteById({ id: sessionId })]);
+    const [cache] = await Promise.allSettled([this.dropCachedSessions({ userId, tokens })]);
+    for (const outcome of [deletion, cache]) {
+      if (outcome.status === "rejected") throw outcome.reason;
+    }
+    logger.info({ sessionId, userId }, "Revoked browser session");
   }
 
   async revokeOtherBrowserSessions({
@@ -368,40 +396,52 @@ export class BrowserSessionService {
     tokens: readonly string[];
     keepToken?: string;
   }): Promise<void> {
-    const cache = this.deps.cache;
-    if (!cache) {
-      return;
-    }
-
     try {
-      const indexKey = activeSessionsKey(userId);
-      const cached = (await cache.findValues({ key: indexKey })).flatMap(parseCachedSessions);
-      const retained = cached.filter(({ token }) => token === keepToken);
-      for (const { token } of cached) {
-        if (token !== keepToken) {
-          await cache.delete({ key: tokenCacheKey(token) });
-        }
-      }
-
-      for (const token of tokens) {
-        if (token !== keepToken) {
-          await cache.delete({ key: tokenCacheKey(token) });
-        }
-      }
-
-      // Better Auth's own lifetime for this index: its furthest live session.
-      const furthest = Math.max(0, ...retained.map(({ expiresAt }) => expiresAt));
-      const ttlSeconds = Math.ceil((furthest - this.deps.now().epochMilliseconds) / 1_000);
-      if (ttlSeconds > 0) {
-        await cache.set({ key: indexKey, value: JSON.stringify(retained), ttlSeconds });
-      } else {
-        await cache.delete({ key: indexKey });
-      }
+      await this.dropCachedSessions({ userId, tokens, keepToken });
     } catch (error) {
       logger.error(
         { error, userId },
         "Failed to clear Better Auth session cache during revocation",
       );
+    }
+  }
+
+  private async dropCachedSessions({
+    userId,
+    tokens,
+    keepToken,
+  }: {
+    userId: string;
+    tokens: readonly string[];
+    keepToken?: string;
+  }): Promise<void> {
+    const cache = this.deps.cache;
+    if (!cache) {
+      return;
+    }
+
+    const indexKey = activeSessionsKey(userId);
+    const cached = (await cache.findValues({ key: indexKey })).flatMap(parseCachedSessions);
+    const retained = cached.filter(({ token }) => token === keepToken);
+    for (const { token } of cached) {
+      if (token !== keepToken) {
+        await cache.delete({ key: tokenCacheKey(token) });
+      }
+    }
+
+    for (const token of tokens) {
+      if (token !== keepToken) {
+        await cache.delete({ key: tokenCacheKey(token) });
+      }
+    }
+
+    // Better Auth's own lifetime for this index: its furthest live session.
+    const furthest = Math.max(0, ...retained.map(({ expiresAt }) => expiresAt));
+    const ttlSeconds = Math.ceil((furthest - this.deps.now().epochMilliseconds) / 1_000);
+    if (ttlSeconds > 0) {
+      await cache.set({ key: indexKey, value: JSON.stringify(retained), ttlSeconds });
+    } else {
+      await cache.delete({ key: indexKey });
     }
   }
 }

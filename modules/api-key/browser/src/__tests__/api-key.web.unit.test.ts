@@ -47,6 +47,16 @@ describe("given a browser that installs api-key", () => {
       expect(loaded).toHaveProperty("default");
     });
 
+    /** @scenario Every key the family claims is served by it */
+    it("names the API keys settings, authorize, MCP authorize and CLI auth screens, and no other", () => {
+      expect(Object.keys(apiKeyWeb.installation.screens).toSorted()).toEqual([
+        "pages/authorize",
+        "pages/cli/auth",
+        "pages/mcp/authorize",
+        "pages/settings/api-keys",
+      ]);
+    });
+
     it("answers with the API Keys component", async () => {
       const screen = apiKeyWeb.installation.screens["pages/settings/api-keys"];
       const loaded = await screen?.load?.();

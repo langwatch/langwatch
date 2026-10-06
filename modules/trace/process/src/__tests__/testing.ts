@@ -5,10 +5,11 @@ import {
   type TraceQueryClassification,
 } from "@langwatch/trace-contract";
 
-import { type TraceEventDerivation, type TraceQueryClassifier } from "../app/trace.members.ts";
 import { TracePayloadReaderRepository } from "../repositories/trace-payload-reader.repository.ts";
 import { TraceRecordRepository } from "../repositories/trace-record.repository.ts";
 import { TraceSummaryReaderRepository } from "../repositories/trace-summary-reader.repository.ts";
+import type { TraceQueryClassifier } from "../services/trace-query-classification.service.ts";
+import type { TraceEventDerivation } from "../services/trace.service.ts";
 
 export { TraceCanonicalisationService } from "../services/trace-canonicalisation.service.ts";
 export { storedSpanReadBack } from "../repositories/clickhouse/__tests__/stored-span-row.test-fakes.ts";

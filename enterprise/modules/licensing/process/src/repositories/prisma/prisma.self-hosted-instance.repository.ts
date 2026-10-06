@@ -14,7 +14,7 @@ import type {
   SelfHostedReportRecord,
 } from "../self-hosted-instance.repository.ts";
 
-export type SelfHostedInstanceDatabase = Pick<
+type SelfHostedInstanceDatabase = Pick<
   PrismaClient,
   "selfHostedInstance" | "selfHostedInstanceReport"
 >;

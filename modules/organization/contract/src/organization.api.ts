@@ -36,9 +36,11 @@ import type {
   JoinRequestMine,
   JoinRequestPending,
 } from "./join-request.responses.ts";
+import type { JoinRequestApiOrigin } from "./join-request.trpc-schemas.ts";
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type {
   PendingInvitationForCaller,
+  PendingInvitationsForCaller,
   OrganizationDirectoryCounts,
   OrganizationInviteAccepted,
   OrganizationInviteCreated,
@@ -54,6 +56,7 @@ import type {
   OrganizationUser,
   OrganizationUserRole,
   ProjectRow,
+  PricingModel,
   Team,
   TeamUser,
   User,
@@ -171,8 +174,12 @@ export type OrganizationWithMembersAndTheirTeams = Organization & {
  */
 export type OrganizationInviteValidation = "strict" | "lenient";
 
-/** An organization's seats: full and lite members, live invitations included. */
-export type OrganizationMemberSeats = Readonly<{ fullMembers: number; liteMembers: number }>;
+/** An organization's seats: full, lite and Developer (ADR-171), live invitations included. */
+export type OrganizationMemberSeats = Readonly<{
+  fullMembers: number;
+  liteMembers: number;
+  developers: number;
+}>;
 
 /** One invitation batch as a transport asks for it, with the mode it chose. */
 export type OrganizationApiCreateInvitationsInput = OrganizationApiCreateInvitesInput &
@@ -242,6 +249,11 @@ export interface OrganizationApi {
    * has proven count.
    */
   getPendingInvitation(by: OrganizationCaller): Promise<PendingInvitationForCaller>;
+  /**
+   * The oldest pending invitation on each address the caller has PROVEN, in any
+   * organization (ADR-171 v6). Carries the invitation code, so verified addresses only.
+   */
+  listPendingInvitationsForCaller(by: OrganizationCaller): Promise<PendingInvitationsForCaller>;
   deleteMember(
     input: Readonly<{ organizationId: string; userId: string }>,
     by: OrganizationCaller | null,
@@ -280,12 +292,34 @@ export interface OrganizationApi {
     organizationId: string;
     maxSessionDurationDays: number;
   }): Promise<void>;
+  /**
+   * The organization's pricing model and currency, for workers deciding on its behalf. A system
+   * read: no caller. An unknown organization has no model and the schema's default currency.
+   */
+  getPricing(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<{ pricingModel: PricingModel | null; currency: "USD" | "EUR" }>;
+  /**
+   * The per-file dataset limit an operator set for the organization, in bytes. A system read:
+   * no caller. Null when none is set, and for an unknown organization.
+   */
+  getDatasetLimits(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<{ attachmentMaxBytes: number | null }>;
+  /** Whether the organization switched Instant Evals on itself; instant-eval's gate reads it. */
+  isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean>;
+  /** The organization's own Instant Evals consent; a second call keeps the first record. */
+  recordInstantEvalsOptIn(input: { organizationId: string; userId: string }): Promise<void>;
   /** Replaces the record, leaving every other sign-up answer where it is. */
   writeGuidedOnboardingState(input: {
     organizationId: string;
     record: GuidedOnboardingRecord;
   }): Promise<GuidedOnboardingRecord>;
-  updateSettings(input: UpdateOrganizationSettingsInput): Promise<UpdateOrganizationSettingsResult>;
+  /** `by` is the member saving it, or nothing for an organization key with no member. */
+  updateSettings(
+    input: UpdateOrganizationSettingsInput,
+    by: Readonly<{ id: string }> | null,
+  ): Promise<UpdateOrganizationSettingsResult>;
   getSettings(input: { organizationId: string }): Promise<organizationModule.OrganizationSettings>;
   listTeams(input: ListOrganizationTeamsInput): Promise<OrganizationTeamPage>;
   listMembers(input: {
@@ -360,17 +394,21 @@ export interface OrganizationApi {
     }>,
   ): Promise<AuthzAccessBreakdownOutput>;
   /**
-   * Makes somebody a MEMBER (ADR-129). With `admittedBy` the grant lands now,
-   * audited to that actor; without it an SSO arrival resumes the admission.
-   * `"already-present"` when a concurrent callback or a retry made the row.
+   * Admits somebody on the joiner seat (ADR-129, ADR-171): a MEMBER's grant lands now with
+   * `admittedBy` or an SSO arrival resumes it; a DEVELOPER's row is the whole admission.
+   * `seat` is the row's role; `"already-present"` is a concurrent callback or a retry.
    */
   createMembership(
     input: Readonly<{
       organizationId: string;
       userId: string;
       admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
+      /** The seat the admitting caller decided (ADR-171 v6); absent is the joiner seat. */
+      seat?: "MEMBER" | "DEVELOPER";
+      /** Where a join request was made, written on the Developer admission audit row. */
+      origin?: JoinRequestApiOrigin;
     }>,
-  ): Promise<"created" | "already-present">;
+  ): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
   memberOrganizationIds(
     input: Readonly<{ userId: string; organizationIds: string[] }>,
@@ -755,7 +793,7 @@ export interface OrganizationApi {
   lookupJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown>;
   listOwnJoinRequests(input: Readonly<{ userId: string }>): Promise<JoinRequestMine>;
   fileJoinRequest(
-    input: Readonly<{ userId: string; organizationId: string }>,
+    input: Readonly<{ userId: string; organizationId: string; origin?: JoinRequestApiOrigin }>,
   ): Promise<JoinRequestFiled>;
   withdrawJoinRequest(input: Readonly<{ joinRequestId: string; userId: string }>): Promise<void>;
   listPendingJoinRequests(input: Readonly<{ organizationId: string }>): Promise<JoinRequestPending>;
@@ -772,13 +810,16 @@ export interface OrganizationApi {
       organizationId: string;
       domainJoin: JoinRequestJoining["domainJoin"];
       domains: readonly string[];
+      joinerRole?: JoinRequestJoining["joinerRole"];
       actorUserId: string;
     }>,
   ): Promise<JoinRequestJoiningChanged>;
   /** The post-login offer: the lookup minus the domains this person dismissed. */
   offerJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown>;
   dismissJoinOffer(input: Readonly<{ userId: string }>): Promise<void>;
-  admitAutomatically(input: Readonly<{ userId: string }>): Promise<JoinRequestAdmitted>;
+  admitAutomatically(
+    input: Readonly<{ userId: string; origin?: JoinRequestApiOrigin }>,
+  ): Promise<JoinRequestAdmitted>;
   listAutomaticJoins(
     input: Readonly<{ organizationId: string }>,
   ): Promise<JoinRequestAutomaticJoins>;

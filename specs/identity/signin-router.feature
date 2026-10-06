@@ -192,7 +192,8 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then the next question is refused and says how long to wait
     And the router is never asked to decide it
 
-  @unit
+  # Gap: auth meters only the caller (auth.route:<caller>, 200/h); no per-address budget exists, and main had none.
+  @unit @unimplemented
   Scenario: One address probed from many places is eventually refused
     Given the same address is asked about from a new client each time
     When that address's budget for the hour is spent
@@ -322,7 +323,9 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And dialing a branded method names the connection Auth0's own screen offered
     And a self-hosted Auth0 deployment is offered only the generic method
 
-  @unit
+  # Alex 2026-10-06: never built. The rail offers the branded bridge methods, but the router's
+  # account ranking holds no brokered-connection to branded-method mapping (not on main either).
+  @unit @unimplemented
   Scenario: An account brokered through a social connection routes to its own button
     Given the account for "sam@home.net" signed in through the broker's Google connection
     When "sam@home.net" is submitted to the router on SaaS

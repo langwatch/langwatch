@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/redaction": "workspace:*",

@@ -11,13 +11,13 @@ import type {
 } from "../channels/elevenlabs-conversation.channel.ts";
 import { REALTIME_SETTLEMENT_BATCH_SIZE } from "../rules/gateway-realtime-session-metering.rules.ts";
 
-export interface RealtimeSessionReconciliationLogger {
+interface RealtimeSessionReconciliationLogger {
   warn(context: Record<string, unknown>, message: string): void;
   info(context: Record<string, unknown>, message: string): void;
   error(context: Record<string, unknown>, message: string): void;
 }
 
-export interface RealtimeSessionReconciliationClock {
+interface RealtimeSessionReconciliationClock {
   now(): Instant;
 }
 
@@ -66,7 +66,7 @@ export interface ElevenLabsCredentialReader {
   }): Promise<{ apiKey: string; baseUrl: string }>;
 }
 
-export interface RealtimeSessionReconciliationConfig {
+interface RealtimeSessionReconciliationConfig {
   tickIntervalMs: number;
   pollAfterMs: number;
   maxSessionsPerTick: number;

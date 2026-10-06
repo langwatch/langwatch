@@ -19,11 +19,24 @@ import {
 } from "../dataset-normalize.service.ts";
 import type { DatasetNormalizeDeps } from "../dataset-normalize.service.ts";
 
+import {
+  createDatasetTestInlineAttachments,
+  createDatasetTestRequestBounds,
+  createDatasetTestRequestBoundsWith,
+} from "../../app/__tests__/dataset.fixture.ts";
+
 /** The adapter's one operation, as the queue calls it. */
 const normalizeHandler =
-  (deps: DatasetNormalizeDeps) =>
+  (
+    deps: Pick<DatasetNormalizeDeps, "repository" | "chunks" | "storedObjects"> &
+      Partial<DatasetNormalizeDeps>,
+  ) =>
   (payload: DatasetNormalizePayload): Promise<void> =>
-    DatasetNormalizeService.create(deps).normalize(payload);
+    DatasetNormalizeService.create({
+      requestBounds: createDatasetTestRequestBounds(),
+      inlineAttachments: createDatasetTestInlineAttachments(),
+      ...deps,
+    }).normalize(payload);
 
 /**
  * The normalize handler at its boundaries: chunk-repository spies, a stub repository and
@@ -114,6 +127,7 @@ describe("DatasetNormalizeService", () => {
   describe("when the payload names a confirmed stored object", () => {
     /** @scenario "Datasets work on a minimal self-hosted install" */
     /** @scenario "A large file uploads on a self-hosted install with no object storage" */
+    /** @scenario "Upload storage remains an injected Dataset seam" */
     it("streams it from stored objects, prepares the rows and touches no staging key", async () => {
       const { storage, writeChunks, removeStagedUpload } = makeStorage();
       const { getById, storedObjects } = storedObjectsHolding('{"a":"1"}\n{"a":"2"}\n');
@@ -517,7 +531,8 @@ describe("DatasetNormalizeService", () => {
     });
   });
 
-  describe("when a .json file exceeds the large-json cap", () => {
+  describe("when a .json file is larger than the organization's .json limit", () => {
+    /** @scenario "A .json array larger than its limit is refused and names JSONL" */
     it("fails the dataset with a convert-to-JSONL statusError", async () => {
       const { storage } = makeStorage();
       const repo = makeRepo({ id: "d1", status: "processing", sourceStoredObjectId: "so1" });
@@ -525,23 +540,64 @@ describe("DatasetNormalizeService", () => {
       const handler = normalizeHandler({
         repository: repo as any,
         chunks: storage as any,
-        storedObjects: storedObjectsHolding("[]", 200 * 1024 * 1024).storedObjects,
+        storedObjects: storedObjectsHolding("[]", 2 * 1024 * 1024).storedObjects,
+        requestBounds: createDatasetTestRequestBoundsWith({ jsonFileBytes: 1024 * 1024 }),
       });
 
-      await expect(handler({ ...storedObjectPayload, filename: "big.json" })).rejects.toThrow(
-        /JSONL/i,
+      await expect(handler({ ...storedObjectPayload, filename: "big.json" })).rejects.toMatchObject(
+        { kind: "file_too_large" },
       );
       const update = repo.update.mock.calls[0]![0];
       expect(update.data.status).toBe("failed");
+      expect(update.data.statusError).toMatch(/JSONL/);
     });
   });
 
-  describe("when a CSV row exceeds the max row size (malformed / no delimiter)", () => {
-    it("aborts and fails the dataset instead of buffering the whole file (I-MEM)", async () => {
-      // A header + a single data row whose field is larger than MAX_CSV_ROW_BYTES
-      // (8 MB). papaparse would buffer the whole thing without the cursor guard;
-      // the guard aborts and the handler fails the dataset.
-      const giantField = "x".repeat(9 * 1024 * 1024);
+  describe("when the stored file is larger than the organization's upload limit", () => {
+    /** @scenario "An import of a stored file larger than the upload limit is refused before it is read" */
+    it("fails the dataset on the size the file records", async () => {
+      const { storage, writeChunks } = makeStorage();
+      const repo = makeRepo({ id: "d1", status: "processing", sourceStoredObjectId: "so1" });
+
+      const handler = normalizeHandler({
+        repository: repo as any,
+        chunks: storage as any,
+        storedObjects: storedObjectsHolding('{"a":1}\n', 2 * 1024 * 1024).storedObjects,
+        requestBounds: createDatasetTestRequestBoundsWith({ fileBytes: 1024 * 1024 }),
+      });
+
+      await expect(handler(storedObjectPayload)).rejects.toMatchObject({ kind: "file_too_large" });
+      expect(writeChunks).not.toHaveBeenCalled();
+      expect(repo.update.mock.calls[0]![0].data.status).toBe("failed");
+    });
+  });
+
+  describe("when the file holds more rows than the organization's row count limit", () => {
+    /** @scenario "An uploaded file with more rows than the row count limit is refused naming the limit" */
+    it("fails the dataset as over the row count limit", async () => {
+      const { storage } = makeStorage({
+        readStagedUpload: vi
+          .fn()
+          .mockResolvedValue(Readable.from(['{"a":1}\n{"a":2}\n{"a":3}\n'])),
+      });
+      const repo = makeRepo({ id: "d1", status: "processing" });
+
+      const handler = normalizeHandler({
+        repository: repo as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
+        requestBounds: createDatasetTestRequestBoundsWith({ rowsMax: 2 }),
+      });
+
+      await expect(handler(basePayload)).rejects.toMatchObject({ kind: "row_limit_exceeded" });
+      expect(repo.update.mock.calls[0]![0].data.status).toBe("failed");
+    });
+  });
+
+  describe("when a CSV row is larger than the organization's row limit", () => {
+    /** @scenario "An uploaded row larger than the row limit is refused naming the limit" */
+    it("stops and fails the dataset instead of holding the whole file", async () => {
+      const giantField = "x".repeat(3 * 1024 * 1024);
       const { storage, removeStagedUpload } = makeStorage({
         readStagedUpload: vi.fn().mockResolvedValue(Readable.from([`a,b\n1,${giantField}\n`])),
       });
@@ -551,15 +607,38 @@ describe("DatasetNormalizeService", () => {
         repository: repo as any,
         chunks: storage as any,
         storedObjects: noStoredObjects,
+        requestBounds: createDatasetTestRequestBoundsWith({ rowBytes: 1024 * 1024 }),
       });
 
-      await expect(handler({ ...basePayload, filename: "malformed.csv" })).rejects.toThrow(
-        /CSV row exceeds max size/i,
-      );
+      await expect(handler({ ...basePayload, filename: "malformed.csv" })).rejects.toMatchObject({
+        code: "dataset_row_too_large",
+        meta: { maxBytes: 1024 * 1024 },
+      });
       const update = repo.update.mock.calls[0]![0];
       expect(update.data.status).toBe("failed");
       // Staging preserved for a manual retry; not deleted on failure.
       expect(removeStagedUpload).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a CSV row holds several megabytes", () => {
+    /** @scenario "An uploaded file with a row of several megabytes is accepted" */
+    it("prepares the row whole", async () => {
+      const wideField = "x".repeat(9 * 1024 * 1024);
+      const { storage, writeChunks } = makeStorage({
+        readStagedUpload: vi.fn().mockResolvedValue(Readable.from([`a,b\n1,${wideField}\n`])),
+      });
+      const repo = makeRepo({ id: "d1", status: "processing" });
+
+      await normalizeHandler({
+        repository: repo as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
+      })({ ...basePayload, filename: "wide.csv" });
+
+      const written = writeChunks.mock.calls.flatMap(([call]) => call.records as any[]);
+      expect(written).toHaveLength(1);
+      expect(written[0].entry.b).toHaveLength(wideField.length);
     });
   });
 
@@ -1140,9 +1219,10 @@ describe("DatasetNormalizeService", () => {
     });
   });
 
-  describe("when a JSONL line exceeds the max line size", () => {
-    it("fails the dataset rather than buffering an unbounded line", async () => {
-      const giant = `{"a":"${"x".repeat(9 * 1024 * 1024)}"}\n`;
+  describe("when a JSONL line is larger than the organization's row limit", () => {
+    /** @scenario "An uploaded row larger than the row limit is refused naming the limit" */
+    it("fails the dataset rather than holding an unbounded line", async () => {
+      const giant = `{"a":"${"x".repeat(3 * 1024 * 1024)}"}\n`;
       const { storage } = makeStorage({
         readStagedUpload: vi.fn().mockResolvedValue(Readable.from([giant])),
       });
@@ -1152,11 +1232,33 @@ describe("DatasetNormalizeService", () => {
         repository: repo as any,
         chunks: storage as any,
         storedObjects: noStoredObjects,
+        requestBounds: createDatasetTestRequestBoundsWith({ rowBytes: 1024 * 1024 }),
       });
 
-      await expect(handler(basePayload)).rejects.toThrow(/max size|malformed/i);
+      await expect(handler(basePayload)).rejects.toMatchObject({ code: "dataset_row_too_large" });
       const update = repo.update.mock.calls[0]![0];
       expect(update.data.status).toBe("failed");
+    });
+  });
+
+  describe("when a JSONL line holds several megabytes", () => {
+    /** @scenario "An uploaded file with a row of several megabytes is accepted" */
+    it("prepares the line whole", async () => {
+      const wide = "x".repeat(9 * 1024 * 1024);
+      const { storage, writeChunks } = makeStorage({
+        readStagedUpload: vi.fn().mockResolvedValue(Readable.from([`{"a":"${wide}"}\n`])),
+      });
+      const repo = makeRepo({ id: "d1", status: "processing" });
+
+      await normalizeHandler({
+        repository: repo as any,
+        chunks: storage as any,
+        storedObjects: noStoredObjects,
+      })(basePayload);
+
+      const written = writeChunks.mock.calls.flatMap(([call]) => call.records as any[]);
+      expect(written).toHaveLength(1);
+      expect(written[0].entry.a).toHaveLength(wide.length);
     });
   });
 

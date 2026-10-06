@@ -15,7 +15,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import type { GuidedOnboardingService } from "./guided-onboarding.service.ts";
 
 /** The owners each checklist figure is counted by, as narrow slices of their apis. */
-export type OnboardingChecksPeers = Readonly<{
+type OnboardingChecksPeers = Readonly<{
   projects: Pick<ProjectApi, "getWithTeam">;
   workflows: Pick<WorkflowApi, "list">;
   dashboards: Pick<DashboardApi, "countUsage">;

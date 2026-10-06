@@ -6,7 +6,15 @@ import {
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 
-import { LangySkillGates } from "../app/langy.members.ts";
+/** Resolves the flag-gated skill ids hidden from the model for one caller. Never rejects:
+ * an unreadable flag reads as off, so the gated skill stays withheld. */
+export abstract class LangySkillGates {
+  abstract resolveDisabled(input: {
+    userId: string;
+    projectId: string;
+    organizationId: string;
+  }): Promise<string[]>;
+}
 
 const logger = createLogger("langwatch:langy:skill-gates");
 

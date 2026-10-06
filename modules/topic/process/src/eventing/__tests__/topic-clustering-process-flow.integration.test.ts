@@ -8,8 +8,8 @@ import {
 } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
+import type { TopicClusteringProcessingEvent } from "../../rules/topic-clustering-events.rules.ts";
 import { TOPIC_CLUSTERING_PROCESS_NAME } from "../../rules/topic-clustering-process.rules.ts";
-import type { TopicClusteringProcessingEvent } from "../../services/topic-events.service.ts";
 import type {
   TopicClusteringDispatchDeps,
   TopicClusteringOutcomeCommands,

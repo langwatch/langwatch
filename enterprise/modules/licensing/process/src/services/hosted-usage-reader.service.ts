@@ -1,8 +1,8 @@
 import type { HostedCaller } from "@langwatch/enterprise-licensing-contract";
 import type { GatewayApi, GatewayBudgetWithSeats } from "@langwatch/gateway-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { Instant } from "@langwatch/time";
 
-import type { HostedBudgetUsage, HostedUsageReader } from "../app/licensing.members.ts";
 import { CONTRACT_BUDGET_EXTERNAL_ID } from "./contract-budget-store.service.ts";
 
 type UsageGateway = Pick<
@@ -75,4 +75,26 @@ function usageOf({
     periodStartedAt: budget.currentPeriodStartedAt,
     isContract: budget.externalId === CONTRACT_BUDGET_EXTERNAL_ID,
   };
+}
+
+/** One budget that applies to the caller, with its spend when that is known. */
+export interface HostedBudgetUsage {
+  id: string;
+  scope: string;
+  window: string;
+  limitUsd: number;
+  /** Null when live spend could not be read. Never zero in that case. */
+  spentUsd: number | null;
+  onBreach: "block" | "warn";
+  periodStartedAt: Instant;
+  isContract: boolean;
+}
+
+/** The budgets that apply to the calling key, with live spend when readable. */
+export interface HostedUsageReader {
+  read(caller: HostedCaller): Promise<{
+    budgets: HostedBudgetUsage[];
+    spendAvailable: boolean;
+    readAt: Instant;
+  }>;
 }

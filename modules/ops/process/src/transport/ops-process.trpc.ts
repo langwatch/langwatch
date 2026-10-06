@@ -1,193 +1,116 @@
 /**
  * The server half of the process-manager fleet procedures. Platform-tier
- * throughout: see `ops-operator.trpc.ts` for why the gate is the
- * application's rather than the door's.
+ * throughout: the door asks `ops:view` or `ops:manage` of the operator's platform grant.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { OpsApi, opsProcessTrpc } from "@langwatch/ops-contract";
 
-import { OPS_MANAGE, OPS_VIEW, opsOperatorFact } from "#transport/ops-operator.trpc";
-
 export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsProcessTrpc> =
   defineTrpcRouter(OpsApi, opsProcessTrpc)
     .procedure("getAggregateProcessManagers")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.getForAggregate({
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) =>
+      app.getForAggregate({
         aggregateType: input.aggregateType,
         projectId: input.tenantId,
         aggregateId: input.aggregateId,
-      });
-    })
+      }),
+    )
 
     .procedure("requeueDeadOutboxMessages")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_MANAGE)
-    .handle(async ({ app, input, actor }, operator) => {
-      await app.admitOperator(operator, "ops:manage");
-
-      return app.requeueDeadMessages({
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app, input, actor }) =>
+      app.requeueDeadMessages({
         processName: input.processName,
         projectId: input.tenantId,
         processKey: input.processKey,
         messageKeyPrefix: input.messageKeyPrefix,
         requestedBy: actor.id,
-      });
-    })
+      }),
+    )
 
     .procedure("listProcessFleet")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.getFleetSummary();
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app }) => app.getFleetSummary())
 
     .procedure("listDeadLetters")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.getDeadLetters(input);
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.getDeadLetters(input))
 
     .procedure("listDeadLetterCounts")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.getDeadLetterCounts();
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app }) => app.getDeadLetterCounts())
 
     .procedure("listProcessInstances")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.getInstances(input);
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.getInstances(input))
 
     .procedure("listUpcomingWakes")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.getUpcomingWakes(input);
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.getUpcomingWakes(input))
 
     .procedure("getProcessInstance")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.findInstanceDetail({ ref: input });
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.findInstanceDetail({ ref: input }))
 
     .procedure("listProcessOutbox")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => {
       const { page, pageSize, ...ref } = input;
 
       return app.getOutbox({ ref, page, pageSize });
     })
 
     .procedure("listProcessActions")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.listRecentActions(input);
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.listRecentActions(input))
 
     .procedure("processWakeNow")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_MANAGE)
-    .handle(async ({ app, input, actor }, operator) => {
-      await app.admitOperator(operator, "ops:manage");
-
-      return app.wakeNow({ ref: input, actorUserId: actor.id });
-    })
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app, input, actor }) => app.wakeNow({ ref: input, actorUserId: actor.id }))
 
     .procedure("processRedriveDeadInstance")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_MANAGE)
-    .handle(async ({ app, input, actor }, operator) => {
-      await app.admitOperator(operator, "ops:manage");
-
-      return app.redriveDeadInstance({ ref: input, actorUserId: actor.id });
-    })
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app, input, actor }) =>
+      app.redriveDeadInstance({ ref: input, actorUserId: actor.id }),
+    )
 
     .procedure("processRedriveDeadMessage")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_MANAGE)
-    .handle(async ({ app, input, actor }, operator) => {
-      await app.admitOperator(operator, "ops:manage");
-
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app, input, actor }) => {
       const { messageId, ...ref } = input;
 
       return app.redriveDeadMessage({ ref, messageId, actorUserId: actor.id });
     })
 
     .procedure("processDiscardDeadMessage")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_MANAGE)
-    .handle(async ({ app, input, actor }, operator) => {
-      await app.admitOperator(operator, "ops:manage");
-
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app, input, actor }) => {
       const { messageId, ...ref } = input;
 
       return app.discardDeadMessage({ ref, messageId, actorUserId: actor.id });
     })
 
     .procedure("redriveDeadLetters")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_MANAGE)
-    .handle(async ({ app, input, actor }, operator) => {
-      await app.admitOperator(operator, "ops:manage");
-
-      return app.redriveDeadLetters({ ...input, actorUserId: actor.id });
-    })
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app, input, actor }) => app.redriveDeadLetters({ ...input, actorUserId: actor.id }))
 
     .procedure("discardDeadLetters")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_MANAGE)
-    .handle(async ({ app, input, actor }, operator) => {
-      await app.admitOperator(operator, "ops:manage");
-
-      return app.discardDeadLetters({
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app, input, actor }) =>
+      app.discardDeadLetters({
         ...(input.processName ? { processName: input.processName } : {}),
         actorUserId: actor.id,
-      });
-    })
+      }),
+    )
 
     .procedure("listOutboxAttempts")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.getOutboxAttempts(input);
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.getOutboxAttempts(input))
 
     .procedure("processReleaseLapsedLease")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_MANAGE)
-    .handle(async ({ app, input, actor }, operator) => {
-      await app.admitOperator(operator, "ops:manage");
-
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app, input, actor }) => {
       const { messageId, ...ref } = input;
 
       return app.releaseLapsedLease({ ref, messageId, actorUserId: actor.id });

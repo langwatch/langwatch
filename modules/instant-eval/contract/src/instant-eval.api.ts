@@ -1,11 +1,12 @@
 import type { RestCredentialPrincipal } from "@langwatch/authorization";
-import { moduleApi } from "@langwatch/module";
+import { moduleApi, defineTrpcContract } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
 import type { InstantEvalJudgement, InstantEvalQuestion } from "./instant-eval-judging.ts";
 import type { InstantEvalJudgmentStatus, InstantEvalTarget } from "./instant-eval-limits.ts";
 import type {
   InstantEvalEstimateWire,
+  InstantEvalOptInAccess,
   InstantEvalResultsWire,
   InstantEvalRunWire,
   InstantEvalSampleWire,
@@ -96,6 +97,15 @@ export interface InstantEvalApi {
    * released project with no judge still gets the "configure a model" primer.
    */
   isReleased(input: { projectId: string }): Promise<boolean>;
+
+  /**
+   * Released or not, and what the refusal popover offers this member: the
+   * organization's own switch, a word with their admin, or a word with us.
+   */
+  getOptInAccess(input: { projectId: string; userId: string }): Promise<InstantEvalOptInAccess>;
+
+  /** Throws the project's organization's switch; refused where the popover offers us instead. */
+  optIn(input: { projectId: string; userId: string }): Promise<InstantEvalOptInAccess>;
 
   /**
    * Accepts a statement, holds its price against the free budget, records the
@@ -209,3 +219,5 @@ export interface InstantEvalApi {
 }
 
 export const InstantEvalApi = moduleApi<InstantEvalApi>()("instant-eval");
+
+export const instantEvalTrpc = defineTrpcContract("instantEval").build();

@@ -9,7 +9,12 @@ import { z, type ZodType } from "zod";
 
 import type { CredentialClass } from "../access-policy.ts";
 import { securityRequirement } from "../access/access.ts";
-import type { RestDeprecation, RestDoorCredential, RestTransportRoute } from "./declaration.ts";
+import {
+  routePermissions,
+  type RestDeprecation,
+  type RestDoorCredential,
+  type RestTransportRoute,
+} from "./declaration.ts";
 import { idempotencyKeyParameter } from "./idempotency.ts";
 import type { RestMultipart } from "./request.ts";
 import type { EndpointDocs, PublishedSchema, RouteResponse } from "./response.ts";
@@ -156,7 +161,7 @@ function accessPolicyExtension({
   return {
     kind: "handlerManaged",
     credential: [CREDENTIAL_CLASS_BY_DOOR[reaches]],
-    permissions: route.access || !route.permission ? [] : [route.permission],
+    permissions: route.permission || route.permissionBy ? routePermissions(route) : [],
   };
 }
 

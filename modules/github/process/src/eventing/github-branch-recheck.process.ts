@@ -24,7 +24,7 @@ export const githubBranchRecheckStateSchema = z.object({
   lastRecheckAt: z.number().nullable(),
   lastPruneAt: z.number().nullable(),
 });
-export type GithubBranchRecheckState = z.infer<typeof githubBranchRecheckStateSchema>;
+type GithubBranchRecheckState = z.infer<typeof githubBranchRecheckStateSchema>;
 
 export const GITHUB_BRANCH_RECHECK_INITIAL_STATE: GithubBranchRecheckState = {
   lastRecheckAt: null,

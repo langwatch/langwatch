@@ -1,6 +1,6 @@
 /**
  * What a judgement costs us, and what it is sold for.
- * @see specs/instant-evals/instant-eval-cost.feature
+ * @see modules/instant-eval/specs/instant-eval-cost.feature
  */
 
 import { describe, expect, it } from "vitest";

@@ -6,7 +6,7 @@ import { type Instant, Temporal } from "@langwatch/time";
  * file its money in a second cell, so only days on or after this line - or every day of a
  * source created after it - are named.
  */
-export const PULLED_ACTOR_NAMING_STARTS_AT = "2026-10-01";
+const PULLED_ACTOR_NAMING_STARTS_AT = "2026-10-01";
 
 const NAMING_STARTS_AT = Temporal.Instant.from(`${PULLED_ACTOR_NAMING_STARTS_AT}T00:00:00.000Z`);
 

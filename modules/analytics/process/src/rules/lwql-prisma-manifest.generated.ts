@@ -283,6 +283,7 @@ export interface LwqlPrismaRows {
     readonly domain: "String";
     readonly state: "String";
     readonly matchedVia: "String";
+    readonly origin: "String";
     readonly expiresAt: "DateTime?";
     readonly resolvedAt: "DateTime?";
     readonly resolvedByType: "String?";
@@ -334,6 +335,7 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
     readonly usageSpendingMaxLimit: "Int?";
+    readonly datasetAttachmentMaxMb: "Int?";
     readonly maxSessionDurationDays: "Int";
     readonly mfaRequired: "Boolean";
     readonly lockoutAfterFailedAttempts: "Int";
@@ -354,6 +356,7 @@ export interface LwqlPrismaRows {
     readonly ssoDomain: "String?";
     readonly ssoProvider: "String?";
     readonly domainJoin: "String";
+    readonly joinerRole: "OrganizationUserRole";
     readonly joinDomains: "String[]";
     readonly presenceEnabled: "Boolean";
     readonly traceSharingEnabled: "Boolean";
@@ -368,6 +371,8 @@ export interface LwqlPrismaRows {
     readonly licenseLastValidatedAt: "DateTime?";
     readonly selfHostedCustomer: "Boolean";
     readonly connectServicesDisabled: "String[]";
+    readonly instantEvalsEnabledAt: "DateTime?";
+    readonly instantEvalsEnabledByUserId: "String?";
     readonly connectLastSyncAt: "DateTime?";
     readonly connectLastSyncError: "String?";
   };
@@ -1182,6 +1187,13 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly TraceIngestSourceBilling: {
+    readonly organizationId: "String";
+    readonly sourceType: "String";
+    readonly billed: "Boolean";
+    readonly recordedAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
   readonly RetentionPolicy: {
     readonly id: "String";
     readonly organizationId: "String";
@@ -1265,6 +1277,7 @@ export interface LwqlPrismaRows {
     readonly targetId: "String?";
     readonly before: "Json?";
     readonly after: "Json?";
+    readonly idempotencyKey: "String?";
   };
   readonly LlmPromptConfig: {
     readonly id: "String";

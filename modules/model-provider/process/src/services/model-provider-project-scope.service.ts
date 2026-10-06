@@ -1,8 +1,24 @@
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
-import { ProjectNotFoundError } from "@langwatch/project-contract";
+import { ProjectNotFoundError, type ProjectWithTeam } from "@langwatch/project-contract";
 import { fromDate, type Instant } from "@langwatch/time";
 
-import type { ModelCostProject } from "../app/model-provider.members.ts";
+/**
+ * The project read the scope facts are derived from, named narrowly rather than a whole
+ * `ProjectApi` so a process that only prices a span doesn't also compose an authz service.
+ */
+export abstract class ModelCostProject {
+  abstract findWithTeam(id: string): Promise<ProjectWithTeam | null>;
+  abstract getWithTeam(id: string): Promise<ProjectWithTeam>;
+}
+
+/**
+ * The scope derivation the cost listing asks for — answered by both
+ * `ModelProviderProjectScopeService` and the wider `ModelProviderScopeService`
+ * that composes it.
+ */
+export abstract class ModelCostProjectScope {
+  abstract getProjectScopes(projectId: string): Promise<ModelDefaultScope[]>;
+}
 
 export type ModelProviderProjectSystemContext = {
   scopes: ModelDefaultScope[];

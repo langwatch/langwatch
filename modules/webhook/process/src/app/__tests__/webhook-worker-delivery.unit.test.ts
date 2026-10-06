@@ -1,8 +1,8 @@
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
@@ -11,7 +11,6 @@ import type { ProjectApi } from "@langwatch/project-contract";
  * the one process store the kernel supplies.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -34,19 +33,6 @@ const entitledPlan: Plan = {
   prices: { USD: 0, EUR: 0 },
 };
 
-function stores() {
-  const members: Record<string, unknown> = {
-    prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-    rateLimiter: { check: async () => ({ allowed: true }) },
-    redis: memoryRedisDouble(),
-  };
-
-  return {
-    order: ["prisma", "rateLimiter", "redis"],
-    read: (name: string) => members[name],
-  };
-}
-
 function worker() {
   const eventing = new EventSourcing({
     eventStore: EventStoreMemory.createForTesting(),
@@ -56,17 +42,24 @@ function worker() {
   });
 
   return createApp({ role: "worker" })
-    .withModules([withMemoryRepositories(webhookProcessModule)])
+    .withModules([webhookProcessModule])
     .withConfig({
       webhook: {
         allowInsecureLocalUrls: false,
         allowAmbientAwsCredentials: false,
+        isSaas: false,
+        outboundProxy: {
+          HTTPS_PROXY: undefined,
+          https_proxy: undefined,
+          HTTP_PROXY: undefined,
+          http_proxy: undefined,
+          NO_PROXY: undefined,
+          no_proxy: undefined,
+        },
       },
     })
-    .withStores(stores())
+    .withStores(memoryStores())
     .withEventing(eventing)
-    .withMember("isSaas", false)
-    .withMember("outboundProxy", {})
     .provide({
       entitlement: createApiFixture<EntitlementApi>({
         getActivePlan: async () => entitledPlan,
@@ -79,6 +72,7 @@ function worker() {
 describe("given a memory-tier worker with one active HTTP endpoint", () => {
   describe("when gateway hands over a request's admitted and confirmed spend steps", () => {
     /** @scenario "A memory-tier worker delivers a completed gateway request to its endpoint" */
+    /** @scenario "A process builds the webhook transport from its own configuration" */
     it("records one delivery attempt for the endpoint", async () => {
       const runtime = await worker().boot();
 

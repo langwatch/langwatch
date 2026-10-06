@@ -128,7 +128,6 @@ function mount({
         },
       }),
     },
-    members: {},
     config: undefined,
     repositories,
     resources: new ResourceScope(),

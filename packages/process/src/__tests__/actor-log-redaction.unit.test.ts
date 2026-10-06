@@ -6,7 +6,7 @@ import { REDACTED } from "@langwatch/secrets";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { processConfig } from "../config.ts";
-import { Server } from "../server-factory.ts";
+import { Server } from "../preamble.ts";
 
 const TOKEN_KEY = "lwcli:access:lw_at_do_not_log";
 

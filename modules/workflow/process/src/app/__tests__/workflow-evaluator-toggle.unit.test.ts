@@ -1,23 +1,19 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type { NlpPayloadStaging } from "../../channels/nlp-lambda.channel.ts";
+import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
 import type { WorkflowLineageRepository } from "../../repositories/workflow-lineage.repository.ts";
-import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
-import { WorkflowModule, type NlpLambdaArnCache } from "../workflow.app.ts";
-import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
+import { WorkflowModule } from "../workflow.app.ts";
 
 const existingEvaluator: Evaluator = {
   id: "evaluator_1",
@@ -40,42 +36,31 @@ async function appWith({
   lineage: Partial<WorkflowLineageRepository>;
   evaluators: EvaluatorApi;
 }): Promise<WorkflowModule> {
-  const members = createWorkflowTestInfrastructure({ evaluators });
-
   return WorkflowModule.create({
-    members: {
-      ...members,
-      prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-      nlpCodeBlockTimeoutSeconds: void 0,
-      nlpInternalSecret: void 0,
-      nlpServiceUrl: void 0,
-      publicBaseUrl: void 0,
-    },
     dependencies: {
       evaluators,
       modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
       apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
-      projects: createApiFixture<ProjectApi>({}, "ProjectApi"),
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
-      datasets: members.datasets,
+      datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
       monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
       secrets: createApiFixture<SecretApi>({}, "SecretApi"),
-      organizations: createApiFixture<OrganizationApi>({}, "OrganizationApi"),
     },
     config: {
+      nlpServiceUrl: void 0,
       stagingThresholdBytes: void 0,
       stagingTtlSeconds: 600,
+      relayTurnCeilingMs: void 0,
+      publicBaseUrl: void 0,
+      nlpCodeBlockTimeoutSeconds: void 0,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories: {
-      workflowRows: members.workflowRows,
-      workflows: createApiFixture<WorkflowRepository>({}, "WorkflowRepository"),
+      ...MemoryWorkflowRepositories.create(),
       lineage: createApiFixture<WorkflowLineageRepository>(lineage, "WorkflowLineageRepository"),
-      nlpLambdaArns: createApiFixture<NlpLambdaArnCache>({}, "NlpLambdaArnCache"),
-      payloadStaging: createApiFixture<NlpPayloadStaging>({}, "NlpPayloadStaging"),
     },
   });
 }

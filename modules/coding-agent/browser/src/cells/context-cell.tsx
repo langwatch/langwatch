@@ -1,11 +1,25 @@
 import { formatTokens } from "@langwatch/design-system/display-formatters";
-import { Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 
 import type { SessionListRow } from "../session-list-row.ts";
 import { MissingValue } from "../ui/elements/cells/missing-value.tsx";
-import { ComparisonBar } from "./comparison-bar.tsx";
+
+/**
+ * How this row's value compares to the largest on the page, drawn quietly
+ * enough that the number stays the thing being read.
+ */
+export const ComparisonBar: React.FC<{ value: number; largest: number }> = ({ value, largest }) => (
+  <Box height="3px" bg="border.subtle" borderRadius="full" overflow="hidden">
+    <Box
+      height="full"
+      width={`${largest > 0 ? (value / largest) * 100 : 0}%`}
+      bg="blue.fg"
+      borderRadius="full"
+    />
+  </Box>
+);
 
 // Total tokens (sorts column) with bar comparing to heaviest session; peak
 // context shows but doesn't sort (saturates at context window).

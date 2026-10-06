@@ -32,14 +32,12 @@ export class LangyTurnStopService {
     userId: string;
   }): Promise<void> {
     const { tokenBuffer, worker, conversations, accessStore } = this.deps;
-    const isActor = accessStore
-      ? await accessStore.isTurnActor({
-          projectId,
-          conversationId,
-          turnId,
-          userId,
-        })
-      : false;
+    const isActor = await accessStore.isTurnActor({
+      projectId,
+      conversationId,
+      turnId,
+      userId,
+    });
     if (!isActor) {
       const conversation = await conversations.findByIdVisible({
         id: conversationId,
@@ -60,18 +58,17 @@ export class LangyTurnStopService {
     // stashed) seconds before any worker runs it, and the outbox re-drives that
     // handoff on its own schedule. Best-effort — the durable terminal below is
     // what makes the stop true, and a Redis blip may not hold it up.
-    await this.deps.handoffStore
-      ?.markStopped({ conversationId, turnId })
-      .catch((error: unknown) => {
-        logger.warn(
-          { error, projectId, conversationId, turnId },
-          "could not record the langy stop marker; a redrive may still dispatch this turn",
-        );
-      });
+    await this.deps.handoffStore.markStopped({ conversationId, turnId }).catch((error: unknown) => {
+      logger.warn(
+        { error, projectId, conversationId, turnId },
+        "could not record the langy stop marker; a redrive may still dispatch this turn",
+      );
+    });
 
-    const partialText = tokenBuffer
-      ? await LANGY_TURN_SHARED.reconstructPartialAnswer(tokenBuffer, { conversationId, turnId })
-      : "";
+    const partialText = await LANGY_TURN_SHARED.reconstructPartialAnswer(tokenBuffer, {
+      conversationId,
+      turnId,
+    });
     await conversations.finalizeTurn({
       projectId,
       conversationId,
@@ -80,7 +77,7 @@ export class LangyTurnStopService {
       outcome: "stopped",
     });
     await Promise.allSettled([
-      tokenBuffer?.markEnd({ conversationId, turnId }) ?? Promise.resolve(),
+      tokenBuffer.markEnd({ conversationId, turnId }),
       worker?.cancel({ conversationId, turnId, projectId }) ?? Promise.resolve(),
     ]);
   }

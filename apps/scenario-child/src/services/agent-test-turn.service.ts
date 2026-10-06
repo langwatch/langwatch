@@ -81,9 +81,10 @@ async function runAgentTestTurnValue({
     voiceAgents: runtime.voiceAgents,
   }).build({
     adapterData: job.adapterData,
-    nlpServiceUrl: job.nlpServiceUrl,
+    nlpServiceUrl: job.executeSyncRoute.mode === "direct" ? job.executeSyncRoute.nlpServiceUrl : "",
     nlpInternalSecret: runtime.nlpInternalSecret,
     projectApiKey: runtime.langwatchApiKey,
+    executeSyncRoute: job.executeSyncRoute,
     parameters: job.parameters,
     httpPort: runtime.httpPort,
     logger: runtime.logger,

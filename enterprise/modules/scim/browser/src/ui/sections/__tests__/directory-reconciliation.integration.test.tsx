@@ -82,6 +82,17 @@ describe("given a connection the directory is pushing to", () => {
   });
 });
 
+describe("given a connection on the connectors page", () => {
+  /** @scenario "The connection's name leads to the connection" */
+  it("links the connection's name to the connection's own page", () => {
+    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" maySetUpSingleSignOn />);
+
+    const name = screen.getByTestId("directory-connection-name");
+    expect(name.textContent).toBe("Okta");
+    expect(name.closest("a")?.getAttribute("href")).toBe("/settings/authentication/provider");
+  });
+});
+
 describe("given a connection no directory has pushed to", () => {
   /** @scenario "A connection the directory has never pushed to says so calmly" */
   it("reads as waiting rather than as a failure", () => {

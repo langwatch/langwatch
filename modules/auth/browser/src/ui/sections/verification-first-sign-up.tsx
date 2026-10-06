@@ -1,4 +1,4 @@
-import type { SignUpEnrollment } from "@langwatch/auth-contract";
+import { isSafeReturnToPath, type SignUpEnrollment } from "@langwatch/auth-contract";
 import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -7,6 +7,7 @@ import { authApi as api } from "../../behavior/auth-api.ts";
 import { signIn } from "../../behavior/auth-client.tsx";
 import { confirmSignUpAddress } from "../../behavior/confirm-sign-up-address.ts";
 import { hardRedirect } from "../../behavior/hard-redirect.ts";
+import { usePasskeyCeremony } from "../../behavior/passkey-ceremony.store.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
 import { forgetCarriedEmail, readCarriedEmail } from "../../model/carried-email.ts";
@@ -25,6 +26,7 @@ import { CredentialSignInForm } from "./credential-sign-in-form.tsx";
 import { FrontDoorFinePrint } from "./front-door-fine-print.tsx";
 import { RoutedToConnection } from "./identifier-first-sign-in.tsx";
 import { IdentifierStepForm } from "./identifier-step-form.tsx";
+import { PasskeyCeremonyPanel, passkeyCeremonyTitle } from "./passkey-ceremony-panel.tsx";
 import {
   AlternativeMethods,
   hasAlternativeMethods,
@@ -33,6 +35,129 @@ import {
 import { SignUpCredentialForm } from "./sign-up-credential-form.tsx";
 import { TwoStepChallengePanel, twoStepChallengeTitle } from "./two-step-challenge-panel.tsx";
 
+type Decide = ReturnType<typeof useSignInRouting>["decide"];
+type ResolveEnrollment = ReturnType<typeof useProofEnrollment>["resolveEnrollment"];
+type RequestSignUpVerification = ReturnType<
+  typeof api.auth.requestSignUpVerification.useMutation
+>["mutateAsync"];
+
+/** Spends the emailed link once, on arrival, and turns its answer into the card's next step. */
+async function spendSignUpLink({
+  token,
+  callbackUrl,
+  decide,
+  resolveEnrollment,
+  onSignedIn,
+  onAccountReady,
+  onProofSpent,
+}: {
+  token: string;
+  callbackUrl: string | undefined;
+  decide: Decide;
+  resolveEnrollment: ResolveEnrollment;
+  onSignedIn: (email: string) => void;
+  onAccountReady: (email: string) => void;
+  onProofSpent: (email: string) => void;
+}): Promise<void> {
+  const { email, accountCreated, accountExists, addressProof, signedIn } =
+    await confirmSignUpAddress({ token });
+  // The link opened the session: a full navigation, so everything cached as signed out goes.
+  if (signedIn) {
+    onSignedIn(email);
+    hardRedirect(callbackUrl ?? JOIN_BEFORE_CREATE_PATH);
+    return;
+  }
+  // A reopened link opens no second session, so the way in is offered.
+  if (accountCreated || accountExists) {
+    onAccountReady(email);
+    await decide({ identifier: email });
+    return;
+  }
+  if (!addressProof) {
+    onProofSpent(email);
+    return;
+  }
+  await resolveEnrollment(email, addressProof);
+}
+
+/** Asks for a confirmation link to the address; `null` when none went out. */
+async function requestSignUpLink({
+  email,
+  callbackUrl,
+  request,
+  decide,
+  resolveEnrollment,
+  onUnconfirmed,
+  onSent,
+  onAlreadyRegistered,
+}: {
+  email: string;
+  /** Rides on the emailed link, so a sign-up finished in a fresh tab lands where this one went. */
+  callbackUrl: string | undefined;
+  request: RequestSignUpVerification;
+  decide: Decide;
+  resolveEnrollment: ResolveEnrollment;
+  onUnconfirmed: () => void;
+  onSent: (email: string) => void;
+  onAlreadyRegistered: (email: string) => void;
+}): Promise<"link_sent" | "unconfirmed" | null> {
+  try {
+    const result = await request({ email, ...(callbackUrl ? { callbackUrl } : {}) });
+    if (!result.sent) {
+      // No link can be mailed here, so the password step comes straight away.
+      onUnconfirmed();
+      await resolveEnrollment(email, result.addressProof);
+      return "unconfirmed";
+    }
+    onSent(email);
+    return "link_sent";
+  } catch (failure) {
+    // Not a refusal, a wrong door: the address has an account, so the screen
+    // turns into the way into it rather than telling somebody to start again
+    // somewhere else.
+    if (readHandledError(failure)?.code === "email_already_registered") {
+      onAlreadyRegistered(email);
+      await decide({ identifier: email });
+    }
+    // Anything else renders from the mutation's error, through the registry.
+    return null;
+  }
+}
+
+/** Asks the router first; only an address no connection claims is sent a link. */
+async function routeThenSend({
+  email,
+  decide,
+  onRouted,
+  sendTo,
+}: {
+  email: string;
+  decide: Decide;
+  onRouted: (email: string) => void;
+  sendTo: (email: string) => Promise<unknown>;
+}): Promise<void> {
+  const decision = await decide({ identifier: email });
+  if (decision?.outcome === "redirect_to_connection") {
+    onRouted(email);
+    return;
+  }
+  if (!decision) return;
+  await sendTo(email);
+}
+
+/** A fresh link for a spent one; the dead-link card stays until one went out. */
+async function resendLink({
+  email,
+  sendTo,
+  onSent,
+}: {
+  email: string;
+  sendTo: (email: string) => Promise<"link_sent" | "unconfirmed" | null>;
+  onSent: () => void;
+}): Promise<void> {
+  if ((await sendTo(email)) !== null) onSent();
+}
+
 /**
  * Sign-up (D13, ADR-117 §6): address, link, proof, then password. The account
  * is created only by spending the proof the link returned. An address with an
@@ -40,7 +165,9 @@ import { TwoStepChallengePanel, twoStepChallengeTitle } from "./two-step-challen
  */
 export function VerificationFirstSignUp() {
   const query = useSearchParams();
-  const callbackUrl = query?.get("callbackUrl") ?? undefined;
+  // Arrived on the query string, so held to a path on this site before it is followed or mailed.
+  const requestedCallbackUrl = query?.get("callbackUrl");
+  const callbackUrl = isSafeReturnToPath(requestedCallbackUrl) ? requestedCallbackUrl : undefined;
   const verifyToken = query?.get("verify");
   // Carried in the FRAGMENT, so the address the log-in door hands over never
   // travelled on a request line. Read at first paint because the field it
@@ -93,28 +220,18 @@ export function VerificationFirstSignUp() {
   useEffect(() => {
     if (!verifyToken || spent.current) return;
     spent.current = true;
-    confirmSignUpAddress({ token: verifyToken })
-      .then(async ({ email, accountCreated, accountExists, addressProof: proof, signedIn }) => {
-        // The link opened the session: a full navigation, so everything cached as signed out goes.
-        if (signedIn) {
-          setSignedInAs(email);
-          hardRedirect(callbackUrl ?? JOIN_BEFORE_CREATE_PATH);
-          return;
-        }
-        // A reopened link opens no second session, so the way in is offered.
-        if (accountCreated || accountExists) {
-          setVerifiedEmail(email);
-          setAccountIsReady(true);
-          await decide({ identifier: email });
-          return;
-        }
-        if (!proof) {
-          setProofRecoveryEmail(email);
-          return;
-        }
-        await resolveEnrollment(email, proof);
-      })
-      .catch(setLinkError);
+    spendSignUpLink({
+      token: verifyToken,
+      callbackUrl,
+      decide,
+      resolveEnrollment,
+      onSignedIn: setSignedInAs,
+      onAccountReady: (email) => {
+        setVerifiedEmail(email);
+        setAccountIsReady(true);
+      },
+      onProofSpent: setProofRecoveryEmail,
+    }).catch(setLinkError);
   }, [verifyToken, callbackUrl, decide, resolveEnrollment]);
 
   const instanceMethods = useInstanceMethods({ decide, verifyToken });
@@ -128,33 +245,23 @@ export function VerificationFirstSignUp() {
     });
   };
 
-  const sendTo = async (email: string): Promise<"link_sent" | "unconfirmed" | null> => {
-    try {
-      const result = await requestVerification.mutateAsync({ email });
-      if (!result.sent) {
-        // No link can be mailed here, so the password step comes straight away.
-        setAddressConfirmed(false);
-        await resolveEnrollment(email, result.addressProof);
-        return "unconfirmed";
-      }
-      setSentTo(email);
-      return "link_sent";
-    } catch (failure) {
-      // Not a refusal, a wrong door: the address has an account, so the screen
-      // turns into the way into it rather than telling somebody to start again
-      // somewhere else.
-      if (readHandledError(failure)?.code === "email_already_registered") {
-        setWelcomeBackEmail(email);
-        await decide({ identifier: email });
-      }
-      // Anything else renders from the mutation's error, through the registry.
-      return null;
-    }
-  };
+  const sendTo = (email: string) =>
+    requestSignUpLink({
+      email,
+      callbackUrl,
+      request: requestVerification.mutateAsync,
+      decide,
+      resolveEnrollment,
+      onUnconfirmed: () => setAddressConfirmed(false),
+      onSent: setSentTo,
+      onAlreadyRegistered: setWelcomeBackEmail,
+    });
 
   // Told once, from the same state the returns below branch on, so the ground
   // can never be showing a step other than the one drawn over it.
   const twoStep = useTwoStepChallenge();
+  // A passkey ceremony somebody deliberately started, from whichever passkey button they pressed.
+  const passkeyCeremony = usePasskeyCeremony();
   usePublishFrontDoorStage({
     door: "signup",
     depth: signUpDepth({
@@ -172,6 +279,14 @@ export function VerificationFirstSignUp() {
     return (
       <AuthCard title={twoStepChallengeTitle({ factor: twoStep.factor })}>
         <TwoStepChallengePanel factor={twoStep.factor} callbackUrl={twoStep.callbackUrl} />
+      </AuthCard>
+    );
+  }
+
+  if (passkeyCeremony) {
+    return (
+      <AuthCard title={passkeyCeremonyTitle({ ceremony: passkeyCeremony })}>
+        <PasskeyCeremonyPanel ceremony={passkeyCeremony} />
       </AuthCard>
     );
   }
@@ -213,9 +328,9 @@ export function VerificationFirstSignUp() {
         error={{ error: "identity_verification_used" }}
         isSending={requestVerification.isPending}
         callbackUrl={callbackUrl}
-        onResend={async (email) => {
-          if ((await sendTo(email)) !== null) setProofRecoveryEmail(null);
-        }}
+        onResend={(email) =>
+          resendLink({ email, sendTo, onSent: () => setProofRecoveryEmail(null) })
+        }
       />
     );
   }
@@ -323,15 +438,7 @@ export function VerificationFirstSignUp() {
         defaultEmail={carriedEmail}
         // The ROUTER decides what this address is offered, the same question log-in asks.
         // No answer is not "no connection": a routing failure stops here, rendered above.
-        onSubmit={async ({ email }) => {
-          const decision = await decide({ identifier: email });
-          if (decision?.outcome === "redirect_to_connection") {
-            setRoutedEmail(email);
-            return;
-          }
-          if (!decision) return;
-          await sendTo(email);
-        }}
+        onSubmit={({ email }) => routeThenSend({ email, decide, onRouted: setRoutedEmail, sendTo })}
         footer={<LogInLink callbackUrl={callbackUrl} label="Or log in instead" />}
         alternatives={
           hasAlternativeMethods({ methodSet: instanceMethods }) ? (

@@ -6,7 +6,6 @@
 import { PermissionDeniedError } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -34,8 +33,15 @@ function buildApp() {
   );
   const app = createFeatureFlagTestApp({
     dependencies: {
-      permissions: createApiFixture<AuthzApi>({ hasPermission }),
-      projects: createApiFixture<ProjectApi>({ getOrganizationId }),
+      permissions: createApiFixture<AuthzApi>({
+        hasPermission,
+        getScope: async ({ projectId }) => ({
+          type: "project",
+          id: projectId ?? "project-1",
+          teamId: "team-1",
+          organizationId: await getOrganizationId(projectId ?? "project-1"),
+        }),
+      }),
       organizations: createApiFixture<OrganizationApi>({ memberOrganizationIds }),
     },
   });

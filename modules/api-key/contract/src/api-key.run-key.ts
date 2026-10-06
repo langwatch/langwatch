@@ -3,11 +3,18 @@ import { z } from "zod";
 /** How long a run's key lives when no caller needs it to outlast a longer bound. */
 export const RUN_KEY_LIFETIME_MS = 15 * 60 * 1000;
 
-/** The longest life a caller may ask a handed-out run key to still have; a run outliving it is refused. */
+/**
+ * The longest life a caller may ask a handed-out run key to still have; a run outliving it is
+ * refused.
+ */
 export const RUN_KEY_MAX_REMAINING_MS = 60 * 60 * 1000;
 
 /** All a code agent's sandbox reaches: the project's agent cache, which user code may read. */
 export const AGENT_SANDBOX_PERMISSIONS: readonly string[] = ["agentCache:manage"];
+
+/** The key a project's code agent runs share (specs/agent-cache/agent-cache.feature). */
+export const mintAgentSandboxKeyInputSchema = z.object({ projectId: z.string().min(1) }).strict();
+export type MintAgentSandboxKeyInput = z.infer<typeof mintAgentSandboxKeyInputSchema>;
 
 /** One run's key (ARCHITECTURE.md §10): the starter's, or nobody's when nobody started it. */
 export const mintRunKeyInputSchema = z

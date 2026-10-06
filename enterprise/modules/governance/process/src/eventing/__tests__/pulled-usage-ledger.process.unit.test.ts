@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** Port of main's `pulledUsageLedger.process.unit.test.ts`. Spec: specs/governance/governance-cost-rollup.feature */
+/**
+ * Port of main's `pulledUsageLedger.process.unit.test.ts`. Spec: specs/governance/governance-cost-rollup.feature,
+ * specs/governance/pulled-usage-cost-reporting.feature */
 import { describe, expect, it } from "vitest";
 
 import type { PulledUsageLedgerState } from "../pulled-usage-ledger.process.ts";
@@ -15,6 +17,30 @@ import {
 } from "./pulled-usage-ledger.fixtures.ts";
 
 const DAY_MS = 86_400_000;
+
+describe("given a pulled observation with a known dollar cost for a team", () => {
+  describe("when the ledger process handles it", () => {
+    /** @scenario "Governance records a priced fact for each pulled observation it can price" */
+    it("records a priced fact in nano-dollars under the team's scope, in the governance tenant", async () => {
+      const { ledger, observe, drainOutbox } = ledgerRuntime();
+
+      await observe(observation());
+      await drainOutbox();
+
+      expect(ledger.rows).toEqual([
+        expect.objectContaining({
+          tenantId: GOV_PROJECT,
+          restatementKey: RESTATEMENT_KEY,
+          organizationId: ORG_ID,
+          scopeId: "team-ledger",
+          amountNanoUsd: 12_000_000_000,
+          occurredAtMs: OCCURRED_AT,
+          observedAtMs: T0,
+        }),
+      ]);
+    });
+  });
+});
 
 describe("resuming an instance persisted before the state carried a filed cell", () => {
   it("treats the missing cell as a first observation and files the charge", async () => {
@@ -44,6 +70,7 @@ describe("resuming an instance persisted before the state carried a filed cell",
 describe("recognising a reissued charge", () => {
   describe("given a day's bill already pulled in one currency", () => {
     /** @scenario "A bill reissued in another currency is withdrawn by the pull that finds it" */
+    /** @scenario "A retraction is dated to the day it corrects" */
     it("withdraws the first currency's version when the next pull returns another currency", async () => {
       const { retraction, observe, drainOutbox } = ledgerRuntime();
 
@@ -77,6 +104,28 @@ describe("recognising a reissued charge", () => {
       expect(ledger.rows).toHaveLength(0);
       const instance = await store.findByRef<PulledUsageLedgerState>({ ref: LEDGER_REF });
       expect(instance?.state.filedCell).toMatchObject({ currencyCode: "EUR" });
+    });
+  });
+
+  describe("given the filed cell is held in the ledger's own persisted state", () => {
+    /** @scenario "A correction still retracts its earlier version after the summary is rebuilt" */
+    it("withdraws from the persisted cell, with no summary read at all", async () => {
+      const { store, retraction, observe, drainOutbox } = ledgerRuntime();
+
+      await observe(observation({ currencyCode: "EUR", costNanoUsd: null }));
+      const filed = await store.findByRef<PulledUsageLedgerState>({ ref: LEDGER_REF });
+      await observe(
+        observation({
+          costNanoMinor: 13_000_000_000,
+          costNanoUsd: 13_000_000_000,
+          observedAtMs: T0 + DAY_MS,
+        }),
+      );
+      await drainOutbox();
+
+      expect(filed?.state.filedCell).toMatchObject({ currencyCode: "EUR" });
+      expect(retraction.sent).toHaveLength(1);
+      expect(retraction.sent[0]).toMatchObject({ currencyCode: "EUR", costNanoMinor: 0 });
     });
   });
 

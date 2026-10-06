@@ -1,5 +1,5 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyConfig, DataPrivacyScope } from "@langwatch/data-privacy-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
@@ -16,8 +16,21 @@ const ORGANIZATION_ID = dataPrivacyTestGraph.organizationId;
 
 const projects = createDataPrivacyTestProjects();
 
-const organizations = createApiFixture<OrganizationApi>({
-  getTeamById: async () => dataPrivacyTestTeam(),
+/** Authz's lineage check over the test graph: consistent only inside the scope's organization. */
+type LineageResult = Awaited<ReturnType<AuthzApi["checkScopeLineage"]>>;
+
+const lineage = createApiFixture<AuthzApi>({
+  checkScopeLineage: async ({ organizationId, teamId, projectId }): Promise<LineageResult> => {
+    const team = dataPrivacyTestTeam();
+    const known = teamId ? teamId === team.id : projectId === dataPrivacyTestGraph.projectId;
+    if (known && organizationId === team.organizationId) return { kind: "consistent" };
+
+    return {
+      kind: "mismatch",
+      widest: { tier: "organization", id: String(organizationId) },
+      entries: [],
+    };
+  },
 });
 
 function build({ projectDirectory = projects }: { projectDirectory?: ProjectApi } = {}) {
@@ -28,7 +41,7 @@ function build({ projectDirectory = projects }: { projectDirectory?: ProjectApi 
     service: DataPrivacyService.create({
       repository,
       projects: projectDirectory,
-      organizations,
+      lineage,
     }),
     stored: () => repository.findAllInOrganization({ organizationId: ORGANIZATION_ID }),
   };
@@ -156,6 +169,36 @@ describe("DataPrivacyService", () => {
       httpStatus: 404,
     });
     await expect(stored()).resolves.toHaveLength(0);
+  });
+
+  /** @scenario A rule is anchored to a single organization */
+  it("refuses a project rule whose caller-supplied organization does not own the project", async () => {
+    const { service, stored } = build();
+
+    await expect(
+      service.setForScope({
+        organizationId: "some-other-org",
+        scope: { scopeType: "PROJECT", scopeId: dataPrivacyTestGraph.projectId },
+        personalOnly: false,
+        config: { categories: { input: { disposition: "drop" } } },
+      }),
+    ).rejects.toMatchObject({ code: "data_privacy_scope_target_not_found", httpStatus: 404 });
+    await expect(stored()).resolves.toHaveLength(0);
+  });
+
+  it("anchors a team rule to the organization that owns the team", async () => {
+    const { service, stored } = build();
+
+    await service.setForScope({
+      organizationId: ORGANIZATION_ID,
+      scope: { scopeType: "TEAM", scopeId: dataPrivacyTestGraph.teamId },
+      personalOnly: false,
+      config: { categories: { input: { disposition: "drop" } } },
+    });
+
+    await expect(stored()).resolves.toMatchObject([
+      { organizationId: ORGANIZATION_ID, scopeType: "TEAM", scopeId: dataPrivacyTestGraph.teamId },
+    ]);
   });
 
   /** @scenario "A rule aimed at a department is refused by name" */

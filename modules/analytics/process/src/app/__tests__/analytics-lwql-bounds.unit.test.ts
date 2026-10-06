@@ -5,42 +5,24 @@
  * @vitest-environment node
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { resolveRequestBound } from "@langwatch/plans";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
-import type { LwqlProvisioningDatabase } from "../../tasks/lwql-provision.task.ts";
 import { AnalyticsModule } from "../analytics.app.ts";
 
 const TIER_PLAN_TYPE: Record<string, string> = {
   "org-free": "FREE",
   "org-enterprise": "ENTERPRISE",
 };
-
-/** A real fixed window: each key counts its own checks, refused past the allowance named. */
-function windowLimiter(): RateLimiter {
-  const used = new Map<string, number>();
-  return {
-    check: (key, limit) => {
-      const count = (used.get(key) ?? 0) + 1;
-      used.set(key, count);
-      const requests = limit?.requests ?? Number.POSITIVE_INFINITY;
-
-      return Promise.resolve(
-        count <= requests ? { allowed: true } : { allowed: false, retryAfterSeconds: 60 },
-      );
-    },
-  };
-}
 
 /**
  * The app as production composes it, minus the substrate: no identity is
@@ -64,14 +46,7 @@ async function harness() {
       traces: createApiFixture<TraceApi>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
-    members: {
-      clickhouse: createApiFixture<ClickHouseQueryClient>(),
-      rateLimiter: windowLimiter(),
-      publicBaseUrl: "https://app.langwatch.test",
-      clickhouseAdmin: { configured: false },
-      databaseTarget: { configured: false },
-      prisma: createApiFixture<LwqlProvisioningDatabase>({}, "prisma"),
-    },
+    repositories: MemoryAnalyticsRepositories.create(),
     config: {
       langwatchQl: {
         url: void 0,
@@ -82,6 +57,7 @@ async function harness() {
         accessModelMode: void 0,
         sqlSingleNode: void 0,
       },
+      publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: {} as never,

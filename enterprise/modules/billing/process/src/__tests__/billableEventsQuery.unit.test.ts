@@ -176,6 +176,7 @@ describe("countBillableEventsByProjects", () => {
   });
 
   describe("when no ClickHouse repository is available", () => {
+    /** @scenario "A deployment with no ClickHouse reads the volume as unknown, not as zero" */
     it("reports the count unknown rather than zero", async () => {
       const result = await BillableEventsQueryService.create(null).countBillableEventsByProjects({
         organizationId: "org-1",

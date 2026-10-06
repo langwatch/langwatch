@@ -74,7 +74,9 @@ Named by one rule: **where the code runs, or what it declares.**
 
 The core is a contract's only framework import and is incredibly light;
 each runtime owns the declaration vocabulary for its own half, so weight is
-imported the rest of the way down, never from the top.
+imported the rest of the way down, never from the top. This stays strict and gains a lint; the date and
+hosting helpers move where a contract may import them (Alex, 2026-10-05). Until they do, analytics' and
+trace's contracts import `@langwatch/api/dates` and gateway's `@langwatch/api/hosting`.
 
 - **`@langwatch/module`** — the light core, and ONLY what a contract needs:
   the `moduleApi` token factory, module ids, UI tokens and
@@ -140,6 +142,16 @@ open item of 2026-09-29).
 Analytics' filter field registry (`availableFilters` and its field types) is `modules/analytics/filters`
 (`@langwatch/analytics-filters`), an analytics-owned package, portable and framework-free on the same
 terms; analytics' browser and automation's process import it (Alex, 2026-09-30).
+The unkeyed-filter detector (`findUnkeyedFilterFields`) moves to the contract that owns the filter grammar,
+and both trace search and automation triggers import it (Alex, 2026-10-05): that is
+`@langwatch/analytics-filters`, which owns `requiresKey` and which automation already imports, so trace's
+process becomes an importer (coordinator, citing that ruling, 2026-10-05). Trace owns the metadata columns, so
+trace-contract exports main's two metadata key/value condition builders (the three storage formats) and
+analytics imports them: one copy, a contract export, not an Api operation (Alex, 2026-10-05).
+The instant-evals consent columns stay on `Organization`: organization owns them, and instant-eval reads and
+sets them through new `OrganizationApi` operations. Monitor reads an evaluator's effective settings through one
+new `EvaluationApi` read operation. Billing's Slack channel is renamed `billing-alert` (`BillingAlertChannel`),
+ownership unchanged (Alex, 2026-10-05).
 
 ---
 
@@ -170,8 +182,8 @@ operations. Billing peer-subscribes to `month_counted`; a lower corrected total 
 meter event (Alex, 2026-10-01). Per-entity periodic work is a keyed process manager (§9, "Per-entity calendar
 work"), never `.schedule`. Every limit is soft:
 eventual and fail-open, with a documented enforcement lag and overshoot (Alex, 2026-10-01).
-Not built yet (Alex, 2026-09-30): `entitlement -> trace` and `trace -> entitlement` stay listed in the
-peer-cycle baseline until usage lands.
+Not built yet (Alex, 2026-09-30): `entitlement -> trace` and `trace -> entitlement` are peer cycle edges
+the peer-cycle test refuses until usage lands (the allowed list is gone, §5; Alex, 2026-10-05).
 Slack is a module of its own (Alex, 2026-09-30; supersedes ADR-093 §5a on ownership). `modules/slack`
 owns the Slack connection subjects: the `SlackIntegration` table, its repositories and services,
 `SlackApi` (main's list, create, update and delete of a connection, plus the reads delivery needs), the
@@ -238,9 +250,9 @@ export const traceProcessModule = defineProcessModule("trace")
 ```
 
 No `.build()`: every `with*` result is installable. `index.ts` exports the
-installer and transport declarations, **nothing else**. The installer and the
-`<Name>Module` class share `<f>.module.ts` — the class is thin forwarding
-(services carry the weight), and one file is the module's identity.
+installer and transport declarations, **nothing else**. The installer lives in `<f>.module.ts`, the
+module's identity; the `<Name>Module` class lives in `app/<f>.app.ts` (Alex, 2026-10-05: the record
+follows the tree, no code moves). The class is thin forwarding (services carry the weight).
 
 **`TraceModule`** is the implementation of `TraceApi`: `static contract`,
 `static dependencies` (peer tokens), private constructor,
@@ -322,9 +334,33 @@ of:
 
 **There are no members** (Alex, 2026-10-01): "member is just an abstraction over DI, and we
 already have the container". A module class receives `repositories`, `channels`,
-`dependencies`, `config`, `secrets`, `role` and `resources`, never a bag of clients or facts
-(what logger, clock and processName become is open, §16). There are no supply tokens and no
-`.provide`; a test stubs a peer through the module's own test seams (§13).
+`dependencies`, `config`, `secrets`, `role` and `resources`, never a bag of clients or facts.
+There are no supply tokens and no `.provide`; a test stubs a peer through the module's own test
+seams (§13).
+An installation test hands `bootInstalledProcess({ peers: [testPeer({ token, instance })] })`
+(`@langwatch/process/testing`) a stand-in for each peer it does not install; `package-boundaries`
+refuses that import outside test files.
+
+**Members are removed now** (Alex, 2026-10-05): before other module work, lanes remove `withMember`,
+`app/<f>.members.ts` and `app/<f>-composition.build.ts` (deleted, §15), each member becoming a config leaf, a secret
+handle or a peer `*Api`; then the grammar refuses the files. Where each kind goes (coordinator, members
+wave, 2026-10-05, citing that ruling):
+
+- **The cipher is a registry input**, not a member and not a shared helper: the live registry
+  `requires` `encryption` and the live Prisma repository seals and opens, as model-provider, webhook and
+  notification do; memory twins hold plaintext, and services stop sealing. Stored-object's memory-tier
+  URL seal signs with a random per-process key, never plaintext.
+- **A rate limiter is a named repository**, `<module>-rate-limit.repository.ts`, with a memory
+  fixed-window twin; the live one wraps the store's `rateLimiter`, so Redis keys are unchanged (trace,
+  46d240425b). Model-provider's talks to Redis with its own `model-provider:rate-limit:` keys, since
+  wrapping would change its keys and its 429's reset time (accepted).
+- **Shared deployment facts are shared leaves** (§6): `publicBaseUrl`, `nlpServiceUrl`, `serviceVersion`
+  and `otelResourceAttributes` in `@langwatch/config`, `nlpInternalSecret` in `@langwatch/secrets`, one
+  instance each, which `packages/process`'s `owner.ts` holds too. A module adds the leaf to its contract
+  config.
+- **The logger** is `createLogger("langwatch:<module>[:<part>]")` inside the module; **`processName`**
+  (deleted, §15) gives way to the role; memory twins take time from `@langwatch/time`.
+- **A task reads config**: `withTasks` factories receive the module's parsed config.
 
 One unowned service has one owning module: evaluation owns the langevals boundary — its endpoint,
 the S3 staging of large payloads and their config — and topic and workflow reach langevals through
@@ -369,8 +405,8 @@ Its inputs and outputs are typed from those declarations, never `any` (Alex, 202
 interactive element is the native one (`button`, `a`, `input`) styled through the design system to
 look as before; a `div` given a role is not (Alex, 2026-09-24).
 A screen reads host services directly, typed by tokens: `useLent`, `openDrawer`,
-`useReleaseFlag` (Alex, 2026-10-01). A `*HostApi` keeps only a module's own
-host needs, which the shell implements from `browser-host` capabilities. The half is declared with
+`useFeatureFlag` (Alex, 2026-10-01; it keeps its name and leaves §15's deleted list, Alex 2026-10-05). A `*HostApi` keeps
+only a module's own host needs, which the shell implements from `browser-host` capabilities. The half is declared with
 `defineBrowserModule` — screens (each may name the release `flags:` it sits behind, §10.1), drawers, publications, host mounts — and
 exported at `./declaration`; the generated `browserModules` list (`apps/ui/src/browser-modules.generated.ts`) installs it.
 
@@ -552,7 +588,8 @@ parse (§6). An app's `config.ts` holds none of it: api's and worker's is only
 own runner controls and connections, and scenario-child's reads what its parent stated.
 A hand-maintained per-app config of what modules own is a defect. One rule, here and in §6:
 an app's `config.ts` holds only that environment seam, never a module's config or a connection
-string (Alex, 2026-10-01).
+string (Alex, 2026-10-01). Only `config.ts` reads `process.env`, apps' `main.ts` included, and
+`langwatch/environment-boundaries` refuses the rest (Alex, 2026-10-05).
 
 ```ts
 // apps/api/src/main.ts
@@ -591,8 +628,8 @@ await server.run(app);
 `.trpc()`, `.rest()` and `.browserBundle()`, plus `.framedDocument({ path,
 document })` for a module-built document that answers on the app origin
 under the sandbox frame policy (a fresh nonce per answer, its own CSP, never
-the app's); it carries no logger, stores, credentials or paths. Required slots derive from the installed
-module declarations: an omitted declared transport refuses boot by name.
+the app's); it carries no logger, stores, credentials or paths. An unselected surface is skipped (D3,
+below).
 The bundle is explicit, including an explicit opt-out for deployments
 without one. There is no `withModules` and no `withPipelines` in an app: a container takes its
 modules from the owners the app already handed to `withConfig(processConfig(processModules))`,
@@ -608,7 +645,8 @@ framework implementations retain the code needed to preserve behaviour.
 **A process mounts only the surfaces it selects and skips the rest (D3, Alex, 2026-10-01).** The
 API package is split into core, `api-rest` and `api-trpc`;
 a process that does not select `.rest()`, `.trpc()` or `.browserBundle()` neither imports nor mounts
-that surface, and a module's declaration for it is skipped without refusal. Deployment is unchanged
+that surface. A module whose transport needs a surface the process did not select still installs, and
+that transport is skipped, not refused (Alex, 2026-10-05; §4 says this here only). Deployment is unchanged
 for now: locally one server runs rest, trpc, ui and the worker; in production one pod runs api, trpc
 and ui, and another the worker.
 
@@ -800,7 +838,8 @@ anywhere and returns the runtime; the test drives `stop`.
 server.container(role)            # modules from the owners handed to withConfig
   │  open the stores (§7); order installers by peer dependencies (tokens, never imports)
   ▼  for each module:
-  1. pick the tier from the opened stores (§7)
+  1. pick the tier the stores state (§7); a module with repositories whose tier nobody stated refuses
+     boot by name (`StoreTierUnstatedError`, Alex 2026-10-05)
   2. check each registry's requires against the opened stores
      — refusal at boot, BY NAME ("webhook needs clickhouse; none opened")
   3. build repositories and channels from the module's registries:
@@ -831,23 +870,30 @@ picks the tier and calls `create`. Every `create()` **arrives with its things al
 Passing a hand-assembled composition object into anything is banned as a shape: nothing receives a
 bag it has to pick apart.
 
-**The module class is the process half's implementation** (§3.2): `static contract`,
+**The module class is the process half's implementation** (§3.2), in `app/<f>.app.ts` (Alex,
+2026-10-05): `static contract`,
 `static dependencies` (peer tokens), `static config`, `static secrets` and `static create`. Peers
 are tokens, so a typo is a compile error and `create()` receives exact typed peers. The graph resolves transitively (a dependency's
 dependencies are its own business — only its API travels), cycles refuse at
 boot by name, and an instance bound at create may not be invoked until
 after boot.
 
-**Peer cycles shrink to zero, then refuse** (Alex, 2026-09-29). Refusal stays the rule, but today
-nothing reaches it: the container hands every `*Api` token a proxy before any module installs and
-orders modules without them, so two modules naming each other's `*Api` in `static dependencies` boot.
-The transition is a shrink-only list. The `peer-cycles` policy reports every declared peer edge whose
-peer reaches back, and `packages/architecture-enforcer/tests/boundary-ratchets.unit.test.ts` refuses an
-edge missing from `tests/baselines/peer-cycle-edges.json` and a listed edge that no longer exists, so
-the list only shrinks and a change that cuts an edge removes it. A cycle is cut in §9's shape (a
+**Peer cycles are refused, and the test stays red until the last is cut** (Alex, 2026-09-29; the list
+deleted 2026-10-05, Alex). Refusal is the rule, but today nothing reaches it at boot: the container hands
+every `*Api` token a proxy before any module installs and orders modules without them, so two modules
+naming each other's `*Api` in `static dependencies` boot. The shrink-only list that held this transition
+was deleted on 2026-10-05 (Alex, 2026-10-05): every cycle is now reported and none is allowed. The
+`peer-cycles` policy reports every declared peer edge whose peer reaches back, and
+`packages/architecture-enforcer/tests/boundary-ratchets.unit.test.ts` expects the edge list to be empty,
+so it fails until the last cycle is cut. A cycle is cut from the reactor's side, in §9's shape (a
 command on the other module's pipeline, or a pull by a scheduled process manager where that would
-itself be a cycle). When the list is empty the container refuses a peer cycle at boot by name, and the
-list is deleted.
+itself be a cycle); `dev/docs/plans/peer-cycles-2026-10-05.md` maps them. Once none remains the
+container refuses a peer cycle at boot by name.
+No peer-cycle edge is cut or listed without asking Alex first (Alex, 2026-10-05). Two cuts are ruled:
+`secret -> project`, and `gateway -> webhook`, where webhook subscribes to gateway's events (§9) and
+gateway holds no `WebhookApi` peer. Workflow's HTTP-credentials backfill is still needed for a while: it
+stays, done another way (workflow walks its own rows; the agents half becomes agent's own task), so
+workflow drops `ProjectApi` and `OrganizationApi` (Alex, 2026-10-05).
 
 Online policy execution (guardrails) is a synchronous capability with an end-to-end deadline and
 cancellation, distinct from monitors and run history. The evaluation runtime it calls is a dependency
@@ -856,10 +902,10 @@ removing a cycle may not make a synchronous precondition eventual (Alex, 2026-10
 A request guardrail answers within 800 ms through `EvaluationApi.checkGuardrail`, the gateway's only
 evaluation dependency; a fail-closed deadline answers the retryable 503 (Alex, 2026-10-01).
 
-`gateway -> evaluation` (guardrail checks) and `instant-eval -> licensing` (Connect judge) are listed
+`gateway -> evaluation` (guardrail checks) and `instant-eval -> licensing` (Connect judge) were listed
 temporarily (Alex, 2026-09-30): hosted judging moves to instant-eval, and the guardrail check's owner is
-revisited later.
-`project -> data-privacy` is listed too (Alex, 2026-09-30): `/api/projects/{id}` carries `piiRedactionLevel`
+revisited later. With the list deleted they are reported like every other cycle (Alex, 2026-10-05).
+`project -> data-privacy` was listed too (Alex, 2026-09-30): `/api/projects/{id}` carries `piiRedactionLevel`
 through `DataPrivacyApi.getPiiRedactionLevel`/`setPiiRedactionLevel`, which merge the level into the
 project-scope rule and read `custom` as `STRICT`.
 
@@ -873,8 +919,10 @@ a reason for more container.
 A factory under `repositories/` or `services/` that assembles collaborators is
 composition in the wrong folder: it moves into `create()`, and another process
 reaches the module through its API, never through its factories (2026-09-23).
-So are `*-composition.build.ts` and `*.members.ts` beside the module class: store wiring moves into
-the registries, the rest into `create()` (Alex, 2026-10-01).
+So are `*-composition.build.ts` and `*.members.ts` beside the module class, deleted (§15): store wiring
+moves into the registries, the rest into `create()` (Alex, 2026-10-01). Lanes remove the remaining files
+before other module work, and the grammar then refuses them (Alex, 2026-10-05; §3.3 says where each
+member goes).
 
 The `processModules` list is generated from `modules/catalogue.json`
 (`pnpm generate:modules` writes one list into each app: process halves into `api`, `worker` and `tasks`, browser halves into `ui`). **Installing a
@@ -908,7 +956,8 @@ export const githubSecrets = {
 } as const;
 export type GithubConfig = ConfigOf<typeof githubConfig>;
 
-// modules/github/process/src/github.module.ts — the module class attaches them
+// modules/github/process/src/app/github.app.ts — the module class attaches them
+// (github's handles move to its contract, Alex 2026-10-05; today github.app.ts declares them)
 static readonly config = githubConfig;
 static readonly secrets = githubSecrets;
 
@@ -982,6 +1031,12 @@ export const billingConfig = Config.define((c) => ({
   name; notification and webhook parse it.
 
 Framework owners (process, observability) pick from the same object.
+
+**Landed as single shared leaves** (coordinator, members wave, 2026-10-05, citing Alex's members
+ruling): `@langwatch/config`'s deployment facts export `publicBaseUrl` (`BASE_HOST`), `isSaas`, `nlpServiceUrl`, `serviceVersion` and `otelResourceAttributes` (read a reported
+version through `releaseVersionOf`), and `@langwatch/secrets` exports the `nlpInternalSecret` handle.
+`packages/process`'s `owner.ts` holds the same instance of each, so a module that adds one to its
+contract config never collides.
 
 When the single owner is a **module** rather than the process, it passes the
 value down as a capability on its own `*Api`, never as a shared variable and
@@ -1196,21 +1251,18 @@ without saying why; the screen tells the user to contact support (SaaS) or their
 ## 7. Stores, the tier, and migrations
 
 ```bash
-# ── local dev (live tier — the default; same shape as production) ──
+# ── local dev (live tier; same shape as production) ──
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/langwatch   # or the development default
 CLICKHOUSE_URL=http://default@localhost:8123/langwatch
 REDIS_URL=redis://localhost:6379
 
-# ── zero-dependency mode: ONE knob, by the word ──
-LANGWATCH_STORES=memory
-
-# ── production: identical shape, managed URLs, the knob unset ──
+# ── production: identical shape, managed URLs ──
+# There is no tier knob: memory is asked for in code, by a test or dev harness (Alex, 2026-10-05)
 ```
 
 ```ts
 export const storesConfig = (modules) =>
   Config.group({
-    tier: Config.value(z.enum(["live", "memory"]).default("live"), { env: "LANGWATCH_STORES" }),
     /* DATABASE_URL, CLICKHOUSE_URL and REDIS_URL are secrets: see storesSecrets below */
     objectStorage: Config.group({
       backend: Config.value(z.enum(["s3", "azure", "file"]).optional(), {
@@ -1218,10 +1270,7 @@ export const storesConfig = (modules) =>
       }),
       /* s3: S3_*; azure: AZURE_BLOB_*, AZURE_* identity; localRoot: LANGWATCH_LOCAL_STORAGE_PATH */
     }),
-  }).refine(
-    /* rule 1: live + a required store unset → refuse naming modules and key
-             rule 2: memory + NODE_ENV=production → refuse by name */
-  );
+  }).refine(/* a required store unset → refuse naming modules and key */);
 
 // connection strings are Secret declarations, never Config.value fields (Alex, 2026-10-01)
 export const storesSecrets = {
@@ -1231,23 +1280,22 @@ export const storesSecrets = {
 } as const;
 ```
 
-| You did                                 | What happens                                                                                           |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| forgot `DATABASE_URL` in production     | refusal: _"live stores: trace, annotation require postgres; DATABASE_URL is unset"_ — **never memory** |
-| `LANGWATCH_STORES=memory` locally       | whole process on memory twins, stated, one line                                                        |
-| `LANGWATCH_STORES=memory` in production | refusal: _"asked to run production on memory storage"_                                                 |
-| typo'd the knob                         | enum refusal — not a fallback to either side                                                           |
+| You did                                       | What happens                                                                                           |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| forgot `DATABASE_URL` in production           | refusal: _"live stores: trace, annotation require postgres; DATABASE_URL is unset"_ — **never memory** |
+| a test or dev harness hands `memoryStores()`  | whole process on memory twins, stated in code                                                          |
+| a module with repositories and no stated tier | refusal: `StoreTierUnstatedError`, naming the module, before any client opens                          |
 
-Memory is reachable only by writing the word, and only outside production.
-Absence always refuses. There is deliberately no per-store tier: one knob,
-whole process, no mixing — half-real storage tests a lie.
+**Store tiers fail closed** (Alex, 2026-10-05). Outside tests a missing tier refuses to boot by name;
+memory runs only when a test or dev harness asks for it. There is no `LANGWATCH_STORES` knob and no
+per-store tier: whole process, no mixing — half-real storage tests a lie.
 
 **The tier travels inside the value.** `openStores` returns branded live
 clients or the branded `memoryStores()` — same type, one `.withStores(...)`
 call — and `boot()` selects every module's registry (`live` or `memory`) from
-the brand. Config is the only place a human states anything about storage;
-the chain call is plumbing that carries config's answer, and the test seam
-(tests hand `memoryStores()` directly and never touch env).
+the tier the value states: opened stores state `live`, `memoryStores()` states `memory`. A module with
+repositories whose tier nobody stated refuses boot by name (Alex, 2026-10-05). Production and dev open
+live stores; a test or dev harness hands `memoryStores()` directly and never touches env.
 
 **Migrations are not the api's job.** They are tasks —
 `pnpm --filter @langwatch/tasks task prisma-migrate clickhouse-migrate` — run
@@ -1312,8 +1360,11 @@ bucket, account or root. Its settings belong to the stores owner:
 `AZURE_BLOB_*`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`,
 `AZURE_FEDERATED_TOKEN_FILE` and `LANGWATCH_LOCAL_STORAGE_PATH`, with
 `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_SESSION_TOKEN` and
-`AZURE_BLOB_ACCOUNT_KEY` as secrets. `LANGWATCH_STORES=memory` answers it with
-a memory twin.
+`AZURE_BLOB_ACCOUNT_KEY` as secrets. Main's per-organisation
+`DATAPLANE_S3__<label>__<orgId>=<json>` family is one `Secret.family("DATAPLANE_S3__")`
+handle on the stores, parsed once at boot into private accounts as the ClickHouse routes
+are; an organisation listed there is placed on its own S3 account whatever the shared
+backend is. The memory tier answers it with a memory twin.
 
 Bodies travel as streams, and every digest is computed over a stream, once.
 Nothing holds a whole object in memory to hash it. Modules build repositories
@@ -1364,12 +1415,14 @@ batch by batch under the tenant guard and the route, holding no slot and never r
 `ProcessManagerOutbox`, `ProcessManagerOutboxAttempt`) and the projection checkpoints. A module changes
 an aggregate by sending a command, never by appending events itself: the `eventing` member stops
 handing modules the whole EventSourcing, so no module reaches `getEventStore().storeEvents` for an
-arbitrary aggregate. Operator work over those tables (purge, redrive, lease release, an event
+arbitrary aggregate. **Each module gets its own event store handle** (Alex, 2026-10-05): `packages/eventing`
+hands each module an append-only event store handle for its own streams, and no module holds the shared
+EventSourcing client; ops holds it today. Operator work over those tables (purge, redrive, lease release, an event
 explorer) is eventing's surface, called through the member, never SQL or a Prisma delegate in the
 calling module. The `eventing-table-access` policy reports raw access by module or application code:
 SQL naming a table, a Prisma delegate over one, the table named as a literal, or a direct
 `storeEvents`/`getEventStore` call. Today's findings are a shrink-only list with a count per file,
-`tests/baselines/eventing-table-access.json`, held by the same ratchet as §5's peer cycles.
+`tests/baselines/eventing-table-access.json`, held by the shrink-only ratchet in `tests/boundary-ratchets.unit.test.ts`.
 
 A check that holds a summary against the facts it was folded from keeps its own record of those
 facts, a projection over the same events on its own pipeline, and never reads `event_log`:
@@ -1458,6 +1511,12 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   apidiff's to catch, not a frozen copy's (Alex, 2026-09-29).
 - `/api/<x>` is the main path; `/v1` is optional; `/latest/` and `/<version>/` are supported but hidden from the
   published docs (Alex, 2026-09-25).
+- A REST path is served by its namespace's owner. For the migration only, another module may serve one
+  by declaring it on the route, `.withSharedPath({ owner, reason, deprecate })`, in a literal family (a
+  family claiming `/api/<x>` would run its middleware ahead of the owner's routes); every such route is
+  planned for deprecation and the route registry lists it (`RegisteredRoute.sharedPath`). A second
+  module mounting a family on a namespace another module claims is refused at mount (Alex, 2026-10-06,
+  R10; `packages/api/specs/shared-path.feature`).
 - A handler never sets a header to refuse: a `HandledError` carrying `meta.retryAfterMs` is rendered by
   the REST runtime with `Retry-After` (2026-09-23).
 - An action that takes no body declares an empty input schema from its contract; the runtime reads an
@@ -1576,14 +1635,76 @@ close() }`. The api's `serve()` answers a claimed request ahead of every route, 
   crashed presenting the document rather than at the split.
 - **The OpenAPI document is generated, never committed** (Rogerio, 2026-10-02). The api builds it
   once at boot from the routes it mounts and serves it at `/api/openapi.json`; `pnpm --filter
-  @langwatch/platform-api openapi:generate` mounts the same declarations on a host whose doors all
+@langwatch/platform-api openapi:generate` mounts the same declarations on a host whose doors all
   refuse and writes it to `specs/api-reference/openapi-document.json`, which git ignores. The
   document names each route once, at its `/api/v1` address. A published name the declaration no
   longer spells (an `operationId`, a component) is kept with `.withDocs({ operationId })` and
   `.meta({ id })` on the route's own schemas, never by editing output. What is committed is what
   is generated from it: the TypeScript, Python and Go clients and the docs site copy
   (`docs/api-reference/openapiLangWatch.json`, which Mintlify needs in the repository). `make
-  sync-all-openapi` regenerates all four, and the `openapi-clients` CI job fails on any diff.
+sync-all-openapi` regenerates all four, and the `openapi-clients` CI job fails on any diff.
+- **Middleware never does the framework's work** (Alex, 2026-10-05): middleware doing what the API framework
+  does (authentication, JSON body parsing) and a route opened to any authenticated or unauthenticated caller
+  are drift, caught by lint rules whose message tells the agent why and what to use instead. Those guard
+  rules are among the few that accept a disable with a reason (§17); the guard list is
+  `dev/docs/plans/api-framework-bypass-2026-10-05.md`.
+- **Framework extensions are shapes first** (Alex, 2026-10-05): for each extension E1 to E8 in that plan, a
+  lane writes the signature and one example route, no code, and Alex approves before any is built. The
+  raw-body media-type refusal (collector, evaluations-legacy `log_results`) joins them as E9, shapes first
+  (coordinator, citing Alex's ingestion-key approval, 2026-10-05). The order: CI green first, then the
+  extension designs and the bypass guard rules (Alex, 2026-10-05).
+- **E9, a raw body under another media type** (Alex, 2026-10-05): a route that reads its raw body names
+  the media type it reads, `.withRawBody("text", { mediaType })`, and any other `Content-Type` is refused
+  after the door, with 415 `unsupported_media_type`. The `*-legacy` family and the collector keep main's
+  400 `malformed_request` by declaring `mismatch: "malformed_request"`. Their protocol refusal renders
+  main's exact 400 body, and its producer may `decline()` a failure, so only `malformed_request` is
+  rendered by the protocol and 401, 403 and 413 stay on the family boundary (coordinator, E9 option B,
+  2026-10-05). Spec: `packages/api/specs/transport-conventions.feature`.
+- **E10, a declared audit target** (Alex, 2026-10-05): a tRPC mutation declares
+  `.withAudit({ target: "organization", via: "projectId" })` and the row names the organization holding
+  that scope, beside the project. The door's `organizationOf` resolves through `AuthzApi.getScope`, auth's
+  existing peer, so there is no auth -> project edge (coordinator, members wave 3, 2026-10-05). A sink
+  without `organizationOf` refuses the declaration at mount, naming the procedure. Spec:
+  `packages/api/specs/trpc-framework.feature`.
+- `POST /api/demo/hotel_bot` is for LangWatch staff only (platform operators) (Alex, 2026-10-05): it moves onto
+  the platform-operator door tier (E4) when that lands; until then the route refuses every caller, since
+  nothing in the product calls it.
+- Contract export names are not wire: `secretReferenceOf` and `queuedThreadIdOf` are renamed as
+  `langwatch/fallible-result-naming` says, and `getLatestLocalControlRequest` returns an explicit result
+  instead of `null`. The collector and evaluations-legacy routes keep main's 400 body through the framework's
+  protocol refusal (`withResponse("protocol", { refusal })`), and the suite routes take one combined REST
+  fact (coordinator, citing the lint-findings ruling, 2026-10-05).
+- Workflow's contract keeps `Date` for `updatedAt` on the wire, since a `Temporal.Instant` drops the
+  milliseconds of whole-second timestamps and a test pins today's JSON; the repository carries Temporal
+  (coordinator, citing `langwatch/temporal-only`, 2026-10-05; replaces that day's `Temporal.Instant` wire ruling).
+- api-key's `POST /ingestion` moves its two refusals, same order and conditions, into a new in-module
+  operation, `createIngestionKey` (Alex, 2026-10-05). Because the route calls `ApiKeyApi`, it is declared on
+  the contract (`createIngestionKeyInputSchema`, `ApiKeyApi.createIngestionKey`) (coordinator, citing that
+  approval, 2026-10-05).
+- **The execute-sync relay (#8429) lives in the workflow module**, beside the engine channel; the project comes
+  from the key, never the body (Alex, 2026-10-05). It is one operation,
+  `WorkflowApi.relayExecuteSync({ projectId, event, signal })`, declared with today's doors (project
+  credential, `scenarios:create`, a 50 MiB body limit, a forwarded response, hidden docs); `projectId` is
+  `scope.id`. A timeout answers 504 and a caller
+  gone 408; the ceiling is a workflow config member defaulting to 900000 ms; a non-JSON body answers the
+  framework's 400 `malformed_request` in place of main's bespoke body (coordinator, L6 R1, citing that ruling,
+  2026-10-05). A top-level `projectId` naming another project answers 403 `scope_input_mismatch`, a project
+  inside the event is ignored as on main, and a non-object JSON body answers 422. Scenario learns whether the
+  deployment has per-project engines through one `WorkflowApi.hasPerProjectEngines()` read;
+  `LANGWATCH_NLP_LAMBDA_CONFIG` stays workflow's secret alone, and the `NLP_FETCH_MAX_TIMEOUT_MS` leaf is
+  workflow's, which scenario's agent-test deadline reads as `nlpFetchMaxTimeoutMs` from workflow-contract
+  (coordinator, L6b R2, citing the same ruling, 2026-10-05). R3: the agent-test turn goes through the
+  relay, like every other turn, and the any-project Lambda credential stays in the control plane:
+  `AgentTestTurnJob` carries `executeSyncRoute` from the same rule as simulation jobs
+  (`WorkflowApi.hasPerProjectEngines`); self-hosted stays direct (Alex, 2026-10-05).
+- The instant-eval opt-in procedures `access` and `enable` are declared in trace's contract under
+  `traces.instantEval` as two `TraceApi` operations that forward to `InstantEvalApi`, as
+  `trace-instant-eval-run.service.ts` already does; instant-eval's process takes `@langwatch/authz-contract`
+  (coordinator, L7 R1 and S1, 2026-10-05). `traces.instantEval.enable` is audited against the organization,
+  as on main, through E10's declared target (Alex, 2026-10-05); never a hand-rolled audit write.
+- Parameters the evaluator overrides are refused everywhere, not on REST only as on main: the monitor service
+  refuses them with 422 `monitor_parameters_unused` at every door, so the UI create form must not send them
+  (Alex, 2026-10-05).
 
 ---
 
@@ -1793,12 +1914,13 @@ A fact is recorded by its owner; delivery modules are handed it; there is no rel
 2026-09-29). Gateway's budget crossings and virtual key lifecycle changes are the case: gateway
 detects a crossing after its own debit lands and records it with `recordBudgetCrossing`, keyed by
 (budget, bucket, kind, period), on its `governance_events_processing` pipeline (main's stored
-names). A subscriber there hands each fact to `WebhookApi.requestGatewayEventDelivery`, and webhook
-builds and delivers the envelope. A failed detection throws and the debit is re-driven. That is
+names). Webhook subscribes to those facts and builds and delivers the envelope; gateway holds no
+`WebhookApi` peer (Alex, 2026-10-05; §5). A failed detection throws and the debit is re-driven. That is
 safe because the ledger insert skips any budget the request has already debited.
 Each destination kind owns its sending (Alex, 2026-09-30; [ADR-167](adr/167-outbound-delivery.md)):
 producers call the kind's `requestDelivery`; retry, dead-letter and redrive are the outbox's; SSRF
-and the outbound proxy are egress's.
+and the outbound proxy are egress's. `requestDelivery` is built now, on the outbox, and producers move
+onto it (Alex, 2026-10-05); no code spells it yet.
 
 Langy's notifications go through Web Push from the server; the tab is never the sender (Rogerio,
 2026-10-02). Web Push is a destination kind, so notification owns it: the browsers a person
@@ -1895,6 +2017,9 @@ forced it: main wrapped the workflows list in
 `withPermissionGuard("workflows:view")`, and the move into
 `modules/workflow/browser` dropped it ("chrome/guard no longer travel"), so a
 viewer without the grant opened the list. specs/ui/ui-page-composition.feature.
+**The seat gate is one gate at the shell route** (Alex, 2026-10-05): `resolveUiPageAccess`, navigation's
+shell resolver, refuses a page whose product the seat does not reach with the standard permission alert;
+no page gates itself, and the API still refuses the data.
 
 Drawers are URL-routed singletons with a navigation stack, opened through the
 host capability, registered through the declaration. The open drawer and its params live in
@@ -1921,7 +2046,7 @@ states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md
 
 **A write makes reads stale through the key** (Alex, 2026-10-01): a cursor-backed read's cache key carries its projection cursor, so a write changes the key and no call site invalidates by hand; a read with no cursor falls back to SSE hints and lifecycle-triggered reconciliation.
 
-**No timer polling** (Alex, 2026-10-01): screens that polled on a timer, ops' 37 included, follow events instead. The "safety refetch" below is lifecycle-triggered reconciliation, not polling and not a staleness bound: the query client's `staleTime` only lets a read older than five minutes refetch when a tab is shown, on mount or on reconnect, and nothing runs on an interval (`packages/browser-host/src/query-sync.ts`). A screen with no server event yet waits for one rather than polling; the backend builds the missing events (Alex, 2026-10-01). The one user-chosen timer, dashboard auto-refresh, is off by default (Alex, 2026-10-01).
+**No timer polling** (Alex, 2026-10-01): screens that polled on a timer, ops' 37 included, follow events instead. The "safety refetch" below is lifecycle-triggered reconciliation, not polling and not a staleness bound: the query client's `staleTime` only lets a read older than five minutes refetch when a tab is shown, on mount or on reconnect, and nothing runs on an interval (`packages/browser-host/src/query-sync.ts`). A screen with no server event yet waits for one rather than polling; the backend builds the missing events (Alex, 2026-10-01). The one user-chosen timer, dashboard auto-refresh, is off by default (Alex, 2026-10-01). The suites page is the one other exception (Alex, 2026-10-05): while its live stream is down, the run history polls its freshness probe every 3 s while a run is active and every 15 s once settled; the Agent Testing results set no timer.
 
 **One tRPC call per request over `httpLink`** (Alex, 2026-10-01): each answer carries its own status, session version and schema hash; a slow call never holds another back.
 
@@ -1966,9 +2091,9 @@ with the same entries. The case: main's Authentication rail (Overview,
 Identity provider, Connectors) spans organization, sso and scim pages.
 
 **A switcher a page borrows is lent by the module that owns the choice**
-(Alex, 2026-09-28): project lends `projectSwitcher` through `withCapabilities`
-(§10.1), and a host mount answers `projectSwitcher()` from that declaration,
-never null. The case: settings/secrets lost main's project selector beside
+(Alex, 2026-09-28): project lends `projectSwitcher` by token, the peer lend (§10.1), and a host mount
+answers `projectSwitcher()` from that declaration, never null. It moves off `withCapabilities`, which
+§15 deletes for a peer lend (Alex, 2026-10-05); today project still declares it there. The case: settings/secrets lost main's project selector beside
 Add Secret because no module lent one.
 
 **A graph a peer borrows arrives already narrowed to the caller** (Alex,
@@ -1993,16 +2118,16 @@ invented:
   not one — it is an invitation to declare something that will never be read.
   Counted across `defineBrowserModule`'s ten module-facing slots:
 
-  | slot                         | declarers | consumer                             |
-  | ---------------------------- | --------- | ------------------------------------ |
-  | `withScreens`                | 33        | `installedModuleScreens`             |
-  | `withDrawers`                | 11        | `installedDrawerLoaders`             |
-  | `withConfig`                 | 1         | yes                                  |
-  | `withApi`                    | 1 of 33   | `installedModuleApis`                |
-  | `withCapabilities`           | 6         | `declared(name)` (`declarations.ts`) |
-  | `withFailureInterceptors`    | 1         | `installedModuleFailures`            |
-  | `withFlags` · `withCommands` | **0**     | **none**                             |
-  | `publishSurfaces`            | 13        | **none — superseded, below**         |
+  | slot                         | declarers | consumer                                   |
+  | ---------------------------- | --------- | ------------------------------------------ |
+  | `withScreens`                | 33        | `installedModuleScreens`                   |
+  | `withDrawers`                | 11        | `installedDrawerLoaders`                   |
+  | `withConfig`                 | 1         | yes                                        |
+  | `withApi`                    | 1 of 33   | `installedModuleApis`                      |
+  | `withCapabilities`           | 6         | `declared(name)`, both deleted since (§15) |
+  | `withFailureInterceptors`    | 1         | `installedModuleFailures`                  |
+  | `withFlags` · `withCommands` | **0**     | **none**                                   |
+  | `publishSurfaces`            | 13        | **none — superseded, below**               |
 
   Only the last row is builder surface that does nothing, and only it is
   deleted. The three above it are the opposite case and stay: their consumers
@@ -2220,7 +2345,8 @@ invented:
   its token in its own `model/`; an extension token lives with the page that hosts it.
 
   **Release flags are a host service feature-flag provides.** browser-host holds `UiFlags` (on, off
-  or not yet answered, for the current scope) and `useReleaseFlag(flag)`. Feature-flag's browser
+  or not yet answered, for the current scope) and `useFeatureFlag(flag, { projectId | organizationId })`,
+  which keeps its name and is not a §15 deleted spelling (Alex, 2026-10-05). Feature-flag's browser
   implements it from its own client, and the shell composes it beside session (auth) and scope
   (organization). Flags are `ReleaseFlagToken`s from `FrontendFlags` in feature-flag's contract,
   screens' `flags:` included. The session answers no flag.
@@ -2261,7 +2387,9 @@ invented:
   `modules/scenario` build their own scope hosts for PUBLIC shared pages where
   no session is mounted, so changing who answers `hasPermission` changes
   authorization behaviour on those pages. That is a change with its own spec
-  and its own scenarios, not a side effect of a file move.
+  and its own scenarios, not a side effect of a file move. **The knot is untied as its own specced
+  change** (Alex, 2026-10-05): permission reads move to the session capability, public shared pages
+  get an explicit no-session host, and then the 506 call sites migrate.
 
 - **State defaults to server state**: react-query over the derived tRPC
   client is the normal answer, so cross-module client state is rare and ruled
@@ -2353,7 +2481,7 @@ decides it. A mirrored read is restored when first asked for, never all at start
 page of a paged read is mirrored too, restored as stale and refetched at once. A tab shown again
 reads IndexedDB first, then refetches the stale reads it holds, so hints it missed while hidden
 are caught up (Alex, 2026-10-01). An answer whose `x-lw-schema` differs from the bundle's hash
-drops that row. Not built yet: the lazy restore (rows restore at start-up). ADR-170 (in part),
+drops that row. ADR-170 (in part),
 specs/ui/browser-query-caching.feature.
 `CachedView` ships.
 
@@ -2422,6 +2550,9 @@ skills.
 **An orgless SSO test sign-in bounces in navigation** (Alex, 2026-10-01): the landing redirect sends a
 person with no organization back to their own account; the browser-host scope hook does not redirect.
 
+**Going live twice costs nothing and states nothing** (Alex, 2026-10-05): activating an already-active SSO
+connection is a silent no-op; the guard allows ACTIVE -> ACTIVE without a fact, and the spec stands.
+
 ---
 
 ## 12. Errors
@@ -2446,6 +2577,17 @@ deadline, and puts the role labels on the `HandledError`'s `meta`; the presentat
 the sentence, and a failed or late explanation leaves the plain denial.
 A REST error body carries its fields (`type`, `code`, `message`, …) at the root, never nested under an
 `error` key (Alex, 2026-09-30); `GET /api/api-keys` keeps main's `{ data: [...] }` list envelope.
+**An undeclared fault at a 5xx is `presumed_platform`** (Alex, 2026-10-05): a `HandledError` whose class
+declares no fault at a 5xx status gets the fault `presumed_platform` (ambiguous, presumed platform): logged
+at error, reported, retryable where that applies, and its body masked. Below 5xx an undeclared fault stays
+`customer`. It goes on the wire as `presumed_platform` too: the published schemas and the generated SDK
+clients gain the value, and anything parsing our responses (the MCP server, module envelope readers)
+accepts it. A class declaring `fault: "customer"` at a 5xx keeps its body, in `packages/api` as everywhere
+(agent connect's `replica_count_unsupported`); undeclared server errors stay masked (Alex, 2026-10-05).
+A relayed herr error with no fault and no status stays `customer`: `presumed_platform` applies only when a
+status of 500 or more is known (coordinator, citing the ruling's "at a 5xx status", 2026-10-05).
+`LangWatchQLFilterRefusal` is a trace contract error (coordinator, citing Alex's ingestion-key approval,
+2026-10-05).
 
 ---
 
@@ -2474,9 +2616,25 @@ for tests (Alex, 2026-09-29). A test never `vi.spyOn`s a real service; it drives
 fixtures instead (Alex, 2026-09-29).
 A scenario bound from a package's tests counts toward feature parity like one bound from a module's
 (Alex, 2026-09-29).
+**Feature parity binds every scenario** (Alex, 2026-10-05): every scenario is bound and its tests written
+(1461 scenarios in 348 files on 2026-10-05). The method is a matcher first: one lane builds a script that
+ranks candidate tests for every unbound scenario; Sonnet lanes then verify and bind in bulk, writing new
+tests only where nothing fits (Alex, 2026-10-05).
+**A bind proves its scenario** (Alex, 2026-10-05). `check:feature-parity` proves only that a title sits
+on a test call; the bind claims the product does what the scenario says. Every Then, and each And after
+it, is proven by an assertion. The test runs at the scenario's level: an `@integration` scenario about a
+composition is proven by booting it, never by a unit with fakes. A library instance the test builds
+proves the library, not the product. One annotation sits on its own line directly above the test call.
+A product that disagrees with its scenario is a behaviour question for the coordinator or Alex, never a
+bind and never a rewording. The `spec-binding-review` skill keeps the detail.
+Every repository has a real memory twin, gateway's included, and unit tests build over the memory
+registry; there is no refusing stand-in tier (coordinator, members wave, 2026-10-05).
+The "New Experiment" button stays solid primary; its e2e expectation is updated (Alex, 2026-10-05).
 
-The installation test boots the installed list over memory members, with no server
-(`apps/api/src/__tests__/api-installation.fixture.ts`; the worker and tasks have the same):
+The installation test boots the installed list over memory stores, with no server
+(`apps/api/src/__tests__/api-installation.fixture.ts`; the worker and tasks have the same). Its
+`members` line and `storesBackedMembers` are deleted (§15) conversion debt the fixture still carries
+until the no-members migration lands (§16); do not copy them into a new test:
 
 ```ts
 const runtime = await bootInstalledProcess({
@@ -2524,6 +2682,10 @@ naming itself. `main.ts` and `config.ts`: zero edits.
 
 ## 15. Deleted spellings
 
+`dev/docs/deleted-spellings.json` lists every spelling below with its replacement, and the
+`deleted-spellings-in-teaching` and `deleted-spellings-in-code` policies check it (§17); change the
+list in the same commit as this section.
+
 Deleted, not deprecated. Writing one new is a defect; reading one marks
 conversion debt:
 
@@ -2557,8 +2719,8 @@ Alex, 2026-09-29) · a mail member (notification owns mail, §3.3) · `AesGcmSec
 · `UiDeclaredCapabilities` / `UiDeclaredName` / `UiDeclared` and `declared("<name>")` · `UiDrawerMap`,
 `UiDrawerPropsOf`, `DrawerPropsMapOf`, `DrawersDifferingFromMap` and browser-host's `*-drawers.ts` props
 files · `useDrawer<Map>()` and a drawer opened, or its flow callbacks set, by a bare name
-(`navigateToDrawer` is the address door) · `withCapabilities` for a peer lend · `useFeatureFlag` and
-per-module `use-feature-flag.ts` copies · `UiSession.featureFlag` / `isFeatureEnabled` (§10.1; Alex,
+(`navigateToDrawer` is the address door) · `withCapabilities` for a peer lend · per-module
+`use-feature-flag.ts` copies · `UiSession.featureFlag` / `isFeatureEnabled` (§10.1; Alex,
 2026-10-01) · `TrpcCachePolicy` and `cache: { persist }` on a tRPC read (the browser mirrors every read
 to disk by default, minus a named exclusion list). While the migration runs the string spellings coexist with their tokens.
 · members, every spelling (Alex, 2026-10-01; §3.3): `static readonly reads` in any form,
@@ -2591,21 +2753,22 @@ This document names the target. **Landed 2026-09-18:** the tree rename
 dissolved into `entitlement-contract`, and `.withStores(stores)` on the
 chain. **Landed 2026-10-01 (the rename window):** `@langwatch/module`, `@langwatch/process`,
 `@langwatch/browser`, `openStores`, `defineProcessModule` / `defineBrowserModule`, `processModules`,
-`<id>ProcessModule`, `XModule` + `.withApi(...)`, `<f>.module.ts` stems, `test-harness/api-fixture`,
+`<id>ProcessModule`, `XModule` + `.withApi(...)`, `<f>.module.ts` stems (the installer; the module class
+lives in `app/<f>.app.ts`, Alex 2026-10-05), `test-harness/api-fixture`,
 `handled-error` presentation subpaths, the ledger actor in `@langwatch/authorization`, the generated
 per-app module lists, and `audit-log-null` deleted (their old spellings are in §15). The rows below
 have not landed: code spells the right column until its row lands, and this record's prose names
 the left, the target.
 
-| Target                                                                                   | Today                                                                                                                                                                               |
-| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| host services (`@langwatch/browser-host`: session, navigation, storage, toasts, drawers) | "capabilities" (§3.5 reserves the word for the four layers)                                                                                                                         |
-| `enterprise/modules/audit-log` (§4)                                                      | `modules/audit-log`                                                                                                                                                                 |
-| `processFacts` in `@langwatch/config`, picked by each slice (§6)                         | `deployment-facts.ts`, `@langwatch/process`'s `owner.ts` (`baseHost`, `nodeEnvironment`, `outboundProxy`), observability's `serviceVersion`, `rawSocketPort`; handed out as members |
-| store clients reach registries only; `.withChannels(registry)` on the installer (§5)     | `static reads` + `setup.members`; channel registries built by hand in `create()`                                                                                                    |
-| `secrets.into({ … }, build)` (§6)                                                        | nested `secrets.into(handle, …)`                                                                                                                                                    |
-| `hostedStores(stores)` (§4)                                                              | `hostedMembers(stores)`                                                                                                                                                             |
-| "store client" (`the clickhouse client`)                                                 | "member" in §7, §9 and §13 prose, and `bootInstalledProcess({ members })`                                                                                                           |
+| Target                                                                                   | Today                                                                                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| host services (`@langwatch/browser-host`: session, navigation, storage, toasts, drawers) | "capabilities" (§3.5 reserves the word for the four layers)                                                                                                                                                               |
+| `enterprise/modules/audit-log` (§4)                                                      | `modules/audit-log`                                                                                                                                                                                                       |
+| `processFacts` in `@langwatch/config`, picked by each slice (§6)                         | single leaves in `deployment-facts.ts` picked by name (`publicBaseUrl`, `isSaas`, `nlpServiceUrl`, `serviceVersion`, `otelResourceAttributes`; §6, 2026-10-05); `owner.ts` still holds `nodeEnvironment`, `outboundProxy` |
+| store clients reach registries only; `.withChannels(registry)` on the installer (§5)     | `static reads` + `setup.members`; channel registries built by hand in `create()`                                                                                                                                          |
+| `secrets.into({ … }, build)` (§6)                                                        | nested `secrets.into(handle, …)`                                                                                                                                                                                          |
+| `hostedStores(stores)` (§4)                                                              | `hostedMembers(stores)`                                                                                                                                                                                                   |
+| "store client" (`the clickhouse client`)                                                 | "member" in §7, §9 and §13 prose, and `bootInstalledProcess({ members })`                                                                                                                                                 |
 
 `createProcessApp` is no longer a target: the container is (Alex, 2026-10-01). Its previous implementation, the
 generated `createServerApp` and its `serverModuleChunk0..9`,
@@ -2620,14 +2783,23 @@ instantiations (107.2s of checking) to 13.9M (2.3s). Build it again once
 ~50 `TS2883`s name module repositories the composed type should not expose).
 A process composes `processModules` through its container.
 
-Homes for the no-members migration (coordinator, 2026-10-01): the logger is `createLogger("<module>")` inside the module; the clock is `@langwatch/time`, and memory twins take one in their registry; `processName` is deleted, and refusals name the module and role; `operatorReads` goes to registries like any store client; tests call `XModule.create(setup)` with `createApiFixture` peers and memory registries, and installation tests boot the installed list over memory; a reader takes the owner contract's exported leaf, which supersedes the 2026-09-18 ask-the-owner's-Api rule; `CREDENTIALS_SECRET` and `NEXTAUTH_SECRET` stay shared as `processSecrets` beside `processFacts`; the egress fence and the OTEL endpoint are process facts, and voice loopback is scenario's; the dev UI lifts the config meta tag from the api's own rendered shell; the names `processFacts`, `defineChannels`, `.withChannels` and `hostedStores` stand.
+Homes for the no-members migration (coordinator, 2026-10-01; the members wave's homes, 2026-10-05, are in §3.3): the logger is `createLogger("langwatch:<module>[:<part>]")` inside the module; the clock is `@langwatch/time`, and memory twins take one in their registry; `processName` is deleted, and refusals name the module and role; `operatorReads` goes to registries like any store client; tests call `XModule.create(setup)` with `createApiFixture` peers and memory registries, and installation tests boot the installed list over memory; a reader takes the owner contract's exported leaf, which supersedes the 2026-09-18 ask-the-owner's-Api rule; `CREDENTIALS_SECRET` and `NEXTAUTH_SECRET` stay shared as `processSecrets` beside `processFacts`; the egress fence and the OTEL endpoint are process facts, and voice loopback is scenario's; the dev UI lifts the config meta tag from the api's own rendered shell; the names `processFacts`, `defineChannels`, `.withChannels` and `hostedStores` stand.
 
 Also open, each a worklist: the no-members migration (process facts, store clients into
-registries, container-installed channels, record `into`, owner-held handles, the dev UI projection);
-eventing's client for both roles; `browserModules` is
+registries, container-installed channels, record `into`, owner-held handles, the dev UI projection),
+ruled to finish now, before other module work (Alex, 2026-10-05; §3.3); eventing's client for both roles,
+and a per-module event store handle (§7); the four process-framework builds (Alex, 2026-10-05): main-loop
+stall liveness with metrics proxied to the main thread, a typed shared-secret supply that refuses a
+misspelled shared secret where it is written, the `LANGWATCH_TASK_MODULES` task-module loader, and
+host-supplied gating for agents, authz, tenancy and eventing in the api process; `browserModules` is
 empty (no module exports `./declaration` yet — the browser serves chrome
 only); the ClickHouse resolver ruling (§7); background loops main runs that this
 branch never starts, each to become a scheduled process manager.
+
+**Open for Alex** (2026-10-05; proposals, not rulings): the E1 to E8 open questions (§8), which Alex answers
+by number. Answered that evening (Alex, 2026-10-05): the usage-named files are renamed `annotation-count`,
+`dataset-count` and `plan-limit.errors.ts`, with no ownership change (landed); E9 and E10 (§8, built); L6b
+R3, the agent-test turn goes through the relay (§8).
 
 **Parked** (Alex, 2026-10-01; do not re-raise): the ingestion stage plan (Alex will redesign it later);
 erasure tombstones and owner-complete acknowledgement; deployment audience and subscription rollout
@@ -2653,11 +2825,42 @@ the type test asserts (Alex, 2026-09-27).
 A policy reads no baseline and reports every finding. A ruled transition may hold a shrink-only list
 beside the enforcer's tests (`packages/architecture-enforcer/tests/baselines/`), keyed so that growth
 inside a key is refused (a count per key), with a test that also refuses a listed finding that is
-gone. Two exist: §5's peer cycles and §7's event-table access (Alex, 2026-09-29). A third is ruled:
-"framework packages depend on no module contract" (§10.1), baselined on today's edges and shrinking
-as UI tokens move the feature types out (Alex, 2026-10-01).
+gone. Three exist: §7's event-table access (Alex, 2026-09-29); "framework packages depend on no
+module contract" (§10.1), baselined on today's edges and shrinking as UI tokens move the feature types
+out (Alex, 2026-10-01); and §15's per-spelling count of deleted spellings in code
+(`deleted-spellings.json`, 2026-10-05). §5's peer cycles held a third until it was deleted: every cycle is refused now
+(Alex, 2026-10-05).
 The `service-ceilings` policy is ported to a custom langwatch oxlint rule with the same exact limits
 (Alex, 2026-09-29).
+
+**Drift is caught by lint, and the message is a prompt** (Alex, 2026-10-05). Wherever code drifts from
+the architecture direction (middleware doing what the API framework does, such as auth or JSON body
+parsing; routes opened to any authenticated or unauthenticated caller, §8), a new lint rule catches it.
+Its error explains, written to the agent reading it, why the shape is wrong and what to use instead.
+Every finding prints what, a one-line why, and fix; `defineRule` refuses a rule with a missing or
+multi-line why (Alex, 2026-10-05). The `feature-configuration` policy demands no `*ServerConfigSchema`
+(deleted, §15), and `langwatch/package-boundaries` names the peer lend, not `withCapabilities` (Alex,
+2026-10-05: the tree follows the record).
+
+**House rules are strict; a disable is very rare** (Alex, 2026-10-05). Most `langwatch/*` rules must not be
+ignored: a disable directive naming one is itself an error (`langwatch/suppression-states-why`). Only a few
+named rules, where the framework may genuinely not cover a case (API middleware usage, opening a route to
+any caller), accept a disable, and only with a reason explaining why the framework cannot be used; a bare
+disable is an error. A rule opts in through `defineRule({ escape })` in `packages/oxlint-rules`. This is for
+the new rules, not a sweep of old directives. When unsure, ask the human: the message on those few rules
+tells the agent that if the case is confusing it stops and asks the human rather than disabling.
+`langwatch/id-generation-origin` stays unsuppressible: it allows a visitor id the contract types as a UUID
+to be minted with `randomUUID` (a named, tested exception in the rule), and the disable directive in
+`modules/feature-flag/browser/src/behavior/anonymous-id.ts` is deleted (Alex, 2026-10-05).
+
+**The lint split and the CI type-aware gate** (Alex, 2026-10-05). oxlint's native rules and the langwatch
+plugin run as two parallel oxlint processes; the root `package.json` lint scripts own the split, and CI,
+lint-staged and the editor call those scripts. CI runs `node dev/nx/lint.mjs --types` in one process
+(affected on a PR via `--base`, all otherwise); the `lint:types` Nx target stays for local per-project runs,
+and ADR-150 is amended to say why. The type-aware pass runs only the rules that need types, from its own
+config. One unused-suppression check replaces oxlint's across the native, plugin and type-aware processes,
+landing in the same change as the split. Because the CI gate is the type-aware run, a directive only a
+type-aware rule uses stays (coordinator, citing this ruling, 2026-10-05). The commands: `dev/docs/TOOLING.md`.
 
 ## 18. Running work
 
@@ -2693,6 +2896,15 @@ the applications, the SDK and the e2e suites, so the two are not the same set.
 
 The cache is local. No Nx Cloud account is configured and `nxCloudId` is
 absent, so no source or task metadata leaves the machine.
+
+**The drive on `feat/strict-feature-layout-v0`** (Alex, 2026-10-05). Reviewed slices are committed and
+pushed directly to the branch; the first goal is the branch's CI green, and the framework-extension designs
+and the bypass guard rules (§8) come after. At most six lanes run at once, their owned paths checked
+disjoint at every spawn, and never two lanes in one module. From the main merge
+(`dev/docs/plans/main-merge-2026-10-05.md`), the developer seat (#8373) is ported now, the server half on
+Opus and the browser half on Sonnet. The webhook deploy drain is an approved operational step: before the
+last old worker stops, confirm the two deleted gateway delivery lanes have nothing queued; afterwards
+re-send blocked spend through the replay route, and governance is re-requested by hand.
 
 ## 19. The dev runtime and the sims
 

@@ -5,10 +5,10 @@
  */
 
 import { defineBrowserVitestConfig } from "@langwatch/vitest-config/browser";
+import { mergeConfig } from "vitest/config";
 
-export default {
-  ...defineBrowserVitestConfig(),
-  // Vite finds this one late on a cold cache; the reload it triggers then
-  // leaves the page with two copies of React and the run fails.
+// Monaco is only reached through a mocked import, so the optimiser finds it
+// after the first run starts, reloads, and fails the file on a cold cache.
+export default mergeConfig(defineBrowserVitestConfig(), {
   optimizeDeps: { include: ["@monaco-editor/react"] },
-};
+});

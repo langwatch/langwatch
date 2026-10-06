@@ -2,16 +2,16 @@ import { OrganizationNotFoundError } from "@langwatch/enterprise-licensing-contr
 
 import type {
   OrganizationLicenseCandidate,
-  OrganizationLicenseStorage,
+  OrganizationLicenseRepository,
   StoredLicense,
-} from "../../app/licensing.members.ts";
+} from "../organization-license.repository.ts";
 
 /**
  * The licence key on each organization, held in memory: an organization in the
  * map exists, and `null` is an organization with no licence. Writes to an unknown
  * organization are refused the way the prisma twin's `update` refuses them.
  */
-export class MemoryOrganizationLicenseRepository implements OrganizationLicenseStorage {
+export class MemoryOrganizationLicenseRepository implements OrganizationLicenseRepository {
   static create(
     licenses: ReadonlyMap<string, string | null> = new Map(),
   ): MemoryOrganizationLicenseRepository {

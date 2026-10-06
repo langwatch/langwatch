@@ -11,7 +11,14 @@ import {
   type TraceNameChangedEventData,
 } from "@langwatch/trace-contract";
 
-import type { TraceProcessingCommands } from "../app/trace.members.ts";
+/** Commands shared by receiver, reviewer, and background callers of Trace. */
+export interface TraceProcessingCommands {
+  recordSpan(data: RecordSpanCommandData): Promise<unknown>;
+  changeTraceName(data: TraceNameChangedEventData): Promise<unknown>;
+  addAnnotation(data: AnnotationAddedEventData): Promise<unknown>;
+  removeAnnotation(data: AnnotationRemovedEventData): Promise<unknown>;
+  assignTopic(data: AssignTopicCommandData): Promise<unknown>;
+}
 
 /** The trace_processing command senders this service dispatches through, and nothing else. */
 type TraceProcessingSenders = Readonly<{
@@ -27,13 +34,13 @@ type TraceProcessingSenders = Readonly<{
 
 /** trace_processing's senders, bound on connect; unbound, each refuses by name. */
 export class TraceProcessingCommandsService implements TraceProcessingCommands {
-  static create(input: { processName: string }): TraceProcessingCommandsService {
-    return new TraceProcessingCommandsService(input.processName);
+  static create(input: { role: string }): TraceProcessingCommandsService {
+    return new TraceProcessingCommandsService(input.role);
   }
 
   #senders: TraceProcessingSenders | undefined;
 
-  private constructor(private readonly processName: string) {}
+  private constructor(private readonly role: string) {}
 
   connect(senders: TraceProcessingSenders): void {
     this.#senders = senders;
@@ -74,7 +81,7 @@ export class TraceProcessingCommandsService implements TraceProcessingCommands {
   #connected(command: string): TraceProcessingSenders {
     if (!this.#senders) {
       throw new TraceCapabilityUnavailableError(
-        this.processName,
+        this.role,
         `the trace_processing "${command}" command`,
       );
     }

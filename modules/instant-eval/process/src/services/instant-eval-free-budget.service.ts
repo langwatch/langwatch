@@ -2,7 +2,7 @@
  * What an organization without a paid plan may have of Instant Evals: the
  * gateway spend ledger, cached for a minute, counted beside the holds taken
  * for work the ledger has not learned about yet.
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import {
@@ -11,7 +11,7 @@ import {
 } from "@langwatch/instant-eval-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type { InstantEvalBudgetReservationsChannel } from "../channels/instant-eval-budget-reservations.channel.ts";
+import type { InstantEvalBudgetReservationsRepository } from "../repositories/instant-eval-budget-reservations.repository.ts";
 import {
   freeInstantEvalStanding,
   INSTANT_EVAL_FREE_BUDGET_USD,
@@ -27,7 +27,7 @@ import { NANO_USD_PER_USD } from "../rules/instant-eval-spend-outcome.rules.ts";
 const CACHE_TTL_MS = 60_000;
 
 /** The peers the budget is resolved through, each one operation wide. */
-export interface InstantEvalBudgetPeers {
+interface InstantEvalBudgetPeers {
   /** The organization the project belongs to, or undefined when it has none. */
   findOrganizationId(input: { projectId: string }): Promise<string | undefined>;
   /** Every project of the organization, archived ones included: the ledger's
@@ -51,13 +51,13 @@ export class InstantEvalFreeBudgetService {
   readonly #spent = new Map<string, CachedSpend>();
 
   private readonly peers: InstantEvalBudgetPeers;
-  private readonly reservations: InstantEvalBudgetReservationsChannel;
+  private readonly reservations: InstantEvalBudgetReservationsRepository;
   private readonly isBounded: boolean;
   private readonly now: () => Instant;
 
   private constructor(options: {
     peers: InstantEvalBudgetPeers;
-    reservations: InstantEvalBudgetReservationsChannel;
+    reservations: InstantEvalBudgetReservationsRepository;
     isBounded: boolean;
     now: () => Instant;
   }) {
@@ -79,7 +79,7 @@ export class InstantEvalFreeBudgetService {
     now,
   }: {
     peers: InstantEvalBudgetPeers;
-    reservations: InstantEvalBudgetReservationsChannel;
+    reservations: InstantEvalBudgetReservationsRepository;
     isBounded?: boolean;
     now?: () => Instant;
   }): InstantEvalFreeBudgetService {

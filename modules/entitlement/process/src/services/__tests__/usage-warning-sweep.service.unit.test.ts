@@ -1,7 +1,7 @@
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
-import { USAGE_UNKNOWN, type ProjectUsageCounts } from "../../app/entitlement.members.ts";
+import { USAGE_UNKNOWN, type ProjectUsageCounts } from "../usage-enforcement.service.ts";
 import {
   type CountedUsageReading,
   UsageWarningSweepService,
@@ -75,6 +75,22 @@ describe("UsageWarningSweepService", () => {
       await service.sweep();
 
       expect(sent.map((input) => input.organizationId)).toEqual(["org-warned"]);
+    });
+  });
+
+  describe("when the counting store cannot report an organization's usage", () => {
+    /** @scenario The usage-limit email is skipped rather than sent with zeros */
+    it("sends no warning for it, and warns again once the counts are real", async () => {
+      const unknown = sweepOver({ isSaas: true, organizations: ["org-unknown"] });
+
+      await unknown.service.sweep();
+
+      expect(unknown.sent).toEqual([]);
+
+      const recovered = sweepOver({ isSaas: true, organizations: ["org-warned"] });
+      await recovered.service.sweep();
+
+      expect(recovered.sent.map((input) => input.organizationId)).toEqual(["org-warned"]);
     });
   });
 

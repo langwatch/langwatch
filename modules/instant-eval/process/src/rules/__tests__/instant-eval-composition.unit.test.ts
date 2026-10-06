@@ -1,7 +1,7 @@
 /**
  * The run's own share of its reads: the parameter names it reserves, the key
  * columns it pages by, and how wide a sample is spread.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {

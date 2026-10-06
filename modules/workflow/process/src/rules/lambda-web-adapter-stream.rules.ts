@@ -41,3 +41,30 @@ export function readLwaPreludeStatus(prelude: Uint8Array<ArrayBufferLike>): numb
     return LWA_DEFAULT_STATUS;
   }
 }
+
+/**
+ * A buffered invoke payload split into the engine's own status and its body. The status is
+ * null when there is no prelude or it names no valid status; the caller falls back then.
+ * @see specs/nlp-go/lambda-invoke-response-contract.feature
+ */
+export function readLwaResponsePayload(payload: Uint8Array<ArrayBufferLike> | undefined): {
+  status: number | null;
+  body: string;
+} {
+  if (!payload || payload.length === 0) return { status: null, body: "" };
+
+  const separator = findLwaPreludeSeparator(payload);
+  if (separator === -1) return { status: null, body: Buffer.from(payload).toString("utf-8") };
+
+  const body = Buffer.from(payload.slice(separator + LWA_PRELUDE_SEPARATOR_LENGTH)).toString(
+    "utf-8",
+  );
+  try {
+    const prelude = Buffer.from(payload.slice(0, separator)).toString("utf-8");
+    const status = Number((JSON.parse(prelude) as { statusCode?: unknown }).statusCode);
+    const isHttpStatus = Number.isInteger(status) && status >= 100 && status <= 599;
+    return { status: isHttpStatus ? status : null, body };
+  } catch {
+    return { status: null, body };
+  }
+}

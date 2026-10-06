@@ -16,7 +16,9 @@ const ownedRepositories = prismaRepositories({
  */
 export const PostgresDataRetentionRepositories = {
   ...ownedRepositories,
-  create: (input: Parameters<typeof ownedRepositories.create>[0]): DataRetentionRepositories => ({
+  create: (
+    input: Parameters<typeof ownedRepositories.create>[0],
+  ): Pick<DataRetentionRepositories, "policies" | "pins" | "directory"> => ({
     ...ownedRepositories.create(input),
     directory: PrismaDataRetentionDirectoryRepository.create(input.prisma),
   }),

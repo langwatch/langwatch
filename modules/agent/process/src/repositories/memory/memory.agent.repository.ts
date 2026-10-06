@@ -63,6 +63,14 @@ export class MemoryAgentRepository implements AgentRepository {
     return structuredClone(this.#get(input));
   }
 
+  async findProjectIdsWithHttpAgents(): Promise<string[]> {
+    const live = [...this.#agents.values()].filter(
+      (agent) => agent.type === "http" && agent.archivedAt === null,
+    );
+
+    return [...new Set(live.map((agent) => agent.projectId))];
+  }
+
   async findAll(input: AgentProjectInput): Promise<Agent[]> {
     return this.#visible(input.projectId).map((agent) => ({
       ...structuredClone(agent),

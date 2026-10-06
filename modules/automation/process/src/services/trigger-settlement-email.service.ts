@@ -9,9 +9,9 @@ import {
 import { DispatchError } from "@langwatch/eventing";
 import type { TraceRecord } from "@langwatch/trace-contract";
 
-import type { AutomationClock } from "../app/automation.members.ts";
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationSettlementLedgerRepository } from "../repositories/automation-settlement-ledger.repository.ts";
+import type { AutomationClock } from "../repositories/automation.repositories.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 
 export type SettlementNotificationCandidate = {

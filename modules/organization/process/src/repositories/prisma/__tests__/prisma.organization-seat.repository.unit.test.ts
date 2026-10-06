@@ -118,8 +118,27 @@ describe("PrismaOrganizationSeatRepository", () => {
       await repository.getMemberCount(organizationId);
 
       expect(mockPrisma.organizationUser.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { organizationId, disabledAt: null } }),
+        expect.objectContaining({
+          where: expect.objectContaining({ organizationId, disabledAt: null }),
+        }),
       );
+    });
+
+    /** @scenario "A deactivated person does not hold a seat" */
+    it("reads only members whose person is not deactivated, beside the disabled filter", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      await repository.getMemberCount(organizationId);
+      await repository.getMembersLiteCount(organizationId);
+      await repository.getMembersDeveloperCount(organizationId);
+
+      expect(mockPrisma.organizationUser.findMany).toHaveBeenCalledTimes(3);
+      for (const [query] of mockPrisma.organizationUser.findMany.mock.calls) {
+        expect(query).toMatchObject({
+          where: { organizationId, disabledAt: null, user: { deactivatedAt: null } },
+        });
+      }
     });
 
     /** @scenario Pending invites count toward total member limit */
@@ -440,6 +459,38 @@ describe("PrismaOrganizationSeatRepository", () => {
       const result = await repository.getMembersLiteCount(organizationId);
 
       expect(result).toBe(2);
+    });
+  });
+
+  describe("when getting the Developer count", () => {
+    /** @scenario Developers are counted and never capped */
+    it("counts DEVELOPER users and pending DEVELOPER invites, and nothing else", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.ADMIN },
+        { userId: "u2", role: OrganizationUserRole.EXTERNAL },
+        { userId: "u3", role: OrganizationUserRole.DEVELOPER },
+        { userId: "u4", role: OrganizationUserRole.DEVELOPER },
+      ]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([
+        { role: OrganizationUserRole.DEVELOPER, teamAssignments: null },
+        { role: OrganizationUserRole.MEMBER, teamAssignments: null },
+      ]);
+
+      expect(await repository.getMembersDeveloperCount(organizationId)).toBe(3);
+    });
+
+    it("never moves the Full or Lite counts", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.MEMBER },
+        { userId: "u2", role: OrganizationUserRole.EXTERNAL },
+        { userId: "u3", role: OrganizationUserRole.DEVELOPER },
+      ]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([
+        { role: OrganizationUserRole.DEVELOPER, teamAssignments: null },
+      ]);
+
+      expect(await repository.getMemberCount(organizationId)).toBe(1);
+      expect(await repository.getMembersLiteCount(organizationId)).toBe(1);
     });
   });
 });

@@ -5,20 +5,15 @@ import type {
   TriggerSummary,
 } from "@langwatch/automation-contract";
 
-import type {
-  AutomationGraphActivity,
-  AutomationProjectDirectory,
-  AutomationClock,
-  AutomationGraphDelivery,
-  AutomationDispatchError,
-  AutomationLogger,
-} from "../app/automation.members.ts";
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
+import type { AutomationClock } from "../repositories/automation.repositories.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
+import type { AutomationGraphDelivery } from "./automation-graph-delivery.service.ts";
+import type { AutomationProjectDirectory, AutomationLogger } from "./automation.service.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import { GraphAlertDispatchService } from "./graph-alert-dispatch.service.ts";
 import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.ts";
@@ -94,4 +89,34 @@ export class AutomationGraphActivityService implements AutomationGraphActivity {
   }): Promise<GraphTriggerEvaluationResult> {
     return this.evaluator.evaluate(input);
   }
+}
+
+/**
+ * Two-method port for graph-alert real-time subscriber to avoid circular dependency on
+ * full AutomationService; excludes heartbeat and persist-cap methods.
+ */
+export interface AutomationGraphActivity {
+  /**
+   * The project's active automations that watch a custom graph. Never a
+   * REPORT-kind automation: a report is a schedule, not an alert, and
+   * re-evaluating one on trace activity would fire it off calendar.
+   */
+  getActiveGraphTriggersForProject(projectId: string): Promise<TriggerSummary[]>;
+
+  /**
+   * Re-evaluates one graph automation and dispatches an alert if it
+   * fired. Idempotent by its own open/resolve bookkeeping, since retry,
+   * heartbeat sweep and manual re-run all land here for the same incident.
+   */
+  evaluateGraphTrigger(input: {
+    triggerId: string;
+    projectId: string;
+    reason: GraphTriggerEvaluationReason;
+  }): Promise<GraphTriggerEvaluationResult>;
+}
+
+/** Host transport semantics for retryable and terminal delivery failures. */
+export abstract class AutomationDispatchError {
+  abstract isTerminal(error: unknown): boolean;
+  abstract createTerminal(message: string): unknown;
 }

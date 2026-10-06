@@ -1,14 +1,14 @@
 # See ../adrs/20260828-trpc-framework-boundary.md
 Feature: tRPC framework boundary
 
-  @typecheck @architecture
+  @typecheck @architecture @unit
   Scenario: A root preserves concrete transport types
     Given a root declares a context and a procedure input
     When a router caller invokes that procedure
     Then its context, input and output remain concrete
     And the framework imports no application or feature module
 
-  @typecheck @architecture
+  @typecheck @architecture @unit
   Scenario: A procedure cannot be built without an authorization declaration
     Given a procedure has declared its input
     When no permission, opt-out or in-service authorization is declared
@@ -181,3 +181,62 @@ Feature: tRPC framework boundary
     Given a procedure that declares no permission and no .input()
     When it is called, so tRPC hands its check an undefined input rather than an object
     Then the check passes the call on to the handler instead of throwing
+
+  @unit
+  Scenario: A mutation declared as audited against its organization records the organization
+    Given a mutation whose input names a project, declared as audited against the organization via projectId
+    When an authenticated caller's call finishes, answered or refused by its handler
+    Then the row its audit trail writes names the organization that holds the project as its organization and its target, beside the project
+    And a declaration naming a field its input does not carry, made on a query, or made twice, is refused where it is written
+    And a process that cannot say which organization holds a project is refused at the mount, naming the procedure
+
+  @unit
+  Scenario: A procedure chooses its permission from its parsed input
+    Given a procedure whose permission depends on a value its input carries, such as the tier a scope names
+    When it declares a map from each value of that field to the permission it asks, and the tier and input field of the scope it is asked at (Alex, 2026-10-05, E3)
+    Then the permission the value chose is asked before the handler, at the scope its entry names, else at the procedure's own scope field
+    And a caller lacking it is refused with permission_denied naming that permission, and the handler never runs
+    And a blank scope id is the caller's validation error
+    And a map whose keys are not exactly the values the field parses as, or an entry naming a tier that cannot grant its permission, is refused where it is written, and by the compiler where the input is known
+
+  @unit
+  Scenario: A procedure's handler is handed the organization holding the scope its door asked at
+    Given a procedure whose permission is asked at a project, a team or an organization its input names
+    When an authenticated caller passes the door (Alex, 2026-10-06, lineage D1)
+    Then the handler's scope names the tier and id the permission was asked at, and the organization holding it
+    And the organization holding a project or team is asked of authz once per call, and an organization is its own
+    And a door that cannot say which organization holds the scope hands a null organization rather than a guess
+    And a procedure the door resolved no scope for is handed none
+
+  @unit
+  Scenario: A procedure asks whether its tenant holds a named plan capability
+    Given a procedure declares that its tenant must hold the webhook endpoints capability (Alex, 2026-10-05, E6)
+    When a caller the access check admitted reaches it
+    Then the plan is asked about that capability by name, at the scope access resolved
+    And a tenant without it is refused with the refusal the process gives for that capability, before the handler
+
+  @unit
+  Scenario: A procedure asks a platform-tier permission of the operator's grant
+    Given a procedure declares a platform-tier permission at the platform (Alex, 2026-10-05, E4)
+    When a caller holding that permission at the platform calls it
+    Then the platform question is asked before the handler, of the operator behind an impersonated caller where there is one
+    And a caller lacking it is refused FORBIDDEN permission_denied, and a hidden procedure answers NOT_FOUND not_found to a caller lacking it and to an anonymous one
+    And a non-platform permission asked at the platform is refused by the compiler and where it is written
+    And a process that cannot answer the platform question refuses the call, and the handler never runs
+
+  @unit
+  Scenario: A staff procedure hides from non-staff and refuses staff by name
+    Given a procedure asks a write permission at the platform and hides from callers lacking a staff permission (Alex, 2026-10-06, Q42)
+    When an anonymous caller, a caller lacking the staff permission and a staff caller lacking the write permission call it
+    Then they are refused UNAUTHORIZED, NOT_FOUND not_found and FORBIDDEN permission_denied naming the write permission
+    And a caller holding both runs the handler
+
+  @unit
+  Scenario: A procedure tells its module about a caller its door refused
+    Given a procedure declares what its module does when the door refuses a caller (Alex, 2026-10-06, Q51)
+    When the door refuses a caller
+    Then the module is handed the parsed input and the refused caller before the refusal is answered
+    And the caller is answered the door's refusal unchanged, and the handler never runs
+    And a hook that fails fails the call, so a refusal is never answered unrecorded
+    And a caller the door admits never reaches the hook
+    And a hook on a procedure whose door refuses nobody is refused where it is written

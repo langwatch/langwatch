@@ -42,6 +42,15 @@ describe("the stored-objects REST family", () => {
       ]);
     });
 
+    /** @scenario "Asking for upload addresses is rate limited" */
+    it("holds asking for an upload address to 600 a minute", () => {
+      const route = declaration.routes.find(
+        (candidate) => candidate.operation === "createStoredObjectUpload",
+      );
+
+      expect(route?.rateLimit).toEqual({ requests: 600, seconds: 60 });
+    });
+
     it("refuses a project the key does not reach before the app is asked", async () => {
       const app = {
         createUpload: vi.fn(),

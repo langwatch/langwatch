@@ -57,22 +57,10 @@ const fuzzUIEmail = "fuzz-ui@mail.langwatch.localhost"
 // tools/fuzz/runner. Absent that runner it is a stub: it writes the plan and
 // says so, leaving findings.jsonl for the runner to fill.
 func runUI(ctx context.Context, streams Streams, options Options) error {
-	if options.Workers <= 0 {
-		options.Workers = DefaultUIWorkers
-	}
-	if options.ActionsPerRoute <= 0 {
-		options.ActionsPerRoute = DefaultActionsPerRoute
-	}
-	if options.ReloadEvery <= 0 {
-		options.ReloadEvery = DefaultReloadEvery
-	}
-	appURL := options.URL
-	if appURL == "" {
-		stack, err := diffkit.BranchStack(ctx)
-		if err != nil {
-			return diffkit.SetupFailed(err)
-		}
-		appURL = stack.AppURL
+	options.uiDefaults()
+	appURL, err := uiAppURL(ctx, options)
+	if err != nil {
+		return diffkit.SetupFailed(err)
 	}
 	runID := time.Now().Format("20060102-150405")
 	runDir := filepath.Join(options.Root, ".fuzz", runID)
@@ -97,19 +85,56 @@ func runUI(ctx context.Context, streams Streams, options Options) error {
 	}
 	fmt.Fprintf(streams.Err, "fuzz ui: wrote %s\n", planPath)
 
-	runner := filepath.Join(options.Root, "tools", "fuzz", "runner")
+	return runUIRunner(ctx, streams, uiRunnerPaths{root: options.Root, plan: planPath, out: runDir})
+}
+
+// uiRunnerPaths are the repository root, the plan the runner reads and the
+// directory it writes to.
+type uiRunnerPaths struct {
+	root, plan, out string
+}
+
+// runUIRunner runs the Node UI runner over the plan, when it is present.
+func runUIRunner(ctx context.Context, streams Streams, paths uiRunnerPaths) error {
+	planPath, runDir := paths.plan, paths.out
+	runner := filepath.Join(paths.root, "tools", "fuzz", "runner")
 	if _, err := os.Stat(filepath.Join(runner, "package.json")); err != nil {
 		fmt.Fprintln(streams.Err, "fuzz ui: runner not present yet (tools/fuzz/runner); plan.json written for it to build against")
 		return nil
 	}
 	command := exec.CommandContext(ctx, "pnpm", "--dir", runner, "start", "--", "--plan", planPath, "--out", runDir)
 	command.Stdout, command.Stderr = streams.Out, streams.Err
-	err = command.Run()
+	err := command.Run()
 	var exit *exec.ExitError
 	if errors.As(err, &exit) && exit.ExitCode() == diffkit.ExitStopped {
 		return &diffkit.Stopped{} // the runner printed why
 	}
 	return err
+}
+
+// uiDefaults fills the UI run's unset knobs.
+func (options *Options) uiDefaults() {
+	if options.Workers <= 0 {
+		options.Workers = DefaultUIWorkers
+	}
+	if options.ActionsPerRoute <= 0 {
+		options.ActionsPerRoute = DefaultActionsPerRoute
+	}
+	if options.ReloadEvery <= 0 {
+		options.ReloadEvery = DefaultReloadEvery
+	}
+}
+
+// uiAppURL is -url, else diffsuite's branch stack.
+func uiAppURL(ctx context.Context, options Options) (string, error) {
+	if options.URL != "" {
+		return options.URL, nil
+	}
+	stack, err := diffkit.BranchStack(ctx)
+	if err != nil {
+		return "", err
+	}
+	return stack.AppURL, nil
 }
 
 func writeJSON(path string, value any) error {

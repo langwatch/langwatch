@@ -1,43 +1,19 @@
 /** What dataset lends this module through its declaration (ARCHITECTURE.md §3.4, rule 7). */
 
-import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
-import type {
-  UiAddOrEditDatasetDrawerProps,
-  UiDatasetRecordSyncProps,
-} from "@langwatch/browser-host/declarations";
-import { lazy, Suspense, useMemo } from "react";
+import { Lent } from "@langwatch/browser-host/lent";
+import {
+  AddOrEditDatasetDrawerToken,
+  DatasetRecordSyncToken,
+  type AddOrEditDatasetDrawerProps,
+  type DatasetRecordSyncProps,
+} from "@langwatch/dataset-contract";
 
 /** Dataset's create-or-edit drawer, rendered as dataset lends it. */
-export function AddOrEditDatasetDrawer(props: UiAddOrEditDatasetDrawerProps) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("addOrEditDatasetDrawer")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function AddOrEditDatasetDrawer(props: AddOrEditDatasetDrawerProps) {
+  return <Lent of={AddOrEditDatasetDrawerToken} props={props} />;
 }
 
 /** Dataset's record sync, which saves pending edits and draws nothing. */
-export function DatasetRecordSync(props: UiDatasetRecordSyncProps) {
-  const declarations = useUiDeclarations();
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("datasetRecordSync")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function DatasetRecordSync(props: DatasetRecordSyncProps) {
+  return <Lent of={DatasetRecordSyncToken} props={props} />;
 }

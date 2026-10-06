@@ -395,10 +395,13 @@ export { type IdentityEmailResolution, IdentityEmailService } from "./identity-e
 export {
   coarseColleagueCount,
   DEFAULT_DOMAIN_JOIN_SETTING,
+  DEFAULT_JOINER_ROLE,
   DOMAIN_JOIN_SETTINGS,
   type DomainJoinSetting,
   isPublicEmailDomain,
   JOIN_REQUEST_VERIFIED_MEMBER_THRESHOLD,
+  JOINER_ROLES,
+  type JoinerRole,
   type JoinCandidateOrganization,
   type JoinLookupDecision,
   type JoinLookupInput,
@@ -407,9 +410,12 @@ export {
   organizationAdmitsDomain,
   organizationAdmitsDomainAutomatically,
   PUBLIC_EMAIL_DOMAINS,
+  readJoinerRole,
   resolveJoinLookup,
+  seatForJoiner,
 } from "./join-matching.ts";
 export {
+  DEFAULT_JOIN_REQUEST_ORIGIN,
   DOMAIN_AUTO_JOIN_POLICY_ID,
   emptyJoinRequest,
   isPendingJoinRequest,
@@ -419,6 +425,7 @@ export {
   JOIN_REJECTED_EVENT_TYPE,
   JOIN_REQUEST_EVENT_TYPES,
   JOIN_REQUEST_EVENT_VERSION_LATEST,
+  JOIN_REQUEST_ORIGINS,
   JOIN_REQUEST_STATES,
   JOIN_REQUESTED_EVENT_TYPE,
   JOIN_RESOLVER_TYPES,
@@ -432,6 +439,7 @@ export {
   type JoinRequestEventType,
   type JoinRequestFact,
   type JoinRequestFactInput,
+  type JoinRequestOrigin,
   type JoinRequestState,
   type JoinRequestedPayload,
   type JoinResolver,
@@ -443,6 +451,7 @@ export {
   joinMatchKindSchema,
   joinRejectedPayloadSchema,
   joinRequestFactInputSchema,
+  joinRequestOriginSchema,
   joinRequestStateSchema,
   joinRequestedPayloadSchema,
   joinResolverSchema,
@@ -632,6 +641,12 @@ export {
 export {
   deriveSessionAmr,
   localFactorsForPath,
+  NO_SESSION_CLAIMS,
+  sessionCallbackEvidenceSchema,
+  sessionClaimsMintInputSchema,
+  type SessionCallbackEvidence,
+  type SessionClaims,
+  type SessionClaimsMintInput,
   signedInWithFor,
   signInMethodLabelFor,
   signInProviderForPath,
@@ -645,6 +660,13 @@ export {
   describePasswordProblem,
 } from "./password-policy.ts";
 export { pickPrimaryEmail } from "./primary-email.ts";
+export {
+  AUTH0_BRIDGE_METHODS,
+  AUTH0_SOCIAL_STRATEGIES,
+  auth0BridgeRailIds,
+  type Auth0BridgeMethod,
+  type Auth0SocialStrategy,
+} from "./auth0-bridge.ts";
 export {
   LOCAL_METHOD_SET,
   PASSKEY_METHOD,

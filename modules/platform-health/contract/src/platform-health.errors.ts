@@ -3,22 +3,6 @@ import { HandledError } from "@langwatch/handled-error";
 import type { PlatformHealthReport } from "./platform-health.ts";
 
 /**
- * The monitoring key was absent or wrong. Deliberately says nothing about
- * which: a monitor holds one key, and telling a caller which half of the
- * check failed is an oracle nobody legitimate needs.
- */
-export class PlatformHealthUnauthorizedError extends HandledError {
-  declare readonly code: "platform_health_unauthorized";
-
-  constructor() {
-    super("platform_health_unauthorized", "The platform health key was not accepted.", {
-      httpStatus: 401,
-    });
-    this.name = "PlatformHealthUnauthorizedError";
-  }
-}
-
-/**
  * The path named a subsystem this platform does not have. The five names are
  * fixed at release, so the caller's own URL is what it can act on.
  */
@@ -49,5 +33,41 @@ export class PlatformHealthUnhealthyError extends HandledError {
     });
     this.name = "PlatformHealthUnhealthyError";
     this.report = report;
+  }
+}
+
+/** Which boundary a canary was sent through. */
+export type CanaryTransport = "rest" | "otlp";
+
+/**
+ * A canary round trip did not complete, which is the platform's fault: the
+ * probes answer external monitors. `meta` is customer-visible, so it names
+ * only the probe, transport and upstream status; the cause goes in the log.
+ */
+export class HealthCheckFailedError extends HandledError {
+  declare readonly code: "health_check_failed";
+
+  constructor({
+    probe,
+    transport,
+    upstreamStatus,
+    reasons,
+  }: {
+    probe: string;
+    transport?: CanaryTransport;
+    upstreamStatus?: number;
+    reasons?: readonly Error[];
+  }) {
+    super("health_check_failed", "The health check could not complete.", {
+      httpStatus: 500,
+      fault: "platform",
+      meta: {
+        check: probe,
+        ...(transport !== undefined ? { transport } : {}),
+        ...(upstreamStatus !== undefined ? { upstreamStatus } : {}),
+      },
+      ...(reasons ? { reasons } : {}),
+    });
+    this.name = "HealthCheckFailedError";
   }
 }

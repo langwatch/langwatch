@@ -33,6 +33,14 @@ architecture linter.
   every server feature, including Enterprise implementations; missing adoption
   is a lint failure. Browser-only features need no fabricated server or API.
   App state and nonpublic helpers use ECMAScript `#private` members.
+- A route's authorization is declared with `.withPermission(...)` and asked by
+  the door before the handler runs. Do not declare `anyAuthenticated` and then
+  check a permission in a middleware fact, a handler or the application. When
+  the library cannot express a check, extend `packages/api` and the door.
+- Product analytics and lifecycle messaging belong to the nurturing feature. A
+  feature records a fact event from its service; nurturing subscribes and talks
+  to PostHog and Customer.io. No other feature holds an analytics channel,
+  client or key.
 - Repository count does not determine service count. Merge duplicate ways of
   loading the same domain data when doing so leaves one coherent owner.
 - A concrete service has a private constructor and `static create`. Construct

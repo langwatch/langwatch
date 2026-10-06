@@ -13,7 +13,7 @@ Feature: Enterprise SSO package boundary
     When a later request evaluates the gate again
     Then the Licensing service is queried again rather than caching the failure
 
-  @architecture
+  @architecture @unit
   Scenario: SSO does not reimplement licensing
     Given SSO needs to decide whether a self-hosted platform is licensed
     When the SSO gate is composed

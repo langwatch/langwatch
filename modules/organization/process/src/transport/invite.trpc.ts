@@ -59,4 +59,15 @@ export const inviteTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof 
     .withFacts(organizationSessionPersonFact)
     .noPermission(BEFORE_MEMBERSHIP)
     .handle(({ app, actor }, person) => app.getPendingInvitation(callerOf(actor, person)))
+
+    /**
+     * Verified addresses only, never the session's unproven one: the answer
+     * carries the invitation code, the secret from the mail.
+     */
+    .procedure("pendingForMe")
+    .withFacts(organizationSessionPersonFact)
+    .noPermission(BEFORE_MEMBERSHIP)
+    .handle(({ app, actor }, person) =>
+      app.listPendingInvitationsForCaller(callerOf(actor, person)),
+    )
     .build();

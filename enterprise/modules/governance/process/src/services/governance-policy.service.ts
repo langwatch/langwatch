@@ -1,20 +1,15 @@
-import type {
-  GovernanceOtlpPolicyInput,
-  GovernanceOtlpReceiverPolicies,
-  TraceDepartmentInput,
-} from "@langwatch/enterprise-governance-contract";
-import { z } from "zod";
+import type { TraceDepartmentInput } from "@langwatch/enterprise-governance-contract";
 
-import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
-import { silentGovernanceDiagnostics } from "../app/governance.members.ts";
 import type { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository.ts";
-import { buildIngestKeyReceiverPolicies } from "../rules/ingest-key-provenance.rules.ts";
+import { isSourceBilledByConfigs } from "../rules/coding-assistant-billing.rules.ts";
+
+export interface GovernanceDiagnosticsSink {
+  warn(message: string, context: Record<string, unknown>): void;
+}
+
+export const silentGovernanceDiagnostics: GovernanceDiagnosticsSink = { warn: () => {} };
 
 const UNASSIGNED_DEPARTMENT = "unassigned";
-const codingAssistantConfigSchema = z.looseObject({
-  assistantKind: z.string(),
-  bundledPlan: z.boolean(),
-});
 
 export class PostgresGovernancePolicyService {
   private readonly cache = new Map<string, { billed: boolean; expiresAt: number }>();
@@ -39,13 +34,6 @@ export class PostgresGovernancePolicyService {
     } = {},
   ) {}
 
-  async resolveOtlpReceiverPolicies(
-    input: GovernanceOtlpPolicyInput,
-  ): Promise<GovernanceOtlpReceiverPolicies> {
-    const billed = await this.isSourceBilled(input);
-    return buildIngestKeyReceiverPolicies(input, !billed);
-  }
-
   async isSourceBilled(input: { organizationId: string; sourceType: string }): Promise<boolean> {
     const key = `${input.organizationId}::${input.sourceType}`;
     const now = (this.options.clock ?? Date.now)();
@@ -57,15 +45,7 @@ export class PostgresGovernancePolicyService {
     let billed = false;
     try {
       const configs = await this.repository.enabledCodingAssistantConfigs(input.organizationId);
-      billed = configs.some((candidate) => {
-        const parsed = codingAssistantConfigSchema.safeParse(candidate);
-
-        return (
-          parsed.success &&
-          parsed.data.assistantKind === input.sourceType &&
-          parsed.data.bundledPlan === false
-        );
-      });
+      billed = isSourceBilledByConfigs({ configs, sourceType: input.sourceType });
     } catch (error) {
       const diagnostics = this.options.diagnostics ?? silentGovernanceDiagnostics;
       diagnostics.warn("failed to resolve bundled-plan policy; defaulting to not billed", {

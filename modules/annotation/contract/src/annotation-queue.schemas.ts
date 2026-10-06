@@ -54,3 +54,19 @@ export type AnnotationQueueItem = z.infer<typeof annotationQueueItemSchema>;
 export type AnnotationQueueListedItem = z.infer<typeof annotationQueueListedItemSchema>;
 export type AnnotationQueuePageItem = z.infer<typeof annotationQueuePageItemSchema>;
 export type AnnotationQueueWithItems = z.infer<typeof annotationQueueWithItemsSchema>;
+
+export type AnnotationQueueConfiguration = Readonly<{
+  projectId: string;
+  queueId?: string;
+  name: string;
+  description: string;
+  userIds: readonly string[];
+  scoreTypeIds: readonly string[];
+}>;
+export type AnnotationQueueScope = Readonly<{ projectId: string }>;
+export type AnnotationQueueCaller = Readonly<{ projectId: string; userId: string }>;
+export type QueueAnnotationTracesInput = AnnotationQueueCaller &
+  Readonly<{
+    traceIds: readonly string[];
+    annotators: readonly string[];
+  }>;

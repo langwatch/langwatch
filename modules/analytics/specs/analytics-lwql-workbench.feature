@@ -1,4 +1,4 @@
-Feature: LangWatchQL query workbench
+Feature: LangWatchQL queries on the dashboard
 
   As an authorized LangWatch project member
   I want to query the live analytics schema, inspect native results, and chart
@@ -10,20 +10,6 @@ Feature: LangWatchQL query workbench
 
   Rule: Availability, authorization, and ownership are enforced at the server boundary
 
-    @integration
-    Scenario: An unavailable or disabled deployment does not expose the workbench
-      Given LangWatchQL provisioning is absent or its project switch is off
-      When the member opens Custom query or calls its schema and query endpoints
-      Then navigation and the page show the unavailable state and the endpoints return the named refusal
-      And no browser environment value can enable the surface
-
-    @integration
-    Scenario: Organization rules and project permissions govern access
-      Given an organization-scoped rule enables LangWatchQL for the project
-      When an authorized member opens Custom query and a member without analytics permission does the same
-      Then the authorized member sees only their live project schema
-      And the unauthorized member sees the permission guard, not the workbench
-
     @unit
     Scenario: The workbench has no unsolicited work or hidden client persistence
       Given the workbench source
@@ -34,28 +20,16 @@ Feature: LangWatchQL query workbench
 
     @unit
     Scenario: Schema documentation and completion use the live response
-      Given a schema response containing datasets, columns, types, descriptions, units, joins, freshness, time columns, and examples
-      When the member browses it or requests Monaco completion and hover details
-      Then every displayed item comes from that response in its returned order
-      And no physical table or column list is hard-coded in the browser
-
-    @integration
-    Scenario: Gated schema fields remain safe and useful
-      Given a schema response containing an unavailable content-gated column
-      When the member expands its dataset or inserts a dataset, column, or example query
-      Then the field is omitted or visibly disabled without exposing its value or hidden detail
-      And insertion copies the response's identifier or SQL
+      Given a schema response containing datasets, columns, types, descriptions and units
+      When the member asks the dashboard widget's editor for completion or hover details
+      Then every offered dataset comes from that response in its returned order
+      And hover reproduces the response's own type, unit and description
 
     @unit
     Scenario: The browser submits exact SQL and does not validate a second language
       Given a draft statement the backend would reject
       When the member runs it
       Then the statement is sent unmodified and the backend's coded refusal is what the member sees
-
-    @integration
-    Scenario: The schema browser names the reserved period parameters where SQL is written
-      When the member reads the schema browser
-      Then it names period_start and period_end and the half-open interval they describe
 
   Rule: Request state distinguishes draft, submitted, and visible result
 
@@ -68,11 +42,9 @@ Feature: LangWatchQL query workbench
 
     @unit
     Scenario: Named scalar parameters accompany the SQL without rewriting it
-      Given a draft using parameter placeholders and named scalar values
+      Given a widget draft using parameter placeholders and named scalar values
       When the member runs the query
       Then the request carries the SQL unmodified and the parameters as named scalars
-      And only the request shape is validated locally, so a row left unnamed or holding
-        the wrong kind of value says so and holds Run query back rather than being sent
 
     @unit
     Scenario: Requests are manual, single-flight, and cancellation-safe
@@ -83,7 +55,7 @@ Feature: LangWatchQL query workbench
 
     @integration
     Scenario: Reserved period parameters are filled only when declared
-      Given SQL declares period_start and/or period_end as ClickHouse date-time parameters
+      Given SQL declares dashboard_context_period_start and/or dashboard_context_period_end as ClickHouse date-time parameters
       When the member runs it with the page's UTC window
       Then only declared parameters are bound with the half-open page window and the SQL remains unchanged
 
@@ -114,24 +86,11 @@ Feature: LangWatchQL query workbench
       And validating that same statement is not refused, because the window is the surface's to supply
 
     @integration
-    Scenario: The step a statement declares is offered as a control, not as a parameter to fill in
-      Given a statement whose first run is refused for an unfilled period_granularity_seconds
-      When the workbench shows the refusal
-      Then the step is not listed among the parameters to give a value
-      And a granularity control offers the steps the contract admits
-
-    @integration
     Scenario: Choosing a step sends it beside the query rather than among its parameters
-      Given the workbench is showing the granularity control
+      Given a LangWatchQL query draft
       When the member chooses a step and runs the query
       Then the request carries that step in its own field
       And no reserved name appears among the parameters sent
-
-    @integration
-    Scenario: A step too fine for the window is refused where the member chose it
-      Given the workbench is showing the granularity control
-      When the member chooses a step that would exceed the bucket ceiling
-      Then the refusal is shown against the query
 
     @unit
     Scenario: Changing the granularity step marks the result stale and restores Run query
@@ -155,7 +114,7 @@ Feature: LangWatchQL query workbench
 
     @unit
     Scenario: A statement declaring the granularity parameter runs at the step the workbench supplies
-      Given SQL declaring period_granularity_seconds as UInt32 alongside both period bounds
+      Given SQL declaring dashboard_context_granularity_seconds as UInt32 alongside both period bounds
       And the surface supplies an offered step
       When the declaration is resolved
       Then the statement is bound with that step
@@ -163,7 +122,7 @@ Feature: LangWatchQL query workbench
 
     @unit
     Scenario: The resolver reports an unfilled declared granularity rather than inventing a step
-      Given SQL declaring period_granularity_seconds as UInt32 and no step supplied
+      Given SQL declaring dashboard_context_granularity_seconds as UInt32 and no step supplied
       When the declaration is resolved on its own
       Then the resolution still says the statement follows the granularity
       And it carries no granularity value, since inventing one would change what a
@@ -171,14 +130,14 @@ Feature: LangWatchQL query workbench
 
     @unit
     Scenario: The granularity parameter declared as anything but UInt32 is refused
-      Given SQL declaring period_granularity_seconds as any other ClickHouse type
+      Given SQL declaring dashboard_context_granularity_seconds as any other ClickHouse type
       When the statement is resolved, at save or at run
       Then it is refused as a wrong granularity declaration
       And the refusal blames the declared type rather than the step
 
     @unit
     Scenario: A zero or fractional step is refused as a wrong declaration
-      Given SQL declaring period_granularity_seconds as UInt32
+      Given SQL declaring dashboard_context_granularity_seconds as UInt32
       When the surface supplies a step that is zero, negative, fractional, or not an offered step
       Then the run is refused as a wrong granularity declaration
       And the refusal describes the step rather than claiming the declaration is mistyped
@@ -186,7 +145,7 @@ Feature: LangWatchQL query workbench
 
     @unit
     Scenario: A granularity declared alongside a mistyped period bound is refused at save
-      Given SQL declaring period_granularity_seconds and a period bound declared as a non-date-time
+      Given SQL declaring dashboard_context_granularity_seconds and a period bound declared as a non-date-time
       When the statement is validated
       Then it is refused because granularity requires well-typed period parameters
       And the refusal distinguishes the mistyped bound from an absent one
@@ -198,50 +157,7 @@ Feature: LangWatchQL query workbench
       Then it is refused as too fine for the period rather than coarsened
       And the refusal names the requested step and the bucket ceiling
 
-  Rule: Results preserve transport fields, ordering, and readable states
-
-    @integration
-    Scenario: Backend failures keep their code-specific presentation
-      Given a parse, policy, missing-parameter, unavailable, or database-timeout refusal with structured metadata
-      When the result pane renders it
-      Then registry copy, source position, violated rule, missing names, unavailable state, or timeout advice is preserved as applicable
-
-    @integration
-    Scenario: A result opens in a native table with deliberate states
-      Given a response containing columns, rows, statistics, diagnostics, truncation, and followsTimeWindow
-      When the first result, an empty result, a loading result, a stale result, or a refusal is rendered
-      Then each state has an intentional presentation, Table is selected first, and every response field remains available to the views
-
-    @integration
-    Scenario: Table order and scale are stable
-      Given a result with ordered ClickHouse columns and up to 10,000 rows
-      When the member scrolls the virtualized semantic table
-      Then columns and rows retain backend order, headers remain usable, and wide results scroll without page breakage
-
-    @unit
-    Scenario: Cell formatting is lossless and distinguishes absence
-      Given cells containing missing keys, null, empty strings, zero, NaN, Infinity, arrays, maps, tuples, 64-bit integers, and high-precision decimals
-      When the member reads or copies them
-      Then each state remains distinguishable, structured values are bounded on screen, and exact wire digits are copied without lossy numeric coercion
-
-    @integration
-    Scenario: Duplicate columns, statistics, and diagnostics are honest
-      Given duplicate column names, a result capped at the row ceiling, statistics, and diagnostics
-      When the table and chart views render
-      Then duplicates and actual returned-row counts are called out, rows returned/elapsed/rows read/bytes read are shown, and every diagnostic remains visible in both modes
-
-    @e2e
-    Scenario: A real browser carries a query from editor to native table
-      When the member writes LangWatchQL and runs it
-      Then the returned rows and result statistics appear in the native table without a second request caused by viewing the result
-
   Rule: Chart mode is a controlled reading of the same result
-
-    @integration
-    Scenario: View changes and specification edits do not rerun SQL
-      Given a successful result
-      When the member switches between Table, Chart, and Specification or edits the chart specification
-      Then the same result is read, the specification is revalidated and rerendered, and no query request is issued
 
     @integration
     Scenario: Chart mode preserves data and offers an accessible table fallback
@@ -251,9 +167,10 @@ Feature: LangWatchQL query workbench
 
     @integration
     Scenario: Starter specifications follow new data until the member edits them
-      Given a chart using an untouched starter specification
-      When Reload returns different result columns
-      Then the starter reshapes to those columns, but an edited specification is never replaced
+      Given a dashboard widget whose chart was saved without a specification
+      When its run returns different result columns
+      Then the starter it draws reshapes to those columns
+      And a widget saved with its own specification keeps drawing that specification
 
     @integration
     Scenario: Chart failures are explicit and do not discard the table

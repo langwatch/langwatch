@@ -2,6 +2,7 @@ import type { Command, CommandHandler } from "@langwatch/eventing";
 import {
   createTenantId,
   defineCommandSchema,
+  EventSchema,
   EventUtils,
   stripEnvelope,
   withCommandEnvelope,
@@ -10,18 +11,25 @@ import {
   PROMPT_CREATED_EVENT_TYPE,
   promptCreatedEventDataSchema,
 } from "@langwatch/prompt-contract";
-import type { z } from "zod";
+import { z } from "zod";
 
-import {
-  PROMPT_AGGREGATE_TYPE,
-  PROMPT_CREATED_EVENT_VERSION,
-  RECORD_PROMPT_CREATED_COMMAND_TYPE,
-  type PromptCreatedEvent,
-} from "./prompt-lifecycle.events.ts";
+/** Prompt's own lifecycle: every project write that gives it a new prompt. */
+export const PROMPT_LIFECYCLE_PIPELINE_NAME = "prompt_lifecycle" as const;
+export const PROMPT_AGGREGATE_TYPE = "prompt" as const;
 
-export const recordPromptCreatedCommandDataSchema = withCommandEnvelope(
-  promptCreatedEventDataSchema,
-);
+export const PROMPT_CREATED_EVENT_VERSION = "2026-09-29" as const;
+export const RECORD_PROMPT_CREATED_COMMAND_TYPE = "lw.prompt.record_created" as const;
+
+export const promptCreatedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(PROMPT_CREATED_EVENT_TYPE),
+  version: z.literal(PROMPT_CREATED_EVENT_VERSION),
+  data: promptCreatedEventDataSchema,
+});
+export type PromptCreatedEvent = z.infer<typeof promptCreatedEventSchema>;
+export type PromptLifecycleEvent = PromptCreatedEvent;
+
+const recordPromptCreatedCommandDataSchema = withCommandEnvelope(promptCreatedEventDataSchema);
 export type RecordPromptCreatedCommandData = z.infer<typeof recordPromptCreatedCommandDataSchema>;
 
 /** Records that a project gained a prompt; one event per prompt, however often it is sent. */

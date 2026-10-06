@@ -27,6 +27,7 @@ function channelOver({ provider }: { provider: string | undefined }) {
 describe("SesOrganizationInviteMailChannel", () => {
   describe("when a gateway is named", () => {
     /** @scenario "An invitation is emailed through notification with its accept link" */
+    /** @scenario "Invitations use the configured email provider" */
     it("sends the invitee one mail carrying the accept link", async () => {
       const { channel, sent } = channelOver({ provider: "smtp" });
 

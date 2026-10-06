@@ -7,6 +7,7 @@ const stubSpan = makeStubSpan();
 
 describe("TraceCanonicalisationService — langwatch.metrics handling", () => {
   describe("when the TypeScript SDK sends the structured metrics shape", () => {
+    /** @scenario TypeScript structured metrics keep working */
     it("extracts token counts and cost from { type, value }", () => {
       const result = canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: {
@@ -41,6 +42,7 @@ describe("TraceCanonicalisationService — langwatch.metrics handling", () => {
   });
 
   describe("when the Python SDK sends the bare snake_case metrics shape", () => {
+    /** @scenario Bare snake_case metrics provide token counts */
     it("extracts token counts from prompt_tokens and completion_tokens", () => {
       const result = canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: {
@@ -57,6 +59,7 @@ describe("TraceCanonicalisationService — langwatch.metrics handling", () => {
       expect(result.attributes["gen_ai.usage.output_tokens"]).toBe(50);
     });
 
+    /** @scenario Bare snake_case metrics provide a manual cost */
     it("extracts a manually reported cost", () => {
       const result = canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: {
@@ -69,6 +72,7 @@ describe("TraceCanonicalisationService — langwatch.metrics handling", () => {
       expect(result.attributes["langwatch.span.cost"]).toBe(0.042);
     });
 
+    /** @scenario Bare snake_case metrics provide reasoning tokens */
     it("extracts reasoning tokens", () => {
       const result = canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: {
@@ -81,6 +85,7 @@ describe("TraceCanonicalisationService — langwatch.metrics handling", () => {
       expect(result.attributes["gen_ai.usage.reasoning_tokens"]).toBe(32);
     });
 
+    /** @scenario Bare snake_case metrics provide time to first token as a duration */
     it("maps first_token_ms to gen_ai.server.time_to_first_token", () => {
       const result = canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: {
@@ -95,6 +100,7 @@ describe("TraceCanonicalisationService — langwatch.metrics handling", () => {
   });
 
   describe("when semconv token attributes are already present", () => {
+    /** @scenario Semconv attributes win over the metrics blob */
     it("keeps the semconv values over the metrics blob", () => {
       const result = canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: {

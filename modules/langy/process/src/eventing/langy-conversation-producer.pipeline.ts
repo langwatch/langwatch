@@ -10,11 +10,11 @@ import type {
   LangyTurnAdmissionCapability,
 } from "@langwatch/langy-contract";
 
-import type { LangyTitleGenerator } from "../app/langy.members.ts";
 import { UnavailableLangyWorkerChannel } from "../channels/unavailable.langy-worker.channel.ts";
 import type { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
 import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
+import type { LangyTitleGenerator } from "../services/langy-title-generator.service.ts";
 import { LangyWorkerMetricsNullService } from "../services/langy-worker-metrics-null.service.ts";
 import type { LangyAnalyticsEventProjectionRecord } from "./langy-analytics-event.projection.ts";
 import { EventingLangyConversationAdapter } from "./langy-conversation-runtime.pipeline.ts";
@@ -99,11 +99,7 @@ function buildLangyConversationProducerPipeline(input: {
   };
   const guidedOnboarding = {
     reader: { getByProject: refuse("read a project's guided onboarding") },
-    analytics: {
-      track: () => {
-        throw producerOnly(processName, "track a guided onboarding turn failure");
-      },
-    },
+    facts: { recordTurnFailed: refuse("record a guided onboarding turn failure") },
   };
 
   return EventingLangyConversationAdapter.create({

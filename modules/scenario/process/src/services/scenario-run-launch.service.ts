@@ -14,7 +14,7 @@ import {
 
 const logger = createLogger("langwatch:scenario:launch");
 
-export type ScenarioRunLaunchSteps = Pick<
+type ScenarioRunLaunchSteps = Pick<
   ScenarioApi,
   "resolveRunParameters" | "prefetchExecution" | "queueSimulationRun"
 >;

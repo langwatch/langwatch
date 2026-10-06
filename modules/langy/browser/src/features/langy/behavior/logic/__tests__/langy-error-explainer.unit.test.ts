@@ -150,6 +150,28 @@ describe("explainLangyError", () => {
         });
       });
 
+      /** @scenario A rate limit filed under the provider's own code reads the same way */
+      it("reads the provider's own rate limit code as the provider rate limiting, with no status reason", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: { http_status: 429, provider: "azure", body_kind: "json" },
+                reasons: [{ kind: "rate_limit_exceeded" }],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.description).toBe(
+          "The model provider is rate-limiting this model right now. Wait a minute and send your message again, or pick a model with more room.",
+        );
+        expect(presentation.action).toEqual({ label: "Try again", kind: "retry" });
+      });
+
       /** @scenario A model the provider refuses to this key reads as a credential to check */
       it("reads a Bedrock access_denied as the provider refusing the key, and offers the settings", () => {
         // The chain a guided-onboarding turn on Bedrock recorded: the key had
@@ -173,6 +195,38 @@ describe("explainLangyError", () => {
 
         expect(presentation.kind).toBe("llm_upstream_error");
         expect(presentation.title).toBe("The model provider rejected that");
+        expect(presentation.description).toBe(
+          "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+
+      /** @scenario A refused credential in a dialect the client does not know still reads as a credential to check */
+      it.each([
+        // A wrong AWS secret, by Bedrock's own exception name.
+        [[{ kind: "InvalidSignatureException" }]],
+        [[{ kind: "UnrecognizedClientException" }]],
+        // A discriminant no list names, with the status reason beside it.
+        [[{ kind: "SomeFutureAuthException" }, { kind: "upstream_forbidden" }]],
+        [[{ kind: "invalid_request_error" }, { kind: "upstream_unauthorized" }]],
+      ])("reads %j as the provider refusing the key, and offers the settings", (reasons) => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: { http_status: 403, provider: "bedrock" },
+                reasons,
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
         expect(presentation.description).toBe(
           "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.",
         );
@@ -331,6 +385,93 @@ describe("explainLangyError", () => {
         );
 
         expect(presentation.kind).toBe("langy_codex_session_expired");
+      });
+    });
+  });
+
+  describe("given an agent failure the gateway stopped for an incomplete provider", () => {
+    const gatewayReason = (meta: Record<string, unknown>) =>
+      domain({
+        code: "langy_agent_errored",
+        httpStatus: 502,
+        reasons: [{ kind: "provider_config_invalid", meta }],
+      });
+
+    describe("when the provider has no API key saved", () => {
+      /** @scenario A provider with no API key saved reads as a key to add */
+      it("says so, and offers the provider settings instead of a retry", () => {
+        const presentation = explainLangyError(
+          gatewayReason({ problem: "api_key_missing", model: "gpt-5.6-terra" }),
+        );
+
+        expect(presentation.kind).toBe("provider_config_invalid");
+        expect(presentation.description).toBe(
+          "This model provider is enabled with no API key saved, so the request never reached it. Add the API key in Settings → Model Providers.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Open model providers",
+          kind: "configure-model",
+        });
+      });
+    });
+
+    describe("when the reason carries more than the client asked for", () => {
+      /** @scenario The card never repeats what the gateway or the provider wrote */
+      it("keeps only the enumerated problem and a model id", () => {
+        const presentation = explainLangyError(
+          gatewayReason({
+            problem: "api_key_missing",
+            model: "gpt-5.6-terra",
+            message: "Incorrect API key provided: sk-proj-abc",
+            provider: "openai",
+            tips: ["anything"],
+          }),
+        );
+
+        expect(presentation.meta).toEqual({
+          problem: "api_key_missing",
+          model: "gpt-5.6-terra",
+        });
+      });
+
+      /** @scenario The card never repeats what the gateway or the provider wrote */
+      it("drops a model that does not read as a model id", () => {
+        const presentation = explainLangyError(
+          gatewayReason({
+            problem: "deployment_missing",
+            model: "gpt <script>alert(1)</script>",
+          }),
+        );
+
+        expect(presentation.meta).toEqual({ problem: "deployment_missing" });
+        expect(presentation.description).toBe(
+          "This model provider has no deployment mapped for that model. Add the deployment mapping in Settings → Model Providers.",
+        );
+      });
+    });
+
+    describe("when the reason sits beneath another one", () => {
+      /** @scenario A provider with no API key saved reads as a key to add */
+      it("is still found", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "chain_exhausted",
+                reasons: [
+                  {
+                    kind: "provider_config_invalid",
+                    meta: { problem: "endpoint_missing" },
+                  },
+                ],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("provider_config_invalid");
+        expect(presentation.description).toContain("no endpoint URL saved");
       });
     });
   });
@@ -502,6 +643,7 @@ describe("explainLangyError", () => {
   });
 
   describe("given the turn stopped because GitHub is not connected", () => {
+    /** @scenario "Langy reaches for GitHub and the user has not connected it" */
     it("suppresses the red card and offers the connect-github action", () => {
       // The panel keys on exactly this shape (render suppress + connect-github)
       // to draw the install card in the message flow and re-drive the turn once
@@ -591,6 +733,7 @@ describe("explainLangyError", () => {
   });
 
   describe("given the worker stopped mid-reply", () => {
+    /** @scenario "The worker stops mid-reply and Langy shows a final, specific error" */
     it("names the stop specifically and offers a manual retry", () => {
       const presentation = explainLangyError(
         domain({ code: "langy_worker_stopped", httpStatus: 503 }),

@@ -5,8 +5,13 @@ import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contrac
 import { z } from "zod";
 
 import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
-import { chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
-import { fullSpanRowsSchema, mapChRowToNormalized } from "./stored-span-row.mapper.ts";
+import {
+  chNumber,
+  chString,
+  chStringMap,
+  fullSpanRowsSchema,
+  mapChRowToNormalized,
+} from "./stored-span-row.mapper.ts";
 
 const logger = createLogger("langwatch:trace:derivation-span-repository");
 
@@ -250,5 +255,3 @@ export class TraceDerivationSpanClickHouseRepository {
     return fullSpanRowsSchema.parse(await result.json()).map((row) => mapChRowToNormalized(row));
   }
 }
-
-export { DERIVATION_EVENT_LIMIT, DERIVATION_SPAN_LIMIT };

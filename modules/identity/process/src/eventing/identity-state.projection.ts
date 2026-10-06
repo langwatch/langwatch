@@ -40,65 +40,65 @@ export const identifierAttachedEventSchema = z.object({
   type: z.literal(IDENTIFIER_ATTACHED_EVENT_TYPE),
   data: identifierAttachedPayloadSchema,
 });
-export type IdentifierAttachedEvent = z.infer<typeof identifierAttachedEventSchema>;
+type IdentifierAttachedEvent = z.infer<typeof identifierAttachedEventSchema>;
 
 export const identifierVerifiedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(IDENTIFIER_VERIFIED_EVENT_TYPE),
   data: identifierVerifiedPayloadSchema,
 });
-export type IdentifierVerifiedEvent = z.infer<typeof identifierVerifiedEventSchema>;
+type IdentifierVerifiedEvent = z.infer<typeof identifierVerifiedEventSchema>;
 
 export const identifierDeadEndedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(IDENTIFIER_DEAD_ENDED_EVENT_TYPE),
   data: identifierDeadEndedPayloadSchema,
 });
-export type IdentifierDeadEndedEvent = z.infer<typeof identifierDeadEndedEventSchema>;
+type IdentifierDeadEndedEvent = z.infer<typeof identifierDeadEndedEventSchema>;
 
 export const primaryChangedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(PRIMARY_CHANGED_EVENT_TYPE),
   data: primaryChangedPayloadSchema,
 });
-export type PrimaryChangedEvent = z.infer<typeof primaryChangedEventSchema>;
+type PrimaryChangedEvent = z.infer<typeof primaryChangedEventSchema>;
 
 export const identifierDetachedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(IDENTIFIER_DETACHED_EVENT_TYPE),
   data: identifierDetachedPayloadSchema,
 });
-export type IdentifierDetachedEvent = z.infer<typeof identifierDetachedEventSchema>;
+type IdentifierDetachedEvent = z.infer<typeof identifierDetachedEventSchema>;
 
 export const userErasedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(USER_ERASED_EVENT_TYPE),
   data: userErasedPayloadSchema,
 });
-export type UserErasedEvent = z.infer<typeof userErasedEventSchema>;
+type UserErasedEvent = z.infer<typeof userErasedEventSchema>;
 
 export const linkProposedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(LINK_PROPOSED_EVENT_TYPE),
   data: linkProposedPayloadSchema,
 });
-export type LinkProposedEvent = z.infer<typeof linkProposedEventSchema>;
+type LinkProposedEvent = z.infer<typeof linkProposedEventSchema>;
 
 export const linkConfirmedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(LINK_CONFIRMED_EVENT_TYPE),
   data: linkConfirmedPayloadSchema,
 });
-export type LinkConfirmedEvent = z.infer<typeof linkConfirmedEventSchema>;
+type LinkConfirmedEvent = z.infer<typeof linkConfirmedEventSchema>;
 
 export const linkRejectedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(LINK_REJECTED_EVENT_TYPE),
   data: linkRejectedPayloadSchema,
 });
-export type LinkRejectedEvent = z.infer<typeof linkRejectedEventSchema>;
+type LinkRejectedEvent = z.infer<typeof linkRejectedEventSchema>;
 
-export const identityEventSchema = z.discriminatedUnion("type", [
+const identityEventSchema = z.discriminatedUnion("type", [
   identifierAttachedEventSchema,
   identifierVerifiedEventSchema,
   identifierDeadEndedEventSchema,

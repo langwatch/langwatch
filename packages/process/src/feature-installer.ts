@@ -153,16 +153,30 @@ export interface ModuleTaskSetup<
   Members,
   Repositories,
   App,
+  Config = unknown,
 > extends ModuleTransportFactSetup<Dependencies, Members, App> {
   readonly repositories: Repositories;
+  /** This module's slice of the one process parse (§6), as its App's `create` received it. */
+  readonly config: Config;
   /** The secrets this module's App declared, scoped to it; resolve with `secrets.into`. */
   readonly secrets: ScopedSecrets;
 }
 
 /** Builds a module's one-shot tasks over its booted App, once at install in the tasks role. */
-export type ModuleTaskBinder<Dependencies extends TokenMap, Members, Repositories, App> = (
-  setup: ModuleTaskSetup<Dependencies, Members, Repositories, App>,
+export type ModuleTaskBinder<
+  Dependencies extends TokenMap,
+  Members,
+  Repositories,
+  App,
+  Config = unknown,
+> = (
+  setup: ModuleTaskSetup<Dependencies, Members, Repositories, App, Config>,
 ) => readonly unknown[] | Promise<readonly unknown[]>;
+
+/** The parsed slice a declaration's phantom `configType` names; nothing where it declared none. */
+type DeclaredConfigOf<Declaration> = Declaration extends { readonly configType?: infer Config }
+  ? Exclude<Config, undefined>
+  : unknown;
 
 /** An inert API descriptor retained for the process root to mount later. */
 export type FeatureTransportDescriptor = Readonly<{
@@ -285,7 +299,7 @@ export interface FeatureInstallArguments<Members> {
 
 /**
  * Application root's view of a module. Retains name + config schema for
- * compile-time checking (ADR-144).
+ * compile-time checking.
  */
 export interface InstallableServerFeature<Members, Name extends string = string, Config = unknown> {
   readonly name: Name;
@@ -328,9 +342,6 @@ export interface InstallableServerFeature<Members, Name extends string = string,
 
 /** One slice per module name, as a process states the config it hands them. */
 export type ModuleConfigRecord = Readonly<Record<string, unknown>>;
-
-/** A process that stated no module config at all. Its key set is empty. */
-export type NoModuleConfig = Readonly<Record<never, never>>;
 
 /** The module name a config slice is keyed by, or nothing where it declared none. */
 type ConfiguredModuleName<Module> =
@@ -1507,7 +1518,7 @@ class ConfiguredAppBuilder<
   /**
    * The doors this module declares. Answers a declaration that is already
    * installable, so there is no half-declared module and no build step to
-   * forget (ADR-144 s1).
+   * forget.
    */
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
@@ -1613,7 +1624,7 @@ class UnconfiguredAppBuilder<
   /**
    * The doors this module declares. Answers a declaration that is already
    * installable, so there is no half-declared module and no build step to
-   * forget (ADR-144 s1).
+   * forget.
    */
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
@@ -1704,7 +1715,7 @@ class UnconfiguredAppBuilder<
 
 /**
  * Installable declaration accepting further work contributions.
- * Stays installable after any contribution (ADR-144).
+ * Stays installable after any contribution.
  */
 export type ModuleContributions<
   Declaration,
@@ -1722,7 +1733,13 @@ export type ModuleContributions<
       ...workers: readonly unknown[]
     ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
     withTasks(
-      bind: ModuleTaskBinder<Dependencies, Members, Repositories, Created>,
+      bind: ModuleTaskBinder<
+        Dependencies,
+        Members,
+        Repositories,
+        Created,
+        DeclaredConfigOf<Declaration>
+      >,
     ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
     withTasks(
       ...tasks: readonly unknown[]
@@ -1792,6 +1809,7 @@ function bindingTasks<Declaration extends object>(
           args.resolve,
         ) as ResolvedTokens<TokenMap>,
         members: args.members,
+        config: declaredConfig(args.config),
         secrets: args.secrets ?? undeclaredSecrets(installable.name),
       });
       return { ...state, tasks: [...(state.tasks ?? []), ...built] };

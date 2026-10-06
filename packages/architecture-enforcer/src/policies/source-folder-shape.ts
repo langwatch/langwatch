@@ -24,6 +24,9 @@ export const FRAGMENT_FLOOR = 20;
  */
 const GRAMMAR_REQUIRED_SUFFIXES = [".module.ts", ".mount.ts"];
 
+/** An application is a `main.ts` and a `config.ts` (ARCHITECTURE.md §1). */
+const APPLICATION_CONFIG = /^apps\/[^/]+\/src\/config\.ts$/;
+
 export const SOURCE_FOLDER_SHAPE_KINDS = ["crowded-folder", "fragment-file"] as const;
 
 export type SourceFolderShapeKind = (typeof SOURCE_FOLDER_SHAPE_KINDS)[number];
@@ -155,6 +158,32 @@ function fragmentFileFinding(
   };
 }
 
+function fragmentFindingOf({
+  file,
+  root,
+  importers,
+}: {
+  file: string;
+  root: string;
+  importers: ReadonlyMap<string, ReadonlySet<string>>;
+}): SourceFolderShapeFinding | null {
+  const path = relative(root, file);
+  if (basename(file).startsWith("index.")) return null;
+  if (APPLICATION_CONFIG.test(path)) return null;
+
+  const grammarRequired = GRAMMAR_REQUIRED_SUFFIXES.some((suffix) => file.endsWith(suffix));
+  if (grammarRequired) return null;
+
+  const readers = [...(importers.get(file) ?? [])];
+  if (readers.length === 0) return null;
+
+  const folder = dirname(file);
+  if (!readers.every((reader) => dirname(reader) === folder)) return null;
+
+  const lines = lineCount(file);
+  return lines >= FRAGMENT_FLOOR ? null : fragmentFileFinding(path, lines, readers);
+}
+
 export function collectSourceFolderShapeFindings(root: string): SourceFolderShapeFinding[] {
   const files = sourceFiles(root);
   const findings: SourceFolderShapeFinding[] = [];
@@ -175,23 +204,8 @@ export function collectSourceFolderShapeFindings(root: string): SourceFolderShap
   const importers = importersOf(files);
 
   for (const file of files) {
-    const isBarrel = basename(file).startsWith("index.");
-    if (isBarrel) continue;
-
-    const grammarRequired = GRAMMAR_REQUIRED_SUFFIXES.some((suffix) => file.endsWith(suffix));
-    if (grammarRequired) continue;
-
-    const readers = [...(importers.get(file) ?? [])];
-    if (readers.length === 0) continue;
-
-    const folder = dirname(file);
-    const readOnlyByNeighbours = readers.every((reader) => dirname(reader) === folder);
-    if (!readOnlyByNeighbours) continue;
-
-    const lines = lineCount(file);
-    if (lines >= FRAGMENT_FLOOR) continue;
-
-    findings.push(fragmentFileFinding(relative(root, file), lines, readers));
+    const finding = fragmentFindingOf({ file, root, importers });
+    if (finding) findings.push(finding);
   }
 
   return findings.toSorted(comparePathThenKind);

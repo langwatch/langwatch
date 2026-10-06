@@ -35,10 +35,10 @@ import {
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { z } from "zod";
 
 import type { LangyTurnAccessRepository } from "../repositories/langy-live-turn.repository.ts";
+import type { LangyRateLimitRepository } from "../repositories/langy-rate-limit.repository.ts";
 import { deriveSyntheticTerminal } from "../rules/langy-turn-settlement.rules.ts";
 import type { TurnHealth } from "../rules/langy-turn-settlement.rules.ts";
 import { LangyPanelAccessService } from "./langy-panel-access.service.ts";
@@ -76,12 +76,11 @@ export type LangyPanelConversationMembers = Readonly<{
     | "findModelsAllowedForProject"
   >;
   turnBounds: Pick<LangyTurnsBoundsService, "assertTurnWithinBounds">;
-  rateLimiter: RateLimiter;
+  rateLimits: LangyRateLimitRepository;
   presence: Pick<PresenceApi, "getTenantEmitter" | "cleanupTenantEmitter">;
-  turnAccess: LangyTurnAccessRepository | null;
-  openBuffer: OpenLangyTurnBuffer | null;
-  /** Absent without Redis: no action is ever published, so no tab can claim or complete one. */
-  uiActions: Pick<LangyUiActionPageService, "claim" | "complete"> | null;
+  turnAccess: LangyTurnAccessRepository;
+  openBuffer: OpenLangyTurnBuffer;
+  uiActions: Pick<LangyUiActionPageService, "claim" | "complete">;
 }>;
 
 /**
@@ -133,7 +132,7 @@ export class LangyPanelConversationService {
       projectId: input.projectId,
       userId: input.caller.userId,
     });
-    if (!conversation || !uiActions) return { isClaimed: false };
+    if (!conversation) return { isClaimed: false };
     return uiActions.claim({
       projectId: input.projectId,
       userId: input.caller.userId,
@@ -147,7 +146,6 @@ export class LangyPanelConversationService {
     input: LangyPanelCall<typeof langyCompleteUiActionInputSchema>,
   ): Promise<{ isAccepted: boolean }> {
     await this.members.access.assertPanelAccess(input);
-    if (!this.members.uiActions) return { isAccepted: false };
     return this.members.uiActions.complete({
       projectId: input.projectId,
       userId: input.caller.userId,
@@ -285,7 +283,7 @@ export class LangyPanelConversationService {
     await this.members.access.assertPanelAccess(input);
     const cold = { conversationId: input.conversationId ?? null, warmed: false };
     try {
-      const budget = await this.members.rateLimiter.check(
+      const budget = await this.members.rateLimits.check(
         `langy:rl:warm:${input.projectId}:${input.caller.userId}`,
         { requests: WARMS_PER_MINUTE, seconds: 60 },
       );
@@ -413,10 +411,7 @@ export class LangyPanelConversationService {
       );
       throw new LangyConversationNotFoundError(conversationId);
     }
-    const watch = this.members.openBuffer?.() ?? null;
-    if (!watch) return;
-
-    const { buffer, release } = watch;
+    const { buffer, release } = this.members.openBuffer();
     yield* LangyTurnTailService.create().streamTurnEntries({
       conversationId,
       turnId,
@@ -439,7 +434,7 @@ export class LangyPanelConversationService {
     adoptConversationId: boolean,
   ): Promise<{ conversationId: string; turnId: string }> {
     await this.members.access.assertPanelAccess(input);
-    const budget = await this.members.rateLimiter.check(
+    const budget = await this.members.rateLimits.check(
       `langy:rl:msg:${input.projectId}:${input.caller.userId}`,
       { requests: MESSAGES_PER_MINUTE, seconds: 60 },
     );
@@ -485,7 +480,7 @@ export class LangyPanelConversationService {
     turnId: string;
     userId: string;
   }): Promise<boolean> {
-    if (this.members.turnAccess && (await this.members.turnAccess.isTurnActor(input))) {
+    if (await this.members.turnAccess.isTurnActor(input)) {
       return true;
     }
     const conversation = await this.members.langy.findByIdVisible({

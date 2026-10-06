@@ -9,9 +9,12 @@ import {
   studioClientEventSchema,
   type NodeDataset,
   type StudioClientEvent,
+  WorkflowDatasetTooLargeToRunError,
 } from "@langwatch/workflow-contract";
 
 type DatasetRows = Record<string, unknown>[];
+
+const MIB = 1024 * 1024;
 
 export class StudioDatasetMaterializerService {
   static create(datasets: DatasetApi): StudioDatasetMaterializerService {
@@ -71,11 +74,10 @@ export class StudioDatasetMaterializerService {
           throw new Error("Dataset ID is required");
         }
 
-        const loadedDataset = await this.datasets.getDatasetWithRecords({
+        const loadedDataset = await this.readSavedWhole({
           slugOrId: sourceDataset.id,
           projectId: input.projectId,
           entrySelection,
-          limitMb: null,
         });
 
         return {
@@ -99,6 +101,31 @@ export class StudioDatasetMaterializerService {
       ...event,
       payload: { ...event.payload, workflow },
     });
+  }
+
+  /**
+   * The rows travel to the engine inside the event, so the read is held to
+   * what the organization reads whole, and a dataset above it refuses the run
+   * instead of running the rows that fit.
+   */
+  private async readSavedWhole(input: {
+    slugOrId: string;
+    projectId: string;
+    entrySelection: DatasetEntrySelection;
+  }) {
+    const { wholeReadBytes } = await this.datasets.getLimits({ projectId: input.projectId });
+    const loaded = await this.datasets.getDatasetWithRecords({
+      ...input,
+      limitMb: wholeReadBytes / MIB,
+    });
+    if (loaded.truncated) {
+      throw new WorkflowDatasetTooLargeToRunError({
+        maxBytes: wholeReadBytes,
+        totalRows: loaded.totalRows ?? loaded.records.length,
+      });
+    }
+
+    return loaded;
   }
 
   private rowsFromColumns(columns: Record<string, unknown[]>): DatasetRows {

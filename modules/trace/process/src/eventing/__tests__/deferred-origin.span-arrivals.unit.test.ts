@@ -8,7 +8,7 @@ import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-co
 import { TOPIC_ASSIGNED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { needsOriginResolution } from "../deferred-origin.process.ts";
+import { needsOriginResolution } from "../deferred-origin.subscriber.ts";
 
 function createEvent(overrides: Partial<TraceProcessingEvent> = {}): TraceProcessingEvent {
   return {

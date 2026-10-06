@@ -15,7 +15,7 @@ export interface TwoStepProtocol {
   disableTwoFactor(input: { headers: Headers; password?: string | undefined }): Promise<void>;
 }
 
-export interface TwoStepVerificationServiceDeps {
+interface TwoStepVerificationServiceDeps {
   sessions: Pick<AuthSessionRepository, "findAmrForSession" | "findAmrForIdentifiers">;
   protocol: TwoStepProtocol;
   now: () => Instant;

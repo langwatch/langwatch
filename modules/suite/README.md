@@ -1,37 +1,44 @@
-# Suite
+# suite
 
-Suite owns run-plan definitions, reference validation, run history, and their
-portable vocabulary. Its canonical server slice provides CRUD, duplication,
-archiving, scoped lookup, slug uniqueness, and run preparation through
-`SuiteService`. Its web slice owns the reusable scenario-run card, message
-preview, status configuration, and completion treatment.
+Suites (run plans): their definitions, the scenario references they hold and their run history.
 
-## Boundary
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-The package owns `SimulationSuite` persistence, definition validation, and the
-policy for resolving Scenario, Prompt, and Agent references. It also owns the
-event-sourced `suite_runs` fold, stored through a private ClickHouse
-repository. The application still supplies the execution port that dispatches
-commands and queues work.
+## At a glance
 
-When ClickHouse is unavailable, composition selects an in-memory Eventing store
-explicitly.
+|                |                                                                                                |
+| -------------- | ---------------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                                |
+| Subjects       | suite                                                                                          |
+| Halves         | [contract](contract) · [process](process) · [browser](browser)                                 |
+| Api token      | `SuiteApi` = `moduleApi<SuiteApi>()("suite")`, `contract/src/suite.api.ts:123` (28 operations) |
+| Installed by   | api, worker, tasks (process); ui (browser)                                                     |
 
-## Remaining migration seams
+## What suite owns
 
-- The execution port (`server/src/ports/suite-execution.port.ts`) is now
-  implemented package-side by `SuiteExecutionService`
-  (`server/src/services/suite-execution.service.ts`), which resolves run-only
-  parameters and dispatches the existing simulation and Suite-run commands.
-  `apps/api/src/features/scenario/scenario.composition.ts` only
-  injects its collaborators (the command queue, the run-id generator, and run-
-  model resolution). The Suite service and its run repository remain
-  package-owned.
-- `@langwatch/suite-browser` routes nothing: its declaration (`suite.web.ts`)
-  only declares the `suite:run-history` slice, and `apps/ui` installs it via
-  `browser-modules.generated.ts`. Scenario's browser module renders the
-  Suite-run pickers, dialogs and run history, reading that slice.
-- The REST `/api/suites` family (`createSuiteRestApp`, mounted from
-  `apps/api/src/app-rest/app-rest.packaged-families.ts`) and the tRPC suite
-  router both consume the process-owned `app.suites`; neither transport
-  constructs a service per request.
+| Kind                           | Name                          | Declared at                                                                 |
+| ------------------------------ | ----------------------------- | --------------------------------------------------------------------------- |
+| Postgres, accessed not claimed | `Scenario`, `SimulationSuite` | `process/src/repositories/prisma/prisma.suite.repository.ts:63`             |
+| ClickHouse table (writes)      | `suite_runs`                  | `process/src/repositories/clickhouse/clickhouse.suite-run.repository.ts:97` |
+| Config                         | `publicBaseUrl` (BASE_HOST)   | `contract/src/suite.api.ts:127`                                             |
+
+Anything else suite needs belongs to another module and is reached through its `*Api`.
+
+## Peers (static dependencies)
+
+| Name             | Token              | Module                                        |
+| ---------------- | ------------------ | --------------------------------------------- |
+| `agents`         | `AgentApi`         | [agent](../agent/README.md)                   |
+| `evaluators`     | `EvaluatorApi`     | [evaluator](../evaluator/README.md)           |
+| `featureFlags`   | `FeatureFlagApi`   | [feature-flag](../feature-flag/README.md)     |
+| `modelProviders` | `ModelProviderApi` | [model-provider](../model-provider/README.md) |
+| `projects`       | `ProjectApi`       | [project](../project/README.md)               |
+| `prompts`        | `PromptApi`        | [prompt](../prompt/README.md)                 |
+| `retention`      | `DataRetentionApi` | [data-retention](../data-retention/README.md) |
+| `scenarios`      | `ScenarioApi`      | [scenario](../scenario/README.md)             |
+
+## Who depends on suite
+
+[platform-health](../platform-health/README.md), [scenario](../scenario/README.md) (as a peer).
+
+<!-- readme:generated:end -->

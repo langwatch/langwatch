@@ -6,7 +6,7 @@ import type {
 
 import { ConnectGatewayChannel } from "../connect-gateway.channel.ts";
 
-export interface MemoryConnectGatewayChannelOptions {
+interface MemoryConnectGatewayChannelOptions {
   /** What `usage` answers, or the refusal it raises. */
   readonly usage?: ConnectUsageView | Error;
   /** What `classify` answers, or the refusal it raises. */

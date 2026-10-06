@@ -6,11 +6,11 @@
 import type { UnlinkUserAccountOutcome, UserLinkedAccount } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { UserPasswordHasher } from "../../app/user.members.ts";
 import type {
   UserCredentialAccount,
   UserCredentialRepository,
 } from "../../repositories/user-signin-credential.repository.ts";
+import type { UserPasswordHasher } from "../user-password.service.ts";
 import { UserCredentialService } from "../user-signin-credential.service.ts";
 
 const USER_ID = "user-1";

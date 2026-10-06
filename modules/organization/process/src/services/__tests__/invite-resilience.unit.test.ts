@@ -69,7 +69,7 @@ describe("InviteService resilience", () => {
       // claims still go through `updateMany`.
       $executeRaw: vi.fn(),
       organizationUser: {
-        createMany: vi.fn(),
+        createMany: vi.fn().mockResolvedValue({ count: 1 }),
         findFirst: vi.fn(),
         findUnique: vi.fn(),
       },

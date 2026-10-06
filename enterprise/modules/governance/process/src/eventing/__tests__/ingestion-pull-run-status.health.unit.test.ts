@@ -76,7 +76,12 @@ function completed(data: Partial<Parameters<typeof completedData>[0]> = {}) {
   });
 }
 
-function completedData(over: { scheduledFor?: number; errorCount?: number; eventCount?: number }) {
+function completedData(over: {
+  scheduledFor?: number;
+  errorCount?: number;
+  eventCount?: number;
+  unreadPage?: boolean;
+}) {
   return {
     sourceId: "source-1",
     runId: "run-1",
@@ -128,6 +133,24 @@ describe("the run-status fold as source health reads it", () => {
 
       const afterThree = projection.handleIngestionPullRunFailed(failed(), afterTwo);
 
+      expect(health(afterThree)).toBe("unhealthy");
+    });
+  });
+
+  describe("when a source is refused part-way through each of its last three runs", () => {
+    /** @scenario A source refused part-way through every run reads as failing */
+    it("marks the source unhealthy although every run ends as a completion", () => {
+      const afterThree = [1, 2, 3].reduce(
+        (state, run) =>
+          projection.handleIngestionPullRunCompleted(
+            completed({ scheduledFor: 8_000 + run, errorCount: 1, unreadPage: true }),
+            state,
+          ),
+        row(),
+      );
+
+      expect(afterThree.LastRunOutcome).toBe("completed");
+      expect(afterThree.ConsecutiveErrors).toBe(3);
       expect(health(afterThree)).toBe("unhealthy");
     });
   });

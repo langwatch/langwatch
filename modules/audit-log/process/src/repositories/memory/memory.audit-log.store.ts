@@ -1,7 +1,11 @@
 import type { AuditLogEntry } from "@langwatch/audit-log-contract";
 import type { Instant } from "@langwatch/time";
 
-export type MemoryAuditLogRow = AuditLogEntry & { id: string; createdAt: Instant };
+export type MemoryAuditLogRow = AuditLogEntry & {
+  id: string;
+  createdAt: Instant;
+  idempotencyKey?: string;
+};
 
 /** The rows both memory twins share: an entry recorded through one is a touch the other reads. */
 export class MemoryAuditLogStore {

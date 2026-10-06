@@ -18,6 +18,7 @@ export type {
   ProcessSignalEnvelope,
 } from "./processManager.types.ts";
 export {
+  captureTraceCarrier,
   DEFAULT_SIGNAL_REVISION_RETRIES,
   type HandleResult,
   ProcessManagerService,
@@ -29,6 +30,7 @@ export { InMemoryProcessStore } from "./stores/inMemoryProcessStore.ts";
 export { deriveInboxKey } from "./stores/inboxKey.ts";
 export type {
   AppendIntentsResult,
+  CallerTransaction,
   CommitResult,
   DueWake,
   FailedOutboxAttempt,
@@ -43,7 +45,6 @@ export type {
   ProcessTransaction,
   TransactResult,
 } from "./stores/processStore.types.ts";
-export { captureTraceCarrier } from "./traceCarrier.ts";
 export {
   ProcessWakeWorker,
   type ProcessWakeWorkerOptions,

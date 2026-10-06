@@ -9,7 +9,7 @@ import type {
   SessionGroupsRepository,
 } from "../session-groups.repository.ts";
 import type { TraceClickHouseResolver as ClickHouseClientResolver } from "./clickhouse.trace-member-client.repository.ts";
-import { chString } from "./clickhouse.trace-row.mapper.ts";
+import { chString } from "./stored-span-row.mapper.ts";
 
 const TABLE_NAME = "trace_summaries" as const;
 

@@ -77,6 +77,7 @@ async function runWith(error: Error) {
 describe("ExecuteEvaluationCommand, given a recovered model naming an unconfigured provider", () => {
   describe("when the provider is not configured", () => {
     /** @scenario A recovered model naming an unconfigured provider degrades rather than erroring */
+    /** @scenario "Online evaluation reports a skipped run when its provider is not configured" */
     it("reports the evaluation as skipped rather than errored", async () => {
       const data = await runWith(
         new EvaluatorConfigError("Provider unconfigured-provider is not configured"),

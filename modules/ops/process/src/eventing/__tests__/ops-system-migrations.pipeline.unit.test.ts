@@ -110,7 +110,9 @@ describe("given ops's system-migrations declaration", () => {
     const { definition, process } = built(async () => undefined);
 
     expect(systemMigrationsEventing.pipeline).toBe(SYSTEM_MIGRATIONS_PIPELINE_NAME);
-    expect(opsProcessModule.eventing?.pipeline.split(", ")).toContain(SYSTEM_MIGRATIONS_PIPELINE_NAME);
+    expect(opsProcessModule.eventing?.pipeline.split(", ")).toContain(
+      SYSTEM_MIGRATIONS_PIPELINE_NAME,
+    );
     expect(definition.metadata.name).toBe(SYSTEM_MIGRATIONS_PIPELINE_NAME);
     expect(process.config.schedule?.everyMs).toBe(HOUR);
   });
@@ -190,6 +192,7 @@ describe("given ops's system-migrations declaration", () => {
 
   describe("when a process does not run the worker stack", () => {
     /** @scenario "Only a worker re-drives" */
+    /** @scenario "The API role installs no event consumers" */
     it("registers the pipeline to send, and runs no process manager of its own", () => {
       const { eventing } = producer();
 

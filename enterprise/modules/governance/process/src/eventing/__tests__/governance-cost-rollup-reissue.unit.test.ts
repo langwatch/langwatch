@@ -67,6 +67,7 @@ describe("the rollup cell an observed charge is keyed by", () => {
 describe("a correction that lands in a different cell", () => {
   describe("when the provider reissues the same bill in another currency", () => {
     /** @scenario "A correction that arrives under a different currency retracts what it replaces" */
+    /** @scenario "A day whose bill changed currency is never counted under both" */
     it("empties the cell the first currency held and leaves the money in the second", () => {
       const { projection, fold } = rollupFold();
       const inEuros = observed({

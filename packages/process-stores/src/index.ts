@@ -1,7 +1,6 @@
 /**
- * The members a process hands its modules, and the function that builds them
- * from parsed config. No pool noun on purpose: a module names the members it
- * reads in `static readonly reads` and is handed exactly those.
+ * The stores a process opens and the members they hand its modules (ARCHITECTURE.md §7).
+ * A module names the members it reads in `static readonly reads` and is handed exactly those.
  */
 export {
   MEMBER_NAMES,
@@ -26,6 +25,7 @@ export {
   type UploadFacts,
 } from "./members.ts";
 export {
+  hostedMembers,
   MemberNotConfiguredError,
   MemberSuppliedUndefinedError,
   type MemberSource,
@@ -68,8 +68,6 @@ export {
   AzureBackendMisconfiguredError,
   AzureTokenExchangeError,
 } from "./object-storage-azure-credentials.ts";
-
-export { hostedMembers } from "./hosted-members.ts";
 
 export { storesOwner, type StoresConfig } from "./config-owner.ts";
 export {

@@ -121,14 +121,14 @@ Feature: Dropping span content a project asked never to store
 
   @unit
   Scenario: The content drop composes from the policy service alone
-    Given a process holding a scoped data-privacy service
-    When the drop graph is composed
-    Then it answers the narrow port the record command names
+    Given a booted data-privacy module with no peer behind it
+    When a peer asks it to drop a span's content
+    Then the module answers from its own policy service
 
   @unit
   Scenario: The composed path removes a dropped category's content
-    Given the composed drop graph
-    When a span is dropped through the port
+    Given the booted data-privacy module and a project whose policy drops input
+    When a span is dropped through its API
     Then the content is gone and the marker explains it
 
   @unit

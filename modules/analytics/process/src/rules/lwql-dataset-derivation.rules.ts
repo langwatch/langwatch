@@ -15,7 +15,7 @@ import { contentFilteredMapSql } from "./lwql-content-gating.rules.ts";
 import type { LwqlGate } from "./lwql-gate.rules.ts";
 
 /** How a derived view deduplicates, mirroring {@link LangWatchQLViewDedup}. */
-export interface DerivedDatasetDedup {
+interface DerivedDatasetDedup {
   /**
    * The source's `ORDER BY`. Defaults to the manifest's sorting key, split on
    * its top-level commas — pass this explicitly when the sorting key contains a
@@ -27,7 +27,7 @@ export interface DerivedDatasetDedup {
   readonly aggregating?: boolean;
 }
 
-export interface DefineDatasetFromTableInput {
+interface DefineDatasetFromTableInput {
   /** Physical source table. Must be a table the manifest carries. */
   readonly table: string;
   /** Name the view is exposed under: the `analytics.<name>` a caller writes. */
@@ -533,7 +533,7 @@ export interface DatasetOverride {
 }
 
 /** The caller-facing name a view gets by default. */
-export function defaultDatasetName(table: string): string {
+function defaultDatasetName(table: string): string {
   return table.startsWith("stored_") ? table.slice("stored_".length) : table;
 }
 

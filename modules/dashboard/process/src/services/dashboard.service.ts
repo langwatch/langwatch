@@ -26,7 +26,6 @@ import {
 } from "@langwatch/dashboard-contract";
 import { generate } from "@langwatch/ksuid";
 
-import type { WorkbenchAccess } from "../app/dashboard.members.ts";
 import type {
   DashboardGraphKind,
   DashboardRepository,
@@ -38,6 +37,14 @@ const defaultLayout: GraphLayout = {
   colSpan: CHART_GRID_DEFAULT_COL_SPAN,
   rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
 };
+
+/**
+ * Whether a project may place workbench cards at all: LangWatchQL's own gate,
+ * a feature flag resolved against the project's organization, reached through Analytics.
+ */
+export interface WorkbenchAccess {
+  isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
+}
 
 /** The project's dashboards and the chart-builder graphs placed on them. */
 export class DashboardService {

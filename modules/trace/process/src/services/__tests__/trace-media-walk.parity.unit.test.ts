@@ -1,8 +1,8 @@
 import { containsMediaMarkers, collectMediaParts } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceMediaStore } from "../../app/trace.members.ts";
 import { TraceContentExtractionService } from "../trace-content-extraction.service.ts";
+import type { TraceMediaStore } from "../trace-stored-media-store.service.ts";
 /**
  * @vitest-environment node
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature

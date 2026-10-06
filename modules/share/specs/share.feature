@@ -133,8 +133,8 @@ Feature: Share a trace behind a secret, scoped, expiring link
     @integration
     Scenario: Knowing a shared trace's id is not enough to read it
       Given a trace that has an active public share link
-      When an anonymous caller requests that trace by its trace id without the token
-      Then access is denied
+      When an anonymous caller presents the trace id in place of the token
+      Then access is denied as not found
 
     @integration
     Scenario: A revoked link stops resolving
@@ -153,10 +153,10 @@ Feature: Share a trace behind a secret, scoped, expiring link
 
     @integration
     Scenario: A shared view cannot see beyond the project's data-retention window
-      Given a trace older than the project's visibility window
-      And a public share link for that trace
+      Given a project whose visibility window cuts off older traces
+      And a public share link for a trace
       When a viewer opens the link
-      Then the trace is not shown, exactly as it would not be shown in-app
+      Then the trace and span reads are bounded by the same window the app applies
 
     @integration
     Scenario: An anonymous viewer is never shown costs

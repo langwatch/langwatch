@@ -42,6 +42,8 @@ Feature: HTTP Agent Test Tracing
     When the user executes a test request to an unreachable endpoint
     Then a trace is submitted with the connection error
 
+  # Gap: no test drives a request body that fails to parse; the engine's http node, not the agent module, parses it.
+  @unimplemented
   Scenario: Invalid JSON body creates a trace
     When the user executes a test request with invalid JSON body
     Then a trace is submitted with the parse error

@@ -7,6 +7,8 @@ import { scenarioClient } from "@langwatch/scenario-client";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { useEffect, useRef } from "react";
 
+import { getAdaptivePollingInterval } from "../../model/suite/adaptive-polling-interval.ts";
+
 interface UseSuiteRunFreshnessOptions {
   /** When provided, scopes the probe to a single scenario set. */
   scenarioSetId?: string;
@@ -15,15 +17,20 @@ interface UseSuiteRunFreshnessOptions {
   /** Currently loaded runs — their statuses drive the polling cadence. */
   runs: readonly Pick<ScenarioRunData, "status">[];
   enabled: boolean;
-  /** While the SSE stream is connected, the probe stops polling. */
+  /** While the SSE stream is connected, the probe does not poll. */
   sseConnected: boolean;
+  /** The suites page polls while the stream is down; the Agent Testing results set no timer. */
+  adaptivePolling?: boolean;
 }
 
 export function useSuiteRunFreshness({
   scenarioSetId,
   startDateMs,
   endDateMs,
+  runs,
   enabled,
+  sseConnected,
+  adaptivePolling = false,
 }: UseSuiteRunFreshnessOptions) {
   const { project } = useOrganizationTeamProject();
   const utils = scenarioClient.useUtils();
@@ -37,6 +44,9 @@ export function useSuiteRunFreshness({
     },
     {
       enabled: !!project && enabled,
+      ...(adaptivePolling && !sseConnected
+        ? { refetchInterval: getAdaptivePollingInterval({ runs }) }
+        : {}),
     },
   );
 

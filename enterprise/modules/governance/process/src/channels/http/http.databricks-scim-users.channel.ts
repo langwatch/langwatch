@@ -39,11 +39,11 @@
 
 import { z } from "zod";
 
-import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import type { DiscoveredPersonRecord, PeopleListing } from "../../rules/people-listing.rules.ts";
 import { peopleListed, peopleRefused } from "../../rules/people-listing.rules.ts";
 import { refusalFromStatus, refusalFromThrown } from "../../rules/provider-listing.rules.ts";
 import type { DatabricksScimUsersChannel } from "../databricks-scim-users.channel.ts";
+import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 import { GenieHttpError, genieGet } from "./http.genie-spaces.channel.ts";
 
 const DATABRICKS_SCIM_USERS_PATH = "/api/2.0/preview/scim/v2/Users";

@@ -24,7 +24,7 @@ type EntryRow = PrismaAiToolEntry & {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type AiToolCatalogDatabase = Pick<PrismaClient, "aiToolEntry" | "$transaction">;
+type AiToolCatalogDatabase = Pick<PrismaClient, "aiToolEntry" | "$transaction">;
 
 export class PrismaAiToolCatalogRepository extends AiToolCatalogRepository {
   private constructor(private readonly database: AiToolCatalogDatabase) {

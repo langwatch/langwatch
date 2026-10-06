@@ -91,10 +91,7 @@ export function createEvaluatorTestApp(
         modelProviders,
         monitors: createApiFixture<MonitorApi>(),
       },
-      members: {
-        publicBaseUrl: "https://langwatch.test",
-      },
-      config: undefined,
+      config: { publicBaseUrl: "https://langwatch.test" },
       resources: new ResourceScope(),
       secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     },

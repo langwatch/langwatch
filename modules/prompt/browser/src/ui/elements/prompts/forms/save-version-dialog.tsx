@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Button, Field, Input } from "@langwatch/design-system/primitives";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";

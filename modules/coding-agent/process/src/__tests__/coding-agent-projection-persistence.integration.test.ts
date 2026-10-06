@@ -26,7 +26,6 @@ async function createPersistence() {
         clickhouse: endpoint.clickhouse,
         defaultRetentionDays: 30,
         clock: new TestClock(),
-        telemetry: { observe: () => undefined },
       }),
     ),
   };

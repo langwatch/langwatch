@@ -1,3 +1,4 @@
+import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
 export const AUDIT_LOG_FEATURE_ID = "audit-log" as const;
@@ -10,6 +11,8 @@ export const auditLogEntrySchema = z.object({
    *  nobody has identified — a lock taken against an address with no account
    *  is precisely the row an attack shows up in, and it still gets appended. */
   userId: z.string().min(1).optional(),
+  /** Who really did it when that is not `userId`, e.g. whoever sent an accepted invite. */
+  actorUserId: z.string().min(1).optional(),
   organizationId: z.string().min(1).optional(),
   projectId: z.string().min(1).optional(),
   action: z.string().min(1),
@@ -20,6 +23,9 @@ export const auditLogEntrySchema = z.object({
   metadata: auditLogJsonValueSchema.optional(),
   targetKind: z.string().min(1).optional(),
   targetId: z.string().min(1).optional(),
+  /** The target's state either side of a change, as the governance trail shows it. */
+  before: auditLogJsonValueSchema.optional(),
+  after: auditLogJsonValueSchema.optional(),
 });
 
 export type AuditLogEntry = z.infer<typeof auditLogEntrySchema>;
@@ -53,3 +59,28 @@ export type ListAuditLogEntityHistoryInput = {
   argumentNames: string[];
   limit: number;
 };
+
+/** Portable audit write capability. */
+export interface AuditLogApi {
+  record(command: RecordAuditLogCommand): Promise<RecordedAuditLogEntry>;
+  listEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]>;
+  /** Whether this actor already recorded this action on this target since `sinceMs`. */
+  hasRecordedSince(input: RecordedSinceInput): Promise<boolean>;
+}
+
+export const AuditLogApi = moduleApi<AuditLogApi>()("audit-log");
+
+/**
+ * `idempotencyKey` is an `audit` KSUID the producer mints once, in the commit that records the
+ * intent; the row stores it in its own unique column, so a repeat delivery writes nothing and
+ * answers the first row (Alex, Q72; audit R2). The row's id stays the table's own.
+ */
+export const recordAuditLogCommandSchema = z.object({
+  ...auditLogEntrySchema.shape,
+  idempotencyKey: z.string().min(1).optional(),
+});
+export type RecordAuditLogCommand = z.infer<typeof recordAuditLogCommandSchema>;
+
+/** The payload of a producer's audit intent: an entry its outbox records after commit. */
+export const auditLogIntentSchema = recordAuditLogCommandSchema.required({ idempotencyKey: true });
+export type AuditLogIntent = z.infer<typeof auditLogIntentSchema>;

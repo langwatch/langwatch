@@ -14,9 +14,9 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { raceOnOneRow } from "../../../__tests__/support/row-lock-race.ts";
 import { PrismaSystemMigrationStateRepository } from "../prisma.system-migration-state.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;

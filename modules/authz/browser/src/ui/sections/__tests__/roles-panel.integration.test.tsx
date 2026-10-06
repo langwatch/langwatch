@@ -259,6 +259,7 @@ describe("given the roles of an organization", () => {
 
   describe("when the roles cannot be read", () => {
     /** @scenario Reading the roles does not depend on a second answer */
+    /** @scenario Custom roles that cannot be read report the failure */
     it("says what failed rather than showing an empty section", () => {
       state.rolesError = new Error("boom");
       renderPanel();

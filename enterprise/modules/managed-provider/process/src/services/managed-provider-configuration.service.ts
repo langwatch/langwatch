@@ -3,7 +3,7 @@ import type {
   ManagedBedrockDirectory,
 } from "@langwatch/enterprise-managed-provider-contract";
 
-export type ManagedBedrockDeployment =
+type ManagedBedrockDeployment =
   | { kind: "managed"; config: ManagedBedrockConfig }
   | { kind: "unmanaged" };
 

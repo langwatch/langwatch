@@ -1,11 +1,6 @@
 export { langyProcessModule } from "./langy.module.ts";
 export type { LangyDatabase } from "./repositories/prisma/langy-database.mapper.ts";
 export type { LangyTurnTechnicalMembers } from "./services/langy-turn.service.ts";
-export type { PrismaLangySessionKeyReapDatabase } from "./repositories/prisma/prisma.langy-session-key-reap.repository.ts";
-// The seam for the two rows above: a composing worker calls this instead of naming either
-// class (private-runtime-export drive, dev/docs/plans/private-runtime-export-drive.md §3d).
-// The raw exports stay until every importer is rewired onto the seam.
-export { createLangySessionKeyReap } from "./langy.module.ts";
 export type { LangySessionKeyRevocation } from "./services/langy-session-key.service.ts";
 export type {
   LangyConversationCommands,
@@ -14,7 +9,6 @@ export type {
   OpenLangyRelay,
 } from "./services/langy.service.ts";
 export type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
-export type { LangyRedis } from "./app/langy.app.ts";
 export type { SetupSkillId } from "./services/setup-skills.service.ts";
 export { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
 export { langyEgressTrpcTransport, langyTrpcTransport } from "./transport/langy.trpc.ts";
@@ -23,12 +17,14 @@ export { langyEgressTrpcTransport, langyTrpcTransport } from "./transport/langy.
 // action manifest, which arrives as {@link LangyUiActionCatalog}.
 export type {
   UiActionBackendRunner,
-  UiActionBlockingRedis,
   UiActionCompletion,
   UiActionConversations,
   UiActionOutcome,
-  UiActionRedis,
 } from "./services/langy-ui-action.service.ts";
+export type {
+  UiActionBlockingRedis,
+  UiActionRedis,
+} from "./repositories/redis/redis.langy-ui-action.repository.ts";
 
 // Application-facing Langy orchestration primitives. These are deliberately
 // exported from the package root so the application never couples itself to
@@ -59,14 +55,6 @@ export {
   type EventingLangyConversationAdapterOptions,
   type RedisLangyConversationRuntimeRepository,
 } from "./eventing/langy-conversation-runtime.pipeline.ts";
-// The seam for the conversation-runtime's five process-graph rows above: a composing worker
-// calls these instead of naming the classes directly (private-runtime-export drive,
-// dev/docs/plans/private-runtime-export-drive.md §3d). The raw exports stay until every
-// importer is rewired onto the seam.
-export {
-  createLangyAnalyticsEventClickHouseSink,
-  createLangyTitleGenerator,
-} from "./langy.module.ts";
 export {
   LANGY_SESSION_KEY_REAP_INTERVAL_MS,
   LANGY_SESSION_KEY_REAP_PROCESS_NAME,
@@ -84,8 +72,8 @@ export type {
   LangyAnalyticsClickHouseWriteClient,
 } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
 export type { LangyAnalyticsEventRecord } from "./repositories/langy-analytics-event.repository.ts";
-export type { LangyEffectMembers } from "./app/langy.members.ts";
-export type { LangyTitleGenerator } from "./app/langy.members.ts";
+export type { LangyIntentEffects } from "./eventing/langy-conversation.intent.ts";
+export type { LangyTitleGenerator } from "./services/langy-title-generator.service.ts";
 export type { CreateLangyEffectRepositoryOptions } from "./repositories/redis/redis.langy-effect.repository.ts";
 export {
   createAgentTurnLivenessSubscriber,
@@ -103,7 +91,10 @@ export type {
   LangyConversationUpdateBroadcastSubscriberDeps,
   LangyFailTurnCommand,
 } from "./eventing/langy-conversation.subscriber.ts";
-export type { LangyGenerateTitleIntent, LangyWorkerDispatchIntent } from "./app/langy.members.ts";
+export type {
+  LangyGenerateTitleIntent,
+  LangyWorkerDispatchIntent,
+} from "./eventing/langy-conversation-process.schemas.ts";
 export type { LangyFrameDedupRedis } from "./repositories/redis/redis.langy-frame-dedup.repository.ts";
 export type { LangyLinkRedis } from "./repositories/redis/redis.langy-resource-links.repository.ts";
 export type { LangyTurnAccess } from "./repositories/langy-live-turn.repository.ts";
@@ -141,7 +132,7 @@ export type { GithubPrLimitResult } from "./services/langy-github-pr-quota.servi
 // ADR-129 local control: the developer's own folder, and the cards that wait
 // for the developer. One runtime per process, two transports over it, and the
 // worker's REST door onto both.
-export type { LocalControlRuntime } from "./app/langy.members.ts";
+export type { LocalControlRuntime } from "./services/langy-local-control-runtime.service.ts";
 export type {
   ControlRequestKeyMinter,
   ControlRequestProjects,

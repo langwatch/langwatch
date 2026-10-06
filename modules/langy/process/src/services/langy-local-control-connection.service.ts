@@ -48,7 +48,7 @@ interface LiveSocket {
   released: boolean;
 }
 
-export interface LocalControlConnectionOptions {
+interface LocalControlConnectionOptions {
   core: LocalControlSessionCoreService;
   pingIntervalMs?: number;
   pongWaitMs?: number;

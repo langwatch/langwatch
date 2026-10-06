@@ -12,7 +12,10 @@
 import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GovernanceHttpClient, GovernanceHttpResponse } from "../../app/governance.members.ts";
+import type {
+  GovernanceHttpClient,
+  GovernanceHttpResponse,
+} from "../../channels/governance-http.channel.ts";
 import { HttpAdminApiUsersChannel } from "../../channels/http/http.admin-api-users.channel.ts";
 import {
   HttpDatabricksScimUsersChannel,

@@ -14,11 +14,11 @@ export const connectedBillingTickStateSchema = z.object({
   /** Epoch ms of the last tick this process asked for. */
   lastTickAt: z.number().nullable(),
 });
-export type ConnectedBillingTickState = z.infer<typeof connectedBillingTickStateSchema>;
+type ConnectedBillingTickState = z.infer<typeof connectedBillingTickStateSchema>;
 
 export const CONNECTED_BILLING_INITIAL_STATE: ConnectedBillingTickState = { lastTickAt: null };
 
-export type ConnectedBillingTickIntents = {
+type ConnectedBillingTickIntents = {
   tick: IntentSpec<typeof connectedBillingTickSchema>;
 };
 

@@ -1,7 +1,7 @@
 /**
  * The trace filter language compiled against the LangWatchQL trace view, the
  * dialect an Instant Eval shorthand writes into its own statement.
- * @see specs/instant-evals/instant-eval-shorthand.feature
+ * @see modules/instant-eval/specs/instant-eval-shorthand.feature
  */
 
 /** A value the compiled condition binds. */

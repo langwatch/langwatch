@@ -22,15 +22,13 @@ import type { AutomationGraphNotifier } from "../../channels/automation-graph-al
 import type { AutomationRunawayNotice } from "../../channels/automation-runaway-notice.channel.ts";
 import type { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
 import type { AutomationRunawayRepository } from "../../repositories/automation-runaway.repository.ts";
+import type { AutomationClock } from "../../repositories/automation.repositories.ts";
 import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
 import { PostgresAutomationRepositories } from "../../repositories/prisma/prisma.automation.repositories.ts";
+import type { AutomationLogger } from "../../services/automation.service.ts";
+import type { AutomationRunawaySignals } from "../../services/runaway-containment.service.ts";
 import type { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
 import { AutomationModule, type AutomationInfrastructure } from "../automation.app.ts";
-import type {
-  AutomationLogger,
-  AutomationRunawaySignals,
-  AutomationClock,
-} from "../automation.members.ts";
 
 export function createCanonicalAutomationApp(): {
   app: AutomationModule;
@@ -156,7 +154,7 @@ export function createCanonicalAutomationApp(): {
     replicate: vi.fn(),
     performanceForProject: vi.fn(),
   });
-  const members: AutomationInfrastructure = {
+  const infrastructure: AutomationInfrastructure = {
     verifier,
     clock,
     notifier,
@@ -166,7 +164,6 @@ export function createCanonicalAutomationApp(): {
     slackDestinations: createTestSlackDestinations(),
     slackConnections: createTestSlackConnections(),
     dispatchErrors: { isTerminal: vi.fn(), createTerminal: vi.fn() },
-    heartbeat: { findClickHouseClient: vi.fn() },
     persistCaps: MemoryAutomationPersistCapRepository.create(),
     providers: {
       actionParamsSchemaFor: vi.fn<AutomationInfrastructure["providers"]["actionParamsSchemaFor"]>(
@@ -194,6 +191,7 @@ export function createCanonicalAutomationApp(): {
       repositories: PostgresAutomationRepositories.create({
         prisma: database,
         redis: memoryRedisDouble(),
+        encryption: { encrypt: (value) => value, decrypt: (value) => value },
       }),
       dependencies: {
         analytics,
@@ -214,13 +212,14 @@ export function createCanonicalAutomationApp(): {
         evaluations: createApiFixture<EvaluationApi>({}),
         webhooks: createApiFixture<WebhookApi>({}),
       },
-      infrastructure: members,
+      infrastructure,
       config: {
         emailHourlyCap: 100,
         tenantDailyCap: 10_000,
         persistDailyCapFree: 50,
         persistDailyCapPaid: 500,
         persistDailyCapEnterprise: 5_000,
+        publicBaseUrl: undefined,
       },
     }),
     triggerCreate,

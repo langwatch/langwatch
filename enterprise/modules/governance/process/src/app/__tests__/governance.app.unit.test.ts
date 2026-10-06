@@ -1,5 +1,6 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -14,7 +15,7 @@ import type {
  * @see specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
  */
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { EnterprisePlanRequiredError, type EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { LogApi } from "@langwatch/log-contract";
@@ -24,16 +25,15 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { memoryRateLimiter } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import { governanceProcessModule } from "../../governance.module.ts";
 import type { GovernanceRepositories } from "../../repositories/governance.repositories.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
+import { governanceCliRest } from "../../transport/governance-cli.rest.ts";
 import { GovernanceModule } from "../governance.app.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -65,11 +65,6 @@ async function buildApp() {
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
     },
-    members: {
-      encryption: createApiFixture<GovernanceEncryptor>(),
-      isSaas: false,
-      rateLimiter: memoryRateLimiter(),
-    },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
@@ -78,7 +73,7 @@ async function buildApp() {
 }
 
 /** The app with a CLI session and a plan decision the CLI plane reads. */
-async function buildCliApp(planType = "ENTERPRISE") {
+async function buildCliApp() {
   const repositories: GovernanceRepositories = MemoryGovernanceRepositories.create();
   const getCliAccessSession = vi.fn<AuthApi["getCliAccessSession"]>(async () => ({
     userId: "user-1",
@@ -86,13 +81,10 @@ async function buildCliApp(planType = "ENTERPRISE") {
     tokenKey: "lwcli:access:lw_at_token",
     clientInfo: { deviceLabel: "Work laptop", hostname: "laptop" },
   }));
-  const getActivePlan = vi.fn<EntitlementApi["getActivePlan"]>(
-    async () =>
-      ({
-        type: planType,
-      }) as never,
-  );
-
+  const getDecision = vi.fn<AuthzApi["getDecision"]>(async ({ permission }) => ({
+    permitted: permission === "ingestionSources:view",
+    organizationRole: "MEMBER",
+  }));
   const app = await GovernanceModule.create({
     config: void 0,
     repositories,
@@ -100,9 +92,9 @@ async function buildCliApp(planType = "ENTERPRISE") {
       agents: createApiFixture<AgentApi>(),
       projects: createApiFixture<ProjectApi>(),
       auth: createApiFixture<AuthApi>({ getCliAccessSession }),
-      entitlements: createApiFixture<EntitlementApi>({ getActivePlan }),
+      entitlements: createApiFixture<EntitlementApi>(),
       organizations: createApiFixture<OrganizationApi>(),
-      permissions: createApiFixture<AuthzApi>(),
+      permissions: createApiFixture<AuthzApi>({ getDecision }),
       scim: createApiFixture<ScimApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
       traces: createApiFixture<TraceApi>(),
@@ -115,16 +107,11 @@ async function buildCliApp(planType = "ENTERPRISE") {
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
     },
-    members: {
-      encryption: createApiFixture<GovernanceEncryptor>(),
-      isSaas: false,
-      rateLimiter: memoryRateLimiter(),
-    },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
-  return { app, getCliAccessSession, getActivePlan };
+  return { app, getCliAccessSession, getDecision };
 }
 
 describe("GovernanceModule ingestion templates", () => {
@@ -319,8 +306,8 @@ describe("GovernanceModule as the module a process installs", () => {
       expect(typeof app.ingestOtlpMetrics).toBe("function");
     });
 
-    it("resolves the CLI caller and Enterprise plan through the named peers", async () => {
-      const { app, getCliAccessSession, getActivePlan } = await buildCliApp();
+    it("resolves the CLI caller through the auth peer", async () => {
+      const { app, getCliAccessSession } = await buildCliApp();
       const request = new Request("http://api.test/api/auth/cli/bootstrap", {
         headers: { authorization: "Bearer lw_at_token" },
       });
@@ -333,28 +320,64 @@ describe("GovernanceModule as the module a process installs", () => {
           clientInfo: { deviceLabel: "Work laptop", hostname: "laptop" },
         }),
       });
-      await expect(
-        app.cliAccess().planDecision({
-          organizationId: "organization-2",
-          feature: "ingestionSources",
-        }),
-      ).resolves.toEqual({ entitled: true });
-
       expect(getCliAccessSession).toHaveBeenCalledWith({ authorization: "Bearer lw_at_token" });
-      expect(getActivePlan).toHaveBeenCalledWith({ organizationId: "organization-2" });
     });
 
-    it("refuses the caller organization when its plan is not Enterprise", async () => {
-      const { app, getActivePlan } = await buildCliApp("FREE");
+    describe("given a route asking a permission behind the CLI token door", () => {
+      const request = () =>
+        new Request("http://api.test/api/auth/cli/governance/status", {
+          headers: { authorization: "Bearer lw_at_token" },
+        });
 
-      await expect(
-        app.cliAccess().planDecision({
-          organizationId: "organization-2",
-          feature: "ingestionSources",
-        }),
-      ).resolves.toMatchObject({ entitled: false });
+      it("asks it of the token's person at the token's organization", async () => {
+        const { app, getDecision } = await buildCliApp();
 
-      expect(getActivePlan).toHaveBeenCalledWith({ organizationId: "organization-2" });
+        await expect(
+          app.cliTokenDoor.authenticate({
+            request: request(),
+            permissions: ["ingestionSources:view"],
+          }),
+        ).resolves.toMatchObject({ actor: { type: "user", id: "user-1" } });
+
+        expect(getDecision).toHaveBeenCalledWith({
+          userId: "user-1",
+          permission: "ingestionSources:view",
+          scope: { tier: "organization", id: "organization-1" },
+        });
+      });
+
+      it("refuses at the door, before the body, when the person lacks it", async () => {
+        const { app } = await buildCliApp();
+
+        await expect(
+          app.cliTokenDoor.authenticate({
+            request: request(),
+            permissions: ["activityMonitor:view"],
+          }),
+        ).rejects.toMatchObject({ code: "permission_denied", httpStatus: 403 });
+      });
+    });
+
+    it("writes a plan refusal behind its CLI token door in main's CLI body (Q31)", async () => {
+      const { app } = await buildCliApp();
+      const routes = createRestRuntime({
+        identity: app.cliTokenDoor,
+        entitlements: {
+          holds: async () => false,
+          refusal: ({ feature }) => new EnterprisePlanRequiredError(feature ?? "enterprise"),
+        },
+      }).mount(governanceCliRest.router(), { app: () => app, onError: canonicalErrorResponse });
+
+      const response = await routes.request("/api/auth/cli/governance/status", {
+        headers: { authorization: "Bearer lw_at_token" },
+      });
+
+      expect(response.status).toBe(402);
+      await expect(response.json()).resolves.toEqual({
+        error: "payment_required",
+        error_description: "Ingestion sources require an Enterprise plan",
+        upgrade_url: "http://localhost:5560/settings/subscription",
+      });
     });
   });
 

@@ -4,6 +4,7 @@ import {
   type IngestionSource,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
+import type { Encryption } from "@langwatch/process-stores";
 import { fromDate, toDate } from "@langwatch/time";
 
 import {
@@ -15,15 +16,20 @@ import {
   type UnpricedUsageWindow,
   type UpdateIngestionSourceRecord,
 } from "../ingestion-source.repository.ts";
+import { PrismaIngestionSourceCredentialsMapper } from "./prisma.ingestion-source-credentials.mapper.ts";
 
-/** The update as Prisma takes it: the seam where instants become dates. */
-function updateDataOf(
-  input: UpdateIngestionSourceRecord,
-): Prisma.IngestionSourceUncheckedUpdateInput {
+/** The update as Prisma takes it: the seam where instants become dates and credentials seal. */
+function updateDataOf({
+  input,
+  credentials,
+}: {
+  input: UpdateIngestionSourceRecord;
+  credentials: PrismaIngestionSourceCredentialsMapper;
+}): Prisma.IngestionSourceUncheckedUpdateInput {
   const { parserConfig, archivedAt, lastEventAt, ...rest } = input;
   const data: Prisma.IngestionSourceUncheckedUpdateInput = rest;
   if (parserConfig !== undefined) {
-    data.parserConfig = parserConfig as Prisma.InputJsonValue;
+    data.parserConfig = credentials.seal(parserConfig) as Prisma.InputJsonValue;
   }
   if (archivedAt !== undefined) {
     data.archivedAt = toDate(archivedAt);
@@ -41,7 +47,13 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function toIngestionSource(row: IngestionSource): GovernanceIngestionSource {
+function toIngestionSource({
+  row,
+  credentials,
+}: {
+  row: IngestionSource;
+  credentials: PrismaIngestionSourceCredentialsMapper;
+}): GovernanceIngestionSource {
   const traceProjectId =
     "traceProjectId" in row && typeof row.traceProjectId === "string" ? row.traceProjectId : null;
   return {
@@ -53,7 +65,7 @@ function toIngestionSource(row: IngestionSource): GovernanceIngestionSource {
     name: row.name,
     description: row.description,
     ingestSecretHash: row.ingestSecretHash,
-    parserConfig: asRecord(row.parserConfig),
+    parserConfig: credentials.open(asRecord(row.parserConfig)),
     pollerCursor: row.pollerCursor,
     errorCount: row.errorCount,
     lastSuccessAt: row.lastSuccessAt,
@@ -75,13 +87,33 @@ function toIngestionSource(row: IngestionSource): GovernanceIngestionSource {
  */
 export type IngestionSourceDatabase = Pick<PrismaClient, "ingestionSource" | "$transaction">;
 
+/**
+ * Sources as Postgres holds them. `parserConfig.credentials` is sealed on every write and opened
+ * on every source read; the claim and bill-history reads never touch it, so they never open it.
+ */
 export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
-  private constructor(private readonly database: IngestionSourceDatabase) {
+  private constructor(
+    private readonly database: IngestionSourceDatabase,
+    private readonly credentials: PrismaIngestionSourceCredentialsMapper,
+  ) {
     super();
   }
 
-  static create(database: IngestionSourceDatabase): PrismaIngestionSourceRepository {
-    return new PrismaIngestionSourceRepository(database);
+  static create({
+    database,
+    cipher,
+  }: {
+    database: IngestionSourceDatabase;
+    cipher: Encryption;
+  }): PrismaIngestionSourceRepository {
+    return new PrismaIngestionSourceRepository(
+      database,
+      PrismaIngestionSourceCredentialsMapper.create({ cipher }),
+    );
+  }
+
+  private toSource(row: IngestionSource): GovernanceIngestionSource {
+    return toIngestionSource({ row, credentials: this.credentials });
   }
 
   async findAll(organizationId: string): Promise<GovernanceIngestionSource[]> {
@@ -89,21 +121,21 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
       where: { organizationId, archivedAt: null },
       orderBy: [{ name: "asc" }],
     });
-    return rows.map(toIngestionSource);
+    return rows.map((row) => this.toSource(row));
   }
 
   async findById(id: string): Promise<GovernanceIngestionSource | null> {
     const row = await this.database.ingestionSource.findUnique({
       where: { id },
     });
-    return row ? toIngestionSource(row) : null;
+    return row ? this.toSource(row) : null;
   }
 
   async findByCurrentSecretHash(hash: string): Promise<GovernanceIngestionSource | null> {
     const row = await this.database.ingestionSource.findFirst({
       where: { ingestSecretHash: hash, archivedAt: null },
     });
-    return row ? toIngestionSource(row) : null;
+    return row ? this.toSource(row) : null;
   }
 
   async findByPriorSecretHash(hash: string): Promise<GovernanceIngestionSource[]> {
@@ -116,7 +148,7 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
         },
       },
     });
-    return rows.map(toIngestionSource);
+    return rows.map((row) => this.toSource(row));
   }
 
   countLive(organizationId: string): Promise<number> {
@@ -144,18 +176,18 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
     const row = await this.database.ingestionSource.create({
       data: {
         ...input,
-        parserConfig: input.parserConfig as Prisma.InputJsonValue,
+        parserConfig: this.credentials.seal(input.parserConfig) as Prisma.InputJsonValue,
       },
     });
-    return toIngestionSource(row);
+    return this.toSource(row);
   }
 
   async update(id: string, input: UpdateIngestionSourceRecord): Promise<GovernanceIngestionSource> {
     const row = await this.database.ingestionSource.update({
       where: { id },
-      data: updateDataOf(input),
+      data: updateDataOf({ input, credentials: this.credentials }),
     });
-    return toIngestionSource(row);
+    return this.toSource(row);
   }
 
   async getUnpricedUsageWindow(id: string): Promise<UnpricedUsageWindow> {
@@ -223,12 +255,12 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
             `;
       if (matched === 0) return { outcome: "cursor_moved" };
 
-      const data = updateDataOf(input.update);
+      const data = updateDataOf({ input: input.update, credentials: this.credentials });
       const row = await database.ingestionSource.update({
         where: { id: input.id },
         data,
       });
-      return { outcome: "updated", source: toIngestionSource(row) };
+      return { outcome: "updated", source: this.toSource(row) };
     });
   }
 }

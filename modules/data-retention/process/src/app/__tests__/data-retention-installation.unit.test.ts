@@ -1,9 +1,12 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import {
   DataRetentionApi,
   PLATFORM_DEFAULT_RETENTION_DAYS,
 } from "@langwatch/data-retention-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
 import { dataRetentionProcessModule } from "../../data-retention.module.ts";
@@ -16,29 +19,20 @@ import {
   retentionTestGraph,
 } from "./data-retention.fixture.ts";
 
-/**
- * The ClickHouse member `DataRetentionModule` reads. Memory-tier
- * installation never reaches a store, so the boot only needs the member to
- * EXIST — a stub that refuses on use proves that without opening a client.
- */
-function analyticalWithoutStore(): ClickHouseQueryClient {
-  const client: Partial<ClickHouseQueryClient> = {};
-  return new Proxy(client, {
-    get(_target, property) {
-      throw new Error(`The memory tier must not reach ClickHouse (read "${String(property)}").`);
-    },
-  }) as ClickHouseQueryClient;
-}
-
-function process(role: "api" | "worker") {
+function process(
+  role: "api" | "worker",
+  config: { platformDefaultDays?: string; nodeEnvironment?: string } = {},
+) {
   return createApp({ role })
-    .withModules([withMemoryRepositories(dataRetentionProcessModule)])
+    .withModules([dataRetentionProcessModule])
+    .withStores(memoryStores())
     .withConfig({
-      "data-retention": { platformDefaultDays: undefined, isSaas: true },
+      "data-retention": {
+        platformDefaultDays: config.platformDefaultDays,
+        isSaas: true,
+        nodeEnvironment: config.nodeEnvironment,
+      },
     })
-    .withMember("nodeEnvironment", undefined)
-    .withAnalytical(analyticalWithoutStore())
-    .withKeyvalue(null)
     .provide({
       project: createDataRetentionTestProjects(),
       organization: createDataRetentionTestOrganizations(),
@@ -76,5 +70,41 @@ describe("data retention app installation", () => {
     } finally {
       await runtime.stop();
     }
+  });
+
+  describe("when boot validates a platform default named in its configuration", () => {
+    /** @scenario "Boot supplies the platform default" */
+    it("resolves every project to that default, with the contract reading no environment", async () => {
+      const runtime = await process("api", {
+        platformDefaultDays: "7",
+        nodeEnvironment: "test",
+      }).boot();
+
+      try {
+        await expect(
+          runtime
+            .service(DataRetentionApi)
+            .getResolvedForProject({ projectId: retentionTestGraph.projectId }),
+        ).resolves.toEqual({ traces: 7, scenarios: 7, experiments: 7 });
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("when the contract is imported", () => {
+    /** @scenario "Boot supplies the platform default" */
+    it("holds no read of the process environment", () => {
+      const contractSrc = join(import.meta.dirname, "..", "..", "..", "..", "contract", "src");
+      const readers = readdirSync(contractSrc)
+        .filter((file) => file.endsWith(".ts"))
+        .filter((file) =>
+          readFileSync(join(contractSrc, file), "utf8")
+            .split("\n")
+            .some((line) => !/^\s*(\/\/|\/?\*)/.test(line) && /process\.env\b/.test(line)),
+        );
+
+      expect(readers).toEqual([]);
+    });
   });
 });

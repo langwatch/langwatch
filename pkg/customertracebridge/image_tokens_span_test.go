@@ -20,7 +20,7 @@ import (
 // base64 pixels, never lands on a span.
 
 // recordImageSpan runs the emitter's span lifecycle for an image request.
-func recordImageSpan(t *testing.T, params aitrace.AITraceParams) sdktrace.ReadOnlySpan {
+func recordImageSpan(t *testing.T, params aitrace.Params) sdktrace.ReadOnlySpan {
 	t.Helper()
 	sr := tracetest.NewSpanRecorder()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr))
@@ -36,7 +36,7 @@ func recordImageSpan(t *testing.T, params aitrace.AITraceParams) sdktrace.ReadOn
 
 /** @scenario A span states its image tokens apart from its text tokens */
 func TestEmitter_ImageTokens_AreStatedApartFromTheTextTotals(t *testing.T) {
-	span := recordImageSpan(t, aitrace.AITraceParams{
+	span := recordImageSpan(t, aitrace.Params{
 		ProviderID:  aitrace.ProviderOpenAI,
 		Model:       "gpt-image-2",
 		RequestType: aitrace.RequestTypeImageGeneration,
@@ -66,7 +66,7 @@ func TestEmitter_ImageTokens_AreStatedApartFromTheTextTotals(t *testing.T) {
 
 /** @scenario A span states its image tokens apart from its text tokens */
 func TestEmitter_ImageEdit_StatesTheInputImageTokens(t *testing.T) {
-	span := recordImageSpan(t, aitrace.AITraceParams{
+	span := recordImageSpan(t, aitrace.Params{
 		ProviderID:  aitrace.ProviderOpenAI,
 		Model:       "gpt-image-2",
 		RequestType: aitrace.RequestTypeImageEdit,
@@ -88,7 +88,7 @@ func TestEmitter_ImageEdit_StatesTheInputImageTokens(t *testing.T) {
 }
 
 func TestEmitter_NoImageTokens_LeavesTheImageAttributesOff(t *testing.T) {
-	span := recordImageSpan(t, aitrace.AITraceParams{
+	span := recordImageSpan(t, aitrace.Params{
 		ProviderID:  aitrace.ProviderOpenAI,
 		Model:       "gpt-5-mini",
 		RequestType: aitrace.RequestTypeChat,
@@ -145,7 +145,7 @@ func TestEndUserID_ImageRoutesReadTheOpenAIUserField(t *testing.T) {
 	for _, reqType := range []aitrace.RequestType{
 		aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit,
 	} {
-		got := endUserID(context.Background(), aitrace.AITraceParams{
+		got := endUserID(context.Background(), aitrace.Params{
 			RequestType: reqType,
 			RequestBody: body,
 		})

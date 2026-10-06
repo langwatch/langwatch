@@ -12,14 +12,14 @@ import {
 
 import type { TopicModule } from "../app/topic.app.ts";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";
-import { TOPIC_CLUSTERING_PROCESS_NAME } from "../rules/topic-clustering-process.rules.ts";
 import {
   TopicClusteringRequestedEventSchema,
   TopicClusteringRunStartedEventSchema,
   TopicClusteringRunCompletedEventSchema,
   TopicClusteringRunFailedEventSchema,
   TopicClusteringTopicsRecordedEventSchema,
-} from "../services/topic-events.service.ts";
+} from "../rules/topic-clustering-events.rules.ts";
+import { TOPIC_CLUSTERING_PROCESS_NAME } from "../rules/topic-clustering-process.rules.ts";
 import {
   type TopicClusteringRunHistoryData,
   TopicClusteringRunHistoryFoldProjection,
@@ -53,7 +53,7 @@ import {
 import { topicClusteringProcessManager } from "./topic-clustering.process.ts";
 import { type TopicModelData, TopicModelFoldProjection } from "./topic-model.projection.ts";
 
-export const TOPIC_CLUSTERING_PIPELINE_NAME = "topic_clustering_processing";
+const TOPIC_CLUSTERING_PIPELINE_NAME = "topic_clustering_processing";
 
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (state, intents, handlers, outbox tuning) is declared

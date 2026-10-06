@@ -4,12 +4,14 @@ import type {
   NurturingSignal,
   NurturingSignalOf,
 } from "@langwatch/enterprise-nurturing-contract";
+import type { GuidedOnboardingTurnFailedEventData } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { onboardingExperimentProperties } from "@langwatch/onboarding-contract";
 import { Temporal } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
+import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
 import {
   fireExperimentRan,
@@ -19,7 +21,9 @@ import {
 } from "../rules/nurturing-feature-adoption-service.rules.ts";
 import {
   fireGuidedOnboardingPaths,
+  fireGuidedOnboardingPostHog,
   fireGuidedOnboardingProgress,
+  fireGuidedTurnFailedPostHog,
 } from "../rules/nurturing-guided-onboarding-service.rules.ts";
 import {
   fireInviteAccepted,
@@ -34,7 +38,10 @@ import {
   fireOrganizationCreated,
   fireSignup,
 } from "../rules/nurturing-signup-identification-service.rules.ts";
-import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
+import {
+  fireSubscriptionStarted,
+  fireSubscriptionSync,
+} from "../rules/nurturing-subscription-sync-service.rules.ts";
 import type { NurturingService } from "./nurturing.service.ts";
 
 const nurturingLogger = createLogger("langwatch:nurturing");
@@ -76,7 +83,7 @@ function isoOf(epochMilliseconds: number): string {
 export class NurturingDeliveryService {
   private constructor(
     private readonly deps: Readonly<{
-      claims: Readonly<{ claim(key: string, ttlSeconds: number): Promise<boolean> }>;
+      claims: NurturingClaimRepository;
       /** Absent where the deployment named no Customer.io key. */
       customerIo: NurturingService | undefined;
       /** Absent where the deployment named no PostHog key. */
@@ -97,6 +104,19 @@ export class NurturingDeliveryService {
     if (await this.withinCustomerIoDebounce(signal)) return this.toPostHogSafely(signal);
     this.toCustomerIo(signal);
     this.toPostHogSafely(signal);
+  }
+
+  /** Langy's failed guided turn: PostHog only, once per source event, never failing the fact. */
+  async deliverGuidedTurnFailed(data: GuidedOnboardingTurnFailedEventData): Promise<void> {
+    const posthog = this.deps.posthog;
+    if (!posthog) return;
+    const key = `nurturing:guided_onboarding_turn_failed:${data.sourceEventId}`;
+    if (!(await this.deps.claims.claim(key, DELIVERED_WINDOW_SECONDS))) return;
+    try {
+      posthog.track(fireGuidedTurnFailedPostHog(data));
+    } catch (error) {
+      reportFailure(error);
+    }
   }
 
   /** A PostHog channel that throws only logs: analytics never fails the delivery. */
@@ -190,10 +210,7 @@ export class NurturingDeliveryService {
         return this.sendCustomerIoCalls(fireSubscriptionSync(signal));
       case "self_hosted_crm":
         return this.selfHostedCrm(signal);
-      case "scenario_run_succeeded":
-      case "evaluation_ran":
-      case "checkout_completed":
-      case "project_active_day":
+      default:
         return;
     }
   }
@@ -219,6 +236,28 @@ export class NurturingDeliveryService {
         },
       });
     switch (signal.kind) {
+      case "guided_onboarding_paths":
+        return posthog.track(
+          fireGuidedOnboardingPostHog({
+            userId: signal.userId,
+            organizationId: signal.organizationId,
+            event: signal.event,
+            payload: signal.payload ?? {},
+            paths: signal.paths,
+            currentPath: undefined,
+          }),
+        );
+      case "guided_onboarding_progress":
+        return posthog.track(
+          fireGuidedOnboardingPostHog({
+            userId: signal.userId,
+            organizationId: signal.organizationId,
+            event: signal.event,
+            payload: signal.payload,
+            paths: signal.state.paths,
+            currentPath: signal.state.currentPath,
+          }),
+        );
       case "scenario_created": {
         const variant = signal.onboardingVariant;
         return track({
@@ -249,8 +288,9 @@ export class NurturingDeliveryService {
       case "experiment_ran":
       case "evaluation_ran":
         return track({ userId: signal.userId, event: "evaluation_ran" });
+      case "user_registered":
+        return track({ userId: signal.userId, event: "signed_up" });
       case "signed_up":
-        track({ userId: signal.userId, event: "signed_up" });
         return posthog.track(fireOrganizationCreated(signal));
       case "team_member_invited":
         return track({
@@ -258,6 +298,8 @@ export class NurturingDeliveryService {
           event: "team_member_invited",
           properties: { inviteCount: signal.roles.length },
         });
+      case "subscription_started":
+        return fireSubscriptionStarted(signal).forEach((event) => posthog.track(event));
       case "checkout_completed":
         return this.checkoutCompleted({ posthog, signal });
       case "project_active_day":

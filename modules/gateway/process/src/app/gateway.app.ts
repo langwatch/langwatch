@@ -7,7 +7,6 @@ import type { RestIdentity } from "@langwatch/api/hosting";
 import type { RestDeclaredResult } from "@langwatch/api/rest";
 import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type {
@@ -19,11 +18,11 @@ import type {
 } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
+  virtualKeyBudgetInputSchema,
   type GatewayBudgetOverviewForUser,
   type GatewayAuthorizedKeyCaller,
   type GatewayAuthorizedVirtualKeyCaller,
   type GatewayKeyCaller,
-  type GatewayKeyCallerReach,
   type GatewayVirtualKeyCaller,
   type GatewayRequestCredential,
   type GatewayVirtualKeyScope,
@@ -49,8 +48,6 @@ import {
   type GatewayEndUserSpendResponse,
   type GatewaySpendEventsPage,
   type GatewaySpendEventsQuery,
-  type GatewaySpendReplayBody,
-  type GatewaySpendReplayResponse,
   type GatewaySpendSummariesPage,
   type GatewaySpendSummariesQuery,
   type GatewaySpendByRequestTypeQuery,
@@ -139,19 +136,15 @@ import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type ProcessMembers } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { gatewayInternalSecret, Secret, virtualKeyPepper } from "@langwatch/secrets";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { recordSpanCommandDataSchema, TraceApi } from "@langwatch/trace-contract";
-// The billing envelope and the subscription grammar are the webhook
-// platform's, and a reconciliation pull has to answer the same bytes a push
-// delivers, so both ARRIVE from that module rather than being restated here.
+// The billing envelope is the webhook platform's, and a reconciliation pull has
+// to answer the same bytes a push delivers, so it ARRIVES from that contract.
 import {
-  eventMatches,
   webhookEnvelopeFromSpendRow,
-  WebhookApi,
   type WebhookSpendEventRow,
 } from "@langwatch/webhook-contract";
 import type { z } from "zod";
@@ -165,41 +158,38 @@ import {
   buildGatewayGovernanceEventsPipeline,
   type GatewayGovernanceEventsDefinition,
 } from "../eventing/gateway-governance-events.pipeline.ts";
+import {
+  buildGatewayPulledUsageLedgerPipeline,
+  type GatewayPulledUsageLedgerPipeline,
+} from "../eventing/gateway-pulled-usage-ledger.pipeline.ts";
 import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
 import type { GatewaySpendProcessingEvent } from "../eventing/gateway-spend.intent.ts";
 import {
   EventingGatewaySpendAdapter,
   GatewaySpendProducerAdapter,
 } from "../eventing/gateway-spend.pipeline.ts";
+import type { GatewayAgentCacheEntryRepository } from "../repositories/gateway-agent-cache.repository.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
+import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
+import type { GatewayBudgetRepository } from "../repositories/gateway-budget.repository.ts";
+import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
 import type { GatewayOpenAdmissionsRepository } from "../repositories/gateway-open-admissions.repository.ts";
 import type { GatewayPrincipalSpendRepository } from "../repositories/gateway-principal-spend.repository.ts";
 import type { GatewaySpendEventsRepository } from "../repositories/gateway-spend-events.repository.ts";
 import type { GatewaySpendFoldCacheRepository } from "../repositories/gateway-spend-fold-cache.repository.ts";
+import type { GatewaySpendScopeRepository } from "../repositories/gateway-spend-scope.repository.ts";
 import type { GatewayLicensedKey } from "../repositories/gateway-virtual-key.repository.ts";
-import { PrismaGatewayConnectUpstreamRepository } from "../repositories/prisma/prisma.gateway-connect-upstream.repository.ts";
-import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
-import { PrismaGatewayInternalStoreRepository } from "../repositories/prisma/prisma.gateway-internal-store.repository.ts";
-import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
-import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
-import { PrismaGatewaySpendScopeRepository } from "../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
-import { PrismaGatewayTraceExportKeyRepository } from "../repositories/prisma/prisma.gateway-trace-export-key.repository.ts";
-import {
-  type GatewayAgentCacheEntryStore,
-  RedisGatewayAgentCacheEntryRepository,
-} from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
-import { RedisGatewayBudgetChangeDedupeRepository } from "../repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
-import { RedisGatewaySpendFoldCacheRepository } from "../repositories/redis/redis.gateway-spend-fold-cache.repository.ts";
+import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
 import { ConnectManagedKeyService } from "../services/connect-managed-key.service.ts";
 import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
-import {
-  GatewayAgentCacheService,
-  type GatewayAgentCacheEncryption,
-} from "../services/gateway-agent-cache.service.ts";
+import { GatewayAgentCacheService } from "../services/gateway-agent-cache.service.ts";
+import { GatewayApplicableBudgetsService } from "../services/gateway-applicable-budgets.service.ts";
+import { GatewayAuthzScopePermissionsService } from "../services/gateway-authz-scope-permissions.service.ts";
 import { GatewayBudgetChangeDedupeService } from "../services/gateway-budget-change-dedupe.service.ts";
 import { GatewayBudgetCrossingService } from "../services/gateway-budget-crossing.service.ts";
 import { GatewayBudgetLedgerService } from "../services/gateway-budget-ledger.service.ts";
 import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
+import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service.ts";
 import { GatewayConfigAssemblyService } from "../services/gateway-config-assembly.service.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import { GatewayConnectUpstreamService } from "../services/gateway-connect-upstream.service.ts";
@@ -210,40 +200,60 @@ import { GatewayElevenLabsWebhookService } from "../services/gateway-elevenlabs-
  * as {@link GatewayActor}, an argument rather than read from session/request, so one check
  * serves both a browser session and an API key.
  */
-import type { GatewayEndUserCap } from "../services/gateway-end-user-caps.service.ts";
-import { GatewayGovernanceEventsService } from "../services/gateway-governance-events.service.ts";
+import {
+  GatewayEndUserCapsService,
+  type GatewayEndUserCap,
+} from "../services/gateway-end-user-caps.service.ts";
+import {
+  GatewayGovernanceEventsService,
+  type GatewayGovernanceSignals,
+} from "../services/gateway-governance-events.service.ts";
 import { GatewayGuardrailEvaluationService } from "../services/gateway-guardrail-evaluation.service.ts";
+import { GatewayGuardrailService } from "../services/gateway-guardrail.service.ts";
 import { GatewayInternalDoorService } from "../services/gateway-internal-door.service.ts";
 import { GatewayInternalIdentityService } from "../services/gateway-internal-identity.service.ts";
 import { GatewayInternalProtocolService } from "../services/gateway-internal-protocol.service.ts";
 import type { GatewaySpendCommandSender } from "../services/gateway-internal-protocol.service.ts";
 import { GatewayJwtService } from "../services/gateway-jwt.service.ts";
+import { GatewayOrganizationDirectoryService } from "../services/gateway-organization-directory.service.ts";
 import {
   GatewayRealtimeSessionReconciliationService,
   realtimeSessionReconciliationConfig,
 } from "../services/gateway-realtime-session-reconciliation.service.ts";
 import { GatewayRealtimeSessionSweepService } from "../services/gateway-realtime-session-sweep.service.ts";
 import type { GatewayRealtimeSessionCollaborators } from "../services/gateway-realtime-session.service.ts";
+import {
+  GatewayScopeResolutionService,
+  type GatewayPlatformProviders,
+} from "../services/gateway-scope-resolution.service.ts";
 import { GatewaySpendDebitService } from "../services/gateway-spend-debit.service.ts";
-import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
+import { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
 import {
   GatewaySpendReconciliationService,
   type GatewaySpendScope,
   type GatewaySpendScopeQuery,
 } from "../services/gateway-spend-reconciliation.service.ts";
 import { GatewaySpendScopeService } from "../services/gateway-spend-scope.service.ts";
-import type {
+import {
   GatewayUsageService,
-  UsageWindow,
+  type UsageWindow,
 } from "../services/gateway-spend-summary.service.ts";
 import { GatewayTraceExportKeyService } from "../services/gateway-trace-export-key.service.ts";
-import type {
-  VirtualKeyCamelDto,
-  VirtualKeySnakeDto,
+import {
+  GatewayVirtualKeyDtoService,
+  type VirtualKeyCamelDto,
+  type VirtualKeySnakeDto,
 } from "../services/gateway-virtual-key-dto.service.ts";
-import type { GatewayService } from "../services/gateway.service.ts";
+import { GatewayService } from "../services/gateway.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
 import { TwilioCredentialService } from "../services/twilio-credential.service.ts";
+import {
+  VirtualKeyAuthorizationService,
+  type VirtualKeyActor,
+} from "../services/virtual-key-authorization.service.ts";
+import { VirtualKeyCryptoService } from "../services/virtual-key-crypto.service.ts";
+import { VirtualKeyDirectBudgetService } from "../services/virtual-key-direct-budget.service.ts";
+import { VirtualKeyService } from "../services/virtual-key.service.ts";
 import type {
   GatewayInternalBucketRequest,
   GatewayInternalChangesRequest,
@@ -255,11 +265,6 @@ import type {
   GatewayInternalSessionRequest,
 } from "../transport/gateway-internal.rest.ts";
 import type { GatewaySpendDoorApi } from "../transport/gateway-spend.rest.ts";
-import {
-  buildGatewayControlPlane,
-  GatewayEndUserCapsAdapter,
-} from "./gateway-composition.build.ts";
-import { type GatewayBudgetSpend, type GatewayChangeEvents } from "./gateway.members.ts";
 
 /**
  * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped
@@ -439,13 +444,8 @@ export type GatewayApplicableBudgetTarget = Readonly<{
  * else lives in this package directly.
  */
 export type GatewayRestInfrastructure = Readonly<{
-  /** Absent only where this process has no encryption and mounts no agent-cache family. */
-  agentCache?:
-    | Readonly<{
-        store: GatewayAgentCacheEntryStore;
-        encryption: GatewayAgentCacheEncryption;
-      }>
-    | undefined;
+  /** Absent only where this process mounts no agent-cache family. */
+  agentCache?: GatewayAgentCacheEntryRepository | undefined;
 }>;
 
 export interface GatewayAppDependencies extends GatewayRestInfrastructure {
@@ -464,9 +464,9 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
    * which is why every read of it degrades explicitly rather than reporting a
    * confident zero.
    */
-  budgetSpend: GatewayBudgetSpend | undefined;
+  budgetSpend: GatewayBudgetSpendRepository | undefined;
   /** The change feed the Go data plane long-polls for budget and key revisions. */
-  changeEvents: GatewayChangeEvents;
+  changeEvents: GatewayChangeEventsRepository;
   /** The ClickHouse principal-scope ledger reader. Absent likewise. */
   principalSpend: GatewayPrincipalSpendRepository | undefined;
   /** The spend-event ledger reader. Absent likewise. */
@@ -688,7 +688,6 @@ function spendCommandRecord(command: string, payload: unknown): Record<string, u
 type GatewaySpendPipelineParts = Readonly<{
   ledger: GatewaySpendEventsRepository;
   commands: Record<string, GatewaySpendCommandSender | undefined>;
-  webhooks: Pick<WebhookApi, "requestGatewayEventDelivery">;
   openAdmissions: GatewayOpenAdmissionsRepository;
   settlementGraceMs: number;
   foldCache: GatewaySpendFoldCacheRepository;
@@ -707,9 +706,9 @@ type GatewaySpendDefinition = StaticPipelineDefinition<
  * own ledger nor a peer's application: the one guarded Postgres connection its
  * two resolutions run on, and how long after a request an outcome may still arrive.
  */
-export type GatewaySpendCollaborators = Readonly<{
-  prisma: ProcessMembers["prisma"];
-  webhooks: WebhookApi;
+type GatewaySpendCollaborators = Readonly<{
+  spendScope: GatewaySpendScopeRepository;
+  budgets: GatewayBudgetRepository;
   settlementGraceMs: number;
 }>;
 
@@ -717,7 +716,7 @@ export type GatewaySpendCollaborators = Readonly<{
  * The two peers the per-member budget overview reads: organization
  * membership plus personal-workspace resolution, and the governance flag.
  */
-export type GatewayBudgetOverviewDeps = Readonly<{
+type GatewayBudgetOverviewDeps = Readonly<{
   organizations: OrganizationApi;
   featureFlags: FeatureFlagApi;
   traces: Pick<TraceApi, "findModelSpend">;
@@ -728,31 +727,369 @@ const unusedBudgetOverviewRepository: GatewayBudgetOverviewRepository = {
   findBudget: async () => null,
 };
 
+const virtualKeyDtos = GatewayVirtualKeyDtoService.create();
+
+/** The other features the gateway control plane reaches, one by one. */
+type GatewayControlPlanePeers = Readonly<{
+  /** The permission service every other surface on this process authorizes with. */
+  authz: AuthzApi;
+  /** The project directory the tenancy graph composed. */
+  projects: ProjectApi;
+  /** The organization directory: existence, membership, groups and their members. */
+  organizations: OrganizationApi;
+  /** The evaluators a guardrail rule runs, as the budget-decision store reads them. */
+  evaluators: EvaluatorApi;
+  /** The monitors a guardrail attachment names. */
+  monitors: MonitorApi;
+  /** The deployment's own providers, which a license's managed key dispatches on. */
+  platformProviders: GatewayPlatformProviders;
+  /** The per-virtual-key spend the usage surfaces read, one tenant at a time. */
+  traces: Pick<
+    TraceApi,
+    "findSpendByAttributeValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
+  >;
+}>;
+
+type GatewayControlPlaneOptions = Readonly<{
+  repositories: GatewayRepositories;
+  peers: GatewayControlPlanePeers;
+  /** The HMAC key a virtual key's stored secret is hashed under. */
+  virtualKeyPepper: string | undefined;
+  /** Where a virtual key's lifecycle is announced, where the deployment composed a ledger. */
+  governanceSignals?: GatewayGovernanceSignals | undefined;
+}>;
+
+type GatewayControlPlane = GatewayAppDependencies &
+  Readonly<{
+    internalVirtualKeys: VirtualKeyService;
+    internalChanges: GatewayChangeEventsRepository;
+    internalScopeResolution: GatewayScopeResolutionService;
+    /** The spend ledger the gateway_spend fold writes. */
+    spendLedger: GatewaySpendEventsRepository;
+    /** The settlement sweeper's read of every server's open admissions. */
+    openAdmissions: GatewayOpenAdmissionsRepository;
+  }>;
+
+/**
+ * Composes the gateway control plane over the module's repositories: the
+ * whole of what {@link GatewayModule}'s core surface answers from.
+ */
+function gatewayControlPlane(options: GatewayControlPlaneOptions): GatewayControlPlane {
+  const { repositories, peers } = options;
+  const { projects, organizations } = peers;
+  const permissions = GatewayAuthzScopePermissionsService.create(peers.authz);
+  const organizationFacts = GatewayOrganizationDirectoryService.create({ organizations });
+  const virtualKeyAuthorization = VirtualKeyAuthorizationService.create({
+    directory: repositories.virtualKeyAuthorization,
+    organizations,
+    projects,
+  });
+  const scopeResolution = GatewayScopeResolutionService.create({
+    repository: repositories.scopeResolution,
+    platformProviders: peers.platformProviders,
+    projects,
+  });
+  const changes = repositories.changeEvents;
+  const virtualKeys = VirtualKeyService.create({
+    transactions: repositories.transactions,
+    keyBudgets: repositories.keyBudgets,
+    scopeResolution,
+    projects,
+    repository: repositories.virtualKeys,
+    changeEvents: changes,
+    auditLog: repositories.audit,
+    crypto: VirtualKeyCryptoService.create({ pepper: options.virtualKeyPepper }),
+    ...(options.governanceSignals ? { governanceSignals: options.governanceSignals } : {}),
+  });
+  const { budgetSpend, principalSpend, openAdmissions } = repositories;
+  const spendLedger = repositories.spendEvents;
+  const spendEvents = GatewaySpendEventsService.create(spendLedger);
+  // The cache-rule and guardrail catalogues live on the one budget service, so
+  // a rule written through one door is the rule every other door reads.
+  const budgetDecisions = GatewayService.create({
+    repository: repositories.budgets,
+    projects,
+    organizations,
+    cacheRules: GatewayCacheRuleService.create(repositories.cacheRules),
+    guardrails: GatewayGuardrailService.create({
+      repository: repositories.guardrails,
+      evaluators: peers.evaluators,
+      monitors: peers.monitors,
+      projects,
+      audit: repositories.audit,
+    }),
+  });
+  // The usage rollup labels each key the ledger reported spend against, which
+  // is a repository read; `virtualKeys` above is the operations service.
+  const usage = GatewayUsageService.create({
+    projects,
+    virtualKeys: repositories.virtualKeys,
+    chRepo: budgetSpend,
+    traces: peers.traces,
+  });
+
+  return {
+    virtualKeys,
+    budgetDecisions,
+    budgetSpend,
+    changeEvents: changes,
+    principalSpend,
+    spendEvents,
+    projects,
+    usage,
+    // The repositories hold a spend ledger in every tier, so the spend source
+    // is present whenever the control plane is.
+    spendSourceAvailable: true,
+    schemas: { virtualKeyBudgetInput: virtualKeyBudgetInputSchema },
+    internalVirtualKeys: virtualKeys,
+    internalChanges: changes,
+    internalScopeResolution: scopeResolution,
+    spendLedger,
+    openAdmissions,
+
+    organizationIdForProject: async (projectId) => {
+      const organizationId = await projects.findOrganizationId(projectId);
+      if (!organizationId) throw new Error(`project ${projectId} missing team`);
+
+      return organizationId;
+    },
+    // The refusal the deleted composition raised, unchanged: the anchor is
+    // read from both doors and a second taxonomy here would change what a
+    // tRPC caller already sees.
+    assertOrganizationExists: (organizationId) => organizationFacts.assertExists(organizationId),
+    resolveProviderLabels: (budgets) =>
+      repositories.providerLabels.resolveProviderLabels([...budgets]),
+    listGroupTargets: (organizationId) =>
+      repositories.organizationDirectory.findGroupTargets(organizationId),
+    groupMemberCounts: (budgets) => repositories.organizationDirectory.groupMemberCounts(budgets),
+    // The label per key a page of spend rows carries, read through this
+    // feature's OWN persistence rather than by a key-table `findMany`.
+    resolveVirtualKeyNames: (input) => virtualKeys.resolveNames(input),
+    isOrganizationMember: (input) => organizationFacts.isMember(input),
+    // A scoped API key acts as its owning user; a legacy project key carries
+    // none, so it acts as a stable machine principal for its project, which
+    // keeps an audit row traceable back to the credential that wrote it.
+    actorForCredential: ({ projectId, credential }) => {
+      if (credential.kind === "user") {
+        return {
+          actor: { kind: "cliAccessToken", userId: credential.userId, projectId },
+          actorUserId: credential.userId,
+        } satisfies { actor: VirtualKeyActor; actorUserId: string };
+      }
+      return credential.kind === "apiKey"
+        ? {
+            actor: {
+              kind: "apiKey",
+              apiKeyId: credential.apiKeyId,
+              userId: credential.userId,
+              organizationId: credential.organizationId,
+            } satisfies VirtualKeyActor,
+            actorUserId: credential.userId ?? `svc_${projectId}`,
+          }
+        : {
+            actor: { kind: "legacyProjectKey", projectId } satisfies VirtualKeyActor,
+            actorUserId: `svc_${projectId}`,
+          };
+    },
+
+    listVisibleVirtualKeys: async ({ organizationId, userId }) => {
+      const membership = await virtualKeyAuthorization.loadMembershipSet({
+        organizationId,
+        userId,
+      });
+
+      return (await virtualKeys.getAll(organizationId)).filter((virtualKey) =>
+        virtualKeyAuthorization.isVisibleToMembership(membership, virtualKey.scopes),
+      );
+    },
+    isVirtualKeyVisible: async ({ organizationId, userId, virtualKey }) =>
+      virtualKeyAuthorization.isVisibleToMembership(
+        await virtualKeyAuthorization.loadMembershipSet({ organizationId, userId }),
+        virtualKey.scopes,
+      ),
+    getVisibleVirtualKeyForUser: async ({ organizationId, id, userId }) =>
+      virtualKeyAuthorization.getVisibleVk(
+        virtualKeys,
+        await virtualKeyAuthorization.loadMembershipSet({ organizationId, userId }),
+        { id, organizationId },
+      ),
+    visibleInProject: async ({ projectId, virtualKeys: page }) => {
+      const membership = await virtualKeyAuthorization.membershipOfProject(projectId);
+
+      return page.filter((virtualKey) =>
+        virtualKeyAuthorization.isVisibleToMembership(membership, virtualKey.scopes),
+      );
+    },
+    heldOnAnyScope: ({ actor, virtualKeys: page, permission }) =>
+      virtualKeyAuthorization.heldByActor(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        page,
+        permission,
+      ),
+    getExistingVirtualKey: ({ organizationId, id }) =>
+      virtualKeyAuthorization.getExistingVk(virtualKeys, id, organizationId),
+
+    assertCanManageAllScopes: ({ actor, scopes }) =>
+      virtualKeyAuthorization.assertActorCanManageAllScopes(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        [...scopes],
+      ),
+    assertCanCreateScopes: ({ actor, scopes, callerProjectId }) =>
+      virtualKeyAuthorization.assertActorCanCreateScopes(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        { scopes: [...scopes], callerProjectId },
+      ),
+    assertCanOperateOnAnyScope: ({ actor, scopes, permission }) =>
+      virtualKeyAuthorization.assertActorCanOperateOnAnyScope(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        [...scopes],
+        permission,
+      ),
+    assertCanOperateAtOrganization: ({ actor, organizationId, permission }) =>
+      virtualKeyAuthorization.assertActorCanOperateAtOrganization(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        { organizationId, permission },
+      ),
+    assertScopesBelongToOrganization: ({ organizationId, scopes }) =>
+      virtualKeyAuthorization.assertScopesBelongToOrg({ organizationId, scopes: [...scopes] }),
+    assertTraceProjectBelongsToOrganization: ({ organizationId, traceProjectId }) =>
+      virtualKeyAuthorization.assertTraceProjectBelongsToOrg({ organizationId, traceProjectId }),
+    assertGuardrailAttachmentsAllowed: ({
+      actor,
+      organizationId,
+      virtualKeyId,
+      scopes,
+      traceProjectId,
+      attachments,
+    }) =>
+      virtualKeyAuthorization.assertGuardrailAttachmentsAllowed(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        {
+          organizationId,
+          vkId: virtualKeyId,
+          inputScopes: scopes ? [...scopes] : undefined,
+          traceProjectId,
+        },
+        attachments ? [...attachments] : undefined,
+      ),
+
+    // One read of the destinations for a whole page, in both casings: a
+    // listing must not cost a query per key to say where its traffic goes.
+    toVirtualKeyCamelDtos: async ({ virtualKeys: page }) => {
+      const facts = await virtualKeyDtos.loadTraceDestinationFacts({
+        projects,
+        virtualKeys: [...page],
+      });
+
+      return page.map((virtualKey) => virtualKeyDtos.toVirtualKeyCamelDto({ virtualKey, facts }));
+    },
+    toVirtualKeySnakeDtos: async ({ virtualKeys: page }) => {
+      const facts = await virtualKeyDtos.loadTraceDestinationFacts({
+        projects,
+        virtualKeys: [...page],
+      });
+
+      return page.map((virtualKey) => virtualKeyDtos.toVirtualKeySnakeDto({ virtualKey, facts }));
+    },
+    listApplicableBudgets: ({ target }) =>
+      GatewayApplicableBudgetsService.create({
+        budgetDecisions,
+        providerLabels: repositories.providerLabels,
+      }).resolveApplicableBudgetsForDraftKey(
+        projects,
+        { ...target, scopes: [...target.scopes] },
+        budgetSpend,
+      ),
+    loadDirectBudgetsForKeys: ({ organizationId, virtualKeyIds, now }) =>
+      VirtualKeyDirectBudgetService.create({
+        repository: repositories.directBudgets,
+        projects,
+      }).loadDirectBudgetsForKeys({
+        organizationId,
+        virtualKeyIds: [...virtualKeyIds],
+        chRepo: budgetSpend,
+        now,
+      }),
+    spendByVirtualKey: ({ organizationId, virtualKeyIds, window }) =>
+      usage.spendByVirtualKey({
+        organizationId,
+        virtualKeyIds: [...virtualKeyIds],
+        window,
+      }),
+  };
+}
+
+/**
+ * The caller as the virtual-key authorization vocabulary names them,
+ * whichever door they arrived through.
+ */
+function gatewayVirtualKeyActor(actor: unknown): VirtualKeyActor {
+  if (typeof actor !== "object" || actor === null) {
+    return { kind: "session", session: null };
+  }
+  if (!("kind" in actor)) {
+    return { kind: "session", session: extractSessionActor(actor) };
+  }
+  if (isApiKeyActor(actor)) {
+    return {
+      kind: "apiKey",
+      apiKeyId: actor.apiKeyId,
+      userId: actor.userId,
+      organizationId: actor.organizationId,
+    };
+  }
+  if (actor.kind === "cliAccessToken") {
+    const userId = "userId" in actor ? actor.userId : null;
+    const projectId = "projectId" in actor ? actor.projectId : null;
+    if (typeof userId === "string" && typeof projectId === "string") {
+      return { kind: "cliAccessToken", userId, projectId };
+    }
+  }
+  if (
+    actor.kind === "legacyProjectKey" &&
+    "projectId" in actor &&
+    typeof actor.projectId === "string"
+  ) {
+    return { kind: "legacyProjectKey", projectId: actor.projectId };
+  }
+
+  return { kind: "session", session: null };
+}
+
+/** Whether the actor is an API key with every member the gateway reads, each well-typed. */
+function isApiKeyActor(actor: {
+  kind: unknown;
+}): actor is { kind: "apiKey"; apiKeyId: string; organizationId: string; userId: string | null } {
+  if (actor.kind !== "apiKey") return false;
+  if (!("apiKeyId" in actor) || typeof actor.apiKeyId !== "string") return false;
+  if (!("organizationId" in actor) || typeof actor.organizationId !== "string") return false;
+  if (!("userId" in actor)) return false;
+  return typeof actor.userId === "string" || actor.userId === null;
+}
+
+/**
+ * The one member the authorization vocabulary reads off a browser session: the
+ * signed-in person's id.
+ */
+function extractSessionActor(value: object): { user: { id: string } } | null {
+  if (!("user" in value)) return null;
+  const user = value.user;
+  if (typeof user !== "object" || user === null) return null;
+  if (!("id" in user) || typeof user.id !== "string") return null;
+
+  return { user: { id: user.id } };
+}
+
 type GatewaySetup = FeatureSetup<
   typeof GatewayModule.dependencies,
-  Pick<ProcessMembers, "prisma" | "clickhouse" | "encryption" | "redis"> &
-    Readonly<{
-      /** The expected control plane, where the gateway's own setting says nothing. */
-      publicBaseUrl?: string | undefined;
-    }>,
-  GatewayServerConfig
+  never,
+  GatewayServerConfig,
+  GatewayRepositories
 >;
 
 export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, GatewaySpendDoorApi {
   static readonly contract = GatewayApiToken;
   static readonly dependencies = {
-    /**
-     * The SAME outbound platform a live spend push is delivered through — the
-     * reconciliation pull and the push must not disagree about what a customer
-     * already received.
-     */
-    webhooks: WebhookApi,
-    /**
-     * Declared HERE though only the billing REST door ever asks it anything, so
-     * a process with no plan store refuses at boot rather than answering every
-     * org as entitled.
-     */
-    entitlement: EntitlementApi,
     /**
      * The four capabilities the control plane reaches that belong to other features, resolved
      * as peers rather than rebuilt. A guardrail attachment and the monitor page it points at
@@ -792,13 +1129,6 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     jwtSecret: Secret.load("LW_GATEWAY_JWT_SECRET", { optional: true }),
     virtualKeyPepper,
   } as const;
-  /**
-   * `prisma` is the one guarded connection every gateway row read runs on.
-   * `clickhouse` is the control plane's ONE routing client, resolved per tenant
-   * rather than a second pool — the spend ledger is a projection in that instance.
-   */
-  static readonly reads = ["prisma", "clickhouse", "encryption", "redis", "publicBaseUrl"] as const;
-
   static async create(setup: GatewaySetup): Promise<GatewayModule> {
     return setup.secrets.into(GatewayModule.secrets.internalSecret, (internalSecret) =>
       setup.secrets.into(GatewayModule.secrets.jwtSecret, (jwtSecret) =>
@@ -820,9 +1150,9 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     const governanceEvents = GatewayGovernanceEventsService.create({
       projects: setup.dependencies.projects,
     });
-    const controlPlane = buildGatewayControlPlane({
-      prisma: setup.members.prisma,
-      clickhouse: setup.members.clickhouse,
+    const { repositories } = setup;
+    const controlPlane = gatewayControlPlane({
+      repositories,
       peers: {
         authz: setup.dependencies.authz,
         projects: setup.dependencies.projects,
@@ -840,19 +1170,15 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     // sweeper carry one answer. `setup.config` is undefined only in a test stub.
     const graceMs = settlementGraceMs(setup.config?.spendSettlementGraceMs);
     const connectUpstream = GatewayConnectUpstreamService.create({
-      repository: PrismaGatewayConnectUpstreamRepository.create(setup.members.prisma),
-      cipher: setup.members.encryption,
+      repository: repositories.connectUpstream,
     });
     const spendCommands: Record<string, GatewaySpendCommandSender | undefined> = {};
     const spend = {
       commands: spendCommands,
       rating: ModelCatalogGatewaySpendRatingService.create(),
     };
-    const internalStore = PrismaGatewayInternalStoreRepository.create({
-      database: setup.members.prisma,
-    });
     const realtimeSessions: GatewayRealtimeSessionCollaborators = {
-      sessions: PrismaGatewayRealtimeSessionRepository.create({ database: setup.members.prisma }),
+      sessions: repositories.realtimeSessions,
       spendRating: spend.rating,
       // The senders `connectSpend` fills once the pipeline registers, read at call time.
       spendConfirmation: {
@@ -865,7 +1191,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       attribution: {
         findSessionAttribution: async ({ virtualKeyId, projectId }) => {
           const [[key], project] = await Promise.all([
-            internalStore.findVirtualKeysForAttribution([virtualKeyId]),
+            repositories.internalStore.findVirtualKeysForAttribution([virtualKeyId]),
             setup.dependencies.projects.findTraceDestination(projectId),
           ]);
           return { principalUserId: key?.principalUserId ?? null, teamId: project?.teamId ?? null };
@@ -891,21 +1217,18 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       budgetDecisions: controlPlane.budgetDecisions,
       modelProviders: setup.dependencies.modelProviders,
       assembly: GatewayConfigAssemblyService.create({
-        repository: PrismaGatewayScopeResolutionRepository.create({
-          database: setup.members.prisma,
-        }),
+        repository: repositories.scopeResolution,
         platformProviders: setup.dependencies.modelProviders,
         projects: setup.dependencies.projects,
       }),
       connectUpstream,
       traceExportKeys: GatewayTraceExportKeyService.create({
-        repository: PrismaGatewayTraceExportKeyRepository.create(setup.members.prisma),
-        cipher: setup.members.encryption,
+        repository: repositories.traceExportKeys,
         apiKeys: setup.dependencies.apiKeys,
       }),
     });
     const guardrails = GatewayGuardrailEvaluationService.create({
-      repository: PrismaGatewayGuardrailRepository.create(setup.members.prisma),
+      repository: repositories.guardrails,
       monitors: setup.dependencies.monitors,
       evaluations: setup.dependencies.evaluations,
     });
@@ -918,7 +1241,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       virtualKeys: controlPlane.internalVirtualKeys,
       projects: setup.dependencies.projects,
       jwt: secrets.jwtSecret ? GatewayJwtService.create({ secret: secrets.jwtSecret }) : void 0,
-      store: internalStore,
+      store: repositories.internalStore,
       changes: controlPlane.internalChanges,
       config,
       budgetSpend: controlPlane.budgetSpend,
@@ -929,13 +1252,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     });
 
     return new GatewayModule({
-      members: {
-        ...controlPlane,
-        agentCache: {
-          store: RedisGatewayAgentCacheEntryRepository.create(setup.members.redis),
-          encryption: setup.members.encryption,
-        },
-      },
+      infrastructure: { ...controlPlane, agentCache: repositories.agentCache },
       voice: {
         webhook: GatewayElevenLabsWebhookService.create({
           credentials: voiceCredentials,
@@ -957,17 +1274,14 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       spendPipeline: {
         ledger: controlPlane.spendLedger,
         commands: spendCommands,
-        webhooks: setup.dependencies.webhooks,
         openAdmissions: controlPlane.openAdmissions,
         settlementGraceMs: graceMs,
-        foldCache: RedisGatewaySpendFoldCacheRepository.create(setup.members.redis),
+        foldCache: repositories.spendFoldCache,
         debits: controlPlane.budgetSpend
           ? GatewaySpendDebitService.create({
               budgets: controlPlane.budgetDecisions,
               spend: controlPlane.budgetSpend,
-              dedupe: GatewayBudgetChangeDedupeService.create(
-                RedisGatewayBudgetChangeDedupeRepository.create(setup.members.redis),
-              ),
+              dedupe: GatewayBudgetChangeDedupeService.create(repositories.budgetChangeDedupe),
               changes: controlPlane.changeEvents,
               crossings: GatewayBudgetCrossingService.create({
                 budgets: controlPlane.budgetDecisions,
@@ -978,8 +1292,8 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
           : void 0,
       },
       spend: {
-        prisma: setup.members.prisma,
-        webhooks: setup.dependencies.webhooks,
+        spendScope: repositories.spendScope,
+        budgets: repositories.budgets,
         settlementGraceMs: graceMs,
       },
       budgetOverviewDeps: {
@@ -990,7 +1304,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       addresses: {
         baseUrl: setup.config?.internalUrl ?? setup.config?.baseUrl,
         publicUrl: setup.config?.publicUrl ?? setup.config?.baseUrl,
-        expectedControlPlaneUrl: setup.config?.controlPlaneUrl ?? setup.members.publicBaseUrl,
+        expectedControlPlaneUrl: setup.config?.controlPlaneUrl ?? setup.config?.publicBaseUrl,
       },
       connectUpstream,
       oneTimeReveals: setup.dependencies.oneTimeReveals,
@@ -1020,7 +1334,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   #governanceEvents: GatewayGovernanceEventsService | undefined;
 
   private constructor({
-    members,
+    infrastructure,
     voice,
     internalProtocol,
     internalDoor,
@@ -1036,7 +1350,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     oneTimeReveals,
     governanceEvents,
   }: {
-    members: GatewayInfrastructure;
+    infrastructure: GatewayInfrastructure;
     voice: GatewayVoiceServices;
     internalProtocol: GatewayInternalProtocolService;
     internalDoor: RestIdentity;
@@ -1062,9 +1376,9 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     // The union's second arm exists for the REST-only composition (agent cache
     // and the ElevenLabs callback), which carries no control plane. Every
     // installed process now takes the first.
-    this.#coreDependencies = "virtualKeys" in members ? members : void 0;
-    this.#agentCache = members.agentCache
-      ? GatewayAgentCacheService.create(members.agentCache)
+    this.#coreDependencies = "virtualKeys" in infrastructure ? infrastructure : void 0;
+    this.#agentCache = infrastructure.agentCache
+      ? GatewayAgentCacheService.create({ store: infrastructure.agentCache })
       : void 0;
     this.#voice = voice;
   }
@@ -1086,7 +1400,6 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     const processing = EventingGatewaySpendAdapter.create({
       spendEvents: parts.ledger,
       cacheStore: (inner) => foldCache.cached(inner),
-      webhookSpendDelivery: parts.webhooks,
       gatewayDebits: debits
         ? {
             name: GATEWAY_DEBITS_PROCESS_NAME,
@@ -1102,14 +1415,16 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     return processing.buildProcessing();
   }
 
-  /** governance_events_processing for this role: the worker also hands each fact to webhook. */
-  governanceEventsPipeline({
-    participation,
-  }: {
-    participation: EventingParticipation;
-  }): GatewayGovernanceEventsDefinition {
-    const webhooks = participation === "produce" ? void 0 : this.#spendPipeline?.webhooks;
-    return buildGatewayGovernanceEventsPipeline(webhooks ? { webhooks } : {});
+  /** governance_events_processing: the same commands in every role; webhook subscribes itself. */
+  governanceEventsPipeline(): GatewayGovernanceEventsDefinition {
+    return buildGatewayGovernanceEventsPipeline();
+  }
+
+  /** gateway_pulled_usage_ledger: the ledger debits governance's priced pulled usage (Q208C). */
+  pulledUsageLedgerPipeline(): GatewayPulledUsageLedgerPipeline {
+    return buildGatewayPulledUsageLedgerPipeline({
+      ledger: this.#dependencies.budgetSpend ? this.#budgetLedgerService : void 0,
+    });
   }
 
   /** Binds the crossing and lifecycle senders the debit writer and key services record through. */
@@ -1253,13 +1568,6 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     return this.#spendAnswers.answerEndUserSpend(input);
   }
 
-  answerSpendReplay(input: {
-    organizationId: string;
-    body: GatewaySpendReplayBody;
-  }): Promise<GatewaySpendReplayResponse> {
-    return this.#spendAnswers.answerSpendReplay(input);
-  }
-
   answerInternalResolveKey(
     input: GatewayInternalResolveKeyRequest,
   ): Promise<RestDeclaredResult<typeof gatewayInternalResolveKeyAnswers>> {
@@ -1381,40 +1689,9 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   // pull surface's envelope/subscription/settlement-grace format with a
   // different one than the push half already uses.
 
-  /** The endpoint registry a replay names its destination in. */
-  webhookEndpoints(): {
-    findDeliverable(input: {
-      organizationId: string;
-      endpointId: string;
-    }): Promise<{ id: string; enabledEvents: readonly string[] } | null>;
-  } {
-    const webhooks = this.#spendCollaborators.webhooks;
-
-    return { findDeliverable: (input) => webhooks.findDeliverable(input) };
-  }
-
-  /** The emitted-envelope log a replay walks, one page at a time. */
-  webhookEvents(): WebhookApi {
-    return this.#spendCollaborators.webhooks;
-  }
-
-  /**
-   * The live delivery path a replay appends to: the webhook platform's own
-   * `WebhookApi.appendReplayToEndpointStream`, reached through the same
-   * declared peer `webhookEvents()` above already uses.
-   */
-  webhookDelivery(): WebhookApi {
-    return this.#spendCollaborators.webhooks;
-  }
-
   /** One spend row rendered as the canonical billing envelope. */
   spendEventEnvelope(row: WebhookSpendEventRow): GatewaySpendEventEnvelope {
     return gatewaySpendEventEnvelopeSchema.parse(webhookEnvelopeFromSpendRow(row));
-  }
-
-  /** Whether an endpoint's subscriptions cover one event type. */
-  endpointAcceptsEvent(input: { enabledEvents: readonly string[]; eventType: string }): boolean {
-    return eventMatches(input.enabledEvents, input.eventType);
   }
 
   /** How long after a request an outcome may still arrive. */
@@ -1430,9 +1707,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     // a fresh one per request would resolve every filter from cold.
     this.#spendScope ??= GatewaySpendScopeService.create({
       projects: this.#dependencies.projects,
-      virtualKeys: PrismaGatewaySpendScopeRepository.create({
-        database: this.#spendCollaborators.prisma,
-      }),
+      virtualKeys: this.#spendCollaborators.spendScope,
     });
 
     return this.#spendScope.resolveSpendScope(input);
@@ -1444,12 +1719,12 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     endUserId: string;
     tenantIds: string[];
     virtualKeyId?: string;
-    budgetRepository: GatewayBudgetSpend;
+    budgetRepository: GatewayBudgetSpendRepository;
   }): Promise<GatewayEndUserCap[]> {
     const { budgetRepository, organizationId, endUserId, tenantIds, virtualKeyId } = input;
 
-    return GatewayEndUserCapsAdapter.create({
-      database: this.#spendCollaborators.prisma,
+    return GatewayEndUserCapsService.create({
+      budgets: this.#spendCollaborators.budgets,
       spend: budgetRepository,
     }).forEndUser({
       organizationId,
@@ -1525,7 +1800,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     return this.getSpendEvents().countUsage(input);
   }
 
-  getBudgetSpend(): GatewayBudgetSpend {
+  getBudgetSpend(): GatewayBudgetSpendRepository {
     const budgetSpend = this.#coreDependencies?.budgetSpend;
     if (!budgetSpend) throw this.spendStoreUnavailable();
     return budgetSpend;
@@ -2463,29 +2738,13 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   }
 
   /**
-   * Who a virtual key route was called by. A credential acting in one project is asked the
-   * route's permission there, as the project door asked it; a key that names no project reaches
-   * its organization and is asked per virtual key, at the scopes that key lives in.
+   * Who a virtual key route was called by. The door asked the route's permission at the
+   * credential's reach; a key that names no project is asked again per virtual key it touches.
    */
-  async authorizeVirtualKeyCaller(input: {
+  async getVirtualKeyCaller(input: {
     caller: GatewayVirtualKeyCaller;
-    permission: AuthzPermission;
   }): Promise<GatewayAuthorizedVirtualKeyCaller> {
-    const authorized = await this.#virtualKeyCallerOf(input.caller);
-    if (authorized.projectId !== null) {
-      await this.#dependencies.assertCanOperateOnAnyScope({
-        actor: authorized.actor,
-        scopes: [{ scopeType: "PROJECT", scopeId: authorized.projectId }],
-        permission: input.permission,
-      });
-    }
-
-    return authorized;
-  }
-
-  async #virtualKeyCallerOf(
-    caller: GatewayVirtualKeyCaller,
-  ): Promise<GatewayAuthorizedVirtualKeyCaller> {
+    const { caller } = input;
     switch (caller.kind) {
       case "project":
         return {
@@ -2516,55 +2775,26 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     }
   }
 
-  /**
-   * One gate for every kind of API key, at the key's own reach or at the whole
-   * organization. A legacy project key reaches its own project, and passes the
-   * organization-wide gate as on main; a scoped key is checked with its owner.
-   */
-  async authorizeKeyCaller(input: {
-    caller: GatewayKeyCaller;
-    permission: AuthzPermission;
-    reach: GatewayKeyCallerReach;
-  }): Promise<GatewayAuthorizedKeyCaller> {
-    const { caller, permission, reach } = input;
-    const authorized =
-      caller.kind === "project"
-        ? {
-            organizationId: await this.organizationIdForProject(caller.projectId),
-            projectId: caller.projectId,
-            actor: { kind: "legacyProjectKey", projectId: caller.projectId } as const,
-            actorUserId: `svc_${caller.projectId}`,
-          }
-        : {
-            organizationId: caller.organizationId,
-            projectId: caller.resolvedProject?.id ?? null,
-            actor: {
-              kind: "apiKey",
-              apiKeyId: caller.apiKeyId,
-              userId: caller.userId,
-              organizationId: caller.organizationId,
-            } as const,
-            actorUserId: caller.userId ?? `svc_${caller.resolvedProject?.id ?? caller.apiKeyId}`,
-          };
-
-    if (reach === "caller" && authorized.projectId) {
-      await this.#dependencies.assertCanOperateOnAnyScope({
-        actor: authorized.actor,
-        scopes: [{ scopeType: "PROJECT", scopeId: authorized.projectId }],
-        permission,
-      });
-    } else {
-      await this.#dependencies.assertCanOperateAtOrganization({
-        actor: authorized.actor,
-        organizationId: authorized.organizationId,
-        permission,
-      });
+  /** Any API key the key door admitted. A legacy project key is its project's organization. */
+  async getKeyCaller(input: { caller: GatewayKeyCaller }): Promise<GatewayAuthorizedKeyCaller> {
+    const { caller } = input;
+    if (caller.kind === "project") {
+      return {
+        organizationId: await this.organizationIdForProject(caller.projectId),
+        actor: { kind: "legacyProjectKey", projectId: caller.projectId },
+        actorUserId: `svc_${caller.projectId}`,
+      };
     }
 
     return {
-      organizationId: authorized.organizationId,
-      actor: authorized.actor,
-      actorUserId: authorized.actorUserId,
+      organizationId: caller.organizationId,
+      actor: {
+        kind: "apiKey",
+        apiKeyId: caller.apiKeyId,
+        userId: caller.userId,
+        organizationId: caller.organizationId,
+      },
+      actorUserId: caller.userId ?? `svc_${caller.resolvedProject?.id ?? caller.apiKeyId}`,
     };
   }
 }

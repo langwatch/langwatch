@@ -17,7 +17,7 @@ export const zodObjectCompositionRule = defineRule({
   messages: {
     spreadShape: {
       what: "`.{{method}}()` builds this schema's type through Zod's mapped `Extend` generic.",
-      why: "Only the shape spread produces a fresh object type; `.safeExtend()` preserves behaviour but instantiates the same generic.",
+      why: "Only the shape spread makes a fresh object type; `.safeExtend()` keeps behaviour but instantiates the same generic.",
       fix:
         "Choose by what the base schema carries. When it is a plain `z.object()` with no" +
         " `.strict()` or `z.strictObject()`, no `.catchall()` and no `.refine()` or" +
@@ -30,7 +30,7 @@ export const zodObjectCompositionRule = defineRule({
     keepRefinements: {
       what: "`.{{method}}()` is called on a Zod object that carries refinements.",
       why: "Spreading its shape alone would discard those checks.",
-      fix: "Write `.safeExtend({ ...fields })` here — a `z.object({ ...base.shape })` spread would drop those refinements without a type error.",
+      fix: "Write `.safeExtend({ ...fields })` here — a `z.object({ ...base.shape })` spread would drop those refinements without a type error. Read the `contract` skill.",
     },
   },
   create(context, file) {

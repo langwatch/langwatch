@@ -107,9 +107,8 @@ Feature: Transport declaration split
   Scenario: A REST request is parsed before its credential is resolved
     Given a mounted REST declaration whose door resolves a project credential
     When a caller sends a request the declared schemas refuse
-    Then the refusal is answered without the door ever resolving the credential
-    And a request the schemas accept resolves the credential, then decides, then runs the handler
-    And the credential is marked used only after the handler has answered
+    Then a caller with no valid credential is answered 401 before the schemas are consulted
+    And an authenticated caller is answered with the schema refusal
 
   @unit
   Scenario: A declared route answers at every address its family already served
@@ -226,12 +225,29 @@ Feature: Transport declaration split
     And a mount that cannot ask the question is refused, naming the route
 
   @unit
+  Scenario: A route says how far the key door asks its permission
+    Given a family behind the key door, whose keys need not name a project
+    When a route declares its permission at the key's grants, or at the organization
+    Then the door is asked that permission with the reach the route declared
+    And a route that declares no reach asks the door the permission alone
+    And a caller the door refuses never reaches the handler
+    And a mount that puts such a route behind any other door is refused, naming the route
+
+  @unit
   Scenario: A family behind a deployment secret names no tenant
     Given a declaration that names the deployment-secret door
     When the process's door accepts the secret and resolves no scope
     Then the handler is handed no actor and no scope
     And the registry records the internal-secret credential class, not a public route
     And a door that resolved a tenant scope for it fails rather than answering
+
+  @unit
+  Scenario: The deployment-secret door reads its bearer as RFC 6750 spells it
+    Given a family behind a deployment secret (Alex, 2026-10-06, Q52)
+    When a caller presents the secret after the "Bearer" scheme in any letter case, with whitespace around the header or between scheme and secret
+    Then the door admits the caller
+    And a secret presented with no scheme, or under another scheme, is refused as unverified
+    And a configured secret with whitespace around it is compared trimmed
 
   @unit
   Scenario: A family behind a deployment secret publishes the secret's own scheme
@@ -329,3 +345,72 @@ Feature: Transport declaration split
     Given two routers under one namespace that both declare "getById"
     When they are composed
     Then the composition is refused, naming the procedure
+
+  @unit
+  Scenario: A route may require several permissions together
+    Given a family behind a key door
+    When a route names two permissions in one declaration (Alex, 2026-10-05, E2)
+    Then the door is asked every one of them, in the order declared, before the body is read
+    And a route asking them at the scope its own path names asks each one there, and the first the caller lacks is the refusal, before the handler
+    And the registry and the document record every permission the route asks
+    And a set naming fewer than two, repeating one, or sharing no scope that grants them all is refused where it is written
+
+  @unit
+  Scenario: A route chooses its permission from its parsed input
+    Given a route whose permission depends on a value its input carries
+    When it declares a map from each value of that field to the permission it asks, and optionally the scope it is asked at (Alex, 2026-10-05, E3)
+    Then the door only identifies the caller before the body is read
+    And once the body is validated, the permission the value chose is asked at the scope its entry names, else at the route's own target, else at the credential's scope
+    And a caller lacking it is refused 403 permission_denied naming that permission, and the handler never runs
+    And the registry records every permission the map can ask
+    And a map whose keys are not exactly the values the field parses as, an entry naming a tier that cannot grant its permission, or a choice asked at a key's reach is refused where it is written
+    And a mount whose door cannot identify or authorize, or a browser route asking a bare entry at the credential's scope, is refused, naming the route
+
+  @integration
+  Scenario: A platform route asks the operator's platform grant at its door
+    Given a route behind the browser door declares a platform-tier permission at the platform (Alex, 2026-10-05, E4)
+    When a signed-in caller holding that permission at the platform calls it
+    Then the door asks the platform question before the body is read, and the handler runs
+    And a caller acting as another user is asked about the grant of the operator behind them
+    And a caller lacking it is refused 403 permission_denied naming the permission, and a caller with no session 401, before the body is read
+    And a non-platform permission asked at the platform, or a platform permission asked anywhere else, is refused where it is written
+    And a mount whose door cannot identify the caller or answer the platform question is refused, naming the route
+
+  @integration
+  Scenario: A hidden platform route answers not found to everyone it refuses
+    Given a platform route declares its refusal hidden (Alex, 2026-10-05, E4)
+    When a caller with no session, or a signed-in caller lacking the permission, calls it with a body over the route's cap
+    Then each is answered 404 not_found, the same answer, before the body is read
+
+  @integration
+  Scenario: A staff platform route hides from non-staff and refuses staff by name
+    Given a platform route asks a write permission and hides from callers lacking a staff permission (Alex, 2026-10-06, Q42)
+    When a caller with no session, a signed-in caller lacking the staff permission, and a staff caller lacking the write permission call it
+    Then they are answered 401, 404 not_found and 403 permission_denied naming the write permission, each before the body is read
+    And a caller holding both reaches the handler
+    And a staff permission that is not platform-tier, or a staff route that also names a refusal, is refused where it is written
+
+  @integration
+  Scenario: A route hands its handler the key the door resolved
+    Given a route behind a key door declares that its handler reads the key (Alex, 2026-10-05, E5)
+    When a caller presents an API key, a person's access token or a legacy project key
+    Then the handler is handed the key's kind, its key id and its owner beside the actor, with no key id for a token or a legacy key and no owner for an ownerless key
+    And an ingestion key and a Langy session key are handed as their own kinds
+    And a route that did not declare it is handed no key
+    And a door that resolves no key cannot declare it: refused by the compiler and where it is written
+
+  @integration
+  Scenario: A route admits only the key kinds it names
+    Given a route behind the project door names the key kinds it admits (Alex, 2026-10-05, E7)
+    When a caller presents a key of a kind the route does not name
+    Then the door is told the admitted kinds, and the caller is refused 403 key_type_not_allowed before the body is read and before the handler
+    And a door that ignored the list is backed by the runtime, which refuses the same key after the door
+    And a list that is empty or repeats a kind, or a list on any door but the project door, is refused where it is written
+
+  @integration
+  Scenario: A permission behind the CLI token door is asked of the token's person at its organization
+    Given a route behind the CLI token door declares a permission, with no target or at the organization (Alex, 2026-10-05, E8)
+    When a caller presents a live CLI token
+    Then the door asks whether the token's person holds the permission at the token's organization, before the body is read
+    And a caller lacking it is refused 403 permission_denied, and the handler never runs
+    And a CLI token door built with no way to ask that question refuses the mount of such a route, naming it

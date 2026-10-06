@@ -83,4 +83,51 @@ describe("Analytics timeseries route table", () => {
       ).toBe("evaluation_runs");
     });
   });
+
+  describe("given a query leaving out trace origins", () => {
+    // The rollup is keyed by bucket and holds no origin; the per-trace slim table keeps each
+    // trace's Origin, which its builder filters on (slim-rollup-builders.unit.test.ts).
+    /** @scenario Leaving out an origin stays accurate on optimized analytics storage */
+    it("routes a query the rollup could serve to the per-trace slim table instead", () => {
+      const series = [{ metric: "performance.total_cost" as const, aggregation: "sum" as const }];
+
+      expect(pickAnalyticsTable({ series })).toBe("trace_analytics_rollup");
+      expect(pickAnalyticsTable({ series, excludeOrigins: ["langy"] })).toBe("trace_analytics");
+    });
+
+    it("keeps the rollup when the list of origins to leave out is empty", () => {
+      expect(
+        pickAnalyticsTable({
+          series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+          excludeOrigins: [],
+        }),
+      ).toBe("trace_analytics_rollup");
+    });
+  });
+
+  describe("given a metadata.key filter on a blocklisted key sent with · for .", () => {
+    it("falls back to trace_summaries (the builders read the dotted key)", () => {
+      const table = pickAnalyticsTable({
+        series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+        filters: { "metadata.key": ["input·value"] },
+      });
+      expect(table).toBe("trace_summaries");
+    });
+  });
+
+  describe("given an evaluation metric filtered by custom metadata", () => {
+    // The eval slim row carries only the evaluation events' metadata, never
+    // the trace's, so it would count nothing (langwatch/tasks#919).
+    it.each([{ "metadata.key": ["outcome"] }, { "metadata.value": { outcome: ["ok"] } }])(
+      "routes %j to evaluation_runs",
+      (filters) => {
+        const query = {
+          series: [{ metric: "evaluations.evaluation_runs", aggregation: "cardinality" }],
+          groupBy: "evaluations.evaluation_label",
+        };
+        expect(pickAnalyticsTable(query as never)).toBe("evaluation_analytics");
+        expect(pickAnalyticsTable({ ...query, filters } as never)).toBe("evaluation_runs");
+      },
+    );
+  });
 });

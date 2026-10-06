@@ -106,17 +106,23 @@ const alice = { userId: "alice-id", name: "Alice", email: "alice@acme.test", ima
 describe("given the /api/groups family", () => {
   describe("when the organization is below Enterprise", () => {
     /** @scenario The groups family answers 402 below Enterprise, naming GROUPS */
+    /** @scenario "Group endpoints require an Enterprise plan" */
     it("refuses with enterprise_plan_required naming GROUPS before reaching the app", async () => {
       const listGroups = vi.fn();
-      const send = mount({ listGroups }, { enterprise: false });
+      const createGroup = vi.fn();
+      const send = mount({ listGroups, createGroup }, { enterprise: false });
 
       const answer = await send("/api/groups");
+      const write = await send("/api/groups", { method: "POST", body: { name: "Ops" } });
 
+      expect(answer.status).toBe(402);
       expect(await answer.json()).toMatchObject({
         code: "enterprise_plan_required",
         meta: { feature: "GROUPS" },
       });
+      expect(write.status).toBe(402);
       expect(listGroups).not.toHaveBeenCalled();
+      expect(createGroup).not.toHaveBeenCalled();
     });
   });
 
@@ -183,6 +189,7 @@ describe("given the /api/groups family", () => {
     };
 
     /** @scenario POST /api/groups creates a group */
+    /** @scenario "A request manages an organization group" */
     it("answers 201 with the group and its generated slug", async () => {
       const send = mount({ createGroup: async () => created });
 
@@ -237,6 +244,7 @@ describe("given the /api/groups family", () => {
 
   describe("when one group is read", () => {
     /** @scenario GET /api/groups/:id returns group with members and bindings */
+    /** @scenario "A request manages an organization group" */
     it("answers its members with userId, name and email, and its bindings", async () => {
       const send = mount({
         getGroup: async () => ({ ...summary("Engineering", 1), members: [alice] }),
@@ -269,6 +277,7 @@ describe("given the /api/groups family", () => {
 
   describe("when a group is renamed", () => {
     /** @scenario PATCH /api/groups/:id renames a group */
+    /** @scenario "A request manages an organization group" */
     it("answers the new name and the updated slug", async () => {
       const renameGroup = vi.fn(async () => ({
         ...summary("New Name", 0),
@@ -298,6 +307,7 @@ describe("given the /api/groups family", () => {
 
   describe("when a group is deleted", () => {
     /** @scenario DELETE /api/groups/:id deletes a group */
+    /** @scenario "A request manages an organization group" */
     it("answers 200 and asks the application to delete it", async () => {
       const deleteGroup = vi.fn(async () => {});
       const send = mount({ deleteGroup });

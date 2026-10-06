@@ -13,6 +13,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
+import type { UiEditProjectDrawerProps } from "@langwatch/organization-contract";
 import { useCallback, useMemo } from "react";
 import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 
@@ -33,12 +34,7 @@ export function EditProjectDrawer({
   projectId,
   projectName,
   currentTeamId,
-}: {
-  open?: boolean;
-  projectId?: string;
-  projectName?: string;
-  currentTeamId?: string;
-}) {
+}: UiEditProjectDrawerProps) {
   const { organization } = useOrganizationTeamProject();
   const toaster = useOrganizationToaster();
   const showErrorToast = useShowErrorToast();

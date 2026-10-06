@@ -112,7 +112,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
       };
 
       expect(reportSchema.parse(report)).toMatchObject(report);
-      expect(reportSchema.safeParse({ schedule: report.schedule }).success).toBe(false);
+      expect(reportSchema.validate({ schedule: report.schedule })).toBe(false);
     });
   });
 
@@ -158,8 +158,10 @@ describe("Feature: an agent configures an automation over MCP", () => {
         actionParams: {},
       });
 
-      expect(verdict.ok).toBe(false);
-      if (!verdict.ok) expect(verdict.message).toContain("SEND_WEBHOOK");
+      expect(verdict).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("SEND_WEBHOOK"),
+      });
     });
 
     it("refuses email fields sent for a webhook channel", () => {
@@ -288,7 +290,12 @@ describe("Feature: an agent configures an automation over MCP", () => {
     });
 
     it("still reads one from a deployment that answers with less", async () => {
-      const { kind, filterQuery, platformUrl, ...older } = TRIGGER;
+      const {
+        kind: _kind,
+        filterQuery: _filterQuery,
+        platformUrl: _platformUrl,
+        ...older
+      } = TRIGGER;
       request.mockResolvedValue(older);
 
       expect(await getTrigger("trigger-1")).toMatchObject({ id: "trigger-1" });

@@ -4,15 +4,6 @@ const DOOR_STATUSES: readonly OpsDoorStatus[] = [
   200, 201, 400, 401, 403, 404, 409, 413, 422, 429, 500, 502, 503,
 ];
 
-/** The posted document, or undefined where the body was not JSON. */
-export function parseJsonDocument(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return undefined;
-  }
-}
-
 /**
  * Rate-limit bucket for the caller. `x-forwarded-for` is only trustworthy from
  * the hop nearest us, which is why this reads the LAST entry.
@@ -22,13 +13,6 @@ export function toCallerKey(forwardedFor: string | null): string {
   const nearest = hops[hops.length - 1]?.trim();
 
   return `ip:${nearest ?? "unknown"}`;
-}
-
-/** The bearer token an `authorization` header presented, or null. */
-export function extractBearerSecret(authorization: string | null): string | null {
-  const bearer = authorization ? /^Bearer\s+(.+)$/i.exec(authorization.trim()) : null;
-
-  return bearer?.[1]?.trim() ?? null;
 }
 
 /** A handled error's status as a door writes it; one outside the door's codes answers 500. */

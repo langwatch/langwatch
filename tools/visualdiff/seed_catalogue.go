@@ -92,17 +92,17 @@ func seedLangyModel(ctx context.Context, request catalogueRequest) error {
 
 // seedAnnotationScores makes the project's one score metric if it is not listed yet.
 func seedAnnotationScores(ctx context.Context, session *trpcSession) error {
-	listed, err := session.call(ctx, "annotationScore.getAll", map[string]any{"projectId": seededProjectID}, true)
+	listed, err := session.query(ctx, "annotationScore.getAll", map[string]any{"projectId": seededProjectID})
 	if err != nil {
 		return err
 	}
 	if namedIDs(listed)[SeedAnnotationScoreName] != "" {
 		return nil
 	}
-	_, err = session.call(ctx, "annotationScore.upsert", map[string]any{
+	_, err = session.mutate(ctx, "annotationScore.upsert", map[string]any{
 		"projectId": seededProjectID, "name": SeedAnnotationScoreName, "dataType": "OPTION",
 		"description": "How good the answer was", "radioCheckboxOptions": []string{"Good", "Bad"},
-	}, false)
+	})
 	return err
 }
 
@@ -136,9 +136,9 @@ func seedNamedWorkflows(ctx context.Context, request catalogueRequest, session *
 		if known[workflow.name] != "" {
 			continue
 		}
-		_, err := session.call(ctx, "workflow.create", map[string]any{
+		_, err := session.mutate(ctx, "workflow.create", map[string]any{
 			"projectId": seededProjectID, "commitMessage": "Seeded by visualdiff", "dsl": workflowDSL(workflow.name, workflow.icon, workflow.description),
-		}, false)
+		})
 		failures = append(failures, err)
 	}
 	return errors.Join(failures...)
@@ -171,13 +171,13 @@ func workflowDSL(name, icon, description string) map[string]any {
 // seedDepartment makes the department if the organization lacks it, and puts the admin in it.
 func seedDepartment(ctx context.Context, session *trpcSession) error {
 	scope := map[string]any{"organizationId": SeededOrganizationID}
-	listed, err := session.call(ctx, "departments.list", scope, true)
+	listed, err := session.query(ctx, "departments.list", scope)
 	if err != nil {
 		return err
 	}
 	id := namedIDs(listed)[SeedDepartmentName]
 	if id == "" {
-		created, err := session.call(ctx, "departments.create", map[string]any{"organizationId": SeededOrganizationID, "name": SeedDepartmentName}, false)
+		created, err := session.mutate(ctx, "departments.create", map[string]any{"organizationId": SeededOrganizationID, "name": SeedDepartmentName})
 		if err != nil {
 			return err
 		}
@@ -187,7 +187,7 @@ func seedDepartment(ctx context.Context, session *trpcSession) error {
 	}
 	assign := map[string]any{"organizationId": SeededOrganizationID, "userId": seededAdminUserID, "departmentId": id}
 	for attempt := 1; ; attempt++ {
-		_, err = session.call(ctx, "departments.assignUser", assign, false)
+		_, err = session.mutate(ctx, "departments.assignUser", assign)
 		if err == nil || attempt == 3 {
 			return err
 		}
@@ -273,9 +273,27 @@ func signInSession(ctx context.Context, request catalogueRequest) (*trpcSession,
 	return nil, fmt.Errorf("sign in as %s: %w", request.identity.Email, err)
 }
 
+// query runs one procedure as a query (GET); see call.
+func (session *trpcSession) query(ctx context.Context, procedure string, input map[string]any) ([]byte, error) {
+	return session.call(ctx, trpcCall{procedure: procedure, input: input, query: true})
+}
+
+// mutate runs one procedure as a mutation (POST); see call.
+func (session *trpcSession) mutate(ctx context.Context, procedure string, input map[string]any) ([]byte, error) {
+	return session.call(ctx, trpcCall{procedure: procedure, input: input})
+}
+
+// trpcCall is one procedure, its input, and whether it is a query.
+type trpcCall struct {
+	procedure string
+	input     map[string]any
+	query     bool
+}
+
 // call runs one procedure as a query (GET) or a mutation, in the envelope that last
 // answered first and the other after, and keeps the one that worked.
-func (session *trpcSession) call(ctx context.Context, procedure string, input map[string]any, query bool) ([]byte, error) {
+func (session *trpcSession) call(ctx context.Context, request trpcCall) ([]byte, error) {
+	procedure, input, query := request.procedure, request.input, request.query
 	var err error
 	for _, wrapped := range []bool{session.wrapped, !session.wrapped} {
 		var body any = input
@@ -305,24 +323,25 @@ func namedIDs(body []byte) map[string]string {
 	if json.Unmarshal(body, &value) != nil {
 		return found
 	}
-	var walk func(node any)
-	walk = func(node any) {
-		switch typed := node.(type) {
-		case []any:
-			for _, item := range typed {
-				walk(item)
-			}
-		case map[string]any:
-			name, _ := typed["name"].(string)
-			id, _ := typed["id"].(string)
-			if name != "" && id != "" {
-				found[name] = id
-			}
-			for _, child := range typed {
-				walk(child)
-			}
+	collectNamedIDs(value, found)
+	return found
+}
+
+// collectNamedIDs walks node, filing every object's id under its name.
+func collectNamedIDs(node any, found map[string]string) {
+	switch typed := node.(type) {
+	case []any:
+		for _, item := range typed {
+			collectNamedIDs(item, found)
+		}
+	case map[string]any:
+		name, _ := typed["name"].(string)
+		id, _ := typed["id"].(string)
+		if name != "" && id != "" {
+			found[name] = id
+		}
+		for _, child := range typed {
+			collectNamedIDs(child, found)
 		}
 	}
-	walk(value)
-	return found
 }

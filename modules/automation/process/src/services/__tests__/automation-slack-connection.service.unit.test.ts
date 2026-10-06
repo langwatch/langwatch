@@ -1,7 +1,8 @@
-/** Automation's half of a Slack save. @see specs/automations/slack-connections.feature */
+/** Automation's half of a Slack save. @see modules/slack/specs/slack-connections.feature */
 import { SlackIntegrationMissingError, type SlackConnectionView } from "@langwatch/slack-contract";
 import { describe, expect, it } from "vitest";
 
+import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
 import { AutomationSlackConnectionService } from "../automation-slack-connection.service.ts";
 
 const PROJECT = "project-1";
@@ -53,10 +54,10 @@ function serviceOver(connections: SlackConnectionView[]) {
   const service = AutomationSlackConnectionService.create({
     slack,
     projects: { getOrganizationId: async () => "org-1" },
-    crypto: {
+    triggers: sealWith({
       encrypt: (value) => `enc(${value})`,
       decrypt: (value) => value.replace(/^enc\(|\)$/g, ""),
-    },
+    }),
   });
   return { service, calls };
 }

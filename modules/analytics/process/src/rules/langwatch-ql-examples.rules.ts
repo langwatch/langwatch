@@ -9,7 +9,7 @@ import type { QueryExampleIntent } from "@langwatch/analytics-contract";
 import type { LwqlGate } from "./lwql-gate.rules.ts";
 
 /** One bound parameter a statement declares. */
-export interface LangWatchQLExampleParameter {
+interface LangWatchQLExampleParameter {
   /** The name inside the braces, without the type. */
   readonly name: string;
   /** The declared ClickHouse type, exactly as the statement writes it. */
@@ -18,7 +18,7 @@ export interface LangWatchQLExampleParameter {
 }
 
 /** One worked LangWatchQL statement. */
-export interface LangWatchQLExample {
+interface LangWatchQLExample {
   /** Stable identifier, unique across both example libraries. */
   readonly id: string;
   readonly title: string;
@@ -44,8 +44,8 @@ export const LWQL_EXAMPLE_DATABASE = "analytics";
  * The keyset cursor parameter names, named here rather than in the CLI: two
  * names in two files is a paging loop that re-reads its first page forever.
  */
-export const LWQL_KEYSET_AFTER_TIMESTAMP_PARAMETER = "after_ts";
-export const LWQL_KEYSET_AFTER_ID_PARAMETER = "after_id";
+const LWQL_KEYSET_AFTER_TIMESTAMP_PARAMETER = "after_ts";
+const LWQL_KEYSET_AFTER_ID_PARAMETER = "after_id";
 
 /**
  * The library. Every statement bounds its dataset's time column, because that

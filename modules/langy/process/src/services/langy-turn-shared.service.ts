@@ -7,16 +7,6 @@ import {
   LANGY_TURN_OVERRIDE_FALLBACK,
 } from "@langwatch/langy-contract";
 
-import {
-  type LangyGithubPermit,
-  type LangyHarness,
-  type LangyModel,
-  type LangySessionKey,
-  type LangyTurnContextRenderer,
-  type LangySkillGates,
-  type LangyTurnMetrics,
-  type LangyUiActionSurface,
-} from "../app/langy.members.ts";
 import { type LangyWorker, type LangyWorkerProbeInput } from "../channels/langy-worker.channel.ts";
 import type {
   LangyTurnAccessRepository,
@@ -28,11 +18,53 @@ import type { LangyTurnAdmissionRepository } from "../repositories/langy-turn-ad
 import type { LangyConversationService } from "./langy-conversation.service.ts";
 import type { LangyCredentialService } from "./langy-credential.service.ts";
 import type { LangyFinalPartsService } from "./langy-final-parts.service.ts";
+import type { LangyGuidedKickoffService } from "./langy-guided-kickoff.service.ts";
+import type { LangyModel } from "./langy-model.service.ts";
 import type { LangyPrompt } from "./langy-prompt-registry.service.ts";
+import type { LangySessionKey } from "./langy-session-key.service.ts";
+import type { LangySkillGates } from "./langy-skill-gates.service.ts";
+import type { LangyUiActionSurface } from "./langy-ui-action-surface.service.ts";
+
+/** Supplies feature-flag-derived worker-harness selection. */
+abstract class LangyHarness {
+  /**
+   * Property rather than a method on purpose: methods are bivariant in
+   * their parameters, so a resolver requiring an extra dependency could
+   * still be wired here and compile. A property is contravariant, so it cannot.
+   */
+  abstract resolve: (input: {
+    userId: string;
+    projectId: string;
+    organizationId: string;
+  }) => Promise<"opencode" | "pi">;
+}
+
+/** Preserves process observability without coupling domain code to app metrics. */
+abstract class LangyTurnMetrics {
+  abstract count(input: {
+    outcome: "accepted" | "busy" | "mismatch" | "rejected" | "replay" | "failed";
+  }): void;
+}
+
+/** Renders the already-validated transport context into Langy's system prompt. */
+abstract class LangyTurnContextRenderer {
+  abstract render(input: { context: object; isUiActionSurfaceOpen: boolean }): string | null;
+}
+
+/** Checks and reserves GitHub pull-request capacity for Langy turns. */
+export abstract class LangyGithubPermit {
+  abstract reserve(input: { userId: string }): Promise<{
+    reserved: boolean;
+    allowed: boolean;
+    resetAt: number;
+  }>;
+  abstract release(input: { userId: string }): Promise<void>;
+  abstract check(input: { userId: string }): Promise<{ allowed: boolean }>;
+}
 
 export const LANGY_OVERRIDE = LANGY_TURN_OVERRIDE_FALLBACK;
 
-export interface LangyChatMessageInput {
+interface LangyChatMessageInput {
   role: "user" | "assistant" | "system";
   parts: LangyMessagePart[];
 }
@@ -51,13 +83,14 @@ export interface StartConversationTurnInput {
 
 export interface LangyTurnServiceDeps {
   finalParts?: LangyFinalPartsService;
+  guidedKickoff?: LangyGuidedKickoffService;
   conversations: LangyConversationService;
   credentials: LangyCredentialService;
   prompts?: LangyPrompt;
   promptProjectId?: string;
   models: LangyModel;
   worker: LangyWorker | null;
-  tokenBuffer: LangyTokenBufferRepository | null;
+  tokenBuffer: LangyTokenBufferRepository;
   permits: LangyGithubPermit;
   harness?: LangyHarness;
   perDayPrCap: number;
@@ -67,8 +100,8 @@ export interface LangyTurnServiceDeps {
   skillGates: LangySkillGates;
   metrics: LangyTurnMetrics;
   admission: LangyTurnAdmissionRepository;
-  accessStore: LangyTurnAccessRepository | null;
-  handoffStore: LangyTurnHandoffRepository | null;
+  accessStore: LangyTurnAccessRepository;
+  handoffStore: LangyTurnHandoffRepository;
   messages: LangyMessageRepository | null;
 }
 
@@ -78,11 +111,12 @@ export type LangyTurnServiceDependencies = LangyTurnServiceDeps & {
 
 export type LangyTurnTechnicalMembers = {
   finalParts?: LangyFinalPartsService;
+  guidedKickoff?: LangyGuidedKickoffService;
   prompts?: LangyPrompt;
   promptProjectId?: string;
   models: LangyModel;
   worker: LangyWorker | null;
-  tokenBuffer: LangyTokenBufferRepository | null;
+  tokenBuffer: LangyTokenBufferRepository;
   permits: LangyGithubPermit;
   harness?: LangyHarness;
   perDayPrCap: number;
@@ -91,8 +125,8 @@ export type LangyTurnTechnicalMembers = {
   uiActionSurface: LangyUiActionSurface;
   skillGates: LangySkillGates;
   metrics: LangyTurnMetrics;
-  accessStore: LangyTurnAccessRepository | null;
-  handoffStore: LangyTurnHandoffRepository | null;
+  accessStore: LangyTurnAccessRepository;
+  handoffStore: LangyTurnHandoffRepository;
 };
 
 export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";

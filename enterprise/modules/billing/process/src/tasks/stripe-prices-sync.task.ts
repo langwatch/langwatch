@@ -142,7 +142,7 @@ const withRetry = async <T>(action: () => Promise<T>, description: string): Prom
   throw new Error(`Stripe request failed after ${RETRY_ATTEMPTS} attempts: ${description}`);
 };
 
-export const fetchAllStripePrices = async (stripe: Stripe): Promise<Stripe.Price[]> => {
+const fetchAllStripePrices = async (stripe: Stripe): Promise<Stripe.Price[]> => {
   const allPrices: Stripe.Price[] = [];
   let startingAfter: string | undefined;
 
@@ -167,7 +167,7 @@ export const fetchAllStripePrices = async (stripe: Stripe): Promise<Stripe.Price
   throw new Error(`Stripe prices pagination exceeded ${MAX_PAGE_COUNT} pages`);
 };
 
-export const fetchAllStripeMeters = async (stripe: Stripe): Promise<Stripe.Billing.Meter[]> => {
+const fetchAllStripeMeters = async (stripe: Stripe): Promise<Stripe.Billing.Meter[]> => {
   const allMeters: Stripe.Billing.Meter[] = [];
   let startingAfter: string | undefined;
 

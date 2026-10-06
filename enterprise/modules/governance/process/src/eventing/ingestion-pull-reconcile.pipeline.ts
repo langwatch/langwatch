@@ -27,7 +27,7 @@ import { INGESTION_PULL_PROCESS_NAME } from "./ingestion-pull.process.ts";
 export const INGESTION_PULL_RECONCILE_PIPELINE_NAME = "ingestion_pull_reconcile";
 
 /** `global`: one pass walks every source and sends configure/disable to ingestion_pull_processing. */
-export function buildIngestionPullReconcile({
+function buildIngestionPullReconcile({
   app,
   processStore,
   bootedAt = nowInstant().epochMilliseconds,

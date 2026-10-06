@@ -30,6 +30,8 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/authorization": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/egress": "workspace:*",
     "@langwatch/enterprise-license-signing": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
@@ -40,6 +42,7 @@
     "@langwatch/internal-slack": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",
@@ -51,6 +54,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "catalog:",
+    "undici": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

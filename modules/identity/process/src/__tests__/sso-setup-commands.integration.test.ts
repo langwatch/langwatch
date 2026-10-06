@@ -20,6 +20,7 @@ import { SsoCredentialRepository } from "../repositories/sso-credential.reposito
 import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { SsoConnectionService } from "../services/sso-connection.service.ts";
+import { SsoIdpCredentialsService } from "../services/sso-idp-credentials.service.ts";
 import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
 import type { SsoMigrationFinalizationService } from "../services/sso-migration-finalization.service.ts";
 import { SsoSetupCommandsService } from "../services/sso-setup-commands.service.ts";
@@ -107,9 +108,12 @@ beforeEach(() => {
     connections: () => connectionService,
     reads: connections,
     activity: identityRepositoriesOverMemory(MemoryIdentityStore.create()).ssoMigrationEvidence,
-    credentials: vault,
+    idpCredentials: SsoIdpCredentialsService.create({
+      credentials: vault,
+      registrations: SsoIdpRegistrationService.create({ discovery: reachableDiscovery }),
+    }),
     breakGlass: new StubBreakGlassBindings(true),
-    registrations: SsoIdpRegistrationService.create({ discovery: reachableDiscovery }),
+    passwordDoor: async () => true,
     finalization: createApiFixture<SsoMigrationFinalizationService>({}),
     now: () => T0,
   });

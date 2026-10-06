@@ -14,7 +14,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 
-import type { ActivityMonitorRepository } from "../app/governance.members.ts";
+import type { ActivityMonitorRepository } from "../repositories/activity-monitor.repository.ts";
 
 export class ActivityMonitorService {
   private constructor(

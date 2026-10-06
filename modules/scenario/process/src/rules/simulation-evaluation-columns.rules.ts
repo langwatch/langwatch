@@ -10,7 +10,7 @@ import { z } from "zod";
  * per evaluator. Booleans travel as 0/1 and absent values as NULL or '',
  * which is how ClickHouse stores them.
  */
-export const clickHouseEvaluationColumnsSchema = z.object({
+const clickHouseEvaluationColumnsSchema = z.object({
   "Evaluations.EvaluatorId": z.array(z.string()),
   "Evaluations.Name": z.array(z.string()),
   "Evaluations.Status": z.array(z.string()),

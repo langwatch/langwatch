@@ -5,7 +5,7 @@ import type {
   UpdateTriggerCommand,
 } from "@langwatch/automation-contract";
 
-import { AutomationLogger } from "../../../app/automation.members.ts";
+import { AutomationLogger } from "../../../services/automation.service.ts";
 import type { ReportScheduleTarget } from "../../trigger.repository.ts";
 import { TriggerRepository } from "../../trigger.repository.ts";
 
@@ -81,6 +81,14 @@ export class HeartbeatTriggerRepository extends TriggerRepository {
 
   update(_input: UpdateTriggerCommand): Promise<Trigger> {
     return unavailable();
+  }
+
+  openSecret(): string {
+    throw new Error("The heartbeat never opens a secret.");
+  }
+
+  sealSecret(): string {
+    throw new Error("The heartbeat never seals a secret.");
   }
 }
 

@@ -1,22 +1,22 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { RestCaller } from "@langwatch/api/hosting";
 /**
  * @vitest-environment node
  * `POST /api/v1/agents/connect/frames`: refused before the transport (ADR-128).
  * @see specs/agents/connected-agents.feature
  */
-import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
+import { createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
+import { createAgentConnectRest } from "../agent-connect.rest.ts";
+import { connectCredentialsFact, connectDoor } from "./agent-connect-door.fixture.ts";
 
 function buildApi(relayMaxPayloadMb?: number) {
   const framesSpy = vi.fn(async () => ({ accepted: 1 }));
   const app = createApiFixture<AgentApi>({ connectFrames: framesSpy });
   const runtime = createRestRuntime({
-    identity: { authenticate: (): RestCaller => ({ actor: null, scope: null }) },
+    identity: connectDoor(),
   } as never);
   const hono = new Hono();
   hono.route(
@@ -24,13 +24,7 @@ function buildApi(relayMaxPayloadMb?: number) {
     runtime.mount(createAgentConnectRest(relayMaxPayloadMb).router(), {
       app: () => app,
       onError: canonicalErrorResponse,
-      facts: [
-        bindRestMiddleware(agentConnectHeaders, (context) => ({
-          authorization: context.req.header("authorization"),
-          projectId: context.req.header("x-project-id"),
-          instanceToken: context.req.header("x-agent-instance-token"),
-        })),
-      ],
+      facts: [connectCredentialsFact],
     }),
   );
   return {
@@ -46,7 +40,7 @@ const headers = { "content-type": "application/json", authorization: "Bearer sk-
 describe("POST /connect/frames", () => {
   describe("when the body carries no ack, result or deregister frame", () => {
     /** @scenario "A frames body the endpoint does not take is refused as a protocol frame" */
-    it("answers the framework validation envelope", async () => {
+    it("answers main's protocol_invalid frame", async () => {
       const { hono, framesSpy } = buildApi();
 
       const response = await hono.request("/api/v1/agents/connect/frames", {
@@ -56,8 +50,9 @@ describe("POST /connect/frames", () => {
       });
 
       expect(response.status).toBe(422);
-      const body = (await response.json()) as { error?: string; target?: string };
-      expect(body).toMatchObject({ code: "validation_error", meta: { target: "json" } });
+      expect(await response.json()).toMatchObject({
+        frame: { type: "refused", protocol: 1, code: "protocol_invalid" },
+      });
       expect(framesSpy).not.toHaveBeenCalled();
     });
   });

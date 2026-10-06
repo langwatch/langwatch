@@ -10,6 +10,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
@@ -47,6 +48,7 @@ function service(
   entitlements: Pick<EntitlementApi, "getActivePlan">,
 ): ScimService {
   return ScimService.create({
+    connections: HeldConnectionsFake.of(),
     prisma: repository,
     writer: new GrantsFake(),
     users: {

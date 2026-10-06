@@ -50,6 +50,7 @@ describe("the address-lock reaper", () => {
     });
 
     describe("when the reservation store is unreachable", () => {
+      /** @scenario The address-lock reap runs on every migration pass */
       it("reports nothing reaped so the next pass retries", async () => {
         const { service } = harness({
           reap: async () => {

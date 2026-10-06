@@ -1,41 +1,24 @@
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { ResourceScope } from "@langwatch/process";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * @vitest-environment node
  * @see enterprise/modules/licensing/specs/licensing.feature
  * The instance list names each install's customer through its own collaborators, not through
  * the licence registry.
  */
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { Temporal } from "@langwatch/time";
+import { nowInstant, Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
-import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
+import { createTestLicensingApp } from "../../__tests__/testing.ts";
 import { MemorySelfHostedInstanceRepository } from "../../repositories/memory/memory.self-hosted-instance.repository.ts";
-import { LicensingInfrastructureService } from "../../services/licensing-infrastructure.service.ts";
-import { LicensingModule, type LicensingInfrastructure } from "../licensing.app.ts";
-import type { SelfHostedInstancesInfrastructure } from "../licensing.members.ts";
+import type { LicensingModule } from "../licensing.app.ts";
 
 const SEEN_AT = Temporal.Instant.from("2026-09-22T12:00:00Z");
 const KNOWN_ORGANIZATIONS = new Map([["org_acme", "Acme"]]);
 
-function storesWithoutMutation(): LicensingInfrastructure {
-  return LicensingInfrastructureService.create({ processName: "the worker" }).withoutMutation({
-    licenses: {
-      getOrganizationLicense: () => Promise.resolve({ licenseKey: null }),
-      findOrganizationsWithLicense: () => Promise.resolve([]),
-    },
-  });
-}
-
-async function instancesAttributedTo(
+async function installAttributedTo(
   organizationId: string,
-): Promise<SelfHostedInstancesInfrastructure> {
+): Promise<MemorySelfHostedInstanceRepository> {
   const repository = MemorySelfHostedInstanceRepository.create();
   await repository.upsert({
     instanceId: "install-1",
@@ -56,42 +39,31 @@ async function instancesAttributedTo(
     lastUnknownFields: 0,
     raisedSignals: [],
   });
-  return {
-    repository,
-    licenses: MemoryIssuedLicenseRepository.create(),
-    organizations: {
-      findById: (id) => {
-        const name = KNOWN_ORGANIZATIONS.get(id);
-        return Promise.resolve(name === undefined ? null : { id, name });
-      },
-    },
-    optionalReportKeys: new Set(),
-  };
+  return repository;
 }
 
-function licensingOver(infrastructure: LicensingInfrastructure): Promise<LicensingModule> {
-  return LicensingModule.create({
-    dependencies: {
-      instantEval: createApiFixture<InstantEvalApi>(),
-      projects: createApiFixture<ProjectApi>(),
-      gateway: createApiFixture<GatewayApi>(),
-      organizations: createApiFixture<OrganizationApi>(),
-    },
-    members: { infrastructure, isSaas: true, serviceVersion: "test" },
-    config: TEST_LICENSING_CONFIG,
-    resources: new ResourceScope(),
-    secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
+/** Customers as the organization feature answers them: only Acme is known. */
+const organizations = createApiFixture<OrganizationApi>({
+  findProvisioningSummary: async (id) => {
+    const name = KNOWN_ORGANIZATIONS.get(id);
+    return name === undefined ? null : { id, name, slug: id, createdAt: nowInstant() };
+  },
+});
+
+async function licensingListing(organizationId: string): Promise<LicensingModule> {
+  return createTestLicensingApp({
+    repositories: { selfHostedInstances: await installAttributedTo(organizationId) },
+    dependencies: { organizations },
+    config: { isSaas: true },
+    role: "worker",
   });
 }
 
 describe("the self-hosted instance list", () => {
-  describe("given an install attributed to an organization, and no licence registry composed", () => {
+  describe("given an install attributed to an organization, and no licence issued to it", () => {
     /** @scenario "The instance list names each install's customer without the licence registry" */
     it("lists the install with its organization's name", async () => {
-      const app = await licensingOver({
-        ...storesWithoutMutation(),
-        instances: await instancesAttributedTo("org_acme"),
-      });
+      const app = await licensingListing("org_acme");
 
       const page = await app.listSelfHostedInstances({ page: 0, pageSize: 25 });
 
@@ -107,10 +79,7 @@ describe("the self-hosted instance list", () => {
   describe("given an install attributed to an organization the organization feature does not know", () => {
     /** @scenario "An install whose customer the organization feature no longer knows lists without a name" */
     it("lists the install with no organization name", async () => {
-      const app = await licensingOver({
-        ...storesWithoutMutation(),
-        instances: await instancesAttributedTo("org_gone"),
-      });
+      const app = await licensingListing("org_gone");
 
       const page = await app.listSelfHostedInstances({ page: 0, pageSize: 25 });
 
@@ -118,17 +87,6 @@ describe("the self-hosted instance list", () => {
         organizationId: "org_gone",
         organizationName: null,
       });
-    });
-  });
-
-  describe("given a process composed without stores or an instance registry", () => {
-    /** @scenario "A process that composes no stores refuses the instance registry by name" */
-    it("refuses the read naming the self-hosted instance registry", async () => {
-      const app = await licensingOver(storesWithoutMutation());
-
-      await expect(app.listSelfHostedInstances({ page: 0, pageSize: 25 })).rejects.toThrow(
-        "does not compose the self-hosted instance registry",
-      );
     });
   });
 });

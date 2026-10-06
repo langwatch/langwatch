@@ -27,10 +27,10 @@ import {
 import type { LangWatchQLFetchedTraces } from "./langwatch-ql-hydration-read.service.ts";
 
 /** Which side of a captured call a messages function answers with. */
-export type LangWatchQLMessagesSide = "both" | "input" | "output";
+type LangWatchQLMessagesSide = "both" | "input" | "output";
 
 /** One named span's messages, and whether the trace holds that span at all. */
-export interface LangWatchQLRenderedSpanMessages {
+interface LangWatchQLRenderedSpanMessages {
   readonly isSpanPresent: boolean;
   readonly json: string | null;
 }

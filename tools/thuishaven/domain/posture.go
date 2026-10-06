@@ -24,14 +24,14 @@ import (
 type ContainerPosture int
 
 const (
-	// PostureUnset: nobody has said, so haven will look at the machine.
+	// PostureUnset means nobody has said, so haven will look at the machine.
 	PostureUnset ContainerPosture = iota
-	// PostureColima: the colima VM, which is what haven sizes and caps.
+	// PostureColima means the colima VM, which is what haven sizes and caps.
 	PostureColima
-	// PostureDocker: whatever daemon the `docker` CLI already talks to —
+	// PostureDocker means whatever daemon the `docker` CLI already talks to —
 	// Docker Desktop, OrbStack, a remote context. haven does not manage it.
 	PostureDocker
-	// PostureNone: no container runtime, by choice. Every tier that would
+	// PostureNone means no container runtime, by choice. Every tier that would
 	// have used one runs natively or not at all.
 	PostureNone
 )
@@ -83,11 +83,11 @@ func PostureChoices() []string { return []string{"colima", "docker", "none"} }
 type PostureSource int
 
 const (
-	// PostureStated: an environment variable, for this run.
+	// PostureStated means an environment variable, for this run.
 	PostureStated PostureSource = iota
-	// PostureRecorded: the developer chose it once and haven wrote it down.
+	// PostureRecorded means the developer chose it once and haven wrote it down.
 	PostureRecorded
-	// PostureDetected: nobody said, so haven used what is installed.
+	// PostureDetected means nobody said, so haven used what is installed.
 	PostureDetected
 )
 

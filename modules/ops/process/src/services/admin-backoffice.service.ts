@@ -2,21 +2,23 @@ import type { LedgerActor } from "@langwatch/authorization";
 import { ValidationError } from "@langwatch/handled-error";
 import { SsoConnectionStringEditRetiredError } from "@langwatch/identity-contract";
 import {
+  ORGANIZATION_DATASET_ATTACHMENT_MAX_MB_REFUSAL,
   adminOperationInputSchema,
   type AdminOperationInput,
   type AdminOperationResult,
 } from "@langwatch/ops-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
-import type { AdminBackofficeRepository } from "../repositories/admin-backoffice.repository.ts";
+import type { AdminBackofficeRepository } from "../repositories/instance-admin.repository.ts";
 import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes.rules.ts";
+import { isOrganizationDatasetLimitWriteAllowed } from "../rules/organization-dataset-limit.rules.ts";
 import type { AdminAuditSink } from "./impersonation.service.ts";
 
 const MUTATING_METHODS = new Set(["create", "update", "updateMany", "delete", "deleteMany"]);
 /** User writes that would skip the user module's facts and last-operator rule. */
 const USER_METHODS_REFUSED = new Set(["updateMany", "delete", "deleteMany"]);
 
-export interface AdminBackofficeServiceOptions {
+interface AdminBackofficeServiceOptions {
   repository: AdminBackofficeRepository;
   users: UserApi;
   audit: AdminAuditSink;
@@ -95,6 +97,7 @@ export class AdminBackofficeService {
       return this.updateUser(parsed);
     }
 
+    this.refuseOutOfRangeDatasetLimit(parsed);
     const normalized = await this.normalizeOrganizationDomain(parsed);
     await this.auditMutation(normalized);
 
@@ -159,6 +162,19 @@ export class AdminBackofficeService {
     }
 
     return "deactivate";
+  }
+
+  /** Refused before the audit entry, so a refused write leaves nothing recorded. */
+  private refuseOutOfRangeDatasetLimit(input: AdminOperationInput): void {
+    if (input.resource !== "organization" || !MUTATING_METHODS.has(input.method)) return;
+
+    if (isOrganizationDatasetLimitWriteAllowed(input.params.data)) return;
+
+    throw new ValidationError("The max dataset file size is outside the allowed range", {
+      meta: {
+        fieldErrors: { datasetAttachmentMaxMb: [ORGANIZATION_DATASET_ATTACHMENT_MAX_MB_REFUSAL] },
+      },
+    });
   }
 
   private async normalizeOrganizationDomain(

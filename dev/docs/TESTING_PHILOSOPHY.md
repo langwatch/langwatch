@@ -19,11 +19,11 @@ Use present tense, active voice. Describe expected behavior directly.
 
 Use MDN-style naming for the unit under test:
 
-| Type      | Format      | Example                             |
-| --------- | ----------- | ----------------------------------- |
-| Function  | `name()`    | `describe("transformData()", ...)`  |
-| Class     | `Name`      | `describe("Analytics", ...)`        |
-| Component | `<Name/>`   | `describe("<DatePicker/>", ...)`    |
+| Type      | Format      | Example                              |
+| --------- | ----------- | ------------------------------------ |
+| Function  | `name()`    | `describe("transformData()", ...)`   |
+| Class     | `Name`      | `describe("Analytics", ...)`         |
+| Component | `<Name/>`   | `describe("<DatePicker/>", ...)`     |
 | Hook      | `useName()` | `describe("useUiDeployment()", ...)` |
 
 ### Nested Describe for Context

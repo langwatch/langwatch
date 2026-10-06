@@ -207,6 +207,7 @@ describe("given a create whose grants become readable", () => {
 
 describe("given a replace whose new grants do not become readable", () => {
   /** @scenario "Replacing a key's grants keeps the old ones when the new ones do not land" */
+  /** @scenario "Replacing grants is fail-safe" */
   it("revokes nothing the key already held", async () => {
     const { service, grantCalls } = makeService("attach");
 
@@ -239,7 +240,7 @@ describe("given a request made with an organization key", () => {
   const KEY_ID = "key_requesting";
   const keyRefuses = async ({ principal }: { principal: Principal }) => principal.type !== "apiKey";
 
-  /** @scenario A key-authenticated request grants at most what the requesting key holds */
+  /** @scenario "A key-authenticated request grants at most what the requesting key holds" */
   it("refuses a create past the key, though its member holds it, writing nothing", async () => {
     const { service, repository, grantCalls } = makeService(null, keyRefuses);
 
@@ -319,7 +320,7 @@ describe("given a request made with an organization key", () => {
 });
 
 describe("given a restricted key with no owner, creator or requesting key", () => {
-  /** @scenario A restricted key nobody answers for is refused */
+  /** @scenario "A restricted key nobody answers for is refused" */
   it("refuses the create and writes nothing", async () => {
     const { service, repository, grantCalls } = makeService(null);
 

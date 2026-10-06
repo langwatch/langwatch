@@ -1,23 +1,30 @@
 import type { RedisConnection } from "@langwatch/redis-client";
 
-import { PostgresSecretRepositories } from "../prisma/prisma.secret.repositories.ts";
+import { PrismaSecretRepository, type SecretDatabase } from "../prisma/prisma.secret.repository.ts";
 import { RedisOneTimeRevealRepository } from "../redis/redis.one-time-reveal.repository.ts";
-import type { SecretRepositories } from "../secret.repositories.ts";
+import type { SecretCipher, SecretRepositories } from "../secret.repositories.ts";
 
-/** The Postgres half's own input, so the generated client is named where the
- *  repositories under `prisma/` name it and not a second time here. */
-type PostgresInput = Parameters<typeof PostgresSecretRepositories.create>[0];
-
-/** Secret's live stores: durable project secrets in Postgres, and one-time
- *  reveals in Redis, where every replica reads the same parked value. */
+/**
+ * Secret's live stores: durable project secrets in Postgres, and one-time reveals in
+ * Redis, where every replica reads the same parked value. Both seal with the process's
+ * cipher; a process with no key refuses at boot naming `encryption`.
+ */
 export class LiveSecretRepositories {
-  static readonly requires = ["prisma", "redis"] as const;
-  static readonly repositories = PostgresSecretRepositories.repositories;
+  static readonly requires = ["prisma", "encryption", "redis"] as const;
+  static readonly repositories = { secrets: { tables: PrismaSecretRepository.tables } };
 
-  static create({ prisma, redis }: PostgresInput & { redis: RedisConnection }): SecretRepositories {
+  static create({
+    prisma,
+    encryption,
+    redis,
+  }: Readonly<{
+    prisma: SecretDatabase;
+    encryption: SecretCipher;
+    redis: RedisConnection;
+  }>): SecretRepositories {
     return {
-      ...PostgresSecretRepositories.create({ prisma }),
-      reveals: RedisOneTimeRevealRepository.create({ redis }),
+      secrets: PrismaSecretRepository.create({ prisma, cipher: encryption }),
+      reveals: RedisOneTimeRevealRepository.create({ redis, cipher: encryption }),
     };
   }
 }

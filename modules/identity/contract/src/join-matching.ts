@@ -1,4 +1,5 @@
 import { extractIdentifierDomain, normalizeIdentifierValue } from "./identifier.ts";
+import type { JoinRequestOrigin } from "./join-request.ts";
 
 /** Determines which organizations will accept an address for joining based on domain verification,
  * member status, and join settings. See ADR-117 D12 for the security model.
@@ -13,6 +14,36 @@ export type DomainJoinSetting = (typeof DOMAIN_JOIN_SETTINGS)[number];
 
 /** What a newly created self-serve organization starts on. */
 export const DEFAULT_DOMAIN_JOIN_SETTING: DomainJoinSetting = "request";
+
+/**
+ * The seat a person admitted without an invitation receives (ADR-171): a
+ * domain join or an SSO-admitted login. Invitations name their own role.
+ */
+export const JOINER_ROLES = ["MEMBER", "DEVELOPER"] as const;
+export type JoinerRole = (typeof JOINER_ROLES)[number];
+export const DEFAULT_JOINER_ROLE: JoinerRole = "MEMBER";
+
+/** The stored joiner seat narrowed to the two the setting allows; anything else is the default. */
+export function readJoinerRole(stored: string | null | undefined): JoinerRole {
+  return (JOINER_ROLES as readonly string[]).includes(stored ?? "")
+    ? (stored as JoinerRole)
+    : DEFAULT_JOINER_ROLE;
+}
+
+/**
+ * The seat a join lands in (ADR-171 v6): the joiner seat for a request made on
+ * the web, a Developer for one made from the terminal. Pure, so the automatic
+ * path decides from the request in hand before any projection row exists.
+ */
+export function seatForJoiner({
+  origin,
+  joinerRole,
+}: {
+  origin: JoinRequestOrigin;
+  joinerRole: JoinerRole;
+}): JoinerRole {
+  return origin === "cli" ? "DEVELOPER" : joinerRole;
+}
 
 /**
  * Asking to join needs ONE member holding a verified address on the domain:

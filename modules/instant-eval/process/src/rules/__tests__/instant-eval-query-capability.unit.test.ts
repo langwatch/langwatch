@@ -1,7 +1,7 @@
 /**
  * What a run executes its statement as, and when there is nothing to execute
  * it as at all.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import { InstantEvalNotEnabledError } from "@langwatch/instant-eval-contract";

@@ -37,7 +37,7 @@ func (o *Orchestrator) CheckHavenPath(ctx context.Context) HavenPath {
 	binDir := goBinDir(ctx)
 	home, _ := os.UserHomeDir()
 	kind := domain.ShellKindOf(os.Getenv("SHELL"))
-	rc := domain.ShellRCPath(kind, home, os.Getenv("ZDOTDIR"), os.Getenv("XDG_CONFIG_HOME"))
+	rc := domain.ShellRCPath(kind, domain.ShellDirs{Home: home, ZDotDir: os.Getenv("ZDOTDIR"), XDGConfig: os.Getenv("XDG_CONFIG_HOME")})
 	line := domain.ShellPathLine(kind, binDir)
 
 	facts := domain.HavenPathFacts{

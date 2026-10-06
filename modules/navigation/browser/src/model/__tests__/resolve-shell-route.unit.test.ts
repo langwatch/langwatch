@@ -10,13 +10,21 @@ function resolve(
     isPersonalScope = false,
     isOrgScope = false,
     isOnOwnPersonalProject = false,
+    organizationRole = "MEMBER",
   }: {
     isPersonalScope?: boolean;
     isOrgScope?: boolean;
     isOnOwnPersonalProject?: boolean;
+    organizationRole?: string;
   } = {},
 ) {
-  return resolveShellRoute({ pathname, isPersonalScope, isOrgScope, isOnOwnPersonalProject });
+  return resolveShellRoute({
+    pathname,
+    isPersonalScope,
+    isOrgScope,
+    isOnOwnPersonalProject,
+    organizationRole,
+  });
 }
 
 describe("resolveShellRoute", () => {
@@ -28,6 +36,7 @@ describe("resolveShellRoute", () => {
         isOrgScopeRoute: true,
         isResolverRoute: false,
         activeProductId: "gateway",
+        seatRefusal: null,
       });
     });
 
@@ -43,6 +52,7 @@ describe("resolveShellRoute", () => {
         isOrgScopeRoute: false,
         isResolverRoute: false,
         activeProductId: "llm-ops",
+        seatRefusal: null,
       });
     });
   });
@@ -78,6 +88,7 @@ describe("resolveShellRoute", () => {
           isOrgScopeRoute: true,
           isResolverRoute: false,
           activeProductId: null,
+          seatRefusal: null,
         });
       }
     });
@@ -113,6 +124,43 @@ describe("resolveShellRoute", () => {
       expect(resolve("/metadata/traces").activeProductId).toBe("llm-ops");
       expect(resolve("/settings-team").isSettingsRoute).toBe(false);
       expect(resolve("/settings-team").activeProductId).toBe("llm-ops");
+    });
+  });
+
+  describe("given a Developer seat", () => {
+    describe("when the address names an organization-wide product", () => {
+      it.each([
+        ["/gateway/virtual-keys", "gateway", "virtualKeys:view"],
+        ["/governance/people", "governance", "governance:view"],
+      ])("refuses %s with the product's grant named", (pathname, productId, permission) => {
+        expect(resolve(pathname, { organizationRole: "DEVELOPER" }).seatRefusal).toEqual({
+          productId,
+          permission,
+        });
+      });
+    });
+
+    describe("when the address names their own Me workspace or a project", () => {
+      it.each(["/me/sessions", "/personal-ada-abc123/traces"])("opens %s", (pathname) => {
+        expect(resolve(pathname, { organizationRole: "DEVELOPER" }).seatRefusal).toBeNull();
+      });
+    });
+
+    describe("when the address belongs to no product", () => {
+      it.each(["/settings/profile", "/onboarding/welcome", "/"])(
+        "leaves %s to the permission gate",
+        (pathname) => {
+          expect(resolve(pathname, { organizationRole: "DEVELOPER" }).seatRefusal).toBeNull();
+        },
+      );
+    });
+  });
+
+  describe("given a Full seat", () => {
+    it("opens an organization-wide product, the seat gate being for the Developer seat only", () => {
+      expect(
+        resolve("/gateway/virtual-keys", { organizationRole: "MEMBER" }).seatRefusal,
+      ).toBeNull();
     });
   });
 });

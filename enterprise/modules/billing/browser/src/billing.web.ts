@@ -5,6 +5,10 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import {
+  ContactSalesToken,
+  SeatProrationPreviewToken,
+} from "@langwatch/enterprise-billing-contract";
 
 export const billingWeb = defineBrowserModule("billing")
   .withHosts({
@@ -40,4 +44,15 @@ export const billingWeb = defineBrowserModule("billing")
       requires: "cost:view",
       load: () => import("./ui/sections/usage.screen.tsx"),
     },
+  })
+  .lends(ContactSalesToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/contact-sales/index.ts")).ContactSalesBlock,
+    }),
+  })
+  .lends(SeatProrationPreviewToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/seat-proration-preview/seat-proration-preview.tsx"))
+        .SeatProrationPreview,
+    }),
   });

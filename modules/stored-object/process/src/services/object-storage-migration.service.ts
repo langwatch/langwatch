@@ -61,9 +61,9 @@ export type MigrationPlan = {
  * Abandoned uploads can leave invalid chunk counts; planning reports every
  * blocker instead of throwing on the first.
  */
-export type DatasetBlockerReason = "active-upload" | "invalid-chunk-count";
+type DatasetBlockerReason = "active-upload" | "invalid-chunk-count";
 
-export type MigrationCopyReport = MigrationPlan & {
+type MigrationCopyReport = MigrationPlan & {
   copied: number;
   repaired: number;
   skippedVerified: number;
@@ -74,7 +74,7 @@ export type MigrationFinalizeReport = {
   publishedStoredObjects: number;
 };
 
-export class MigrationBlockedError extends Error {
+class MigrationBlockedError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "MigrationBlockedError";

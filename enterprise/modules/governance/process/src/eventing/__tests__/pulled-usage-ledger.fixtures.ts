@@ -2,6 +2,7 @@
 import {
   PULLED_USAGE_EVENT_TYPES,
   type PulledUsageObservedEventData,
+  type PulledUsagePricedEventData,
   type PulledUsageRetractedEventData,
 } from "@langwatch/enterprise-governance-contract";
 import {
@@ -13,10 +14,7 @@ import {
   ProcessManagerService,
 } from "@langwatch/eventing";
 
-import type {
-  PulledUsageLedgerRepository,
-  PulledUsageLedgerRow,
-} from "../../app/governance.members.ts";
+import type { PulledUsagePricingDeps } from "../pulled-usage-ledger.intent.ts";
 import {
   PULLED_USAGE_LEDGER_PROCESS_NAME,
   PulledUsageLedgerProcess,
@@ -68,12 +66,13 @@ export function observation(
   };
 }
 
-class RecordingLedger implements PulledUsageLedgerRepository {
-  readonly rows: PulledUsageLedgerRow[] = [];
-  insert(rows: PulledUsageLedgerRow[]): Promise<void> {
-    this.rows.push(...rows);
+/** The priced facts the process records, which gateway's ledger debits. */
+class RecordingLedger implements PulledUsagePricingDeps {
+  readonly rows: (PulledUsagePricedEventData & RetractCommandEnvelope)[] = [];
+  sendRecordPulledUsagePriced = (data: PulledUsagePricedEventData & RetractCommandEnvelope) => {
+    this.rows.push(data);
     return Promise.resolve();
-  }
+  };
 }
 
 class RecordingRetraction implements PulledUsageRetractionDeps {
@@ -96,7 +95,7 @@ export function ledgerRuntime() {
   const retraction = new RecordingRetraction();
   const config = buildProcessManager({
     name: PULLED_USAGE_LEDGER_PROCESS_NAME,
-    applier: PulledUsageLedgerProcess.create({ ledger, retraction }).processManager(),
+    applier: PulledUsageLedgerProcess.create({ pricing: ledger, retraction }).processManager(),
   }).config;
   const store = InMemoryProcessStore.createForTesting();
   const service = new ProcessManagerService({ store, definition: buildProcessDefinition(config) });

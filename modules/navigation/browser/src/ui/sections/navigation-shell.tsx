@@ -3,12 +3,14 @@
  * Drawer mounted separately (portal-based). Moved from platform/app; DashboardLayout deleted.
  */
 
+import { UiPageForbidden } from "@langwatch/browser/page-fallbacks";
 import { Box, HStack } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, type ReactNode } from "react";
 
 import {
   useNavigationShellState,
   type NavigationShellReadyState,
+  type NavigationShellState,
 } from "../../behavior/use-navigation-shell-state.ts";
 import { useProjectAddressRedirect } from "../../behavior/use-project-address-redirect.ts";
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
@@ -56,7 +58,8 @@ export function NavigationShell({
   // a later navigation keeps the last chrome and blanks just the page.
   const state = reading.status === "loading" ? lastReady.current : reading;
   if (state === null) return <>{host.waiting()}</>;
-  const page = reading.status === "loading" ? null : children;
+  const page =
+    reading.status === "loading" ? null : <SeatGate state={reading}>{children}</SeatGate>;
   if (state.status === "chromeless" || fullScreen) return <>{page}</>;
 
   const isIconRail = mode === "icon-rail";
@@ -101,6 +104,15 @@ export function NavigationShell({
       </Box>
     </Box>
   );
+}
+
+/**
+ * The one seat gate for every page in the shell (ARCHITECTURE.md §10): a page
+ * whose product the seat does not reach draws the standard permission alert.
+ */
+function SeatGate({ state, children }: { state: NavigationShellState; children: ReactNode }) {
+  if (state.status !== "ready" || !state.seatRefusal) return <>{children}</>;
+  return <UiPageForbidden permission={state.seatRefusal.permission} />;
 }
 
 /**

@@ -17,13 +17,9 @@ import { NurturingDeliveryService } from "../services/nurturing-delivery.service
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
 import { NurturingService } from "../services/nurturing.service.ts";
 
-type NurturingMembers = Readonly<{
-  idempotency: Readonly<{ claim(key: string, ttlSeconds: number): Promise<boolean> }>;
-}>;
-
 type NurturingSetup = FeatureSetup<
   typeof NurturingModule.dependencies,
-  NurturingMembers,
+  never,
   NurturingServerConfig,
   NurturingRepositories
 >;
@@ -32,7 +28,6 @@ type NurturingSetup = FeatureSetup<
 export class NurturingModule implements NurturingApi {
   static readonly contract = NurturingApi;
   static readonly dependencies = { users: UserApi };
-  static readonly reads = ["idempotency"] as const;
   static readonly config = nurturingConfig;
   static readonly secrets = nurturingSecrets;
 
@@ -46,7 +41,6 @@ export class NurturingModule implements NurturingApi {
   static async create({
     config,
     dependencies,
-    members,
     repositories,
     resources,
     secrets,
@@ -69,19 +63,20 @@ export class NurturingModule implements NurturingApi {
     if (posthog) resources.own("Nurturing PostHog client", () => posthog.close());
 
     const delivery = NurturingDeliveryService.create({
-      claims: members.idempotency,
+      claims: repositories.claims,
       customerIo,
       posthog,
       users: dependencies.users,
     });
     const milestones = NurturingMilestonesService.create({
       milestones: repositories.milestones,
-      claims: members.idempotency,
+      claims: repositories.claims,
     });
     return new NurturingModule(
       buildNurturingPipeline({
         deliver: (input) => delivery.deliver(input),
         projectCreated: (data) => milestones.projectCreated(data),
+        guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
         evaluationCompleted: (input) => milestones.evaluationCompleted(input),
         simulationRunFinished: (input) => milestones.simulationRunFinished(input),
       }),

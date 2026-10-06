@@ -4,7 +4,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { JoinRequestNotificationContextRepository } from "../join-request-notification-context.repository.ts";
 
 /** Only what this repository touches, so composition names the slice it needs. */
-export type JoinRequestNotificationContextDatabase = Pick<
+type JoinRequestNotificationContextDatabase = Pick<
   PrismaClient,
   "organization" | "joinRequest" | "team"
 >;

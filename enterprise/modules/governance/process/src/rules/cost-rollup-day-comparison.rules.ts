@@ -21,12 +21,12 @@ import {
 } from "./governance-cost-rollup-cell.rules.ts";
 
 /** One cell as the day's charges state it: its money and the newest event moment behind it. */
-export interface CostRollupDerivedCell {
+interface CostRollupDerivedCell {
   amountNanoMinor: number;
   LastEventOccurredAt: number;
 }
 
-export interface CostRollupCellMismatch {
+interface CostRollupCellMismatch {
   cell: GovernanceCostRollupCell;
   /** The BILLED amount: a non-dollar row's dollar column is empty and would read as agreement. */
   summarizedNanoMinor: number | null;
@@ -40,7 +40,7 @@ export interface CostRollupDayComparison {
 }
 
 /** The fold key a stored row or charge was written under; an unknown lane is a broken record. */
-export function keyOfSummarizedRow(row: GovernanceCostRollupCellAddress): string {
+function keyOfSummarizedRow(row: GovernanceCostRollupCellAddress): string {
   if (!isGovernanceCostSource(row.CostSource)) {
     throw new Error(`Governance cost rollup row names an unknown lane: ${row.CostSource}`);
   }

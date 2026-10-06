@@ -8,7 +8,6 @@ import {
   organizationApiKeyResolutionSchema,
   resolvedApiKeyTokenSchema,
   type ApiKey,
-  type ApiKeyBinding,
   type OrganizationApiKeyResolution,
   type ResolvedApiKeyCredential,
   API_KEY_PREFIX,
@@ -18,7 +17,7 @@ import {
 import type * as apiKeyContractModule from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 import { projectIdentitySchema, type ProjectIdentity } from "@langwatch/project-contract";
-import { Temporal, fromDate, nowInstant, type Instant } from "@langwatch/time";
+import { Temporal, fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import {
@@ -27,6 +26,7 @@ import {
   type ApiKeyAnswerCacheRepository,
 } from "../repositories/api-key-answer-cache.repository.ts";
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
+import { bindingsReachProject, findGrantedProjectIds } from "../rules/api-key-grant-reach.rules.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
@@ -54,32 +54,6 @@ function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;
 
   return key;
-}
-
-/**
- * Whether the key's own grants reach the project a caller named. An organization binding
- * reaches every project in it, a team binding every project on that team, a project binding
- * only its own.
- */
-function bindingsReachProject(
-  // The two fields the answer turns on, rather than the whole binding: the
-  // verified key carries the schema's own rows, whose optional `customRoleId`
-  // is not the narrowed one `ApiKeyBinding` states, and neither field below is
-  // that one.
-  bindings: readonly Pick<ApiKeyBinding, "scopeType" | "scopeId">[],
-  project: ProjectIdentity,
-): boolean {
-  return bindings.some((binding) => {
-    if (binding.scopeType === "ORGANIZATION") {
-      return binding.scopeId === project.organizationId;
-    }
-
-    if (binding.scopeType === "TEAM") {
-      return binding.scopeId === project.teamId;
-    }
-
-    return binding.scopeId === project.id;
-  });
 }
 
 export class ApiKeyTokenResolutionService {
@@ -183,7 +157,9 @@ export class ApiKeyTokenResolutionService {
       await this.hold({ key: unknownKey(hash), value: "1", ttlMs });
       return null;
     }
-    const heldProjectId = withProject ? (projectId ?? onlyProjectId(answer.grants)) : null;
+    const grantedProjectIds = findGrantedProjectIds(answer.grants);
+    const soleProjectId = grantedProjectIds.length === 1 ? grantedProjectIds[0] : undefined;
+    const heldProjectId = withProject ? (projectId ?? soleProjectId ?? null) : null;
     const project = heldProjectId ? await this.findProjectIdentity(heldProjectId) : null;
     const ttlMs = Math.min(
       this.sinceRead({ startedMs, ttlMs: API_KEY_ANSWER_TTL_MS }),
@@ -333,7 +309,9 @@ export class ApiKeyTokenResolutionService {
     }
     const apiKey = held.answer;
 
-    const effectiveProjectId = projectId ?? onlyProjectId(apiKey.grants);
+    const grantedProjectIds = findGrantedProjectIds(apiKey.grants);
+    const soleProjectId = grantedProjectIds.length === 1 ? grantedProjectIds[0] : undefined;
+    const effectiveProjectId = projectId ?? soleProjectId;
     if (!effectiveProjectId) {
       return null;
     }
@@ -449,20 +427,6 @@ export class ApiKeyTokenResolutionService {
   }
 }
 
-/** The one project a key's own grants name, when they name exactly one. */
-function onlyProjectId(
-  bindings: readonly Pick<ApiKeyBinding, "scopeType" | "scopeId">[],
-): string | null {
-  const projectIds = new Set(
-    bindings.flatMap((binding) =>
-      binding.scopeType === "PROJECT" && binding.scopeId ? [binding.scopeId] : [],
-    ),
-  );
-  const [only] = projectIds;
-
-  return projectIds.size === 1 && only ? only : null;
-}
-
 /** Concurrent reads of one token in this process share one promise, dropped once it settles. */
 function shared<T>({
   pending,
@@ -490,7 +454,9 @@ function tokenHash(token: string): string {
 function parseHeld(raw: string): unknown {
   try {
     return JSON.parse(raw, (field, value: unknown) =>
-      DATE_FIELDS.has(field) && typeof value === "string" ? new Date(value) : value,
+      DATE_FIELDS.has(field) && typeof value === "string"
+        ? toDate(Temporal.Instant.from(value))
+        : value,
     );
   } catch {
     return undefined;

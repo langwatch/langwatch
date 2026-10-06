@@ -43,6 +43,7 @@ const REPORT = { event: "daily_usage_stats", instance_id: "install-1", version: 
 
 describe("the usage-report receiver's doors", () => {
   /** @scenario "Both doors hand the report to the same operation" */
+  /** @scenario "An install on an older version still reaches the old statistics route" */
   it.each(["/api/track_usage", "/api/connect/v1/stats"])(
     "hands %s's body, unknown fields included, and the sender headers to the receiver",
     async (path) => {

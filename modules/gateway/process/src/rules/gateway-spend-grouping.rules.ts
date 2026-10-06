@@ -10,8 +10,6 @@ import {
   type SpendGroupByKey,
 } from "@langwatch/gateway-contract";
 
-import type { GatewaySettlementPolicy } from "../app/gateway.members.ts";
-
 /**
  * The keys the fold rewrites after admission. Requested model and provider
  * are replaced by the resolved ones, so a row's group can move under a walk.
@@ -103,4 +101,8 @@ export function assertGroupingIsWalkable({
     // A window ending past the last representable moment settles at that moment.
     settlesAtMs: Math.min(toMs + settlementPolicy.graceMs(), GATEWAY_MAX_EPOCH_MS),
   });
+}
+
+export interface GatewaySettlementPolicy {
+  graceMs(): number;
 }

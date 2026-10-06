@@ -7,6 +7,7 @@ import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import type { ScimRepository } from "../../repositories/scim.repository.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
@@ -27,6 +28,7 @@ function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
     findTokenIdsForConnection: vi.fn(async () => []),
     moveDirectoryToConnection: vi.fn(async () => undefined),
     findTokensByHashes: vi.fn(async () => []),
+    replaceTokenDigest: vi.fn(async () => undefined),
     recordTokenUse: vi.fn(async () => undefined),
     scimConnectionExists: vi.fn(async () => true),
     findDirectoryUserId: vi.fn(async () => null),
@@ -36,6 +38,7 @@ function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
     rememberDirectoryIdentity: vi.fn(async () => undefined),
     forgetDirectoryIdentity: vi.fn(async () => undefined),
     forgetDirectoryIdentitiesForUser: vi.fn(async () => undefined),
+    releaseDirectoryPeople: vi.fn(async () => undefined),
     findDirectoryConnectionsForUser: vi.fn(async () => []),
     findMembership: vi.fn(async () => null),
     findOrganizationUsers: vi.fn(async () => ({ rows: [], total: 0 })),
@@ -95,6 +98,7 @@ function service(
   lifecycle: ScimSyncLifecycle = new QuietScimSyncLifecycle(),
 ): ScimService {
   return ScimService.create({
+    connections: HeldConnectionsFake.of(),
     prisma: repo,
     writer: new GrantsFake(),
     users: {
@@ -295,6 +299,7 @@ describe("SCIM characterization: provisioning invariants", () => {
       create: vi.fn(),
     } satisfies ScimUserProvisioning;
     const scim = ScimService.create({
+      connections: HeldConnectionsFake.of(),
       prisma: repo,
       users,
       writer,
@@ -325,6 +330,100 @@ describe("SCIM characterization: provisioning invariants", () => {
     });
     expect(repo.addMembership).toHaveBeenCalledOnce();
     expect(writer.attachBindings).toHaveBeenCalledOnce();
+  });
+
+  /** @scenario Directory sync leaves a Developer alone */
+  it("asserts no organization-wide grant for a Developer seat and leaves its role alone", async () => {
+    const writer = new GrantsFake();
+    const repo = repository({
+      addMembership: vi.fn(async () => undefined),
+      findMembership: vi.fn(async () => ({
+        userId: "user_1",
+        organizationId: "org_1",
+        role: "DEVELOPER",
+        user: {
+          id: "user_1",
+          email: "developer@example.com",
+          name: "Developer",
+          deactivatedAt: null,
+          createdAt: now,
+          updatedAt: now,
+          emailVerified: true,
+          image: null,
+          pendingSsoSetup: false,
+          lastLoginAt: null,
+        },
+      })),
+      // A directory that deleted the person once and now pushes them again: the re-admission path.
+      findUserResource: vi.fn(async () => ({
+        userId: "user_1",
+        organizationId: "org_1",
+        userName: "developer@example.com",
+        name: null,
+        active: false,
+        deletedAt: fromDate(new Date(0)),
+        createdAt: fromDate(new Date(0)),
+        updatedAt: fromDate(new Date(0)),
+      })),
+    });
+    const users = {
+      findByEmail: vi.fn(async () => ({
+        id: "user_1",
+        email: "member@example.com",
+        name: "Member",
+        deactivatedAt: null,
+        createdAt: now,
+        updatedAt: now,
+        emailVerified: true,
+        image: null,
+        pendingSsoSetup: false,
+        lastLoginAt: null,
+      })),
+      findById: vi.fn(async () => ({
+        id: "user_1",
+        email: "member@example.com",
+        name: "Member",
+        deactivatedAt: null,
+        createdAt: now,
+        updatedAt: now,
+        emailVerified: true,
+        image: null,
+        pendingSsoSetup: false,
+        lastLoginAt: null,
+      })),
+      create: vi.fn(),
+    } satisfies ScimUserProvisioning;
+    const scim = ScimService.create({
+      connections: HeldConnectionsFake.of(),
+      prisma: repo,
+      users,
+      writer,
+      governance: {
+        departmentResolveByNameOrCreate: vi.fn(async () => ({
+          id: "department_1",
+          organizationId: "org_1",
+          name: "Engineering",
+          // A Department carries its timestamps; the stub used to omit them and a
+          // cast onto the whole service hid it.
+          createdAt: new Date(0),
+          updatedAt: new Date(0),
+        })),
+        departmentAssignUser: vi.fn(async () => undefined),
+      },
+      organization: new OrganizationAdministrationFake(),
+      entitlements: new FixedEntitlementService(true),
+      lifecycle: new QuietScimSyncLifecycle(),
+      provenOffboarding: false,
+      tokenPepper: "scim-test-pepper",
+    });
+    await scim.createUser({
+      organizationId: "org_1",
+      request: {
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        userName: "member@example.com",
+      },
+    });
+    expect(writer.attachBindings).not.toHaveBeenCalled();
   });
 
   describe("given a directory push carries a connection", () => {
@@ -368,6 +467,7 @@ describe("SCIM characterization: provisioning invariants", () => {
           })),
         } satisfies ScimUserProvisioning;
         const scim = ScimService.create({
+          connections: HeldConnectionsFake.of(),
           prisma: repository({ addMembership: vi.fn(async () => undefined) }),
           writer,
           users,

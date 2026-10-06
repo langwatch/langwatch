@@ -7,8 +7,11 @@ import type {
 } from "@langwatch/authz-contract";
 import { newAuthzGrantId } from "@langwatch/authz-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
+import { readJoinerRole } from "@langwatch/identity-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   CannotRemoveSelfAsLastAdminError,
+  DeveloperSeatNoSharedAccessError,
   LiteMemberViewerOnlyError,
   TeamLastAdminRequiredError,
   TeamMembershipNotFoundError,
@@ -36,6 +39,10 @@ import {
 import { fromDate } from "@langwatch/time";
 
 import {
+  DEVELOPER_ADMISSION_AUDIT_ACTION,
+  type DeveloperAdmissionVia,
+} from "../../rules/admission-audit.rules.ts";
+import {
   isActiveAdmin,
   isAdminDemotion,
   isAssignableCustomRole,
@@ -58,6 +65,7 @@ const personalTeamScope = PrismaPersonalTeamScopeRepository.create();
 const effectiveTeamAdmins = PrismaEffectiveTeamAdminsRepository.create();
 import { isCustomRole } from "../../rules/custom-role-naming.rules.ts";
 import {
+  holdsOrganizationBinding,
   isTeamRoleAllowedForOrganizationRole,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
@@ -81,6 +89,9 @@ import type {
   UpdateMemberRoleResult,
   UpdateTeamMemberRoleInput,
 } from "../organization-membership.repository.ts";
+import type { OrganizationSettingsCipher } from "../organization.repository.ts";
+
+const logger = createLogger("langwatch:organization:membership-repository");
 
 /**
  * The team's name for a refusal or a report, both of which are read by somebody
@@ -224,6 +235,8 @@ async function planUserScopeBinding({
  */
 type ScopeBindingPlan = {
   revokeIds: string[];
+  /** Why `revokeIds` go, recorded on the ledger fact; a duplicate collapse carries none. */
+  revokeReason?: string;
   change?: {
     bindingId: string;
     role: TeamUserRole;
@@ -231,6 +244,21 @@ type ScopeBindingPlan = {
   };
   attach?: AuthzLedgerBindingAttach;
 };
+
+/** The reason stamped on every row a move to the Developer seat deletes (ADR-171). */
+const DEVELOPER_SEAT_REVOKE_REASON = "seat changed to Developer";
+
+/** Revocations grouped by reason, so a seat-decided deletion is recorded as one. */
+function revokesByReason(plans: ScopeBindingPlan[]): Map<string | undefined, string[]> {
+  const grouped = new Map<string | undefined, string[]>();
+  for (const plan of plans) {
+    if (plan.revokeIds.length === 0) continue;
+    const ids = grouped.get(plan.revokeReason) ?? [];
+    ids.push(...plan.revokeIds);
+    grouped.set(plan.revokeReason, ids);
+  }
+  return grouped;
+}
 
 /**
  * Emits a batch of plans, revocations first: a crash mid-batch leaves the member with less
@@ -249,12 +277,12 @@ async function emitScopeBindingPlans({
   caller: AuthzGrantCaller;
   actor: LedgerActor;
 }): Promise<void> {
-  const revokeIds = plans.flatMap((plan) => plan.revokeIds);
-  if (revokeIds.length > 0) {
+  for (const [reason, bindingIds] of revokesByReason(plans)) {
     await writer.revokeBindings({
       organizationId,
-      bindingIds: revokeIds,
+      bindingIds,
       actor,
+      ...(reason ? { reason } : {}),
     });
   }
   for (const plan of plans) {
@@ -327,7 +355,10 @@ async function assertTeamRoleUpdateAllowed({
       teamRole: teamRoleUpdate.role as TeamRoleValue,
     })
   ) {
-    throw new LiteMemberViewerOnlyError(await teamNameFor({ tx, teamId }));
+    const teamName = await teamNameFor({ tx, teamId });
+    if (role === OrganizationUserRole.DEVELOPER)
+      throw new DeveloperSeatNoSharedAccessError(teamName);
+    throw new LiteMemberViewerOnlyError(teamName);
   }
 
   const updateIsCustomRole = isCustomRole(teamRoleUpdate.role);
@@ -429,7 +460,7 @@ async function planTeamRoleUpdate({
   ];
 }
 
-/** The ORGANIZATION-scoped grant kept in step with the seat; a Lite Member holds none. */
+/** The ORGANIZATION-scoped grant kept in step with the seat; Lite and Developer hold none. */
 async function planOrganizationSeatBinding({
   tx,
   organizationId,
@@ -441,7 +472,7 @@ async function planOrganizationSeatBinding({
   userId: string;
   role: OrganizationUserRole;
 }): Promise<ScopeBindingPlan> {
-  if (role !== OrganizationUserRole.EXTERNAL) {
+  if (holdsOrganizationBinding(role)) {
     return planUserScopeBinding({
       tx,
       organizationId,
@@ -461,7 +492,69 @@ async function planOrganizationSeatBinding({
     },
     select: { id: true },
   });
-  return { revokeIds: orgRows.map((row) => row.id) };
+  return {
+    revokeIds: orgRows.map((row) => row.id),
+    ...(role === OrganizationUserRole.DEVELOPER
+      ? { revokeReason: DEVELOPER_SEAT_REVOKE_REASON }
+      : {}),
+  };
+}
+
+/**
+ * ADR-171: a Developer holds nothing shared. Every shared team and project row goes, with
+ * the seat as its reason; the personal team and project are in neither set. A team left
+ * without an admin is reported, not refused, as the team loop reports a seat correction.
+ */
+async function planDeveloperSeatRevocations({
+  tx,
+  organizationId,
+  userId,
+  sharedTeamRows,
+  teamsLeftWithoutAdmin,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  userId: string;
+  sharedTeamRows: { id: string; scopeId: string; role: string }[];
+  teamsLeftWithoutAdmin: { id: string; name: string }[];
+}): Promise<ScopeBindingPlan> {
+  for (const row of sharedTeamRows) {
+    if (row.role !== TeamUserRole.ADMIN) continue;
+    const adminsAfter = await effectiveTeamAdmins.projectAdminUserIdsWithoutDirectRole({
+      tx,
+      organizationId,
+      teamId: row.scopeId,
+      userId,
+    });
+    if (adminsAfter.size > 0) continue;
+    teamsLeftWithoutAdmin.push({
+      id: row.scopeId,
+      name: await teamNameFor({ tx, teamId: row.scopeId }),
+    });
+  }
+  const projectRows = await tx.roleBinding.findMany({
+    where: { organizationId, userId, scopeType: RoleBindingScopeType.PROJECT },
+    select: { id: true, scopeId: true },
+  });
+  const sharedProjects =
+    projectRows.length === 0
+      ? []
+      : await tx.project.findMany({
+          where: {
+            id: { in: projectRows.map((row) => row.scopeId) },
+            isPersonal: false,
+            team: { organizationId, isPersonal: false },
+          },
+          select: { id: true },
+        });
+  const sharedProjectIds = new Set(sharedProjects.map((project) => project.id));
+  return {
+    revokeIds: [
+      ...sharedTeamRows.map((row) => row.id),
+      ...projectRows.filter((row) => sharedProjectIds.has(row.scopeId)).map((row) => row.id),
+    ],
+    revokeReason: DEVELOPER_SEAT_REVOKE_REASON,
+  };
 }
 
 /**
@@ -530,8 +623,8 @@ async function getTeamForMemberChange({
   return team;
 }
 
-/** Whether the member holds a Lite Member seat in the organization. */
-async function holdsLiteSeat({
+/** The seat the member holds in the organization, or "no-membership". */
+async function readMemberSeat({
   tx,
   organizationId,
   userId,
@@ -539,11 +632,11 @@ async function holdsLiteSeat({
   tx: Prisma.TransactionClient;
   organizationId: string;
   userId: string;
-}): Promise<boolean> {
+}): Promise<OrganizationUserRole | "no-membership"> {
   const membership = await tx.organizationUser.findUnique({
     where: { userId_organizationId: { userId, organizationId } },
   });
-  return membership?.role === OrganizationUserRole.EXTERNAL;
+  return membership?.role ?? "no-membership";
 }
 
 async function getTeamBindingRole({
@@ -616,9 +709,10 @@ async function planCustomTeamRole({
   if (!isAssignableCustomRole({ customRole, organizationId })) {
     throw new CustomRoleNotAssignableError(customRoleId);
   }
-  if (await holdsLiteSeat({ tx, organizationId, userId })) {
-    throw new LiteMemberViewerOnlyError(team.name);
-  }
+  const seat = await readMemberSeat({ tx, organizationId, userId });
+  if (seat === OrganizationUserRole.DEVELOPER)
+    throw new DeveloperSeatNoSharedAccessError(team.name);
+  if (seat === OrganizationUserRole.EXTERNAL) throw new LiteMemberViewerOnlyError(team.name);
   const current = await getTeamBindingRole({ tx, organizationId, teamId, userId });
   if (current === TeamUserRole.ADMIN) {
     await assertTeamKeepsAnAdmin({
@@ -658,8 +752,11 @@ async function planBuiltInTeamRole({
 }): Promise<PlannedTeamRole> {
   const team = await getTeamForMemberChange({ tx, teamId });
   const { organizationId } = team;
+  const seat = await readMemberSeat({ tx, organizationId, userId });
+  if (seat === OrganizationUserRole.DEVELOPER)
+    throw new DeveloperSeatNoSharedAccessError(team.name);
   if (
-    (await holdsLiteSeat({ tx, organizationId, userId })) &&
+    seat === OrganizationUserRole.EXTERNAL &&
     !isTeamRoleAllowedForOrganizationRole({
       organizationRole: OrganizationUserRole.EXTERNAL,
       teamRole: role as TeamRoleValue,
@@ -767,13 +864,20 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
      * The grant ledger every membership write states its access on.
      */
     grants: AuthzGrantsService;
+    /** Opens the stored S3 endpoint and access key an organization read carries. */
+    cipher: OrganizationSettingsCipher;
   }): PrismaOrganizationMembershipRepository {
-    return new PrismaOrganizationMembershipRepository(options.database, options.grants);
+    return new PrismaOrganizationMembershipRepository(
+      options.database,
+      options.grants,
+      options.cipher,
+    );
   }
 
   private constructor(
     private readonly prisma: PrismaClient,
     private readonly writer: AuthzGrantsService,
+    private readonly cipher: OrganizationSettingsCipher,
   ) {}
 
   findPersonalTeamsInScopes(params: {
@@ -864,74 +968,102 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }
 
   async createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult> {
-    const created = await this.prisma.$transaction(async (tx) => {
-      const organization = await tx.organization.create({
-        data: {
-          id: input.orgId,
-          name: input.orgName,
-          slug: input.orgSlug,
-          phoneNumber: input.phoneNumber,
-          signupData: input.signUpData as Prisma.InputJsonValue | undefined,
-          primaryIntent: input.primaryIntent ?? null,
-          pricingModel: input.pricingModel,
-        },
-      });
+    const created = await this.createFounderBootstrap(input);
 
-      await tx.organizationUser.create({
-        data: {
+    try {
+      // The membership stays disabled while the founder's two grants make
+      // their round trip, so committing the organization first exposes no access.
+      await this.writer.attachBindings({
+        organizationId: created.organization.id,
+        bindings: [
+          { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: created.organization.id },
+          { scopeType: RoleBindingScopeType.TEAM, scopeId: created.team.id },
+        ].map((scope) => ({
+          bindingId: newAuthzGrantId(),
+          principal: { userId: input.userId },
+          role: TeamUserRole.ADMIN,
+          customRoleId: null,
+          ...scope,
+          membershipStamp: created.membershipStamp,
+          membershipBootstrap: true,
+        })),
+        caller: { type: "system" },
+        actor: ledgerActorFor({
           userId: input.userId,
-          organizationId: organization.id,
-          role: "ADMIN",
-        },
+          fallback: "organizationService",
+        }),
+        onDuplicate: "skip",
+        requireProjection: true,
       });
 
-      const team = await tx.team.create({
-        data: {
-          id: input.teamId,
-          name: input.orgName,
-          slug: input.teamSlug,
-          organizationId: organization.id,
+      await this.prisma.organizationUser.update({
+        where: {
+          userId_organizationId: {
+            userId: input.userId,
+            organizationId: created.organization.id,
+          },
         },
+        data: { disabledAt: null },
       });
-
-      return {
-        organization: { id: organization.id, name: organization.name },
-        team: { id: team.id, slug: team.slug, name: team.name },
-      };
-    });
-
-    // The organization, its membership row and its first team are not grant
-    // facts; the founder's two ADMIN grants are, so they are emitted once the
-    // scopes they point at exist.
-    await this.writer.attachBindings({
-      organizationId: created.organization.id,
-      bindings: [
-        {
-          bindingId: newAuthzGrantId(),
-          principal: { userId: input.userId },
-          role: TeamUserRole.ADMIN,
-          customRoleId: null,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: created.organization.id,
+    } catch (error) {
+      // A queued append may outlive this request: deleting the committed rows
+      // leaves any late projection pointing at an organization never reused.
+      await this.deleteProvisionedOrganization(created.organization.id).catch(
+        (cleanupError: unknown) => {
+          logger.error(
+            { organizationId: created.organization.id, userId: input.userId, error: cleanupError },
+            "failed to clean up an incomplete founder organization",
+          );
         },
-        {
-          bindingId: newAuthzGrantId(),
-          principal: { userId: input.userId },
-          role: TeamUserRole.ADMIN,
-          customRoleId: null,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: created.team.id,
-        },
-      ],
-      caller: { type: "system" },
-      actor: ledgerActorFor({
-        userId: input.userId,
-        fallback: "organizationService",
-      }),
-      onDuplicate: "skip",
-    });
+      );
+      throw error;
+    }
 
-    return created;
+    return { organization: created.organization, team: created.team };
+  }
+
+  /** The organization, its first team and the founder's membership, held disabled. */
+  private async createFounderBootstrap(
+    input: CreateAndAssignInput,
+  ): Promise<CreateAndAssignResult & { membershipStamp: string }> {
+    const pendingDisabledAt = new Date();
+    return this.prisma.$transaction(
+      async (tx) => {
+        const organization = await tx.organization.create({
+          data: {
+            id: input.orgId,
+            name: input.orgName,
+            slug: input.orgSlug,
+            phoneNumber: input.phoneNumber,
+            signupData: input.signUpData as Prisma.InputJsonValue | undefined,
+            primaryIntent: input.primaryIntent ?? null,
+            pricingModel: input.pricingModel,
+          },
+        });
+        const membership = await tx.organizationUser.create({
+          data: {
+            userId: input.userId,
+            organizationId: organization.id,
+            role: "ADMIN",
+            disabledAt: pendingDisabledAt,
+          },
+        });
+        const team = await tx.team.create({
+          data: {
+            id: input.teamId,
+            name: input.orgName,
+            slug: input.teamSlug,
+            organizationId: organization.id,
+          },
+        });
+        return {
+          organization: { id: organization.id, name: organization.name },
+          team: { id: team.id, slug: team.slug, name: team.name },
+          membershipStamp: membership.membershipStamp,
+        };
+      },
+      { maxWait: 10_000, timeout: 30_000 },
+    );
   }
 
   async createForProvisioning(input: CreateForProvisioningInput): Promise<CreateAndAssignResult> {
@@ -1189,7 +1321,27 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         },
       },
     });
-    return organizations.map(fullyLoadedOrganizationFromRecord);
+    return organizations.map((record) =>
+      this.#openStoredSettings(fullyLoadedOrganizationFromRecord(record)),
+    );
+  }
+
+  /** The S3 endpoint and access key the organization and its projects store, opened. */
+  #openStoredSettings(organization: FullyLoadedOrganization): FullyLoadedOrganization {
+    const open = (value: string | null) => (value ? this.cipher.decrypt(value) : value);
+    return {
+      ...organization,
+      s3Endpoint: open(organization.s3Endpoint),
+      s3AccessKeyId: open(organization.s3AccessKeyId),
+      teams: organization.teams.map((team) => ({
+        ...team,
+        projects: team.projects.map((project) => ({
+          ...project,
+          s3Endpoint: open(project.s3Endpoint),
+          s3AccessKeyId: open(project.s3AccessKeyId),
+        })),
+      })),
+    };
   }
 
   async findOrganizationWithMembers(params: {
@@ -1527,20 +1679,64 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     organizationId: string;
     userId: string;
     pendingAdmissionId: string;
-  }): Promise<"created" | "already-present"> {
+    via: DeveloperAdmissionVia;
+    /** The seat a caller decided (ADR-171 v6); absent reads the joiner seat. */
+    seat?: "MEMBER" | "DEVELOPER";
+    /** Where a join request was made, for the Developer admission audit row. */
+    origin?: "web" | "cli";
+  }): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
+    const { organizationId, userId } = input;
+    const seat =
+      input.seat ??
+      readJoinerRole(
+        (
+          await this.prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: { joinerRole: true },
+          })
+        )?.joinerRole,
+      );
     try {
-      await this.prisma.organizationUser.create({
-        data: {
-          userId: input.userId,
-          organizationId: input.organizationId,
-          role: OrganizationUserRole.MEMBER,
-          pendingSsoGrantId: input.pendingAdmissionId,
-        },
+      await this.prisma.$transaction(async (tx) => {
+        await tx.organizationUser.create({
+          data: {
+            userId,
+            organizationId,
+            role: seat,
+            pendingSsoGrantId: seat === "MEMBER" ? input.pendingAdmissionId : null,
+          },
+        });
+        // A Developer gets no grant, so its admission is audited here (ADR-171).
+        if (seat === "DEVELOPER") {
+          await tx.auditLog.create({
+            data: {
+              action: DEVELOPER_ADMISSION_AUDIT_ACTION,
+              userId,
+              organizationId,
+              // The origin says a Developer seat on a Full-seat organisation was
+              // the terminal's doing, not a setting somebody changed.
+              metadata: {
+                seat,
+                via: input.via,
+                ...(input.origin === undefined ? {} : { origin: input.origin }),
+              },
+            },
+          });
+        }
       });
-      return "created";
+      return { outcome: "created", seat };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        return "already-present";
+        // The row that is there decides, not today's setting: a MEMBER row a
+        // concurrent callback made still has its grant to attach.
+        const existing = await this.prisma.organizationUser.findUnique({
+          where: { userId_organizationId: { userId, organizationId } },
+          select: { role: true },
+        });
+        return {
+          outcome: "already-present",
+          seat: existing?.role === OrganizationUserRole.DEVELOPER ? "DEVELOPER" : "MEMBER",
+        };
       }
       throw error;
     }
@@ -1804,6 +2000,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
           scopeId: { in: organizationTeamIds },
         },
         select: {
+          id: true,
           scopeId: true,
           role: true,
           customRoleId: true,
@@ -1830,6 +2027,18 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
 
       if (role === OrganizationUserRole.EXTERNAL) {
         plans.push(...(await planLiteProjectCorrections({ tx, organizationId, userId })));
+      }
+
+      if (role === OrganizationUserRole.DEVELOPER) {
+        plans.push(
+          await planDeveloperSeatRevocations({
+            tx,
+            organizationId,
+            userId,
+            sharedTeamRows: currentMemberships,
+            teamsLeftWithoutAdmin,
+          }),
+        );
       }
 
       const finalAdminCount = await tx.organizationUser.count({

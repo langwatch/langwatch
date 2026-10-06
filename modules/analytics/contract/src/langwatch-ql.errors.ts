@@ -349,3 +349,22 @@ export class LangWatchQLRateLimitedError extends HandledError {
     this.name = "LangWatchQLRateLimitedError";
   }
 }
+
+/**
+ * The shared LangWatchQL identity is already running as many statements as it
+ * may (ClickHouse TOO_MANY_SIMULTANEOUS_QUERIES). Nothing is wrong with the
+ * query: the same request succeeds moments later, so it is retryable.
+ */
+export class LangWatchQLBusyError extends HandledError {
+  declare readonly code: "lwql_busy";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super("lwql_busy", "Too many LangWatchQL queries are running right now.", {
+      httpStatus: 503,
+      retryable: true,
+      fault: "platform",
+      ...options,
+    });
+    this.name = "LangWatchQLBusyError";
+  }
+}

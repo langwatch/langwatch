@@ -83,6 +83,8 @@ interface LwQueryResult<Row = Record<string, unknown>> {
 interface LwQueryError extends Error {
   readonly code?: string;
   readonly title?: string;
+  /** Set when the host expects the same request to succeed shortly. */
+  readonly retryable?: boolean;
 }
 
 /** The four \`console\`/error origins the frame forwards to the parent for logging. */
@@ -99,8 +101,12 @@ interface LwChartQueryState<Row = Record<string, unknown>> {
   readonly isLoading: boolean;
   /** True for the initial load AND every refetch (dashboard context change, manual \`refetch()\`). */
   readonly isFetching: boolean;
+  /** True only when there is nothing to show: the query failed and never had data. */
   readonly isError: boolean;
   readonly error: LwQueryError | null;
+  /** True when the latest refetch failed and \`data\` still holds the previous rows. */
+  readonly isRefetchError: boolean;
+  readonly refetchError: LwQueryError | null;
   readonly status: "pending" | "success" | "error";
   /** Re-runs the query on demand, e.g. from a "Retry" button. */
   readonly refetch: () => void;

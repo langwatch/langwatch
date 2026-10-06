@@ -48,29 +48,47 @@ func FlowStatuses(verdicts []FlowVerdict) map[string]flowStatus {
 	}
 	statuses := map[string]flowStatus{}
 	for _, flow := range order {
-		var parts []string
-		worst := len(verdictStates) - 1
-		for _, verdict := range grouped[flow] {
-			part := string(verdict.Verdict)
-			if len(verdict.Proof) > 0 {
-				part += fmt.Sprintf(" (%d expects held)", len(verdict.Proof))
-			}
-			if verdict.FirstFailure != "" {
-				part += ": " + head(verdict.FirstFailure)
-			}
-			if len(grouped[flow]) > 1 {
-				part = string(verdict.Edition) + " " + part
-			}
-			parts = append(parts, part)
-			for rank, entry := range verdictStates {
-				if entry.verdict == verdict.Verdict && rank < worst {
-					worst = rank
-				}
-			}
-		}
-		statuses[flow] = flowStatus{result: markdownCell(strings.Join(parts, "; ")), state: verdictStates[worst].state}
+		statuses[flow] = statusOf(grouped[flow])
 	}
 	return statuses
+}
+
+// statusOf is one flow's cell, each edition's verdict joined, and the state
+// of the worst of them.
+func statusOf(verdicts []FlowVerdict) flowStatus {
+	var parts []string
+	worst := len(verdictStates) - 1
+	for _, verdict := range verdicts {
+		parts = append(parts, verdictPart(verdict, len(verdicts) > 1))
+		worst = min(worst, verdictRank(verdict.Verdict, worst))
+	}
+	return flowStatus{result: markdownCell(strings.Join(parts, "; ")), state: verdictStates[worst].state}
+}
+
+// verdictPart is one verdict's words, named by edition when the flow has several.
+func verdictPart(verdict FlowVerdict, byEdition bool) string {
+	part := string(verdict.Verdict)
+	if len(verdict.Proof) > 0 {
+		part += fmt.Sprintf(" (%d expects held)", len(verdict.Proof))
+	}
+	if verdict.FirstFailure != "" {
+		part += ": " + head(verdict.FirstFailure)
+	}
+	if byEdition {
+		part = string(verdict.Edition) + " " + part
+	}
+	return part
+}
+
+// verdictRank is the lowest rank in verdictStates below worst that names
+// verdict, or worst when none does.
+func verdictRank(verdict Verdict, worst int) int {
+	for rank, entry := range verdictStates {
+		if entry.verdict == verdict && rank < worst {
+			worst = rank
+		}
+	}
+	return worst
 }
 
 var headingCount = regexp.MustCompile(`\((\d+)\)`)
@@ -88,29 +106,8 @@ func SpliceFlowStatus(body string, statuses map[string]flowStatus) (string, erro
 	if err != nil {
 		return body, err
 	}
-	seen := map[string]bool{}
-	for index := table.header + 2; index < table.end; index++ {
-		cells := splitRow(lines[index])
-		if len(cells) != len(table.columns) {
-			continue
-		}
-		flow := strings.Trim(cells[table.flow], " `")
-		status, covered := statuses[flow]
-		if !covered {
-			continue
-		}
-		seen[flow] = true
-		cells[table.result], cells[table.state] = status.result, status.state
-		lines[index] = joinRow(cells, lines[index])
-	}
-	var added []string
-	for flow, status := range statuses {
-		if !seen[flow] {
-			cells := make([]string, len(table.columns))
-			cells[table.flow], cells[table.result], cells[table.state] = flow, status.result, status.state
-			added = append(added, joinRow(cells, lines[table.header]))
-		}
-	}
+	seen := table.update(lines, statuses)
+	added := table.missingRows(lines[table.header], statuses, seen)
 	if len(added) > 0 {
 		sort.Strings(added)
 		lines = append(lines[:table.end], append(added, lines[table.end:]...)...)
@@ -128,14 +125,8 @@ type flowsTable struct {
 }
 
 func findFlowsTable(lines []string) (flowsTable, error) {
-	table := flowsTable{heading: -1, header: -1}
-	for index, line := range lines {
-		if table.heading < 0 && strings.HasPrefix(strings.TrimSpace(line), StatusFlowsHeading) {
-			table.heading = index
-		} else if table.heading >= 0 && table.header < 0 && strings.HasPrefix(strings.TrimSpace(line), "|") {
-			table.header = index
-		}
-	}
+	table := flowsTable{}
+	table.heading, table.header = locateFlowsTable(lines)
 	if table.header < 0 || table.header+1 >= len(lines) {
 		return table, errors.New("the status has no " + StatusFlowsHeading + " table")
 	}
@@ -149,6 +140,56 @@ func findFlowsTable(lines []string) (flowsTable, error) {
 		return table, errors.New("the flows table lacks a flow, last result or state column")
 	}
 	return table, nil
+}
+
+// locateFlowsTable is the line of the flows heading and of the first table
+// row after it, each -1 when absent.
+func locateFlowsTable(lines []string) (heading, header int) {
+	heading, header = -1, -1
+	for index, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if heading < 0 && strings.HasPrefix(trimmed, StatusFlowsHeading) {
+			heading = index
+		} else if heading >= 0 && header < 0 && strings.HasPrefix(trimmed, "|") {
+			header = index
+		}
+	}
+	return heading, header
+}
+
+// update writes each covered flow's status into its row and answers the flows
+// it found.
+func (table flowsTable) update(lines []string, statuses map[string]flowStatus) map[string]bool {
+	seen := map[string]bool{}
+	for index := table.header + 2; index < table.end; index++ {
+		cells := splitRow(lines[index])
+		if len(cells) != len(table.columns) {
+			continue
+		}
+		flow := strings.Trim(cells[table.flow], " `")
+		status, covered := statuses[flow]
+		if !covered {
+			continue
+		}
+		seen[flow] = true
+		cells[table.result], cells[table.state] = status.result, status.state
+		lines[index] = joinRow(cells, lines[index])
+	}
+	return seen
+}
+
+// missingRows is a new row, shaped like header, for each status no row held.
+func (table flowsTable) missingRows(header string, statuses map[string]flowStatus, seen map[string]bool) []string {
+	var added []string
+	for flow, status := range statuses {
+		if seen[flow] {
+			continue
+		}
+		cells := make([]string, len(table.columns))
+		cells[table.flow], cells[table.result], cells[table.state] = flow, status.result, status.state
+		added = append(added, joinRow(cells, header))
+	}
+	return added
 }
 
 func column(columns []string, name string) int {

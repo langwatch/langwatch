@@ -1,6 +1,6 @@
 /**
  * The budget arithmetic: integer nano-USD throughout, so a dollar is a dollar
- * and no float decides it. @see specs/instant-evals/instant-eval-billing.feature
+ * and no float decides it. @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { describe, expect, it } from "vitest";

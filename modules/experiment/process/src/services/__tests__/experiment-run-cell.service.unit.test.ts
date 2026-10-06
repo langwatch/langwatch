@@ -15,11 +15,11 @@ import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contrac
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
-import type { ExperimentRunStreamMessage } from "../../channels/experiment-run-event-stream.channel.ts";
+import type { ExperimentRunStreamMessage } from "../../repositories/experiment-run-event-stream.repository.ts";
 import type { ExperimentRunProgressState } from "../../repositories/experiment-run-fold.repository.ts";
-import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment-run-abort.repository.ts";
+import { MemoryExperimentRunEventStreamRepository } from "../../repositories/memory/memory.experiment-run-event-stream.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
+import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment.repositories.ts";
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
 import { foldEvaluatorsOf } from "../../rules/experiment-run-plan.rules.ts";
 import { markFinished } from "../../rules/experiment-run-window.rules.ts";
@@ -127,10 +127,15 @@ const engine: {
   answers: Map<string, StudioServerEvent>;
   dispatched: string[];
   sandboxKeys: unknown[];
+  /** Each kind of event the engine was sent, and what it answers a whole-workflow run with. */
+  eventTypes: string[];
+  flow: StudioServerEvent[];
 } = {
   answers: new Map(),
   dispatched: [],
   sandboxKeys: [],
+  eventTypes: [],
+  flow: [],
 };
 
 function succeeds(nodeId: string, outputs: Record<string, unknown>, cost?: number): void {
@@ -155,7 +160,10 @@ const reported: string[] = [];
 function compose({
   collaborating = {},
   agents = [],
+  workflows,
 }: {
+  /** The committed workflows a workflow target or workflow agent may name. */
+  workflows?: ExecutionDataServices["workflows"];
   /** Real collaborators in place of the scripted ones. */
   collaborating?: Partial<Pick<ExperimentRunCollaborators, "cost" | "sandboxCredentials">>;
   /** The saved agents a target may name. */
@@ -175,6 +183,11 @@ function compose({
       }),
       studio: {
         postStudioEvent: async ({ event, onEvent }) => {
+          engine.eventTypes.push(event.type);
+          if (event.type === "execute_flow") {
+            for (const serverEvent of engine.flow) onEvent(serverEvent);
+            return;
+          }
           const nodeId = "node_id" in event.payload ? String(event.payload.node_id) : "";
           engine.dispatched.push(nodeId);
           if ("workflow" in event.payload) {
@@ -187,7 +200,7 @@ function compose({
     },
     "collaborators",
   );
-  const stream = experimentRunEventStreamChannels.memory.create();
+  const stream = MemoryExperimentRunEventStreamRepository.create();
   const cells = ExperimentRunCellService.create({
     folds,
     stream,
@@ -204,6 +217,7 @@ function compose({
             return agent;
           },
         }),
+        ...(workflows ? { workflows } : {}),
       },
       "services",
     ),
@@ -278,6 +292,8 @@ beforeEach(() => {
   engine.answers.clear();
   engine.dispatched = [];
   engine.sandboxKeys = [];
+  engine.eventTypes = [];
+  engine.flow = [];
   reported.length = 0;
 });
 
@@ -625,12 +641,12 @@ const codePlan = (): ExperimentRunPlan => ({
 });
 
 /** A cell of a code target, lent whatever key the project's credential answers with. */
-async function codeCell(credential: { mint: ApiKeyApi["mintRunKey"] }) {
+async function codeCell(credential: { mint: ApiKeyApi["mintAgentSandboxKey"] }) {
   const { folds, cells } = compose({
     agents: [codeAgent],
     collaborating: {
       sandboxCredentials: ExperimentRunSandboxCredentialService.create({
-        apiKeys: createApiFixture<ApiKeyApi>({ mintRunKey: credential.mint }),
+        apiKeys: createApiFixture<ApiKeyApi>({ mintAgentSandboxKey: credential.mint }),
       }),
     },
   });
@@ -641,21 +657,18 @@ async function codeCell(credential: { mint: ApiKeyApi["mintRunKey"] }) {
 }
 
 describe("given a cell whose target executes code", () => {
-  /** @scenario "A run lends its code a per-run key holding only the agent cache" */
-  it("lends a per-run key holding only the agent cache to the dispatched workflow", async () => {
-    const asked: string[][] = [];
-    const floors: (number | undefined)[] = [];
+  /** @scenario "A run lends its code the project's shared sandbox key" */
+  it("lends the project's shared agent sandbox key to the dispatched workflow", async () => {
+    const asked: unknown[] = [];
     const executed = await codeCell({
-      mint: async ({ permissions, minRemainingMs }) => {
-        asked.push(permissions);
-        floors.push(minRemainingMs);
+      mint: async (input) => {
+        asked.push(input);
         return "sandbox-key";
       },
     });
 
-    expect(asked).toEqual([["agentCache:manage"]]);
-    // It must outlive a Lambda dispatch (900 s and a minute back), like the engine's own key.
-    expect(floors).toEqual([960_000]);
+    // The project's shared sandbox key: api-key decides its grain, owner and lifetime.
+    expect(asked).toEqual([{ projectId: "project_alpha" }]);
 
     expect(executed.outcome).toBe("succeeded");
     expect(engine.sandboxKeys).toEqual(["sandbox-key"]);
@@ -671,5 +684,87 @@ describe("given a cell whose target executes code", () => {
 
     expect(executed.outcome).toBe("succeeded");
     expect(engine.sandboxKeys).toEqual([undefined]);
+  });
+});
+
+const workflowAgent: AgentOverview = {
+  ...codeAgent,
+  id: "agent_wf",
+  name: "Support workflow",
+  type: "workflow",
+  config: { name: "Support workflow", workflow_id: "wf_1" },
+  workflowId: "wf_1",
+  parameters: [],
+};
+
+const savedWorkflowDsl = {
+  workflow_id: "wf_1",
+  spec_version: "1.4",
+  name: "Support workflow",
+  icon: "x",
+  description: "x",
+  version: "1",
+  nodes: [
+    { id: "entry", type: "entry", position: { x: 0, y: 0 }, data: {} },
+    { id: "end", type: "end", position: { x: 0, y: 0 }, data: {} },
+  ],
+  edges: [],
+  state: {},
+};
+
+const committedWorkflows = createApiFixture<ExecutionDataServices["workflows"]>({
+  findWorkflow: async ({ workflowId }) => ({
+    id: workflowId,
+    name: "Support workflow",
+    publishedId: "version_1",
+  }),
+  findVersionDsl: async () => savedWorkflowDsl,
+});
+
+describe("given a cell whose target is a workflow agent", () => {
+  describe("when the experiment runs it", () => {
+    /** @scenario "Running the experiment executes the underlying workflow" */
+    it("executes the agent's committed workflow and reports its result, not a code validation error", async () => {
+      const { folds, cells } = compose({ agents: [workflowAgent], workflows: committedWorkflows });
+      await planned(folds, {
+        ...codePlan(),
+        targets: [
+          {
+            id: "target_code",
+            type: "agent",
+            agentType: "workflow",
+            dbAgentId: "agent_wf",
+            inputs: [{ identifier: "question", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+            mappings: {},
+          },
+        ],
+      });
+      engine.flow = [
+        {
+          type: "execution_state_change",
+          payload: {
+            execution_state: {
+              status: "success",
+              trace_id: "trace_wf_0",
+              result: { output: "4" },
+              timestamps: { started_at: 1000, finished_at: 1500 },
+            },
+          },
+        },
+        { type: "done" },
+      ];
+
+      const executed = await cells.execute(request(0, 1));
+
+      expect(engine.eventTypes).toEqual(["execute_flow"]);
+      expect(executed.outcome).toBe("succeeded");
+      expect(executed.results.map((result) => result.kind)).toEqual(["target"]);
+      expect(executed.results[0]?.data).toMatchObject({
+        targetId: "target_code",
+        predicted: { output: "4" },
+        error: null,
+      });
+    });
   });
 });

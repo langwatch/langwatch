@@ -162,6 +162,10 @@ describe("a handoff instance is ignored and the directory README is not", () => 
       }
     }
 
+    // Both directories are gitignored, so a fresh checkout has neither.
+    mkdirSync(dirname(handoffProbe), { recursive: true });
+    mkdirSync(dirname(manifestProbe), { recursive: true });
+
     try {
       writeFileSync(handoffProbe, "probe\n");
       writeFileSync(manifestProbe, "probe\n");

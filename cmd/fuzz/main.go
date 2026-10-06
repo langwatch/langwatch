@@ -14,5 +14,5 @@ func main() {
 	if err != nil {
 		root = "."
 	}
-	os.Exit(fuzz.Main(context.Background(), os.Args[1:], fuzz.Streams{Out: os.Stdout, Err: os.Stderr}, root))
+	os.Exit(fuzz.Main(context.Background(), fuzz.Invocation{Args: os.Args[1:], Streams: fuzz.Streams{Out: os.Stdout, Err: os.Stderr}, Root: root}))
 }

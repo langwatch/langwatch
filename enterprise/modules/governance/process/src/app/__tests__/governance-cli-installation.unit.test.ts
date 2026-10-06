@@ -22,7 +22,6 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 /**
  * @vitest-environment node
  */
-import { memoryRateLimiter } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -30,7 +29,8 @@ import { describe, expect, it } from "vitest";
 
 import { governanceProcessModule } from "../../governance.module.ts";
 import { governanceCliRest } from "../../transport/governance-cli.rest.ts";
-import type { GovernanceEncryptor } from "../governance.members.ts";
+import { governanceIngestRest } from "../../transport/governance-ingest.rest.ts";
+import { governanceRest } from "../../transport/governance.rest.ts";
 
 const MAIN_CLI_ROUTES = [
   "GET /api/auth/cli/budget/status",
@@ -62,6 +62,8 @@ function restHost() {
     },
     bearers: () => closed,
     audit: { record: async () => {} },
+    // The process's plan port, as the api surface supplies it; the CLI plane asks it (Q31).
+    entitlements: { holds: async () => true },
   });
 }
 
@@ -72,12 +74,6 @@ async function boot(rest: RestHost) {
     .withModules([governanceProcessModule])
     .withStores(memoryStores())
     .expose(() => ({ hosts: { rest, trpc: { mount: () => ({}) } }, serve: () => undefined }))
-    .withMembers({
-      encryption: createApiFixture<GovernanceEncryptor>(),
-      isSaas: false,
-      publicBaseUrl: "https://app.test",
-      rateLimiter: memoryRateLimiter(),
-    })
     .provide({
       agent: createApiFixture<AgentApi>(),
       project: createApiFixture<ProjectApi>(),
@@ -123,6 +119,49 @@ describe("the governance installation's CLI plane", () => {
       expect(routes.toSorted()).toEqual(MAIN_CLI_ROUTES.toSorted());
       expect(response.status).toBe(401);
       await expect(response.json()).resolves.toMatchObject({ code: "invalid_credentials" });
+    } finally {
+      await runtime.stop();
+    }
+  });
+});
+
+describe("the governance installation's REST families", () => {
+  /** @scenario Every governance REST family answers from the installed module */
+  it("serves the project family, the CLI plane and the push receivers from one installed app", async () => {
+    const rest = restHost();
+    const runtime = await boot(rest);
+
+    try {
+      const probes = [
+        {
+          family: governanceRest,
+          request: () => new Request("http://api.test/api/governance/ingestion-templates"),
+        },
+        {
+          family: governanceCliRest,
+          request: () =>
+            new Request("http://api.test/api/auth/cli/budget/status", {
+              headers: { Authorization: "Bearer lw_at_unknown" },
+            }),
+        },
+        {
+          family: governanceIngestRest,
+          request: () =>
+            new Request("http://api.test/api/ingest/otel/src_unknown", {
+              method: "POST",
+              body: "{}",
+            }),
+        },
+      ];
+
+      for (const probe of probes) {
+        expect(governanceProcessModule.transports).toContain(probe.family);
+        const response = await rest.app.fetch(probe.request());
+        const body = (await response.json()) as { code?: string };
+
+        expect(response.status, String(body.code)).toBeLessThan(500);
+        expect(body.code).not.toBe("unknown_error");
+      }
     } finally {
       await runtime.stop();
     }

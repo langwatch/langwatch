@@ -34,11 +34,9 @@ read an arbitrary location. Resolution derives the permitted location from
 the digest and configured store, verifies size and digest, then decodes within
 the envelope limits.
 
-Durable keys use the caller-owned `group-queue` namespace beneath the project
-root, such as `{projectId}/group-queue/{contentHash}`. GroupQueue's object-store
-adapter encodes that structured key. Its sweeper cannot enumerate the
-`stored-objects` namespace, while a platform project purge can still enumerate
-the complete project root.
+Durable keys are kind first, tenant second: `group-queue/{projectId}/{contentHash}`
+(ADR-172), so an operator lifecycle rule on the `group-queue/` prefix reaches every
+object. Project deletion purges nothing; the lifecycle rule alone reclaims them.
 
 Each staged job holds a lease on referenced content. Identical bodies may
 share the content while retaining distinct holder leases. Deduplication,
@@ -51,8 +49,9 @@ new lease and releases the prior lease in one operation.
 
 Content has a TTL backstop. When the last Redis holder releases, the remaining
 content receives a bounded grace window. A sweeper reclaims expired leases and
-unreferenced Redis content in cursor-bounded passes. Durable objects are
-reclaimed by GroupQueue's durable-tier lifecycle and sweeper contract.
+unreferenced Redis content in cursor-bounded passes. GroupQueue deletes no
+S3-tier object: the operator's lifecycle rule on the `group-queue/` prefix (minimum
+7 days) reclaims them, and a missing blob completes the slot fail-safe (ADR-172).
 
 Errors distinguish absent content, integrity failure, transient store failure
 and payload-limit rejection. A body that remains readable is retained while a

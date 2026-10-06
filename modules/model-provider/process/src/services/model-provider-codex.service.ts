@@ -11,8 +11,8 @@ import {
 } from "@langwatch/model-provider-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 
-import type { CodexTokenRefresher } from "../app/model-provider.members.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
+import type { CodexTokenRefresher } from "./codex-oauth-model-provider-token-refresher.service.ts";
 import type { ModelProviderQueryService } from "./model-provider-query.service.ts";
 
 type ModelProviderCodexOptions = {

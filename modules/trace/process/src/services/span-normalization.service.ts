@@ -15,9 +15,24 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
-import type { TraceSpanNormalization } from "../app/trace.members.ts";
+import {
+  convertUnixNanoToUnixMs,
+  normalizeOtlpId,
+  normalizeOtlpUnixNano,
+} from "../rules/otlp-span-identity.rules.ts";
 import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
 import { SpanRecordIdentityService } from "./span-record-identity.service.ts";
+
+export interface TraceSpanNormalization {
+  normalizeSpanReceived(params: {
+    tenantId: string;
+    span: OtlpSpan;
+    resource: OtlpResource | null;
+    instrumentationScope: OtlpInstrumentationScope | null;
+  }): NormalizedSpan;
+
+  enrichRagContextIds(span: NormalizedSpan): void;
+}
 
 const spanRecordIdentityService = SpanRecordIdentityService.create();
 
@@ -54,8 +69,8 @@ export class SpanNormalizationPipelineService implements TraceSpanNormalization 
         kind: SpanKind.INTERNAL,
         attributes: {
           "tenant.id": tenantId,
-          "trace.id": OtlpTraceRequestService.normalizeOtlpId(otlpSpan.traceId),
-          "span.id": OtlpTraceRequestService.normalizeOtlpId(otlpSpan.spanId),
+          "trace.id": normalizeOtlpId(otlpSpan.traceId),
+          "span.id": normalizeOtlpId(otlpSpan.spanId),
         },
       },
       (span) => {
@@ -107,12 +122,10 @@ export class SpanNormalizationPipelineService implements TraceSpanNormalization 
   }): NormalizedSpan {
     // decode span data
     const { traceId, spanId } = OtlpTraceRequestService.normalizeOtlpSpanIds(otlpSpan);
-    const startTimeUnixNano = OtlpTraceRequestService.normalizeOtlpUnixNano(
-      otlpSpan.startTimeUnixNano,
-    );
-    const endTimeUnixNano = OtlpTraceRequestService.normalizeOtlpUnixNano(otlpSpan.endTimeUnixNano);
-    const startTimeUnixMs = OtlpTraceRequestService.convertUnixNanoToUnixMs(startTimeUnixNano);
-    const endTimeUnixMs = OtlpTraceRequestService.convertUnixNanoToUnixMs(endTimeUnixNano);
+    const startTimeUnixNano = normalizeOtlpUnixNano(otlpSpan.startTimeUnixNano);
+    const endTimeUnixNano = normalizeOtlpUnixNano(otlpSpan.endTimeUnixNano);
+    const startTimeUnixMs = convertUnixNanoToUnixMs(startTimeUnixNano);
+    const endTimeUnixMs = convertUnixNanoToUnixMs(endTimeUnixNano);
     const durationMs = Math.max(0, endTimeUnixMs - startTimeUnixMs);
     const parentAndTraceContext = OtlpTraceRequestService.normalizeOtlpParentAndTraceContext(
       otlpSpan.parentSpanId,
@@ -177,9 +190,7 @@ export class SpanNormalizationPipelineService implements TraceSpanNormalization 
       .filter((event) => Boolean(event))
       .map((event) => ({
         name: event.name,
-        timeUnixMs: OtlpTraceRequestService.convertUnixNanoToUnixMs(
-          OtlpTraceRequestService.normalizeOtlpUnixNano(event.timeUnixNano),
-        ),
+        timeUnixMs: convertUnixNanoToUnixMs(normalizeOtlpUnixNano(event.timeUnixNano)),
         attributes: OtlpTraceRequestService.normalizeOtlpAttributes(event.attributes),
       }));
   }
@@ -188,8 +199,8 @@ export class SpanNormalizationPipelineService implements TraceSpanNormalization 
     return otlpSpan.links
       .filter((link) => Boolean(link))
       .map((link) => ({
-        traceId: OtlpTraceRequestService.normalizeOtlpId(link.traceId),
-        spanId: OtlpTraceRequestService.normalizeOtlpId(link.spanId),
+        traceId: normalizeOtlpId(link.traceId),
+        spanId: normalizeOtlpId(link.spanId),
         attributes: OtlpTraceRequestService.normalizeOtlpAttributes(link.attributes),
       }));
   }

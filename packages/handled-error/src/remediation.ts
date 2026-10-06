@@ -32,6 +32,11 @@ const registry = {
       "The body could not be parsed at all; check for truncated JSON, a trailing comma, or a Content-Type that does not match what was sent",
     ],
   },
+  unsupported_media_type: {
+    tips: [
+      "Send the body with the Content-Type in meta.expected; meta.received names the one that was sent",
+    ],
+  },
 
   // ---- dataset storage ----
   storage_not_writable: {
@@ -83,6 +88,12 @@ const registry = {
   },
   filter_field_unknown: {
     tips: ["Use one of the fields listed in meta.knownFields", "Field names are case-sensitive"],
+  },
+  filter_value_refused: {
+    tips: [
+      "meta.field names the field whose value the shorthand filter cannot answer exactly",
+      "Ask for that value with a LangWatchQL statement instead",
+    ],
   },
   lwql_unparseable: {
     tips: [
@@ -632,6 +643,13 @@ const registry = {
     ],
     docsPath: "/evaluations/evaluators/list",
   },
+  monitor_parameters_unused: {
+    tips: [
+      "Change the settings on the evaluator named in meta.evaluatorId: PUT /api/evaluators/{evaluatorId}",
+      "Or send parameters as {}; the evaluator's settings are what run, and a move to another evaluator re-checks the stored parameters",
+    ],
+    docsPath: "/evaluations/evaluators/list",
+  },
   monitor_not_found: {
     tips: [
       "List what this project has: langwatch monitor list",
@@ -895,8 +913,15 @@ const registry = {
   },
   instant_eval_not_enabled: {
     tips: [
-      "Instant Evals are behind a release flag; ask LangWatch to enable them for this project",
+      "Instant Evals are off for this organization; a self-serve organization on the hosted service is switched on by an organization admin from the search bar, and any other organization or install asks LangWatch to",
     ],
+    docsPath: "/features/instant-evals/limits-and-cost",
+  },
+  instant_eval_opt_in_not_offered: {
+    tips: [
+      "An enterprise organization, or a self-hosted install, is switched on by LangWatch rather than from the search bar; contact support@langwatch.ai",
+    ],
+    docsPath: "/features/instant-evals/limits-and-cost",
   },
   instant_eval_not_found: {
     tips: [

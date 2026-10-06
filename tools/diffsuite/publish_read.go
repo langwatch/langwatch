@@ -300,27 +300,34 @@ func readFuzz(log string) fuzzResults {
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 1024*1024), 64*1024*1024)
 	for scanner.Scan() {
-		var record struct {
-			Kind, Oracle                 string
-			Status                       int
-			Finding                      bool
-			RoutesExercised, RoutesTotal int
-		}
-		if json.Unmarshal(scanner.Bytes(), &record) != nil {
-			continue
-		}
-		switch {
-		case record.Kind == "run-complete":
-			found.visited, found.routes = record.RoutesExercised, record.RoutesTotal
-		case record.Finding:
-			found.findings++
-			if record.Status == 502 {
-				found.proxy502++
-			}
-			if record.Oracle == "hang" {
-				found.hangs++
-			}
-		}
+		found.count(scanner.Bytes())
 	}
 	return found
+}
+
+// count adds one findings.jsonl record to the results; an unreadable line is skipped.
+func (found *fuzzResults) count(line []byte) {
+	var record struct {
+		Kind, Oracle                 string
+		Status                       int
+		Finding                      bool
+		RoutesExercised, RoutesTotal int
+	}
+	if json.Unmarshal(line, &record) != nil {
+		return
+	}
+	if record.Kind == "run-complete" {
+		found.visited, found.routes = record.RoutesExercised, record.RoutesTotal
+		return
+	}
+	if !record.Finding {
+		return
+	}
+	found.findings++
+	if record.Status == 502 {
+		found.proxy502++
+	}
+	if record.Oracle == "hang" {
+		found.hangs++
+	}
 }

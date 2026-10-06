@@ -1,7 +1,7 @@
 /**
  * The eval call each kind of question becomes, and the refusals for a
  * question whose fields belong to another kind.
- * @see specs/instant-evals/instant-eval-shorthand.feature
+ * @see modules/instant-eval/specs/instant-eval-shorthand.feature
  */
 
 import type {

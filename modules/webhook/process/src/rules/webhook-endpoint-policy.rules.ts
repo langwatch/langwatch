@@ -105,7 +105,7 @@ export function assertValidEvents(enabledEvents: string[]): void {
  * dials it, not us), so the canonical SQS URL shape IS the fence. Ambient credentials would
  * write with the deployment's identity, which can reach other tenants' queues.
  */
-export function assertValidSqsDestination(
+function assertValidSqsDestination(
   sqs: SqsDestinationInput,
   configuration: WebhookEndpointConfiguration,
 ): void {

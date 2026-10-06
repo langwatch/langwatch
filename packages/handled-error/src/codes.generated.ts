@@ -378,6 +378,11 @@ export const goErrorCodes = {
    * operation. Terminal, and the remediation is in the customer's model
    * provider settings rather than in the request.
    *
+   * The answer carries a "problem" in its meta, one of the ConfigProblem*
+   * values below, naming which of those it was. The copy the customer reads is
+   * chosen from it, because "add your API key" and "add a deployment mapping"
+   * are different instructions.
+   *
    * @source services/aigateway/domain/errors.go
    */
   provider_config_invalid: { service: "aigateway", httpStatus: 400 },

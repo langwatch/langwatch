@@ -93,7 +93,7 @@ func stageOf(operation *Operation) int {
 // no lane's ids depend on how fast another ran.
 func (engine *probeEngine) runStage(selected []Operation, lanes [][]int, results []opResult) {
 	if len(lanes) > 1 {
-		engine.lanes = laneTables(selected, lanes, engine.symbolsA, engine.symbolsB)
+		engine.lanes = engine.laneTables(selected, lanes)
 	}
 	var group errgroup.Group
 	group.SetLimit(max(engine.options.Concurrency, 1))
@@ -120,10 +120,10 @@ func (engine *probeEngine) runStage(selected []Operation, lanes [][]int, results
 
 // laneTables gives each lane its own copy of both sides' tables, keyed by
 // the operations it runs.
-func laneTables(selected []Operation, lanes [][]int, symbolsA, symbolsB *SymbolTable) map[string][2]*SymbolTable {
+func (engine *probeEngine) laneTables(selected []Operation, lanes [][]int) map[string][2]*SymbolTable {
 	tables := map[string][2]*SymbolTable{}
 	for _, lane := range lanes {
-		own := [2]*SymbolTable{symbolsA.clone(), symbolsB.clone()}
+		own := [2]*SymbolTable{engine.symbolsA.clone(), engine.symbolsB.clone()}
 		for _, index := range lane {
 			tables[operationKeyOf(selected[index])] = own
 		}

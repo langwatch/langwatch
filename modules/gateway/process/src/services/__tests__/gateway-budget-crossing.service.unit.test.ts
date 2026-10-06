@@ -10,7 +10,10 @@ import type {
 import { type Instant, Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type { BudgetSpendTarget, ScopeSpend } from "../../app/gateway.members.ts";
+import type {
+  BudgetSpendTarget,
+  ScopeSpend,
+} from "../../repositories/gateway-budget-spend.repository.ts";
 import type { BucketBoundaryRow } from "../../repositories/gateway-budget.repository.ts";
 import { GatewayBudgetCrossingService } from "../gateway-budget-crossing.service.ts";
 
@@ -85,7 +88,7 @@ class StaticSpend {
     private readonly refusal?: Error,
   ) {}
 
-  async getSpendForTargetsAcrossTenants(
+  async findSpendForTargetsAcrossTenants(
     _tenantIds: string[],
     targets: BudgetSpendTarget[],
   ): Promise<ScopeSpend[]> {

@@ -3,22 +3,29 @@ import { fromDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type {
-  AppendGatewayChangeEventInput,
   BudgetDebitRow,
-  GatewayBudgetSpend,
-  GatewayChangeEvents,
-} from "../../app/gateway.members.ts";
+  GatewayBudgetSpendRepository,
+} from "../../repositories/gateway-budget-spend.repository.ts";
+import type {
+  AppendGatewayChangeEventInput,
+  GatewayChangeEventsRepository,
+} from "../../repositories/gateway-change-event.repository.ts";
 import { GatewayBudgetLedgerService } from "../gateway-budget-ledger.service.ts";
 
-class RecordingLedger implements Pick<GatewayBudgetSpend, "insertDebit"> {
+class RecordingLedger implements Pick<
+  GatewayBudgetSpendRepository,
+  "insertDebit" | "insertPulledUsageRows"
+> {
   readonly batches: BudgetDebitRow[][] = [];
 
   async insertDebit(rows: BudgetDebitRow[]): Promise<void> {
     this.batches.push(rows);
   }
+
+  async insertPulledUsageRows(): Promise<void> {}
 }
 
-class RecordingChanges implements Pick<GatewayChangeEvents, "append"> {
+class RecordingChanges implements Pick<GatewayChangeEventsRepository, "append"> {
   readonly appended: AppendGatewayChangeEventInput[] = [];
 
   async append(input: AppendGatewayChangeEventInput): Promise<{ revision: bigint }> {

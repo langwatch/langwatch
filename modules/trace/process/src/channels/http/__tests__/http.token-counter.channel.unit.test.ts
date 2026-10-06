@@ -38,6 +38,7 @@ describe("HttpTokenCounterChannel", () => {
     });
 
     /** @scenario "The tokenizer's local BPE directory is preferred over the network" */
+    /** @scenario "Token counting reads the tokenizer files the image ships" */
     it("counts from the local table and fetches nothing", async () => {
       channel = HttpTokenCounterChannel.create({
         bpeDirectory: directory,

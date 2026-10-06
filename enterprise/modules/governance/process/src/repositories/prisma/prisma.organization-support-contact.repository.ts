@@ -5,7 +5,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { OrganizationSupportContactRepository } from "../organization-support-contact.repository.ts";
 
 /** The client slice the support-contact reads bind to. */
-export type OrganizationSupportContactDatabase = Pick<PrismaClient, "organizationUser" | "user">;
+type OrganizationSupportContactDatabase = Pick<PrismaClient, "organizationUser" | "user">;
 
 /** Private Prisma owner for the rows behind "contact your admin". */
 export class PrismaOrganizationSupportContactRepository extends OrganizationSupportContactRepository {

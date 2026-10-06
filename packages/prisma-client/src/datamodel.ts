@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 export interface PrismaDatamodelModel {
   name: string;
   fields: string[];
+  ignored?: boolean;
 }
 
 /**
@@ -21,10 +22,12 @@ export function parsePrismaDatamodel(): PrismaDatamodelModel[] {
       continue;
     }
     if (line === "}") {
-      models.push(current);
+      // An @@ignore model has no client delegate (the upgrade ledger), so no module can claim it.
+      if (!current.ignored) models.push(current);
       current = undefined;
       continue;
     }
+    if (line === "@@ignore") current.ignored = true;
     const field = /^(\w+)\s/.exec(line);
     if (field?.[1]) current.fields.push(field[1]);
   }

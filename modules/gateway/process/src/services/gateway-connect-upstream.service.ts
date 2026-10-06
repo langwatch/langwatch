@@ -1,6 +1,6 @@
 /**
  * The LangWatch-hosted provider a connected install's gateway reaches for one
- * organization (ADR-156 §8). The token rests encrypted; the slot goes after the
+ * organization (ADR-156 §8). The repository seals the token at rest; the slot goes after the
  * organization's own providers, so a customer credential keeps serving its models.
  */
 import type { GatewayConnectUpstream } from "@langwatch/gateway-contract";
@@ -11,29 +11,20 @@ import type { ProviderSlot } from "../rules/gateway-config-wire.rules.ts";
 /** The row id the synthesized slot carries: fixed, so a refresh never reads as a new provider. */
 export const CONNECT_LANGWATCH_PROVIDER_ID = "connect-langwatch";
 
-export type GatewayConnectUpstreamCipher = Readonly<{
-  encrypt(plaintext: string): string;
-  decrypt(ciphertext: string): string;
-}>;
-
 export class GatewayConnectUpstreamService {
-  private constructor(
-    private readonly repository: GatewayConnectUpstreamRepository,
-    private readonly cipher: GatewayConnectUpstreamCipher,
-  ) {}
+  private constructor(private readonly repository: GatewayConnectUpstreamRepository) {}
 
   static create(input: {
     repository: GatewayConnectUpstreamRepository;
-    cipher: GatewayConnectUpstreamCipher;
   }): GatewayConnectUpstreamService {
-    return new GatewayConnectUpstreamService(input.repository, input.cipher);
+    return new GatewayConnectUpstreamService(input.repository);
   }
 
   async set(input: GatewayConnectUpstream): Promise<void> {
     await this.repository.save({
       organizationId: input.organizationId,
       baseUrl: input.baseUrl,
-      encryptedToken: this.cipher.encrypt(input.token),
+      token: input.token,
       instanceId: input.instanceId,
     });
   }
@@ -48,7 +39,7 @@ export class GatewayConnectUpstreamService {
     return stored.map((slot) => ({
       organizationId: slot.organizationId,
       baseUrl: slot.baseUrl,
-      token: this.cipher.decrypt(slot.encryptedToken),
+      token: slot.token,
       instanceId: slot.instanceId,
     }));
   }

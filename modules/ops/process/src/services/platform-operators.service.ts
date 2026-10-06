@@ -42,14 +42,14 @@ export type PlatformOperatorSeedOutcome = Readonly<{
 }>;
 
 /** Sends ops's own record-the-seed command; the event latches the seed process's marker. */
-export type PlatformOperatorSeedRecorder = Readonly<{
+type PlatformOperatorSeedRecorder = Readonly<{
   record(outcome: {
     via: Exclude<PlatformOperatorSeedOutcome["via"], "waiting">;
     userIds: readonly string[];
   }): Promise<void>;
 }>;
 
-export type PlatformOperatorsServiceOptions = Readonly<{
+type PlatformOperatorsServiceOptions = Readonly<{
   authz: Pick<
     AuthzApi,
     "grantPlatformOperator" | "revokePlatformOperator" | "listPlatformOperators"

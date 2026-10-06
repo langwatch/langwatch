@@ -1,3 +1,4 @@
+import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 /**
  * Everything a door may ask about a project's evaluators. Two doors
  * reach it — `evaluators.*` tRPC and `/api/evaluators` REST — so a rule
@@ -153,3 +154,8 @@ export interface EvaluatorApi {
 }
 
 export const EvaluatorApi = moduleApi<EvaluatorApi>()("evaluator");
+
+/** Evaluator's settings: only the shared deployment origin its platform URLs are built on. */
+export const evaluatorConfig = Config.define(() => ({ publicBaseUrl }));
+
+export type EvaluatorServerConfig = ConfigOf<typeof evaluatorConfig>;

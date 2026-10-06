@@ -34,7 +34,7 @@ import {
 
 export const SYSTEM_MIGRATIONS_PIPELINE_NAME = "ops_system_migrations";
 
-export type SystemMigrationsPipelineDefinition = StaticPipelineDefinition<
+type SystemMigrationsPipelineDefinition = StaticPipelineDefinition<
   SystemMigrationPassRequestedEvent,
   Record<string, Projection>,
   {

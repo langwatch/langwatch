@@ -44,7 +44,7 @@ const logger = createLogger("langwatch:connected-agents:dispatcher");
  */
 const CALL_KSUID_RESOURCE = "call";
 
-export interface CallDispatcherOptions {
+interface CallDispatcherOptions {
   podId: string;
   store: SessionStateStore;
   registry: ConnectedAgentRegistryService;

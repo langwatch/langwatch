@@ -4,7 +4,7 @@
  * `langyNeedsModel` gate over `api.modelProvider.getResolvedDefault`.
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -23,10 +23,11 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
   });
 }
 
+const sendMessage = vi.hoisted(() => vi.fn());
 vi.mock("@ai-sdk/react", () => ({
   useChat: () => ({
     messages: [],
-    sendMessage: vi.fn(),
+    sendMessage,
     stop: vi.fn(),
     status: "ready",
     setMessages: vi.fn(),
@@ -208,7 +209,8 @@ function renderPanel() {
 beforeEach(() => {
   resolvedDefaultRef.current = { data: undefined, isLoading: false, isError: false };
   refetchResolvedDefault.mockClear();
-  useLangyStore.setState({ isOpen: true, panelMode: "floating" });
+  sendMessage.mockClear();
+  useLangyStore.setState({ isOpen: true, panelMode: "floating", pendingPrompt: null });
 });
 
 afterEach(() => {
@@ -233,6 +235,36 @@ describe("given a project with no model provider configured", () => {
 
       // It replaces the ordinary empty state rather than sitting beside it.
       expect(screen.queryByText(/Just type away/)).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("given a project with no model and a question handed to Langy from a page", () => {
+  describe("when the panel opens with that question queued", () => {
+    /** @scenario "A question handed to Langy waits for a model instead of failing" */
+    it("holds the question behind the setup prompt and sends it once a model resolves", async () => {
+      resolvedDefaultRef.current = { data: { model: null }, isLoading: false, isError: false };
+      const rendered = renderPanel();
+      act(() => {
+        useLangyStore.getState().askLangy("Set up my first evaluator");
+      });
+
+      expect(await screen.findByText("Langy needs a model to get started")).toBeInTheDocument();
+      expect(sendMessage).not.toHaveBeenCalled();
+      expect(useLangyStore.getState().pendingPrompt).toBe("Set up my first evaluator");
+
+      resolvedDefaultRef.current = {
+        data: { model: "gpt-5-mini" },
+        isLoading: false,
+        isError: false,
+      };
+      rendered.rerender(<LangySidecar />);
+
+      await waitFor(() => {
+        expect(sendMessage).toHaveBeenCalledTimes(1);
+      });
+      expect(JSON.stringify(sendMessage.mock.calls[0]?.[0])).toContain("Set up my first evaluator");
+      expect(useLangyStore.getState().pendingPrompt).toBeNull();
     });
   });
 });

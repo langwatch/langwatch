@@ -7,12 +7,12 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
 import type { PresenceBroadcast, PresenceEmitter } from "../../app/presence.app.ts";
-import type { BroadcastTenantRateLimiterService } from "../../services/broadcast-tenant-rate-limiter.service.ts";
+import type { BroadcastTenantRateLimiterRepository } from "../broadcast-tenant-rate-limiter.repository.ts";
 
 /** The two token buckets a broadcast fabric counts against: what it sends, and what it relays. */
 export type BroadcastRateLimits = Readonly<{
-  sender: BroadcastTenantRateLimiterService;
-  subscriber: BroadcastTenantRateLimiterService;
+  sender: BroadcastTenantRateLimiterRepository;
+  subscriber: BroadcastTenantRateLimiterRepository;
 }>;
 
 /** Every `broadcast:*` channel this fan-out relays; the one list of them (record §3.3). */
@@ -51,8 +51,8 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
   private readonly EMITTER_CLEANUP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
   private emitterEmptyTimes = new Map<string, number>(); // tenantId -> empty time
   private active = false;
-  private readonly senderRateLimiter: BroadcastTenantRateLimiterService;
-  private readonly subscriberRateLimiter: BroadcastTenantRateLimiterService;
+  private readonly senderRateLimiter: BroadcastTenantRateLimiterRepository;
+  private readonly subscriberRateLimiter: BroadcastTenantRateLimiterRepository;
   private closed = false;
 
   static create(

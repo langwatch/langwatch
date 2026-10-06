@@ -1,3 +1,4 @@
+import type { IntentContext } from "@langwatch/eventing";
 import { z } from "zod";
 
 export const TRIGGER_SETTLEMENT_INTENT_TYPES = {
@@ -36,3 +37,9 @@ export const logOverflowIntentSchema = z.object({
   totalFlushed: z.number().int().positive(),
 });
 export type LogOverflowIntent = z.infer<typeof logOverflowIntentSchema>;
+
+export abstract class AutomationSettlementExecutor {
+  abstract notifyDigest(payload: NotifyDigestIntent, context: IntentContext): Promise<void>;
+  abstract persistMatch(payload: PersistMatchIntent, context: IntentContext): Promise<void>;
+  abstract logOverflow(payload: LogOverflowIntent, context: IntentContext): Promise<void>;
+}

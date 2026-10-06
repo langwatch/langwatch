@@ -8,8 +8,8 @@ import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doub
 import { describe, expect, it } from "vitest";
 
 import { TestClock } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
-import type { CodingAgentReadMetrics } from "../../../app/coding-agent.members.ts";
 import { NoopCodingAgentReadMetricsService } from "../../../services/coding-agent-read-metrics-noop.service.ts";
+import type { CodingAgentReadMetrics } from "../../coding-agent-session.repository.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 
 const WINDOW_FROM = new Date("2026-07-24T00:00:00.000Z").getTime();

@@ -6,7 +6,7 @@ import {
 
 import { sha256 } from "./metric-serialization.rules.ts";
 
-export function clampMetricCommandShardCount(value: number): number {
+function clampMetricCommandShardCount(value: number): number {
   if (!Number.isFinite(value)) return MIN_METRIC_COMMAND_SHARDS;
   return Math.min(
     MAX_METRIC_COMMAND_SHARDS,

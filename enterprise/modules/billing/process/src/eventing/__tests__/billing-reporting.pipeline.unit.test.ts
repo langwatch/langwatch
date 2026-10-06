@@ -35,6 +35,7 @@ function rollUp() {
     billingCheckpoints: repositories.checkpoints,
     getUsageReportingService: () => void 0,
     queryInstantEvalSpendTotal: async () => ({ outcome: "unavailable" }),
+    isInstantEvalMeterProvisioned: () => true,
     organizationCache: repositories.organizationCache,
     errorReporter: BillingErrorReporterService.create(),
     connectedUsageCeiling: async () => null,
@@ -81,9 +82,13 @@ describe("the monthly billing roll-up's eventing declaration", () => {
       const app = BillingModule.assemble({
         usageWarnings: createApiFixture<UsageWarningService>({}),
         resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
-        members: { isSaas: false, nodeEnvironment: "test" },
         repositories: MemoryBillingRepositories.create(),
-        config: { bankDetails: undefined, licensePaymentLinkId: undefined },
+        config: {
+          bankDetails: undefined,
+          licensePaymentLinkId: undefined,
+          isSaas: false,
+          nodeEnvironment: "test",
+        },
         peers,
         stripeSecretKey: undefined,
       });
@@ -103,9 +108,13 @@ describe("the monthly billing roll-up's eventing declaration", () => {
       BillingModule.assemble({
         usageWarnings: createApiFixture<UsageWarningService>({}),
         resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
-        members: { isSaas: true, nodeEnvironment: "test" },
         repositories: MemoryBillingRepositories.create(),
-        config: { bankDetails: undefined, licensePaymentLinkId: undefined },
+        config: {
+          bankDetails: undefined,
+          licensePaymentLinkId: undefined,
+          isSaas: true,
+          nodeEnvironment: "test",
+        },
         peers,
         stripeSecretKey: undefined,
       });
@@ -121,8 +130,32 @@ describe("the monthly billing roll-up's eventing declaration", () => {
     });
   });
 
+  describe("given usage owns the billable-events meter", () => {
+    /** @scenario "The billable-events meter keeps its lane name" */
+    it("registers no projection under the meter's lane name", () => {
+      const pipeline = BillingModule.assemble({
+        usageWarnings: createApiFixture<UsageWarningService>({}),
+        resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
+        repositories: MemoryBillingRepositories.create(),
+        config: {
+          bankDetails: undefined,
+          licensePaymentLinkId: undefined,
+          isSaas: true,
+          nodeEnvironment: "test",
+        },
+        peers,
+        stripeSecretKey: undefined,
+      }).reportingPipeline({ participation: "produce" });
+
+      expect(pipeline.globalProjections?.map(({ name }) => name)).not.toContain(
+        "orgBillableEventsMeter",
+      );
+    });
+  });
+
   describe("given usage records a month's counted total", () => {
     /** @scenario "Billing reports to Stripe from the month's counted total" */
+    /** @scenario "Billing reports the month's total to Stripe from usage's month_counted event" */
     it("subscribes to month_counted and dispatches the month's report with that total", async () => {
       const pipeline = rollUp();
       const { definition, subscribers } = peerSubscribers(pipeline);

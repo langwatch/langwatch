@@ -164,3 +164,42 @@ export interface CodingAgentDefinition {
   /** Events-only telemetry: session fold gets model calls and tool runs from LOG events. */
   logsOnly?: boolean;
 }
+
+/**
+ * Claude Code (CLI): namespaces under `claude_code.`, scope
+ * `com.anthropic.claude_code.events` — the bare `anthropic` match catches
+ * un-namespaced records. Registered AFTER claude_cowork, since cowork shares this runtime.
+ */
+export const claudeCodeAgent: CodingAgentDefinition = {
+  id: "claude_code",
+  matches: (signal) => signalSays(signal, "claude_code") || signal.scope.includes("anthropic"),
+  namePrefixes: ["claude_code."],
+};
+
+// Claude Cowork (Claude desktop in VM) shares Claude Code's event vocabulary
+// but has unique service.name; registered first to win scope over claude_code.
+export const claudeCoworkAgent: CodingAgentDefinition = {
+  id: "claude_cowork",
+  matches: (signal) => signalSays(signal, "cowork"),
+  namePrefixes: ["claude_cowork.", "cowork."],
+  // Cowork exports events over the logs protocol; spans only via a beta
+  // flag. The session fold folds its model calls and tool runs from events.
+  logsOnly: true,
+};
+
+/**
+ * GitHub Copilot CLI: namespaces under the ORG, not the product
+ * (`github.copilot.`). Emits lifecycle events as SPAN EVENTS, not log
+ * records; the aliases below fold them the same way if they ever arrive as logs.
+ */
+export const copilotAgent: CodingAgentDefinition = {
+  id: "copilot",
+  matches: (signal) => signalSays(signal, "copilot"),
+  // Longest first: `github.copilot.` must strip before bare `copilot.`.
+  namePrefixes: ["github.copilot.", "copilot."],
+
+  eventAliases: {
+    session_compaction_complete: "compaction",
+    skill_invoked: "skill_activated",
+  },
+};

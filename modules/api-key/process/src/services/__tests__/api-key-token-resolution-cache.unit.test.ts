@@ -203,6 +203,7 @@ describe("checking an API key through the shared answers", () => {
 
   describe("when a key held on both pods is revoked on one", () => {
     /** @scenario "A revoked key is refused on another pod's next request" */
+    /** @scenario A revoke made on another process reaches this one within five seconds */
     it("is refused on the other pod's next request, with no time passing", async () => {
       const { podA, podB, lifecycleOnA, mint } = harness();
       const { token, id } = await mint({ organizationId: "acme" });
@@ -442,6 +443,7 @@ describe("checking an API key through the shared answers", () => {
 
   describe("when a held key reaches its expiry", () => {
     /** @scenario "A key past its expiry is refused even while held" */
+    /** @scenario An expired key is refused at its moment, not at the cache bound */
     it("refuses it once expired", async () => {
       const { podA, podB, mint, secondsPass } = harness();
       const { token } = await mint({
@@ -522,6 +524,7 @@ describe("checking an API key through the shared answers", () => {
 
   describe("when a legacy project key is checked on two pods", () => {
     /** @scenario "A legacy project key's answer is held for five seconds" */
+    /** @scenario A legacy project key still authenticates */
     it("asks the project once until five seconds pass", async () => {
       const { podA, podB, reads, secondsPass } = harness();
 
@@ -542,6 +545,7 @@ describe("checking an API key through the shared answers", () => {
 
   describe("when a revoked legacy key's column value is presented", () => {
     /** @scenario "A revoked legacy key's column value is refused before any lookup" */
+    /** @scenario A revoked legacy key is refused */
     it("is refused without asking Redis or the project", async () => {
       const { podA, reads } = harness();
       reads.legacy.mockResolvedValue("project-acme");

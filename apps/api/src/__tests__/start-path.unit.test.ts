@@ -22,6 +22,7 @@ describe("the API start path", () => {
     });
 
     /** @scenario "The API listens only after preparation succeeded" */
+    /** @scenario "A failed migration stops the boot instead of serving" */
     it("chains the entry point behind preparation with &&, so a failed preparation never reaches it", () => {
       const start = scripts["start"] ?? "";
       expect(start.indexOf(" && ")).toBe(PREPARE.length);
@@ -55,6 +56,24 @@ describe("the API start path", () => {
           ),
         ),
       ).toEqual([]);
+    });
+  });
+
+  describe("given the worker and the browser application", () => {
+    /** @scenario "The browser application never migrates and the worker runs the API's preflight" */
+    it("starts the browser application without preparation and the worker through the API's", () => {
+      const migrates =
+        /start:prepare|prisma-migrate|clickhouse-migrate|lwql-provision|system-migrations-pass/;
+      const [worker, ui] = ["worker", "ui"].map(
+        (app) =>
+          JSON.parse(readFromRoot(`apps/${app}/package.json`)).scripts as Record<string, string>,
+      );
+
+      for (const name of ["predev", "dev", "build", "start"]) {
+        expect(ui?.[name] ?? "").not.toMatch(migrates);
+      }
+      expect(worker?.["start"]).toContain(PREPARE);
+      expect(worker?.["start:prepare:db"]).toBe(scripts["start:prepare:db"]);
     });
   });
 });

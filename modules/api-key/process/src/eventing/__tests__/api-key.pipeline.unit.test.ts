@@ -63,6 +63,7 @@ describe("given the API-key module's eventing declaration", () => {
 
   describe("when a consuming process builds it", () => {
     /** @scenario "A module declares its event sourcing beside its transports" */
+    /** @scenario The worker composes the sandbox sweep from the feature package */
     it("builds the agent-sandbox maintenance pipeline with both credential sweeps", () => {
       const { definition } = installed();
 
@@ -73,6 +74,7 @@ describe("given the API-key module's eventing declaration", () => {
     });
 
     /** @scenario "A module declares its event sourcing beside its transports" */
+    /** @scenario The worker composes the sandbox sweep from the feature package */
     it("revokes sandbox keys through the module's own repositories when the schedule fires", async () => {
       const { definition, revokeExpiredByName } = installed();
 

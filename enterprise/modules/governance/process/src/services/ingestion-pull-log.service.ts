@@ -2,7 +2,19 @@
 
 import { createLogger } from "@langwatch/observability";
 
-import type { IngestionPullDiagnosticsSink } from "../app/governance.members.ts";
+export interface IngestionPullDiagnosticsSink {
+  info(message: string, context: Record<string, unknown>): void;
+  warn(message: string, context: Record<string, unknown>): void;
+  error(message: string, context: Record<string, unknown>): void;
+  capture(error: Error, context: Record<string, unknown>): void;
+}
+
+export const silentIngestionPullDiagnostics: IngestionPullDiagnosticsSink = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  capture: () => {},
+};
 
 const logger = createLogger("langwatch:governance:ingestion-pull");
 

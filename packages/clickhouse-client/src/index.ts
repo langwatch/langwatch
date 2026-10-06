@@ -41,6 +41,7 @@ export {
   ClickHouseConnectionClosedError,
   ClickHouseConnectionService,
   ClickHouseNotConfiguredError,
+  ClickHouseShutdownService,
 } from "./connection.ts";
 export type {
   ClickHouseClientCreationInput,
@@ -48,7 +49,6 @@ export type {
   ClickHouseConnectionServiceOptions,
   ClickHouseInstance,
 } from "./connection.ts";
-export { ClickHouseShutdownService } from "./shutdown.ts";
 export {
   ClickHouseManagedClientService,
   ClickHouseManagedClientLogger,
@@ -57,6 +57,8 @@ export {
   ClickHouseVendorClientFactory,
   createVendorClientResiliencePolicy,
   createResilientVendorClient,
+  DEFAULT_CLICKHOUSE_SETTINGS,
+  READ_BACK_FOLD_INSERT_SETTINGS,
   withClickHouseDefaultQuerySettings,
   withClickHouseStatementLimit,
   withClickHouseTenantScope,
@@ -160,10 +162,6 @@ export {
   DEFAULT_RETENTION_FLOOR_MARGIN_MS,
   RetentionFloorService,
 } from "./retentionFloor.ts";
-
-/** The per-query and per-insert settings every non-analytics statement carries.
- * Was `platform/app/src/server/clickhouse/queryDefaults.ts`. */
-export { DEFAULT_CLICKHOUSE_SETTINGS, READ_BACK_FOLD_INSERT_SETTINGS } from "./queryDefaults.ts";
 
 /** The `CLICKHOUSE_URL__<label>__<org>` private-route key grammar.
  * Was `platform/app/src/server/clickhouse/privateRouteKey.ts`. */

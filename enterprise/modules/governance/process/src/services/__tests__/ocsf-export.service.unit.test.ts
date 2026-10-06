@@ -2,7 +2,7 @@ import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-c
 import { describe, expect, it, vi } from "vitest";
 
 import { createGovernanceProjectApi } from "../../__tests__/testing.ts";
-import type { GovernanceOcsfEventsReader } from "../../app/governance.members.ts";
+import type { GovernanceOcsfEventsReader } from "../../repositories/governance.repositories.ts";
 import { DefaultGovernanceOcsfExportService } from "../ocsf-export.service.ts";
 
 class FixedEventReader implements GovernanceOcsfEventsReader {

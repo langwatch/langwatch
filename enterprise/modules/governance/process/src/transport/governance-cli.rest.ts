@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** The CLI governance plane under `/api/auth/cli`. */
+/**
+ * The CLI governance plane under `/api/auth/cli`. The plan is asked before the permission and
+ * both refusals keep main's CLI body, written by the CLI token door (Q31).
+ */
 import { anyAuthenticated } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
@@ -28,7 +31,7 @@ import {
 const JSON_MEDIA_TYPE = "application/json";
 const CLI_DOOR = anyAuthenticated({
   reason:
-    "the CLI token door admits the device-session bearer; each operation gates on the plan, the organization permission and, for key-minting routes, the active seat",
+    "main asked no permission here: the CLI token door admits the device-session bearer, and the key-minting routes check the active seat",
 });
 
 export const governanceCliRest = defineRestRouter(GovernanceRestApi)
@@ -83,7 +86,8 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
   )
   .get("/api/auth/cli/governance/ingest/sources", "listCliIngestionSources")
   .withQuery(governanceCliSourcesQuerySchema)
-  .withAccess(CLI_DOOR)
+  .withPermission("ingestionSources:view")
+  .withEntitlement("enterprise", { feature: "INGESTION_SOURCES", before: "permission" })
   .responds(governanceCliIngestionSourcesAnswers)
   .handle(({ app, actor, session, scope, input }) =>
     app.cliIngestionSources({
@@ -96,7 +100,8 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
   .get("/api/auth/cli/governance/ingest/sources/:sourceId/events", "listCliIngestionSourceEvents")
   .withParams(governanceCliSourceParamsSchema)
   .withQuery(governanceCliSourceEventsQuerySchema)
-  .withAccess(CLI_DOOR)
+  .withPermission("activityMonitor:view")
+  .withEntitlement("enterprise", { feature: "ACTIVITY_MONITOR", before: "permission" })
   .responds(governanceCliIngestionSourceEventsAnswers)
   .handle(({ app, actor, session, scope, input }) =>
     app.cliIngestionSourceEvents({
@@ -110,7 +115,8 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
   )
   .get("/api/auth/cli/governance/ingest/sources/:sourceId/health", "readCliIngestionSourceHealth")
   .withParams(governanceCliSourceParamsSchema)
-  .withAccess(CLI_DOOR)
+  .withPermission("activityMonitor:view")
+  .withEntitlement("enterprise", { feature: "INGESTION_SOURCES", before: "permission" })
   .responds(governanceCliIngestionSourceHealthAnswers)
   .handle(({ app, actor, session, scope, input }) =>
     app.cliIngestionSourceHealth({
@@ -122,6 +128,7 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
   )
   .get("/api/auth/cli/governance/status", "readCliGovernanceStatus")
   .withAccess(CLI_DOOR)
+  .withEntitlement("enterprise", { feature: "INGESTION_SOURCES" })
   .responds(governanceCliGovernanceStatusAnswers)
   .handle(({ app, actor, session, scope }) =>
     app.cliGovernanceStatus({ actor, session, organizationId: scope.id }),

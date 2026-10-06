@@ -5,7 +5,6 @@ import {
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
 
-import type { IdentifierIdentity } from "../app/identity.members.ts";
 import type {
   BackfillAccountRow,
   BackfillUserRow,
@@ -14,6 +13,7 @@ import {
   adoptAccountCommandId,
   adoptUserEmailCommandId,
 } from "../rules/identity-command-id.rules.ts";
+import type { IdentifierIdentity } from "./crypto-identifier-identity.service.ts";
 
 /**
  * What the legacy rows IMPLY — the plan a backfill pass states, and the

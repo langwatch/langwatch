@@ -1337,3 +1337,90 @@ describe("coerceMonitorMappings (runtime write-path coercion for non-Zod callers
     });
   });
 });
+
+describe("mapTraceToDatasetEntry annotations column on a trace with comments on its parts", () => {
+  const TRACE_ID = "95bf974e4f330faa31ed1decdeb0a590";
+  const SEARCH_SPAN_ID = "0af31b2c9d4e5f60";
+  const REPLY_SPAN_ID = "7c1d2e3f4a5b6c70";
+  const commentedTrace = {
+    trace_id: TRACE_ID,
+    timestamps: { started_at: Date.now() },
+    spans: [
+      { span_id: SEARCH_SPAN_ID, name: "web_search", type: "span" },
+      { span_id: REPLY_SPAN_ID, name: "compose_reply", type: "span" },
+    ],
+    annotations: [
+      {
+        id: "annotation-trace",
+        traceId: TRACE_ID,
+        comment: "overall fine",
+        isThumbsUp: null,
+        user: { name: "Ada" },
+        email: null,
+        scoreOptions: null,
+        expectedOutput: null,
+        anchorKind: null,
+        anchorId: null,
+        anchorPath: null,
+      },
+      {
+        id: "annotation-span",
+        traceId: TRACE_ID,
+        comment: "slow search",
+        isThumbsUp: null,
+        user: { name: "Ada" },
+        email: null,
+        scoreOptions: null,
+        expectedOutput: null,
+        anchorKind: "span",
+        anchorId: SEARCH_SPAN_ID,
+        anchorPath: null,
+      },
+      {
+        id: "annotation-output",
+        traceId: TRACE_ID,
+        comment: "too terse",
+        isThumbsUp: null,
+        user: { name: "Ada" },
+        email: null,
+        scoreOptions: null,
+        expectedOutput: null,
+        anchorKind: "field",
+        anchorId: REPLY_SPAN_ID,
+        anchorPath: "output",
+      },
+      {
+        id: "annotation-input",
+        traceId: TRACE_ID,
+        comment: "ambiguous question",
+        isThumbsUp: null,
+        user: { name: "Ada" },
+        email: null,
+        scoreOptions: null,
+        expectedOutput: null,
+        anchorKind: "field",
+        anchorId: REPLY_SPAN_ID,
+        anchorPath: "input",
+      },
+    ],
+  };
+
+  describe("when the annotations column is mapped", () => {
+    /** @scenario "A dataset column of annotations carries every comment, each naming its target" */
+    it("holds all four comments and names the part each anchored one is about", () => {
+      const [row] = mapTraceToDatasetEntry({
+        trace: commentedTrace as any,
+        mapping: { annotations: { source: "annotations", key: "ai_readable", subkey: "" } },
+        expansions: new Set() as any,
+      });
+
+      const lines = String(row?.annotations).split("\n---\n");
+      expect(lines).toEqual([
+        "Ada: overall fine",
+        "Ada (on web_search span (0af31b2c)): slow search",
+        "Ada (on compose_reply span (7c1d2e3f) · Output): too terse",
+        "Ada (on compose_reply span (7c1d2e3f) · Input): ambiguous question",
+      ]);
+    });
+  });
+});

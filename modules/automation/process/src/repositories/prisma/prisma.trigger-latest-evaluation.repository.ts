@@ -4,7 +4,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { TriggerLatestEvaluationRepository } from "../trigger-latest-evaluation.repository.ts";
 
 /** Only what this repository touches. */
-export type TriggerLatestEvaluationDatabase = Pick<
+type TriggerLatestEvaluationDatabase = Pick<
   PrismaClient,
   "triggerLatestEvaluation" | "$executeRaw"
 >;

@@ -797,7 +797,7 @@ func runUpAttached(ctx context.Context, d deps, rest []string) error {
 		return err
 	}
 	logDir, _ := domain.StackLogPaths(d.worktree, st.slug)
-	if err := runUpViewer(ctx, st.slug, preferredGroup(rest), st.logPath, logDir, d.sessionActions(st.slug)); err != nil {
+	if err := runUpViewer(ctx, viewerTarget{slug: st.slug, logPath: st.logPath, logDir: logDir, session: d.sessionActions(st.slug)}, preferredGroup(rest)); err != nil {
 		return err
 	}
 	fmt.Printf("detached — stack %q keeps running in the background\n", st.slug)

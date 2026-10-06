@@ -124,6 +124,7 @@ function scenario({
   authentications = [],
   legacyAccounts = 0,
   otherAccounts = [],
+  passwordless = [],
 }: {
   connections?: SsoConnectionState[];
   identifiers?: IdentifierFact[];
@@ -140,6 +141,8 @@ function scenario({
   legacyAccounts?: number;
   /** Addresses held by accounts outside the organization. */
   otherAccounts?: string[];
+  /** Holders of a grant who have only ever signed in through the provider. */
+  passwordless?: string[];
 } = {}) {
   const store = MemoryIdentityStore.create();
   const accounts = [
@@ -169,6 +172,7 @@ function scenario({
     connections: repositories.ssoConnections,
     evidence: repositories.ssoMigrationEvidence,
     breakGlass: repositories.ssoBreakGlass,
+    holderCanWalkIn: async ({ userId }) => !passwordless.includes(userId),
     memberships: { listActiveMembers: async () => members },
     legacyAccess: { count: async () => legacyAccounts },
     now: () => NOW,
@@ -373,6 +377,20 @@ describe("given a cutover that is nearly done", () => {
     const view = await progress(scenario({ bindings: [] }));
 
     expect(view?.blockers.map((blocker) => blocker.code)).toContain("recovery-path-missing");
+  });
+
+  /** @scenario "Finalizing counts the ways back in that can actually be walked" */
+  it("does not count a live grant whose holder holds no password", async () => {
+    const view = await progress(scenario({ passwordless: [liveBinding.userId] }));
+
+    expect(view?.blockers.map((blocker) => blocker.code)).toContain("recovery-path-missing");
+    expect(view?.canFinalize).toBe(false);
+  });
+
+  it("counts a live grant whose holder holds a password", async () => {
+    const view = await progress(scenario());
+
+    expect(view?.blockers.map((blocker) => blocker.code)).not.toContain("recovery-path-missing");
   });
 
   /** @scenario "The ask to set a password lands while the old provider can still sign somebody in" */

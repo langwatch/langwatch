@@ -6,6 +6,7 @@
 import type {
   InstantEvalApi,
   InstantEvalEstimateWire,
+  InstantEvalOptInAccess,
   InstantEvalRunProgress,
   InstantEvalRunReference,
 } from "@langwatch/instant-eval-contract";
@@ -74,6 +75,16 @@ export class TraceInstantEvalRunService {
     });
 
     return toExplorerRunProgress(run);
+  }
+
+  /** What the refusal popover offers; the peer resolves the project's organization. */
+  getAccess(input: { projectId: string; userId: string }): Promise<InstantEvalOptInAccess> {
+    return this.#instantEvals.getOptInAccess(input);
+  }
+
+  /** The organization's own switch; the route has already asked `organization:manage`. */
+  enable(input: { projectId: string; userId: string }): Promise<InstantEvalOptInAccess> {
+    return this.#instantEvals.optIn(input);
   }
 
   async getRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress> {

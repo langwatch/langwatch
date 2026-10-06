@@ -3,6 +3,7 @@ import type { SessionStartedEventData, SsoAutoAddedEventData } from "@langwatch/
 import type {
   CheckoutCompletedEventData,
   SubscriptionChangedEventData,
+  SubscriptionStartedEventData,
 } from "@langwatch/enterprise-billing-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import type {
@@ -10,7 +11,10 @@ import type {
   EvaluationRanEventData,
 } from "@langwatch/evaluation-contract";
 import type { ExperimentRanEventData } from "@langwatch/experiment-contract";
-import type { GuidedOnboardingRecordedEventData } from "@langwatch/onboarding-contract";
+import type {
+  GuidedOnboardingRecordedEventData,
+  OnboardingVariant,
+} from "@langwatch/onboarding-contract";
 import type {
   IntegrationMethodChosenEventData,
   InviteAcceptedEventData,
@@ -18,24 +22,25 @@ import type {
   OrganizationSignedUpEventData,
 } from "@langwatch/organization-contract";
 import type { PromptCreatedEventData } from "@langwatch/prompt-contract";
-import type {
-  ScenarioCreatedEventData,
-  SimulationRunFinishedEventData,
+import {
+  type ScenarioCreatedEventData,
+  type SimulationRunFinishedEventData,
+  UNGRADED_RUN_STATUSES,
 } from "@langwatch/scenario-contract";
+import { Temporal } from "@langwatch/time";
 import type {
   FirstTraceRecordedEventData,
   TraceReceivedEventData,
 } from "@langwatch/trace-contract";
+import type { UserLifecycleEventData } from "@langwatch/user-contract";
 import type { WorkflowCreatedEventData } from "@langwatch/workflow-contract";
-
-import { isConnectedAgentRunSucceeded } from "./nurturing-scenario-run.rules.ts";
 
 /** The signal a peer's event raises, keyed by the aggregate and instant the event carries. */
 type OwnerEvent<Data> = Readonly<{ data: Data; aggregateId: string }>;
 /** An owner's event whose data names no tenant: the delivery context's is the event's own. */
 type TenantEvent<Data> = OwnerEvent<Data> & Readonly<{ tenantId: string }>;
 
-/** The picks reach nurturing as `guided_onboarding_paths`, the finished steps as progress. */
+/** The picks reach nurturing as `guided_onboarding_paths`, every other step as progress. */
 export function guidedOnboardingSignal({
   data,
   aggregateId,
@@ -56,10 +61,13 @@ export function guidedOnboardingSignal({
         event: data.event,
         previousPaths: data.previousPaths,
         paths: data.state.paths,
+        payload: data.payload,
       };
     case "provider_connected":
+    case "provider_skipped":
     case "tour_completed":
     case "tour_skipped":
+    case "tour_replayed":
     case "path_completed":
       return {
         kind: "guided_onboarding_progress",
@@ -154,6 +162,22 @@ export function subscriptionChangedSignal({
   };
 }
 
+/** A subscription that became active, once per transition: keyed by it and its instant. */
+export function subscriptionStartedSignal({
+  data,
+  aggregateId,
+}: OwnerEvent<SubscriptionStartedEventData>): NurturingSignal {
+  return {
+    kind: "subscription_started",
+    sourceEventId: `${aggregateId}:${data.subscriptionId}:${data.occurredAt}`,
+    tenantId: data.tenantId,
+    occurredAt: data.occurredAt,
+    organizationId: data.organizationId,
+    memberUserIds: data.memberUserIds,
+    plan: data.plan,
+  };
+}
+
 /** A completed checkout reaches PostHog as `subscription_created` and the organization group. */
 export function checkoutCompletedSignal({
   data,
@@ -183,6 +207,24 @@ export function sessionStartedSignal({
     userId: data.userId,
     // Auth records only a member of an organization, so nurturing never makes a ghost person.
     hasOrganization: true,
+  };
+}
+
+/**
+ * A person's own sign-up, from user's registration or auth's sign-up fact. Keyed by the person
+ * alone, so a redelivery or a second owner reporting the same person is one signed_up.
+ */
+export function userRegisteredSignal({
+  data,
+}: {
+  data: Pick<UserLifecycleEventData, "tenantId" | "userId" | "occurredAt">;
+}): NurturingSignal {
+  return {
+    kind: "user_registered",
+    sourceEventId: data.userId,
+    tenantId: data.tenantId,
+    occurredAt: data.occurredAt,
+    userId: data.userId,
   };
 }
 
@@ -310,6 +352,26 @@ export function scenarioRunSucceededSignal({
   ];
 }
 
+/** The project's active day by a succeeded run against a connected agent, as the run's admin. */
+export function scenarioRunActiveDaySignal({
+  data,
+  tenantId,
+}: TenantEvent<SimulationRunFinishedEventData>): NurturingSignal[] {
+  const { organizationAdmin: admin, occurredAt } = data;
+  if (!isConnectedAgentRunSucceeded(data) || !admin || occurredAt === undefined) return [];
+  return [
+    projectActiveDaySignal({
+      source: "scenario_run",
+      tenantId,
+      projectId: tenantId,
+      userId: admin.userId,
+      occurredAt,
+      organizationCreatedAt: admin.organizationCreatedAt,
+      onboardingVariant: admin.onboardingVariant,
+    }),
+  ];
+}
+
 /** The organization a finished run was counted against, as nurturing's own store holds it. */
 type CountedRunOrganization = Readonly<{
   adminUserId: string | null;
@@ -362,6 +424,52 @@ export function firstTraceRecordedSignal({
   };
 }
 
+const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
+
+/** What an application signal tells nurturing about the project's day, as its owner raised it. */
+type ActiveDaySignal = Readonly<{
+  source: "trace" | "scenario_run";
+  tenantId: string;
+  projectId: string;
+  /** The organization's admin. */
+  userId: string;
+  occurredAt: number;
+  /** When the organization was created, in epoch milliseconds; absent where the owner did not say. */
+  organizationCreatedAt?: number | null;
+  onboardingVariant?: OnboardingVariant | null;
+}>;
+
+/**
+ * The project's active day: keyed by the project and the UTC day of the signal, so delivery's
+ * claim lets the first signal of each day through and no other (main's once-per-day marker).
+ */
+export function projectActiveDaySignal({
+  source,
+  tenantId,
+  projectId,
+  userId,
+  occurredAt,
+  organizationCreatedAt,
+  onboardingVariant,
+}: ActiveDaySignal): NurturingSignal {
+  const day = Temporal.Instant.fromEpochMilliseconds(occurredAt).toString().slice(0, 10);
+  const daysSinceSignup =
+    organizationCreatedAt == null
+      ? null
+      : Math.max(0, Math.floor((occurredAt - organizationCreatedAt) / DAY_MILLISECONDS));
+  return {
+    kind: "project_active_day",
+    sourceEventId: `${projectId}:${day}`,
+    tenantId,
+    occurredAt,
+    userId,
+    projectId,
+    source,
+    daysSinceSignup,
+    onboardingVariant,
+  };
+}
+
 /** A later real trace against the admin, keyed by the project and the trace's instant. */
 export function traceReceivedSignal({
   data,
@@ -370,4 +478,18 @@ export function traceReceivedSignal({
   const { tenantId, occurredAt, userId, projectId } = data;
   const sourceEventId = `${aggregateId}:${occurredAt}`;
   return { kind: "trace_received", sourceEventId, tenantId, occurredAt, userId, projectId };
+}
+
+/**
+ * A run that worked against a connected agent: it finished with a verdict,
+ * whichever way the judge decided. An ungraded status (error, unreachable
+ * target, timeout) is not one.
+ */
+export function isConnectedAgentRunSucceeded(data: SimulationRunFinishedEventData): boolean {
+  const { target, status, results } = data;
+  if (target?.type !== "connected") return false;
+  const explicit = status?.toUpperCase();
+  if (explicit && UNGRADED_RUN_STATUSES.has(explicit)) return false;
+  if (explicit === "SUCCESS" || explicit === "FAILED" || explicit === "FAILURE") return true;
+  return results?.verdict === "success" || results?.verdict === "failure";
 }

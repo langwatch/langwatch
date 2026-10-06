@@ -4,6 +4,10 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import type { Instant } from "@langwatch/time";
 
+export interface IngestionPullSourceReader {
+  findById(id: string): Promise<GovernanceIngestionSource | null>;
+}
+
 export type CreateIngestionSourceRecord = {
   organizationId: string;
   teamId: string | null;

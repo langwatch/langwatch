@@ -1,5 +1,4 @@
 import type { Event } from "../domain/types.ts";
-import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 
 export interface ProjectionCursor {
@@ -36,12 +35,6 @@ export interface StateProjectionStore<State> {
 }
 
 export interface StateProjectionOptions {
-  /**
-   * Operator stop for this component, resolved per tenant at dispatch time.
-   * Absent means the generated key; a `customKey` must also be what the
-   * descriptors advertise or the switch cannot be set.
-   */
-  killSwitch?: KillSwitchOptions;
   /** Disable this projection in the assembled runtime. */
   disabled?: boolean;
   /** One load and one store may fold this many queued events. Defaults to 1. */

@@ -14,7 +14,7 @@ To let Langy clone and push (open PRs), you enable egress. The pod's traffic the
 
 LLM traffic never uses this path; it goes to the in-cluster [LangWatch AI Gateway](/ai-gateway/self-hosting/helm).
 
-The one boundary to understand before you rely on this in a regulated environment: the L7 adapter is **cooperative by default**. A prompt-injected worker can dial an external IP directly on `:443` and bypass it, and that bypass is monitored, not blocked, in the stock pod. Mandatory enforcement is designed but not shipped. The details are below and in [The sandbox](/langy/security/sandbox).
+The one boundary to understand before you rely on this in a regulated environment: once `networkPolicy.allowExternalHttps` is `true`, the L7 adapter is **cooperative by default**. A prompt-injected worker can dial an external IP directly on `:443` and bypass it, and that bypass is monitored, not blocked, in the stock pod. Mandatory enforcement is opt-in and needs the Cilium CNI. The details are below and in [The sandbox](/langy/security/sandbox).
 
 <Info>
   **Also check:** [Self-hosting overview](/self-hosting/langy/overview), [Environment
@@ -23,9 +23,11 @@ The one boundary to understand before you rely on this in a regulated environmen
 
 ## Why egress is L7, not iptables
 
-The pod runs under gVisor. gVisor's user-space kernel implements no netfilter, so `iptables` and `nftables` fail in every mode. Any egress control based on iptables (REDIRECT, OWNER-match DROP, NAT) is off the table.
+By default the pod runs on the node's normal container runtime (`runtimeClassName: ""`). gVisor, or another sandboxed RuntimeClass, is an opt-in hardening step, see [Setup](/self-hosting/langy/setup#hardening-a-sandboxed-runtime).
 
-That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy inside the manager, rather than in kernel firewall rules. See [The sandbox](/langy/security/sandbox).
+Egress control has to work on both runtimes. gVisor's network stack supports only part of `iptables` and `nftables`, so Langy does not rely on iptables-based controls (REDIRECT, OWNER-match DROP, NAT).
+
+That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy inside the manager, rather than in kernel firewall rules. The same controls apply whether or not you enable the sandbox. See [The sandbox](/langy/security/sandbox).
 
 ## What the agent needs to reach
 
@@ -77,16 +79,17 @@ A browser that cannot subscribe at all, because it has no Push API or subscribin
 
 ## Enable outbound egress
 
-The stock `charts/langyagent` chart keeps `networkPolicy.allowExternalHttps: false`. To allow `git`, `gh`, and `npm`, turn it on:
+The stock `charts/langyagent` chart keeps `networkPolicy.allowExternalHttps: false`. To allow `git`, `gh`, and `npm`, turn it on in your `langwatch` chart values:
 
-```bash title="values.langyagent.yaml"
-networkPolicy:
-  allowExternalHttps: true
+```yaml title="values.yaml"
+langyagent:
+  networkPolicy:
+    allowExternalHttps: true
 ```
 
 With it on, the pod may open `:443` to anywhere at L3/L4, and the L7 adapter is what narrows that to the allowed destinations. The FQDN floor (`github.com`, `api.github.com`, `codeload.github.com`) works without further changes.
 
-Make sure `privateExcept` and `privateExceptV6` include any non-RFC1918 service or VPC CIDR you actually need to reach. The defaults already include `100.64.0.0/10` (CGNAT) for EKS custom networking.
+Make sure `langyagent.networkPolicy.privateExcept` and `privateExceptV6` include any non-RFC1918 service or VPC CIDR you actually need to reach. The defaults already include `100.64.0.0/10` (CGNAT) for EKS custom networking.
 
 ## The L7 egress adapter
 
@@ -105,13 +108,14 @@ See [Environment variables](/self-hosting/langy/environment-variables#egress) fo
 
 For a tighter perimeter than "`:443` to anywhere, narrowed at L7", flip `allowExternalHttps` back to `false` and add an explicit allow-list of the three GitHub FQDNs at the CNI layer, so the L3/L4 policy itself only permits GitHub:
 
-```bash title="values.langyagent.yaml"
-networkPolicy:
-  allowExternalHttps: false
-egress:
-  enforceFloor: true
-  cilium:
-    enabled: true
+```yaml title="values.yaml"
+langyagent:
+  networkPolicy:
+    allowExternalHttps: false
+  egress:
+    enforceFloor: true
+    cilium:
+      enabled: true
 ```
 
 An operator can also place the pod on an opt-in public-subnet node group (a node group with no route to the private data tier) via `nodeSelector`, `affinity`, and `tolerations`.
@@ -121,7 +125,8 @@ An operator can also place the pod on an opt-in public-subnet node group (a node
 State this plainly for a regulated review. Today (ADR-053, Proposed):
 
 - **Shipped.** The L3/L4 NetworkPolicy is deny-by-default: `:443` to anywhere is off unless you enable it, and private ranges, CGNAT, and cloud metadata are blocked regardless. The default service-account token is dropped. Node placement on a public subnet with no route to the data tier is available. The L7 adapter's require-TLS, SNI cross-check, and FQDN floor apply to traffic that goes through the proxy.
-- **Cooperative, not mandatory.** The L7 egress adapter is cooperative by default. A prompt-injected worker that ignores `HTTPS_PROXY` can dial an external IP on `:443` directly and bypass the adapter. In the stock pod that bypass is **monitored, not blocked**.
-- **Designed, not shipped.** Mandatory enforcement, which would make the bypass impossible, is the Cilium `toFQDNs` policy on the floor or a per-worker network namespace (ADR-033 Fix B, which needs `CAP_SYS_ADMIN`). These are designed and not shipped in the stock chart.
+- **Cooperative, not mandatory.** With `networkPolicy.allowExternalHttps: true`, the L7 egress adapter is cooperative by default. A prompt-injected worker that ignores `HTTPS_PROXY` can dial an external IP on `:443` directly and bypass the adapter. In the stock pod that bypass is **monitored, not blocked**.
+- **Opt-in, Cilium only.** `langyagent.egress.cilium.enabled: true` renders a `CiliumNetworkPolicy` with `toFQDNs` on the floor, which a worker cannot bypass. It needs the Cilium CNI and is off by default. It enforces the operator floor only; per-project allow-lists stay with the L7 adapter.
+- **Designed, not shipped.** A per-worker network namespace (ADR-033 Fix B, which needs `CAP_SYS_ADMIN`), the equivalent for clusters without Cilium.
 
 If your threat model requires that a compromised worker cannot reach an arbitrary external host, enable the Cilium `toFQDNs` path rather than relying on the cooperative adapter alone. See [The sandbox](/langy/security/sandbox) for the full boundary map.

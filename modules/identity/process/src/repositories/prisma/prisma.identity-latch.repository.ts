@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
 import { IdentityLatchRepository } from "../identity-latch.repository.ts";
@@ -6,7 +6,7 @@ import { IdentityLatchRepository } from "../identity-latch.repository.ts";
 /**
  * Whether a user's identifier history is proven (ADR-110, re-tenanted to
  * users). Only `finalized` opens it; `migrated` is HELD (landed but unproven),
- * and rollback pins `rolled_back` as an ops action. Reads only, no writes.
+ * and rollback pins `rolled_back` as an ops action, which a write never overrides.
  */
 export class PrismaIdentityLatchRepository extends IdentityLatchRepository {
   static create(database: PrismaClient): PrismaIdentityLatchRepository {
@@ -45,5 +45,38 @@ export class PrismaIdentityLatchRepository extends IdentityLatchRepository {
       select: { status: true },
     });
     return row?.status === "finalized";
+  }
+
+  /** The runner's own guard: a write parked on the pin's row lock re-checks it, so SQL. */
+  async recordFinalized({ userId, report }: { userId: string; report: unknown }): Promise<void> {
+    const occurredAt = new Date();
+    const reportJson = report == null ? null : JSON.stringify(report);
+    const updated = await this.database.$executeRaw`
+      -- @tenancy: keyed by (migrationName, tenantId); the tenant is the key itself.
+      UPDATE "SystemMigrationTenantState"
+         SET "status" = 'finalized',
+             "report" = ${reportJson}::jsonb,
+             "occurredAt" = ${occurredAt},
+             "updatedAt" = now()
+       WHERE "migrationName" = ${IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME}
+         AND "tenantId" = ${userId}
+         AND "status" <> 'rolled_back'
+    `;
+    if (updated > 0) return;
+    try {
+      await this.database.systemMigrationTenantState.create({
+        data: {
+          migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+          tenantId: userId,
+          status: "finalized",
+          report: report == null ? Prisma.DbNull : (report as Prisma.InputJsonValue),
+          occurredAt,
+        },
+      });
+    } catch (error) {
+      // The row exists and the guarded update matched nothing: the pin wins.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return;
+      throw error;
+    }
   }
 }

@@ -17,13 +17,13 @@ export const agentSandboxKeyReapSchema = z.object({
 export const agentSandboxKeyReapStateSchema = z.object({
   lastReapAt: z.number().nullable(),
 });
-export type AgentSandboxKeyReapState = z.infer<typeof agentSandboxKeyReapStateSchema>;
+type AgentSandboxKeyReapState = z.infer<typeof agentSandboxKeyReapStateSchema>;
 
 export const AGENT_SANDBOX_KEY_REAP_INITIAL_STATE: AgentSandboxKeyReapState = {
   lastReapAt: null,
 };
 
-export type AgentSandboxKeyReapIntents = {
+type AgentSandboxKeyReapIntents = {
   reap: IntentSpec<typeof agentSandboxKeyReapSchema>;
 };
 

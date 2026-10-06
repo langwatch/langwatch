@@ -56,7 +56,7 @@ function harness() {
       getOrganizationId: (projectId) =>
         Promise.resolve(projectId === "project-enterprise" ? ENTERPRISE_TIER_ORG : FREE_TIER_ORG),
     }),
-    rateLimiter: windowLimiter(),
+    rateLimits: windowLimiter(),
   });
 
   const run = (projectId: string, messageCount = 1) =>

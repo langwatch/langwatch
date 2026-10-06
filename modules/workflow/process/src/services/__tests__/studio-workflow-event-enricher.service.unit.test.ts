@@ -20,9 +20,7 @@ const projectId = "project-123";
 class FakeProjectEnvironment implements WorkflowProjectEnvironment {
   readonly projectIds: string[] = [];
 
-  constructor(
-    private readonly secrets: Record<string, string> = { OPENAI_API_KEY: "sk-abc123" },
-  ) {}
+  constructor(private readonly secrets: Record<string, string> = { OPENAI_API_KEY: "sk-abc123" }) {}
 
   async get(input: { projectId: string }): Promise<WorkflowRunEnvironment> {
     this.projectIds.push(input.projectId);
@@ -265,7 +263,12 @@ describe("StudioWorkflowEventEnricherService", () => {
 
     expect(result.payload.workflow).toMatchObject({ api_key: "ownerless-run-key" });
     expect(runKeys.calls).toEqual([
-      { userId: null, projectId, permissions: ["traces:create"], minRemainingMs: DISPATCH_FLOOR_MS },
+      {
+        userId: null,
+        projectId,
+        permissions: ["traces:create"],
+        minRemainingMs: DISPATCH_FLOOR_MS,
+      },
     ]);
   });
 

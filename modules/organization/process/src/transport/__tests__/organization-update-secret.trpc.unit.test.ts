@@ -85,3 +85,30 @@ describe("organization.update over the S3 secret", () => {
     expect(updateSettings).not.toHaveBeenCalled();
   });
 });
+
+describe("organization.update over who saved it", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    updateSettings.mockResolvedValue({ traceShareRevocationRequired: false });
+  });
+
+  /** @scenario "Both doors that save organization settings name who saved them" */
+  it("tells the organization service the member who saved the form", async () => {
+    await caller.update({ organizationId: "org_1", name: "Acme", presenceEnabled: false });
+
+    expect(updateSettings.mock.calls[0]?.[1]).toEqual({ id: "user_ana" });
+  });
+});
+
+describe("organization's session-person fact", () => {
+  /** @scenario "The signed-in person fact may carry an image organization does not read" */
+  it("reads the name and the email and leaves an image out", () => {
+    const person = organizationSessionPersonFact.schema.parse({
+      name: "Ana",
+      email: "ana@acme.com",
+      image: "https://example.com/ana.png",
+    });
+
+    expect(person).toEqual({ name: "Ana", email: "ana@acme.com" });
+  });
+});

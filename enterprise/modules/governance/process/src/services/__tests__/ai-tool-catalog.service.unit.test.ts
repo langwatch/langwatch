@@ -17,6 +17,7 @@ const ORG = "organization";
 function world(member: { departmentId: string | null } = { departmentId: null }) {
   const repositories = MemoryGovernanceRepositories.create();
   const scopesAsked: unknown[] = [];
+  const billingFactsFor: string[] = [];
   const organizations = createApiFixture<OrganizationApi>({
     findMemberDepartments: async ({ userIds }) =>
       userIds.map((userId) => ({ userId, departmentId: member.departmentId })),
@@ -46,19 +47,26 @@ function world(member: { departmentId: string | null } = { departmentId: null })
     }),
     sources: repositories.ingestionSources,
     members: organizations,
+    billingFacts: {
+      recordAfterChange: async ({ organizationId }) => {
+        billingFactsFor.push(organizationId);
+      },
+    },
     diagnostics: { warn: () => undefined },
   });
-  return { catalogue, repositories, scopesAsked };
+  return { catalogue, repositories, scopesAsked, billingFactsFor };
 }
 
 describe("DefaultGovernanceAiToolCatalogService", () => {
   describe("given a fresh organization", () => {
+    /** @scenario "A member's first portal load of a zero-row organization returns the provisioned catalog" */
     it("provisions the complete canonical starter catalogue on the member's first list", async () => {
       const { catalogue } = world();
 
       const tiles = await catalogue.findForMember({ organizationId: ORG, userId: "user" });
 
       expect(tiles).toHaveLength(AI_TOOL_STARTER_TILES.length);
+      expect(tiles.every(({ enabled }) => enabled)).toBe(true);
     });
 
     it("keeps Cursor direct OTLP disabled regardless of stored config", async () => {
@@ -106,6 +114,41 @@ describe("DefaultGovernanceAiToolCatalogService", () => {
           config: { descriptionMarkdown: "hi", linkUrl: "https://wiki.test" },
         }),
       ).rejects.toThrow("One or more departments do not belong to this organization");
+    });
+  });
+
+  describe("when an admin edits a coding-assistant tile", () => {
+    const tile = {
+      organizationId: ORG,
+      departmentIds: [],
+      type: "coding_assistant" as const,
+      displayName: "Codex",
+      config: { assistantKind: "codex" as const, setupCommand: "codex", bundledPlan: false },
+    };
+
+    /** @scenario "Governance records the billing fact when a coding-assistant config changes" */
+    it("records the organization's billing fact after create, update and remove", async () => {
+      const { catalogue, billingFactsFor } = world();
+
+      const created = await catalogue.create(tile);
+      await catalogue.update({ id: created.id, organizationId: ORG, enabled: false });
+      await catalogue.remove({ id: created.id, organizationId: ORG });
+
+      expect(billingFactsFor).toEqual([ORG, ORG, ORG]);
+    });
+
+    it("records no billing fact for a tile that is not a coding assistant", async () => {
+      const { catalogue, billingFactsFor } = world();
+
+      await catalogue.create({
+        organizationId: ORG,
+        departmentIds: [],
+        type: "external_tool",
+        displayName: "Wiki",
+        config: { descriptionMarkdown: "hi", linkUrl: "https://wiki.test" },
+      });
+
+      expect(billingFactsFor).toEqual([]);
     });
   });
 

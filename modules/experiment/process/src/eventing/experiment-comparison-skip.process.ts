@@ -32,7 +32,7 @@ export type ComparisonSetupSkip = Extract<
 >;
 
 /** "a", "a and b", "a, b and c" — for the skip-reason message. */
-export const formatList = (names: string[]): string => {
+const formatList = (names: string[]): string => {
   if (names.length <= 1) return names[0] ?? "";
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 };

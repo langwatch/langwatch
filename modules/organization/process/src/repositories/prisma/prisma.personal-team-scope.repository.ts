@@ -3,9 +3,9 @@ import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { PersonalTeamScopeReader } from "../../services/personal-team-scope.service.ts";
 
-export type PersonalTeamScopeClient = PrismaClient | Prisma.TransactionClient;
+type PersonalTeamScopeClient = PrismaClient | Prisma.TransactionClient;
 
-export interface PersonalTeamGrantScope {
+interface PersonalTeamGrantScope {
   scopeType: GrantScopeTier;
   scopeId: string;
 }

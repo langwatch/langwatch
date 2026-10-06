@@ -21,6 +21,3 @@ export type GraphAlertDispatchResult = {
 export abstract class AutomationGraphNotifier {
   abstract dispatch(input: GraphAlertDispatchInput): Promise<GraphAlertDispatchResult>;
 }
-
-export type AutomationGraphNotifierInput = GraphAlertDispatchInput;
-export type AutomationGraphNotifierResult = GraphAlertDispatchResult;

@@ -1,4 +1,3 @@
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { Logger } from "@langwatch/observability";
 import type { Span, TraceCanonicalisationService } from "@langwatch/trace-contract";
 
@@ -12,7 +11,6 @@ import {
 type ClaudeCodeLogEnrichmentDependencies = {
   logRecords: TraceLogRecordReader;
   traceCanonicalisation: TraceCanonicalisationService;
-  codingAgents?: CodingAgentApi;
   logger?: Logger;
 };
 
@@ -48,7 +46,7 @@ export class ClaudeCodeLogEnrichmentService {
     if (!hasCodingAgentJoinableSpans(spans)) {
       return spans;
     }
-    const { logRecords, traceCanonicalisation, codingAgents, logger } = this.#dependencies;
+    const { logRecords, traceCanonicalisation, logger } = this.#dependencies;
 
     try {
       const logRows = await logRecords.getLogsByTraceId({ tenantId, traceId, occurredAtMs });
@@ -57,7 +55,6 @@ export class ClaudeCodeLogEnrichmentService {
         spans,
         logRows,
         traceCanonicalisation,
-        codingAgents,
       });
     } catch (error) {
       logger?.warn(

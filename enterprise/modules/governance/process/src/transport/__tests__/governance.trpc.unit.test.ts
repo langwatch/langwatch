@@ -102,6 +102,7 @@ describe("the governance tRPC namespace", () => {
     expect(calls).toEqual([[{ organizationId: "org_1" }, { id: "user_1" }]]);
   });
 
+  /** @scenario setupState returns boolean OR for nav-promotion signal */
   it("answers the setup state under governance:view", async () => {
     const { caller, asked, calls } = mount(null);
 

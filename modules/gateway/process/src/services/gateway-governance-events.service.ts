@@ -1,16 +1,12 @@
 import type { EventingCommandSender } from "@langwatch/eventing";
 import type {
+  VkLifecycleAction,
   RecordBudgetCrossingCommandData,
   RecordVkLifecycleCommandData,
 } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
-
-import type {
-  GatewayGovernanceSignals,
-  GatewayVirtualKeyLifecycleSignal,
-} from "../app/gateway.members.ts";
 
 const logger = createLogger("langwatch:gateway:governance-events");
 
@@ -92,4 +88,25 @@ export class GatewayGovernanceEventsService implements GatewayGovernanceSignals 
     });
     return ids.toSorted()[0] ?? null;
   }
+}
+
+/**
+ * The Enterprise governance ledger's view of a virtual key's life. A port
+ * rather than a direct call: governance is an Enterprise capability, and a
+ * core package may not reach one directly. Absent when no ledger is composed.
+ */
+export type GatewayVirtualKeyLifecycleSignal = {
+  virtualKey: {
+    id: string;
+    organizationId: string;
+    name: string;
+    displayPrefix: string;
+    traceProjectId: string | null;
+  };
+  action: VkLifecycleAction;
+  reason?: string | null;
+};
+
+export interface GatewayGovernanceSignals {
+  emitVirtualKeyLifecycle(signal: GatewayVirtualKeyLifecycleSignal): Promise<void>;
 }

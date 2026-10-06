@@ -33,12 +33,7 @@ Feature: Trace span-tree read service
     Then it returns the updated span in start-time order
     And the query is not bounded by occurrence time
 
-  Scenario: Full compatibility routes wait for complete characterization
-    Given the existing drawer response has resource, evaluation, redaction, enrichment, event, link, and blob fields
-    When the Trace package owns the paged tree and delta routes
-    Then whole-tree, shared, REST and full-detail routes remain authoritative in the app
-    And their migration waits for a complete byte-and-field characterization fixture
-
+  @unit
   Scenario: Full-read characterization preserves storage and projected summary distinctions
     Given a trace has a frozen storage anchor, an earlier span start, topic identities, and reserved token metrics
     When the legacy viewer or export read maps its trace summary
@@ -54,12 +49,6 @@ Feature: Trace span-tree read service
     Then a persisted positive cost wins unchanged
     And otherwise it delegates to the canonical ModelProviderService estimateCost
     And the span-tree response shape remains unchanged
-
-  Scenario: Browser presentation remains transport-neutral
-    Given the browser display toolkit formats trace previews, costs, and terminal output
-    When it is consumed by the app trace explorer
-    Then it does not fetch, authorize, or reshape a trace response
-    And existing route payload fields and nullability remain authoritative in the app
 
   @unit
   Scenario: Loaded-trace find remains a browser-owned presentation behaviour

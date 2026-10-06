@@ -96,6 +96,10 @@ type Request struct {
 	// ThreadID groups Studio runs into a single conversation in trace
 	// metadata. Mirrors langwatch_nlp commit ac986cc3c. Optional.
 	ThreadID string
+	// MaxAttachmentBytes is the per-file attachment limit of the calling run,
+	// sent as X-LangWatch-Max-Attachment-Bytes so a workflow run this call
+	// starts fetches attachments under the same limit. 0 sends no header.
+	MaxAttachmentBytes int64
 	// TimeoutMS asks for LESS time than the operator allows; it can never
 	// buy more. 0 (and any negative) means the executor's own ceiling.
 	TimeoutMS int
@@ -219,6 +223,9 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	}
 	if req.ThreadID != "" {
 		httpReq.Header.Set("X-LangWatch-Thread-Id", req.ThreadID)
+	}
+	if req.MaxAttachmentBytes > 0 {
+		httpReq.Header.Set("X-LangWatch-Max-Attachment-Bytes", strconv.FormatInt(req.MaxAttachmentBytes, 10))
 	}
 
 	// Propagate W3C trace context + baggage on the outbound call so the

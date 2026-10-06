@@ -10,7 +10,7 @@ import { resolveRequestBound } from "@langwatch/plans";
 import { callerKeyOf } from "../rules/auth-caller-key.rules.ts";
 
 /** What the legacy token check reads through: the credential ledger and a per-caller counter. */
-export interface ProjectAuthTokenDeps {
+interface ProjectAuthTokenDeps {
   apiKeys: Pick<ApiKeyApi, "findResolvedToken">;
   rateLimiter: RateLimiter;
 }

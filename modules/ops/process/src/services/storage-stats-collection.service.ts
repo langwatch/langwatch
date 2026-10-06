@@ -34,7 +34,7 @@ export interface StorageStatsInstance {
   storage: StorageFootprintRepository;
 }
 
-export interface StorageStatsCollectionOptions {
+interface StorageStatsCollectionOptions {
   resolveInstances: () => Promise<readonly StorageStatsInstance[]>;
   /** Where each endpoint's reading goes, for every process's gauges to read. */
   readings: StorageStatsReadingsRepository;

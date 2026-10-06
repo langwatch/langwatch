@@ -2,7 +2,7 @@
  * Whether a statement can be a run, decided before anything is spent: the
  * reserved names first, then the query policy, then the projection on a
  * `LIMIT 0` probe that judges nothing.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import type {

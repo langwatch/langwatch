@@ -23,10 +23,12 @@ import {
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { ModelCostProject } from "../app/model-provider.members.ts";
 import { PrismaModelProviderEvidenceRepository } from "../repositories/prisma/prisma.model-provider-evidence.repository.ts";
 import { ModelProviderEvidenceService } from "../services/model-provider-evidence.service.ts";
-import { ModelProviderProjectScopeService } from "../services/model-provider-project-scope.service.ts";
+import {
+  ModelCostProject,
+  ModelProviderProjectScopeService,
+} from "../services/model-provider-project-scope.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

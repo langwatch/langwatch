@@ -93,6 +93,7 @@ describe("AgentHttpEditorDrawer", () => {
     expect(screen.queryByText("New HTTP Agent")).toBeNull();
   });
 
+  /** @scenario "HTTP editor preserves stored and default scenario mappings" */
   it("uses default scenario mappings when a stored agent has an empty mapping", async () => {
     const updates: {
       id: string;
@@ -146,5 +147,29 @@ describe("AgentHttpEditorDrawer", () => {
       },
     });
     expect(closeCount).toBe(1);
+  });
+
+  /** @scenario "HTTP editor preserves stored and default scenario mappings" */
+  it("shows the persisted mappings rather than the app defaults when the agent has some", async () => {
+    renderEditor({
+      agent: {
+        ...agent,
+        config: {
+          ...agent.config,
+          scenarioMappings: {
+            input: { type: "source", sourceId: "dataset", path: ["question"] },
+            expected: { type: "source", sourceId: "dataset", path: ["answer"] },
+          },
+        },
+      },
+      agentId: agent.id,
+      defaultScenarioMappings: {
+        input: { type: "source", sourceId: "dataset", path: ["input"] },
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("scenario-mapping-count").textContent).toBe("2");
+    });
   });
 });

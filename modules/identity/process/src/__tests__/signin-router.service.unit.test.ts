@@ -290,6 +290,7 @@ describe("SignInRouterService", () => {
 
   describe("when the break-glass parameter is used", () => {
     /** @scenario "The break-glass path always reaches a local sign-in" */
+    /** @scenario The only connection on an installation still leaves a way in */
     it("answers the local method set without reading the connection store", async () => {
       const { service, findConnectionsForDomain, findActiveConnections } = build({
         active: [ACME],

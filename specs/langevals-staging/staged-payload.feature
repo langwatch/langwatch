@@ -34,7 +34,7 @@ Feature: Auto S3 staging for large langevals payloads
     Given a payload was staged to S3 for an upstream call
     When the upstream langevals call returns
     Then the staged object is deleted from the same bucket and key
-    And the delete failure is non-fatal because a bucket lifecycle rule reaps orphans
+    And the delete failure is non-fatal because a bucket lifecycle rule on the langevals-staging/ prefix (3-day minimum) reaps orphans
 
   @unit
   Scenario: A staged payload is parked in the project's object storage behind a signed download

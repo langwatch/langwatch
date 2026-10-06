@@ -21,8 +21,11 @@ import {
 import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { CostRollupDayComparer, CostRollupDayLook } from "../../app/governance.members.ts";
 import { MemoryGovernanceCostChargeRepository } from "../../repositories/memory/memory.governance-cost-charge.repository.ts";
+import type {
+  CostRollupDayComparer,
+  CostRollupDayLook,
+} from "../../services/cost-rollup-day-comparer.service.ts";
 import {
   COST_ROLLUP_MISMATCH_METRIC_NAME,
   CostRollupDayComparerService,
@@ -455,6 +458,7 @@ describe("a failing comparison against its process store", () => {
 describe("drift that outlives the ladder", () => {
   describe("given a day's summary no longer matches its recorded charges", () => {
     /** @scenario "Drift that outlives every look is counted and logged" */
+    /** @scenario "The comparator counts a summary that drifted from its events" */
     it("counts it once and logs both figures", async () => {
       const world = await driftingWorld();
       world.toNextSlot();

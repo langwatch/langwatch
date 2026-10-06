@@ -12,11 +12,10 @@ import type { TopicClusteringMetrics } from "../eventing/topic-clustering.intent
  * via `prom-client`, a worker via OTLP — same counter, histogram, and
  * `outcome`/`mode` labels, so a query need not know which process ran it.
  */
-export const TOPIC_CLUSTERING_PAGE_TOTAL_METRIC_NAME = "topic_clustering_page_total";
-export const TOPIC_CLUSTERING_PAGE_DURATION_METRIC_NAME =
-  "topic_clustering_page_duration_milliseconds";
+const TOPIC_CLUSTERING_PAGE_TOTAL_METRIC_NAME = "topic_clustering_page_total";
+const TOPIC_CLUSTERING_PAGE_DURATION_METRIC_NAME = "topic_clustering_page_duration_milliseconds";
 /** The series the App writes for the same langevals request-size measurement. */
-export const TOPIC_CLUSTERING_PAYLOAD_SIZE_METRIC_NAME = "payload_size_bytes";
+const TOPIC_CLUSTERING_PAYLOAD_SIZE_METRIC_NAME = "payload_size_bytes";
 
 /** Topic clustering page outcomes and durations, pushed over OTLP. */
 export class OtelTopicClusteringMetricsService implements TopicClusteringMetrics {

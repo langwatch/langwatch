@@ -15,8 +15,8 @@ import { UserNotFoundError } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import type { AuthDirectory } from "../../app/auth.members.ts";
 import { MemoryCliDeviceSettlementChannel } from "../../channels/memory/memory.cli-device-settlement.channel.ts";
+import type { AuthDirectoryRepository } from "../../repositories/auth-directory.repository.ts";
 import type { CliDeviceSessionRepository } from "../../repositories/cli-device-session.repository.ts";
 import {
   CliDeviceFlowService,
@@ -42,6 +42,8 @@ const organizationKey = {
 
 describe("given a CLI starting a device login", () => {
   describe("when the browser approves it and the CLI polls", () => {
+    /** @scenario "an approval that is never exchanged mints nothing" */
+    /** @scenario device-login exchange returns the personal project without its key */
     it("mints a session carrying the personal project and the scoped CLI key", async () => {
       const world = deviceFlowWorld();
       const api = mount(world);
@@ -475,6 +477,7 @@ describe("given a CLI starting a device login", () => {
 
     describe("when the CLI polls after approval", () => {
       /** @scenario A project login answers tokens and the project, never a key */
+      /** @scenario A CLI project login answers a session, never a minted key */
       it("answers a project session and no key", async () => {
         const world = deviceFlowWorld();
         world.project = liveProject();
@@ -655,7 +658,9 @@ describe("given a CLI starting a device login", () => {
           api.post("/api/auth/cli/refresh", { refresh_token }),
         ]);
 
-        expect(answers.map((answer) => answer.status).sort()).toEqual([200, 401]);
+        expect(answers.map((answer) => answer.status).toSorted((a, b) => a - b)).toEqual([
+          200, 401,
+        ]);
       });
     });
 
@@ -821,7 +826,10 @@ describe("given a CLI starting a device login", () => {
         project_id: projectId,
       });
 
-    /** @scenario project-login approval rejects another user's personal project id */
+    /**
+     * @scenario project-login approval rejects another user's personal project id
+     * @scenario the server still refuses a personal project that is not the caller's own
+     */
     it("refuses another user's personal project by name and discloses no key", async () => {
       const world = deviceFlowWorld();
       world.project = liveProject({
@@ -842,7 +850,7 @@ describe("given a CLI starting a device login", () => {
     });
 
     /** @scenario project-login approval honours the caller's own explicitly picked personal project */
-    it("honours the caller's own personal project, whose key the exchange then returns", async () => {
+    it("honours the caller's own personal project, opening a project session on it", async () => {
       const world = deviceFlowWorld();
       world.project = liveProject({
         id: "project-mine",
@@ -857,15 +865,19 @@ describe("given a CLI starting a device login", () => {
       const exchanged = await api.post("/api/auth/cli/exchange", {
         device_code: grant.device_code,
       });
+      const exchangedBody = await exchanged.text();
 
       expect(approved.status).toBe(200);
-      await expect(exchanged.json()).resolves.toMatchObject({
+      await expect(approved.json()).resolves.toMatchObject({ project: { id: "project-mine" } });
+      expect(JSON.parse(exchangedBody)).toMatchObject({
+        kind: "project_session",
         project: { id: "project-mine" },
       });
+      expect(exchangedBody).not.toContain("sk-lw-mine");
     });
 
-    /** @scenario project-login approval returns the shared project's key */
-    it("approves a shared project, whose key the exchange then returns", async () => {
+    /** @scenario project-login approval opens a project session on the shared project */
+    it("approves a shared project, opening a project session on it", async () => {
       const world = deviceFlowWorld();
       world.project = liveProject();
       const api = mount(world);
@@ -875,13 +887,69 @@ describe("given a CLI starting a device login", () => {
       const exchanged = await api.post("/api/auth/cli/exchange", {
         device_code: grant.device_code,
       });
+      const exchangedBody = await exchanged.text();
 
       expect(approved.status).toBe(200);
       await expect(approved.json()).resolves.toMatchObject({
         kind: "api_key",
         project: { id: "project-shared" },
       });
-      await expect(exchanged.json()).resolves.toMatchObject({ project: { id: "project-shared" } });
+      expect(JSON.parse(exchangedBody)).toMatchObject({
+        kind: "project_session",
+        project: { id: "project-shared" },
+      });
+      expect(exchangedBody).not.toContain("sk-lw-shared");
+    });
+
+    /** @scenario project-login approval allows an org admin who is not a direct team member */
+    it("approves a shared project on a team the admin is not on, returning no key", async () => {
+      const world = deviceFlowWorld();
+      world.memberRole = "ADMIN";
+      world.administersProject = true;
+      world.project = liveProject({ teamId: "team-the-admin-is-not-on" });
+      const api = mount(world);
+      const grant = await pendingProjectKeyCode(api);
+
+      const approved = await approveProject(api, grant, "project-shared");
+      const body = await approved.text();
+
+      expect(approved.status).toBe(200);
+      expect(JSON.parse(body)).toMatchObject({ project: { id: "project-shared" } });
+      expect(body).not.toContain("sk-lw-shared");
+    });
+
+    describe("when the caller holds a Developer seat (ADR-171)", () => {
+      /** @scenario CLI login refuses a shared project for a Developer */
+      /** @scenario project-login approval refuses a shared project for a Developer, naming the seat */
+      it("refuses a shared project, naming the seat", async () => {
+        const world = deviceFlowWorld();
+        world.memberRole = "DEVELOPER";
+        world.project = liveProject();
+        const api = mount(world);
+        const grant = await pendingProjectKeyCode(api);
+
+        const approved = await approveProject(api, grant, "project-shared");
+        const body = await approved.text();
+
+        expect(approved.status).toBe(400);
+        expect(JSON.parse(body)).toMatchObject({ error: "developer_seat_personal_only" });
+        expect(body).not.toContain("sk-lw-shared");
+      });
+
+      /** @scenario A Developer works inside their own project */
+      /** @scenario project-login approval honours a Developer's own personal project */
+      it("still honours their own personal project", async () => {
+        const world = deviceFlowWorld();
+        world.memberRole = "DEVELOPER";
+        world.project = liveProject({ id: "project-mine", isPersonal: true, ownerUserId: USER_ID });
+        const api = mount(world);
+        const grant = await pendingProjectKeyCode(api);
+
+        const approved = await approveProject(api, grant, "project-mine");
+
+        expect(approved.status).toBe(200);
+        await expect(approved.json()).resolves.toMatchObject({ project: { id: "project-mine" } });
+      });
     });
 
     /** @scenario project-login approval denies a project the caller cannot manage */
@@ -990,6 +1058,33 @@ describe("given a CLI starting a device login", () => {
    * poll, and a second redemption would hand out a second credential.
    */
   describe("given an approved device code being redeemed", () => {
+    describe("when two exchanges for the same approval arrive together", () => {
+      /** @scenario Two exchanges racing the same approval redeem it once */
+      it("hands the credential to one and tells the other to slow down", async () => {
+        const world = deviceFlowWorld();
+        const api = mount(world);
+        const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+          device_code: string;
+          user_code: string;
+        };
+        await api.post("/api/auth/cli/approve", {
+          user_code: grant.user_code,
+          organization_id: ORGANIZATION_ID,
+        });
+
+        const settled = await Promise.all([
+          api.post("/api/auth/cli/exchange", { device_code: grant.device_code }),
+          api.post("/api/auth/cli/exchange", { device_code: grant.device_code }),
+        ]);
+
+        expect(settled.map((response) => response.status).toSorted((a, b) => a - b)).toEqual([
+          200, 429,
+        ]);
+        const refused = settled.find((response) => response.status === 429)!;
+        await expect(refused.json()).resolves.toMatchObject({ error: "slow_down" });
+      });
+    });
+
     const claims = (world: ReturnType<typeof deviceFlowWorld>) =>
       world.store.keys().filter((key) => key.includes("claim:"));
 
@@ -1346,6 +1441,7 @@ function deviceFlowWorld(
   /** What the world answers right now — every field a test may move mid-flow. */
   interface DeviceFlowWorld {
     activeMembership: boolean;
+    memberRole: string;
     /** The project the directory answers NOW, moved between approve and exchange. */
     project: LiveProject | null;
     /** Whether the person still administers it NOW. */
@@ -1366,6 +1462,7 @@ function deviceFlowWorld(
   }
   const world: DeviceFlowWorld = {
     activeMembership: true,
+    memberRole: "ADMIN",
     project: null,
     administersProject: true,
     personExists: true,
@@ -1379,7 +1476,7 @@ function deviceFlowWorld(
     validatedSelections: [],
   };
 
-  const directory: AuthDirectory = {
+  const directory: AuthDirectoryRepository = {
     getOrganizationIdBySsoDomain: () => Promise.reject(new OrganizationNotFoundError()),
     getPerson: (userId) =>
       world.personExists
@@ -1391,6 +1488,7 @@ function deviceFlowWorld(
         ? Promise.reject(new Error("directory unavailable"))
         : Promise.resolve(world.maxSessionDurationDays),
     hasActiveMembership: () => Promise.resolve(world.activeMembership),
+    findActiveMemberRole: () => Promise.resolve(world.activeMembership ? world.memberRole : null),
     getLiveProject: () =>
       world.project === null
         ? Promise.reject(new ProjectNotFoundError())

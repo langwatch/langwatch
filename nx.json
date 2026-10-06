@@ -19,6 +19,7 @@
     "lintGlobals": [
       "sharedGlobals",
       "{workspaceRoot}/.oxlintrc.jsonc",
+      "{workspaceRoot}/.oxlintrc.*.jsonc",
       "{workspaceRoot}/packages/oxlint-rules/**/*",
       "{workspaceRoot}/packages/architecture-enforcer/oxlint*",
       "{workspaceRoot}/modules/catalogue.json",

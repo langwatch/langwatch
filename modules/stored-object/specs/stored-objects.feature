@@ -8,7 +8,7 @@ Feature: Stored Objects service and API
   I want durable project-scoped byte references
   So that bytes can be stored and delivered without exposing provider details
 
-  @architecture @typecheck
+  @architecture @typecheck @unit
   Scenario: Stored Objects lives in one feature package
     Given Stored Objects is installed
     Then @langwatch/stored-object-contract contains portable schemas, errors and RPC contracts
@@ -16,19 +16,7 @@ Feature: Stored Objects service and API
     And the feature has no web package or separate object-storage package
     And neither package imports the application
 
-  @architecture @typecheck
-  Scenario: Stored Objects adopts the strict feature layout
-    Given the Stored Objects implementation is reduced to its approved scope
-    And its feature.json declares layoutVersion 0
-    Then its contract capability is the StoredObjectApi interface and its feature token
-    And its server service is services/stored-object.service.ts
-    And its canonical row is reached through a repository interface with a Prisma and a memory backend
-    And a process selects the backend once, at boot, through the repository registry
-    And its public RPC family and its existence probe are flat transport declarations the process mounts
-    And its ClickHouse import is migrations/clickhouse-import.stored-object.migration.ts
-    And no composition, registration, lifecycle, or eventing source directory remains
-
-  @architecture @persistence
+  @architecture @persistence @unit
   Scenario: One Postgres row owns current state
     Given Stored Objects persists operational metadata
     Then StoredObject is its only Postgres domain table
@@ -53,14 +41,11 @@ Feature: Stored Objects service and API
     And each installation holds its own rows
     And a read scoped to another project is refused as not found
 
-  @architecture @storage
+  @architecture @storage @unit
   Scenario: Stored Objects has one portable storage URI owner
-    Given the application composes its existing storage drivers
-    Then @langwatch/stored-object-contract owns URI formatting and redaction
-    And the existing S3, Azure Blob and local-filesystem drivers remain authoritative
-    And application composition owns lazy scheme dispatch
-    And validated application configuration retains destination selection and credentials
-    And inactive Azure configuration does not block S3 or local-filesystem traffic
+    Given a storage destination of the S3, Azure Blob or local-filesystem kind
+    Then @langwatch/stored-object-contract formats its URI and redacts destinations and credentials
+    And only the configured driver schemes are recognised
 
   @unimplemented @integration @stored-objects
   Scenario: Internal storage is content addressed
@@ -120,6 +105,21 @@ Feature: Stored Objects service and API
     When the storage checkup probe runs for it
     Then one canary object is written under the project's checkup prefix
     And the canary object is removed again
+
+  @unit @migration
+  Scenario: The purge removes main-era evaluation input objects and keeps every other purpose
+    Given stored objects with purpose evaluation_inputs in several projects and objects of other purposes
+    When the purge runs with apply
+    Then the bytes and the rows of the evaluation_inputs objects are deleted, page by page
+    And objects of every other purpose are untouched
+    And without apply the purge only counts what it would delete
+
+  @unit @migration
+  Scenario: A purge that cannot delete an object's bytes keeps its row for the next run
+    Given an evaluation_inputs object whose bytes storage refuses to delete
+    When the purge runs with apply
+    Then that row is kept and counted as failed
+    And the other evaluation_inputs objects are still deleted
 
   @unimplemented @integration @api @authorization
   Scenario: The public API uses the unified API package

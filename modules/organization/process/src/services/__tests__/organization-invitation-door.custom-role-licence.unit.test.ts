@@ -8,11 +8,9 @@ import type { OrganizationCaller } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  OrganizationInvitations,
-  OrganizationSignals,
-} from "../../app/organization.members.ts";
 import { OrganizationInvitationDoorService } from "../organization-invitation-door.service.ts";
+import type { OrganizationInvitations } from "../organization-invitations.service.ts";
+import type { OrganizationSignals } from "../organization-signals.service.ts";
 
 const ORGANIZATION_ID = "org-1";
 const CALLER: OrganizationCaller = { id: "user-1", name: "Sam", email: "sam@acme.test" };
@@ -36,6 +34,7 @@ function door(options: { beyondCaller?: string[] }) {
     assertWithinCaller,
     service: OrganizationInvitationDoorService.create({
       invitations,
+      directory: { findProvenAddresses: async () => [] },
       joinRequests: null,
       signals,
       lifecycle: { membersInvited: vi.fn(), inviteAccepted: vi.fn() },

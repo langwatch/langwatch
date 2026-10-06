@@ -191,6 +191,12 @@ class Triggers extends TriggerRepository {
   update() {
     return Promise.reject(new Error("unused"));
   }
+  openSecret(): string {
+    throw new Error("unused");
+  }
+  sealSecret(): string {
+    throw new Error("unused");
+  }
 }
 class Fires extends TriggerFireHistoryRepository {
   listPageByTriggerId(): Promise<TriggerFirePage> {

@@ -5,8 +5,7 @@ import { Temporal } from "@langwatch/time";
 export const GOVERNANCE_COST_SOURCE = { GATEWAY: "gateway", PULLED: "pulled" } as const;
 export const GOVERNANCE_COST_CURRENCY_USD = "USD";
 
-export type GovernanceCostSource =
-  (typeof GOVERNANCE_COST_SOURCE)[keyof typeof GOVERNANCE_COST_SOURCE];
+type GovernanceCostSource = (typeof GOVERNANCE_COST_SOURCE)[keyof typeof GOVERNANCE_COST_SOURCE];
 
 /** One provider item's newest observation; the prior* fields exist only once its figure moved. */
 export interface PulledContribution {
@@ -59,7 +58,7 @@ export interface GovernanceCostRollupCell {
 }
 
 /** In sort-key order: the table's ORDER BY and the read side's KEY_COLUMNS are the same contract. */
-export const GOVERNANCE_COST_ROLLUP_KEY_FIELDS = [
+const GOVERNANCE_COST_ROLLUP_KEY_FIELDS = [
   "tenantId",
   "day",
   "costSource",
@@ -126,7 +125,7 @@ export function decodeGovernanceCostRollupKey(key: string): GovernanceCostRollup
   };
 }
 
-export interface GovernanceCostRollupTotals {
+interface GovernanceCostRollupTotals {
   amountNanoUsd: number | null;
   amountNanoMinor: number;
   tokensInput: number;

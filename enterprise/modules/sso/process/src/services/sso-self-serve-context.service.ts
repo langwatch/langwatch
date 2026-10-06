@@ -42,7 +42,7 @@ export class LicenseDomainClaimAuthority {
   }
 }
 
-export interface LicenseDomainClaimAuthorityDeps {
+interface LicenseDomainClaimAuthorityDeps {
   isHosted: () => boolean;
   licenseGate: () => Promise<boolean>;
   licensing: Pick<LicensingApi, "getDomainClaimAuthority">;
@@ -77,16 +77,16 @@ export class InstanceLicenseProof {
 }
 
 /** Whether this organization was opted in to setting single sign-on up itself. */
-export interface SsoSelfServeOptIn {
+interface SsoSelfServeOptIn {
   isOptedIn(input: { organizationId: string }): Promise<boolean>;
 }
 
 /** Who counts as a platform operator (holds the platform grant). */
-export interface SsoPlatformOperators {
+interface SsoPlatformOperators {
   isPlatformOperator(input: { actorId: string }): Promise<boolean>;
 }
 
-export interface SsoSelfServeContextDeps {
+interface SsoSelfServeContextDeps {
   authority: LicenseDomainClaimAuthority;
   licenseProof: InstanceLicenseProof;
   optIn: SsoSelfServeOptIn;

@@ -25,8 +25,10 @@ procedures with the reusable web state and components.
 
 ## Dependencies
 
-The server receives the canonical Project service, a private Presence
-repository, and narrow broadcast and diagnostics ports. The web package
+The server holds no peer: it folds project's and organization's
+presence-setting facts through its own peer subscribers into durable Redis keys
+(rulings 2026-10-05, "Presence flag"), beside a private Presence repository and
+narrow broadcast and diagnostics ports. The web package
 depends on the contract and UI libraries, never app transport hooks.
 
 ## Persistence
@@ -37,7 +39,7 @@ connection.
 
 ## Runtime and registration
 
-Composition builds one service per process and supplies Redis, Project, and
+Composition builds one service per process and supplies Redis and
 broadcast implementations. Requests use that composed instance.
 
 ## Environment and configuration
@@ -79,8 +81,9 @@ cross-feature stores.
 Application composition imports the reusable presentation and browser state
 from `@langwatch/presence-browser`; no duplicate implementation remains in the app.
 
-`PresenceApp` names the portable `ProjectApi` and `UserApi` peers in its
-`static dependencies` and is installed by `presenceServer`; the API composition
+`PresenceModule` names no peer in its `static dependencies` (2026-10-06: the
+presenter comes from the session-person fact, the setting from its own fold) and
+is installed by `presenceProcessModule`; the API composition
 root boots that installer and hands it the fan-out it publishes on. The
 process-composition bridge that used to construct the graph by hand is gone,
 and with it the second, hand-wired way to build Presence.

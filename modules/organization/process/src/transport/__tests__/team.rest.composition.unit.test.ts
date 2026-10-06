@@ -6,27 +6,14 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
  * stub — the prior version lost its only caller silently and every
  * operation 404'd for a stretch. Spec: specs/teams/teams-rest-api.feature
  */
-import { Temporal, toDate, type Instant } from "@langwatch/time";
-import { describe, expect, it } from "vitest";
+import { Temporal, toDate } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
 
-import { organizationAppForTesting } from "../../app/__tests__/support/organization-app-for-testing.ts";
-import type {
-  OrganizationGrantCache,
-  OrganizationPromptSeed,
-  OrganizationSeatLicense,
-  OrganizationSessionRevocation,
-  OrganizationSettingsSecret,
-} from "../../app/organization.members.ts";
-import { MemoryGroupRepository } from "../../repositories/memory/memory.group.repository.ts";
-import { MemoryOrganizationMembershipRepository } from "../../repositories/memory/memory.organization-membership.repository.ts";
-import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
-import { MemoryOrganizationRepository } from "../../repositories/memory/memory.organization.repository.ts";
-import { MemoryTeamRepository } from "../../repositories/memory/memory.team.repository.ts";
-import { GroupIdentityService } from "../../services/group-identity.service.ts";
-import { OrganizationMembershipService } from "../../services/organization-membership.service.ts";
-import { OrganizationService } from "../../services/organization.service.ts";
-import { PersonalWorkspaceIdentityService } from "../../services/personal-workspace-identity.service.ts";
-import { TeamIdentityService } from "../../services/team-identity.service.ts";
+import {
+  organizationModuleSetup,
+  type OrganizationModuleSetup,
+} from "../../app/__tests__/support/organization-module-setup.ts";
+import { OrganizationModule } from "../../app/organization.app.ts";
 import { TestAuthzApi } from "./support/test-authz-api.ts";
 import {
   CREDENTIAL,
@@ -46,61 +33,6 @@ const ARCHIVED_TEAM_ID = "team_archived";
 const COLLEAGUE_ID = "user-colleague";
 const OUTSIDER_ID = "user-outsider";
 const NOW = Temporal.Instant.from("2026-09-01T00:00:00.000Z");
-
-const passthroughSecrets: OrganizationSettingsSecret = {
-  encrypt: (value) => value,
-  decrypt: (value) => value,
-};
-
-/**
- * The membership half of the application. The teams family never reaches it —
- * every member here refuses rather than answering, so a route that started
- * reading organization membership through this door would fail loudly.
- */
-const unreachablePromptSeed: OrganizationPromptSeed = {
-  seedTagsForOrganization: () => Promise.reject(new Error("prompt seeding is not reached")),
-  reportCompensationFailure: () => {
-    throw new Error("prompt compensation is not reached");
-  },
-};
-
-const unreachableSeats: OrganizationSeatLicense = {
-  checkLimit: () => Promise.reject(new Error("seat limits are not reached")),
-  assertRoleChangeAllowed: () => Promise.reject(new Error("seat limits are not reached")),
-};
-
-const unreachableSessions: OrganizationSessionRevocation = {
-  revokeAllBrowserSessions: () => Promise.reject(new Error("session revocation is not reached")),
-};
-
-const unreachableGrantCache: OrganizationGrantCache = {
-  invalidateOrganization: () => Promise.reject(new Error("grant caching is not reached")),
-};
-
-function teamRow(
-  overrides: Partial<{
-    id: string;
-    name: string;
-    slug: string;
-    organizationId: string;
-    isPersonal: boolean;
-    ownerUserId: string | null;
-    archivedAt: Instant | null;
-  }> = {},
-) {
-  return {
-    id: SHARED_TEAM_ID,
-    name: "Shared Team",
-    slug: "shared-team",
-    organizationId: ORGANIZATION_ID,
-    isPersonal: false,
-    ownerUserId: null,
-    archivedAt: null,
-    createdAt: NOW,
-    updatedAt: NOW,
-    ...overrides,
-  };
-}
 
 /** One project row, as the project boundary answers `listByTeam` with. */
 function projectRow(overrides: Partial<Project> = {}): Project {
@@ -138,71 +70,11 @@ function projectRow(overrides: Partial<Project> = {}): Project {
 }
 
 /**
- * The application as `OrganizationModule` is wired at boot: real
- * organization and membership services over the module's own in-memory
- * repositories, with authorization and projects as complete doubles.
+ * The application `OrganizationModule.create` builds, over the memory tier of its own registry
+ * seeded through its repositories, with authorization and projects as complete doubles.
+ * Rows are stamped at NOW, as the read assertions expect.
  */
-function application() {
-  const memory = MemoryOrganizationDatabase.create();
-
-  memory.organizations.set(ORGANIZATION_ID, {
-    id: ORGANIZATION_ID,
-    name: "ACME",
-    slug: "acme",
-    supportContact: null,
-    presenceEnabled: false,
-    traceSharingEnabled: false,
-    primaryIntent: null,
-    s3Endpoint: null,
-    s3AccessKeyId: null,
-    s3SecretAccessKey: null,
-    s3Bucket: null,
-    stripeCustomerId: null,
-    createdAt: NOW,
-    updatedAt: NOW,
-  });
-
-  memory.teams.set(SHARED_TEAM_ID, teamRow());
-  memory.teams.set(
-    OTHER_TEAM_ID,
-    teamRow({
-      id: OTHER_TEAM_ID,
-      name: "Another Organization's Team",
-      slug: "another-organizations-team",
-      organizationId: OTHER_ORGANIZATION_ID,
-    }),
-  );
-  memory.teams.set(
-    PERSONAL_TEAM_ID,
-    teamRow({
-      id: PERSONAL_TEAM_ID,
-      name: "Owner's Workspace",
-      slug: "--personal-owner",
-      isPersonal: true,
-      ownerUserId: USER_ID,
-    }),
-  );
-  memory.teams.set(
-    ARCHIVED_TEAM_ID,
-    teamRow({
-      id: ARCHIVED_TEAM_ID,
-      name: "Retired Team",
-      slug: "retired-team",
-      archivedAt: Temporal.Instant.from("2026-08-01T00:00:00.000Z"),
-    }),
-  );
-
-  for (const userId of [USER_ID, COLLEAGUE_ID]) {
-    memory.organizationUsers.push({
-      userId,
-      organizationId: ORGANIZATION_ID,
-      role: "ADMIN",
-      disabledAt: null,
-      createdAt: NOW,
-      updatedAt: NOW,
-    });
-  }
-
+async function application() {
   const permissions = TestAuthzApi.create({
     people: [
       { id: USER_ID, name: "Workspace Owner", email: "owner@acme.test" },
@@ -230,42 +102,81 @@ function application() {
     "ProjectApi",
   );
 
-  const organizations = OrganizationService.create({
-    repository: MemoryOrganizationRepository.create({ memory }),
-    teams: MemoryTeamRepository.create({ memory }),
-    groups: MemoryGroupRepository.create({ memory }),
-    identities: PersonalWorkspaceIdentityService.create(),
-    teamIdentities: TeamIdentityService.create(),
-    groupIdentities: GroupIdentityService.create(),
-    authz: permissions,
-    grants: permissions,
-    settingsSecrets: passthroughSecrets,
-  });
+  const setup = organizationModuleSetup({ permissions, projects });
+  const { repositories } = setup;
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(toDate(NOW));
+  try {
+    await seed(repositories, permissions);
+  } finally {
+    vi.useRealTimers();
+  }
 
-  const membership = OrganizationMembershipService.create({
-    repository: MemoryOrganizationMembershipRepository.create({ memory }),
-    prompts: unreachablePromptSeed,
-    seats: unreachableSeats,
-    sessions: unreachableSessions,
-    grantCache: unreachableGrantCache,
-    testArrivals: { standingFor: async () => ({ testing: false }) as const },
-    ceiling: { assertWithinCaller: async () => {} },
-    admissions: {
-      attachBindings: () => Promise.reject(new Error("no admission expected")),
-      completeAdmission: () => Promise.reject(new Error("no admission expected")),
+  return { app: await OrganizationModule.create(setup), repositories, permissions };
+}
+
+/** One organization with a shared, a personal and an archived team, and a team elsewhere. */
+async function seed(
+  repositories: OrganizationModuleSetup["repositories"],
+  permissions: TestAuthzApi,
+) {
+  const membership = repositories.membership(permissions);
+  await membership.createAndAssign({
+    userId: USER_ID,
+    orgId: ORGANIZATION_ID,
+    orgName: "ACME",
+    orgSlug: "acme",
+    teamId: SHARED_TEAM_ID,
+    teamSlug: "shared-team",
+    pricingModel: "SEAT_EVENT",
+  });
+  await repositories.team.update({
+    teamId: SHARED_TEAM_ID,
+    organizationId: ORGANIZATION_ID,
+    name: "Shared Team",
+  });
+  await membership.createMembership({
+    organizationId: ORGANIZATION_ID,
+    userId: COLLEAGUE_ID,
+    pendingAdmissionId: "admission-colleague",
+    via: "invite",
+  });
+  await membership.createForProvisioning({
+    orgId: OTHER_ORGANIZATION_ID,
+    orgName: "Another Organization",
+    orgSlug: "another-organization",
+    teamId: OTHER_TEAM_ID,
+    teamSlug: "another-organizations-team",
+    pricingModel: "SEAT_EVENT",
+  });
+  await repositories.team.update({
+    teamId: OTHER_TEAM_ID,
+    organizationId: OTHER_ORGANIZATION_ID,
+    name: "Another Organization's Team",
+  });
+  await repositories.organization.ensurePersonalWorkspace({
+    workspace: { userId: USER_ID, organizationId: ORGANIZATION_ID, displayName: "Owner" },
+    resources: {
+      teamId: PERSONAL_TEAM_ID,
+      teamSlug: "--personal-owner",
+      projectId: "project_personal",
+      projectSlug: "personal-owner",
+      projectApiKey: "sk-lw-personal",
+      ownerBindingId: "binding-owner-personal",
     },
   });
-
-  const app = organizationAppForTesting({
-    dependencies: {
-      organizations,
-      membership,
-      projects,
-      permissions,
-    },
+  await repositories.team.create({
+    teamId: ARCHIVED_TEAM_ID,
+    name: "Retired Team",
+    slug: "retired-team",
+    organizationId: ORGANIZATION_ID,
   });
+  await repositories.team.archive({ teamId: ARCHIVED_TEAM_ID, organizationId: ORGANIZATION_ID });
+}
 
-  return { app, memory, permissions };
+/** How many live teams the organization holds. */
+async function activeTeamCount(repositories: OrganizationModuleSetup["repositories"]) {
+  return (await repositories.team.findActive({ organizationId: ORGANIZATION_ID })).length;
 }
 
 /** The refusal body, read once so a test asserts on `code` rather than prose. */
@@ -277,14 +188,14 @@ describe("given the teams REST family over the application the composition build
   describe("when the credential is missing or unknown", () => {
     /** @scenario Rejects unauthenticated requests */
     it("answers 401 with no authorization header", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       expect((await send("/api/teams", { credential: null })).status).toBe(401);
     });
 
     /** @scenario Rejects invalid API key */
     it("answers 401 for a bearer token the door does not know", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       expect((await send("/api/teams", { credential: "not-a-key" })).status).toBe(401);
     });
@@ -292,8 +203,9 @@ describe("given the teams REST family over the application the composition build
 
   describe("when a team is created", () => {
     /** @scenario Creates a team */
+    /** @scenario "A request manages a shared team" */
     it("answers 201 with the team's id, name, slug, organization and timestamps", async () => {
-      const { app, memory } = application();
+      const { app, repositories } = await application();
       const { send } = mountTeamsRestApplication(app);
 
       const response = await send("/api/teams", {
@@ -311,7 +223,7 @@ describe("given the teams REST family over the application the composition build
       expect(body.slug).toEqual(expect.any(String));
       expect(body.createdAt).toEqual(expect.any(String));
       expect(body.updatedAt).toEqual(expect.any(String));
-      expect(memory.teams.get(String(body.id))?.name).toBe("My Test Team");
+      expect((await repositories.team.getById(String(body.id))).name).toBe("My Test Team");
     });
 
     /**
@@ -323,19 +235,19 @@ describe("given the teams REST family over the application the composition build
      * application answered, so the CODE is what this asserts.
      */
     it("refuses an empty body by name, and creates nothing", async () => {
-      const { app, memory } = application();
+      const { app, repositories } = await application();
       const { send } = mountTeamsRestApplication(app);
-      const before = memory.teams.size;
+      const before = await activeTeamCount(repositories);
 
       const refusal = await refusalOf(await send("/api/teams", { method: "POST", body: {} }));
 
       expect(refusal.code).toBe("validation_error");
-      expect(memory.teams.size).toBe(before);
+      expect(await activeTeamCount(repositories)).toBe(before);
     });
 
     /** @scenario Rejects create when name is empty */
     it("refuses an empty name by name", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const refusal = await refusalOf(
         await send("/api/teams", { method: "POST", body: { name: "" } }),
@@ -346,7 +258,7 @@ describe("given the teams REST family over the application the composition build
 
     /** @scenario Rejects create when name exceeds 255 characters */
     it("refuses a name longer than 255 characters by name", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const refusal = await refusalOf(
         await send("/api/teams", { method: "POST", body: { name: "n".repeat(256) } }),
@@ -356,23 +268,23 @@ describe("given the teams REST family over the application the composition build
     });
 
     it("refuses a name carrying a null byte rather than failing the write", async () => {
-      const { app, memory } = application();
+      const { app, repositories } = await application();
       const { send } = mountTeamsRestApplication(app);
-      const before = memory.teams.size;
+      const before = await activeTeamCount(repositories);
 
       const refusal = await refusalOf(
         await send("/api/teams", { method: "POST", body: { name: "a\u0000b" } }),
       );
 
       expect(refusal.code).toBe("validation_error");
-      expect(memory.teams.size).toBe(before);
+      expect(await activeTeamCount(repositories)).toBe(before);
     });
   });
 
   describe("when the collection is listed", () => {
     /** @scenario Lists non-archived teams for the organization */
     it("answers 200 with a paginated data array", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const response = await send("/api/teams");
 
@@ -390,7 +302,7 @@ describe("given the teams REST family over the application the composition build
 
     /** @scenario Paginates team list */
     it("honours page and limit from the query string", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const response = await send("/api/teams?page=1&limit=2");
 
@@ -406,7 +318,7 @@ describe("given the teams REST family over the application the composition build
      * organization from the CREDENTIAL rather than from the team it was handed.
      */
     it("never lists a team belonging to another organization", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const body = (await (await send("/api/teams")).json()) as { data: { id: string }[] };
 
@@ -415,7 +327,7 @@ describe("given the teams REST family over the application the composition build
 
     /** @scenario Archived team is excluded from list */
     it("never lists a team that has been archived", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const body = (await (await send("/api/teams")).json()) as { data: { id: string }[] };
 
@@ -425,8 +337,9 @@ describe("given the teams REST family over the application the composition build
 
   describe("when one team is read", () => {
     /** @scenario Returns a team by id */
+    /** @scenario "A request manages a shared team" */
     it("answers 200 with the team", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const response = await send(`/api/teams/${SHARED_TEAM_ID}`);
 
@@ -442,14 +355,14 @@ describe("given the teams REST family over the application the composition build
 
     /** @scenario Returns 404 for non-existent team */
     it("answers 404 for a team id nothing holds", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       expect((await send("/api/teams/team_doesnotexist")).status).toBe(404);
     });
 
     /** @scenario An unknown team names the code */
     it("names team_not_found rather than a reason phrase", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const response = await send("/api/teams/team_doesnotexist");
 
@@ -459,20 +372,20 @@ describe("given the teams REST family over the application the composition build
 
     /** @scenario Returns 404 for team in another organization */
     it("answers 404 for a team in another organization", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       expect((await send(`/api/teams/${OTHER_TEAM_ID}`)).status).toBe(404);
     });
 
     /** @scenario Archived team is inaccessible via GET */
     it("answers 404 for a team that has been archived", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       expect((await send(`/api/teams/${ARCHIVED_TEAM_ID}`)).status).toBe(404);
     });
 
     it("answers the family's canonical /api/v1 twin the same way", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const response = await send(`/api/v1/teams/${SHARED_TEAM_ID}`);
 
@@ -488,8 +401,9 @@ describe("given the teams REST family over the application the composition build
      * `updateTeam`, not `updateTeamWithMembers`: a PATCH carrying a name has no
      * membership array to give, and demanding one would have changed the wire.
      */
+    /** @scenario "A request manages a shared team" */
     it("answers 200 with the new name and writes it", async () => {
-      const { app, memory } = application();
+      const { app, repositories } = await application();
       const { send } = mountTeamsRestApplication(app);
 
       const response = await send(`/api/teams/${SHARED_TEAM_ID}`, {
@@ -499,12 +413,12 @@ describe("given the teams REST family over the application the composition build
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toMatchObject({ name: "Updated Name" });
-      expect(memory.teams.get(SHARED_TEAM_ID)?.name).toBe("Updated Name");
+      expect((await repositories.team.getById(SHARED_TEAM_ID)).name).toBe("Updated Name");
     });
 
     /** @scenario Returns 404 when updating non-existent team */
     it("answers 404 for a team id nothing holds", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const response = await send("/api/teams/team_ghost", {
         method: "PATCH",
@@ -515,7 +429,7 @@ describe("given the teams REST family over the application the composition build
     });
 
     it("refuses a team in another organization, and writes nothing", async () => {
-      const { app, memory } = application();
+      const { app, repositories } = await application();
       const { send } = mountTeamsRestApplication(app);
 
       const response = await send(`/api/teams/${OTHER_TEAM_ID}`, {
@@ -524,14 +438,17 @@ describe("given the teams REST family over the application the composition build
       });
 
       expect(response.status).toBe(404);
-      expect(memory.teams.get(OTHER_TEAM_ID)?.name).toBe("Another Organization's Team");
+      expect((await repositories.team.getById(OTHER_TEAM_ID)).name).toBe(
+        "Another Organization's Team",
+      );
     });
   });
 
   describe("when a team is archived", () => {
     /** @scenario Archives a team */
+    /** @scenario "A request manages a shared team" */
     it("answers 200 with the archive stamp, and archives the row", async () => {
-      const { app, memory } = application();
+      const { app, repositories } = await application();
       const { send } = mountTeamsRestApplication(app);
 
       const response = await send(`/api/teams/${SHARED_TEAM_ID}`, { method: "DELETE" });
@@ -544,19 +461,24 @@ describe("given the teams REST family over the application the composition build
       };
       expect(body.id).toBe(SHARED_TEAM_ID);
       expect(body.archivedAt).not.toBeNull();
-      expect(memory.teams.get(SHARED_TEAM_ID)?.archivedAt).not.toBeNull();
+      await expect(repositories.team.getById(SHARED_TEAM_ID)).rejects.toMatchObject({
+        code: "team_not_found",
+      });
+      await expect(repositories.team.findOrganizationId({ teamId: SHARED_TEAM_ID })).resolves.toBe(
+        ORGANIZATION_ID,
+      );
     });
 
     /** @scenario Returns 404 when deleting non-existent team */
     it("answers 404 for a team id nothing holds", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       expect((await send("/api/teams/team_nope", { method: "DELETE" })).status).toBe(404);
     });
 
     /** @scenario Returns 404 when deleting already-archived team */
     it("answers 404 for a team that is already archived", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       expect((await send(`/api/teams/${ARCHIVED_TEAM_ID}`, { method: "DELETE" })).status).toBe(404);
     });
@@ -569,20 +491,23 @@ describe("given the teams REST family over the application the composition build
      * while the workspace lookup skipped the archived row.
      */
     it("refuses a personal team with its code, and archives nothing", async () => {
-      const { app, memory } = application();
+      const { app, repositories } = await application();
       const { send } = mountTeamsRestApplication(app);
 
       const response = await send(`/api/teams/${PERSONAL_TEAM_ID}`, { method: "DELETE" });
 
       expect(response.status).toBe(403);
       expect((await refusalOf(response)).code).toBe("personal_workspace_not_managed_here");
-      expect(memory.teams.get(PERSONAL_TEAM_ID)?.archivedAt).toBeNull();
+      await expect(repositories.team.getById(PERSONAL_TEAM_ID)).resolves.toMatchObject({
+        id: PERSONAL_TEAM_ID,
+      });
     });
   });
 
   describe("when a team's members are listed", () => {
+    /** @scenario "A request lists a team's related resources" */
     it("answers 200 with each member's id, name, email and role", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const response = await send(`/api/teams/${SHARED_TEAM_ID}/members`);
 
@@ -605,7 +530,7 @@ describe("given the teams REST family over the application the composition build
      * tells a caller the team exists and is empty.
      */
     it("answers 404 for a team in another organization rather than an empty list", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const response = await send(`/api/teams/${OTHER_TEAM_ID}/members`);
 
@@ -616,7 +541,7 @@ describe("given the teams REST family over the application the composition build
 
   describe("when a member is added to a team", () => {
     it("answers 201 and attaches the binding", async () => {
-      const { app, permissions } = application();
+      const { app, permissions } = await application();
       const { send } = mountTeamsRestApplication(app);
 
       const response = await send(`/api/teams/${SHARED_TEAM_ID}/members`, {
@@ -631,7 +556,7 @@ describe("given the teams REST family over the application the composition build
 
     /** @scenario A service key grants through the organization doors, bounded by its own grants */
     it("adds a member for a service key, answering as the key itself", async () => {
-      const { app, permissions } = application();
+      const { app, permissions } = await application();
       const { send } = mountTeamsRestApplication(app, { actor: null });
 
       const response = await send(`/api/teams/${SHARED_TEAM_ID}/members`, {
@@ -645,7 +570,7 @@ describe("given the teams REST family over the application the composition build
 
     /** @scenario A personal key is bounded by the key, not by its owner */
     it("bounds a personal key's grant by the key, not by the member who owns it", async () => {
-      const { app, permissions } = application();
+      const { app, permissions } = await application();
       const { send } = mountTeamsRestApplication(app, { actor: { type: "user", id: USER_ID } });
 
       await send(`/api/teams/${SHARED_TEAM_ID}/members`, {
@@ -658,7 +583,7 @@ describe("given the teams REST family over the application the composition build
 
     /** @scenario Adding somebody who is not in the organization names the code */
     it("refuses a user who does not belong to the organization", async () => {
-      const { app, permissions } = application();
+      const { app, permissions } = await application();
       const { send } = mountTeamsRestApplication(app);
 
       const response = await send(`/api/teams/${SHARED_TEAM_ID}/members`, {
@@ -673,7 +598,7 @@ describe("given the teams REST family over the application the composition build
 
     /** @scenario Granting a role a member already holds is written again */
     it("writes a role the member already holds again", async () => {
-      const { app } = application();
+      const { app } = await application();
       const { send } = mountTeamsRestApplication(app);
 
       await send(`/api/teams/${SHARED_TEAM_ID}/members`, {
@@ -690,7 +615,7 @@ describe("given the teams REST family over the application the composition build
 
     /** @scenario Refuses to add a member to a personal team */
     it("refuses a personal team with its code, and leaves it holding its owner alone", async () => {
-      const { app, permissions } = application();
+      const { app, permissions } = await application();
       const { send } = mountTeamsRestApplication(app);
 
       const response = await send(`/api/teams/${PERSONAL_TEAM_ID}/members`, {
@@ -713,7 +638,7 @@ describe("given the teams REST family over the application the composition build
      * through whichever role it did not reach.
      */
     it("takes every binding they hold on that team", async () => {
-      const { app, permissions } = application();
+      const { app, permissions } = await application();
       const { send } = mountTeamsRestApplication(app);
       permissions.seedTeamBinding({
         id: "binding-colleague-member",
@@ -741,7 +666,7 @@ describe("given the teams REST family over the application the composition build
 
     /** @scenario Removing somebody who holds no role on the team names the code */
     it("refuses somebody who holds no binding on the team", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const response = await send(`/api/teams/${SHARED_TEAM_ID}/members/${COLLEAGUE_ID}`, {
         method: "DELETE",
@@ -753,7 +678,7 @@ describe("given the teams REST family over the application the composition build
 
     /** @scenario Refuses to remove a member from a personal team */
     it("refuses a personal team's owner with its code, and leaves the binding", async () => {
-      const { app, permissions } = application();
+      const { app, permissions } = await application();
       const { send } = mountTeamsRestApplication(app);
 
       const response = await send(`/api/teams/${PERSONAL_TEAM_ID}/members/${USER_ID}`, {
@@ -771,7 +696,7 @@ describe("given the teams REST family over the application the composition build
      * `callerOf` builds, distinct from the ledger actor `addTeamMember` uses.
      */
     it("carries out a removal asked for by a service key that acts as nobody", async () => {
-      const { app, permissions } = application();
+      const { app, permissions } = await application();
       const { send } = mountTeamsRestApplication(app, { actor: null });
       permissions.seedTeamBinding({
         id: "binding-colleague-member",
@@ -791,8 +716,9 @@ describe("given the teams REST family over the application the composition build
   });
 
   describe("when a team's projects are listed", () => {
+    /** @scenario "A request lists a team's related resources" */
     it("answers 200 with the projects that live in the team", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const response = await send(`/api/teams/${SHARED_TEAM_ID}/projects`);
 
@@ -802,7 +728,7 @@ describe("given the teams REST family over the application the composition build
     });
 
     it("answers each project's name and stamps only, never its keys", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const response = await send(`/api/teams/${SHARED_TEAM_ID}/projects`);
 
@@ -821,7 +747,7 @@ describe("given the teams REST family over the application the composition build
 
     /** The same pre-flight read: a foreign team is absent, not empty. */
     it("answers 404 for a team in another organization rather than an empty list", async () => {
-      const { send } = mountTeamsRestApplication(application().app);
+      const { send } = mountTeamsRestApplication((await application()).app);
 
       const response = await send(`/api/teams/${OTHER_TEAM_ID}/projects`);
 
@@ -841,14 +767,14 @@ describe("given the teams REST family over the application the composition build
      * credential the door recognised.
      */
     it("answers 403 when it lists teams", async () => {
-      const { send } = mountTeamsRestApplication(application().app, viewer);
+      const { send } = mountTeamsRestApplication((await application()).app, viewer);
 
       expect((await send("/api/teams", { credential: CREDENTIAL })).status).toBe(403);
     });
 
     /** @scenario Viewer cannot create a team */
     it("answers 403 when it creates a team", async () => {
-      const { send } = mountTeamsRestApplication(application().app, viewer);
+      const { send } = mountTeamsRestApplication((await application()).app, viewer);
 
       const response = await send("/api/teams", {
         method: "POST",
@@ -860,7 +786,7 @@ describe("given the teams REST family over the application the composition build
 
     /** @scenario Viewer cannot update a team */
     it("answers 403 when it renames a team", async () => {
-      const { app, memory } = application();
+      const { app, repositories } = await application();
       const { send } = mountTeamsRestApplication(app, viewer);
 
       const response = await send(`/api/teams/${SHARED_TEAM_ID}`, {
@@ -869,18 +795,64 @@ describe("given the teams REST family over the application the composition build
       });
 
       expect(response.status).toBe(403);
-      expect(memory.teams.get(SHARED_TEAM_ID)?.name).toBe("Shared Team");
+      expect((await repositories.team.getById(SHARED_TEAM_ID)).name).toBe("Shared Team");
     });
 
     /** @scenario Viewer cannot delete a team */
     it("answers 403 when it archives a team", async () => {
-      const { app, memory } = application();
+      const { app, repositories } = await application();
       const { send } = mountTeamsRestApplication(app, viewer);
 
       const response = await send(`/api/teams/${SHARED_TEAM_ID}`, { method: "DELETE" });
 
       expect(response.status).toBe(403);
-      expect(memory.teams.get(SHARED_TEAM_ID)?.archivedAt).toBeNull();
+      await expect(repositories.team.getById(SHARED_TEAM_ID)).resolves.toMatchObject({
+        id: SHARED_TEAM_ID,
+      });
+    });
+  });
+  /**
+   * Finding H4 of the 2026-09-04 feature-surface security pass.
+   * Spec: specs/security/resource-scope-permission-checks.feature
+   */
+  describe("given a credential whose grant covers one team and not another", () => {
+    // The organization grant stays held, so a check resolved at the organization would pass
+    // every route below: what refuses the other team is the team scope, and nothing else.
+    const SCOPED = {
+      granted: ["team:view", "team:manage"],
+      grantedOnTeam: {
+        [SHARED_TEAM_ID]: ["team:view", "team:manage"],
+        [PERSONAL_TEAM_ID]: [],
+      },
+    };
+
+    /** @scenario A team route resolves its permission at the team it names */
+    it("refuses every route naming the other team before the team service is asked", async () => {
+      const { app, repositories } = await application();
+      const asked = vi.spyOn(app, "getTeam");
+      const { send } = mountTeamsRestApplication(app, SCOPED);
+      const other = `/api/teams/${PERSONAL_TEAM_ID}`;
+
+      const statuses = [
+        (await send(other)).status,
+        (await send(other, { method: "PATCH", body: { name: "Renamed" } })).status,
+        (await send(other, { method: "DELETE" })).status,
+        (await send(`${other}/members`)).status,
+        (await send(`${other}/members`, { method: "POST", body: { userId: COLLEAGUE_ID } })).status,
+        (await send(`${other}/members/${USER_ID}`, { method: "DELETE" })).status,
+        (await send(`${other}/projects`)).status,
+      ];
+
+      expect(statuses).toEqual(statuses.map(() => 403));
+      expect(asked).not.toHaveBeenCalled();
+      expect((await repositories.team.getById(PERSONAL_TEAM_ID)).name).not.toBe("Renamed");
+    });
+
+    it("still serves the team the grant does name", async () => {
+      const { app } = await application();
+      const { send } = mountTeamsRestApplication(app, SCOPED);
+
+      expect((await send(`/api/teams/${SHARED_TEAM_ID}`)).status).toBe(200);
     });
   });
 });

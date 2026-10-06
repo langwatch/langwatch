@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { ErasedIdentifierSuppressionRow } from "../erased-identifier-suppression.repository.ts";
+import type { GovernanceTenantRow } from "../governance-tenant-history.repository.ts";
 import type { GovernanceRepositories } from "../governance.repositories.ts";
+import { SuppressionSnapshotRepository } from "../suppression-snapshot.repository.ts";
 import { MemoryActivityMonitorRepository } from "./memory.activity-monitor.repository.ts";
 import { MemoryAiToolCatalogRepository } from "./memory.ai-tool-catalog.repository.ts";
 import { MemoryAnomalyRuleRepository } from "./memory.anomaly-rule.repository.ts";
@@ -13,6 +16,7 @@ import { MemoryDiscoveredPersonRepository } from "./memory.discovered-person.rep
 import { MemoryErasedIdentifierSuppressionRepository } from "./memory.erased-identifier-suppression.repository.ts";
 import { MemoryGovernanceCostChargeRepository } from "./memory.governance-cost-charge.repository.ts";
 import { MemoryGovernanceCostRollupRepository } from "./memory.governance-cost-rollup.repository.ts";
+import { MemoryGovernanceRateLimitRepository } from "./memory.governance-rate-limit.repository.ts";
 import { MemoryGovernanceSetupStateRepository } from "./memory.governance-setup-state.repository.ts";
 import { MemoryGovernanceTenantHistoryRepository } from "./memory.governance-tenant-history.repository.ts";
 import { MemoryGovernanceStore } from "./memory.governance.store.ts";
@@ -26,7 +30,24 @@ import { MemoryOcsfEventsRepository } from "./memory.ocsf-events.repository.ts";
 import { MemoryOrganizationSupportContactRepository } from "./memory.organization-support-contact.repository.ts";
 import { MemoryRollupErasureRepository } from "./memory.rollup-erasure.repository.ts";
 import { MemorySpendSpikeAnomalyRepository } from "./memory.spend-spike-anomaly.repository.ts";
-import { MemorySuppressionSnapshotRepository } from "./memory.suppression-snapshot.repository.ts";
+
+class MemorySuppressionSnapshotRepository extends SuppressionSnapshotRepository {
+  private constructor(private readonly store: MemoryDiscoveredPeopleStore) {
+    super();
+  }
+
+  static create(store: MemoryDiscoveredPeopleStore): MemorySuppressionSnapshotRepository {
+    return new MemorySuppressionSnapshotRepository(store);
+  }
+
+  async findAllSuppressions(): Promise<ErasedIdentifierSuppressionRow[]> {
+    return this.store.suppressions.map((row) => ({ ...row }));
+  }
+
+  async findAllTenants(): Promise<GovernanceTenantRow[]> {
+    return this.store.tenants.map(({ organizationId, tenantId }) => ({ organizationId, tenantId }));
+  }
+}
 
 /** The "memory" tier: every governance repository, with no database behind it. */
 export class MemoryGovernanceRepositories {
@@ -57,6 +78,7 @@ export class MemoryGovernanceRepositories {
       costRollup: MemoryGovernanceCostRollupRepository.create(),
       costCharges: MemoryGovernanceCostChargeRepository.create(),
       ocsfEvents: MemoryOcsfEventsRepository.create(),
+      rateLimits: MemoryGovernanceRateLimitRepository.create(),
       anomalySpend: MemoryAnomalySpendRepository.create(),
       rollupErasure: MemoryRollupErasureRepository.create(),
       setupState: MemoryGovernanceSetupStateRepository.create(),

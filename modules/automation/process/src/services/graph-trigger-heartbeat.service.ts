@@ -8,17 +8,14 @@ import { isNoDataPredicate, type GraphTriggerSweepCandidate } from "@langwatch/a
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
-import type { AutomationLogger } from "../app/automation.members.ts";
 import type {
   AnalyticsMetricSource as RepositoryMetricSource,
   GraphTriggerSentRepository,
 } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
+import type { AutomationLogger } from "./automation.service.ts";
 
-export type AnalyticsMetricSource = RepositoryMetricSource;
-
-export const GRAPH_TRIGGER_HEARTBEAT_NAME = "graphTriggerHeartbeat" as const;
-export const GRAPH_TRIGGER_HEARTBEAT_INTERVAL_MS = 30_000;
+type AnalyticsMetricSource = RepositoryMetricSource;
 
 const heartbeatActionParamsSchema = z
   .object({

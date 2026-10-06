@@ -169,6 +169,7 @@ function setupView(overrides: Partial<SsoSetupPageView> = {}): SsoSetupPageView 
       activated: false,
     },
     legacyRoute: null,
+    enterpriseRequired: false,
     migration: null,
     availability: { available: true, proof: "dns-txt" },
     serviceProvider: SERVICE_PROVIDER,
@@ -271,6 +272,31 @@ describe("the single sign-on setup page", () => {
       expect(screen.queryByText(/No identity provider is registered/)).toBeNull();
     });
 
+    /** @scenario "A step that cannot be read says so rather than looking finished" */
+    it("quotes the words registered for the failure's code and shows no step as done", () => {
+      state.isError = true;
+      state.error = {
+        data: {
+          error: {
+            code: "sso_issuer_unreachable",
+            kind: "sso_issuer_unreachable",
+            httpStatus: 422,
+            fault: "customer",
+            meta: {},
+            reasons: [{ code: "unknown", kind: "unknown" }],
+          },
+        },
+      };
+      state.view = null;
+
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      expect(screen.getByText("The identity provider could not be reached")).toBeInTheDocument();
+      expect(screen.getByText(/We could not load single sign-on setup\./)).toBeInTheDocument();
+      expect(screen.queryByTestId("step-done")).toBeNull();
+      expect(screen.queryByTestId("setup-step-1")).toBeNull();
+    });
+
     it("still says the setup is unavailable when the read answered nothing at all", () => {
       state.view = null;
 
@@ -292,6 +318,19 @@ describe("the single sign-on setup page", () => {
 
       expect(screen.getByTestId("sso-availability-refusal")).toHaveTextContent(/active license/);
       expect(screen.queryByTestId("sso-setup")).toBeNull();
+    });
+  });
+
+  describe("given an organization not on an Enterprise plan", () => {
+    /** @scenario "The setup screen still renders without an Enterprise plan" */
+    it("says single sign-on needs Enterprise and offers no control that would be refused", () => {
+      state.view = setupView({ enterpriseRequired: true, connection: null, goLive: null });
+
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      expect(screen.getByTestId("sso-enterprise-required")).toHaveTextContent(/Enterprise plan/);
+      expect(screen.queryByTestId("sso-setup")).toBeNull();
+      expect(screen.queryByRole("button")).toBeNull();
     });
   });
 

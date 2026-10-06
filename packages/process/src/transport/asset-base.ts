@@ -54,30 +54,3 @@ export function assetBaseBootstrapBody(base: string): string {
     `window.${ASSET_URL_GLOBAL}=function(p){return window.${ASSET_BASE_GLOBAL}+p};`
   );
 }
-
-export function injectAssetBaseIntoHtml({ html, base }: { html: string; base: string }): string {
-  const withBootstrap = insertBootstrap({
-    html,
-    snippet: assetBaseBootstrapScript(base),
-  });
-  if (base === "/") return withBootstrap;
-  // Whitespace-anchored so it rewrites the `src`/`href` of Vite's entry
-  // `<script>` / `modulepreload` / stylesheet tags but never a `data-src` etc.
-  // Function replacer (not a `$1` string) so a "$" in the base can't be read as
-  // a replacement-pattern token.
-  return withBootstrap.replace(
-    /(\s(?:src|href))="\/assets\//g,
-    (_match, attr: string) => `${attr}="${base}assets/`,
-  );
-}
-
-function insertBootstrap({ html, snippet }: { html: string; snippet: string }): string {
-  for (const anchor of [/<head[^>]*>/i, /<html[^>]*>/i, /<!doctype[^>]*>/i]) {
-    const match = anchor.exec(html);
-    if (match) {
-      const at = match.index + match[0].length;
-      return html.slice(0, at) + snippet + html.slice(at);
-    }
-  }
-  return snippet + html;
-}

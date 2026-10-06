@@ -62,8 +62,8 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
   Scenario: The Vega dependency set is pinned and compatible
     Given the application's dependency manifest
     When the Vega packages are inspected
-    Then react-vega, vega, vega-lite, and vega-embed are direct, exact-pinned,
-      mutually compatible versions recorded in the PR
+    Then vega, vega-lite and vega-embed are direct, exact-pinned,
+      mutually compatible versions
 
   @integration
   Scenario: Vega loads lazily from the dashboard widget only

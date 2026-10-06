@@ -1,4 +1,5 @@
 import type { AnalyticsFilterValue } from "@langwatch/analytics-contract";
+import { customMetadataValueCondition } from "@langwatch/trace-contract";
 
 /**
  * Internal helpers shared by the slim + rollup timeseries SQL builders
@@ -11,7 +12,7 @@ const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
 const DAYS_PER_WEEK = 7;
 const DAYS_PER_MONTH = 31;
 
-export function validateTimeZone(tz: string): string {
+function validateTimeZone(tz: string): string {
   try {
     Intl.DateTimeFormat(undefined, { timeZone: tz });
     return tz;
@@ -125,26 +126,35 @@ export function isEvalMetricKey(metric: string): metric is EvalMetricKey {
 }
 
 export function appendMetadataValueFilterClauses({
-  attributes,
+  alias,
   rawValue,
   clauses,
   params,
   next,
 }: {
-  attributes: string;
+  /** Alias of the row carrying `Attributes`. */
+  alias: string;
   rawValue: AnalyticsFilterValue;
   clauses: string[];
   params: Record<string, unknown>;
   next: (prefix: string) => string;
 }): void {
-  if (typeof rawValue !== "object" || Array.isArray(rawValue)) return;
+  // Values with no key match nothing, as on trace_summaries.
+  if (Array.isArray(rawValue)) {
+    clauses.push("1=0");
+    return;
+  }
+  if (typeof rawValue !== "object") return;
 
   for (const [metaKey, vals] of Object.entries(rawValue)) {
     if (!Array.isArray(vals) || vals.length === 0) continue;
-    const pKey = next("metaValueKey");
-    params[pKey] = metaKey;
-    const pVals = next("metaValueVals");
-    params[pVals] = vals;
-    clauses.push(`${attributes}[{${pKey}:String}] IN ({${pVals}:Array(String)})`);
+    const condition = customMetadataValueCondition({
+      values: vals,
+      paramId: next("metaValue"),
+      key: metaKey,
+      alias,
+    });
+    clauses.push(condition.sql);
+    Object.assign(params, condition.params);
   }
 }

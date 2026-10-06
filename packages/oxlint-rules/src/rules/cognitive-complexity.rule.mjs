@@ -179,6 +179,28 @@ function heaviestExtractable(blocks, score) {
   return heaviest;
 }
 
+/** Reports the function the tally just closed, when its score is over `max`. */
+function reportTooComplex({ context, max, node, tally }) {
+  const { blocks, score: complexity } = tally;
+  if (complexity <= max) return;
+  const heaviest = heaviestExtractable(blocks, complexity);
+  // Under a third of the score, the report says "spread" rather than invent a target.
+  const concentrated = Boolean(heaviest) && heaviest.subtotal * 3 >= complexity;
+  context.report({
+    node,
+    messageId: concentrated ? "tooComplex" : "tooComplexSpread",
+    data: {
+      atLine: heaviest?.node?.loc?.start?.line ?? "?",
+      blocks: blocks.length,
+      complexity,
+      construct: heaviest ? describeConstruct(heaviest.node) : "construct",
+      max,
+      name: functionName(node) ?? "This function",
+      share: heaviest ? `${heaviest.subtotal} of ${complexity}` : "an unclear share",
+    },
+  });
+}
+
 export const cognitiveComplexityRule = defineRule({
   name: "cognitive-complexity",
   kind: "problem",
@@ -188,7 +210,8 @@ export const cognitiveComplexityRule = defineRule({
   messages: {
     tooComplex: {
       what: "`{{name}}` has cognitive complexity {{complexity}} (max {{max}}); the {{construct}} at line {{atLine}} carries {{share}} of it.",
-      fix: "Extract that {{construct}} into a module-level function (a nested closure still counts toward `{{name}}`) so the rest of `{{name}}` stays flat.",
+      why: "Each nested branch depends on the ones above it, so a deep function is hard to read and to test.",
+      fix: "Extract that {{construct}} into a module-level function (a nested closure still counts toward `{{name}}`) so the rest of `{{name}}` stays flat. Read the `linting` skill.",
     },
     // The score is nesting spread thin rather than one heavy block. Naming a
     // block here would prescribe an extraction that removes a few points and
@@ -196,32 +219,14 @@ export const cognitiveComplexityRule = defineRule({
     // actually pays: fewer levels.
     tooComplexSpread: {
       what: "`{{name}}` has cognitive complexity {{complexity}} (max {{max}}), spread across {{blocks}} nested blocks with no single one carrying a third of it -- the depth is the cost, not any one branch.",
+      why: "Each nested branch depends on the ones above it, so a deep function is hard to read and to test.",
       fix: "Flatten it: take the nesting down with early returns, or lift a whole stage of the work -- the {{construct}} at line {{atLine}} is the largest single block at {{share}} -- into a module-level function; a nested closure still counts toward `{{name}}`.",
     },
   },
   create(context, file, { max }) {
     const tally = createTally();
 
-    const report = (node) => {
-      const { blocks, score: complexity } = tally;
-      if (complexity <= max) return;
-      const heaviest = heaviestExtractable(blocks, complexity);
-      // Under a third of the score, the report says "spread" rather than invent a target.
-      const concentrated = Boolean(heaviest) && heaviest.subtotal * 3 >= complexity;
-      context.report({
-        node,
-        messageId: concentrated ? "tooComplex" : "tooComplexSpread",
-        data: {
-          atLine: heaviest?.node?.loc?.start?.line ?? "?",
-          blocks: blocks.length,
-          complexity,
-          construct: heaviest ? describeConstruct(heaviest.node) : "construct",
-          max,
-          name: functionName(node) ?? "This function",
-          share: heaviest ? `${heaviest.subtotal} of ${complexity}` : "an unclear share",
-        },
-      });
-    };
+    const report = (node) => reportTooComplex({ context, max, node, tally });
     const enterFunction = (node) => {
       const owner = functionName(node) ?? tally.owners.at(-1);
       if (tally.top) {

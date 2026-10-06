@@ -34,7 +34,7 @@ func runHub(ctx context.Context, d deps) error {
 		}
 		switch {
 		case out.OpenStack != "":
-			if err := runUpViewer(ctx, out.OpenStack, "", d.orch.LogPath(out.OpenStack), d.orch.LogDir(out.OpenStack), d.sessionActions(out.OpenStack)); err != nil {
+			if err := runUpViewer(ctx, viewerTarget{slug: out.OpenStack, logPath: d.orch.LogPath(out.OpenStack), logDir: d.orch.LogDir(out.OpenStack), session: d.sessionActions(out.OpenStack)}, ""); err != nil {
 				fmt.Fprintf(os.Stderr, "haven: viewer for %s failed: %v\n", out.OpenStack, err)
 			}
 		case out.RunCleanup:

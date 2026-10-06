@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
 )
 
 // versionSelector is the hidden alias segment of /api/<x>: `/api/<ns>/latest/<x>` and
@@ -42,8 +44,8 @@ type Finding struct {
 
 // signatureOf is the grouping key: oracle, method, path template and status,
 // so one distinct cause is one row however many times it fires.
-func signatureOf(oracle, method, route string, status int) string {
-	return fmt.Sprintf("%s :: %s %s :: %d", oracle, method, canonicalRoute(route), status)
+func signatureOf(oracle string, op diffkit.Operation, status int) string {
+	return fmt.Sprintf("%s :: %s %s :: %d", oracle, op.Method, canonicalRoute(op.Path), status)
 }
 
 // Group is one distinct cause with a count and a representative finding (the

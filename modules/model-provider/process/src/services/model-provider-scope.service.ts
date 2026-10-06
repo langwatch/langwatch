@@ -14,7 +14,7 @@ import {
 
 type ScopeReference = { id: string; name: string };
 
-export type ModelProviderProjectContext = {
+type ModelProviderProjectContext = {
   projectId: string;
   projectName: string;
   teamId: string;
@@ -22,13 +22,11 @@ export type ModelProviderProjectContext = {
   organizationName: string;
 };
 
-export type ModelProviderAvailableScopes = {
+type ModelProviderAvailableScopes = {
   organization: ScopeReference;
   teams: ScopeReference[];
   projects: (ScopeReference & { teamId: string })[];
 };
-
-export type { ModelProviderProjectSystemContext };
 
 export class ModelProviderScopeService {
   private constructor(

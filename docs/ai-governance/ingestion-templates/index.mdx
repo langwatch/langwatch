@@ -13,9 +13,13 @@ without LangWatch ever participating in the upstream tool's authentication.
 
 You install a template, paste an **ingestion key** into your tool's OTLP exporter, and
 traces land at `/me/traces` already shaped into the canonical `gen_ai.*` form, cost,
-tokens, and model populated automatically. An ingestion key is one
+tokens, and model populated automatically.
+
+An ingestion key is one
 [API key](/platform/api-keys) row with an `ik-lw-…` prefix, scoped to one project with a
-write-only, ingest-only role: it can create traces and nothing else. That is a much
+write-only, ingest-only role: it can only create traces.
+
+That is a much
 smaller blast radius than a full project key (`sk-lw-…`), which can read and change your
 project data, so the prefix tells you which one you are holding at a glance. An ingestion
 key is still a secret: the traces it writes carry your prompts and your tool content, and
@@ -46,7 +50,9 @@ That's an Ingestion Template:
 - **Admin/platform side:** a curated catalog row (slug, source identifier, credential
   schema, optional `ottlRules`). Platform-published rows ship empty `ottlRules`:
   Claude Code, Cursor, and Claude cowork all emit OpenTelemetry `gen_ai.*` canonical
-  spans natively, so no transform is needed for the common case. **Org admins can clone
+  spans natively, so no transform is needed for the common case.
+
+  **Org admins can clone
   a platform-default template into an org-authored template** and author OTTL via the
   OttlEditor at `/governance/inventory?tab=catalog → Ingestion Templates → Clone to
 customise → Edit OTTL`, to adapt a template to their org's upstream-tool quirks (an
@@ -166,7 +172,9 @@ An `IngestionTemplate` row has:
 - `ottlRules`, an optional OTTL transform applied to the span before the receiver's
   authoritative re-stamp pass. **Platform-default templates ship empty `ottlRules`**
   because Claude Code, Cursor, and Claude cowork all emit OpenTelemetry `gen_ai.*`
-  canonical spans natively, there is nothing to reshape for the common case. **Org
+  canonical spans natively, there is no reshaping to do for the common case.
+
+  **Org
   admins can fork a platform-default template into an org-authored template and author
   OTTL via the OttlEditor** in `/governance/inventory?tab=catalog → Ingestion
 Templates → Edit OTTL`. Forking lets the admin adapt a template to their org's
@@ -180,7 +188,7 @@ Templates → Edit OTTL`. Forking lets the admin adapt a template to their org's
 
 | schema           | what the install drawer captures             | covers v1                                             |
 | ---------------- | -------------------------------------------- | ----------------------------------------------------- |
-| `null`           | nothing, drawer auto-mints the ingestion key | claude_code, cursor, claude_cowork, raw_otlp_advanced |
+| `null`           | empty, drawer auto-mints the ingestion key | claude_code, cursor, claude_cowork, raw_otlp_advanced |
 | `static_api_key` | one labeled API key field                    | (deferred to v1.1+)                                   |
 | `agent_id`       | a labeled agent-identifier text input        | (deferred to v1.1+)                                   |
 
@@ -197,7 +205,7 @@ receiver:
 2. **Verifies** the key (HMAC + pepper) and resolves the `ApiKey` row, the same path
    any SDK or management key takes.
 3. **Ceilings to ingest-only.** An ingestion key carries a write-only, ingest-only role
-   that grants `traces:create` and nothing else, so the receiver rejects any non-ingest
+   that grants `traces:create` and no other permission, so the receiver rejects any non-ingest
    operation regardless of what the payload claims.
 4. **Sets `tenantId`** to the key's bound project, credential-as-scope. This is
    authoritative.

@@ -15,6 +15,10 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./src/testing.ts"
+    },
     "./nlp-internal-secret": {
       "types": "./dist/nlp-internal-secret.d.ts",
       "default": "./src/nlp-internal-secret.ts"
@@ -33,7 +37,6 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/ops-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/secrets": "workspace:*",
@@ -42,6 +45,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",

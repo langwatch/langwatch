@@ -1,4 +1,4 @@
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import { PrismaGatewayAuditRepository } from "../../repositories/prisma/prisma.gateway-audit.repository.ts";
@@ -25,7 +25,7 @@ const NO_PLATFORM_PROVIDERS: GatewayPlatformProviders = {
  * compose the concrete repositories the way a process does.
  */
 function createVirtualKeyServiceForTest(
-  prisma: ProcessMembers["prisma"],
+  prisma: PrismaClient,
   projects: ProjectApi,
 ): VirtualKeyService {
   return VirtualKeyService.create({

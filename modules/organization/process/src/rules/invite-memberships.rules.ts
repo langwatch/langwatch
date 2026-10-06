@@ -1,6 +1,9 @@
 import { OrganizationUserRole, TeamUserRole } from "@langwatch/organization-contract";
 
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "./member-role-constraints.rules.ts";
+import {
+  holdsSharedAccess,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
+} from "./member-role-constraints.rules.ts";
 
 /**
  * The team memberships an accepted invitation grants. Pure, like
@@ -15,6 +18,8 @@ export function resolveInviteTeamMemberships({
   teamIds: string;
   teamAssignments: unknown;
 }): { teamId: string; role: TeamUserRole; customRoleId?: string }[] {
+  // A Developer seat grants no team, whatever the stored invitation promised (ADR-171).
+  if (!holdsSharedAccess(role)) return [];
   let memberships: {
     teamId: string;
     role: TeamUserRole;

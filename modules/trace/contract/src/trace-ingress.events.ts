@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { piiRedactionLevelSchema } from "./trace-ingress.commands.ts";
-import { SPAN_RECEIVED_EVENT_TYPE } from "./trace-ingress.constants.ts";
+import { piiRedactionLevelSchema } from "./trace-processing.commands.ts";
+import { SPAN_RECEIVED_EVENT_TYPE } from "./trace.constants.ts";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./trace.otlp.ts";
 
 /** Portable envelope for Trace's durable raw ingress fact. */

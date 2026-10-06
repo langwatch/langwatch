@@ -44,7 +44,8 @@ export function useTraceListEvents({
     },
     {
       enabled,
-      placeholderData: keepPreviousData,    },
+      placeholderData: keepPreviousData,
+    },
   );
 
   const rollups = query.data;

@@ -38,7 +38,7 @@ import {
   targetResultIdentity,
 } from "./experiment-run-processing.commands.ts";
 
-export const executeExperimentCellCommandDataSchema = withCommandEnvelope(
+const executeExperimentCellCommandDataSchema = withCommandEnvelope(
   z.object({
     runId: z.string(),
     experimentId: z.string(),

@@ -6,11 +6,9 @@ import { TenantGuard } from "@langwatch/clickhouse-client";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type {
-  GatewayBudgetSpendRecord,
-  GatewayClickHouseClient,
-} from "../../../app/gateway.members.ts";
+import type { GatewayBudgetSpendRecord } from "../../gateway-budget-spend.repository.ts";
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
+import type { GatewayClickHouseClient } from "../clickhouse.gateway-session.store.ts";
 
 const PROJECTS = ["project-a", "project-b"];
 const NOW = Temporal.Instant.from("2026-09-15T12:00:00Z");
@@ -55,7 +53,7 @@ describe("GatewayBudgetClickHouseRepository across an organisation's projects", 
       const { repository, statements } = guardedRepository();
 
       await expect(repository.recentEventsForBudget(PROJECTS, "budget-1")).resolves.toEqual([]);
-      await repository.getSpendForTargetsAcrossTenants(
+      await repository.findSpendForTargetsAcrossTenants(
         PROJECTS,
         [
           { budgetId: "budget-1", scope: "ORGANIZATION", scopeId: "org-1", window: "MONTH" },
@@ -69,7 +67,7 @@ describe("GatewayBudgetClickHouseRepository across an organisation's projects", 
         ],
         NOW,
       );
-      await repository.getBucketSpendBreakdownForBudget({
+      await repository.findBucketSpendBreakdownForBudget({
         budget,
         tenantIds: PROJECTS,
         boundaries: [],
@@ -92,7 +90,7 @@ describe("GatewayBudgetClickHouseRepository across an organisation's projects", 
 
       await expect(repository.recentEventsForBudget([], "budget-1")).resolves.toEqual([]);
       await expect(
-        repository.getSpendForTargetsAcrossTenants(
+        repository.findSpendForTargetsAcrossTenants(
           [],
           [{ budgetId: "budget-1", scope: "ORGANIZATION", scopeId: "org-1", window: "MONTH" }],
           NOW,

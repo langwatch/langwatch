@@ -1,7 +1,7 @@
 import type { LitellmPriceEntry } from "../rules/litellm-audio-prices.rules.ts";
 
 /** Why litellm's price registry could not be read this run. */
-export type LitellmPriceUnavailableReason = "transport_failed" | "http_status" | "malformed_body";
+type LitellmPriceUnavailableReason = "transport_failed" | "http_status" | "malformed_body";
 
 export type LitellmPriceRegistry =
   | { outcome: "fetched"; prices: Record<string, LitellmPriceEntry> }

@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import {
   type DSPyLLMCall,
   type DSPyStepRESTParams,
+  type ExperimentDspyLlmCall,
   type ExperimentDspyStep,
 } from "@langwatch/experiment-contract";
 import {
@@ -128,4 +129,33 @@ function priceLlmCall(call: DSPyLLMCall, costs: readonly ModelCostRate[]): DSPyL
         })
       : undefined,
   };
+}
+
+/** One step's items, an earlier write's first: an item whose hash is already held is dropped. */
+export function mergeByHash<T extends { hash: string }>(existing: T[], incoming: T[]): T[] {
+  const seen = new Set(existing.map((item) => item.hash));
+  return [
+    ...existing,
+    ...incoming.filter((item) => {
+      if (seen.has(item.hash)) return false;
+      seen.add(item.hash);
+      return true;
+    }),
+  ];
+}
+
+/** The step's call count, tokens and cost, as its summary row lists them. */
+export function llmSummary(calls: ExperimentDspyLlmCall[]): {
+  total: number;
+  tokens: number;
+  cost: number;
+} {
+  return calls.reduce(
+    (total, call) => ({
+      total: total.total + 1,
+      tokens: total.tokens + (call.prompt_tokens ?? 0) + (call.completion_tokens ?? 0),
+      cost: total.cost + (call.cost ?? 0),
+    }),
+    { total: 0, tokens: 0, cost: 0 },
+  );
 }

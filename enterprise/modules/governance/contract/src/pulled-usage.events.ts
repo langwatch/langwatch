@@ -12,11 +12,14 @@ export const PULLED_USAGE_EVENT_TYPES = {
    * and can double the day's total unless this fires.
    */
   RETRACTED: "lw.obs.pulled_usage.retracted",
+  /** The ledger's dollar figure for one observation; gateway's budget ledger debits it (Q208C). */
+  PRICED: "lw.obs.pulled_usage.priced",
 } as const;
 export const PULLED_USAGE_PROCESSING_EVENT_TYPES = Object.values(PULLED_USAGE_EVENT_TYPES);
 export const PULLED_USAGE_EVENT_VERSIONS = {
   OBSERVED: "2026-08-06",
   RETRACTED: "2026-09-09",
+  PRICED: "2026-10-06",
 } as const;
 export const PULLED_USAGE_COST_BASIS = {
   PROVIDER_REPORTED: "provider_reported",
@@ -136,6 +139,35 @@ export const pulledUsageRetractedEventSchema = governanceEventEnvelopeSchema.saf
 });
 
 /**
+ * One observation priced in the ledger's nano-dollars, scoped to its team or organization.
+ * Governance decides the figure; gateway's ledger peer-subscribes and debits it (Alex, 2026-10-06).
+ */
+export const pulledUsagePricedEventDataSchema = z
+  .object({
+    restatementKey: z.string().min(1),
+    organizationId: z.string().min(1),
+    teamId: z.string().nullable(),
+    scopeId: z.string().min(1),
+    model: z.string(),
+    /** Signed: a provider credit reaches the ledger as a negative figure. */
+    amountNanoUsd: z.number().int(),
+    tokensInput: z.number().int().nonnegative(),
+    tokensOutput: z.number().int().nonnegative(),
+    tokensCacheRead: z.number().int().nonnegative(),
+    tokensCacheWrite: z.number().int().nonnegative(),
+    occurredAtMs: z.number().int().positive(),
+    observedAtMs: z.number().int().positive(),
+  })
+  .strict();
+
+export const pulledUsagePricedEventSchema = governanceEventEnvelopeSchema.safeExtend({
+  aggregateType: z.literal(PULLED_USAGE_AGGREGATE_TYPE),
+  type: z.literal(PULLED_USAGE_EVENT_TYPES.PRICED),
+  version: z.literal(PULLED_USAGE_EVENT_VERSIONS.PRICED),
+  data: pulledUsagePricedEventDataSchema,
+});
+
+/**
  * Translates old events' costNanoUsd (the amount) to costNanoMinor, since this build
  * reuses costNanoUsd for the biller's dollar conversion. Read path parses data directly;
  * log is append-only. Legacy entries all reported dollars, making the fallback correct.
@@ -171,3 +203,5 @@ export type PulledUsageObservedEventData = z.infer<typeof pulledUsageObservedEve
 export type PulledUsageObservedEvent = z.infer<typeof pulledUsageObservedEventSchema>;
 export type PulledUsageRetractedEventData = z.infer<typeof pulledUsageRetractedEventDataSchema>;
 export type PulledUsageRetractedEvent = z.infer<typeof pulledUsageRetractedEventSchema>;
+export type PulledUsagePricedEventData = z.infer<typeof pulledUsagePricedEventDataSchema>;
+export type PulledUsagePricedEvent = z.infer<typeof pulledUsagePricedEventSchema>;

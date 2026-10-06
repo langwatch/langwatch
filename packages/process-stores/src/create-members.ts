@@ -7,7 +7,13 @@ import { createLogger } from "@langwatch/observability";
 import type { OperatorReadMint } from "@langwatch/prisma-client";
 
 import { buildClickHouse } from "./clickhouse-member.ts";
-import { aesEncryption, loggedTelemetry, resolvedSecrets, systemClock } from "./config-members.ts";
+import {
+  aesEncryption,
+  loggedTelemetry,
+  resolvedSecrets,
+  rotatingEncryption,
+  systemClock,
+} from "./config-members.ts";
 import type { ProcessConfig } from "./config.ts";
 import { buildPrisma, buildRedis, type BuiltMember } from "./datastore-members.ts";
 import { buildEventing } from "./eventing-members.ts";
@@ -20,7 +26,7 @@ import { cachedTenantDirectory, prismaTenantDirectory } from "./tenant-directory
 /**
  * A member this process was not configured to build. Thrown where the member is
  * read, so the caller that reached for it is on the stack and boot can name
- * both the module and the member (ADR-144 s2).
+ * both the module and the member.
  */
 export class MemberNotConfiguredError extends Error {
   constructor(
@@ -57,6 +63,8 @@ export class MemberSuppliedUndefinedError extends Error {
  * under something not yet open.
  */
 export interface MemberSource<Members> {
+  /** The store tier these members belong to; boot selects every registry from it (§7). */
+  readonly tier?: "live" | "memory";
   readonly order: readonly (keyof Members & string)[];
   /** Builds the member, or refuses naming it. Repeated reads answer once. */
   read<Name extends keyof Members & string>(name: Name): Members[Name];
@@ -76,7 +84,25 @@ type TenantDirectory = ReturnType<typeof cachedTenantDirectory>;
 /** No key is a state, not a refusal: only a use of the cipher refuses. */
 function encryptionMember(config: ProcessConfig): Encryption {
   const key = config.encryptionKey.trim();
-  return key ? aesEncryption(Buffer.from(key, "hex")) : refusingEncryption();
+  if (!key) return refusingEncryption();
+
+  const current = aesEncryption(Buffer.from(key, "hex"));
+  const previousKey = config.previousEncryptionKey?.trim();
+  if (!previousKey) return current;
+
+  return rotatingEncryption({ current, previous: previousEncryption(previousKey) });
+}
+
+/** A malformed previous key refuses as a malformed current one does, under its own name. */
+function previousEncryption(key: string): Encryption {
+  try {
+    return aesEncryption(Buffer.from(key, "hex"));
+  } catch (error) {
+    throw new Error(
+      `CREDENTIALS_SECRET_PREVIOUS is not a usable key. ${error instanceof Error ? error.message : ""}`,
+      { cause: error },
+    );
+  }
 }
 
 function prismaMember({
@@ -268,6 +294,8 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
   };
 
   const source: ProcessMemberSource = {
+    // Real clients: the one place the live tier is stated, so boot never assumes it.
+    tier: "live",
     order: MEMBER_NAMES,
     read,
     async close(): Promise<void> {
@@ -283,4 +311,9 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
   };
 
   return { members: source, operatorReads };
+}
+
+/** Host before the runtime so its stores close after the runtime stops. */
+export function hostedMembers(source: ProcessMemberSource) {
+  return { name: "process stores", stop: () => source.close() };
 }

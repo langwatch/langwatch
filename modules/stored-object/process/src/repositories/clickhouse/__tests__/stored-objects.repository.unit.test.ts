@@ -37,7 +37,7 @@ vi.mock("langwatch", () => ({
 
 import { TenantGuard, TenantScopeError } from "@langwatch/clickhouse-client";
 
-import type { StoredObjectsClickHouse } from "../../../app/stored-object.members.ts";
+import type { StoredObjectsClickHouse } from "../stored-objects.repository.ts";
 import { ClickHouseStoredObjectsRepository } from "../stored-objects.repository.ts";
 
 /** The routed connection, as this suite's one project resolves it. */

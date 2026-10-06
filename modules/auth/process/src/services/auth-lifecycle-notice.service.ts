@@ -3,6 +3,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type {
   RecordSessionStartedCommandData,
+  RecordSignedUpCommandData,
   RecordSsoAutoAddedCommandData,
 } from "../eventing/auth-lifecycle.events.ts";
 
@@ -11,12 +12,13 @@ type Sender<Data> = Pick<EventingCommandSender<Data>, "send">;
 export type AuthLifecycleSenders = Readonly<{
   recordSessionStarted: Sender<RecordSessionStartedCommandData>;
   recordSsoAutoAdded: Sender<RecordSsoAutoAddedCommandData>;
+  recordSignedUp: Sender<RecordSignedUpCommandData>;
 }>;
 
 /**
- * Where a session and a domain auto-join are recorded as auth's events, which the worker hands to
- * nurturing (§9). The senders arrive once the pipeline registers, and a record that fails is
- * reported, never thrown: a sign-in never fails because it was not announced.
+ * Where a sign-up, a session and a domain auto-join are recorded as auth's events, which the
+ * worker hands to nurturing (§9). The senders arrive once the pipeline registers, and a record
+ * that fails is reported, never thrown: a sign-in never fails because it was not announced.
  */
 export class AuthLifecycleNoticeService {
   static create(dependencies: {
@@ -31,6 +33,15 @@ export class AuthLifecycleNoticeService {
 
   connect(senders: AuthLifecycleSenders): void {
     this.#senders = senders;
+  }
+
+  /** A new person, for nurturing's PostHog signed_up; auth never holds an analytics client. */
+  signedUp(input: Readonly<{ userId: string }>): void {
+    this.#send(this.#senders?.recordSignedUp, {
+      tenantId: input.userId,
+      occurredAt: this.#now(),
+      userId: input.userId,
+    });
   }
 
   sessionStarted(input: Readonly<{ userId: string }>): void {

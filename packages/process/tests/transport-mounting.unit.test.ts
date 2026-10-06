@@ -2,7 +2,7 @@ import { type FeatureRestHost, type FeatureTrpcHost } from "@langwatch/api";
 import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
-import { createApp } from "../src/application.ts";
+import { ApplicationBuilder } from "../src/application.ts";
 import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
 import {
   DuplicateTransportNamespaceError,
@@ -105,7 +105,7 @@ describe("given a feature whose server declares transports", () => {
         .withTransports(catalogueRest);
       const rest = recordingRestHost();
 
-      const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
+      const runtime = await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports({ rest })
         .withModules([server])
         .boot();
@@ -119,7 +119,7 @@ describe("given a feature whose server declares transports", () => {
         .withApi(CatalogueApp)
         .withTransports(catalogueTrpc);
 
-      const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
+      const runtime = await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports({ trpc: recordingTrpcHost() })
         .withModules([server])
         .boot();
@@ -134,7 +134,7 @@ describe("given a feature whose server declares transports", () => {
         .withApi(CatalogueApp)
         .withTransports(catalogueTrpc);
 
-      const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
+      const runtime = await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports({ trpc: recordingTrpcHost() })
         .withModules([server])
         .boot();
@@ -148,7 +148,7 @@ describe("given a feature whose server declares transports", () => {
         .withApi(CatalogueApp)
         .withTransports(catalogueRest);
 
-      await createApp({ role: "api", members: memberSourceOf({}) })
+      await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports({ rest })
         .withModules([server])
         .boot();
@@ -165,7 +165,7 @@ describe("given a feature whose server declares transports", () => {
         .withTransports(catalogueRest)
         .withTransportFacts(({ app }) => [restBinding(() => app.read())]);
 
-      await createApp({ role: "api", members: memberSourceOf({}) })
+      await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports({ rest })
         .withModules([server])
         .boot();
@@ -182,7 +182,7 @@ describe("given a feature whose server declares transports", () => {
         .withTransports(catalogueRest)
         .withTransportFacts(({ app }) => [restBinding(() => app.read())]);
 
-      await createApp({ role: "api", members: memberSourceOf({}) })
+      await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports({ rest })
         .withModules([server])
         .boot();
@@ -205,7 +205,7 @@ describe("given a feature whose server declares transports", () => {
           trpcBinding(() => app.read()),
         ]);
 
-      await createApp({ role: "api", members: memberSourceOf({}) })
+      await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports({ rest, trpc })
         .withModules([server])
         .boot();
@@ -229,7 +229,7 @@ describe("given a feature whose server declares transports", () => {
           return [];
         });
 
-      await createApp({ role: "worker", members: memberSourceOf({}) })
+      await new ApplicationBuilder({ role: "worker", members: memberSourceOf({}) })
         .withModules([server])
         .boot();
 
@@ -244,7 +244,7 @@ describe("given a feature whose server declares transports", () => {
         .withTransports(catalogueTrpc);
 
       await expect(
-        createApp({ role: "api", members: memberSourceOf({}) })
+        new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
           .withTransports({ rest: recordingRestHost() })
           .withModules([server])
           .boot(),
@@ -270,7 +270,7 @@ describe("given a feature whose server declares transports", () => {
         .withTransports(catalogueTrpc);
 
       await expect(
-        createApp({ role: "api", members: memberSourceOf({}) })
+        new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
           .withTransports({ trpc: recordingTrpcHost() })
           .withModules([dataset, monitor])
           .boot(),
@@ -285,7 +285,7 @@ describe("given a feature whose server declares transports", () => {
         .withTransports(catalogueRest, catalogueTrpc);
       const rest = recordingRestHost();
 
-      const runtime = await createApp({ role: "worker", members: memberSourceOf({}) })
+      const runtime = await new ApplicationBuilder({ role: "worker", members: memberSourceOf({}) })
         .withTransports({ rest })
         .withModules([server])
         .boot();
@@ -318,7 +318,7 @@ describe("given a feature whose server declares a socket", () => {
     it("mounts the socket on it, bound to the feature's own app", async () => {
       const sockets: { declaration: object; app: unknown }[] = [];
 
-      await createApp({ role: "api", members: memberSourceOf({}) })
+      await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports({
           rest: recordingRestHost(),
           websocket: { mount: (declaration, app) => sockets.push({ declaration, app: app() }) },
@@ -337,7 +337,7 @@ describe("given a feature whose server declares a socket", () => {
   describe("when the api process opened no upgrade router", () => {
     /** @scenario "An api process without an upgrade router refuses a declared socket by name" */
     it("refuses boot, naming the feature and the protocol", async () => {
-      const boot = createApp({ role: "api", members: memberSourceOf({}) })
+      const boot = new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports({ rest: recordingRestHost() })
         .withModules([server])
         .boot();
@@ -350,7 +350,7 @@ describe("given a feature whose server declares a socket", () => {
   describe("when the worker boots the same feature", () => {
     /** @scenario "The worker never mounts a declared socket" */
     it("opens no door and mounts nothing, so the socket is never refused", async () => {
-      const runtime = await createApp({ role: "worker", members: memberSourceOf({}) })
+      const runtime = await new ApplicationBuilder({ role: "worker", members: memberSourceOf({}) })
         .withModules([server])
         .boot();
 
@@ -375,7 +375,7 @@ describe("given a feature whose server declares a raw-socket door", () => {
     it("mounts the door on it, bound to the feature's own app", async () => {
       const doors: { declaration: object; app: unknown }[] = [];
 
-      await createApp({ role: "worker", members: memberSourceOf({}) })
+      await new ApplicationBuilder({ role: "worker", members: memberSourceOf({}) })
         .withTransports({
           rawsocket: { mount: (declaration, app) => doors.push({ declaration, app: app() }) },
         })
@@ -396,7 +396,7 @@ describe("given a feature whose server declares a raw-socket door", () => {
       const doors: object[] = [];
       const rest = recordingRestHost();
 
-      await createApp({ role: "api", members: memberSourceOf({}) })
+      await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports({
           rest,
           rawsocket: { mount: (declaration) => doors.push(declaration) },
@@ -426,7 +426,7 @@ describe("given a feature whose server declares a raw HTTP door", () => {
     it("mounts the door on it, bound to the feature's own app", async () => {
       const doors: { declaration: object; app: unknown }[] = [];
 
-      await createApp({ role: "api", members: memberSourceOf({}) })
+      await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports({
           rest: recordingRestHost(),
           rawhttp: { mount: (declaration, app) => doors.push({ declaration, app: app() }) },
@@ -445,7 +445,7 @@ describe("given a feature whose server declares a raw HTTP door", () => {
   describe("when the api process opened no raw HTTP host", () => {
     /** @scenario "An api process without a raw HTTP host refuses a declared door by name" */
     it("refuses boot naming the feature and the protocol", async () => {
-      const booting = createApp({ role: "api", members: memberSourceOf({}) })
+      const booting = new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports({ rest: recordingRestHost() })
         .withModules([server])
         .boot();
@@ -463,7 +463,7 @@ describe("given a feature whose server declares a raw HTTP door", () => {
     it("opens no door", async () => {
       const doors: object[] = [];
 
-      await createApp({ role: "worker", members: memberSourceOf({}) })
+      await new ApplicationBuilder({ role: "worker", members: memberSourceOf({}) })
         .withTransports({ rawhttp: { mount: (declaration) => doors.push(declaration) } })
         .withModules([server])
         .boot();

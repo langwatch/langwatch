@@ -74,6 +74,7 @@ describe("ExplorerLangyActions", () => {
 
       expect(Object.keys(host.registered ?? {}).toSorted()).toEqual([
         "explorer.getState",
+        "explorer.runInstantEval",
         "explorer.select",
         "explorer.setFilter",
         "explorer.setLens",

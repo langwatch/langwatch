@@ -1,9 +1,8 @@
+import type { EvaluatorSettingsSource } from "@langwatch/evaluation-contract";
+
 const CONFIG_METADATA_KEYS = new Set(["evaluatorType", "settings"]);
 
-export type EvaluatorSettingsSource =
-  | "config-settings"
-  | "top-level-recovery"
-  | "monitor-parameters";
+export type { EvaluatorSettingsSource };
 
 export class EvaluatorSettingsService {
   static create(): EvaluatorSettingsService {

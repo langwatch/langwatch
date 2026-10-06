@@ -79,30 +79,6 @@ Feature: Triggering online evaluations from an ingested trace
     When the commands are built
     Then each carries a distinct evaluation id with the platform's evaluation prefix
 
-  # Retired 2026-09-25: evaluation owns the delay and dedup (evaluation-trace-evaluation-queue.unit.test.ts).
-  Scenario: A trace-level dispatch is deduplicated for six minutes
-    Given a trace-level monitor
-    When the command is sent
-    Then the deduplication window outlasts the deferred origin resolution and survives dispatch
-
-  # Retired 2026-09-25: evaluation owns the delay and dedup (evaluation-trace-evaluation-queue.unit.test.ts).
-  Scenario: The dedup id comes from the evaluation command itself
-    Given a command about to be enqueued
-    When the queue asks for its deduplication key
-    Then the key is the evaluation command's own, not one the trace path spells
-
-  # Retired 2026-09-25: evaluation owns the delay and dedup (evaluation-trace-evaluation-queue.unit.test.ts).
-  Scenario: A thread-level monitor waits for the thread to go idle
-    Given a monitor with a thread idle timeout and a trace carrying a conversation id
-    When the command is sent
-    Then it is delayed by the idle timeout and deduplicated for the same window
-
-  # Retired 2026-09-25: evaluation owns the delay and dedup (evaluation-trace-evaluation-queue.unit.test.ts).
-  Scenario: A thread-level monitor with no thread falls back to the trace window
-    Given a monitor with a thread idle timeout and a trace with no conversation id
-    When the command is sent
-    Then the trace-level window is used
-
   @unit
   Scenario: The command carries the trace fields preconditions match on
     Given a trace with metadata, labels, topics and models
@@ -163,9 +139,3 @@ Feature: Triggering online evaluations from an ingested trace
     Given each delivery mints a new evaluation id
     When the command is queued twice for one trace and monitor
     Then the two commands carry different evaluation ids over the same trace and evaluator
-
-  # Retired 2026-09-25: evaluation owns the delay and dedup (evaluation-trace-evaluation-queue.unit.test.ts).
-  Scenario: The identity outlives the first dispatch
-    Given the first command has already been dispatched
-    When the redelivery arrives inside the window
-    Then the still-alive identity squashes it rather than staging a duplicate run

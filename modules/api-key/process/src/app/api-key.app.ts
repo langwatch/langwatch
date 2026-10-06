@@ -12,6 +12,8 @@ import {
   type ApiKeyTeam,
   type ApiKeyUser,
   type CreateApiKeyInput,
+  type CreateIngestionKeyInput,
+  type MintAgentSandboxKeyInput,
   type MintRunKeyInput,
   type NamedApiKeyBinding,
   type UpdateApiKeyInput,
@@ -40,17 +42,20 @@ import { ConfigParseError } from "@langwatch/config";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { credentialsSecret, Secret, sessionSecret, type ScopedSecrets } from "@langwatch/secrets";
+import {
+  credentialsSecret,
+  credentialsSecretPrevious,
+  Secret,
+  sessionSecret,
+  type ScopedSecrets,
+} from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";
 
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
-import { MemoryApiKeyAnswerCacheRepository } from "../repositories/memory/memory.api-key-answer-cache.repository.ts";
-import {
-  RedisApiKeyAnswerCacheRepository,
-  type ApiKeyAnswerCacheRedis,
-} from "../repositories/redis/redis.api-key-answer-cache.repository.ts";
+import { AgentSandboxKeyService } from "../services/agent-sandbox-key.service.ts";
 import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
+import { IngestionKeyMintService } from "../services/ingestion-key-mint.service.ts";
 import { LegacyApiKeyGrantService } from "../services/legacy-api-key-grant.service.ts";
 import { RunKeyMintService } from "../services/run-key-mint.service.ts";
 
@@ -67,7 +72,7 @@ type ApiKeyDependencies = Readonly<{
 }>;
 
 // Module dependencies from the process: repositories, peer APIs, the HMAC pepper's secrets.
-// This list IS the complete member set.
+// This list is everything the module is built from.
 export type ApiKeySetup = Readonly<{
   repositories: ApiKeyRepositories;
   dependencies: Readonly<{
@@ -76,8 +81,8 @@ export type ApiKeySetup = Readonly<{
     projects: ProjectApi;
   }>;
   secrets: ScopedSecrets;
-  /** Where every pod shares its token answers: Redis, else this process's memory. */
-  members: Readonly<{ redis: ApiKeyAnswerCacheRedis | null }>;
+  /** API-key declares no config slice. */
+  config?: undefined;
 }>;
 
 /** What a key may create: the caller's own personal key, or an admin's key. */
@@ -116,22 +121,31 @@ function scopeNames(
   return names.projectName;
 }
 
-/** The first pepper the chain answers; none refuses the boot rather than hashing under "". */
-async function apiKeyPepper(secrets: ScopedSecrets): Promise<string> {
-  const { pepper, pepperFallback, pepperLastFallback } = ApiKeyModule.secrets;
+/**
+ * The first pepper the chain answers; none refuses the boot rather than hashing under "".
+ * The previous credentials secret verifies old hashes only while the pepper follows
+ * CREDENTIALS_SECRET: a dedicated API_KEY_PEPPER does not move when that secret rotates.
+ */
+async function apiKeyPeppers(
+  secrets: ScopedSecrets,
+): Promise<{ pepper: string; previousPepper: string | undefined }> {
+  const { pepper, pepperFallback, pepperLastFallback, pepperPrevious } = ApiKeyModule.secrets;
   const answered = await secrets.into(pepper, (primary) =>
     secrets.into(pepperFallback, (credentials) =>
       secrets.into(pepperLastFallback, (session) =>
-        [primary, credentials, session].find((value) => value !== void 0 && value !== ""),
+        secrets.into(pepperPrevious, (previous) => ({
+          pepper: [primary, credentials, session].find((value) => value !== void 0 && value !== ""),
+          previousPepper: primary ? void 0 : previous || void 0,
+        })),
       ),
     ),
   );
-  if (answered === void 0) {
+  if (answered.pepper === void 0) {
     throw new ConfigParseError([
       "api-key.pepper ← API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET: none is set",
     ]);
   }
-  return answered;
+  return { pepper: answered.pepper, previousPepper: answered.previousPepper };
 }
 
 export class ApiKeyModule implements ApiKeyApi {
@@ -142,23 +156,21 @@ export class ApiKeyModule implements ApiKeyApi {
     projects: ProjectApi,
   };
 
-  static readonly reads = ["redis"] as const;
   /** Main's pepper chain, first set wins: API_KEY_PEPPER, CREDENTIALS_SECRET, NEXTAUTH_SECRET. */
   static readonly secrets = {
     pepper: Secret.load("API_KEY_PEPPER", { optional: true }),
     pepperFallback: credentialsSecret,
     pepperLastFallback: sessionSecret,
+    /** Verifies keys hashed before a CREDENTIALS_SECRET rotation; each re-hashes on next use. */
+    pepperPrevious: credentialsSecretPrevious,
   } as const;
 
   static async create(setup: ApiKeySetup): Promise<ApiKeyModule> {
-    const pepper = await apiKeyPepper(setup.secrets);
+    const { pepper, previousPepper } = await apiKeyPeppers(setup.secrets);
     const authorization = setup.dependencies.authorization;
-    const { redis } = setup.members;
     const service = ApiKeyService.create({
       repository: setup.repositories.apiKeys,
-      answers: redis
-        ? RedisApiKeyAnswerCacheRepository.create({ redis })
-        : MemoryApiKeyAnswerCacheRepository.create(),
+      answers: setup.repositories.answers,
       authz: authorization,
       grants: authorization,
       organizations: setup.dependencies.organizations,
@@ -173,22 +185,40 @@ export class ApiKeyModule implements ApiKeyApi {
         deriveBindingId: (input) => authorization.deriveGrantId(input),
         diagnostics: createLogger("langwatch:api-key"),
       }),
-      tokens: ApiKeyTokenService.create(pepper),
+      tokens: ApiKeyTokenService.create(pepper, previousPepper),
     });
     const runKeys = RunKeyMintService.create({ apiKeys: service, authz: authorization });
+    const sandboxKeys = AgentSandboxKeyService.create({
+      apiKeys: service,
+      authz: authorization,
+      projects: setup.dependencies.projects,
+      held: setup.repositories.sandboxKeys,
+    });
 
-    return new ApiKeyModule(service, authorization, runKeys);
+    const ingestionKeys = IngestionKeyMintService.create({ apiKeys: service });
+
+    return new ApiKeyModule({ service, authorization, runKeys, sandboxKeys, ingestionKeys });
   }
 
-  private constructor(service: ApiKeyService, authorization: AuthzApi, runKeys: RunKeyMintService) {
-    this.#service = service;
-    this.#authorization = authorization;
-    this.#runKeys = runKeys;
+  private constructor(deps: {
+    service: ApiKeyService;
+    authorization: AuthzApi;
+    runKeys: RunKeyMintService;
+    sandboxKeys: AgentSandboxKeyService;
+    ingestionKeys: IngestionKeyMintService;
+  }) {
+    this.#service = deps.service;
+    this.#authorization = deps.authorization;
+    this.#runKeys = deps.runKeys;
+    this.#sandboxKeys = deps.sandboxKeys;
+    this.#ingestionKeys = deps.ingestionKeys;
   }
 
   readonly #service: ApiKeyService;
   readonly #authorization: AuthzApi;
   readonly #runKeys: RunKeyMintService;
+  readonly #sandboxKeys: AgentSandboxKeyService;
+  readonly #ingestionKeys: IngestionKeyMintService;
 
   /**
    * The service itself, for the one thing this application deliberately is not about: turning a
@@ -212,8 +242,14 @@ export class ApiKeyModule implements ApiKeyApi {
   ): Promise<ResolvedApiKeyCredential | null> {
     return this.#service.findResolvedToken(input);
   }
+  createIngestionKey(input: CreateIngestionKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
+    return this.#ingestionKeys.createIngestionKey(input);
+  }
   mintRunKey(input: MintRunKeyInput): Promise<string> {
     return this.#runKeys.mintRunKey(input);
+  }
+  mintAgentSandboxKey(input: MintAgentSandboxKeyInput): Promise<string> {
+    return this.#sandboxKeys.mintAgentSandboxKey(input);
   }
   async resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,

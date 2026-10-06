@@ -8,20 +8,20 @@ export type {
   LicensingEntitlementSourceMode,
 } from "./services/licensing-entitlement-source.service.ts";
 export type {
+  OrganizationLicense,
+  OrganizationLicenseCandidate,
+  OrganizationLicenseCandidates,
+  OrganizationLicenseReads,
+  StoredLicense,
+} from "./repositories/organization-license.repository.ts";
+export type { LicensePlanSourceOptions } from "./services/license-plan-source.service.ts";
+export type {
   LicenseLogger,
   LicenseRetention,
   LicenseRetentionRule,
   LicenseStorage,
   LicenseUsage,
   LicenseUsageCount,
-  OrganizationLicense,
-  OrganizationLicenseCandidate,
-  OrganizationLicenseCandidates,
-  OrganizationLicenseReads,
-  StoredLicense,
-} from "./app/licensing.members.ts";
-export type { LicensePlanSourceOptions } from "./services/license-plan-source.service.ts";
-export type {
   LicenseRetentionConfiguration,
   LicenseServiceConfigurationInput,
   LicenseServiceOptions,
@@ -49,14 +49,9 @@ export type {
   IssuedLicenseRecord,
   IssuedLicenseRepository,
 } from "./repositories/issued-license.repository.ts";
-export type {
-  ConnectManagedKeys,
-  ContractBudgets,
-  LicenseCustomers,
-  LicenseDeliveryCipher,
-  LicenseRegistryInfrastructure,
-  LicenseSyncRateLimit,
-} from "./app/licensing.members.ts";
+export type { ContractBudgets } from "./services/contract-budget.service.ts";
+export type { ConnectManagedKeys, LicenseCustomers } from "./services/license-registry.service.ts";
+export type { LicenseSyncRateLimit } from "./services/license-sync.service.ts";
 
 /** The install end of Connect (ADR-156, section 9). */
 export { connectTrpcTransport } from "./transport/connect.trpc.ts";
@@ -77,15 +72,13 @@ export type {
 /** The hosted end of Connect (ADR-156, section 5), on LangWatch Cloud only. */
 export { connectHostRest } from "./transport/connect-host.rest.ts";
 export { connectHostedRest } from "./transport/connect-hosted.rest.ts";
+export type { ContractBudget, ContractBudgetStore } from "./services/contract-budget.service.ts";
+export type { HostedSpendRecorder } from "./services/connect-spend-buffer.service.ts";
+export type { HostedJudge } from "./services/hosted-services.service.ts";
 export type {
-  ContractBudget,
-  ContractBudgetStore,
   HostedBudgetUsage,
-  HostedJudge,
-  HostedServicesInfrastructure,
-  HostedSpendRecorder,
   HostedUsageReader,
-} from "./app/licensing.members.ts";
+} from "./services/hosted-usage-reader.service.ts";
 
 /** Activation codes (ADR-156, section 5). */
 export type {
@@ -100,9 +93,8 @@ export type { ActivationRateLimit, LicenseMinter } from "./services/activation-c
 export type {
   CloudCustomer,
   CloudCustomerLookup,
-  SelfHostedInstancesInfrastructure,
   SelfHostedLeadNotifications,
   SelfHostedLeadNurturing,
   SelfHostedLeadsInfrastructure,
   SelfHostedOrgTraits,
-} from "./app/licensing.members.ts";
+} from "./services/self-hosted-crm.service.ts";

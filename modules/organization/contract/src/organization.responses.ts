@@ -26,7 +26,7 @@ const organizationInviteRowSchema = z
     organizationId: z.string().min(1),
     teamIds: z.string(),
     teamAssignments: z.unknown().nullable(),
-    role: z.enum(["ADMIN", "MEMBER", "EXTERNAL"]),
+    role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]),
     requestedBy: z.string().nullable(),
     subscriptionId: z.string().nullable(),
     acceptedByUserId: z.string().nullable(),
@@ -95,6 +95,18 @@ export type PendingInvitationForCaller = z.infer<
   typeof organizationPendingInvitationForCallerSchema
 >;
 
+/** The oldest pending invitation on each address the caller has proven (ADR-171 v6). */
+export const organizationPendingInvitationsForCallerSchema = z.array(
+  z.object({
+    inviteCode: z.string().min(1),
+    organizationName: z.string(),
+    role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]),
+  }),
+);
+export type PendingInvitationsForCaller = z.infer<
+  typeof organizationPendingInvitationsForCallerSchema
+>;
+
 /** The user row, flat. Mirrors `User` in `organization.rows.ts`. */
 export const organizationUserRowSchema = z
   .object({
@@ -130,7 +142,7 @@ export const organizationUserRowsSchema = organizationMemberUserSchema.array();
 export const organizationMemberRecordSchema = z.object({
   userId: z.string().min(1),
   organizationId: z.string().min(1),
-  role: z.enum(["ADMIN", "MEMBER", "EXTERNAL"]),
+  role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]),
   createdAt: z.date(),
   updatedAt: z.date(),
   departmentId: z.string().nullable(),
@@ -157,7 +169,7 @@ export const organizationMemberDirectorySchema = z.object({
     z.object({
       userId: z.string().min(1),
       organizationId: z.string().min(1),
-      role: z.enum(["ADMIN", "MEMBER", "EXTERNAL"]),
+      role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]),
       createdAt: z.date(),
       updatedAt: z.date(),
       departmentId: z.string().nullable(),

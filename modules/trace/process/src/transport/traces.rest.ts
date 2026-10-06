@@ -26,7 +26,6 @@ import {
   traceMetadataBodySchema,
   traceMetadataResponseSchema,
   traceNotFoundBodySchema,
-  traceSearchBodyExtensions,
   traceSearchBodySchema,
   traceSearchResponseSchema,
   tracesRestCredentialSchema,
@@ -46,6 +45,7 @@ import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.
  * literal /facets, before the bare :traceId.
  */
 import { formatTraceSummaryDigest } from "#rules/trace-formatting.rules";
+import { unkeyedLegacyFilterViolations } from "#rules/trace-legacy-filter-keys.rules";
 import { tracePath } from "#rules/trace-platform-url.rules";
 import { compileProjection } from "#rules/trace-projection-compile.rules";
 
@@ -233,6 +233,11 @@ async function searchTraces({
     ...searchFields
   } = params;
   const format = resolveTraceFormat({ format: formatParam, llmMode });
+  const unkeyed = unkeyedLegacyFilterViolations({
+    filters: searchFields.filters,
+    offersFilterString: true,
+  });
+  if (unkeyed.length > 0) throw new RequestValidationError({ target: "json", violations: unkeyed });
 
   logger.info({ projectId: scope.id }, "Searching traces for project");
 
@@ -295,7 +300,7 @@ async function searchTraces({
   return streamSearchEnvelope(serializedTraces, pagination, schemaSuffix);
 }
 
-export function createTracesRest(): Readonly<{
+function createTracesRest(): Readonly<{
   protocol: "rest";
   namespace: string;
   router: () => RestTransportDeclaration<TraceApi>;
@@ -465,6 +470,3 @@ export function createTracesRest(): Readonly<{
 
 /** The metadata amendment stays absent: no module member answers its command queue. */
 export const tracesRest = createTracesRest();
-
-export { traceSearchBodyExtensions };
-export type { TraceSearchBody };

@@ -29,7 +29,7 @@ export class JobNotAcceptedByPoolError extends Error {
 }
 
 /** Per-project slot budget for a resource class; a class absent here has no per-project cap. */
-export type ProjectSlotBudgets = Partial<Record<ScenarioResourceClass, number>>;
+type ProjectSlotBudgets = Partial<Record<ScenarioResourceClass, number>>;
 
 function resourceClassOf(job: ExecutionJobData): ScenarioResourceClass {
   return TARGET_RESOURCE_CLASS[job.target.type];

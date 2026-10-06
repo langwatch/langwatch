@@ -1,6 +1,7 @@
 import type { PrincipalRef } from "@langwatch/authorization";
 import type {
   InstantEvalEstimateWire,
+  InstantEvalOptInAccess,
   InstantEvalRunProgress,
   InstantEvalRunReference,
 } from "@langwatch/instant-eval-contract";
@@ -17,8 +18,6 @@ import type {
   DeriveClaudeResponseContentInput,
   DeriveClaudeResponseContentResult,
 } from "./trace-canonicalisation.ts";
-import type { RecordCapturedSpanInput } from "./trace-captured-span.commands.ts";
-import type { DerivedTraceEvent } from "./trace-derived-event.ts";
 import type { TraceEditOverlayDto, TraceEditOverlayPatch } from "./trace-edit-overlay.contract.ts";
 import type {
   EvaluationTraceReadInput,
@@ -32,7 +31,6 @@ import type {
   TraceFullRecord,
   TraceFullThreadReadInput,
 } from "./trace-full-read.contract.ts";
-import type { RecordSpanCommandData } from "./trace-ingress.commands.ts";
 import type { ResolvedInstantEvalRun } from "./trace-instant-eval-chips.ts";
 import type { ExplorerInstantEvalRunInput } from "./trace-instant-eval.schemas.ts";
 import type { LangWatchQLTraceFilter } from "./trace-langwatch-ql-filter.ts";
@@ -53,7 +51,9 @@ import type {
 import type { CheckPreconditions } from "./trace-precondition.schemas.ts";
 import type {
   AssignTopicCommandData,
+  RecordCapturedSpanInput,
   RecordMetricCorrelationCommandData,
+  RecordSpanCommandData,
 } from "./trace-processing.commands.ts";
 import type { LogRecordReceivedEventData } from "./trace-processing.events.ts";
 import type { TraceSummaryData } from "./trace-projection.ts";
@@ -76,10 +76,6 @@ import type {
   TraceFacetsQuery,
   TraceMetadataUpdate,
 } from "./trace-rest.schemas.ts";
-import type {
-  ScenarioRoleMetrics,
-  ScenarioRoleMetricsInput,
-} from "./trace-scenario-role-metrics.ts";
 import type { SharedTraceDto } from "./trace-share.schemas.ts";
 import type {
   SpanSummaryRow,
@@ -104,7 +100,7 @@ import type {
   TraceDerivedEventsInput,
   TraceSummaryLookupInput,
 } from "./trace.queries.ts";
-import type { TracesConversationContext } from "./trace.responses.ts";
+import type { DerivedTraceEvent, TracesConversationContext } from "./trace.responses.ts";
 import type { NormalizedSpan } from "./trace.spans.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
 
@@ -400,11 +396,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
     logRows: TraceLogRecordDto[];
   }): Span;
   mapCodingAgentSummaryRows(rows: SpanSummaryRow[]): unknown;
-  codingAgentLogContentKeys(eventName: string): readonly {
-    key: string;
-    category: "input" | "output" | "both";
-  }[];
-  buildCodingAgentTranscript(input: { spans: SpanDetail[]; logs: TraceLogRecordDto[] }): unknown;
   getLogsByTraceId(input: {
     tenantId: string;
     traceId: string;
@@ -761,6 +752,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): Promise<InstantEvalRunProgress>;
   /** One run's counters, which is all a chip and a progress bar read. */
   getExplorerEvalRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress>;
+  /** Whether the Explorer may judge, and what its refusal popover offers this member. */
+  getExplorerEvalAccess(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<InstantEvalOptInAccess>;
+  /** The organization's own switch, thrown from the popover; the organization is the project's. */
+  enableExplorerEvals(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<InstantEvalOptInAccess>;
   /**
    * The runs a query's `eval` chips claim, checked against the project and
    * dated for the compiler. A claim the project does not own is dropped, so
@@ -841,3 +842,18 @@ export type TracePreconditionSampleInput = {
 };
 
 export const TraceApi = moduleApi<TraceApi>()("trace");
+
+/** One trace's per-role cost and latency, derived from its stored spans. */
+export interface ScenarioRoleMetrics {
+  scenarioRoleCosts: Record<string, number>;
+  scenarioRoleLatencies: Record<string, number>;
+}
+
+export interface ScenarioRoleMetricsInput {
+  tenantId: string;
+  traceId: string;
+  /** The trace's earliest span time: a partition hint, never a freshness cutoff. */
+  occurredAtMs?: number;
+  /** The fold's span count. A derivation is reused only within one fold version. */
+  foldVersion?: number;
+}

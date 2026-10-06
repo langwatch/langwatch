@@ -8,14 +8,17 @@ import {
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
-  DATASET_ATTACHMENT_MAX_BYTES,
   DATASET_ATTACHMENT_MULTIPART_SLACK_BYTES,
   DATASET_ATTACHMENT_REQUEST_MAX_BYTES,
+  DATASET_DEFAULT_LIMITS,
   DatasetApi,
   DatasetAttachmentTooLargeError,
+  datasetAttachmentUploadSchema,
+  datasetDisplayRecordCount,
   datasetRestArchivedSchema,
   datasetRestAttachmentFieldsSchema,
   datasetRestAttachmentQuerySchema,
+  datasetRestAttachmentUploadSchema,
   datasetRestBatchCreateRecordsSchema,
   datasetRestCreateSchema,
   datasetRestDeleteRecordsSchema,
@@ -41,17 +44,13 @@ import {
   datasetRestSummarySchema,
   datasetRestUpdateRecordSchema,
   datasetRestUpdateSchema,
-  MAX_FILE_SIZE_BYTES,
+  formatDatasetByteLimit,
   storedDatasetAttachmentSchema,
   UploadValidationError,
   type DatasetColumns,
+  type DatasetRecordPage,
 } from "@langwatch/dataset-contract";
-
-/**
- * The read ceiling for `GET /api/dataset/:slugOrId`, which answers with the
- * whole dataset inline. A dataset above it is refused rather than truncated.
- */
-const MAX_LIMIT_MB = 25;
+import { resolveRequestBound } from "@langwatch/plans";
 
 /**
  * The two column refusals an append raises, given their HTTP grain here rather
@@ -74,29 +73,65 @@ function datasetUrl(app: DatasetApi, projectSlug: string, datasetId: string): st
   return app.platformUrl({ projectSlug, path: `/datasets/${datasetId}` });
 }
 
-/** Main's pace for the attachment route: well above a person filling cells. */
-const ATTACHMENT_UPLOADS_PER_MINUTE = 30;
+/** One page of records as this family answers it: rows, paging and the dataset's summary. */
+function recordPage(app: DatasetApi, projectSlug: string, page: DatasetRecordPage) {
+  const { dataset } = page;
+
+  return {
+    data: page.data,
+    pagination: page.pagination,
+    ...(dataset && {
+      dataset: {
+        id: dataset.id,
+        name: dataset.name,
+        slug: dataset.slug,
+        columnTypes: dataset.columnTypes,
+        createdAt: dataset.createdAt,
+        updatedAt: dataset.updatedAt,
+        platformUrl: datasetUrl(app, projectSlug, dataset.id),
+      },
+    }),
+  };
+}
+
+/**
+ * How many files one caller may send in a minute: far above a person filling
+ * cells, and enough to load tens of thousands of files in an hour.
+ */
+const ATTACHMENT_UPLOADS_PER_MINUTE = resolveRequestBound(
+  "datasetAttachmentUploadsPerMinute",
+  "FREE",
+);
 
 /** Where a dataset attachment's file is uploaded now. */
-const STORED_OBJECTS_SUCCESSOR = "/api/v1/stored-objects";
+const ATTACHMENT_UPLOADS_SUCCESSOR = "/api/dataset/attachments/uploads";
 
 /** Where a dataset is built from an uploaded file now (ADR-158 §8). */
 const IMPORTS_SUCCESSOR = "/api/v1/dataset/imports";
 
-/** The deprecated /upload pair's whole-request cap: main's 25 MB file plus multipart framing. */
-const UPLOAD_REQUEST_MAX_BYTES = MAX_FILE_SIZE_BYTES + DATASET_ATTACHMENT_MULTIPART_SLACK_BYTES;
+/**
+ * The deprecated /upload pair's whole-request cap. The pair holds the posted
+ * file in memory, so it stops at one full row; a larger file is uploaded as a
+ * stored object and imported, which reads it as a stream.
+ */
+const UPLOAD_FILE_MAX_BYTES = DATASET_DEFAULT_LIMITS.rowBytes;
 
 const uploadBodyLimit = {
-  maxBytes: UPLOAD_REQUEST_MAX_BYTES,
+  maxBytes: UPLOAD_FILE_MAX_BYTES + DATASET_ATTACHMENT_MULTIPART_SLACK_BYTES,
   onExceeded: () =>
-    new UploadValidationError("File size exceeds the maximum limit of 25MB", "file_too_large"),
+    new UploadValidationError(
+      `The file is larger than the ${formatDatasetByteLimit(UPLOAD_FILE_MAX_BYTES)} this address accepts. ` +
+        "Upload it as a stored object with the purpose dataset_import, then create the dataset " +
+        "from it at POST /api/dataset/imports.",
+      "file_too_large",
+    ),
 };
 
 const UPLOAD_THEN_IMPORT =
   "upload the file as a stored object with the purpose dataset_import, then create the dataset from it";
 
 /** The inert declaration the process mounts on its own project-key door. */
-export type DatasetRestDeclaration = Readonly<{
+type DatasetRestDeclaration = Readonly<{
   protocol: "rest";
   namespace: string;
   router: () => RestTransportDeclaration<DatasetApi>;
@@ -132,7 +167,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
             columnTypes: dataset.columnTypes,
             createdAt: dataset.createdAt,
             updatedAt: dataset.updatedAt,
-            recordCount: dataset.recordCount,
+            recordCount: datasetDisplayRecordCount(dataset),
             platformUrl: datasetUrl(app, project.projectSlug, dataset.id),
           })),
         };
@@ -286,14 +321,16 @@ export function createDatasetRest(): DatasetRestDeclaration {
       })
       .withBodyLimit({
         maxBytes: DATASET_ATTACHMENT_REQUEST_MAX_BYTES,
-        onExceeded: () => new DatasetAttachmentTooLargeError(DATASET_ATTACHMENT_MAX_BYTES),
+        onExceeded: () =>
+          new DatasetAttachmentTooLargeError(DATASET_DEFAULT_LIMITS.attachmentBytes),
       })
       .withRateLimit({ requests: ATTACHMENT_UPLOADS_PER_MINUTE, seconds: 60 })
       .withPermission("datasets:manage")
       .withOutput(storedDatasetAttachmentSchema)
       .withDeprecated({
-        successor: STORED_OBJECTS_SUCCESSOR,
-        notice: "upload the file as a stored object, then put its reference in the cell",
+        successor: ATTACHMENT_UPLOADS_SUCCESSOR,
+        notice:
+          "create the upload, send the file to the address it answers, confirm it as a stored object, then put its reference in the cell",
       })
       .withDocs({
         description:
@@ -315,17 +352,41 @@ export function createDatasetRest(): DatasetRestDeclaration {
         }),
       )
 
+      // The file's bytes never pass through here: the answer is the signed
+      // address they are sent to, within the organization's per-file limit.
+      .post("/attachments/uploads", "postApiDatasetAttachmentsUploads")
+      .withInput(datasetRestAttachmentUploadSchema)
+      .withRateLimit({ requests: ATTACHMENT_UPLOADS_PER_MINUTE, seconds: 60 })
+      .withPermission("datasets:update")
+      .withStatus(201)
+      .withOutput(datasetAttachmentUploadSchema)
+      .withDocs({
+        summary: "Create an upload for an image or file cell",
+        description:
+          "Answers the address to PUT the file to. After the PUT, confirm the upload at `POST /api/v1/stored-objects/uploads/{objectId}/confirmation`, then write `/api/files/{projectId}/{objectId}/{filename}` into the cell.",
+        errors: [
+          { status: 413, description: "The file is larger than the organization's limit." },
+          { status: 415, description: "The media type is not accepted." },
+          { status: 429, description: "Too many uploads for this project in one minute." },
+        ],
+      })
+      .handle(({ app, input, scope }) =>
+        app.createAttachmentUpload({ ...input, projectId: scope.id }),
+      )
+
       .get("/:slugOrId", "getApiDatasetBySlugOrId")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withPermission("datasets:view")
       .withMiddleware(projectRestFacts)
       .withOutput(datasetRestDetailResponseSchema)
-      .withDocs({ description: "Get a dataset by its slug or id." })
+      .withDocs({
+        description:
+          "Get a dataset by its slug or id, with every record inline. A dataset too large for one response is refused: read it page by page from `GET /{slugOrId}/records`.",
+      })
       .handle(async ({ app, input, scope }, project) => {
         const { dataset, records } = await app.getDatasetWithinLimit({
           slugOrId: input.slugOrId,
           projectId: scope.id,
-          limitMb: MAX_LIMIT_MB,
         });
 
         return {
@@ -387,15 +448,23 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withQuery(datasetRestPaginationQuerySchema)
       .withPermission("datasets:view")
+      .withMiddleware(projectRestFacts)
       .withOutput(datasetRestRecordPageSchema)
-      .withDocs({ description: "List records for a dataset (paginated)" })
-      .handle(async ({ app, input, scope }) =>
-        app.listRecords({
-          slugOrId: input.slugOrId,
-          projectId: scope.id,
-          page: input.page,
-          limit: input.limit,
-        }),
+      .withDocs({
+        description:
+          "List records for a dataset (paginated). Each page also carries the dataset itself. A page too large for one response is refused with `dataset_page_too_large`: ask again with the smaller `limit` the error names.",
+      })
+      .handle(async ({ app, input, scope }, project) =>
+        recordPage(
+          app,
+          project.projectSlug,
+          await app.listRecords({
+            slugOrId: input.slugOrId,
+            projectId: scope.id,
+            page: input.page,
+            limit: input.limit,
+          }),
+        ),
       )
 
       // The legacy spelling of the records list, beside the legacy `POST` of the
@@ -404,17 +473,22 @@ export function createDatasetRest(): DatasetRestDeclaration {
       .withParams(datasetRestSlugParamsSchema)
       .withQuery(datasetRestPaginationQuerySchema)
       .withPermission("datasets:view")
+      .withMiddleware(projectRestFacts)
       .withOutput(datasetRestRecordPageSchema)
       .withDocs({
         description: "List entries of a dataset (paginated). Same as GET /:slugOrId/records.",
       })
-      .handle(async ({ app, input, scope }) =>
-        app.listRecords({
-          slugOrId: input.datasetSlug,
-          projectId: scope.id,
-          page: input.page,
-          limit: input.limit,
-        }),
+      .handle(async ({ app, input, scope }, project) =>
+        recordPage(
+          app,
+          project.projectSlug,
+          await app.listRecords({
+            slugOrId: input.datasetSlug,
+            projectId: scope.id,
+            page: input.page,
+            limit: input.limit,
+          }),
+        ),
       )
 
       // 201 when the record did not exist yet and was created, 200 when it was updated.

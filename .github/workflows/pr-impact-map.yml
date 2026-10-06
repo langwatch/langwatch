@@ -5,8 +5,9 @@ name: pr-impact-map
 #
 # `synchronize` IS "a new commit was pushed to this PR", so one `pull_request`
 # trigger covers both "on open" and "on every push". There is deliberately no
-# `push:` trigger and no `actions/checkout` — the changed-file list comes from
-# the pulls/files API, which keeps the whole job to a single ~5s step.
+# `push:` trigger. The changed-file list comes from
+# a full-history checkout and `git diff --numstat`, because the pulls/files
+# API stops at 3000 files and large restructures exceed it.
 #
 # Deliberately non-blocking: this workflow only ever describes the diff, it
 # never judges it. Nothing here should gate a merge, so it is not a candidate
@@ -38,74 +39,65 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
+      # Full history, so `git diff --numstat` counts every changed file. Only
+      # the classifier script is checked out into the working tree.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          fetch-depth: 0
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
       - name: Build and upsert impact map comment
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const MARKER = "<!-- pr-impact-map -->";
 
-            // First match wins, so order is load-bearing: a broad `apps/**`
-            // would otherwise swallow migrations, specs and tests. Lockfiles are
-            // pulled out above the language buckets so a dependency bump does
-            // not masquerade as a large Go or app change — but `go.mod` and
-            // `package.json` stay with their language, because those express
-            // intent rather than churn.
-            const CATEGORIES = [
-              ["Migrations",     p => /^packages\/prisma-client\/prisma\/migrations\//.test(p) || /^packages\/clickhouse-client\/migrations\//.test(p)],
-              ["Specs",          p => p.startsWith("specs/")],
-              ["Tests",          p => /(^|\/)__tests__\//.test(p)
-                                   || /\.(test|spec)\.[cm]?[jt]sx?$/.test(p)
-                                   || /_test\.go$/.test(p)
-                                   || /(^|\/)test_[^/]+\.py$/.test(p)
-                                   || p.startsWith("dev/tests/agentic-e2e/")],
-              ["CI/CD",          p => p.startsWith(".github/")],
-              ["Deploy",         p => p.startsWith("charts/")
-                                   || /^infra\/docker\/Dockerfile/.test(p)
-                                   || /^infra\/compose[.\w-]*\.ya?ml$/.test(p)],
-              ["Docs",           p => p.startsWith("docs/")
-                                   || p.startsWith("dev/docs/")
-                                   || p.startsWith("skills/")
-                                   || p.endsWith(".md")],
-              ["Deps",           p => /(^|\/)(pnpm-lock\.yaml|go\.sum|uv\.lock|poetry\.lock)$/.test(p)
-                                   || p.endsWith(".lock")],
-              ["SDKs",           p => /^(sdks\/python|sdks\/typescript|sdks\/go|mcp\/typescript|packages)\//.test(p)],
-              // Python must precede "Go services": services/langevals starts with
-              // `services/`, which the Go-services regex would otherwise claim first.
-              ["Python",         p => /^services\/langevals\//.test(p)],
-              ["Go services",    p => /^(services|pkg|cmd)\//.test(p) || p === "go.mod"],
-              ["App · Server",   p => /^apps\/(api|worker)\//.test(p)
-                                   || p.endsWith("schema.prisma")],
-              ["App · Frontend", p => /^apps\/ui\//.test(p)
-                                   || p.endsWith(".tsx")],
-              ["Other",          () => true],
-            ];
-
-            const classify = (path) => CATEGORIES.find(([, test]) => test(path))[0];
+            const { classify, moduleOf } = require(
+              `${process.env.GITHUB_WORKSPACE}/.github/scripts/pr-impact-map-categories.cjs`
+            );
+            const { execFileSync } = require("node:child_process");
 
             const pr = context.payload.pull_request;
             const { owner, repo } = context.repo;
             const shortSha = pr.head.sha.slice(0, 7);
 
-            const files = await github.paginate(github.rest.pulls.listFiles, {
-              owner,
-              repo,
-              pull_number: pr.number,
-              per_page: 100,
-            });
-
-            // The pulls/files API caps out at 3000 files. `changed_files` on the
-            // PR payload is authoritative, so a shortfall means we were truncated
-            // and the per-category counts below are a floor, not a total.
-            const truncated = files.length < pr.changed_files;
+            // `git diff --numstat` counts every file. The pulls/files API caps
+            // at 3000, and large restructures exceed it. -z keeps odd paths
+            // intact; binary files report "-" and count as zero lines.
+            const out = execFileSync(
+              "git",
+              ["diff", "--numstat", "-z", "--no-renames", `${pr.base.sha}...${pr.head.sha}`],
+              { encoding: "utf8", maxBuffer: 1 << 30 }
+            );
+            const files = out
+              .split("\0")
+              .filter(Boolean)
+              .map((entry) => {
+                const [adds, dels, ...rest] = entry.split("\t");
+                return {
+                  filename: rest.join("\t"),
+                  additions: Number(adds) || 0,
+                  deletions: Number(dels) || 0,
+                };
+              });
+            const totalAdditions = files.reduce((n, f) => n + f.additions, 0);
+            const totalDeletions = files.reduce((n, f) => n + f.deletions, 0);
 
             const buckets = new Map();
-            for (const file of files) {
-              const name = classify(file.filename);
-              const bucket = buckets.get(name) ?? { files: 0, additions: 0, deletions: 0 };
+            const modules = new Map();
+            const add = (map, key, file) => {
+              const bucket = map.get(key) ?? { files: 0, additions: 0, deletions: 0 };
               bucket.files += 1;
               bucket.additions += file.additions;
               bucket.deletions += file.deletions;
-              buckets.set(name, bucket);
+              map.set(key, bucket);
+            };
+            for (const file of files) {
+              add(buckets, classify(file.filename), file);
+              const mod = moduleOf(file.filename);
+              if (mod) add(modules, mod, file);
             }
 
             const num = (n) => n.toLocaleString("en-US");
@@ -134,7 +126,7 @@ jobs:
                 const pct = Math.round(share * 100);
                 return [
                   "  ",
-                  name.padEnd(16),
+                  name.padEnd(20),
                   String(b.files).padStart(5),
                   ("+" + num(b.additions)).padStart(11),
                   ("-" + num(b.deletions)).padStart(10),
@@ -145,23 +137,37 @@ jobs:
                 ].join("");
               });
 
+              const topModules = [...modules.entries()]
+                .sort((a, b) => b[1].files - a[1].files || a[0].localeCompare(b[0]))
+                .slice(0, 8);
+              const moduleTable = topModules.length === 0 ? [] : [
+                "",
+                "  " + "Module".padEnd(20) + "Files".padStart(5) +
+                  "Added".padStart(11) + "Removed".padStart(10),
+                "  " + "-".repeat(46),
+                ...topModules.map(([name, b]) =>
+                  "  " + name.padEnd(20) + String(b.files).padStart(5) +
+                  ("+" + num(b.additions)).padStart(11) +
+                  ("-" + num(b.deletions)).padStart(10)),
+                ...(modules.size > topModules.length
+                  ? [`  ... and ${modules.size - topModules.length} more modules`]
+                  : []),
+              ];
+
               const header =
-                "  " + "Category".padEnd(16) + "Files".padStart(5) +
+                "  " + "Category".padEnd(20) + "Files".padStart(5) +
                 "Added".padStart(11) + "Removed".padStart(10) + "   Share";
-              const rule = "  " + "-".repeat(62);
+              const rule = "  " + "-".repeat(66);
 
-              // Every figure on the totals row comes from the PR payload, never
-              // from the (possibly truncated) file list, so the row stays
-              // internally consistent even when the category rows are a floor.
               const totals =
-                "  " + "Total".padEnd(16) + String(pr.changed_files).padStart(5) +
-                ("+" + num(pr.additions)).padStart(11) +
-                ("-" + num(pr.deletions)).padStart(10);
+                "  " + "Total".padEnd(20) + String(files.length).padStart(5) +
+                ("+" + num(totalAdditions)).padStart(11) +
+                ("-" + num(totalDeletions)).padStart(10);
 
-              const fileWord = pr.changed_files === 1 ? "file" : "files";
+              const fileWord = files.length === 1 ? "file" : "files";
               const title =
-                `PR Impact Map · ${num(pr.changed_files)} ${fileWord} · ` +
-                `+${num(pr.additions)} / -${num(pr.deletions)} · ${shortSha}`;
+                `PR Impact Map · ${num(files.length)} ${fileWord} · ` +
+                `+${num(totalAdditions)} / -${num(totalDeletions)} · ${shortSha}`;
 
               body = [
                 MARKER,
@@ -176,15 +182,8 @@ jobs:
                 ...table,
                 rule,
                 totals,
+                ...moduleTable,
                 "```",
-                ...(truncated
-                  ? [
-                      "",
-                      `> **File list truncated.** GitHub returned ${num(files.length)} of ` +
-                        `${num(pr.changed_files)} changed files, so the per-category counts ` +
-                        `above are a lower bound. The totals row is complete.`,
-                    ]
-                  : []),
                 "",
                 `<sub>Updated for \`${shortSha}\` · ${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC</sub>`,
               ].join("\n");

@@ -1,6 +1,6 @@
 import type { WireOf } from "@langwatch/api/web";
 import { datasetDisplayRecordCount } from "@langwatch/dataset-contract";
-import type { Dataset, DatasetColumns } from "@langwatch/dataset-contract";
+import type { DatasetColumns, DatasetWire } from "@langwatch/dataset-contract";
 /**
  * Searchable list of the project's datasets: shared by the Choose Dataset
  * drawer (evaluations workbench) and the workflow dataset node. Renders
@@ -34,7 +34,7 @@ export function DatasetPickerList({
   onSelect,
 }: {
   /** Gate the datasets query (e.g. only when the hosting dialog is open). */
-  datasets: WireOf<Dataset>[] | undefined;
+  datasets: WireOf<DatasetWire>[] | undefined;
   isLoading?: boolean;
   isError?: boolean;
   onSelect: (dataset: DatasetPickerSelection) => void;

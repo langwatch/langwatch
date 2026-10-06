@@ -9,9 +9,24 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, toDate } from "@langwatch/time";
 
-import { LangySessionKey, type LangySessionKeyMetrics } from "../app/langy.members.ts";
 import type { LangySessionKeyRepository } from "../repositories/langy-session-key.repository.ts";
 import { LangySessionKeyReapService } from "./langy-session-key-reap.service.ts";
+
+/** Counts minted/revoked/reaped as one series with operation labels so dashboards read
+ * minted-minus-revoked without joining (a port because App and worker export differently). */
+export interface LangySessionKeyMetrics {
+  record(input: { operation: "minted" | "revoked" | "reaped"; count?: number }): void;
+}
+
+/** Mints and revokes the restricted worker session credential. */
+export abstract class LangySessionKey {
+  abstract mint(input: {
+    session: LangyCredentialSession;
+    projectId: string;
+    organizationId: string;
+  }): Promise<{ token: string; apiKeyId: string }>;
+  abstract revoke(input: { apiKeyId: string; projectId: string }): Promise<void>;
+}
 
 const logger = createLogger("langwatch:langy:session-key");
 const sessionKeyLifetimeMs = 6 * 60 * 60 * 1000;

@@ -8,7 +8,7 @@ import { generate } from "@langwatch/ksuid";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 /** The two models and the transaction the topic-model swap runs inside. */
-export type TopicModelProjectionDatabase = Pick<
+type TopicModelProjectionDatabase = Pick<
   PrismaClient,
   "$transaction" | "topic" | "topicModelProjection"
 >;

@@ -2,7 +2,9 @@
 
 **Date:** 2026-07-10
 
-**Status:** Proposed
+**Status:** Superseded in part by [ADR-172](./172-oversized-payloads-live-under-expirable-prefixes.md)
+
+**Superseded by ADR-172:** the stored-object offload target, the key, the lifecycle, the project-delete cascade, the byte ledger and the retention follow-up. Oversized evaluation inputs now live under `evaluation-inputs/r<days>/<projectId>/` with an operator lifecycle rule and no `stored_objects` row. The thresholds, marker shape, hard ceiling, fail-open rule, read resolution and unconditional row cap below still stand.
 
 **Partially superseded by:** [Stored Objects ADR-001](../../../modules/stored-object/adrs/001-package-boundary.md) for Stored Objects persistence, write ordering, current-state projection and byte-ledger authority. This ADR continues to own evaluation thresholds, marker shapes, fail-open policy, read resolution and the evaluation-specific retention requirement.
 
@@ -71,7 +73,7 @@ The unconditional repository cap is deliberately coarser than the offload (it tr
 
 ## References
 
-- Feature spec: `specs/evaluations/evaluation-payload-offload.feature`
+- Feature spec: `modules/evaluation/specs/evaluation-payload-offload.feature`
 - Offload service: `modules/evaluation/process/src/services/evaluation-inputs-offload.service.ts`
 - App infrastructure adapter: `platform/app/src/runtime/app/features/evaluation.ts`
 - Unconditional caps: `modules/evaluation/process/src/repositories/clickhouse/clickhouse-evaluation.repository.ts`

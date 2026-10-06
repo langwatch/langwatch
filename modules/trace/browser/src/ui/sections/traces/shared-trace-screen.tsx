@@ -16,9 +16,9 @@ import {
 import { Link2Off } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { useTraceDrawer } from "../../../behavior/trace-drawer.ts";
 import { useSharedTraceRead } from "../../../behavior/reads/use-project-reads.ts";
 import { api, type RouterOutputs } from "../../../behavior/trace-api.ts";
+import { useTraceDrawer } from "../../../behavior/trace-drawer.ts";
 import { TRACE_DRAWER_NAME } from "../../../model/trace-drawer-params.ts";
 import { TraceViewerProvider } from "../../elements/explorer/context/trace-viewer-context.tsx";
 import { HandledErrorState } from "../errors/index.ts";

@@ -264,6 +264,7 @@ describe.skipIf(!databaseUrl)("virtual keys must have a home for their traces (r
   }, 120_000);
 
   /** @scenario "A key owned above a project is refused until its traces have a home" */
+  /** @scenario Org-scoped key creation without a governance project is refused */
   it("refuses creating an org- or team-owned key when no trace project resolves", async () => {
     await expect(
       service.create({
@@ -275,7 +276,7 @@ describe.skipIf(!databaseUrl)("virtual keys must have a home for their traces (r
         // rolls back the whole transaction, budget included.
         budget: { limitUsd: "10.00", window: "DAY" },
       }),
-    ).rejects.toMatchObject({ code: "trace_project_required" });
+    ).rejects.toMatchObject({ code: "trace_project_required", httpStatus: 400 });
 
     await expect(
       service.create({

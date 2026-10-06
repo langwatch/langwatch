@@ -1,7 +1,7 @@
 /**
  * How many rows one run may judge: the default is every plan's, the raised
  * cap is a paid-plan lever rather than a technical one.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import {

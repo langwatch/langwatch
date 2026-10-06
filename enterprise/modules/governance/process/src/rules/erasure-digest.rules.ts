@@ -5,7 +5,7 @@ import { createHmac } from "node:crypto";
 import { ErasureSecretMissingError } from "@langwatch/enterprise-governance-contract";
 
 /** An email is low-entropy; the secret is all that stands between the list and a brute force. */
-export const ERASURE_SECRET_MIN_LENGTH = 32;
+const ERASURE_SECRET_MIN_LENGTH = 32;
 
 /** Refuses a secret too short to be one. Never rotate it once anyone is erased (ADR-128 §9). */
 export function getErasureSecret({ secret }: { secret: string | undefined }): string {

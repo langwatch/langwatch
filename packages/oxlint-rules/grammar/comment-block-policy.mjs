@@ -10,11 +10,14 @@ const WHERE_IT_BELONGS =
 export const COMMENT_BLOCK_ERROR_WHAT =
   "Comment block has {{lines}} lines; the maximum is {{max}}.";
 
+export const COMMENT_BLOCK_ERROR_WHY =
+  "A comment is for what the code cannot say, and a long one is narrative that drifts from it.";
+
 export const COMMENT_BLOCK_ERROR_FIX = `${WHERE_IT_BELONGS} See ADR-140.`;
 
 /** The rendered message for a block of `lines`; retire once no test renders it by hand. */
 export function commentBlockSizeMessage(lines) {
-  return `${COMMENT_BLOCK_ERROR_WHAT} ${COMMENT_BLOCK_ERROR_FIX}`
+  return `${COMMENT_BLOCK_ERROR_WHAT} ${COMMENT_BLOCK_ERROR_WHY} ${COMMENT_BLOCK_ERROR_FIX}`
     .replaceAll("{{lines}}", String(lines))
     .replaceAll("{{max}}", String(MAX_COMMENT_BLOCK_LINES));
 }

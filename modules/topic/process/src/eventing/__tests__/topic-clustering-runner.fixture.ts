@@ -54,7 +54,6 @@ export function fakeRunnerDeps(overrides: Partial<TopicClusteringRunnerDeps> = {
       findProjectsWithTopicsPage: vi.fn().mockResolvedValue([]),
       findEligibleProjectsPage: vi.fn().mockResolvedValue([]),
       findOwnedTopicModelProjectIds: vi.fn().mockResolvedValue([]),
-      findAlreadyScheduledProjectIds: vi.fn().mockResolvedValue([]),
     },
     migration: {
       seedProjectTopicModel: vi.fn().mockResolvedValue("skipped" as const),

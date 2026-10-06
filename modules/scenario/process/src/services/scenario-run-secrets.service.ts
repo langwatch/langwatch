@@ -1,18 +1,21 @@
 import type { RunSecretCiphertext } from "@langwatch/scenario-contract";
 
-import type { ScenarioSecretCipher } from "../app/scenario.app.ts";
+import type { ScenarioRunSecretSeal } from "../repositories/scenario.repository.ts";
 
-/** Owns the durable encryption boundary for per-run secret parameters. */
+/** A run's secret parameters, sealed and opened one by one through the scenario repository. */
 export class ScenarioRunSecretsService {
-  static create(cipherPort: ScenarioSecretCipher): ScenarioRunSecretsService {
-    return new ScenarioRunSecretsService(cipherPort);
+  static create(seal: ScenarioRunSecretSeal): ScenarioRunSecretsService {
+    return new ScenarioRunSecretsService(seal);
   }
 
-  private constructor(private readonly cipherPort: ScenarioSecretCipher) {}
+  private constructor(private readonly seal: ScenarioRunSecretSeal) {}
 
   encrypt(values: Record<string, string>): RunSecretCiphertext {
     return Object.fromEntries(
-      Object.entries(values).map(([name, value]) => [name, this.cipherPort.encrypt(value)]),
+      Object.entries(values).map(([name, value]) => [
+        name,
+        this.seal.sealRunSecret({ plain: value }),
+      ]),
     );
   }
 
@@ -20,7 +23,7 @@ export class ScenarioRunSecretsService {
     return Object.fromEntries(
       Object.entries(values).map(([name, ciphertext]) => {
         try {
-          return [name, this.cipherPort.decrypt(ciphertext)];
+          return [name, this.seal.openRunSecret({ sealed: ciphertext })];
         } catch {
           throw new Error(`Secret parameter "${name}" could not be decrypted for this run`);
         }

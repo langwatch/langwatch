@@ -6,6 +6,13 @@ import {
   langyWorkerCredentialsSchema,
   renderLangyTurnContext,
 } from "@langwatch/langy-contract";
+import {
+  buildGuidedKickoffParts,
+  findGuidedKickoffParts,
+  type GuidedKickoffInput,
+  type OnboardingApi,
+} from "@langwatch/onboarding-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -19,6 +26,8 @@ import type {
   LangyWorkerDispatchInput,
   LangyWorkerProbeInput,
 } from "../../channels/langy-worker.channel.ts";
+import type { LangyConversationService } from "../langy-conversation.service.ts";
+import { LangyGuidedKickoffService } from "../langy-guided-kickoff.service.ts";
 import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
 
 /**
@@ -30,7 +39,9 @@ function makeFixture(over: LangyTurnDepsOverrides = {}) {
   );
   const findPendingHandoff = vi.fn(async () => null);
   const dispatch = vi.fn<LangyWorker["dispatch"]>(async () => "accepted");
-  const acceptTurn = vi.fn(async () => ({ turnId: "turn-1" }));
+  const acceptTurn = vi.fn(
+    async (_input: Parameters<LangyConversationService["acceptTurn"]>[0]) => ({ turnId: "turn-1" }),
+  );
 
   const deps = langyTurnDeps({
     conversations: {
@@ -54,7 +65,6 @@ function makeFixture(over: LangyTurnDepsOverrides = {}) {
       cancel: vi.fn(async () => undefined),
       warm: vi.fn(async () => undefined),
     },
-    tokenBuffer: null,
     permits: {
       reserve: vi.fn(async () => ({ reserved: false, allowed: true, resetAt: 0 })),
       release: vi.fn(async () => undefined),
@@ -231,6 +241,7 @@ describe("LangyTurnPreparationService golden path", () => {
   });
 
   /** @scenario "A new conversation takes its placeholder title in sentence case" */
+  /** @scenario "An ordinary first message still gets its placeholder title" */
   it("records the first message as a sentence-case placeholder and chooses no title at creation", async () => {
     const fixture = makeFixture();
 
@@ -271,6 +282,100 @@ describe("LangyTurnPreparationService golden path", () => {
           userMessage: expect.objectContaining({ title: "Getting started" }),
         }),
       );
+    });
+  });
+
+  /** @scenario "A retry re-drives the turn instead of re-posting the message" */
+  it("runs a retry against the message already on record and records no second copy", async () => {
+    const fixture = makeFixture();
+
+    await LangyTurnService.create(fixture.deps).startConversationTurn({
+      ...input,
+      isRetry: true,
+    });
+
+    expect(fixture.acceptTurn).toHaveBeenCalledOnce();
+    expect(fixture.acceptTurn).toHaveBeenCalledWith(
+      expect.objectContaining({ questionParts: input.messages[0]!.parts }),
+    );
+    expect(fixture.acceptTurn).toHaveBeenCalledWith(
+      expect.not.objectContaining({ userMessage: expect.anything() }),
+    );
+  });
+
+  describe("given a turn stopped because GitHub was not connected and the user then connects it", () => {
+    const githubCredentials = (githubToken: string | undefined) => ({
+      getOrProvision: vi.fn(async () =>
+        workerCredentials({
+          organizationId: "organization-1",
+          ...(githubToken ? { githubToken, githubLogin: "octocat" } : {}),
+        }),
+      ),
+      findEgressAllowlist: vi.fn(async () => null),
+      resolveMirrorTier: vi.fn(async () => "content" as const),
+      findModelsAllowed: vi.fn(async () => null),
+    });
+
+    /** @scenario "Connecting GitHub resumes the turn without a duplicate message" */
+    it("re-drives it with the token in place, one permit and no second copy of the message", async () => {
+      const reserve = vi.fn(async () => ({ reserved: true, allowed: true, resetAt: 0 }));
+      const permits = { reserve, release: vi.fn(async () => undefined), check: vi.fn() };
+      const before = makeFixture({
+        credentials: githubCredentials(undefined),
+        permits: { ...permits, check: vi.fn(async () => ({ allowed: true })) },
+      });
+      await LangyTurnService.create(before.deps).startConversationTurn({ ...input });
+      expect(reserve).not.toHaveBeenCalled();
+
+      const after = makeFixture({
+        credentials: githubCredentials("gh-token"),
+        permits: { ...permits, check: vi.fn(async () => ({ allowed: true })) },
+      });
+      await LangyTurnService.create(after.deps).startConversationTurn({
+        ...input,
+        isRetry: true,
+      });
+
+      expect(reserve).toHaveBeenCalledTimes(1);
+      expect(after.acceptTurn).toHaveBeenCalledWith(
+        expect.not.objectContaining({ userMessage: expect.anything() }),
+      );
+      expect(after.dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          credentials: expect.objectContaining({ githubToken: "gh-token" }),
+        }),
+      );
+    });
+  });
+
+  describe("given the user already opened the per-day maximum of pull requests", () => {
+    /** @scenario "The API process meters the daily pull-request cap on its own Redis" */
+    it("tells the turn the real per-day cap and the hour it resets", async () => {
+      const fixture = makeFixture({
+        credentials: {
+          getOrProvision: vi.fn(async () =>
+            workerCredentials({
+              organizationId: "organization-1",
+              githubToken: "gh-token",
+              githubLogin: "octocat",
+            }),
+          ),
+          findEgressAllowlist: vi.fn(async () => null),
+          resolveMirrorTier: vi.fn(async () => "content" as const),
+          findModelsAllowed: vi.fn(async () => null),
+        },
+        permits: {
+          reserve: vi.fn(async () => ({ reserved: false, allowed: false, resetAt: 0 })),
+          release: vi.fn(async () => undefined),
+          check: vi.fn(async () => ({ allowed: false })),
+        },
+      });
+
+      await LangyTurnService.create(fixture.deps).startConversationTurn({ ...input });
+
+      const dispatched = fixture.dispatch.mock.calls[0]![0] as { prompt: string };
+      expect(dispatched.prompt).toContain("of 5 GitHub pull requests");
+      expect(dispatched.prompt).not.toContain("of 0 GitHub pull requests");
     });
   });
 
@@ -412,6 +517,7 @@ describe("LangyTurnPreparationService golden path", () => {
     expect(fixture.dispatch).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Invalid modelOverride must NOT burn a permit" */
   it("rejects a disallowed model and releases the admission", async () => {
     const abort = vi.fn(async () => undefined);
     const reserve = vi.fn(async () => ({ reserved: false, allowed: true, resetAt: 0 }));
@@ -445,7 +551,7 @@ describe("LangyTurnPreparationService golden path", () => {
         ...input,
         modelOverride: "evil/model",
       }),
-    ).rejects.toBeInstanceOf(LangyModelNotAllowedError);
+    ).rejects.toMatchObject({ code: "langy_model_not_allowed", httpStatus: 400 });
 
     expect(abort).toHaveBeenCalledOnce();
     expect(reserve).not.toHaveBeenCalled();
@@ -469,6 +575,7 @@ describe("LangyTurnPreparationService golden path", () => {
     expect(fixture.dispatch).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Permit must be released on every non-PR exit" */
   it("revokes the key, releases the permit, and aborts when acceptance fails", async () => {
     const revoke = vi.fn(async () => undefined);
     const release = vi.fn(async () => undefined);
@@ -684,5 +791,100 @@ describe("when the conversation's runToken cannot be resolved", () => {
     ).rejects.toBeInstanceOf(LangyAgentUnavailableError);
 
     expect(fixture.dispatch).not.toHaveBeenCalled();
+  });
+
+  describe("given the panel composed the kickoff before the tour's key was recorded", () => {
+    const snapshot: GuidedKickoffInput = {
+      path: "gateway",
+      paths: ["gateway"],
+      orgName: "Acme",
+      firstName: "Ada",
+      tourStatus: "completed",
+    };
+    const stored = {
+      paths: ["gateway" as const, "llmops" as const],
+      donePaths: [],
+      provider: "OpenAI",
+      providerModel: "gpt-5",
+      gatewayUrl: "https://gateway.example/v1",
+      virtualKeyName: "production-app",
+      virtualKeyPreview: "vk-lw-abc",
+      virtualKeyRevealId: "reveal-1",
+      variant: "guided" as const,
+    };
+    const kickoffInput = () => ({
+      ...input,
+      messages: [
+        { role: "user" as const, parts: [...buildGuidedKickoffParts({ input: snapshot })] },
+      ],
+    });
+    const start = async (getGuidedState: OnboardingApi["getGuidedState"]) => {
+      const kickoff = LangyGuidedKickoffService.create({
+        onboarding: createApiFixture<OnboardingApi>({ getGuidedState }, "onboarding"),
+      });
+      const fixture = makeFixture({ guidedKickoff: { settle: (args) => kickoff.settle(args) } });
+      await LangyTurnService.create(fixture.deps).startConversationTurn(kickoffInput());
+      const accepted = fixture.acceptTurn.mock.calls[0]?.[0];
+      return { fixture, parts: accepted?.userMessage?.parts ?? [] };
+    };
+
+    /** @scenario "The brief's state lines are settled on the server from the stored guided state" */
+    it("records the kickoff with the stored key, picks, provider and gateway, keeping the panel's own facts", async () => {
+      const getGuidedState = vi.fn(async () => stored);
+
+      const { parts } = await start(getGuidedState);
+
+      expect(getGuidedState).toHaveBeenCalledWith({
+        organizationId: "organization-1",
+        userId: "user-1",
+      });
+      const [recorded] = findGuidedKickoffParts(parts);
+      expect(recorded).toMatchObject({
+        virtualKeyName: "production-app",
+        virtualKeyPreview: "vk-lw-abc",
+        virtualKeyRevealId: "reveal-1",
+        paths: ["gateway", "llmops"],
+        provider: "OpenAI",
+        providerModel: "gpt-5",
+        gatewayUrl: "https://gateway.example/v1",
+        orgName: "Acme",
+        firstName: "Ada",
+        tourStatus: "completed",
+      });
+      expect(JSON.stringify(parts)).toContain("reveal id reveal-1");
+    });
+
+    /** @scenario "The prompt the model reads is the settled brief, not the panel's snapshot" */
+    it("hands the worker a prompt with the settled Virtual key line and never none minted", async () => {
+      const { fixture } = await start(vi.fn(async () => stored));
+
+      const prompt = fixture.dispatch.mock.calls[0]?.[0].prompt;
+      expect(prompt).toContain(
+        "Virtual key: production-app is live (preview vk-lw-abc, reveal id reveal-1)",
+      );
+      expect(prompt).not.toContain("none minted");
+    });
+
+    /** @scenario "The turn text of the kickoff message is the brief alone" */
+    it("reads the brief as the turn text and nothing of the typed part", async () => {
+      const { fixture, parts } = await start(vi.fn(async () => stored));
+
+      const brief = (parts[1] as { text: string }).text;
+      const prompt = fixture.dispatch.mock.calls[0]?.[0].prompt ?? "";
+      expect(prompt.endsWith(brief)).toBe(true);
+      expect(prompt).not.toContain("guided-onboarding-kickoff");
+    });
+
+    /** @scenario "A kickoff the guided state cannot be read for goes out as the panel composed it" */
+    it("sends the kickoff as composed when the guided state cannot be read", async () => {
+      const { fixture, parts } = await start(
+        vi.fn(async () => {
+          throw new Error("guided state unavailable");
+        }),
+      );
+
+      expect(fixture.dispatch).toHaveBeenCalledOnce();
+      expect(parts).toEqual(buildGuidedKickoffParts({ input: snapshot }));
+    });
   });
 });

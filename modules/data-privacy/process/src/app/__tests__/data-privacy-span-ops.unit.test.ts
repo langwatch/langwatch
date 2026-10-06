@@ -1,17 +1,17 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi, PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { dataPrivacyProcessModule } from "../../data-privacy.module.ts";
 import {
   createDataPrivacyTestProjects,
   dataPrivacyTestGraph,
-  installableDataPrivacy,
+  dataPrivacyTestSecrets,
 } from "./data-privacy.fixture.ts";
 
 const PROJECT_ID = dataPrivacyTestGraph.projectId;
@@ -35,16 +35,23 @@ function spanWith(value: string): OtlpSpan {
 }
 
 async function boot({ enforcement }: { enforcement?: string }) {
-  const runtime = await createApp({ role: "worker" })
-    .withModules([installableDataPrivacy()])
-    .withMember("nodeEnvironment", undefined)
-    .withConfig({ "data-privacy": { googleDlpDisabled: undefined, enforcement } })
+  const runtime = await createApp({ role: "worker", secrets: dataPrivacyTestSecrets() })
+    .withModules([dataPrivacyProcessModule])
+    .withStores(memoryStores())
+    .withConfig({
+      "data-privacy": {
+        googleDlpDisabled: undefined,
+        enforcement,
+        nodeEnvironment: undefined,
+        langevalsEndpoint: undefined,
+      },
+    })
     .provide({
       project: createDataPrivacyTestProjects(),
-      organization: createApiFixture<OrganizationApi>(),
-      authz: createApiFixture<AuthzApi>(),
+      authz: createApiFixture<AuthzApi>({
+        checkScopeLineage: async () => ({ kind: "consistent" }),
+      }),
       "feature-flag": createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
-      evaluation: createApiFixture<EvaluationApi>(),
     })
     .boot();
 
@@ -63,6 +70,8 @@ async function dropInputForProject(app: DataPrivacyApi): Promise<void> {
 describe("given a peer handing a span to the data-privacy API", () => {
   describe("when the project's policy drops input content", () => {
     /** @scenario "A peer drops a span's content through the data-privacy API" */
+    /** @scenario "The content drop composes from the policy service alone" */
+    /** @scenario "The composed path removes a dropped category's content" */
     it("strips the content and stamps the dropped-category marker", async () => {
       const { app, stop } = await boot({});
       try {
@@ -101,6 +110,7 @@ describe("given a peer handing a span to the data-privacy API", () => {
 
   describe("when the span carries an email address", () => {
     /** @scenario "A peer redacts a span through the data-privacy API" */
+    /** @scenario "The privacy graph builds end to end from what the process already holds" */
     it("redacts the address in place", async () => {
       const { app, stop } = await boot({});
       try {

@@ -201,9 +201,8 @@ Feature: Organization authentication settings
     @integration
     Scenario: The two ways a domain matters are told apart
       When "ana" reads the who-can-join policy
-      Then it says a verified domain is what lets colleagues join automatically
-      And it says asking to join needs only one member with a verified address,
-      because "ana" approves each request herself
+      Then it says people on a verified domain join without waiting for approval
+      And it says people with a verified company address can ask to join
 
     @integration @unimplemented
     Scenario: A domain is proved in one place, and the policy points at it

@@ -9,6 +9,7 @@ import { setSessionCookie } from "better-auth/cookies";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
+import { isLockoutCountedPath } from "../../../rules/sign-in-identifier-hash.rules.ts";
 import {
   answerAuthRefusalByRegisteredCode,
   releaseHandledRefusal,
@@ -162,6 +163,27 @@ describe("answerAuthRefusalByRegisteredCode", () => {
     })();
 
     expect(answer).toMatchObject({ code: "identity_mfa_locked_out", httpStatus: 429 });
+  });
+
+  /** @scenario "The second step keeps the lock it already had" */
+  it("keeps the second step's lock apart from the counter that guards the password path", () => {
+    const secondStep = ["verify-totp", "verify-otp", "verify-backup-code"].map(
+      (endpoint) => `/api/auth/two-factor/${endpoint}`,
+    );
+
+    expect(secondStep.map((path) => isLockoutCountedPath(path))).toEqual([false, false, false]);
+    expect(isLockoutCountedPath("/api/auth/sign-in/email")).toBe(true);
+    expect(() =>
+      answerAuthRefusalByRegisteredCode({
+        request: { url: `${BASE}/two-factor/verify-totp` },
+        context: {
+          returned: APIError.from("TOO_MANY_REQUESTS", {
+            code: "ACCOUNT_TEMPORARILY_LOCKED",
+            message: "Account temporarily locked",
+          }),
+        },
+      }),
+    ).toThrow(expect.objectContaining({ code: "identity_mfa_locked_out", httpStatus: 429 }));
   });
 
   it("leaves a refusal on another endpoint as it was", () => {

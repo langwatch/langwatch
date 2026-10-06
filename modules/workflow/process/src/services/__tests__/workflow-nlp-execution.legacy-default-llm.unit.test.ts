@@ -12,6 +12,7 @@ import {
   type WorkflowNlpDispatchResponse,
 } from "../../app/workflow.app.ts";
 import { WorkflowNlpExecutionService } from "../workflow-nlp-execution.service.ts";
+import { WorkflowStudioVersionService } from "../workflow-studio-version.service.ts";
 import { TestModelProviderService } from "./model-provider.service.fake.ts";
 
 class FixedWorkflowId implements WorkflowId {
@@ -138,5 +139,78 @@ describe("WorkflowNlpExecutionService with a migrated legacy version", () => {
     const llm = signature?.data.parameters?.find((parameter) => parameter.type === "llm")?.value;
 
     expect(llm).toEqual({ model: "openai/gpt-5-mini", max_tokens: 256 });
+  });
+
+  /** @scenario "Studio and execution share graph migration" */
+  it("hands Studio and execution the same current graph from one older persisted version", async () => {
+    const legacy = {
+      spec_version: "1.4",
+      workflow_id: "workflow_1",
+      name: "Legacy published workflow",
+      icon: "🧩",
+      description: "",
+      version: "1",
+      template_adapter: "default",
+      enable_tracing: true,
+      default_llm: { model: "openai/gpt-5-mini", max_tokens: 256 },
+      state: {},
+      nodes: [
+        {
+          id: "llm_call",
+          type: "signature",
+          position: { x: 0, y: 0 },
+          data: { parameters: [{ identifier: "llm", type: "llm", value: null }] },
+        },
+      ],
+      edges: [],
+    };
+    const version = {
+      id: "version_1",
+      workflowId: "workflow_1",
+      projectId: "project_1",
+      version: "1",
+      autoSaved: false,
+      commitMessage: "legacy publish",
+      authorId: null,
+      parentId: null,
+      dsl: structuredClone(legacy),
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    };
+    const studio = WorkflowStudioVersionService.create({
+      workflows: {
+        getById: async () => ({ id: "workflow_1", currentVersion: structuredClone(version) }),
+      } as never,
+      studioDsl: { prepare: async ({ dsl }) => dsl },
+      httpSecrets: { store: async ({ dsl }) => dsl },
+      agentMappings: { recompute: async () => void 0 },
+    });
+    const dispatchNlp = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => ({ result: {}, status: "success" }),
+    });
+
+    const studioGraph = (
+      await studio.getWithMigratedDsl({ workflowId: "workflow_1", projectId: "project_1" })
+    ).currentVersion?.dsl;
+    await WorkflowNlpExecutionService.create({
+      ids: new FixedWorkflowId(),
+      modelProviders: new TestModelProviderService(),
+      nlpRuntime: new TestWorkflowNlpRuntime(dispatchNlp),
+      studioEvents: {
+        enrich: async (event: { event: StudioClientEvent }) => event.event,
+        prepare: async (event: { event: StudioClientEvent }) => event.event,
+      },
+    }).execute({ projectId: "project_1", workflowId: "workflow_1", inputs: {}, version });
+    const event = studioClientEventSchema.parse(dispatchNlp.mock.calls[0]?.[0]?.body);
+    if (event.type !== "execute_flow") throw new Error("Expected an execute_flow event.");
+
+    expect(studioGraph).toEqual(migrateDSLVersion(structuredClone(legacy)));
+    expect(studioGraph?.spec_version).toBe("1.5");
+    expect(event.payload.workflow.spec_version).toBe(studioGraph?.spec_version);
+    expect(event.payload.workflow.nodes).toEqual(studioGraph?.nodes);
+    expect("default_llm" in event.payload.workflow).toBe(false);
   });
 });

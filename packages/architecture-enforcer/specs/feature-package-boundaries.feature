@@ -294,10 +294,10 @@ Feature: Feature package boundary lint
 
   @unit @architecture
   Scenario: Service dependencies are explicit domain capabilities
-    Given a service imports a database client or recovers the global application graph
+    Given a service imports a store client for Prisma, ClickHouse or Redis
     When Oxlint checks the service module
     Then it rejects that hidden dependency
-    And directs the service to receive its own repository or another service
+    And directs the service to call its own repository instead
 
   @unit @architecture
   Scenario: Retired schema runtimes cannot re-enter feature packages

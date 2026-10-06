@@ -1,7 +1,7 @@
 /**
  * Settings → Integrations: Slack for every member, GitHub for organization managers. The page
  * guards on `organization:view` and each card gates its own writes, so a project admin still
- * reaches a project-scoped connection. Specs: specs/automations/slack-connections.feature.
+ * reaches a project-scoped connection. Specs: modules/slack/specs/slack-connections.feature.
  */
 
 import { PageLayout } from "@langwatch/design-system/page-layout";

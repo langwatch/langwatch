@@ -257,7 +257,7 @@ function isTerminalOAuthRejection(error: unknown): error is CodexAuthError {
   );
 }
 
-export interface CodexClaims {
+interface CodexClaims {
   accountId: string;
   email: string;
   plan: string;

@@ -4,7 +4,7 @@
 export const INGESTION_PULL_MAX_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 /** What a provider's refusal asks of us: nothing, or to wait until an instant. */
-export type ProviderWait = { outcome: "no_wait" } | { outcome: "wait_until"; at: number };
+type ProviderWait = { outcome: "no_wait" } | { outcome: "wait_until"; at: number };
 
 /** Anything but a readable positive length is no wait; measured from the refusal instant. */
 export function providerWaitFrom({

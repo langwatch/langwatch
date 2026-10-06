@@ -8,13 +8,13 @@ import type { AddressInfo } from "node:net";
 import type { Duplex } from "node:stream";
 
 import { PROTOCOL_VERSION } from "@langwatch/agent-contract";
+import type { AgentConnectCaller } from "@langwatch/agent-contract";
 import type { ConnectUpgradeRouter, UpgradeHandler } from "@langwatch/api";
 import { memorySessionState } from "@langwatch/process-stores";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 
 import { createConnectedAgentFixture } from "../../__tests__/connected-agent.fixture.ts";
-import type { ConnectedAgentCredentials } from "../../services/connected-agent-credential.service.ts";
 import { ConnectedAgentRuntimeService } from "../../services/connected-agent-runtime.service.ts";
 import { CONNECT_PATH } from "../agent-connect.ws.ts";
 import { ConnectGatewayFixture } from "./agent-connect-gateway.fixture.ts";
@@ -44,11 +44,11 @@ function createUpgradeRouter(server: Server): ConnectUpgradeRouter {
   };
 }
 
-class WorkingCredentials implements ConnectedAgentCredentials {
-  async resolve() {
-    return { project: { id: "proj_1", slug: "proj-1" }, principalId: "key:test", userId: null };
-  }
-}
+const caller: AgentConnectCaller = {
+  project: { id: "proj_1", slug: "proj-1" },
+  principalId: "key:test",
+  userId: null,
+};
 
 const fakeAgents = createConnectedAgentFixture();
 
@@ -81,7 +81,7 @@ async function startGateway(options: { pingIntervalMs: number; pongWaitMs: numbe
   const gateway = ConnectGatewayFixture.create({
     runtime,
     agents: fakeAgents,
-    credentials: new WorkingCredentials(),
+    caller,
     publicBaseUrl: "https://example.test",
     replicaCount: 1,
     ...options,
@@ -174,16 +174,6 @@ describe("ConnectGateway liveness", () => {
   describe("when the socket closes while its registration is still running", () => {
     /** @scenario "A socket that goes away during registration retires its instance" */
     it("holds no connection for it once registration finishes", async () => {
-      class SlowCredentials implements ConnectedAgentCredentials {
-        async resolve() {
-          await new Promise((resolve) => setTimeout(resolve, 50));
-          return {
-            project: { id: "proj_1", slug: "proj-1" },
-            principalId: "key:test",
-            userId: null,
-          };
-        }
-      }
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_a",
         store: memorySessionState(),
@@ -195,7 +185,7 @@ describe("ConnectGateway liveness", () => {
       const gateway = ConnectGatewayFixture.create({
         runtime,
         agents: fakeAgents,
-        credentials: new SlowCredentials(),
+        caller,
         publicBaseUrl: "https://example.test",
         replicaCount: 1,
       });
@@ -215,11 +205,10 @@ describe("ConnectGateway liveness", () => {
         });
         socket.once("error", reject);
       });
-      // The credential resolution is still in flight (SlowCredentials);
-      // close the socket before registration can finish.
+      // The register frame is in flight; close the socket before registration can finish.
       socket.terminate();
 
-      // Wait past the credential delay, so registerInstance has run.
+      // Wait so registerInstance has run.
       await new Promise((resolve) => setTimeout(resolve, 120));
 
       expect(gateway.sessionCount).toBe(0);

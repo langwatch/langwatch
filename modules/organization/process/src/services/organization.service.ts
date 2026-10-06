@@ -59,26 +59,31 @@ import {
   type UpdateOrganizationSettingsResult,
   type OrganizationUsageCount,
   OrganizationNotFoundForTeamError,
+  type PricingModel,
 } from "@langwatch/organization-contract";
-import type { Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 
-import type {
-  GroupIdentity,
-  OrganizationSettingsSecret,
-  PersonalWorkspaceDiagnostics,
-  PersonalWorkspaceIdentity,
-  TeamIdentity,
-} from "../app/organization.members.ts";
 import type { GroupRepository } from "../repositories/group.repository.ts";
 import type { OrganizationRepository } from "../repositories/organization.repository.ts";
 import type { TeamRepository } from "../repositories/team.repository.ts";
+import type { GroupIdentity } from "./group-identity.service.ts";
 import { OrganizationGroupService } from "./organization-group.service.ts";
+import type { OrganizationLifecycleNoticeService } from "./organization-lifecycle-notice.service.ts";
 import { OrganizationTeamAccessService } from "./organization-team-access.service.ts";
 import { OrganizationTeamMembersService } from "./organization-team-members.service.ts";
+import type { PersonalWorkspaceDiagnostics } from "./personal-workspace-diagnostics.service.ts";
+import type { PersonalWorkspaceIdentity } from "./personal-workspace-identity.service.ts";
 import {
   PersonalWorkspaceService,
   type PersonalWorkspaceNotices,
 } from "./personal-workspace.service.ts";
+import type { TeamIdentity } from "./team-identity.service.ts";
+
+/** Where a stored presence switch is recorded, so presence folds it from its own side (§9). */
+export type OrganizationSettingsNotices = Pick<
+  OrganizationLifecycleNoticeService,
+  "presenceSettingChanged" | "recordStoredPresenceSetting"
+>;
 
 export class OrganizationService extends OrganizationServiceContract {
   private readonly repository: OrganizationRepository;
@@ -90,7 +95,7 @@ export class OrganizationService extends OrganizationServiceContract {
   private readonly authz: AuthzApi;
   private readonly grants: AuthzApi;
   private readonly diagnostics: PersonalWorkspaceDiagnostics | undefined;
-  private readonly settingsSecrets: OrganizationSettingsSecret;
+  private readonly settingsNotices: OrganizationSettingsNotices | undefined;
 
   private constructor({
     repository,
@@ -102,8 +107,8 @@ export class OrganizationService extends OrganizationServiceContract {
     authz,
     grants,
     diagnostics,
-    settingsSecrets,
     notices,
+    settingsNotices,
   }: {
     repository: OrganizationRepository;
     teams: TeamRepository;
@@ -114,10 +119,11 @@ export class OrganizationService extends OrganizationServiceContract {
     authz: AuthzApi;
     grants: AuthzApi;
     diagnostics: PersonalWorkspaceDiagnostics | undefined;
-    settingsSecrets: OrganizationSettingsSecret;
     notices: PersonalWorkspaceNotices | undefined;
+    settingsNotices: OrganizationSettingsNotices | undefined;
   }) {
     super();
+    this.settingsNotices = settingsNotices;
     this.repository = repository;
     this.teams = teams;
     this.groups = groups;
@@ -127,7 +133,6 @@ export class OrganizationService extends OrganizationServiceContract {
     this.authz = authz;
     this.grants = grants;
     this.diagnostics = diagnostics;
-    this.settingsSecrets = settingsSecrets;
     this.groupService = OrganizationGroupService.create({
       groups,
       groupIdentities,
@@ -216,19 +221,6 @@ export class OrganizationService extends OrganizationServiceContract {
     return organizationId;
   }
 
-  /** The stored row, decrypted: the cipher is this service's dependency, not the repository's. */
-  private decryptSettings(stored: { s3Endpoint: string | null; s3AccessKeyId: string | null }): {
-    s3Endpoint: string | null;
-    s3AccessKeyId: string | null;
-  } {
-    return {
-      s3Endpoint: stored.s3Endpoint ? this.settingsSecrets.decrypt(stored.s3Endpoint) : null,
-      s3AccessKeyId: stored.s3AccessKeyId
-        ? this.settingsSecrets.decrypt(stored.s3AccessKeyId)
-        : null,
-    };
-  }
-
   async getSettings(input: { organizationId: string }): Promise<OrganizationSettings> {
     const parsed = getOrganizationSettingsInputSchema.parse(input);
     const stored = await this.repository.findStoredSettings(parsed.organizationId);
@@ -236,7 +228,7 @@ export class OrganizationService extends OrganizationServiceContract {
       throw new OrganizationNotFoundError();
     }
 
-    return { ...stored, ...this.decryptSettings(stored) };
+    return stored;
   }
 
   /** How colleagues on a matching domain get in, where the organization keeps it. */
@@ -259,6 +251,27 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.repository.saveSessionPolicy(input);
   }
 
+  getPricing(input: {
+    organizationId: string;
+  }): Promise<{ pricingModel: PricingModel | null; currency: "USD" | "EUR" }> {
+    return this.repository.getPricing(input);
+  }
+
+  getDatasetLimits(input: {
+    organizationId: string;
+  }): Promise<{ attachmentMaxBytes: number | null }> {
+    return this.repository.getDatasetLimits(input);
+  }
+
+  isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean> {
+    return this.repository.isInstantEvalsOptedIn(input);
+  }
+
+  /** The moment that counts is the one the agreement was given, so it is taken here. */
+  recordInstantEvalsOptIn(input: { organizationId: string; userId: string }): Promise<void> {
+    return this.repository.recordInstantEvalsOptIn({ ...input, at: nowInstant() });
+  }
+
   /** The guided-onboarding record, where the organization keeps it. */
   readGuidedOnboardingState(input: { organizationId: string }): Promise<GuidedOnboardingRecord> {
     return this.repository.getGuidedOnboarding(input);
@@ -273,35 +286,45 @@ export class OrganizationService extends OrganizationServiceContract {
 
   async updateSettings(
     input: UpdateOrganizationSettingsInput,
+    by: Readonly<{ id: string }> | null,
   ): Promise<UpdateOrganizationSettingsResult> {
     const parsed = updateOrganizationSettingsInputSchema.parse(input);
     const keepsSecret = !!parsed.s3Endpoint && parsed.s3SecretAccessKey === undefined;
     if (keepsSecret && !(await this.repository.hasStoredS3Secret(parsed.organizationId))) {
       throw new OrganizationS3SecretRequiredError();
     }
+    const stored =
+      parsed.traceSharingEnabled === false || parsed.presenceEnabled !== undefined
+        ? await this.repository.findStoredSettings(parsed.organizationId)
+        : null;
     const wasSharingEnabled =
-      parsed.traceSharingEnabled === false
-        ? (await this.repository.findStoredSettings(parsed.organizationId))?.traceSharingEnabled ===
-          true
-        : false;
-    await this.repository.updateSettings({
-      ...parsed,
-      ...(parsed.s3Endpoint !== undefined
-        ? { s3Endpoint: this.encryptOrNull(parsed.s3Endpoint) }
-        : {}),
-      ...(parsed.s3AccessKeyId !== undefined
-        ? { s3AccessKeyId: this.encryptOrNull(parsed.s3AccessKeyId) }
-        : {}),
-      ...(parsed.s3SecretAccessKey !== undefined
-        ? { s3SecretAccessKey: this.encryptOrNull(parsed.s3SecretAccessKey) }
-        : {}),
-    });
+      parsed.traceSharingEnabled === false && stored?.traceSharingEnabled === true;
+    await this.repository.updateSettings(parsed);
+    if (
+      stored &&
+      parsed.presenceEnabled !== undefined &&
+      parsed.presenceEnabled !== stored.presenceEnabled
+    ) {
+      this.settingsNotices?.presenceSettingChanged({
+        organizationId: parsed.organizationId,
+        presenceEnabled: parsed.presenceEnabled,
+        changedByUserId: by?.id ?? null,
+      });
+    }
 
     return { traceShareRevocationRequired: wasSharingEnabled };
   }
 
-  private encryptOrNull(value: string | null): string | null {
-    return value ? this.settingsSecrets.encrypt(value) : null;
+  /** The backfill's record of one organization's stored presence switch; keyed once per row. */
+  async recordStoredPresenceSetting(input: { organizationId: string }): Promise<boolean> {
+    const stored = await this.repository.findStoredSettings(input.organizationId);
+    if (!stored) return false;
+    if (!this.settingsNotices) throw new Error("organization settings notices are not wired");
+    await this.settingsNotices.recordStoredPresenceSetting({
+      organizationId: input.organizationId,
+      presenceEnabled: stored.presenceEnabled,
+    });
+    return true;
   }
 
   static create(options: {
@@ -314,9 +337,10 @@ export class OrganizationService extends OrganizationServiceContract {
     authz: AuthzApi;
     grants: AuthzApi;
     diagnostics?: PersonalWorkspaceDiagnostics;
-    settingsSecrets: OrganizationSettingsSecret;
     /** Where a newly created personal workspace is recorded, so project records its project. */
     notices?: PersonalWorkspaceNotices;
+    /** Where a changed presence switch is recorded, so presence folds it. */
+    settingsNotices?: OrganizationSettingsNotices;
   }): OrganizationService {
     return new OrganizationService({
       repository: options.repository,
@@ -328,8 +352,8 @@ export class OrganizationService extends OrganizationServiceContract {
       authz: options.authz,
       grants: options.grants,
       diagnostics: options.diagnostics,
-      settingsSecrets: options.settingsSecrets,
       notices: options.notices,
+      settingsNotices: options.settingsNotices,
     });
   }
 

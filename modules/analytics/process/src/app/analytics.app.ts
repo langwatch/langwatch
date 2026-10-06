@@ -48,35 +48,29 @@ import {
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
 import type { RestCredentialPrincipal } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/process";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import { toEpochMs, type Instant } from "@langwatch/time";
 import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 
 import type { AnalyticsRecencyRepository } from "../repositories/analytics-recency.repository.ts";
-import {
-  ClickHouseAnalyticsEvaluationRepository,
-  type EvaluationAnalyticsClickHouseClient,
-} from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
-import { ClickHouseAnalyticsRecencyRepository } from "../repositories/clickhouse/clickhouse.analytics-recency.repository.ts";
-import { ClickHouseAnalyticsSessionRepository } from "../repositories/clickhouse/clickhouse.analytics-session.repository.ts";
-import { ClickHouseAnalyticsRepository } from "../repositories/clickhouse/clickhouse.analytics.repository.ts";
+import type {
+  AnalyticsRepositories,
+  LangWatchQlSupply,
+} from "../repositories/analytics.repositories.ts";
+import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { FilterOptionsClickHouseRepository } from "../repositories/clickhouse/clickhouse.filter-options.repository.ts";
-import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-app-function-store.repository.ts";
 import { ClickHouseLangWatchQLExecutorRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LwqlKeyMapClickHouseRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LangWatchQLAppFunctionStoreRepository } from "../repositories/langwatch-ql-app-function-store.repository.ts";
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
-import type { ClickHouseAdminStatements } from "../repositories/langwatch-ql-provisioning.repository.ts";
 import {
   filterFieldRequiresKey,
   filterFieldRequiresSubkey,
@@ -88,8 +82,10 @@ import { canProvisionAppFunctions } from "../rules/langwatch-ql-app-function-sto
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { statementMightCallEvalFunction } from "../rules/langwatch-ql-eval-function-catalog.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
+import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
+import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
 import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
 import { FilterService } from "../services/filter.service.ts";
@@ -98,7 +94,6 @@ import {
   LangWatchQLConnectionService,
   LWQL_CONNECTION_DEFAULTS,
 } from "../services/langwatch-ql-connection.service.ts";
-import { DEFAULT_LWQL_RESULT_LIMITS } from "../services/langwatch-ql-executor.service.ts";
 import { LangWatchQLHydrationComputeService } from "../services/langwatch-ql-hydration-compute.service.ts";
 import {
   LangWatchQLHydrationReadService,
@@ -119,15 +114,15 @@ import {
   LangWatchQLService as LangWatchQLServiceClass,
 } from "../services/langwatch-ql.service.ts";
 import { WorkbenchProtectionsService } from "../services/workbench-protections.service.ts";
-import {
-  convergeLwqlAccessModel,
-  type LwqlProvisioningDatabase,
-} from "../tasks/lwql-provision.task.ts";
+import { convergeLwqlAccessModel } from "../tasks/lwql-provision.task.ts";
 import type {
   AnalyticsLegacyApi,
   AnalyticsLegacyTimeseriesAnswer,
 } from "../transport/analytics-legacy.rest.ts";
 import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
+
+/** ADR-034: runs the legacy read beside the routed one and logs a divergence. */
+const ANALYTICS_READ_TRIPWIRE_FLAG = "release_event_sourced_analytics_read_tripwire";
 
 /**
  * The filter-value read this feature makes on the host's filter registry — declared
@@ -208,50 +203,7 @@ type AnalyticsDependencies = Readonly<{
   retention: typeof DataRetentionApi;
 }>;
 
-/**
- * Shapes restated rather than imported from `@langwatch/process-stores`: a
- * module depends on contracts. `publicBaseUrl` is the process's own fact,
- * absent where the deployment named no `BASE_HOST`.
- */
-type AnalyticsMembers = Readonly<{
-  clickhouse: ClickHouseQueryClient;
-  rateLimiter: RateLimiter;
-  publicBaseUrl: string | undefined;
-  clickhouseAdmin: LangWatchQlSupply["admin"];
-  databaseTarget: LangWatchQlSupply["postgres"];
-  prisma: LwqlProvisioningDatabase;
-}>;
-
-/**
- * Whether this deployment offers LangWatchQL (ADR-159): the credential-free ClickHouse target and
- * identity, plus what self-provisioning reads, built from the store members (Alex, 2026-09-28).
- */
-export type LangWatchQlSupply = Readonly<{
-  /** The stores' untenanted ClickHouse seam and credential-free target (ADR-159). */
-  admin: Readonly<
-    | { configured: false }
-    | {
-        configured: true;
-        target: Readonly<{ url: string; database: string }>;
-        statements: ClickHouseAdminStatements;
-      }
-  >;
-  /** The PostgreSQL endpoint the named collection dials, without credentials. */
-  postgres: Readonly<
-    | { configured: false }
-    | {
-        configured: true;
-        host: string;
-        port: number;
-        database: string;
-        schema: string;
-        connectionLimit?: number;
-      }
-  >;
-  database: () => LwqlProvisioningDatabase;
-}>;
-
-export type LwqlProvisioningOperations = Readonly<{
+type LwqlProvisioningOperations = Readonly<{
   probeOwner: () => Promise<LwqlAccessModelOwner>;
   converge: () => Promise<void>;
 }>;
@@ -316,7 +268,12 @@ function lwqlProvisioningOperations({
   };
 }
 
-type AnalyticsSetup = FeatureSetup<AnalyticsDependencies, AnalyticsMembers, AnalyticsServerConfig>;
+type AnalyticsSetup = FeatureSetup<
+  AnalyticsDependencies,
+  never,
+  AnalyticsServerConfig,
+  AnalyticsRepositories
+>;
 
 /**
  * The two reads hydration makes, in the Trace peer's own vocabulary: it names
@@ -367,20 +324,7 @@ export class AnalyticsModule
     traces: TraceApi,
     retention: DataRetentionApi,
   };
-  /**
-   * `rateLimiter` is the per-project counter every LangWatchQL execution is
-   * checked against. All three names are from the process's vocabulary; boot
-   * refuses by name.
-   */
   static readonly config = analyticsServerConfig;
-  static readonly reads = [
-    "clickhouse",
-    "rateLimiter",
-    "publicBaseUrl",
-    "clickhouseAdmin",
-    "databaseTarget",
-    "prisma",
-  ] as const;
   /** The restricted identity's password and the PostgreSQL reader's (ADR-132). */
   static readonly secrets = {
     lwqlClickHousePassword: Secret.load("LWQL_CLICKHOUSE_PASSWORD", { optional: true }),
@@ -388,21 +332,25 @@ export class AnalyticsModule
   } as const;
 
   static async create(setup: AnalyticsSetup): Promise<AnalyticsModule> {
-    const clickhouse = setup.members.clickhouse;
+    const { sessions, langWatchQl, evaluations } = setup.repositories;
     const resolveClient = (tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> =>
-      Promise.resolve(ClickHouseAnalyticsSessionRepository.create({ clickhouse, tenantId }));
-    // `reads = ["clickhouse"]` makes boot refuse before `create()` if none is configured.
+      sessions.resolve(tenantId);
     // Data retention owns the default retention days; a second claim refuses the process.
     const analytics = AnalyticsServiceClass.create({
-      repository: ClickHouseAnalyticsRepository.create({ resolveClient }),
-      evaluationRepository: ClickHouseAnalyticsEvaluationRepository.create({
-        resolveClient,
+      repository: setup.repositories.analytics,
+      evaluationRepository: evaluations.open({
         defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
+      }),
+      tripwire: LoggingAnalyticsTripwireService.create({
+        isEnabled: (projectId) =>
+          setup.dependencies.featureFlags.isEnabled(ANALYTICS_READ_TRIPWIRE_FLAG, {
+            kind: "project",
+            projectId,
+          }),
       }),
     });
     const lwqlConfig = setup.config.langwatchQl;
-    const { clickhouseAdmin: admin, databaseTarget: postgres, prisma } = setup.members;
-    const database = (): LwqlProvisioningDatabase => prisma;
+    const { admin, postgres, database } = langWatchQl;
     const target = admin.configured
       ? LangWatchQLConnectionService.create().applyTargetOverrides({
           target: admin.target,
@@ -457,11 +405,11 @@ export class AnalyticsModule
         lwqlBounds: LangWatchQLBoundsService.create({
           entitlement: setup.dependencies.plans,
           projects: setup.dependencies.projects,
-          rateLimiter: setup.members.rateLimiter,
+          rateLimits: setup.repositories.rateLimits,
         }),
         traces: setup.dependencies.traces,
-        appFunctionStore: ClickHouseLangWatchQLAppFunctionStoreRepository.create(clickhouse),
-        recency: ClickHouseAnalyticsRecencyRepository.create(clickhouse),
+        appFunctionStore: setup.repositories.appFunctionStore,
+        recency: setup.repositories.recency,
         lwqlProvisioning,
         lwqlKeyMap: LwqlKeyMapService.create({
           repository: LwqlKeyMapClickHouseRepository.create({ resolveClient }),
@@ -471,7 +419,7 @@ export class AnalyticsModule
             : {}),
         }),
       },
-      setup.members.publicBaseUrl,
+      setup.config.publicBaseUrl,
     );
   }
 

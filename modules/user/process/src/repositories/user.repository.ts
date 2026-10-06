@@ -23,10 +23,13 @@ import type {
  * write rather than being held by the repository, since a repository is
  * built from the connection alone; the app carries it to the three writes that mint a row.
  */
-export type UserCredentialIssuer = Readonly<{ issuer: string }>;
+type UserCredentialIssuer = Readonly<{ issuer: string }>;
 
 /** Whether a mailbox proof already confirmed the address, so the account is born confirmed. */
-export type UserAddressConfirmation = Readonly<{ emailVerified: boolean }>;
+type UserAddressConfirmation = Readonly<{ emailVerified: boolean }>;
+
+/** A credential user and the row it signs in with: identity states its identifier against it. */
+export type CreatedCredentialUser = CreatedUser & { accountId: string; accountCreatedAtMs: number };
 
 export type CreateCredentialUserRow = CreateCredentialUserInput &
   UserCredentialIssuer &
@@ -47,7 +50,7 @@ export interface UserRepository {
   /** Every account on this address, case aside: older rows may carry capitals. */
   findByEmail(email: string): Promise<UserProfile[]>;
   create(input: CreateUserInput): Promise<UserProfile>;
-  createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedUser>;
+  createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser>;
   createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;
   hasPassword(id: string): Promise<boolean>;
   setFirstPassword(input: SetFirstUserPasswordRow): Promise<SetFirstUserPasswordResult>;

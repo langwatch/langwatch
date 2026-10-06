@@ -1,6 +1,6 @@
 /**
  * What an Instant Eval costs us and what it costs the customer; only input
- * tokens are priced. @see specs/instant-evals/instant-eval-cost.feature
+ * tokens are priced. @see modules/instant-eval/specs/instant-eval-cost.feature
  */
 
 import type { InstantEvalPricing } from "@langwatch/instant-eval-contract";

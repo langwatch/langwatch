@@ -1,4 +1,4 @@
-import { isFullMember, isLiteMember } from "@langwatch/entitlement-contract";
+import { isDeveloper, isFullMember, isLiteMember } from "@langwatch/entitlement-contract";
 import {
   INVITE_STATUS,
   OrganizationUserRole,
@@ -11,7 +11,7 @@ import { z } from "zod";
 import { OrganizationSeatRepository } from "../organization-seat.repository.ts";
 
 /** Only what this repository needs, named so a caller never names Prisma's own types. */
-export type PrismaOrganizationSeatDatabase = PrismaClient | Prisma.TransactionClient;
+type PrismaOrganizationSeatDatabase = PrismaClient | Prisma.TransactionClient;
 
 /** An invitation's team assignments as stored; anything else reads as none. */
 const teamAssignmentsSchema = z.array(
@@ -69,17 +69,26 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
   }
 
   /**
+   * Counts Developer seats (ADR-171): DEVELOPER users plus live PENDING
+   * DEVELOPER invites. Shown on the plan page, never compared to a limit.
+   */
+  async getMembersDeveloperCount(organizationId: string): Promise<number> {
+    const context = await this.getMemberClassificationContext(organizationId);
+    return this.countMembersByType(context, isDeveloper);
+  }
+
+  /**
    * Fetches all data needed for member classification.
    * Shared between getMemberCount and getMembersLiteCount.
    */
   private async getMemberClassificationContext(
     organizationId: string,
   ): Promise<MemberClassificationContext> {
-    // Disabled memberships are out of the seat pool by definition: they hold
-    // no access, so billing for them would be charging for a locked door.
+    // A disabled membership and a deactivated person hold no access, so they
+    // hold no seat: billing for them would be charging for a locked door.
     // See seat-reconciliation.feature.
     const users = await this.prisma.organizationUser.findMany({
-      where: { organizationId, disabledAt: null },
+      where: { organizationId, disabledAt: null, user: { deactivatedAt: null } },
       select: { userId: true, role: true },
     });
 

@@ -116,6 +116,34 @@ describe("source folder shape", () => {
     });
   });
 
+  describe("given an application's config.ts that only its main.ts reads", () => {
+    /** @scenario An application's config.ts is never a fragment of its main.ts */
+    it("leaves config.ts alone but still folds any other small file beside main.ts", () => {
+      write("apps/api/src/config.ts", "export const config = 1;\n");
+      write(
+        "apps/api/src/main.ts",
+        'import { config } from "./config.ts";\nimport { route } from "./api-health-route.ts";\nexport const main = [config, route];\n',
+      );
+      write("apps/api/src/api-health-route.ts", "export const route = 1;\n");
+
+      const findings = collectSourceFolderShapeFindings(root);
+
+      expect(findings.map((finding) => finding.path)).toEqual(["apps/api/src/api-health-route.ts"]);
+    });
+
+    it("exempts only the config.ts directly under an application's src", () => {
+      write("packages/widget/src/config.ts", "export const config = 1;\n");
+      write(
+        "packages/widget/src/main.ts",
+        'import { config } from "./config.ts";\nexport const main = config;\n',
+      );
+
+      expect(collectSourceFolderShapeFindings(root).map((finding) => finding.path)).toEqual([
+        "packages/widget/src/config.ts",
+      ]);
+    });
+  });
+
   describe("given a small file its neighbour reads only for types", () => {
     it("leaves it alone, since a type import reads nothing at runtime", () => {
       write("packages/widget/src/rules/shapes.ts", "export type Shape = { id: string };\n");

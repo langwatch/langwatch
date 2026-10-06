@@ -1,11 +1,9 @@
 import type { Projection, StaticPipelineDefinition } from "@langwatch/eventing";
-import type { GithubApi } from "@langwatch/github-contract";
 import { defineProcessModule } from "@langwatch/process";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 
 import {
   GithubModule,
-  type GithubComposition,
   type GithubBranchMaintenanceComposition,
   type GithubBranchDemandComposition,
   type GithubBranchDemand,
@@ -52,18 +50,6 @@ function buildGithubRepositories({ prisma, redis }: GithubStoreConnections): Git
     pullRequestStatusCache: GithubPullRequestStatusCacheRedisRepository.create(redis),
     tokenCache: GithubTokenCacheRedisRepository.create(redis),
   };
-}
-
-/** The whole GitHub capability, composed from the process's own Prisma client. */
-export function composeGithubApi(
-  parts: Omit<GithubComposition, "repositories"> & GithubStoreConnections,
-): GithubApi {
-  const { prisma, redis, ...rest } = parts;
-
-  return GithubModule.composeApi({
-    ...rest,
-    repositories: buildGithubRepositories({ prisma, redis }),
-  });
 }
 
 /** The fleet-wide branch sweep alone, composed from the process's own Prisma client. */

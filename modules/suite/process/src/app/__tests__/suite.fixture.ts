@@ -12,6 +12,7 @@ import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
+import { MemorySuiteRunProcessingRepository } from "../../repositories/memory/memory.suite.repositories.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
 import type { SuiteRepositories } from "../../repositories/suite.repositories.ts";
 import type { SuiteExecution } from "../suite.app.ts";
@@ -37,6 +38,7 @@ export class RecordingSuiteExecution implements SuiteExecution {
 export function createSuiteTestRepositories(database?: MemorySuiteDatabase): SuiteRepositories {
   return {
     suites: MemorySuiteRepository.create({ database: database ?? MemorySuiteDatabase.create() }),
+    runProcessing: MemorySuiteRunProcessingRepository.create(),
   };
 }
 

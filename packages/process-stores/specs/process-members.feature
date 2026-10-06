@@ -17,3 +17,9 @@ Feature: Process members refuse what a process did not give them
     Then it refuses, naming the member and the setting it is missing
     And the members built over that store refuse for the same reason
     And no live repository factory runs and no memory tier is chosen in its place
+
+  @unit
+  Scenario: Opened stores state the live tier
+    Given a process builds its stores from config
+    When boot reads the member source
+    Then the source states the live tier, so boot never assumes one

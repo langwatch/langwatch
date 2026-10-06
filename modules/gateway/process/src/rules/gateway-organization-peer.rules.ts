@@ -9,3 +9,11 @@ export function isMemberNotFound(error: unknown): boolean {
 export function isGroupNotFound(error: unknown): boolean {
   return HandledError.isHandled(error) && error.code === "group_not_found";
 }
+
+/**
+ * Whether a seat shares in the organization's gateway keys through membership alone. Neither a
+ * Developer (ADR-171) nor a Lite Member holds an organization-scoped binding, so the seat decides.
+ */
+export function seatSharesOrganizationKeys(role: string): boolean {
+  return role !== "DEVELOPER" && role !== "EXTERNAL";
+}

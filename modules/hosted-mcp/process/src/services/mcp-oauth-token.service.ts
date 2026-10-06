@@ -17,18 +17,12 @@ const logger = createLogger("langwatch:mcp");
 /** The label a hosted MCP sign-in carries in the person's session inventory. */
 const MCP_CLIENT_LABEL = "Hosted MCP";
 
-/** Reversible encryption for the credential a session record holds. */
-export interface McpApiKeyCipher {
-  encrypt(plaintext: string): string;
-  decrypt(ciphertext: string): string;
-}
-
 type OAuthError = Readonly<{
   error: string;
   error_description?: string;
 }>;
 
-export type McpOAuthTokenExchange =
+type McpOAuthTokenExchange =
   | Readonly<{
       status: 200;
       body: Readonly<{
@@ -41,7 +35,7 @@ export type McpOAuthTokenExchange =
   | Readonly<{ status: 400 | 401 | 500; body: OAuthError }>;
 
 /** The OAuth form values after the raw Node transport has decoded them. */
-export type McpOAuthTokenRequest = Readonly<{
+type McpOAuthTokenRequest = Readonly<{
   grantType: string | undefined;
   code: string | undefined;
   codeVerifier: string | undefined;

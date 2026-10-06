@@ -60,6 +60,7 @@ describe("the daily rollup and the currency a day was billed in", () => {
 
   describe("when one day holds two currencies", () => {
     /** @scenario "A day in two currencies keeps a separate running total for each" */
+    /** @scenario "Amounts in different currencies stay separate rows after compaction" */
     it("keys them to separate cells so neither total mixes the two", () => {
       const { projection } = rollupFold();
 
@@ -148,12 +149,14 @@ describe("the restatement marker", () => {
       };
     };
 
+    /** @scenario "A day restated twice reports only the latest move" */
     it("reports the newest correction, whichever order the two arrive in", () => {
       const { inOrder, reversed } = both();
       expect(inOrder.revisedAt).toBe(restatedBAt);
       expect(reversed.revisedAt).toBe(restatedBAt);
     });
 
+    /** @scenario "A day restated twice reports only the latest move" */
     it("names the same prior figure, whichever order the two arrive in", () => {
       const { inOrder, reversed } = both();
       expect(inOrder.previousAmountNanoUsd).toBe(150 + 200);
@@ -171,6 +174,7 @@ describe("the restatement marker", () => {
 
   describe("given the provider restates a day at a different amount", () => {
     /** @scenario "A restated day shows what it was before" */
+    /** @scenario "A restated day reads as the restated amount even before compaction" */
     it("names the amount the day held before, and when the change was seen", () => {
       const { fold } = rollupFold();
 
@@ -180,6 +184,7 @@ describe("the restatement marker", () => {
       ]);
 
       expect(state).toMatchObject({ previousAmountNanoUsd: 100, revisedAt: T2, revisionCount: 1 });
+      expect(governanceCostRollupTotals(state).amountNanoUsd).toBe(150);
     });
   });
 
@@ -270,6 +275,20 @@ describe("a retraction", () => {
     );
 
     expect(cell.rawActorId).toBe("digest-1");
+  });
+});
+
+describe("the cell one day and one dimension combination share", () => {
+  describe("when several items of that combination are processed", () => {
+    /** @scenario "A day's spend lands as one summary row per dimension combination" */
+    it("holds them in one cell whose amount is their sum", () => {
+      const { projection, fold } = rollupFold();
+      const first = observed({ restatementKey: "a", costNanoMinor: 300 });
+      const second = observed({ restatementKey: "b", costNanoMinor: 450 });
+
+      expect(projection.key(first)).toBe(projection.key(second));
+      expect(governanceCostRollupTotals(fold([first, second])).amountNanoUsd).toBe(750);
+    });
   });
 });
 

@@ -14,7 +14,7 @@ func mailPlanChildren(t *testing.T, sel domain.Selection) []Child {
 	st := domain.Stack{Slug: "test", Services: []domain.Service{
 		{Name: domain.MailService, Port: 45580, SMTPPort: 45581, URL: "https://mail.test.langwatch.localhost"},
 	}}
-	return o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo}, repo, "")
+	return o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo}, repo)
 }
 
 // @scenario "The mail lane runs by default and can be turned off per worktree"
@@ -71,7 +71,7 @@ func TestMailSMTPEnvReachesBothNodeLanes(t *testing.T) {
 	st := domain.Stack{Slug: "test", Services: []domain.Service{
 		{Name: domain.MailService, Port: 45580, SMTPPort: 45581, URL: "https://mail.test.langwatch.localhost"},
 	}}
-	children := o.planChildren(st, PlanOptions{Selection: domain.DefaultSelection(), RepoRoot: repo}, repo, "")
+	children := o.planChildren(st, PlanOptions{Selection: domain.DefaultSelection(), RepoRoot: repo}, repo)
 	for _, name := range []string{"ui", APILane} {
 		child, ok := findChild(children, name)
 		if !ok {
@@ -103,7 +103,7 @@ func TestMailLaneIsIsolatedPerWorktree(t *testing.T) {
 		st := domain.Stack{Slug: slug, Services: []domain.Service{
 			{Name: domain.MailService, Port: port, SMTPPort: smtpPort, URL: "https://mail." + slug + ".langwatch.localhost"},
 		}}
-		child, ok := findChild(o.planChildren(st, PlanOptions{Selection: domain.DefaultSelection(), RepoRoot: repo}, repo, ""), "mail")
+		child, ok := findChild(o.planChildren(st, PlanOptions{Selection: domain.DefaultSelection(), RepoRoot: repo}, repo), "mail")
 		if !ok {
 			t.Fatalf("no mail lane was planned for %q", slug)
 		}
@@ -141,7 +141,7 @@ func TestMailDataDirIsStableAcrossReplans(t *testing.T) {
 		{Name: domain.MailService, Port: 45580, SMTPPort: 45581, URL: "https://mail.test.langwatch.localhost"},
 	}}
 	plan := func() string {
-		child, ok := findChild(o.planChildren(st, PlanOptions{Selection: domain.DefaultSelection(), RepoRoot: repo}, repo, ""), "mail")
+		child, ok := findChild(o.planChildren(st, PlanOptions{Selection: domain.DefaultSelection(), RepoRoot: repo}, repo), "mail")
 		if !ok {
 			t.Fatal("no mail lane was planned")
 		}

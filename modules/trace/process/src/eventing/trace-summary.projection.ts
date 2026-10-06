@@ -66,7 +66,7 @@ export const MAX_PROCESSED_SPANS = 512;
  * ±7 days, aligned with TRACE_ANALYTICS_READ_WINDOW_MS — see the `options`
  * docstring for the production measurement that retired the ±2-day width.
  */
-export const TRACE_SUMMARY_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const TRACE_SUMMARY_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Reserved keys for cache/reasoning token sums (per-span numbers don't reach
 // the attribute allowlist, so we fold sums here instead of adding CH columns)

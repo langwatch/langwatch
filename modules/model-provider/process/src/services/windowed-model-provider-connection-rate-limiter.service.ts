@@ -1,10 +1,11 @@
 import { ModelProviderTestRateLimitedError } from "@langwatch/model-provider-contract";
 import { nowInstant } from "@langwatch/time";
 
-import {
-  ModelProviderConnectionRateLimiter,
-  type ModelProviderRateLimit,
-} from "../app/model-provider.members.ts";
+import type { ModelProviderRateLimitRepository } from "../repositories/model-provider-rate-limit.repository.ts";
+
+export abstract class ModelProviderConnectionRateLimiter {
+  abstract assertAvailable(input: { organizationId: string }): Promise<void>;
+}
 
 /** Generous for a person clicking "test connection", ungenerous for a loop that could get an
  * organization's key rate-limited by the provider. */
@@ -21,12 +22,12 @@ const GLOBAL_WINDOW = { windowSeconds: 60, max: 500 } as const;
  */
 export class WindowedModelProviderConnectionRateLimiterService extends ModelProviderConnectionRateLimiter {
   static create(input: {
-    limiter: ModelProviderRateLimit;
+    limiter: ModelProviderRateLimitRepository;
   }): WindowedModelProviderConnectionRateLimiterService {
     return new WindowedModelProviderConnectionRateLimiterService(input.limiter);
   }
 
-  private constructor(private readonly limiter: ModelProviderRateLimit) {
+  private constructor(private readonly limiter: ModelProviderRateLimitRepository) {
     super();
   }
 

@@ -74,6 +74,7 @@ function scenario(
     authenticatedAtMs: number;
     providerAccountId?: string | null;
   }[] = [],
+  entitled = true,
 ) {
   const store = MemoryIdentityStore.create();
   for (const record of authentications) {
@@ -91,10 +92,12 @@ function scenario(
     connections: repositories.ssoConnections,
     breakGlass: repositories.ssoBreakGlass,
     activity: repositories.ssoMigrationEvidence,
+    entitled: async () => entitled,
     migrations: SsoMigrationProgressService.create({
       connections: repositories.ssoConnections,
       evidence: repositories.ssoMigrationEvidence,
       breakGlass: repositories.ssoBreakGlass,
+      holderCanWalkIn: async () => true,
       memberships: { listActiveMembers: async () => [] },
       legacyAccess: { count: async () => 0 },
       now: () => NOW,
@@ -111,8 +114,17 @@ describe("given an organization that has registered nothing", () => {
       record: null,
       goLive: null,
       legacyRoute: null,
+      enterpriseRequired: false,
       migration: null,
     });
+  });
+});
+
+describe("given an organization not on an Enterprise plan", () => {
+  it("says the plan is what refuses single sign-on", async () => {
+    const view = await scenario([], [], [], false).getSetup({ organizationId: ORG });
+
+    expect(view.enterpriseRequired).toBe(true);
   });
 });
 

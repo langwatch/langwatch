@@ -6,9 +6,8 @@
  */
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
-import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
 import { authzProcessModule } from "../../authz.module.ts";
@@ -17,7 +16,7 @@ import { createAuthzTestApp } from "./authz.fixture.ts";
 
 function process() {
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(authzProcessModule)])
+    .withModules([authzProcessModule])
     .withConfig({
       authz: {
         epochCacheEnabled: false,
@@ -26,8 +25,7 @@ function process() {
         demoProjectSlug: undefined,
       },
     })
-    .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
-    .withKeyvalue(redisDouble())
+    .withStores(memoryStores())
     .withEventing(
       new EventSourcing({ enabled: false, processStore: InMemoryProcessStore.createForTesting() }),
     )

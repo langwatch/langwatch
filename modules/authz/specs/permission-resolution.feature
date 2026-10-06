@@ -92,6 +92,14 @@ Feature: Permission resolution
     Then no role grants it
     And only a member and above may share a trace
 
+  # Alex, 2026-10-06 (Q97): the playground's completion route asks
+  # playground:view, so the built-in administrators carry it.
+  Scenario: The built-in administrators may open the playground
+    Given the built-in team and organization roles
+    When "playground:view" is requested
+    Then a team admin and an organization admin are allowed
+    But a team member, a team viewer and a plain organization member are refused
+
   Scenario: A CUSTOM team role falls back to the viewer bag
     Given a team binding on the CUSTOM role with no permissions of its own
     When a permission is requested
@@ -122,6 +130,11 @@ Feature: Permission resolution
     Given a project id that resolves to no project
     When a permission is checked on it
     Then the check is denied and carries no organization role
+
+  Scenario: An archived project resolves to no scope, as an unknown one does
+    Given a project that has been archived
+    When its team and organization are resolved
+    Then nothing is resolved for it, for every caller
 
   Scenario: A caller with no organization membership resolves nothing
     Given a caller with a binding but no membership in the owning organization
@@ -238,3 +251,8 @@ Feature: Permission resolution
     When one permission is decided for them by a declared check and by an imperative check
     Then both are permitted by the one authorization service
     And the declared decision names the caller's organization role
+
+  Scenario: A team scope names whether it is a personal workspace
+    Given a personal team
+    When its scope is resolved
+    Then the scope carries that it is personal and the workspace name

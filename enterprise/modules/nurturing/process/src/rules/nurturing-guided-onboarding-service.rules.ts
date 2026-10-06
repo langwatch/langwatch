@@ -1,13 +1,17 @@
+import { createHash } from "node:crypto";
+
 import type {
   CioBatchCall,
   CioEventName,
   CioOrgTraits,
   CioPersonTraits,
 } from "@langwatch/enterprise-nurturing-contract";
-import type {
-  GuidedOnboardingState,
-  GuidedPath,
-  OnboardingVariant,
+import type { GuidedOnboardingTurnFailedEventData } from "@langwatch/langy-contract";
+import {
+  onboardingExperimentProperties,
+  type GuidedOnboardingState,
+  type GuidedPath,
+  type OnboardingVariant,
 } from "@langwatch/onboarding-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -16,7 +20,7 @@ import { nowInstant } from "@langwatch/time";
  * these, so the names are part of the contract with Customer.io and never
  * change with the path enum.
  */
-export const GUIDED_PATH_CAMPAIGN_EVENT: Record<GuidedPath, CioEventName> = {
+const GUIDED_PATH_CAMPAIGN_EVENT: Record<GuidedPath, CioEventName> = {
   llmops: "onboarding_path_llmops",
   coding: "onboarding_path_coding_agents",
   gateway: "onboarding_path_gateway",
@@ -131,7 +135,13 @@ export function fireGuidedOnboardingProgress({
 }: {
   userId: string;
   organizationId: string;
-  event: "provider_connected" | "tour_completed" | "tour_skipped" | "path_completed";
+  event:
+    | "provider_connected"
+    | "provider_skipped"
+    | "tour_completed"
+    | "tour_skipped"
+    | "tour_replayed"
+    | "path_completed";
   payload: Record<string, string | string[] | number | undefined>;
   state: GuidedOnboardingState;
 }): CioBatchCall[] {
@@ -176,5 +186,132 @@ export function fireGuidedOnboardingProgress({
         },
       ];
     }
+    case "provider_skipped":
+    case "tour_replayed":
+      return [];
   }
+}
+
+type GuidedPostHogEventName =
+  | "paths_selected"
+  | "path_begun"
+  | "provider_connected"
+  | "provider_skipped"
+  | "tour_completed"
+  | "tour_skipped"
+  | "tour_replayed"
+  | "path_completed";
+
+const POSTHOG_EVENT: Record<GuidedPostHogEventName, string> = {
+  paths_selected: "guided_onboarding_paths_selected",
+  path_begun: "guided_onboarding_path_begun",
+  provider_connected: "guided_onboarding_provider_connected",
+  provider_skipped: "guided_onboarding_provider_skipped",
+  tour_completed: "guided_onboarding_tour_completed",
+  tour_skipped: "guided_onboarding_tour_skipped",
+  tour_replayed: "guided_onboarding_tour_replayed",
+  path_completed: "guided_onboarding_path_completed",
+};
+
+/**
+ * Only the named fields of the payload reach PostHog: nothing but the provider name and
+ * the model may leave the process for a provider connection.
+ */
+function guidedPostHogProperties({
+  event,
+  payload,
+  paths,
+  currentPath,
+}: {
+  event: GuidedPostHogEventName;
+  payload: Record<string, string | string[] | number | undefined>;
+  paths: GuidedPath[];
+  currentPath: GuidedPath | undefined;
+}): Record<string, unknown> {
+  switch (event) {
+    case "paths_selected":
+      return { paths, primary_path: paths[0] };
+    case "provider_connected":
+      return { provider: payload.provider, model: payload.model };
+    case "tour_completed":
+    case "tour_skipped":
+    case "tour_replayed":
+      return { path: currentPath };
+    case "path_begun":
+    case "path_completed":
+      return { path: payload.path };
+    case "provider_skipped":
+      return {};
+  }
+}
+
+/**
+ * The PostHog event a guided write is tracked as: the step's own properties, the experiment
+ * property, the organization, and the person properties the A/B split reads.
+ */
+export function fireGuidedOnboardingPostHog({
+  userId,
+  organizationId,
+  event,
+  payload,
+  paths,
+  currentPath,
+}: {
+  userId: string;
+  organizationId: string;
+  event: GuidedPostHogEventName;
+  payload: Record<string, string | string[] | number | undefined>;
+  paths: GuidedPath[];
+  currentPath: GuidedPath | undefined;
+}): { userId: string; event: string; properties: Record<string, unknown> } {
+  return {
+    userId,
+    event: POSTHOG_EVENT[event],
+    properties: {
+      ...guidedPostHogProperties({ event, payload, paths, currentPath }),
+      ...onboardingExperimentProperties("guided"),
+      organization_id: organizationId,
+      $set: {
+        onboarding_variant: "guided",
+        onboarding_paths: paths,
+        onboarding_primary_path: paths[0],
+      },
+    },
+  };
+}
+
+/** The same for every delivery of one source event, so PostHog keeps exactly one of them. */
+function postHogUuidFor(sourceEventId: string): string {
+  const hex = createHash("sha256").update(`nurturing-guided-turn:${sourceEventId}`).digest("hex");
+  const variant = ((Number.parseInt(hex.charAt(16), 16) & 0x3) | 0x8).toString(16);
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    `5${hex.slice(13, 16)}`,
+    `${variant}${hex.slice(17, 20)}`,
+    hex.slice(20, 32),
+  ].join("-");
+}
+
+/** The PostHog event a failed turn of the guided conversation is tracked as, against its owner. */
+export function fireGuidedTurnFailedPostHog(data: GuidedOnboardingTurnFailedEventData): {
+  userId: string;
+  event: string;
+  properties: Record<string, unknown>;
+  uuid: string;
+} {
+  return {
+    userId: data.userId,
+    event: "guided_onboarding_turn_failed",
+    uuid: postHogUuidFor(data.sourceEventId),
+    properties: {
+      code: data.code,
+      path: data.path,
+      conversation_id: data.conversationId,
+      turn_id: data.turnId,
+      organization_id: data.organizationId,
+      ...onboardingExperimentProperties(data.onboardingVariant),
+      projectId: data.tenantId,
+    },
+  };
 }

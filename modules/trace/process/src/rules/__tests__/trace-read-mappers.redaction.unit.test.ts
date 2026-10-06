@@ -8,7 +8,6 @@ import {
 import type { CategoryVisibility, TraceLogRecordDto } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TestCodingAgentService } from "../../services/__tests__/support/coding-agent.service.fake.ts";
 import {
   buildContentPrivacy,
   contentSearchTermsForViewer,
@@ -57,8 +56,6 @@ function redactV2Content<
 }
 
 const visible: CategoryVisibility = { canSee: true, restrictVisibleTo: null };
-const codingAgents = new TestCodingAgentService();
-
 type LogProtections = {
   canSeeCapturedInput?: boolean | null;
   canSeeCapturedOutput?: boolean | null;
@@ -73,7 +70,6 @@ function redactTraceLogContent(
   return redactTraceLogContentWithService({
     row,
     protections,
-    codingAgents,
     derivedAttrPrefixes: DERIVED_ATTR_PREFIXES,
   });
 }
@@ -87,7 +83,6 @@ function gateTraceLogVisibility(
     row,
     protections,
     visibilityCutoffMs,
-    codingAgents,
     derivedAttrPrefixes: DERIVED_ATTR_PREFIXES,
   });
 }

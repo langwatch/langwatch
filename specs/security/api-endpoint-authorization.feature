@@ -168,14 +168,15 @@ Feature: Hono API endpoint authorization and tenant isolation
 
     @integration
     Scenario: A project API key lacking the required permission is forbidden
-      Given a project API key whose role grants only "traces:view"
+      Given an API key whose grants hold only a view permission
       When I call a route that requires a different permission
       Then the response status is 403
 
     @integration
     Scenario: A read-only key cannot perform a write action
-      Given a project API key restricted to read-only permissions
+      Given an API key restricted to read-only permissions
       When I call a mutating endpoint that requires a write permission
+      And the application is never asked to write
       Then the response status is 403
 
     @unit
@@ -189,7 +190,7 @@ Feature: Hono API endpoint authorization and tenant isolation
 
     @integration
     Scenario: An authorized key passes the permission gate
-      Given a project API key whose role grants the required permission
+      Given an API key whose grants hold the required permission
       When I call the route
       Then the request is not rejected with 401 or 403
 
@@ -302,11 +303,11 @@ Feature: Hono API endpoint authorization and tenant isolation
       When a credential-less request hits an internal route
       Then the request is denied
 
-    @integration
-    Scenario: A destructive cron route rejects callers without the secret
-      Given the internal shared secret is configured
-      When the old-lambdas-cleanup cron route is called with no Authorization header
-      Then the response status is 401
+    @unit
+    Scenario: A destructive scheduled job answers no caller
+      Given the deployment declares no cron route
+      Then the old-lambdas cleanup runs as a scheduled process manager, not as an HTTP route
+      And there is no request a caller without the secret could make to it
 
   # ============================================================================
   Rule: A budget cannot be scoped to another organization's resource
@@ -387,7 +388,7 @@ Feature: Hono API endpoint authorization and tenant isolation
     Langy surfaces an admin configures. The organization's GitHub connection is
     not one of them any more: it belongs to the organization rather than to
     Langy, so organization management gates it
-    (specs/integrations/github-connection.feature).
+    (modules/integration/specs/github-connection.feature).
 
     Granted from MEMBER upward and to org admins; below that, nothing. The
     permission grain is not what keeps Langy scarce — the rollout flag is — so

@@ -1,7 +1,7 @@
 export * from "./activity-monitor.trpc.ts";
 export * from "./anomaly-rule.ts";
 export * from "./anomaly-rules.trpc.ts";
-export * from "./agents-listing.ts";
+export * from "./governance-agents.ts";
 export * from "./ingestion-source-activity.queries.ts";
 export * from "./admin-workspace-view-audit.ts";
 export * from "./ai-tool-catalog.ts";
@@ -13,15 +13,12 @@ export * from "./canonical-cost.ts";
 export * from "./department.ts";
 export * from "./departments.trpc.ts";
 export * from "./governance.ts";
-export * from "./governance-attributes.ts";
-export * from "./governance-audit.ts";
 export * from "./governance.errors.ts";
 export * from "./governance-cli-rest.schemas.ts";
 export * from "./governance-ingest-rest.schemas.ts";
 export * from "./governance-rest.schemas.ts";
 export * from "./governance.api.ts";
 export * from "./governance.config.ts";
-export * from "./governance-agents.ts";
 export * from "./governance-cost.ts";
 export * from "./governance-cost.trpc.ts";
 export * from "./governance-people.ts";
@@ -38,6 +35,8 @@ export * from "./ingestion-templates.trpc.ts";
 export * from "./ingestion-pull.commands.ts";
 export * from "./ingestion-pull.events.ts";
 export * from "./ingestion-source-key.commands.ts";
+export * from "./coding-assistant-billing.commands.ts";
+export * from "./coding-assistant-billing.events.ts";
 export * from "./ottl.ts";
 export * from "./ocsf-export.ts";
 export * from "./persona-home.ts";
@@ -49,7 +48,4 @@ export * from "./pulled-usage.commands.ts";
 export * from "./pulled-usage.events.ts";
 export * from "./quarantine-fill.ts";
 
-export type {
-  GovernanceOtlpPolicyInput,
-  GovernanceOtlpReceiverPolicies,
-} from "./otlp-receiver-policy.ts";
+export * from "./otlp-receiver-policy.ts";

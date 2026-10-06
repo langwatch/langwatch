@@ -1,7 +1,6 @@
 import {
   defineAggregate,
   definePipeline,
-  type EventSourcing,
   type IntentSpec,
   type ProcessManagerStage,
   type ProcessManagerInitialStage,
@@ -20,12 +19,10 @@ import {
 import type { ZodType } from "zod";
 
 import type { IdentityModule } from "../app/identity.app.ts";
-import type { SsoDomainProofMail } from "../app/identity.members.ts";
+import type { SsoDomainProofMail } from "../channels/sso-domain-proof-mail.channel.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
-import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
+import type { SsoBreakGlassBindingRepository } from "../repositories/sso-connection.repository.ts";
 import type { SsoEngineProviderProjection } from "../repositories/sso-engine-provider.repository.ts";
-import { SsoBreakGlassRecoveryService } from "../services/sso-break-glass-recovery.service.ts";
-import { RequiresLocalDoorAndBinding } from "../services/sso-break-glass.service.ts";
 import type { SsoConnectionDirectoryMoveService } from "../services/sso-connection-directory-move.service.ts";
 import type { SsoConnectionGuardsDeps } from "../services/sso-connection-guard-checks.service.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
@@ -51,8 +48,12 @@ import {
   onTeardownRequested,
   onTornDown,
 } from "./connection-teardown.process.ts";
+import type { IdentityEventing } from "./identity-command-senders.store.ts";
 import { EngineFollowingSsoConnectionHeadStore } from "./sso-connection-head.store.ts";
-import { SsoConnectionLedgerStore } from "./sso-connection-ledger.store.ts";
+import {
+  type SsoConnectionEventAppends,
+  SsoConnectionLedgerStore,
+} from "./sso-connection-ledger.store.ts";
 import {
   type SsoConnectionEvent,
   type SsoConnectionFoldState,
@@ -158,7 +159,7 @@ const CONNECTION_COMMANDS = [
 /** The sender names the pipeline carries, which the ledger's own table must match. */
 export const CONNECTION_COMMAND_NAMES: readonly string[] = CONNECTION_COMMANDS;
 
-export interface SsoConnectionPipelineDeps {
+interface SsoConnectionPipelineDeps {
   connectionProjectionStore: StateProjectionStore<SsoConnectionFoldState>;
   /** The guards every command handler runs — `@langwatch/identity-process`'s
    *  SsoConnectionGuardsService over the app's projection reads, the same instance
@@ -183,9 +184,7 @@ export type SsoConnectionPipeline = StaticPipelineDefinition<
   RegisteredCommand
 >;
 
-export function defineSsoConnectionPipeline(
-  deps: SsoConnectionPipelineDeps,
-): SsoConnectionPipeline {
+function defineSsoConnectionPipeline(deps: SsoConnectionPipelineDeps): SsoConnectionPipeline {
   const builder = definePipeline({
     name: SSO_CONNECTION_PIPELINE_NAME,
     aggregate: defineAggregate({
@@ -433,11 +432,15 @@ export function composeSsoConnectionGraph(options: {
     | "ssoConnectionHeads"
     | "ssoConnections"
     | "ssoRegistrationSlots"
-    | "ssoBreakGlass"
     | "ssoStranding"
     | "joinRequestAudience"
   >;
-  eventSourcing: EventSourcing;
+  /** The one "is there a way back in" answer, shared with the setup journey. */
+  breakGlass: SsoBreakGlassBindingRepository;
+  /** The sso_connection pipeline's own store. */
+  eventStore: SsoConnectionEventAppends;
+  /** The senders the process connected, which the ledger stages through. */
+  commands: IdentityEventing;
   directoryMove: Pick<SsoConnectionDirectoryMoveService, "migrationFinalized">;
   directory?: SsoConnectionDirectoryRevocation;
   mail?: SsoDomainProofMail;
@@ -447,7 +450,7 @@ export function composeSsoConnectionGraph(options: {
   /** The platform-operator grant the operator-only acts are asked against. */
   authorization: SsoConnectionGuardsDeps["authorization"];
 }): SsoConnectionGraph {
-  const { repositories, eventSourcing } = options;
+  const { repositories, eventStore, commands } = options;
   const head = EngineFollowingSsoConnectionHeadStore.create({
     heads: repositories.ssoConnectionHeads,
     engineProvider: options.engineProvider,
@@ -455,17 +458,14 @@ export function composeSsoConnectionGraph(options: {
   const guards = SsoConnectionGuardsService.create({
     connections: repositories.ssoConnections,
     registrationSlots: repositories.ssoRegistrationSlots,
-    breakGlass: RequiresLocalDoorAndBinding.create({
-      localDoor: LocalDoorBreakGlassBindingRepository.create(),
-      bindings: SsoBreakGlassRecoveryService.create({ bindings: repositories.ssoBreakGlass }),
-    }),
+    breakGlass: options.breakGlass,
     stranding: repositories.ssoStranding,
     authorization: options.authorization,
     licensing: options.licensing,
   });
   const connections = SsoConnectionService.create(
     guards,
-    SsoConnectionLedgerStore.forEventSourcing({ projectionStore: head, eventSourcing }),
+    SsoConnectionLedgerStore.forPipeline({ projectionStore: head, eventStore, commands }),
   );
   const mail = options.mail;
   const pipeline = () =>
@@ -489,8 +489,14 @@ export function composeSsoConnectionGraph(options: {
 
 export const ssoConnectionEventing = defineEventingModule({
   pipeline: SSO_CONNECTION_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<IdentityRepositories, IdentityModule>) =>
-    app.ssoConnectionPipeline(),
+  build: ({
+    app,
+    participation,
+    eventStore,
+  }: EventingSetup<IdentityRepositories, IdentityModule>) => {
+    app.keepEventStore({ pipeline: SSO_CONNECTION_PIPELINE_NAME, participation, eventStore });
+    return app.ssoConnectionPipeline();
+  },
   connect: ({ app, commands }) =>
     app.connectPipeline({ pipeline: SSO_CONNECTION_PIPELINE_NAME, commands }),
 });

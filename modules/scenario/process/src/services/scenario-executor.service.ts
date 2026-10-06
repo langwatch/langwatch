@@ -14,11 +14,8 @@ import type { SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
-import type {
-  CancellationPublisher,
-  CancellationSubscriber,
-  ScenarioSecretCipher,
-} from "../app/scenario.app.ts";
+import type { CancellationPublisher, CancellationSubscriber } from "../app/scenario.app.ts";
+import type { ScenarioRunSecretSeal } from "../repositories/scenario.repository.ts";
 import {
   NodeScenarioChildService,
   type ScenarioChildProcessConfig,
@@ -37,7 +34,7 @@ import type { VoicePublicUrl } from "./voice-public-url.service.ts";
 const logger = createLogger("langwatch:scenarios:executor");
 
 /** The peers a run resolves against: the same applications the api reads. */
-export type ScenarioExecutorPeers = Readonly<{
+type ScenarioExecutorPeers = Readonly<{
   agents: AgentApi;
   prompts: PromptApi;
   secrets: SecretApi;
@@ -54,8 +51,8 @@ export type ScenarioExecutorPeers = Readonly<{
 const WORKSPACE_ROOT = path.join(import.meta.dirname, "..", "..", "..", "..", "..");
 const CHILD_PACKAGE_ROOT = path.join(WORKSPACE_ROOT, "apps", "scenario-child");
 
-/** The process facts a child is started with, read as members. */
-export type ScenarioExecutorHost = Readonly<{
+/** The process facts a child is started with, as the module resolved them. */
+type ScenarioExecutorHost = Readonly<{
   voicePublicUrl: VoicePublicUrl;
   nlpServiceUrl: string | undefined;
   /** The engine hop's shared credential, as the process resolved it. */
@@ -71,7 +68,7 @@ type ScenarioExecutorInput = Readonly<{
   peers: ScenarioExecutorPeers;
   scenarios: ScenarioService;
   simulations: SimulationService;
-  secretCipher: ScenarioSecretCipher;
+  runSecretSeal: ScenarioRunSecretSeal;
   cancellations: CancellationPublisher;
   cancellationSubscriptions: CancellationSubscriber;
   config: ScenarioServerConfig;
@@ -125,7 +122,7 @@ export class ScenarioExecutorService {
   }): ScenarioProcessorService {
     const { peers, config, simulations } = this.input;
     const prefetcher = ScenarioExecutionPrefetcherService.create({
-      secretCipher: this.input.secretCipher,
+      runSecretSeal: this.input.runSecretSeal,
       config: {
         langwatchEndpoint,
         nlpServiceUrl,

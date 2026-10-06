@@ -11,13 +11,13 @@ export const storageStatsMeasurementSchema = z.object({
 export const storageStatsStateSchema = z.object({
   lastMeasuredAt: z.number().nullable(),
 });
-export type StorageStatsState = z.infer<typeof storageStatsStateSchema>;
+type StorageStatsState = z.infer<typeof storageStatsStateSchema>;
 
 export const STORAGE_STATS_INITIAL_STATE: StorageStatsState = {
   lastMeasuredAt: null,
 };
 
-export type StorageStatsIntents = {
+type StorageStatsIntents = {
   measure: IntentSpec<typeof storageStatsMeasurementSchema>;
 };
 

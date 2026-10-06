@@ -1,6 +1,20 @@
+import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 import type { LlmPromptConfigComponent, NodeDataset } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import isEqual from "lodash-es/isEqual";
+import type { DeepPartial } from "react-hook-form";
+
+/**
+ * Compare two form values for deep equality after JSON normalization
+ * (Dates and the like), so a change is detected on the saved shape.
+ */
+export function areFormValuesEqual(
+  a?: DeepPartial<PromptConfigFormValues>,
+  b?: DeepPartial<PromptConfigFormValues>,
+): boolean {
+  if (!a || !b) return false;
+  return isEqual(JSON.parse(JSON.stringify(a)), JSON.parse(JSON.stringify(b)));
+}
 
 /**
  * Checks if a demonstrations dataset has any records.

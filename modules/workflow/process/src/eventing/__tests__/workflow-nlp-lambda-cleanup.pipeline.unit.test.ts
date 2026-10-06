@@ -56,6 +56,7 @@ async function deliver(process: ReturnType<typeof built>["process"], at: number)
 
 describe("given workflow's Lambda cleanup declaration", () => {
   /** @scenario "The daily wake asks for one sweep" */
+  /** @scenario A destructive scheduled job answers no caller */
   it("is installed with the module and wakes once a day", () => {
     const { definition, process } = built(async () => undefined);
 

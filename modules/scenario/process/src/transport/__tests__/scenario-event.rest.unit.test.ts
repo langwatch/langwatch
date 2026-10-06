@@ -1,5 +1,7 @@
+import { canonicalErrorResponse } from "@langwatch/api/rest";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { PlanLimitExceededError } from "@langwatch/entitlement-contract";
+import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type * as observability from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
@@ -14,14 +16,15 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => ({ info: logInfo, warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
 
+import { simulationRunState } from "../../__tests__/support/simulation-run-state.fixture.ts";
 import type { ScenarioTabStore } from "../../app/scenario.app.ts";
+import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import { scenarioEventsRest } from "../scenario-event.rest.ts";
 import {
   createScenarioRestTestApp,
   createScenarioRestTestRuntime,
   ORGANIZATION_ID,
   PROJECT_ID,
-  scenarioRestTestErrors,
 } from "./scenario-rest.harness.ts";
 
 async function buildEventFamily(
@@ -61,7 +64,7 @@ async function buildEventFamily(
   });
   const mounted = runtime.mount(scenarioEventsRest.router(), {
     app: () => world.app,
-    onError: scenarioRestTestErrors,
+    onError: canonicalErrorResponse,
     facts: [projectFacts],
   });
 
@@ -191,6 +194,38 @@ describe("the scenario-events REST declaration", () => {
         hasMore: false,
       });
       expect(deleteRun).toHaveBeenCalledTimes(2);
+    });
+
+    /** @scenario "Archiving the default set matches both default and empty set ids" */
+    it("selects the runs stored under both ids and no other set's", async () => {
+      const repositories = MemoryScenarioRepositories.create();
+      const store = repositories.simulationRunProcessing.runStateStore({
+        defaultRetentionDays: () => 30,
+      });
+      for (const [scenarioRunId, ScenarioSetId] of [
+        ["run-default", "default"],
+        ["run-legacy", ""],
+        ["run-other", "set-b"],
+      ] as const) {
+        await store.store(simulationRunState({ ScenarioRunId: scenarioRunId, ScenarioSetId }), {
+          tenantId: createTenantId(PROJECT_ID),
+          aggregateId: scenarioRunId,
+        });
+      }
+      const deleted: string[] = [];
+      const family = await buildEventFamily({
+        simulations: {
+          getRunIdsForSet: (input) => repositories.simulations.findAllRunIdsForSet(input),
+          deleteRun: async ({ scenarioRunId }) => {
+            deleted.push(scenarioRunId);
+          },
+        },
+      });
+
+      const response = await deleteEvents(family, "?scenarioSetId=default");
+
+      await expect(response.json()).resolves.toMatchObject({ archived: 2, failed: 0 });
+      expect(deleted.toSorted()).toEqual(["run-default", "run-legacy"]);
     });
 
     it("returns an empty archive result without dispatching deletes", async () => {
@@ -463,6 +498,32 @@ describe("the scenario-events REST declaration", () => {
       expect(messageSnapshot).not.toHaveBeenCalled();
     });
 
+    /** @scenario "Event POST rejects bodies larger than 50MB with 413 before extraction" */
+    it("refuses a body declared over 50MB before extracting or dispatching anything", async () => {
+      const messageSnapshot = vi.fn();
+      const extractInlineMedia = vi.fn(async ({ event }: { event: unknown }) => ({
+        rewrittenEvent: event,
+        refs: [],
+      }));
+      const family = await buildEventFamily({
+        simulations: { messageSnapshot },
+        extractInlineMedia,
+      });
+
+      const response = await family.request("/api/scenario-events", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "content-length": String(50 * 1024 * 1024 + 1),
+        },
+        body: JSON.stringify(messageSnapshotEvent()),
+      });
+
+      expect(response.status).toBe(413);
+      expect(extractInlineMedia).not.toHaveBeenCalled();
+      expect(messageSnapshot).not.toHaveBeenCalled();
+    });
+
     /** @scenario "Ingest logs list every stored_objects id extracted for an event" */
     it("logs every externalised object id", async () => {
       logInfo.mockClear();
@@ -497,6 +558,8 @@ describe("the scenario-events usage gate", () => {
 
   describe("when the organization spent its monthly allowance", () => {
     /** @scenario "A scenario event past the monthly usage limit is refused" */
+    /** @scenario "A scenario event past the monthly allowance is refused with the plan limit" */
+    /** @scenario "Reporting a scenario event over the allowance is refused" */
     it("refuses the event with the plan limit and dispatches nothing", async () => {
       const messageSnapshot = vi.fn();
       const family = await buildEventFamily({
@@ -506,7 +569,8 @@ describe("the scenario-events usage gate", () => {
 
       const response = await postJson(family, "/api/scenario-events", messageSnapshotEvent());
       expect(response.status).toBe(402);
-      await expect(response.json()).resolves.toMatchObject({ error: "ERR_PLAN_LIMIT" });
+      expect(response.headers.get("retry-after")).toBeNull();
+      await expect(response.json()).resolves.toMatchObject({ code: "ERR_PLAN_LIMIT" });
       expect(messageSnapshot).not.toHaveBeenCalled();
     });
 
@@ -525,16 +589,19 @@ describe("the scenario-events usage gate", () => {
   });
 
   describe("when the organization is within its allowance", () => {
-    it("asks for the organization the project belongs to", async () => {
+    /** @scenario "Reporting a scenario event within the allowance is accepted" */
+    it("asks for the organization the project belongs to, then writes the event", async () => {
       const assertWithinUsageLimit = vi.fn(async () => {});
+      const messageSnapshot = vi.fn(async () => {});
       const family = await buildEventFamily({
-        simulations: { messageSnapshot: async () => {} },
+        simulations: { messageSnapshot },
         plans: { assertWithinUsageLimit },
       });
 
       const response = await postJson(family, "/api/scenario-events", messageSnapshotEvent());
       expect(response.status).toBe(201);
       expect(assertWithinUsageLimit).toHaveBeenCalledWith({ organizationId: ORGANIZATION_ID });
+      expect(messageSnapshot).toHaveBeenCalledTimes(1);
     });
   });
 });

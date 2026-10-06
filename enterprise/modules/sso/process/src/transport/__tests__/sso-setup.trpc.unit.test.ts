@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createSsoTestApp,
+  createSsoTestConfig,
   createSsoTestFeatureFlags,
   createSsoTestIdentity,
   RecordingSsoBreakGlass,
@@ -107,6 +108,7 @@ async function harness(
     record: null,
     goLive: null,
     legacyRoute: null,
+    enterpriseRequired: false,
     migration: null,
   };
   const auditLog = {
@@ -116,7 +118,7 @@ async function harness(
   };
   const app = await createSsoTestApp({
     connections,
-    members: { isSaas: options.isSaas ?? false },
+    config: createSsoTestConfig({ isSaas: options.isSaas ?? false }),
     dependencies: {
       licensing: createApiFixture<LicensingApi>({
         inspectPlatformAccess: async () => ({
@@ -242,6 +244,7 @@ describe("the organization's own single sign-on surface", () => {
           record: null,
           goLive: null,
           legacyRoute: null,
+          enterpriseRequired: false,
           migration: null,
         },
       });

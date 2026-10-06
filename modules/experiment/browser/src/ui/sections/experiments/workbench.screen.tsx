@@ -24,6 +24,7 @@ import { assertCrispChatHidden } from "../../../behavior/workflow/crisp-bubble-p
 import { type ProposalHandlers } from "../../../model/langy/langy-proposal-handlers.ts";
 import { AutosaveStatus } from "../../../ui/elements/experiments-v3/autosave-status.tsx";
 import { EditableHeading } from "../../../ui/elements/experiments-v3/editable-heading.tsx";
+import { WorkbenchRowsCutBanner } from "../../../ui/elements/experiments-v3/workbench-rows-cut-banner.tsx";
 import { WorkbenchStaleBanner } from "../../../ui/elements/experiments-v3/workbench-stale-banner.tsx";
 import { EvaluationsV3Table } from "../../../ui/sections/experiments-v3/evaluations-v3-table.tsx";
 import { HistoryButton } from "../../../ui/sections/experiments-v3/history-button.tsx";
@@ -46,11 +47,12 @@ export default function ExperimentsWorkbenchPage() {
   const { project } = useOrganizationTeamProject();
   const slug = router.query.slug as string | undefined;
 
-  const { name, setName, datasets, targets, reset, autosaveStatus, addEvaluator } =
+  const { name, setName, datasets, activeDatasetId, targets, reset, autosaveStatus, addEvaluator } =
     useEvaluationsV3Store((state) => ({
       name: state.name,
       setName: state.setName,
       datasets: state.datasets,
+      activeDatasetId: state.activeDatasetId,
       targets: state.targets,
       reset: state.reset,
       autosaveStatus: state.ui.autosaveStatus,
@@ -165,6 +167,9 @@ export default function ExperimentsWorkbenchPage() {
     assertCrispChatHidden();
   }, []);
 
+  // The active saved dataset, when the page holds fewer of its rows than it has.
+  const activeRowsCut = datasets.find((dataset) => dataset.id === activeDatasetId)?.savedRecordsCut;
+
   // Show 404 if experiment doesn't exist
   if (!slug || isNotFound) {
     return (
@@ -223,6 +228,8 @@ export default function ExperimentsWorkbenchPage() {
               onReload={reloadStaleWorkbench}
             />
           )}
+
+          {activeRowsCut && <WorkbenchRowsCutBanner cut={activeRowsCut} />}
 
           {/* Main content - table container with config panel */}
           <Box

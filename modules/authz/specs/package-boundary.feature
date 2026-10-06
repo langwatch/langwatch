@@ -11,7 +11,7 @@ Feature: AuthZ package boundary
   I want authorization to follow the strict feature package layout
   So that every caller uses one portable contract and runtime details stay private
 
-  @architecture @typecheck
+  @unit @architecture @typecheck
   Scenario: AuthZ has one versioned feature root
     Given the AuthZ feature declares layoutVersion 0
     Then @langwatch/authz-contract contains its portable vocabulary, schemas, errors and service capabilities
@@ -19,7 +19,7 @@ Feature: AuthZ package boundary
     And packages/authz and packages/authz-server do not exist
     And no compatibility package or forwarding export preserves the old package name
 
-  @architecture @contract @typecheck
+  @unit @architecture @contract @typecheck
   Scenario: The contract is portable and uses Zod 4
     Given a browser or another feature imports @langwatch/authz-contract
     Then principals, scopes, permissions, decisions, commands and event payloads come from Zod 4 schemas
@@ -27,14 +27,14 @@ Feature: AuthZ package boundary
     And the permission registry retains its exact append-only order
     And the package imports no Node, Prisma, Redis, Eventing, Hono, tRPC server code or application source
 
-  @architecture @contract @security
+  @unit @architecture @contract @security
   Scenario: Authorization witnesses can only be minted by the service
     Given a caller needs an Authorized witness
     When AuthzService authorizes the request
     Then the service returns the opaque witness after an allowed decision
     And the contract exports the witness type but no witness-minting function or subpath
 
-  @architecture @services
+  @unit @architecture @services
   Scenario: AuthZ exposes two service capabilities
     Given a runtime composes AuthZ
     Then AuthzService owns decisions, scope resolution and access reads
@@ -50,26 +50,26 @@ Feature: AuthZ package boundary
     Then it receives the AuthZ service, the grants service, the migration and the pipeline
     And nothing is dispatched and no audit row is written by the build itself
 
+  @unit
+  Scenario: A process with no database composes no AuthZ service
+    Given a process with command dispatch and no database
+    When the live AuthZ install runs
+    Then the install is refused naming the database it cannot supply
+    And no AuthZ service is composed
+
   @unit @observability
   Scenario: AuthZ counts on the process registry
     Given a process composes the AuthZ adapter
     When it builds the feature
     Then its engine-gate read failure and queue-bypassing write counters are in the process registry
 
-  @architecture @persistence
+  @unit @architecture @persistence
   Scenario: Persistence stays behind the server package
     Given AuthZ reads or writes authorization state
     Then its repository ports are abstract classes
     And Prisma-compatible implementations live only below repositories/prisma
     And generated Prisma types never cross a package export
     And ordinary app modules import neither an AuthZ repository nor @langwatch/authz-process
-
-  @architecture @persistence
-  Scenario: The move changes no durable model
-    Given the AuthZ packages move into the feature root
-    Then no authorization table is added or removed
-    And every grant and role event keeps its type, aggregate identity, tenant and idempotency semantics
-    And existing projection rows and migration tenant states remain readable
 
   @integration @eventing
   Scenario: Eventing registration is explicit

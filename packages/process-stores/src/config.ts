@@ -4,7 +4,7 @@
  * eventing's store/queue factory and the process store a process-manager role supplies.
  */
 import type { PoolSizingInput } from "@langwatch/clickhouse-client";
-import type { EventingParticipation, ExecutionTarget, KillSwitch } from "@langwatch/eventing";
+import type { EventingParticipation, ExecutionTarget } from "@langwatch/eventing";
 import type { GroupQueuePolicy, GroupQueueStorage } from "@langwatch/group-queue";
 
 /** Postgres, as one guarded client per process. */
@@ -97,8 +97,6 @@ export interface EventingConfig {
   readonly processManagerMode?: "run" | "producer-only";
   /** Overrides the half this process's role would otherwise install. */
   readonly participation?: EventingParticipation;
-  /** Per-tenant operator stop for every component the pipelines mount. */
-  readonly killSwitch?: KillSwitch;
 }
 
 /** Where one S3 account's objects are written, and under whose credentials. */
@@ -146,15 +144,19 @@ export interface ObjectStorageAzureConfig {
 }
 
 /**
- * Object storage: the shared backend `STORED_OBJECTS_BACKEND` selects, and
- * the organizations that bring their own S3 account.
+ * Object storage: the shared backend `STORED_OBJECTS_BACKEND` selects, and the organizations
+ * that bring their own S3 account. `legacyAzure` is the `AZURE_BLOB_*` block kept after writes
+ * moved off Azure: it only reads what was already recorded there.
  */
 export type ObjectStorageConfig = (
   | Readonly<{ backend: "s3"; s3: ObjectStorageAccount }>
   | Readonly<{ backend: "azure"; azure: ObjectStorageAzureConfig }>
   | Readonly<{ backend: "file"; root: string }>
 ) &
-  Readonly<{ privateAccounts?: readonly ObjectStoragePrivateAccount[] }>;
+  Readonly<{
+    privateAccounts?: readonly ObjectStoragePrivateAccount[];
+    legacyAzure?: ObjectStorageAzureConfig;
+  }>;
 
 /** What the members are built from: parsed config, and nothing read from the shell. */
 export interface ProcessConfig {
@@ -162,6 +164,8 @@ export interface ProcessConfig {
   readonly processName: string;
   /** The 32-byte key stored values are encrypted under, hex-encoded. */
   readonly encryptionKey: string;
+  /** The key before a rotation, hex-encoded: stored values open under it, none is sealed. */
+  readonly previousEncryptionKey?: string;
   /** Every secret this process resolved at boot (ADR-132). */
   readonly secrets: Readonly<Record<string, string>>;
   /** The default allowance a rate-limited route counts against. */

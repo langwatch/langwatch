@@ -40,6 +40,9 @@
       "path": "../../../packages/module/tsconfig.build.json"
     },
     {
+      "path": "../../onboarding/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {

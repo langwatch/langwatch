@@ -45,7 +45,6 @@ function makeDeps(over: LangyTurnDepsOverrides = {}) {
       cancel: vi.fn(async () => undefined),
       warm: vi.fn(async () => undefined),
     },
-    tokenBuffer: null,
     permits: {
       reserve: vi.fn(async () => ({ reserved: false, allowed: true, resetAt: 0 })),
       release: vi.fn(async () => undefined),

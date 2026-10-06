@@ -1,6 +1,5 @@
 import {
   type FoldProjectionStore,
-  type Projection,
   AbstractFoldProjection,
   type FoldEventHandlers,
 } from "@langwatch/eventing";
@@ -18,10 +17,6 @@ import {
 } from "@langwatch/suite-contract";
 
 export type { SuiteRunStateData } from "@langwatch/suite-contract";
-
-export interface SuiteRunState extends Projection<SuiteRunStateData> {
-  data: SuiteRunStateData;
-}
 
 const suiteRunEvents = [
   SuiteRunStartedEventSchema,

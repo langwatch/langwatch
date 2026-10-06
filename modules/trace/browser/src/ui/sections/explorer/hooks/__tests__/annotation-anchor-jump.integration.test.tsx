@@ -9,9 +9,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { setWindowAddress } from "../../../../../__tests__/window-location-router.ts";
-import { getTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
 import { useSpanPulseStore } from "../../../../../behavior/span-pulse.store.ts";
+import { getTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { useSectionFocusGlow } from "../../trace-drawer/trace-accordions/use-section-focus-glow.ts";
 import { useJumpToAnnotationAnchor } from "../use-jump-to-annotation-anchor.ts";
 

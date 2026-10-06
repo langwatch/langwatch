@@ -134,9 +134,38 @@ function renderReduced() {
 }
 
 describe("LangyTraceSampleCard", () => {
+  describe("given a CLI trace search that returned matching traces", () => {
+    describe("when the card renders", () => {
+      /** @scenario "A CLI trace search renders the traces card" */
+      it("lists the matched traces, each row linking to its own trace", () => {
+        renderCard({ totalHits: 2, count: 2 });
+
+        expect(screen.getByText("2 traces")).toBeTruthy();
+        expect(screen.getByText("question trace_0")).toBeTruthy();
+        expect(screen.getByText("question trace_1")).toBeTruthy();
+        const hrefs = screen.getAllByRole("link").map((link) => link.getAttribute("href") ?? "");
+        expect(hrefs.some((href) => href.includes("trace_0"))).toBe(true);
+        expect(hrefs.some((href) => href.includes("trace_1"))).toBe(true);
+      });
+    });
+  });
+
+  describe("given a CLI trace search that returned none", () => {
+    describe("when the card renders", () => {
+      /** @scenario "A CLI trace search that matched nothing renders an empty traces card" */
+      /** @scenario "A genuinely empty result still reads as a real answer" */
+      it("says no traces matched", () => {
+        renderCard({ totalHits: 0, count: 0 });
+
+        expect(screen.getByText("No traces matched.")).toBeTruthy();
+      });
+    });
+  });
+
   describe("given recorded rows that lost their trace id", () => {
     describe("when the card renders", () => {
       /** @scenario "Rows the card cannot identify render as unreadable, never as an empty result" */
+      /** @scenario "Unreadable tool output renders as unreadable, never as an empty result" */
       it("says it could not read the result instead of claiming nothing matched", () => {
         renderReduced();
 
@@ -146,6 +175,7 @@ describe("LangyTraceSampleCard", () => {
       });
 
       /** @scenario "Rows the card cannot identify render as unreadable, never as an empty result" */
+      /** @scenario "Unreadable tool output renders as unreadable, never as an empty result" */
       it("still offers the way through to the Trace Explorer", () => {
         renderReduced();
 
@@ -157,10 +187,13 @@ describe("LangyTraceSampleCard", () => {
   describe("given a search that matched far more traces than it returned", () => {
     describe("when the card renders", () => {
       /** @scenario "The sample never pretends to be the whole result" */
+      /** @scenario "A result too large for the chat still renders correctly" */
       it("says how many were found and how many it is showing", () => {
         renderCard({ totalHits: 34, count: 25 });
 
         expect(screen.getByText("34 traces · showing 3")).toBeTruthy();
+        expect(screen.getByText("question trace_0")).toBeTruthy();
+        expect(screen.getByText("View in Trace Explorer")).toBeTruthy();
         expect(screen.getByText("31 more in the Trace Explorer")).toBeTruthy();
       });
     });

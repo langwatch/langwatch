@@ -59,3 +59,11 @@ Feature: HTTP agent credentials
     And a label is 1 to 32 characters, starts with a letter, holds only letters, "_", "-" and at most 4 digits
     And a token-shaped or longer label, such as "ghp_abc123def456={{ secrets.X }}", is a literal stored as a secret
     And any other word before a space, such as "hunter {{ secrets.X }}", is a literal stored as a secret
+
+  @unit
+  Scenario: Credentials typed into an HTTP agent before this change are moved to project secrets
+    Given HTTP agents in several projects, some still holding literal credentials
+    When the agent credential backfill runs, once or more
+    Then each literal is stored as a project secret once and the agent keeps its reference
+    And an agent holding only secret references is left alone
+    And an agent whose secret cannot be stored is left as it was, and the walk continues

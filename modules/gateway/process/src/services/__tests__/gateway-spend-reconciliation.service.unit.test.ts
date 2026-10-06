@@ -1,12 +1,9 @@
 /**
- * The reconciliation reads and the replay: what they refuse before touching
- * a store, and what a replay queues.
+ * The reconciliation reads: what they refuse before touching a store.
  * @see specs/ai-gateway/gateway-spend-rest.feature
  * @see specs/ai-gateway/billing-spend-events.feature
  */
 import {
-  GATEWAY_SPEND_REPLAY_MAX_ENVELOPES,
-  type GatewaySpendEnvelope,
   type GatewaySpendSummariesQuery,
   gatewaySpendSummariesQuerySchema,
 } from "@langwatch/gateway-contract";
@@ -17,7 +14,6 @@ import { FixedGatewaySettlementPolicyService } from "../fixed-gateway-settlement
 import {
   type GatewaySpendApp,
   GatewaySpendReconciliationService,
-  type GatewaySpendWebhookEndpoint,
 } from "../gateway-spend-reconciliation.service.ts";
 
 const NOW = Date.now();
@@ -30,11 +26,7 @@ const unreached = (): never => {
 const baseCollaborators: GatewaySpendApp = {
   getSpendEvents: unreached,
   getBudgetSpend: unreached,
-  webhookEndpoints: unreached,
-  webhookEvents: unreached,
-  webhookDelivery: unreached,
   spendEventEnvelope: unreached,
-  endpointAcceptsEvent: unreached,
   settlementPolicy: () => FixedGatewaySettlementPolicyService.create(30 * 60 * 1000),
   resolveSpendScope: unreached,
   endUserCaps: unreached,
@@ -75,63 +67,5 @@ describe("reading the summaries with a cursor", () => {
       status: 400,
       error: expect.stringContaining("Start a new walk"),
     });
-  });
-});
-
-const ENDPOINT: GatewaySpendWebhookEndpoint = { id: "we_1", enabledEvents: ["*"] };
-
-function envelopes(count: number): GatewaySpendEnvelope[] {
-  return Array.from({ length: count }, (_, index) => ({
-    id: `evt_${index}`,
-    type: "gateway.spend.recorded",
-    created: "2026-09-01T00:00:00.000Z",
-    schema_version: "1",
-    data: {},
-  }));
-}
-
-/** A replay over a log that serves the given envelopes in one page, recording what was queued. */
-function replayOver(log: GatewaySpendEnvelope[]) {
-  const queued: { id: string; replayId: string }[] = [];
-  const sut = GatewaySpendReconciliationService.create({
-    collaborators: {
-      ...baseCollaborators,
-      webhookEndpoints: () => ({ findDeliverable: async () => ENDPOINT }),
-      webhookEvents: () => ({
-        getEmittedEvents: async () => ({ events: log, nextCursor: null }),
-      }),
-      webhookDelivery: () => ({
-        appendReplayToEndpointStream: async ({ envelope, replayId }) => {
-          queued.push({ id: envelope.id, replayId });
-        },
-      }),
-      endpointAcceptsEvent: () => true,
-    },
-  });
-  return { sut, queued };
-}
-
-describe("replaying a window to one endpoint", () => {
-  const body = { from: 1_000, to: 2_000, endpoint_id: "we_1" };
-
-  /** @scenario Replay re-delivers a window's envelopes to one endpoint through the delivery path */
-  it("queues every matching envelope on the delivery stream under its own id", async () => {
-    const { sut, queued } = replayOver(envelopes(3));
-
-    const { data } = await sut.answerSpendReplay({ organizationId: "org_1", body });
-
-    expect(data.replayed).toBe(3);
-    expect(queued.map(({ id }) => id)).toEqual(["evt_0", "evt_1", "evt_2"]);
-    expect(new Set(queued.map(({ replayId }) => replayId))).toEqual(new Set([data.replay_id]));
-  });
-
-  /** @scenario An over-limit replay queues nothing */
-  it("refuses a window past the cap before any envelope is queued", async () => {
-    const { sut, queued } = replayOver(envelopes(GATEWAY_SPEND_REPLAY_MAX_ENVELOPES + 1));
-
-    await expect(sut.answerSpendReplay({ organizationId: "org_1", body })).rejects.toMatchObject({
-      status: 400,
-    });
-    expect(queued).toEqual([]);
   });
 });

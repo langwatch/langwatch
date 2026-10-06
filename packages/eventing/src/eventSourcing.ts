@@ -6,7 +6,6 @@ import { getLangWatchTracer } from "langwatch";
 import { DisabledPipeline } from "./disabledPipeline.ts";
 import { createEventCatalogue } from "./domain/definitions.ts";
 import type { Event, Projection } from "./domain/types.ts";
-import type { KillSwitch } from "./kill-switch/index.ts";
 import type { EventingParticipation, ReadHintMap } from "./pipeline/feature-eventing.ts";
 import {
   type SealedPipelineDefinition,
@@ -66,11 +65,6 @@ export interface EventSourcingOptions {
   executionTarget?: ExecutionTarget;
   replayMarkerChecker?: ReplayMarkerChecker;
   retentionPolicyResolver?: RetentionPolicyResolver;
-  /**
-   * Per-tenant operator stop for every component the registered pipelines
-   * mount. Absent means no switch is readable, so every component runs.
-   */
-  killSwitch?: KillSwitch;
   /** Enables warnings when projections run inline because no shared queue exists. */
   warnWhenProjectionsRunInline?: boolean;
   configureGlobalProjections?: (registry: ProjectionRegistry<Event>) => void;
@@ -147,7 +141,6 @@ export class EventSourcing {
   private readonly _executionTarget?: ExecutionTarget;
   private readonly _replayMarkerChecker?: ReplayMarkerChecker;
   private readonly _retentionPolicyResolver?: RetentionPolicyResolver;
-  private readonly _killSwitch?: KillSwitch;
   private readonly _warnWhenProjectionsRunInline: boolean;
   private readonly _processStore?: ProcessStore;
   private readonly _processManagerMode: "run" | "producer-only";
@@ -172,7 +165,6 @@ export class EventSourcing {
     this._executionTarget = options.executionTarget;
     this._replayMarkerChecker = options.replayMarkerChecker;
     this._retentionPolicyResolver = options.retentionPolicyResolver;
-    this._killSwitch = options.killSwitch;
     this._warnWhenProjectionsRunInline = options.warnWhenProjectionsRunInline ?? false;
     this._processStore = options.processStore;
     this._processManagerMode = options.processManagerMode ?? "run";
@@ -206,6 +198,11 @@ export class EventSourcing {
    */
   get processStore(): ProcessStore | undefined {
     return this._processStore;
+  }
+
+  /** Wakes one process manager's outbox now; a no-op where no process runtime runs. */
+  notifyOutbox(processName: string): void {
+    this._processRuntimeInstance?.notifyOutbox(processName);
   }
 
   /**
@@ -524,7 +521,6 @@ export class EventSourcing {
       executionTarget: this._executionTarget,
       replayMarkerChecker: this._replayMarkerChecker,
       retentionPolicyResolver: definition.retentionPolicyResolver ?? this._retentionPolicyResolver,
-      killSwitch: this._killSwitch,
       warnWhenProjectionsRunInline: this._warnWhenProjectionsRunInline,
       prepareEventForProjection: definition.prepareEventForProjection,
     });

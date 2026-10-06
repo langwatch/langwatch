@@ -9,7 +9,7 @@ export const INGESTION_PULL_RECONCILE_PROCESS_NAME = "ingestionPullReconcile";
 /** Outbox rows are bookkeeping, one per boot, pruned like every recurring process's. */
 const RECONCILE_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
-export interface IngestionPullReconcileRunDeps {
+interface IngestionPullReconcileRunDeps {
   readonly reconcile: () => Promise<{ reconciled: number; failed: number }>;
   readonly deleteDispatchedBefore: (params: {
     processName: string;

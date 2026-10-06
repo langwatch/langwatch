@@ -12,12 +12,21 @@ import {
   type LangySliceSurface,
 } from "@langwatch/langy-contract";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
+import {
+  EXPLORE_BREAKDOWNS,
+  EXPLORE_INTERVALS,
+  EXPLORE_MEASURES,
+} from "../../../../model/explore-query.ts";
+import {
+  fakeGovernanceHost,
+  findNativeSelects,
+  renderWithGovernanceHost,
+} from "../../../../testing.tsx";
 
 vi.mock("../../../../behavior/governance-api.ts", () => {
   const node = (): unknown =>
@@ -118,6 +127,29 @@ describe("the Insights screen on first open", () => {
 
     expect(langy.getState().isOpen).toBe(true);
   });
+
+  /** @scenario "The Setup drawer keeps its edits for the sitting and never claims to save" */
+  it("keeps a saved schedule on reopening and raises no confirmation", async () => {
+    const host = fakeGovernanceHost({
+      enabledFlags: FLAGS,
+      permissions: ["organization:view", "governance:view"],
+    });
+    const { container } = renderWithGovernanceHost(<InsightsScreen />, { host });
+
+    await userEvent.click(screen.getByRole("button", { name: "Set up data" }));
+    const at = () => document.body.querySelector<HTMLInputElement>('input[type="time"]');
+    expect(at()?.value).toBe("07:00");
+    fireEvent.change(at() as HTMLInputElement, { target: { value: "09:30" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(screen.queryByText("Set up Insights")).not.toBeInTheDocument());
+    expect(host.recording.successes).toEqual([]);
+    expect(host.recording.failures).toEqual([]);
+    expect(container.textContent ?? "").not.toMatch(/\b(saved|stored)\b/i);
+
+    await userEvent.click(screen.getByRole("button", { name: "Set up data" }));
+    expect(at()?.value).toBe("09:30");
+  });
 });
 
 describe("the Signals & Alerts screen on first open", () => {
@@ -183,5 +215,88 @@ describe("the copy on the Platform screens", () => {
     const { container } = open(page);
 
     expect(container.textContent ?? "").not.toMatch(CLAIMS_OF_WORK_DONE);
+  });
+});
+
+describe("every screen on the Platform section", () => {
+  const screens: [string, () => ReactElement][] = [
+    ["/governance/analytics", () => <AnalyticsScreen />],
+    ["/governance/insights", () => <InsightsScreen />],
+    ["/governance/signals", () => <SignalsScreen />],
+  ];
+
+  /** @scenario "Every control the Platform screens offer does something when pressed" */
+  it("answers a press on every enabled control of all three screens with a visible change", async () => {
+    for (const [path, page] of screens) {
+      const host = fakeGovernanceHost({
+        enabledFlags: FLAGS,
+        permissions: ["organization:view", "governance:view"],
+      });
+      const controlCount = () =>
+        renderWithGovernanceHost(page(), { host }).container.querySelectorAll(
+          "button:not([disabled])",
+        ).length;
+      const count = controlCount();
+      cleanup();
+      const links = renderWithGovernanceHost(page(), { host }).container.querySelectorAll(
+        "a[href]",
+      );
+      expect(count + links.length).toBeGreaterThan(0);
+      for (const link of links) {
+        expect(link.getAttribute("href"), `${link.textContent} is a dead link`).toMatch(
+          /^\/|^https?:/,
+        );
+      }
+      cleanup();
+
+      for (let index = 0; index < count; index += 1) {
+        const { container } = renderWithGovernanceHost(page(), { host });
+        const control = container.querySelectorAll("button:not([disabled])")[index];
+        if (!control) throw new Error(`no control ${index}`);
+        const label = control.textContent || control.getAttribute("aria-label") || `#${index}`;
+        // The folder already open is where pressing it would take the reader.
+        if (control.getAttribute("aria-current") === "true") {
+          cleanup();
+          continue;
+        }
+        const before = document.body.innerHTML;
+        const navigationsBefore = host.recording.navigations.length;
+        const panelWasOpen = langy.getState().isOpen;
+
+        await userEvent.click(control);
+
+        const acted =
+          document.body.innerHTML !== before ||
+          host.recording.navigations.length !== navigationsBefore ||
+          langy.getState().isOpen !== panelWasOpen;
+        expect(acted, `pressing "${label}" changed nothing on ${path}`).toBe(true);
+        langy.setState({ isOpen: false });
+        cleanup();
+      }
+    }
+  }, 120_000);
+});
+
+describe("the Analytics screen's query choices", () => {
+  /** @scenario "A choice too long for a pill uses the app's own select" */
+  it("offers Measure, Break down by and Over time through the app's select, listing every option, with no native select", async () => {
+    open(<AnalyticsScreen />);
+
+    expect(findNativeSelects(document.body)).toEqual([]);
+    const choices = [
+      { label: "Measure", options: EXPLORE_MEASURES },
+      { label: "Break down by", options: EXPLORE_BREAKDOWNS },
+      { label: "Over time", options: EXPLORE_INTERVALS },
+    ];
+    for (const { label, options } of choices) {
+      await userEvent.click(screen.getByRole("combobox", { name: label }));
+      const listed = await screen.findAllByRole("option");
+      expect(listed.map((option) => option.textContent)).toEqual(
+        options.map((option) => option.label),
+      );
+      await userEvent.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryAllByRole("option")).toEqual([]));
+    }
+    expect(findNativeSelects(document.body)).toEqual([]);
   });
 });

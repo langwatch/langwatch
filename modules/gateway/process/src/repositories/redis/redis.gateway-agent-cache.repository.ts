@@ -1,75 +1,51 @@
 import type { RedisConnection } from "@langwatch/redis-client";
-import { nowInstant } from "@langwatch/time";
 
-import type { GatewayAgentCacheEntryRepository } from "../../repositories/gateway-agent-cache.repository.ts";
+import {
+  GatewayAgentCacheEntryUnreadableError,
+  type GatewayAgentCacheEntryRepository,
+} from "../gateway-agent-cache.repository.ts";
+import type { GatewayCipher } from "../gateway.repositories.ts";
 
-export type GatewayAgentCacheEntryStore = GatewayAgentCacheEntryRepository;
-
-export class RedisGatewayAgentCacheEntryRepository implements GatewayAgentCacheEntryStore {
+/** The agent cache in Redis: each value rests sealed with the process's cipher. */
+export class RedisGatewayAgentCacheEntryRepository implements GatewayAgentCacheEntryRepository {
   readonly #redis: RedisConnection;
+  readonly #cipher: GatewayCipher;
 
-  static create(redis: RedisConnection): RedisGatewayAgentCacheEntryRepository {
-    return new RedisGatewayAgentCacheEntryRepository(redis);
+  static create({
+    redis,
+    cipher,
+  }: Readonly<{
+    redis: RedisConnection;
+    cipher: GatewayCipher;
+  }>): RedisGatewayAgentCacheEntryRepository {
+    return new RedisGatewayAgentCacheEntryRepository(redis, cipher);
   }
 
-  private constructor(redis: RedisConnection) {
+  private constructor(redis: RedisConnection, cipher: GatewayCipher) {
     this.#redis = redis;
+    this.#cipher = cipher;
   }
 
   async find(key: string): Promise<string | undefined> {
-    return (await this.#redis.get(key)) ?? undefined;
+    const sealed = await this.#redis.get(key);
+    if (sealed === null) return undefined;
+
+    try {
+      return this.#cipher.decrypt(sealed);
+    } catch (error) {
+      throw new GatewayAgentCacheEntryUnreadableError({ cause: error });
+    }
   }
 
   async set(key: string, value: string, ttlMs: number): Promise<void> {
-    await this.#redis.set(key, value, "PX", ttlMs);
+    await this.#redis.set(key, this.#cipher.encrypt(value), "PX", ttlMs);
   }
 
   async claim(key: string, value: string, ttlMs: number): Promise<boolean> {
-    return (await this.#redis.set(key, value, "PX", ttlMs, "NX")) === "OK";
+    return (await this.#redis.set(key, this.#cipher.encrypt(value), "PX", ttlMs, "NX")) === "OK";
   }
 
   async delete(key: string): Promise<void> {
     await this.#redis.del(key);
-  }
-}
-
-export class MemoryGatewayAgentCacheEntryRepository implements GatewayAgentCacheEntryStore {
-  readonly #entries = new Map<string, { value: string; expiresAt: number }>();
-
-  static create(): MemoryGatewayAgentCacheEntryRepository {
-    return new MemoryGatewayAgentCacheEntryRepository();
-  }
-
-  find(key: string): Promise<string | undefined> {
-    return Promise.resolve(this.#live(key)?.value);
-  }
-
-  set(key: string, value: string, ttlMs: number): Promise<void> {
-    this.#entries.set(key, { value, expiresAt: nowInstant().epochMilliseconds + ttlMs });
-    return Promise.resolve();
-  }
-
-  claim(key: string, value: string, ttlMs: number): Promise<boolean> {
-    if (this.#live(key)) return Promise.resolve(false);
-
-    this.#entries.set(key, { value, expiresAt: nowInstant().epochMilliseconds + ttlMs });
-    return Promise.resolve(true);
-  }
-
-  delete(key: string): Promise<void> {
-    this.#entries.delete(key);
-    return Promise.resolve();
-  }
-
-  #live(key: string): { value: string; expiresAt: number } | undefined {
-    const entry = this.#entries.get(key);
-    if (!entry) return undefined;
-
-    if (entry.expiresAt <= nowInstant().epochMilliseconds) {
-      this.#entries.delete(key);
-      return undefined;
-    }
-
-    return entry;
   }
 }

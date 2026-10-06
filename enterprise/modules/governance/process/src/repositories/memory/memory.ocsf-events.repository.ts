@@ -3,16 +3,16 @@
 import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
 
 import type {
-  GovernanceOcsfEvent,
-  GovernanceOcsfEventsReader,
-  GovernanceOcsfEventWriter,
-} from "../../app/governance.members.ts";
-import type {
   FindOcsfEventsInput,
   GovernanceSeatReportRow,
   OcsfEventBatchWriter,
   OcsfSeatReportReader,
 } from "../clickhouse/clickhouse.ocsf-events.repository.ts";
+import type {
+  GovernanceOcsfEvent,
+  GovernanceOcsfEventsReader,
+  GovernanceOcsfEventWriter,
+} from "../governance.repositories.ts";
 
 /**
  * The OCSF-events twin: the newest write per (tenantId, eventId) wins, same

@@ -7,16 +7,13 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentServerConfig } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { MembersRead } from "@langwatch/process-stores/members";
+import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { experimentAttachmentLinkChannels } from "../channels/experiment-attachment-link-channels.registry.ts";
-import { experimentRunEventStreamChannels } from "../channels/experiment-run-event-stream-channels.registry.ts";
-import type { ExperimentRunEventStream } from "../channels/experiment-run-event-stream.channel.ts";
 import { ExecuteExperimentCellCommand } from "../eventing/experiment-run-cell.commands.ts";
 import {
   completeRun,
@@ -30,16 +27,20 @@ import {
   type ExperimentRunProcessingPipeline,
 } from "../eventing/experiment-run-processing.pipeline.ts";
 import { ExperimentRunProgressStore } from "../eventing/experiment-run-progress.store.ts";
-import type { ExperimentEventingClickHouseResolver } from "../repositories/experiment-clickhouse.repository.ts";
 import type { ExperimentIdLookupRepository } from "../repositories/experiment-id-lookup.repository.ts";
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
+import type { ExperimentRunEventStreamRepository } from "../repositories/experiment-run-event-stream.repository.ts";
 import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
-import { experimentRunRepositories } from "../repositories/experiment-run-repositories.registry.ts";
-import type { ExperimentRunRepositories } from "../repositories/experiment-run.repositories.ts";
+import type {
+  ExperimentRunProcessingStores,
+  ExperimentRunRepositories,
+} from "../repositories/experiment-run.repositories.ts";
 import {
   runRefusalsOf,
   type ExperimentRunRefusals,
 } from "../rules/experiment-run-availability.rules.ts";
+import { ExperimentAgentOwnershipService } from "./experiment-agent-ownership.service.ts";
+import { ExperimentAttachmentLimitService } from "./experiment-attachment-limit.service.ts";
 import { ExperimentAttachmentInputService } from "./experiment-attachment-input.service.ts";
 import type { ExecutionDataServices } from "./experiment-execution-data.service.ts";
 import { ExperimentRunBoardWriteBackService } from "./experiment-run-board-write-back.service.ts";
@@ -57,7 +58,7 @@ export type ExperimentRunProcessing = Readonly<{
   commands: ExperimentRunCommandDispatcherService;
   idLookup: ExperimentIdLookupRepository;
   /** The channel a run's frames reach the process streaming it on. */
-  stream: ExperimentRunEventStream;
+  stream: ExperimentRunEventStreamRepository;
   /** The run's progress fold, which a poll and an abort read by runId. */
   folds: ExperimentRunFoldRepository;
   /** The run's stop signal, set on abort. */
@@ -67,15 +68,12 @@ export type ExperimentRunProcessing = Readonly<{
   /** The peers a run's execution data is loaded through before it is planned. */
   services: ExecutionDataServices;
   /** Refuses a run against someone else's personal development agent before it starts. */
-  ownership: Pick<SuiteApi, "assertConnectedAgentsRunnable">;
+  ownership: Pick<ExperimentAgentOwnershipService, "assertConnectedAgentsRunnable">;
   /** Cells in flight at once when a run names no limit of its own. */
   concurrency: number;
   /** What this process refuses of a run, for want of Redis or a public address. */
   refusals: ExperimentRunRefusals;
 }>;
-
-type ExperimentRunMembers = MembersRead<readonly ["redis", "logger"]> &
-  Readonly<{ publicBaseUrl: string | undefined; processName: string; isSaas: boolean }>;
 
 type ExperimentRunPeers = Readonly<{
   workflows: WorkflowApi;
@@ -89,43 +87,41 @@ type ExperimentRunPeers = Readonly<{
   modelProviders: ModelProviderApi;
   evaluation: EvaluationApi;
   apiKeys: ApiKeyApi;
-  suite: SuiteApi;
   storedObjects: StoredObjectApi;
 }>;
 
 type ExperimentRunDeps = Readonly<{
   commands: ExperimentRunCommandDispatcherService;
   experiments: ExperimentService;
-  resolveClient: ExperimentEventingClickHouseResolver;
-  members: ExperimentRunMembers;
+  /** The run's stores from this module's registry, opened once retention's fallback is known. */
+  runStores: ExperimentRunProcessingStores;
   peers: ExperimentRunPeers;
   config: Pick<
     ExperimentServerConfig,
-    "blockLocalHttpCalls" | "allowedProxyHosts" | "runConcurrency"
+    "blockLocalHttpCalls" | "allowedProxyHosts" | "runConcurrency" | "publicBaseUrl" | "isSaas"
   >;
+  /** The role this process serves, named in a start's refusal. */
+  role: string;
 }>;
 
 /** The run machinery: folds, stop signal, frames, cells, board write-back and the run pipeline. */
 export class ExperimentRunService {
   static create(deps: ExperimentRunDeps): ExperimentRunService {
-    const { commands, experiments, resolveClient, members, peers, config } = deps;
-    const { redis, logger, publicBaseUrl, processName } = members;
+    const { commands, experiments, runStores, peers, config, role } = deps;
+    const { publicBaseUrl } = config;
     const { retention } = peers;
-    const defaultRetentionDays = () => retention.getPlatformDefaultRetentionDays();
-    const repositories = redis
-      ? experimentRunRepositories.shared.create({ redis, resolveClient, defaultRetentionDays })
-      : experimentRunRepositories.local.create({ resolveClient, defaultRetentionDays });
-    const { folds, abort } = repositories;
-    const stream = redis
-      ? experimentRunEventStreamChannels.live.create({ redis })
-      : experimentRunEventStreamChannels.memory.create();
+    const repositories = runStores.open({
+      defaultRetentionDays: () => retention.getPlatformDefaultRetentionDays(),
+    });
+    const { folds, abort, stream } = repositories;
     const refusals = runRefusalsOf({
-      sharedStore: redis !== undefined,
+      // Both tiers share a run across the deployment: live in Redis, memory in its one process.
+      sharedStore: true,
       publicBaseUrl,
-      processName,
+      processName: role,
     });
     if (refusals.start) {
-      logger.warn(
+      createLogger("langwatch:experiment:run").warn(
         { capability: refusals.start.capability },
         "experiment runs are refused in this process",
       );
@@ -167,7 +163,7 @@ export class ExperimentRunService {
         abort,
         publicBaseUrl,
         services,
-        ownership: peers.suite,
+        ownership: ExperimentAgentOwnershipService.create(peers.agents),
         concurrency: config.runConcurrency,
         refusals,
       },
@@ -204,7 +200,7 @@ function executionDataServicesOf(peers: ExperimentRunPeers): ExecutionDataServic
 }
 
 function createRunCells({
-  deps: { experiments, members, peers, config },
+  deps: { experiments, peers, config },
   folds,
   stream,
   services,
@@ -213,7 +209,7 @@ function createRunCells({
 }: {
   deps: ExperimentRunDeps;
   folds: ExperimentRunFoldRepository;
-  stream: ExperimentRunEventStream;
+  stream: ExperimentRunEventStreamRepository;
   services: ExecutionDataServices;
   cost: ExperimentRunModelCostService;
   abort: ExperimentRunAbortRepository;
@@ -239,8 +235,12 @@ function createRunCells({
           policy: {
             blockLocal: config.blockLocalHttpCalls,
             allowedHosts: config.allowedProxyHosts,
-            verifyTls: members.isSaas,
+            verifyTls: config.isSaas,
           },
+        }),
+        limits: ExperimentAttachmentLimitService.create({
+          entitlements: peers.entitlement,
+          projects: peers.projects,
         }),
       }),
     },
@@ -260,7 +260,7 @@ function buildRunPipeline({
   workflowEvaluations: WorkflowEvaluationService;
   cells: ExperimentRunCellService;
   boardWriteBack: ExperimentRunBoardWriteBackService;
-  stream: ExperimentRunEventStream;
+  stream: ExperimentRunEventStreamRepository;
 }): ExperimentRunProcessingPipeline {
   const { folds } = repositories;
   return buildExperimentRunProcessingPipeline({

@@ -941,7 +941,7 @@ describe("CodingAgentSessionFoldProjection", () => {
       const projection = makeProjection();
       let state = projection.init();
 
-      const declared = (title: string) =>
+      const sessionNamed = (title: string) =>
         logFactsEvent({
           facts: {
             "event.name": "langwatch.session_context",
@@ -951,10 +951,13 @@ describe("CodingAgentSessionFoldProjection", () => {
         });
 
       state = projection.handleCodingAgentSessionLogFactsContributed(
-        declared("pr-reviewer"),
+        sessionNamed("pr-reviewer"),
         state,
       );
-      state = projection.handleCodingAgentSessionLogFactsContributed(declared("pr-hound"), state);
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        sessionNamed("pr-hound"),
+        state,
+      );
 
       expect(state.title).toBe("pr-hound");
     });
@@ -964,7 +967,7 @@ describe("CodingAgentSessionFoldProjection", () => {
       const projection = makeProjection();
       let state = projection.init();
 
-      const declared = (title: string) =>
+      const sessionNamed = (title: string) =>
         logFactsEvent({
           facts: {
             "event.name": "langwatch.session_context",
@@ -974,10 +977,10 @@ describe("CodingAgentSessionFoldProjection", () => {
         });
 
       state = projection.handleCodingAgentSessionLogFactsContributed(
-        declared("pr-reviewer"),
+        sessionNamed("pr-reviewer"),
         state,
       );
-      state = projection.handleCodingAgentSessionLogFactsContributed(declared("   "), state);
+      state = projection.handleCodingAgentSessionLogFactsContributed(sessionNamed("   "), state);
 
       expect(state.title).toBe("pr-reviewer");
     });

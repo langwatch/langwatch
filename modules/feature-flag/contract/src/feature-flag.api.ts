@@ -20,8 +20,7 @@ import type {
   OrganizationFeatureFlagsForCaller,
 } from "./feature-flag.schemas.ts";
 import type { FeatureFlagKey } from "./feature-flag.ts";
-import type { FrontendFeatureFlag } from "./frontend-feature-flags.ts";
-import type { PublicAnonymousFlagMap } from "./public-anonymous-feature-flags.ts";
+import type { FrontendFeatureFlag, PublicAnonymousFlagMap } from "./frontend-feature-flags.ts";
 
 /** A person's own enrolment in one experiment. */
 export type UserExperimentEnrolmentInput = {

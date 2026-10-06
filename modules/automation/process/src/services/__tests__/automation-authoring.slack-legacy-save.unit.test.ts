@@ -7,6 +7,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { SilentLogger } from "../../__tests__/fixtures/graph-activity.fixture.ts";
+import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
 import { createTestSlackDestinations } from "../../__tests__/testing.ts";
 import { triggerRow } from "../../transport/__tests__/automation-rest-redaction.fixture.ts";
 import { AutomationAuthoringService } from "../automation-authoring.service.ts";
@@ -15,7 +16,7 @@ import { AutomationRulesService } from "../automation-rules.service.ts";
 import { AutomationSlackConnectionService } from "../automation-slack-connection.service.ts";
 import type { AutomationService } from "../automation.service.ts";
 
-/** @see specs/automations/slack-connections.feature */
+/** @see modules/slack/specs/slack-connections.feature */
 const crypto = {
   encrypt: (value: string) => `enc(${value})`,
   decrypt: (value: string) => value.replace(/^enc\(|\)$/g, ""),
@@ -73,7 +74,7 @@ function dashboard() {
       projects: createApiFixture<ProjectApi>({}),
     }),
     monitors: createApiFixture<MonitorApi>({ getAllByIds: async () => [] }),
-    providers: AutomationProviderRegistryService.create(crypto),
+    providers: AutomationProviderRegistryService.create(sealWith(crypto)),
     slackChannels: { list: async () => ({ channels: [], error: null, gaps: [] }) },
     slackDestinations: createTestSlackDestinations(),
     slackConnections: AutomationSlackConnectionService.create({
@@ -88,7 +89,7 @@ function dashboard() {
         releaseConnection: async () => undefined,
       },
       projects: { getOrganizationId: async () => "organization-1" },
-      crypto,
+      triggers: sealWith(crypto),
     }),
     traceFilters: { assertCompiles: () => undefined },
     limits: { count: async () => ({ allowed: true, resetAt: 0 }) },

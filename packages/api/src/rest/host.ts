@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { Hono } from "hono";
 
 import type { Entitlements } from "../access/access.ts";
+import { SurfaceUnconfiguredError } from "../errors.ts";
 /**
  * Where every declared REST family mounts. Thin on purpose: it states which
  * credential answers which family and hands one application to the hosting.
@@ -17,7 +18,11 @@ import type { MountableRestApp } from "./addressing.ts";
 import { CliTokenIdentity } from "./cli-token-identity.ts";
 import type { RestDoorCredential, RestTransportDeclaration } from "./declaration.ts";
 import type { IdempotentRunner } from "./idempotency.ts";
-import { isRestCredentialBinding, type RestTransportMiddlewareBinding } from "./request.ts";
+import {
+  isRestCredentialBinding,
+  type RestDoor,
+  type RestTransportMiddlewareBinding,
+} from "./request.ts";
 import { canonicalErrorResponse } from "./response.ts";
 import { createRestRuntime, type RestDeprecationLog } from "./runtime.ts";
 
@@ -27,8 +32,8 @@ const restErrorLogger = createLogger("langwatch:api:rest");
 const restDeprecationLog: RestDeprecationLog = {
   deprecatedRouteCalled: (route) => restErrorLogger.warn(route, "Deprecated REST route called"),
 };
-import { SessionKeyIdentity } from "./session-key-identity.ts";
 import type { RestAuditSink, RestIdentity } from "../hosting/api-door.ts";
+import { SessionKeyIdentity } from "./session-key-identity.ts";
 
 /** Every credential kind a family may name, except the three a module binds for itself. */
 export type RestIdentities = Readonly<
@@ -36,16 +41,15 @@ export type RestIdentities = Readonly<
 >;
 
 /**
- * Which bearer guards one internal family, by the family's own namespace: a
- * cron bearer must not reach the agent manager. Each bearer's target home is
- * its declaring module's transport declaration; that migration consumes this seam.
+ * Which bearer guards one internal family, by the family's own namespace. Absent, a family
+ * naming `internal_secret` without binding its own door refuses every call.
  */
 export type RestFamilyBearers = (namespace: string) => RestIdentity;
 
 export class RestHost implements FeatureRestHost<MountableRestApp> {
   static create(options: {
     identities: RestIdentities;
-    bearers: RestFamilyBearers;
+    bearers?: RestFamilyBearers | undefined;
     /** Every route-declared trail lands on this ONE sink. */
     audit: RestAuditSink;
     /**
@@ -74,6 +78,9 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
    */
   readonly app = new Hono();
 
+  /** Which module claims each prefixed namespace mounted so far. */
+  private readonly claims = new Map<string, string>();
+
   private constructor(private readonly options: Parameters<typeof RestHost.create>[0]) {}
 
   /**
@@ -87,6 +94,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     options?: FeatureRestMountOptions,
   ): MountableRestApp {
     const declaration = transport as RestTransportDeclaration<unknown>;
+    this.claimNamespace(declaration);
     const identities = this.identitiesFor(declaration);
     const bindings = options?.facts ?? [];
     const credentials = new Set<RestDoorCredential>();
@@ -137,16 +145,46 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     return family;
   }
 
+  /**
+   * A family that is not literal claims `/api/<namespace>` whole, so a second module's would
+   * run its middleware ahead of the first's routes: it declares a shared path instead (§8, R10).
+   */
+  private claimNamespace(declaration: RestTransportDeclaration<unknown>): void {
+    if (declaration.addressing === "literal") return;
+
+    const serving = declaration.api.name;
+    const claimant = this.claims.get(declaration.namespace);
+
+    if (claimant !== void 0 && claimant !== serving) {
+      throw new Error(
+        `REST "${declaration.namespace}" of ${serving} claims a namespace ${claimant} already claims; ` +
+          `serve its routes from a literal family with .withSharedPath({ owner: "${claimant}", reason, deprecate })`,
+      );
+    }
+
+    this.claims.set(declaration.namespace, serving);
+  }
+
   private identitiesFor(
     declaration: RestTransportDeclaration<unknown>,
-  ): Record<RestDoorCredential, RestIdentity> {
+  ): Record<RestDoorCredential, RestDoor> {
     return {
       ...this.options.identities,
-      internal_secret: this.options.bearers(declaration.namespace),
+      internal_secret:
+        this.options.bearers?.(declaration.namespace) ??
+        unboundInternalSecret(declaration.namespace),
       session_key: SessionKeyIdentity.unbound(declaration.namespace),
       cli_token: CliTokenIdentity.unbound(declaration.namespace),
     };
   }
+}
+
+function unboundInternalSecret(namespace: string): RestIdentity {
+  const refuse = (): never => {
+    throw new SurfaceUnconfiguredError(`${namespace} internal secret`);
+  };
+
+  return { authenticate: refuse, identify: refuse };
 }
 
 /**

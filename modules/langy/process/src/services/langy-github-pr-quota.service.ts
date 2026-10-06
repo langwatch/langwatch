@@ -37,14 +37,11 @@ function openResult(limit: number, bucket = dayBucket()): GithubPrLimitResult {
 
 /** Spends and refunds the per-user daily GitHub PR permit. */
 export class LangyGithubPrQuotaService {
-  static create(options: {
-    /** The process's counts, or `null` where no Redis is composed (dev, small self-hosters). */
-    counts: LangyGithubPrCountRepository | null;
-  }): LangyGithubPrQuotaService {
+  static create(options: { counts: LangyGithubPrCountRepository }): LangyGithubPrQuotaService {
     return new LangyGithubPrQuotaService(options.counts);
   }
 
-  private constructor(private readonly counts: LangyGithubPrCountRepository | null) {}
+  private constructor(private readonly counts: LangyGithubPrCountRepository) {}
 
   /** Check-only — does NOT increment. Fails open when the counter cannot be read. */
   async usage({
@@ -55,7 +52,6 @@ export class LangyGithubPrQuotaService {
     limit?: number;
   }): Promise<GithubPrLimitResult> {
     const bucket = dayBucket();
-    if (!this.counts) return openResult(limit, bucket);
     let count: number;
     try {
       count = await this.counts.count(bucketKey(userId, bucket));
@@ -82,7 +78,6 @@ export class LangyGithubPrQuotaService {
     limit?: number;
   }): Promise<GithubPrLimitResult> {
     const bucket = dayBucket();
-    if (!this.counts) return openResult(limit, bucket);
     let count: number;
     try {
       count = await this.counts.add({ key: bucketKey(userId, bucket), amount: 1 });
@@ -99,7 +94,7 @@ export class LangyGithubPrQuotaService {
 
   /** EXTRA increments when one turn opens more PRs than the one permit it held. Best-effort. */
   async recordExtra({ userId, extra }: { userId: string; extra: number }): Promise<void> {
-    if (!this.counts || extra <= 0) return;
+    if (extra <= 0) return;
     await this.counts
       .add({ key: bucketKey(userId, dayBucket()), amount: extra })
       .catch(() => undefined);
@@ -119,7 +114,6 @@ export class LangyGithubPrQuotaService {
   }): Promise<GithubPrLimitResult> {
     const bucket = dayBucket();
     // No counter: allowing keeps GitHub PRs working, and no reservation means none to release.
-    if (!this.counts) return openResult(limit, bucket);
     const key = bucketKey(userId, bucket);
     let count: number;
     try {

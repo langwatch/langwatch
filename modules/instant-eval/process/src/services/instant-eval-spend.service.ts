@@ -1,7 +1,8 @@
 /**
  * Where a judged query or run reports what it spent: one record per query and
  * one per run, on the gateway spend spine, so the same fold, the same budget
- * debits and the same monthly meter see it. @see specs/instant-evals/instant-eval-billing.feature
+ * debits and the same monthly meter see it.
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import type { InstantEvalPricing } from "@langwatch/instant-eval-contract";

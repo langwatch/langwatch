@@ -8,14 +8,14 @@ import type {
 import { ConnectLicenseChannel } from "../connect-license.channel.ts";
 
 /** One sync as it was made, so a suite can assert what left the install. */
-export interface RecordedLicenseSync {
+interface RecordedLicenseSync {
   readonly token: string;
   readonly instanceId: string;
   readonly version: string;
   readonly seats: LicenseSeatCounts;
 }
 
-export interface MemoryConnectLicenseChannelOptions {
+interface MemoryConnectLicenseChannelOptions {
   /** What a sync answers. A thrown value is thrown instead. */
   readonly syncAnswer?: LicenseSyncAnswer | Error;
   /** What an activation code redeems to. */

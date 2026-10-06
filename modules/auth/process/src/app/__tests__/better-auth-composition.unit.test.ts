@@ -13,7 +13,6 @@ import type { SignInProviderMounts, SsoApi } from "@langwatch/enterprise-sso-con
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
-import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -71,6 +70,8 @@ async function appFor(
       isSaas: false,
       signInProviders: { ...NO_SIGN_IN_PROVIDERS, ...providers.config },
       signUpMode: "open",
+      publicBaseUrl: undefined,
+      nodeEnvironment: undefined,
     },
     repositories: MemoryAuthRepositories.create(),
     dependencies: {
@@ -95,23 +96,12 @@ async function appFor(
     },
     members: {
       encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-      logger: createLogger("langwatch:auth:test"),
       // Better Auth's storage and hook repositories take the client and query
       // nothing until a request reaches them; no test below reaches one.
       prisma: {} as never,
       redis: null as never,
-      rateLimiter: { check: async () => ({ allowed: true }) } as never,
-      secrets: {
-        find: () => undefined,
-        read: (key: string) => {
-          throw new Error(`test double does not stub secrets.read("${key}")`);
-        },
-      },
-      publicBaseUrl: undefined,
       identityEmails: undefined as never,
       invites: null,
-      isSaas: false,
-      nodeEnvironment: undefined,
       processName: "langwatch-api",
     },
     resources: { own: () => undefined } as never,
@@ -123,6 +113,7 @@ async function appFor(
 }
 
 describe("given a deployment that named no browser-session identity", () => {
+  /** @scenario "A process that can compose no browser sessions says so, with the reason" */
   it("composes no instance and refuses the sign-in door by name", async () => {
     const app = await appFor();
 
@@ -130,6 +121,14 @@ describe("given a deployment that named no browser-session identity", () => {
     await expect(app.betterAuth()).rejects.toThrowError(/NEXTAUTH_SECRET and NEXTAUTH_URL/);
   });
 
+  /** @scenario A process with no Better Auth instance still declares the auth family */
+  it("refuses a sign-in attempt with the code service_unavailable", async () => {
+    const app = await appFor();
+
+    await expect(app.betterAuth()).rejects.toMatchObject({ code: "service_unavailable" });
+  });
+
+  /** @scenario A process with no Better Auth instance still declares the auth family */
   it("verifies every caller as anonymous rather than failing", async () => {
     const app = await appFor();
 

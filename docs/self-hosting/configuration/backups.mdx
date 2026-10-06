@@ -21,11 +21,11 @@ If you're using the chart-managed PostgreSQL (development/small deployments), us
 
 ```bash
 # Create a backup
-kubectl exec -n langwatch deploy/langwatch-postgresql -- \
+kubectl exec -n langwatch statefulset/langwatch-postgresql -- \
   pg_dump -U postgres langwatch > backup-$(date +%Y%m%d).sql
 
 # Restore from backup
-kubectl exec -i -n langwatch deploy/langwatch-postgresql -- \
+kubectl exec -i -n langwatch statefulset/langwatch-postgresql -- \
   psql -U postgres langwatch < backup-20260407.sql
 ```
 
@@ -73,8 +73,12 @@ Or use the `cold-storage-s3.yaml` overlay which enables both cold storage and ba
 ```bash
 helm install langwatch langwatch/langwatch \
   -f examples/overlays/size-prod.yaml \
-  -f examples/overlays/cold-storage-s3.yaml
+  -f examples/overlays/cold-storage-s3.yaml \
+  --set clickhouse.objectStorage.bucket=my-langwatch-backups \
+  --set clickhouse.objectStorage.region=us-east-1
 ```
+
+The overlay leaves `bucket` and `region` empty, and the chart refuses to render without them.
 
 ### S3 Authentication
 
@@ -98,8 +102,8 @@ clickhouse:
     credentials:
       secretKeyRef:
         name: clickhouse-s3-creds # K8s secret name
-        accessKeyKey: "accessKey"
-        secretKeyKey: "secretKey"
+        accessKeyId: "accessKey" # key in the secret that holds the access key ID
+        secretAccessKey: "secretKey" # key in the secret that holds the secret access key
 ```
 
 ### Backup Schedule
@@ -109,7 +113,7 @@ clickhouse:
 | Full        | `0 */12 * * *` (every 12h) | Complete database backup            |
 | Incremental | `0 * * * *` (every 1h)     | Only changes since last full backup |
 
-Both are implemented as Kubernetes CronJobs that run `clickhouse-client` commands inside the ClickHouse pod.
+Both run as Kubernetes CronJobs (`<release>-clickhouse-backup-full` and `<release>-clickhouse-backup-incremental`). Each job starts its own pod from the ClickHouse image and runs the backup against the first ClickHouse replica over the network.
 
 ### Restore from Backup
 

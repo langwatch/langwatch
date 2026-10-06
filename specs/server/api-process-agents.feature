@@ -1,67 +1,34 @@
-Feature: The standalone API process composes its own agent service
+Feature: The agent module installs with the modules it needs
   As an operator running a LangWatch API deployment
-  I want the API process to build the agent service its RPC surface serves
-  So that the agents door does not require a second process to hand it one
+  I want a process that installs the agent module without a module it needs to refuse to boot
+  So that an agents door never answers over a peer nobody installed
 
-  # WHY THIS EXISTS
-  #
-  # `API_UNAVAILABLE_PRODUCT_ADAPTERS` named "AgentsWorkflowPort and
-  # AgentsAuditLogPort: agent workflow copies and agent audit history" as the
-  # reason the agent service had to arrive from a host. The ports were always
-  # the Agents package's; what was missing was any implementation of them
-  # outside the legacy application.
-  #
-  # `@langwatch/agent-process` has them now — `PostgresAgentAdapter` builds the
-  # repository, the linked-workflow reads and the audit-history read from ONE
-  # guarded Prisma client, which is the client this process already composes.
-  #
-  # One capability did not come with them, and it is named rather than hidden.
-  # Copying a WORKFLOW agent copies the Studio graph it points at, which is the
-  # Workflow application's `copy` — a dataset copier, a DSL rewriter and the
-  # version rules behind them. This process composes no Workflow application,
-  # so it composes no workflow-copy capability, and the agent service it builds
-  # refuses that one operation by name instead of writing an agent that points
-  # at another project's graph.
+  # The agent module declares the workflow and audit-log modules it needs
+  # (its static dependencies). A process installing it without either refuses
+  # to boot, naming the module and the peer (record sections 3 and 6). There is
+  # no host that injects an agent service, and no process composes one by hand.
 
-  Rule: A process with a database composes the agent service itself
+  Rule: A process missing a module the agent module needs refuses to boot
 
     @unit
-    Scenario: The API process composes its own agent service
-      Given the deployment configured a database
-      And no host supplied an agent service
-      When the process composes
-      Then it builds the agent service over its own guarded client
-      And the agents RPC surface is served from it
+    Scenario: A process installing agent without the modules it needs refuses to boot
+      Given the agent module declares the workflow and audit-log modules as peers
+      When a process installs it with neither installed
+      Then the boot refuses, naming the agent module and the first peer missing
+      And the agent module's service is never constructed
+      And the process never becomes ready
+
+  Rule: Copying a workflow agent copies its graph through the workflow module
 
     @unit
-    Scenario: An injected agent service is the one the process serves
-      Given a host supplies the API process with its own agent service
-      When the process composes
-      Then the agents surface is served by the host's service
-      And the process composes none of its own
-      # A second agent service in one process would read the same rows through
-      # two graphs, and only one of them would be the one a host can observe.
-
-    @unit
-    Scenario: A process with no database composes no agent service
-      Given the deployment configured no database
-      And no host supplied an agent service
-      When the process composes
-      Then it composes no agent service, and names the missing half at boot
-      And the agents RPC surface mounts backed by the null object
-      And every agents call refuses by name instead of leaving no route at all
-
-  Rule: The one capability it cannot compose is announced at boot
-
-    @unit
-    Scenario: The process says it copies no workflow agents
-      Given the process is composing its own agent service
-      When it composes
-      Then it records that it holds no workflow-copy capability
-      And every other agent operation is served
+    Scenario: A copied workflow agent points at the graph the workflow module copied
+      Given an agent service composed with the workflow module as its peer
+      And a workflow agent pointing at a Studio graph
+      When the agent is copied to another project
+      Then the workflow module is asked to copy the graph into that project
+      And the copied agent points at the graph the workflow module returned
+      And the source agent is unchanged
 
     # The boot statement used to carry a standing list of adapters no package
     # implemented, and the entries that closed had to be removed from it by
-    # hand. The list outlived its last true entry and was deleted; what the
-    # agent service does or does not hold is stated by the service composing
-    # it, in the scenario above.
+    # hand. The list outlived its last true entry and was deleted.

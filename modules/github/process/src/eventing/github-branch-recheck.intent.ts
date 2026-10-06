@@ -8,7 +8,7 @@ import { GITHUB_BRANCH_RECHECK_PROCESS_NAME } from "./github-branch-recheck.proc
 const logger = createLogger("langwatch:github:branch-recheck");
 const OUTBOX_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;
 
-export interface GithubBranchRecheckDeps {
+interface GithubBranchRecheckDeps {
   github: GithubBranchMaintenance;
   processStore: ProcessStore;
 }

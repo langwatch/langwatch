@@ -6,14 +6,14 @@ user-invocable: true
 
 # API transports: REST, tRPC, streams
 
-Record: `dev/docs/ARCHITECTURE.md` section 8 (transports), section 12 (errors), the "Read hints" and
-"Projection cursor reads" paragraphs of section 10.1. This skill teaches the shape and the traps and does
+Record: `dev/docs/ARCHITECTURE.md` section 8 (transports), section 12 (errors), the read-hint ("The server never
+answers `unchanged`") and "Projection cursor reads" paragraphs of section 10. This skill teaches the shape and the traps and does
 not restate rulings. Deleted spellings are section 15; target names are section 16.
 
 A transport file **declares**. It never implements. The module's `*Api` operation holds the behaviour.
 
 Writing the contract itself (`*Api`, schemas, error classes) is the `contract` skill. Not here: how the module gets installed, how stores and peers reach it, how `boot()` opens the hosts.
-Those are the future `process-composition` and `module-dependencies` skills. A module never mounts
+Those are the `process-composition` and `module-dependencies` skills. A module never mounts
 anything; the process mounts every installed module's declarations.
 
 ## The rules that matter
@@ -31,16 +31,44 @@ anything; the process mounts every installed module's declarations.
 5. **The framework owns validation.** Never hand-check a body, a content type or a param. Tighten the
    schema. Unparseable input is the 400 `malformed_request`; parsed but failing the schema is the 422
    `validation_error`. A REST request is authenticated before its body is read, so a bad key is 401/403,
-   never 422 or 413.
+   never 422 or 413. A route that reads its raw body names its media type,
+   `.withRawBody("text", { mediaType })`; any other `Content-Type` is refused after the door with 415
+   `unsupported_media_type`. Only the `*-legacy` family and the collector add
+   `mismatch: "malformed_request"`, keeping main's 400 (record §8, E9, Alex 2026-10-05;
+   `modules/evaluation/process/src/transport/evaluations-legacy.rest.ts`).
 6. **Every wire schema imports from the module's own contract.** No schema declared in the transport file.
 7. **Docs live on the route.** `.withDocs({ tags, description, errors? })` in the same `*.rest.ts` file.
    Never a `*-openapi.rules.ts`. An extra status or non-JSON body goes through `documentedResponses()`.
 8. **Paths are `/api/<x>`; `/api/v1/<x>` also answers.** Dated and `latest` versions exist but stay
    hidden (ADR `packages/api/adrs/004-public-rest-v1-and-date-negotiation.md`). A path parameter is named
    for what it identifies (`:triggerId`, never `:id`), except a route main already publishes.
+   **A path in another module's namespace is declared, never borrowed** (record §8, R10, Alex
+   2026-10-06). When a door moves owner with its path unchanged, the new owner serves it from a
+   literal family and declares `.withSharedPath({ owner: "project", reason, deprecate })`: the module
+   whose namespace it is, why, and the plan or release that retires it. A blank reason or plan is
+   refused, a family claiming `/api/<x>` may not carry one, and a second module claiming a namespace is
+   refused at mount. The route registry lists every shared path (`packages/api/specs/shared-path.feature`).
 9. **Auth is the process's.** REST authenticates with API keys, tRPC with the session. A route names a
    permission (`.withPermission("triggers:view")`), never a credential source. The caller arrives as
    `actor`/`scope`; no handler reads headers or looks the key's owner up.
+   The door asks the permission before the handler runs. Never declare
+   `.withAccess(anyAuthenticated(...))` and then ask a permission in a middleware fact, the handler or
+   the `*Api`: that is a bypass. `{ at: "route", param }` asks at the scope the path names; on the
+   `api_key` door `{ at: "grants" }` passes a key naming no project on any scope it is granted at, and
+   `{ at: "organization" }` asks at the organization. If none fits, extend `packages/api` and the
+   door (`modules/auth/process/src/services/api-door.service.ts`), with a spec scenario in
+   `packages/api/specs/transport-declaration-split.feature`. A service keeps only the check that needs
+   the loaded row.
+   **Middleware never does the framework's work** (record §8, 2026-10-05): middleware that
+   authenticates or parses a JSON body, and a route opened to any authenticated or unauthenticated
+   caller, are drift that lint rules catch; the guard list is
+   `dev/docs/plans/api-framework-bypass-2026-10-05.md`. The framework extensions E1 to E8 in that plan
+   are shapes first: Alex approves the signature and one example route before any is built. E9 (above)
+   and E10 (below) are built (record §8).
+   **The audit is declared too.** A mutation whose row names the organization holding the project its
+   input names declares `.withAudit({ target: "organization", via: "projectId" })` (record §8, E10,
+   Alex 2026-10-05; `modules/trace/process/src/transport/traces-instant-eval.trpc.ts`). The door resolves
+   the organization; never write an audit row by hand.
 10. **A query never returns a credential.** Secrets come back only from a mutation.
 
 ## Worked example: one contract, one tRPC binding, one REST route
@@ -55,7 +83,7 @@ export const automationTrpc = defineTrpcContract("automation")
 
   .query("getTriggers")
   .withInput(automationApiProjectScopeSchema)
-  .withOutput(automationListRowSchema.array())
+  .withOutput(automationListRowSchema.array());
 ```
 
 Process (`modules/automation/process/src/transport/automation.trpc.ts`): permission plus one call.
@@ -64,7 +92,7 @@ Process (`modules/automation/process/src/transport/automation.trpc.ts`): permiss
 defineTrpcRouter(AutomationApi, automationTrpc)
   .procedure("getTriggers")
   .withPermission("triggers:view")
-  .handle(({ app, input }) => app.listAutomations({ projectId: input.projectId }))
+  .handle(({ app, input }) => app.listAutomations({ projectId: input.projectId }));
 ```
 
 REST (`.../transport/automation.rest.ts`): a namespace, a version, then complete routes.
@@ -78,7 +106,10 @@ defineRestRouter(AutomationApi)
   .withPermission("triggers:view")
   .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
   .withDocs({ tags: ["Triggers"], description: "Get a trigger by its ID" })
-  .handle(async ({ app, input, scope }) => ({ status: 200 as const, body: wire(await app.getPublicTrigger({ triggerId: input.triggerId, projectId: scope.id })) }))
+  .handle(async ({ app, input, scope }) => ({
+    status: 200 as const,
+    body: wire(await app.getPublicTrigger({ triggerId: input.triggerId, projectId: scope.id })),
+  }));
 ```
 
 A POST that creates declares `.withInput(...)`, `.withStatus(201)` and `.withOutput(...)` in the same
@@ -120,17 +151,17 @@ code slug. Register the code in `packages/handled-error/src/app-codes.ts` and it
 
 ## Traps
 
-| Trap | Instead |
-| --- | --- |
-| `c.json(...)`, `try/catch` into a status | return the value; throw a HandledError |
-| checking `typeof body.x` in a handler | tighten the Zod schema in the contract |
-| `:id` on a new route | `:<thing>Id` |
-| a docs object in `*-openapi.rules.ts` | `.withDocs()` on the route |
-| a handler calling two `*Api` operations | one operation that carries both |
-| a new procedure name chosen casually | the wire name is the browser's cache key; choose once |
-| a secret in a query output | a mutation returns it once; forms read blank |
-| a raw `/api/cron/*` route | a scheduled process manager (`eventing-and-worker`) |
-| REST route for the UI | the UI uses tRPC; REST is key-authenticated public API |
+| Trap                                                 | Instead                                                |
+| ---------------------------------------------------- | ------------------------------------------------------ |
+| `c.json(...)`, `try/catch` into a status             | return the value; throw a HandledError                 |
+| checking `typeof body.x` in a handler                | tighten the Zod schema in the contract                 |
+| `:id` on a new route                                 | `:<thing>Id`                                           |
+| a docs object in `*-openapi.rules.ts` (deleted, §15) | `.withDocs()` on the route                             |
+| a handler calling two `*Api` operations              | one operation that carries both                        |
+| a new procedure name chosen casually                 | the wire name is the browser's cache key; choose once  |
+| a secret in a query output                           | a mutation returns it once; forms read blank           |
+| a raw `/api/cron/*` route                            | a scheduled process manager (`eventing-and-worker`)    |
+| REST route for the UI                                | the UI uses tRPC; REST is key-authenticated public API |
 
 ## Tests
 

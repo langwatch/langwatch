@@ -10,7 +10,7 @@ export const MICROSOFT_PROVIDER_ID = "microsoft";
 export const LEGACY_MICROSOFT_ISSUER = issuerForProviderId(MICROSOFT_PROVIDER_ID);
 
 /** From the token's `sub` (how the row was stored) to its `iss` and `oid` (how 1.7 looks it up). */
-export type MicrosoftAccountKeyMove =
+type MicrosoftAccountKeyMove =
   | { kind: "none" }
   | { kind: "move"; legacySubject: string; issuer: string; accountId: string };
 

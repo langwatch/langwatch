@@ -1,5 +1,6 @@
 Feature: Evaluator service boundary
 
+  @unit @composition
   Scenario: A process composes one evaluator capability
     Given the application composes the evaluator adapter at startup
     When a REST or tRPC handler requests an evaluator
@@ -23,6 +24,7 @@ Feature: Evaluator service boundary
     And both answer an absence with undefined rather than a refusal
     And neither answers with a row belonging to another project
 
+  @unit
   Scenario: Evaluator persistence stays behind the server boundary
     Given an evaluator is loaded from Postgres
     When the repository maps the row

@@ -9,14 +9,14 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  type TraceSpanContentDrop,
-  type TraceSpanCostEnrichment,
-  type TraceSpanPiiRedaction,
-  type TraceSpanTokenEstimation,
-  type TraceSpanSpool,
-  type TraceSpanSpoolIdentity,
-} from "../../app/trace.members.ts";
+import type {
+  TraceSpanContentDrop,
+  TraceSpanCostEnrichment,
+  TraceSpanPiiRedaction,
+  TraceSpanTokenEstimation,
+  TraceSpanSpool,
+  TraceSpanSpoolIdentity,
+} from "../record-span.commands.ts";
 import { EventingRecordSpanAdapter } from "../record-span.commands.ts";
 
 class PiiRedactionFake implements TraceSpanPiiRedaction {
@@ -239,8 +239,11 @@ describe("EventingRecordSpanAdapter", () => {
     // have been broken here before: the handler strips whole attribute
     // namespaces, so a provenance name that lands in one is deleted between
     // the receiver writing it and the span being stored.
-    async function emittedResourceAfterReceiver(apiKeyId: string | null) {
-      const input = commandData({ resource: { attributes: [] } });
+    async function emittedResourceAfterReceiver(
+      apiKeyId: string | null,
+      submitted: { key: string; value: { stringValue: string } }[] = [],
+    ) {
+      const input = commandData({ resource: { attributes: submitted } });
       const request = { resourceSpans: [{ resource: input.resource }] };
       applyOtlpReceiverPolicy({
         request: request,
@@ -278,6 +281,25 @@ describe("EventingRecordSpanAdapter", () => {
 
       const source = emitted.find((attribute) => attribute.key === "langwatch.source");
       expect(source?.value.stringValue).toBe("claude_code");
+    });
+
+    /** @scenario A caller cannot forge the API key id attribute */
+    it("stamps the authenticated key's id over one the payload submitted", async () => {
+      const emitted = await emittedResourceAfterReceiver("key_abc", [
+        { key: "langwatch.api_key.id", value: { stringValue: "key_forged" } },
+      ]);
+
+      const ids = emitted.filter((attribute) => attribute.key === "langwatch.api_key.id");
+      expect(ids.map((attribute) => attribute.value.stringValue)).toEqual(["key_abc"]);
+    });
+
+    /** @scenario Legacy project key auth leaves no API key id behind */
+    it("drops a submitted API key id when the request had no ApiKey row", async () => {
+      const emitted = await emittedResourceAfterReceiver(null, [
+        { key: "langwatch.api_key.id", value: { stringValue: "key_forged" } },
+      ]);
+
+      expect(emitted.some((attribute) => attribute.key === "langwatch.api_key.id")).toBe(false);
     });
 
     it("emits no API key id when the request had no ApiKey row", async () => {

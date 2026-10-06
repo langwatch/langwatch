@@ -16,7 +16,7 @@ import type {
 
 const DAY_MS = 86_400_000;
 
-export interface GovernanceCostFigure {
+interface GovernanceCostFigure {
   amountUsd: number | null;
   cellsWithoutAmount: number;
   currenciesWithoutUsdAmount: string[];
@@ -64,7 +64,7 @@ export function spenderFigure(rows: readonly FigureRow[]): GovernanceCostFigure 
 }
 
 /** What a record was for: the model and the agent the provider named. */
-export function recordLabel({ model, agentId }: { model: string; agentId: string }): string {
+function recordLabel({ model, agentId }: { model: string; agentId: string }): string {
   if (model === "" && agentId === "") return "Not named";
   if (agentId === "") return model;
   if (model === "") return agentId;

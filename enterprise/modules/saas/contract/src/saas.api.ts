@@ -1,3 +1,4 @@
+import { Config, isSaas, type ConfigOf } from "@langwatch/config";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { moduleApi } from "@langwatch/module";
 import { USAGE_REPORT_MAX_BODY_BYTES, usageReportBodySchema } from "@langwatch/ops-contract";
@@ -34,3 +35,36 @@ export interface SaasApi {
 }
 
 export const SaasApi = moduleApi<SaasApi>()("saas");
+
+export const SAAS_FEATURE_ID = "saas" as const;
+
+export const saasBrowserUserSchema = z.object({
+  id: z.string(),
+  email: z.string().nullish(),
+  name: z.string().nullish(),
+  impersonator: z.string().nullish(),
+});
+
+export const saasBrowserScopeSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+
+export type SaasBrowserUser = z.infer<typeof saasBrowserUserSchema>;
+export type SaasBrowserScope = z.infer<typeof saasBrowserScopeSchema>;
+
+export abstract class SaasBrowserService {
+  abstract updateLastLogin(): void;
+}
+
+/** What a browser is told: which product it is looking at. */
+export const saasWebConfigSchema = z.strictObject({
+  deployment: z.enum(["saas", "self-hosted"]),
+});
+
+export type SaasWebConfig = z.infer<typeof saasWebConfigSchema>;
+
+/** Whether this deployment is LangWatch Cloud: the shared `isSaas` leaf, one claim among many. */
+export const saasConfig = Config.define(() => ({ isSaas }));
+
+export type SaasServerConfig = ConfigOf<typeof saasConfig>;

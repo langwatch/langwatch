@@ -78,8 +78,14 @@ import {
   type ResolveTraceSpansFn,
 } from "../trace-legacy-read.repository.ts";
 import type { TraceClickHouseClient } from "./clickhouse.trace-member-client.repository.ts";
-import { chBoolean, chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
-import { deserializeAttributes, ensureStringRecord } from "./stored-span-row.mapper.ts";
+import {
+  chBoolean,
+  chNumber,
+  chString,
+  chStringMap,
+  deserializeAttributes,
+  ensureStringRecord,
+} from "./stored-span-row.mapper.ts";
 
 const attributeMapSchema = z.record(z.string(), z.unknown());
 const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));

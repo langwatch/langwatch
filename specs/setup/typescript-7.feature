@@ -62,14 +62,16 @@ Feature: TypeScript 7 is the compiler
     Given TypeScript 7 is released
     Then no package declares `@typescript/native-preview`
 
-  @unit
+  # Gap: main's tsAst helper (parseSourceText) was deleted in 0affb6cbab; no helper parses source text that has no file.
+  @unit @unimplemented
   Scenario: Source text with no file behind it still parses
     Given a snippet that exists only as a string
     When a scan asks for its parsed form
     Then it gets back a syntax tree of that text
     And the scan walks it without the snippet ever reaching disk
 
-  @unit
+  # Gap: main's tsAst helper (parseSourceText) was deleted in 0affb6cbab; no helper parses source text that has no file.
+  @unit @unimplemented
   Scenario: A name reused with new text parses the new text
     Given a snippet was parsed under some file name
     When different text is parsed under that same name

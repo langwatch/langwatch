@@ -8,7 +8,7 @@ import {
   type ErasedIdentifierSuppressionRow,
 } from "../erased-identifier-suppression.repository.ts";
 
-export type ErasedIdentifierSuppressionDatabase = Pick<PrismaClient, "erasedIdentifierSuppression">;
+type ErasedIdentifierSuppressionDatabase = Pick<PrismaClient, "erasedIdentifierSuppression">;
 
 const ROW = { organizationId: true, provider: true, identifierHash: true } as const;
 

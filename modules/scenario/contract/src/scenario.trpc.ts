@@ -32,8 +32,8 @@ import {
   SIMULATION_RUN_EVENT_TYPES,
   SIMULATION_SET_EVENT_TYPES,
 } from "./simulation-event.constants.ts";
-import { simulationTargetSchema } from "./simulation-target.ts";
 import {
+  simulationTargetSchema,
   simulationAllSuitesRunDataSchema,
   simulationBatchHistorySchema,
   simulationBatchRunCountSchema,

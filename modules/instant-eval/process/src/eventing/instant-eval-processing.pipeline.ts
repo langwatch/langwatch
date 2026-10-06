@@ -39,7 +39,7 @@ import {
   type InstantEvalRunProjectionState,
 } from "./instant-eval-run.projection.ts";
 
-export interface InstantEvalProcessingPipelineDeps {
+interface InstantEvalProcessingPipelineDeps {
   /** The run's counters, on its own row. */
   instantEvalRunStore: StateProjectionStore<InstantEvalRunProjectionState>;
   dispatch: InstantEvalDispatchDeps;

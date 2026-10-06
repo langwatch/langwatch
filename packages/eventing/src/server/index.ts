@@ -28,8 +28,6 @@ export type { EventingProcessPersistenceDatabase } from "./process-persistence.d
 export {
   createEventingRetentionConfiguration,
   type EventingRetentionConfiguration,
-} from "./retention.ts";
-export {
   EventingServerRuntime,
   type EventingServerRuntimeDependencies,
   type EventingServerRuntimeOptions,

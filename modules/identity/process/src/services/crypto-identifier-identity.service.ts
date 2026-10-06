@@ -1,8 +1,24 @@
 import { createHash } from "node:crypto";
 
+import type { IdentifierProvider } from "@langwatch/identity-contract";
 import { Instance, Ksuid } from "@langwatch/ksuid";
 
-import type { DeriveIdentifierIdInput, IdentifierIdentity } from "../app/identity.members.ts";
+/** The fact an identifier id is derived from. */
+export type DeriveIdentifierIdInput = {
+  userId: string;
+  provider: IdentifierProvider;
+  providerAccountId: string | null;
+  normalizedValue: string;
+  occurredAtMs: number;
+};
+
+/**
+ * Where an identifier fact's identity comes from.
+ */
+export interface IdentifierIdentity {
+  /** The deterministic id this fact always derives, on any pass. */
+  deriveIdentifierId(fact: DeriveIdentifierIdInput): string;
+}
 
 /**
  * Pinned, never read from the ambient environment - the grants ledger's

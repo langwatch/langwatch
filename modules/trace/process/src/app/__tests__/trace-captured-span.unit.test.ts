@@ -2,8 +2,9 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { RecordCapturedSpanInput, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { TraceSpanIngest } from "../../services/trace-metadata-write.service.ts";
+import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import { TraceModule, type TraceAppDependencies } from "../trace.app.ts";
-import type { TraceSpanIngest, TraceLegacyRead } from "../trace.members.ts";
 
 const input: RecordCapturedSpanInput = {
   projectId: "project_1",
@@ -23,7 +24,7 @@ const input: RecordCapturedSpanInput = {
 
 function fixture() {
   const recordSpan = vi.fn<TraceSpanIngest["recordSpan"]>().mockResolvedValue(void 0);
-  const app: TraceApi = TraceModule.create(
+  const app: TraceApi = TraceModule.fromDependencies(
     createApiFixture<TraceAppDependencies>({
       spanIngest: createApiFixture<TraceSpanIngest>({ recordSpan }),
       traces: createApiFixture<TraceAppDependencies["traces"]>({

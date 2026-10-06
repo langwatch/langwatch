@@ -1,4 +1,4 @@
-import { Config, type ConfigOwner } from "@langwatch/config";
+import { Config, type ConfigOwner, rawSocketPort } from "@langwatch/config";
 import { storesOwner } from "@langwatch/process-stores/config";
 import { z } from "zod";
 
@@ -23,8 +23,7 @@ const processSettings = (role: "api" | "worker") =>
         z.coerce.number().int().positive().optional(),
       ),
     ),
-    /** The port the worker's raw-socket doors listen on (voice media dials back here). */
-    rawSocketPort: c.env("VOICE_WS_PORT", port.default(3300)),
+    rawSocketPort,
   }));
 
 /** Framework owners and installed module owners feed the same config parser. */

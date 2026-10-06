@@ -70,35 +70,48 @@ func placeholderValue(name string, vars map[string]string) (string, bool) {
 func expandValue(value any, vars map[string]string) (any, error) {
 	switch typed := value.(type) {
 	case string:
-		// A value that is exactly {nowMs[±N]} is a number, so a JSON timestamp field gets one.
-		if name, ok := strings.CutPrefix(typed, "{nowMs"); ok && strings.HasSuffix(name, "}") && scenarioPlaceholder.FindString(typed) == typed {
-			if value, ok := placeholderValue(typed[1:len(typed)-1], vars); ok {
-				return strconv.ParseInt(value, 10, 64)
-			}
-		}
-		return expandText(typed, vars)
+		return expandString(typed, vars)
 	case []any:
-		out := make([]any, len(typed))
-		for index, element := range typed {
-			expanded, err := expandValue(element, vars)
-			if err != nil {
-				return nil, err
-			}
-			out[index] = expanded
-		}
-		return out, nil
+		return expandArray(typed, vars)
 	case map[string]any:
-		out := make(map[string]any, len(typed))
-		for key, element := range typed {
-			expanded, err := expandValue(element, vars)
-			if err != nil {
-				return nil, err
-			}
-			out[key] = expanded
-		}
-		return out, nil
+		return expandObject(typed, vars)
 	}
 	return value, nil
+}
+
+// expandString fills a string's placeholders. A value that is exactly
+// {nowMs[±N]} is a number, so a JSON timestamp field gets one.
+func expandString(typed string, vars map[string]string) (any, error) {
+	if name, ok := strings.CutPrefix(typed, "{nowMs"); ok && strings.HasSuffix(name, "}") && scenarioPlaceholder.FindString(typed) == typed {
+		if value, ok := placeholderValue(typed[1:len(typed)-1], vars); ok {
+			return strconv.ParseInt(value, 10, 64)
+		}
+	}
+	return expandText(typed, vars)
+}
+
+func expandArray(typed []any, vars map[string]string) (any, error) {
+	out := make([]any, len(typed))
+	for index, element := range typed {
+		expanded, err := expandValue(element, vars)
+		if err != nil {
+			return nil, err
+		}
+		out[index] = expanded
+	}
+	return out, nil
+}
+
+func expandObject(typed map[string]any, vars map[string]string) (any, error) {
+	out := make(map[string]any, len(typed))
+	for key, element := range typed {
+		expanded, err := expandValue(element, vars)
+		if err != nil {
+			return nil, err
+		}
+		out[key] = expanded
+	}
+	return out, nil
 }
 
 // lookupPath walks a dotted path through decoded JSON: object keys, and
@@ -109,24 +122,29 @@ func lookupPath(value any, dotted string) (any, bool) {
 	}
 	current := value
 	for _, segment := range strings.Split(dotted, ".") {
-		switch typed := current.(type) {
-		case map[string]any:
-			next, ok := typed[segment]
-			if !ok {
-				return nil, false
-			}
-			current = next
-		case []any:
-			index, err := strconv.Atoi(segment)
-			if err != nil || index < 0 || index >= len(typed) {
-				return nil, false
-			}
-			current = typed[index]
-		default:
+		next, ok := lookupSegment(current, segment)
+		if !ok {
 			return nil, false
 		}
+		current = next
 	}
 	return current, true
+}
+
+// lookupSegment is one step of lookupPath: an object key, or an array index.
+func lookupSegment(current any, segment string) (any, bool) {
+	switch typed := current.(type) {
+	case map[string]any:
+		next, ok := typed[segment]
+		return next, ok
+	case []any:
+		index, err := strconv.Atoi(segment)
+		if err != nil || index < 0 || index >= len(typed) {
+			return nil, false
+		}
+		return typed[index], true
+	}
+	return nil, false
 }
 
 // checkExpect answers "" when the response holds the expectation, else the
@@ -135,20 +153,11 @@ func checkExpect(expect scenarioExpect, result SideResult) string {
 	if len(expect.Status) > 0 && !slices.Contains(expect.Status, result.Status) {
 		return fmt.Sprintf("status %d, expected %s: %s", result.Status, joinInts(expect.Status), excerpt(result.Body))
 	}
-	for _, name := range sortedStringKeys(expect.Headers) {
-		if got := result.Headers.Get(name); !strings.Contains(got, expect.Headers[name]) {
-			return fmt.Sprintf("header %s is %q, expected it to contain %q", name, got, expect.Headers[name])
-		}
+	if detail := checkHeaders(expect, result); detail != "" {
+		return detail
 	}
-	for _, text := range expect.Contains {
-		if !strings.Contains(result.Body, text) {
-			return fmt.Sprintf("body does not contain %q", text)
-		}
-	}
-	for _, text := range expect.NotContains {
-		if strings.Contains(result.Body, text) {
-			return fmt.Sprintf("body contains %q", text)
-		}
+	if detail := checkText(expect, result.Body); detail != "" {
+		return detail
 	}
 	if expect.Body == nil && expect.Length == nil {
 		return ""
@@ -163,6 +172,30 @@ func checkExpect(expect scenarioExpect, result SideResult) string {
 		}
 	}
 	return checkLength(expect, decoded)
+}
+
+func checkHeaders(expect scenarioExpect, result SideResult) string {
+	for _, name := range sortedStringKeys(expect.Headers) {
+		if got := result.Headers.Get(name); !strings.Contains(got, expect.Headers[name]) {
+			return fmt.Sprintf("header %s is %q, expected it to contain %q", name, got, expect.Headers[name])
+		}
+	}
+	return ""
+}
+
+// checkText checks the body's contains and notContains lists, in that order.
+func checkText(expect scenarioExpect, body string) string {
+	for _, text := range expect.Contains {
+		if !strings.Contains(body, text) {
+			return fmt.Sprintf("body does not contain %q", text)
+		}
+	}
+	for _, text := range expect.NotContains {
+		if strings.Contains(body, text) {
+			return fmt.Sprintf("body contains %q", text)
+		}
+	}
+	return ""
 }
 
 func joinInts(values []int) string {
@@ -235,25 +268,38 @@ func matchObject(want map[string]any, got any, at string) string {
 	if !ok {
 		return fmt.Sprintf("%s: expected an object, got %s", pointerOrRoot(at), excerptValue(got))
 	}
+	match := objectMatch{object: object, at: at}
 	for _, key := range sortedKeys(want) {
-		child, found := object[key]
-		if !found {
-			child, found = lookupPath(object, key)
-		}
-		if want[key] == scenarioAbsent {
-			if found {
-				return fmt.Sprintf("%s/%s: expected it absent, got %s", at, key, excerptValue(child))
-			}
-			continue
-		}
-		if !found {
-			return at + "/" + key + ": missing from the body"
-		}
-		if detail := matchBody(want[key], child, at+"/"+key); detail != "" {
+		if detail := match.member(key, want[key]); detail != "" {
 			return detail
 		}
 	}
 	return ""
+}
+
+// objectMatch is a got object and its path, matched one wanted key at a time.
+type objectMatch struct {
+	object map[string]any
+	at     string
+}
+
+// member matches one wanted key: a literal key first, else a dotted path.
+func (match objectMatch) member(key string, want any) string {
+	path := match.at + "/" + key
+	child, found := match.object[key]
+	if !found {
+		child, found = lookupPath(match.object, key)
+	}
+	if want == scenarioAbsent {
+		if found {
+			return fmt.Sprintf("%s: expected it absent, got %s", path, excerptValue(child))
+		}
+		return ""
+	}
+	if !found {
+		return path + ": missing from the body"
+	}
+	return matchBody(want, child, path)
 }
 
 func matchArray(want []any, got any, at string) string {

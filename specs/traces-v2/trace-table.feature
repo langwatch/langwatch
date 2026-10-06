@@ -17,6 +17,9 @@
 # PAGE LAYOUT
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Untagged scenarios below are @unimplemented (Q196): rows of the old table vision whose behaviour has no covering test.
+# Wording stays as main's; rebind a row when a test proves it.
+
 Feature: Trace table
 
 Rule: Trace table page layout
@@ -36,18 +39,21 @@ Rule: Trace table page layout
     When the table reads its effective lens
     Then it receives the same lens object both times
 
+  @unimplemented
   Scenario: Three-panel layout renders on Observe page
     When the Observe page loads
-    Then the filter sidebar is on the left
+    Then the filter sidebar is on the left, collapsed on a fresh load
     And the trace table fills the center column
     And the trace drawer area is on the right (hidden until a trace is selected)
 
+  @unimplemented
   Scenario: Filter sidebar expanded state
     When the filter sidebar is expanded
     Then it is 220px wide
     And full facet sections with three-stage checkboxes are visible
     And a collapse button "«" is in the top-right of the sidebar
 
+  @unimplemented
   Scenario: Filter sidebar collapsed state
     When the user clicks the collapse button "«"
     Then the sidebar collapses to 40px wide
@@ -58,7 +64,7 @@ Rule: Trace table page layout
   # Not yet implemented as of 2026-05-01 — collapsed sidebar today shows
   # facet abbreviations with active dots; there is no separate horizontal
   # chip bar above the table.
-  @planned
+  @planned @unimplemented
   Scenario: Filter chip bar when sidebar collapsed with active filters
     Given the filter sidebar is collapsed
     And filters are active
@@ -76,48 +82,53 @@ Rule: Origin filter in sidebar
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
+  @integration
   Scenario: Origin facet is first in the sidebar
     When the filter sidebar renders
     Then the Origin section appears above all other facet sections
     And it has slightly more visual emphasis than other facets
 
+  @integration
   Scenario: Origin facet shows three values with counts
     When the filter sidebar renders
     Then the Origin section shows "Application", "Simulation", and "Evaluation"
     And each value has a count badge
 
+  @integration
   Scenario: No origin selected by default
     When the Observe page loads
     Then no origin checkbox is checked
     And traces from all origins are shown
 
+  @unimplemented
   Scenario: Selecting an origin filters traces and syncs with search bar
     When the user checks "Application" in the Origin facet
     Then only Application traces are shown in the table
-    And the search bar shows "@origin:application"
+    And the search bar shows "origin:application"
 
+  @unimplemented
   Scenario: Multi-select origins
     When the user checks "Application" and "Simulation"
     Then traces from both origins are shown
-    And the search bar shows "@origin:application @origin:simulation"
+    And the search bar shows "(origin:application OR origin:simulation)"
 
   # The following three scenarios describe origin-conditional facet sections
   # (Scenario / Verdict / Eval Type / Score Range) that are not implemented
   # — the sidebar always renders the same facet sections regardless of which
   # origin is checked.
-  @planned
+  @planned @unimplemented
   Scenario: Simulation origin reveals additional facets
     When the user checks "Simulation"
     Then additional facets appear below the standard ones: Scenario, Verdict
     And standard facets remain visible
 
-  @planned
+  @planned @unimplemented
   Scenario: Evaluation origin reveals additional facets
     When the user checks "Evaluation"
     Then additional facets appear below the standard ones: Eval Type, Score Range
     And standard facets remain visible
 
-  @planned
+  @planned @unimplemented
   Scenario: Application origin shows standard facets only
     When the user checks "Application"
     Then no additional facets appear beyond the standard ones
@@ -134,18 +145,22 @@ Rule: Toolbar strip
     Given the user is authenticated with "traces:view" permission
     And the Observe page is loaded
 
+  @unimplemented
   Scenario: Toolbar renders the expected controls
     Then the toolbar shows lens tabs flushed left
     And the right cluster includes (in order): tour button, live indicator, time range picker, columns dropdown, grouping selector, density toggle, find button, keyboard shortcuts button
     And the toolbar row is 36px minimum height
 
+  @integration
   Scenario: Lens tabs take remaining horizontal space
     Then the lens tabs flex to fill remaining space before the right cluster
 
+  @integration
   Scenario: Grouping selector shows checkmark on selected item
     When the user opens the grouping dropdown
     Then the selected grouping has a checkmark (not a radio circle)
 
+  @integration
   Scenario: Time range picker shows relative presets and absolute dates
     When the user opens the time range picker
     Then relative presets are available (Last 15m, Last 1h, Last 24h, etc.)
@@ -155,7 +170,7 @@ Rule: Toolbar strip
 
   # Not yet implemented as of 2026-05-01 — there is no "+ sim" button in the
   # current Toolbar.
-  @planned
+  @planned @unimplemented
   Scenario: "+ sim" button is de-emphasized
     Then the "+ sim" button is positioned far right
     And it has de-emphasized styling
@@ -172,20 +187,24 @@ Rule: All Traces lens (default)
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
+  @unit
   Scenario: All Traces is the default lens
     When the Observe page loads
     Then the "All" tab is active
     And traces are shown in a flat list with no grouping
 
+  @unit
   Scenario: Default sort is by time descending
     When the All Traces lens is active
     Then `viewStore.sort` is `{ columnId: "time", direction: "desc" }`
 
+  @unimplemented
   Scenario: All-traces default columns
     When the All Traces lens is active
     Then the visible columns are: Time, Trace, Service, Duration, Cost, Tokens, Spans, Model, Labels, Evals, Events
     And the lens addons include "io-preview" and "expanded-peek"
 
+  @unit
   Scenario: No filters are locked
     When the All Traces lens is active
     Then the full filter column is available with no locked sections
@@ -202,6 +221,7 @@ Rule: Conversations lens
     Given the user is authenticated with "traces:view" permission
     And the project has traces with conversation IDs
 
+  @unit
   Scenario: Switching to Conversations groups traces by conversation ID
     When the user clicks the "Conversations" tab
     Then traces are grouped by conversation ID
@@ -209,7 +229,7 @@ Rule: Conversations lens
 
   # Not yet implemented as of 2026-05-01 — Conversations lens does not lock
   # conversation-related facet sections in the sidebar.
-  @planned
+  @planned @unimplemented
   Scenario: Conversation-related filters are locked
     When the Conversations lens is active
     Then conversation-related filter sections show a lock icon
@@ -217,61 +237,74 @@ Rule: Conversations lens
     And the locked section cannot be expanded
     And hovering the heading shows "This filter is set by the Conversations view. Switch to All Traces to change it."
 
+  @integration
   Scenario: Conversations sorted by most recent activity
     When the Conversations lens is active
     Then conversations are sorted by most recent message timestamp descending
 
+  @integration
   Scenario: Traces without conversation ID are excluded
     Given some traces have no conversation ID
     When the Conversations lens is active
     Then those traces do not appear in the list
 
+  @unimplemented
   Scenario: Collapsed conversation row shows summary data
     When a conversation row is collapsed
     Then line 1 shows: expand toggle, conversation ID (truncated to 8 chars), relative time, last message snippet (~40 chars), turn count, duration, cost, status
     And line 2 shows: message counts (user, assistant, tool), primary model, service name, wall-clock duration
 
+  @unimplemented
   Scenario: Conversation ID is copyable
     When the user clicks the conversation ID in a row
     Then the full conversation ID is copied to clipboard
     And hovering the ID shows the full ID
 
+  @unit
   Scenario: Conversation status shows worst status across traces
     Given a conversation has 5 OK traces and 1 errored trace
     Then the conversation row shows Error status
 
+  @unit
   Scenario: Wall-clock duration shows elapsed real time
     Given a conversation started at 10:00 and the last trace ended at 10:08:12
     Then the wall-clock duration shows "wall: 8m 12s"
 
+  @integration
   Scenario: Expanding a conversation shows turn rows
     When the user clicks the expand toggle on a conversation
     Then up to 5 turn rows appear below the conversation header
     And each turn shows: turn number, user message, assistant message, tool calls (if any), duration, time-between turns
 
+  @integration
   Scenario: Long pauses between turns are highlighted
     Given two turns are separated by more than 30 seconds
     Then the time-between shows a highlight like "⏱ +12.4s ← long pause"
 
+  @unimplemented
   Scenario: More than 5 turns shows overflow
     Given a conversation has 8 turns
     When the conversation is expanded
     Then 5 turns are shown
     And "... 3 more turns" with a "Show all" link appears
 
+  @integration
   Scenario: Clicking a turn row opens the trace drawer
     When the user clicks a turn row
     Then the trace drawer opens in Trace mode for that specific trace
     And the Conversation toggle is visible in the drawer
 
+  @unimplemented
   Scenario: Clicking the conversation header row opens drawer in Conversation mode
     When the user clicks the conversation header row (not a turn)
     Then the trace drawer opens in Conversation mode
 
+  @unimplemented
   Scenario: Conversation columns differ from All Traces
     When the Conversations lens is active
     Then the visible columns are: Conversation (320px min), Turns, Duration, Cost, Tokens, Model, Service, Status
 
+  @unimplemented
   Scenario: Empty state when no conversations exist
     Given no traces have conversation IDs in the current time range
     When the Conversations lens is active
@@ -290,6 +323,7 @@ Rule: Errors lens
     Given the user is authenticated with "traces:view" permission
     And the project has traces including some with errors
 
+  @unit
   Scenario: Switching to Errors shows only error traces
     When the user clicks the "Errors" tab
     Then the lens injects `status:error` into the query text
@@ -297,32 +331,37 @@ Rule: Errors lens
 
   # Not yet implemented as of 2026-05-01 — the Errors lens injects its filter
   # via queryText, not by locking a sidebar facet section.
-  @planned
+  @planned @unimplemented
   Scenario: Status filter is locked in Errors lens
     When the Errors lens is active
     Then the Status facet section is collapsed and locked
     And the section heading shows "Status: Error (set by Errors view)"
     And hovering shows "This filter is set by the Errors view. Switch to All Traces to change it."
 
+  @unimplemented
   Scenario: Error rows use two-line format
     When the Errors lens is active
     Then each row has two lines
     And line 1 shows: red dot, time, root span name, service, duration, cost, model
     And line 2 shows: erroring span name and exception type + message (truncated, monospace)
 
+  @integration
   Scenario: Erroring span on root shows "(root)"
     Given a trace where the root span itself errored
     Then line 2 shows "(root)" as the span name
 
+  @unimplemented
   Scenario: Clicking an error row opens drawer with erroring span pre-selected
     When the user clicks an error row
     Then the trace drawer opens
     And the erroring span is pre-selected in the waterfall
 
+  @unit
   Scenario: Errors sorted by timestamp descending
     When the Errors lens is active
     Then error traces are sorted by timestamp descending
 
+  @unimplemented
   Scenario: Empty state when no errors exist
     Given no traces have error status in the current time range
     When the Errors lens is active
@@ -341,6 +380,7 @@ Rule: Default columns and status indicator
     Given the user is authenticated with "traces:view" permission
     And the Observe page is loaded with traces
 
+  @unimplemented
   Scenario: Default columns are displayed
     Then the table shows columns from the all-traces lens with these widths:
       | id       | size | minSize |
@@ -357,62 +397,76 @@ Rule: Default columns and status indicator
   # Columns dropdown. The TIME column additionally switches between relative
   # ("3m") and ISO 8601 via a Relative / ISO toggle in the column picker;
   # the hover card is read-only and never changes the format.
+  @integration
   Scenario: Time column shows compact relative time
     Given a trace occurred 2 minutes ago
     Then the Time column shows "2m"
 
+  @integration
   Scenario: Since column shows verbose relative time
     Given a trace occurred 2 minutes ago
     And the "Since" column is enabled
     Then the Since column shows "2 minutes ago"
 
+  @integration
   Scenario: Timestamp column shows ISO 8601
     Given the "Timestamp" column is enabled
     Then the Timestamp column shows the full ISO 8601 timestamp
 
+  @integration
   Scenario: Hovering a time cell shows a read-only breakdown
     When the user hovers any time cell
     Then a hover card shows verbose relative, local, UTC, and ISO forms
     And the hover card has no control to change the column's format
 
+  @integration
   Scenario: The row-select column is sticky during horizontal scroll
     When the table scrolls horizontally
     Then the leftmost row-select column stays frozen at the left edge
     # Only the row-select gutter is sticky; no data column (including Time)
     # is pinned.
 
+  @integration
   Scenario: Table header row is sticky during vertical scroll
     When the table scrolls vertically
     Then the header row stays fixed at the top
 
+  @integration
   Scenario: Table scrolls horizontally when columns exceed viewport
     Given many columns are enabled
     When total column width exceeds the container
     Then horizontal scrolling is available
 
+  @integration
   Scenario: Duration column shows inline proportional bar
     Then each duration cell shows the formatted duration ("1.2s", "340ms")
     And a subtle proportional bar is rendered inline
 
+  @integration
   Scenario: Cost column shows appropriate precision
     Then cost values show "$0.003" or "$1.24" with appropriate decimal places
 
+  @integration
   Scenario: Tokens column shows compact format
     Then token counts show compact format like "1.2K" or "450"
 
-  Scenario: Model column shows abbreviated provider/model
+  @unimplemented
+  Scenario: Model column shows the raw model string
     Given a trace used "gpt-4o"
-    Then the Model column shows "oai/4o"
+    Then the Model column shows "gpt-4o"
 
+  @integration
   Scenario: Model column shows badge for multiple models
     Given a trace used "gpt-4o" and "claude-sonnet"
     Then the Model column shows the primary model plus a "+1" badge
 
+  @integration
   Scenario: Labels column shows colour-coded badges
     Given a trace has labels "billing" and "refund"
     Then the Labels column shows a badge per label
     And each badge's colour is derived deterministically from the label text
 
+  @integration
   Scenario: Labels column shows an em dash when there are no labels
     Given a trace has no labels
     Then the Labels column shows "—"
@@ -427,65 +481,78 @@ Rule: Interactive value chips
   link-out reveals on hover to jump to the value's source. Clicking a chip
   never opens the row's trace drawer (the click is contained).
 
+  @integration
   Scenario: Clicking a label chip filters by that label
     Given a trace row shows the label "billing"
     When the user clicks the "billing" chip
     Then `toggleFacet("label", "billing")` runs and the drawer does not open
 
+  @integration
   Scenario: Clicking a model chip filters by that model
     When the user clicks the model chip for "gpt-4o"
     Then `toggleFacet("model", "gpt-4o")` runs
 
+  @integration
   Scenario: Clicking an evaluation chip filters by that evaluator
     When the user clicks an evaluation chip
     Then `toggleFacet("evaluator", <evaluatorId>)` runs
 
+  @integration
   Scenario: Clicking a prompt chip filters by that prompt
     When the user clicks the prompt chip
     Then `toggleFacet("lastUsedPrompt", <promptId>)` runs
 
+  @unimplemented
   Scenario: Known model links to provider settings
     Given a model whose provider is recognised
     Then its hover ↗ links to "/settings/model-providers"
 
+  @unimplemented
   Scenario: Unrecognised model is flagged and links to mapping
     Given a model whose provider is not recognised
     Then the chip shows an amber help glyph (no cost-regex match)
     And its hover ↗ links to model settings to map it
 
+  @integration
   Scenario: Online evaluation can open its definition
     Given an evaluation whose evaluator id has no "/" (a configured evaluator)
     Then its hover popover offers "View definition"
     And an "evaluator_*" id opens the evaluator editor, others the online-evaluation drawer
 
+  @integration
   Scenario: Built-in evaluator type has no definition link
     Given an evaluation whose evaluator id is a langevals type like "ragas/faithfulness"
     Then no "View definition" action is offered
 
+  @unit
   Scenario: OK status has no visual indicator
     Given a trace with OK status
     Then the row has no left border
     And no background tint
 
+  @unit
   Scenario: Warning status shows yellow border and tint
     Given a trace with warning status
     Then the row has a 2px yellow left border
     And a very subtle yellow background tint
 
+  @unit
   Scenario: Error status shows red border and tint
     Given a trace with error status
     Then the row has a 2px red left border
     And a very subtle red background tint
 
+  @unit
   Scenario: Status tint composes with hover state
     Given a trace with error status
     When the user hovers the row
     Then both the hover highlight and the red tint are visible simultaneously
 
+  # Gap: display-formatters.cost.unit.test.ts proves the tilde (as ~$0.0030); the tooltip and the three-decimal wording are unasserted.
+  @unimplemented
   Scenario: Estimated cost shows tilde prefix
     Given a trace with TokensEstimated = true
-    Then the cost shows "~$0.003" with a tilde prefix
-    And hovering shows a tooltip "Estimated"
+    Then the cost shows "~$0.0030" with a tilde prefix
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -502,12 +569,14 @@ Rule: Two-zone row format (compact density only)
     And the Observe page is loaded
     And density is "compact"
 
+  @integration
   Scenario: LLM trace row renders the IOPreviewAddon below the header
     Given a trace has both `input` and `output` populated
     And the row is not expanded
     Then a preview sub-row is rendered below the main row
     And the sub-row inherits the row's status border colour on the left edge
 
+  @integration
   Scenario: The I/O preview stops before Labels, Evals, Prompt, or Events
     Given a trace renders the I/O preview sub-row
     Then the preview cell's right edge stops at the leftmost of the Labels, Evals, Prompt, or Events columns
@@ -518,36 +587,44 @@ Rule: Two-zone row format (compact density only)
     # that carries its own content (Labels, Evals, Prompt, Events).
     # The boundary follows the live column order, so it survives reorder.
 
+  @unimplemented
   Scenario: Non-LLM trace row shows header only
     Given a trace is missing either `input` or `output`
     Then no IOPreview sub-row is rendered
 
+  @unimplemented
   Scenario: Comfortable density disables the I/O sub-row
     Given density is "comfortable"
     Then no IOPreview sub-row is rendered for any row
 
+  @unimplemented
   Scenario: Chat messages I/O shows user and assistant with role icons
     Given a trace I/O is a chat messages array with role and content
     Then the I/O shows the last user message as "↑" with a user icon
     And the assistant response as "↓" with an assistant icon
 
+  @unimplemented
   Scenario: Tool call I/O shows function name
     Given a trace I/O has a last message with tool_calls
     Then the I/O shows "↓ 🔧 [function_name](args...)"
 
+  @unimplemented
   Scenario: Plain text I/O shows input and output
     Given a trace I/O is plain text (not chat messages)
     Then the I/O shows '↑ "input text..."' and '↓ "output text..."' with no role icons
 
+  @unimplemented
   Scenario: JSON I/O shows truncated object
     Given a trace I/O is JSON (non-chat)
     Then the I/O shows "↑ {key: value...}" truncated
 
+  @unimplemented
   Scenario: I/O snippets are truncated to available width
     Given a trace has long I/O content
     Then snippets are truncated with "..."
     And full text is visible on hover tooltip
 
+  @unimplemented
   Scenario: LLM detection uses ComputedInput/Output or span attributes
     Given a trace has ComputedInput and ComputedOutput in trace summaries
     Then it renders as an LLM trace with I/O sub-rows
@@ -555,6 +632,7 @@ Rule: Two-zone row format (compact density only)
     Given a trace root span has gen_ai.input.messages in attributes
     Then it also renders as an LLM trace with I/O sub-rows
 
+  @integration
   Scenario: Two-zone hover treats both lines as one unit
     Given a trace has I/O sub-rows
     When the user hovers over the I/O sub-row
@@ -572,11 +650,13 @@ Rule: Column visibility and reorder
     Given the user is authenticated with "traces:view" permission
     And the Observe page is loaded
 
+  @integration
   Scenario: Columns dropdown shows organized sections
     When the user clicks the "Columns" button in the toolbar
     Then a dropdown appears with sections: Standard, Evaluations, Events
     And each column has a visibility checkbox
 
+  @unimplemented
   Scenario: Standard columns are always available
     When the columns dropdown is open
     # Source: traceColumnDefs in components/TraceTable/columns.ts
@@ -590,20 +670,24 @@ Rule: Column visibility and reorder
   # That behaviour is owned by specs/traces-v2/evaluations.feature
   # ("Per-evaluator eval columns").
 
+  @integration
   Scenario: Toggling a column checkbox shows or hides the column
     Given the Service column is hidden
     When the user checks "Service" in the dropdown
     Then the Service column appears in the table
 
+  @unimplemented
   Scenario: Drag-to-reorder columns
     When the user drags a column via its drag handle in the dropdown
     Then a blue top-border indicator shows the drop target
     And releasing reorders the column in the table
 
+  @unimplemented
   Scenario: Time column cannot be resized
     Then the Time column has `enableResizing: false`
     And dragging its resize grip is a no-op
 
+  @unit
   Scenario: Column preferences persist
     When the user hides the Tokens column
     And refreshes the page
@@ -634,24 +718,29 @@ Rule: Row click and selection behavior
     Given the user is authenticated with "traces:view" permission
     And the Observe page is loaded with traces
 
+  @integration
   Scenario: Clicking a row opens the trace drawer
     When the user clicks a trace row
     Then the trace drawer opens showing that trace's details
 
+  @integration
   Scenario: Clicking the same trace again closes the drawer (toggle)
     Given the drawer is open for trace "abc123"
     When the user clicks the same trace row
     Then the drawer closes
 
+  @integration
   Scenario: Clicking a different trace updates the drawer
     Given the drawer is open for trace "abc123"
     When the user clicks trace "def456"
     Then the drawer updates to show "def456"
 
+  @unit
   Scenario: Selected row shows visual indicator
     When a trace row is selected
     Then it has a left border accent and a subtle background tint
 
+  @integration
   Scenario: Keyboard navigation with arrow keys
     Given the table body is focused
     When the user presses the Down arrow key
@@ -660,17 +749,20 @@ Rule: Row click and selection behavior
     When the user presses the Up arrow key
     Then `focusedIndex` decreases by one (clamped to 0)
 
+  @integration
   Scenario: Enter key toggles the drawer for the focused row
     Given a row is focused via keyboard navigation
     When the user presses Enter
     Then `useTraceLensKeyboard.toggleTrace` runs for that row
     And the drawer opens (or closes, if it was already open for this trace)
 
+  @integration
   Scenario: Escape closes the drawer
     Given the drawer is open
     When the user presses Escape while the table is focused
     Then `closeDrawer()` is invoked
 
+  @integration
   Scenario: "p" toggles the inline peek for the focused row
     Given a row is focused via keyboard navigation
     When the user presses "p"
@@ -688,18 +780,21 @@ Rule: Density toggle
     Given the user is authenticated with "traces:view" permission
     And the Observe page is loaded
 
+  @unimplemented
   Scenario: Compact density uses tight spacing
     When the user selects "compact" density
     Then rows are approximately 32px tall
     And font size is 12px
     And padding is tight
 
+  @unimplemented
   Scenario: Comfortable density uses generous spacing
     When the user selects "comfortable" density
     Then rows are approximately 44px tall
     And font size is 14px
     And padding is generous
 
+  @unit
   Scenario: Density preference persists across sessions
     When the user selects "compact" density
     And refreshes the page
@@ -717,27 +812,32 @@ Rule: Pagination
     Given the user is authenticated with "traces:view" permission
     And the project has 583 traces
 
+  @integration
   Scenario: Default page size is 50
     When the Observe page loads
     Then `filterStore.pageSize` is 50
     And pagination shows "Page 1 of 12 (583 traces)"
 
+  @integration
   Scenario: Page size selector exposes the supported sizes
     Then the pagination row exposes page-size buttons for 25, 50, 100, 250, 500, 1000
     And the active size is rendered semibold
 
+  @integration
   Scenario: Next page navigates forward
     Given the user is on page 1
     When the user clicks the next page arrow
     Then page 2 loads with the next 50 traces
 
+  @integration
   Scenario: Previous page navigates backward
     Given the user is on page 2
     When the user clicks the previous page arrow
     Then page 1 loads
 
-  Scenario: Pagination controls are bottom-right
-    Then the pagination controls (previous/next arrows and page indicator) are in the bottom-right of the table
+  @unimplemented
+  Scenario: Pagination controls are centred below the table
+    Then the pagination controls (previous/next arrows and page indicator) are centred below the table, with the summary on the left
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -755,16 +855,19 @@ Rule: Real-time trace updates via SSE
     Given the user is authenticated with "traces:view" permission
     And the Observe page is loaded
 
+  @unimplemented
   Scenario: SSE event invalidates the table query
     When a `trace_summary_updated` event arrives via SSE
     Then `useTraceFreshness` invalidates `tracesV2.list` and `tracesV2.newCount`
     And the refresh icon pulses to acknowledge the update
 
+  @integration
   Scenario: Open drawer is invalidated for affected traces
     Given the drawer is open for trace "abc123"
     When a `trace_summary_updated` event arrives that includes "abc123"
     Then `tracesV2.header`, `tracesV2.spanTree`, and `tracesV2.evals` are invalidated for that trace
 
+  @integration
   Scenario: Newly-arrived ids surface a scroll-up indicator
     Given the user has scrolled away from the top of the table
     When SSE delivers new traces that land above the current viewport
@@ -774,14 +877,14 @@ Rule: Real-time trace updates via SSE
 
   # Not yet implemented as of 2026-05-01 — there is no inline banner row at
   # the top of the table; the scroll-up indicator is the only surface.
-  @planned
+  @planned @unimplemented
   Scenario: Inline "↑ N new traces" banner with Show action
     Given new traces have arrived
     Then a banner reading "↑ N new traces" with a "Show" button appears at the top of the table
 
   # Not yet implemented as of 2026-05-01 — the table does not auto-insert
   # rows; the SSE invalidation just refetches the page.
-  @planned
+  @planned @unimplemented
   Scenario: Auto-insert when user is not interacting
     Given the user is not hovering or focused on the table
     When new traces arrive
@@ -798,17 +901,20 @@ Rule: Table loading states
   Background:
     Given the user is authenticated with "traces:view" permission
 
+  @unimplemented
   Scenario: Initial load shows skeleton rows
     Given no cached data exists
     When the Observe page loads
-    Then approximately 10 shimmer skeleton rows are displayed
+    Then 50 shimmer skeleton rows are displayed
 
+  @integration
   Scenario: Preset switch reduces opacity while loading
     Given the All Traces lens is active with data
     When the user switches to the Errors lens
     Then the table remains visible with reduced opacity while re-querying
     And when data arrives the table updates at full opacity
 
+  @unimplemented
   Scenario: Empty after filter shows message with clear link
     Given filters are active
     And no traces match the current filters
@@ -826,16 +932,19 @@ Rule: Data gating and null handling
   Background:
     Given the user is authenticated with "traces:view" permission
 
+  @integration
   Scenario: Zero traces in project shows onboarding empty state
     Given the project has zero traces
     When the Observe page loads
     Then the onboarding empty state is shown instead of the table
 
+  @integration
   Scenario: Lens preset has no matching data
     Given the project has traces but none with errors
     When the Errors lens is active
     Then an inline empty state shows within the table area
 
+  @integration
   Scenario: Null column values show dash
     Given a trace has no service set
     Then the Service column shows "—"
@@ -845,7 +954,7 @@ Rule: Data gating and null handling
   # response via `evaluations`. Events are the one exception: they live in
   # `stored_spans`, not on the summary fold, so they are read on demand — see
   # specs/traces-v2/trace-list-events-column.feature.
-  @planned
+  @planned @unimplemented
   Scenario: Data fetching only queries visible columns
     Given only the default columns are visible
     Then the backend query only fetches fields for visible columns

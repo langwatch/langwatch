@@ -55,7 +55,7 @@ func runAdminMix(t *testing.T, baseURL string) (int, string) {
 		Progress: &report, A: baseURL, Timeout: 2 * time.Second, Concurrency: 1, Shards: 1, RunDir: t.TempDir(),
 		Glob: writeScenarioYAML(t, adminMixYAML), Keys: Keys{ProjectKey: "key", OrgKey: "org", AdminKey: "admin"},
 	}
-	code := runScenarioPhase(context.Background(), options, &report, &report)
+	code := runScenarioPhase(context.Background(), scenarioPhase{options: options, report: &report, progress: &report})
 	return code, report.String()
 }
 
@@ -82,7 +82,7 @@ func TestTheDeferredListRoundTripsThroughScenarioID(t *testing.T) {
 		Progress: &report, A: adminStack(t, http.StatusNotFound), Timeout: 2 * time.Second, Concurrency: 1, Shards: 1,
 		RunDir: runDir, Glob: glob, Keys: Keys{ProjectKey: "key", OrgKey: "org", AdminKey: "admin"},
 	}
-	runScenarioPhase(context.Background(), options, &report, &report)
+	runScenarioPhase(context.Background(), scenarioPhase{options: options, report: &report, progress: &report})
 	listed := filepath.Join(runDir, deferredFile)
 	if !strings.Contains(report.String(), "deferred list: "+listed) {
 		t.Fatalf("the run must name its deferred list:\n%s", report.String())
@@ -184,7 +184,7 @@ func TestSaaSSeedsSecondOrganizationsThroughTheAdminSession(t *testing.T) {
 		Progress: &report, A: sessionStack(t), Timeout: 2 * time.Second, Concurrency: 1, Shards: 1, RunDir: t.TempDir(),
 		Glob: writeScenarioYAML(t, selfHostedYAML), Keys: Keys{ProjectKey: "key", OrgKey: "org", AdminKey: "admin"},
 	}
-	code := runScenarioPhase(context.Background(), options, &report, &report)
+	code := runScenarioPhase(context.Background(), scenarioPhase{options: options, report: &report, progress: &report})
 	if code != exitEqual {
 		t.Fatalf("code %d:\n%s", code, report.String())
 	}

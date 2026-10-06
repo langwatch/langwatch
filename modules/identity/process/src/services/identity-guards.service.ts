@@ -25,12 +25,12 @@ import {
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
 
-import type { IdentifierIdentity } from "../app/identity.members.ts";
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
 import { computeIdentifierHash } from "../rules/identifier-hash.rules.ts";
 import { assertDetachKeepsWayBack } from "../rules/identity-detach.rules.ts";
+import type { IdentifierIdentity } from "./crypto-identifier-identity.service.ts";
 
 /**
  * The identity guards (ADR-101 §2): what runs BEFORE any fact exists — the
@@ -154,18 +154,7 @@ export class IdentityGuardsService {
   }
 
   async attachIdentifier(data: AttachIdentifierCommandData): Promise<IdentityFactInput[]> {
-    const {
-      userId,
-      accountId,
-      provider,
-      providerId,
-      issuer,
-      providerAccountId,
-      value,
-      occurredAtMs,
-      commandId,
-      actor,
-    } = data;
+    const { userId, provider, providerAccountId, value, occurredAtMs, commandId, actor } = data;
     const normalizedValue = normalizeIdentifierValue(value);
     const identifierId = this.identifiers.deriveIdentifierId({
       userId,
@@ -184,12 +173,7 @@ export class IdentityGuardsService {
       return [];
     }
 
-    const { userHashKey } = await this.heads.getUserHashKey({ userId }).catch((error: unknown) => {
-      if (HandledError.isHandled(error) && error.code === "user_not_found") {
-        return { userHashKey: null };
-      }
-      throw error;
-    });
+    const userHashKey = await this.userHashKeyOrNull({ userId });
     // Non-email providers arrive VERIFIED with no verify ceremony to re-check them, so the
     // attach itself is where a cross-user race resolves — and the address lock is what resolves
     // it, atomically. The loser arrives ATTACHED and dead-ends in the same emission, which is
@@ -204,25 +188,8 @@ export class IdentityGuardsService {
         commandId,
         normalizedValue,
       }));
-    const attached = (state: IdentifierArrivalState): IdentityFactInput => ({
-      type: IDENTIFIER_ATTACHED_EVENT_TYPE,
-      data: {
-        identifierId,
-        userId,
-        accountId,
-        provider,
-        providerId,
-        issuer,
-        providerAccountId,
-        value: normalizedValue,
-        identifierHash:
-          userHashKey === null ? null : computeIdentifierHash({ userHashKey, normalizedValue }),
-        domain: extractIdentifierDomain(normalizedValue),
-        connectionId: null,
-        state,
-        actor,
-      },
-    });
+    const attached = (state: IdentifierArrivalState): IdentityFactInput =>
+      identifierAttachedFact({ data, identifierId, normalizedValue, userHashKey, state });
     if (isRaceLoser) {
       return [
         attached("ATTACHED"),
@@ -234,6 +201,16 @@ export class IdentityGuardsService {
     }
 
     return [attached(arrivalState)];
+  }
+
+  private async userHashKeyOrNull({ userId }: { userId: string }): Promise<string | null> {
+    const { userHashKey } = await this.heads.getUserHashKey({ userId }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "user_not_found") {
+        return { userHashKey: null };
+      }
+      throw error;
+    });
+    return userHashKey;
   }
 
   async verifyIdentifier(data: VerifyIdentifierCommandData): Promise<IdentityFactInput[]> {
@@ -405,4 +382,39 @@ export class IdentityGuardsService {
       },
     ];
   }
+}
+
+function identifierAttachedFact({
+  data,
+  identifierId,
+  normalizedValue,
+  userHashKey,
+  state,
+}: {
+  data: AttachIdentifierCommandData;
+  identifierId: string;
+  normalizedValue: string;
+  userHashKey: string | null;
+  state: IdentifierArrivalState;
+}): IdentityFactInput {
+  const { userId, accountId, provider, providerId, issuer, providerAccountId, actor } = data;
+  return {
+    type: IDENTIFIER_ATTACHED_EVENT_TYPE,
+    data: {
+      identifierId,
+      userId,
+      accountId,
+      provider,
+      providerId,
+      issuer,
+      providerAccountId,
+      value: normalizedValue,
+      identifierHash:
+        userHashKey === null ? null : computeIdentifierHash({ userHashKey, normalizedValue }),
+      domain: extractIdentifierDomain(normalizedValue),
+      connectionId: null,
+      state,
+      actor,
+    },
+  };
 }

@@ -1,9 +1,25 @@
 Feature: The demo hotel bot fills a project with traces
 
-  `POST /api/demo/hotel_bot` runs a scripted hotel concierge on the platform's
-  own OpenAI key and posts each conversation to the collector with the caller's
-  project key, so the project shows real traces. About half the calls are
-  turned away on purpose, so the project shows failures too.
+  The hotel bot runs a scripted hotel concierge on the platform's own OpenAI
+  key and posts each conversation to the collector with the caller's project
+  key, so the project shows real traces. About half the calls are turned away
+  on purpose, so the project shows failures too.
+
+  It is for LangWatch staff only: `POST /api/demo/hotel_bot` answers behind the
+  browser door, asked `ops:manage` at the platform tier, and hides itself from
+  everyone else (ruling 2026-10-05).
+
+  @unit
+  Scenario: The hotel bot is mounted behind the platform-operator door
+    When the sample agents module is installed
+    Then it mounts the hotel bot's route
+
+  @unit
+  Scenario: The hotel bot's door hides the bot from anyone who is not a platform operator
+    Given a caller with no session, or a signed-in user without ops:manage at the platform
+    When the hotel bot door is called with an X-Auth-Token
+    Then the door answers 404 not_found
+    And the bot never runs, so no model call is made
 
   @unit
   Scenario: A call without a project key is refused before any model call
@@ -78,13 +94,15 @@ Feature: The demo hotel bot fills a project with traces
     Then it fails
 
   @unit
-  Scenario: The door hands the caller's key to the hotel bot
+  Scenario: The door hands a platform operator's X-Auth-Token to the hotel bot
+    Given a platform operator holding ops:manage
     When the hotel bot door is called with an X-Auth-Token
     Then the hotel bot runs with that key
     And the door answers the bot's reply
 
   @unit
   Scenario: The door answers a declined run with its code
-    Given the hotel bot declines the run
+    Given a platform operator holding ops:manage
+    And the hotel bot declines the run
     When the hotel bot door is called with an X-Auth-Token
     Then the door answers 401 with the code demo_bot_declined

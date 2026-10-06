@@ -14,7 +14,7 @@ export const usageWarningSweepSchema = z.object({ scheduledFor: z.number().int()
 export const usageWarningSweepStateSchema = z.object({
   lastSweepAt: z.number().nullable(),
 });
-export type UsageWarningSweepState = z.infer<typeof usageWarningSweepStateSchema>;
+type UsageWarningSweepState = z.infer<typeof usageWarningSweepStateSchema>;
 
 type UsageWarningSweepIntents = {
   sweep: IntentSpec<typeof usageWarningSweepSchema>;

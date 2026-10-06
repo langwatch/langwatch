@@ -9,7 +9,7 @@ import type {
   EventingClickHouseClient,
   EventingClickHouseClientResolver,
 } from "../../clickhouse-client-resolver.ts";
-import type { EventingRetentionConfiguration } from "../../retention.ts";
+import type { EventingRetentionConfiguration } from "../../eventing-server-runtime.ts";
 
 const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;
 

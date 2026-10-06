@@ -6,6 +6,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FrameBridgeSession, type ChartFrameExecuteQuery } from "../frame-bridge.ts";
+import { createWidgetQueryLane, type WidgetQueryLane } from "../widget-query-lane.ts";
 
 const CONTEXT = {
   timeWindow: { start: 0, end: 1 },
@@ -27,7 +28,10 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-function attach(executeQuery: ChartFrameExecuteQuery = () => new Promise(() => undefined)) {
+function attach(
+  executeQuery: ChartFrameExecuteQuery = () => new Promise(() => undefined),
+  queryLane: WidgetQueryLane = createWidgetQueryLane({ limit: 8 }),
+) {
   const iframe = document.createElement("iframe");
   document.body.appendChild(iframe);
   const inits: unknown[] = [];
@@ -38,6 +42,7 @@ function attach(executeQuery: ChartFrameExecuteQuery = () => new Promise(() => u
     iframe,
     source: "export default () => null;",
     executeQuery,
+    queryLane,
     dashboardContext: CONTEXT,
     onLog: (entry) => events.push({ log: entry }),
     onHeightChange: (px) => events.push({ height: px }),
@@ -130,6 +135,55 @@ describe("the frame bridge session", () => {
         },
       },
     ]);
+  });
+
+  /** @scenario "The frame is told when a failed query is worth retrying" */
+  it("marks a retryable error for the frame, and leaves any other unmarked", async () => {
+    const answers = [
+      () => Promise.reject({ code: "lwql_busy", title: "Busy", message: "Wait", retryable: true }),
+      () => Promise.reject({ code: "bad_param", title: "Bad", message: "No", retryable: "yes" }),
+    ];
+    const { fromParent, load, send } = attach(() => answers.shift()!());
+    load();
+    await send({ type: "lw:query", requestId: 1, queryName: "q1" });
+    await send({ type: "lw:query", requestId: 2, queryName: "q2" });
+    expect(fromParent).toEqual([
+      {
+        type: "lw:query-error",
+        requestId: 1,
+        error: { code: "lwql_busy", title: "Busy", message: "Wait", retryable: true },
+      },
+      {
+        type: "lw:query-error",
+        requestId: 2,
+        error: { code: "bad_param", title: "Bad", message: "No" },
+      },
+    ]);
+  });
+
+  /** @scenario "A dashboard does not send every widget query at once" */
+  it("starts a query only when the page's lane gives it a slot", async () => {
+    const lane = createWidgetQueryLane({ limit: 1 });
+    const release: (() => void)[] = [];
+    const asked: string[] = [];
+    const executeQuery: ChartFrameExecuteQuery = ({ queryName }) =>
+      new Promise((resolve) => {
+        asked.push(queryName);
+        release.push(() => resolve(RESULT));
+      });
+    const first = attach(executeQuery, lane);
+    const second = attach(executeQuery, lane);
+    first.load();
+    second.load();
+
+    await first.send({ type: "lw:query", requestId: 1, queryName: "from-first" });
+    await second.send({ type: "lw:query", requestId: 1, queryName: "from-second" });
+    expect(asked).toEqual(["from-first"]);
+
+    release[0]!();
+    await flush();
+    await flush();
+    expect(asked).toEqual(["from-first", "from-second"]);
   });
 
   it("refuses a query past eight in flight, and aborts the in-flight ones on dispose", async () => {

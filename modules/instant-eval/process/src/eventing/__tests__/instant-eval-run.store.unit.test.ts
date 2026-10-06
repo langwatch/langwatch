@@ -1,7 +1,7 @@
 /**
  * The projection's half of the run row: counters laid over what the service
  * wrote, never the definition, and never over a run that is gone.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type { ProjectionStoreContext, StoredProjection } from "@langwatch/eventing";

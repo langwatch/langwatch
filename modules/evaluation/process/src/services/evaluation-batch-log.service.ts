@@ -3,10 +3,12 @@
  * evaluator rows, and the verdicts it puts on the processing pipeline.
  * @see specs/monitors/guardrails-api-compatibility.feature
  */
-import type {
-  EvaluationSlugLookup,
-  EvaluationSlugMatch,
-  LogBatchEvaluationInput,
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import {
+  EvaluationLogResultsTooLargeError,
+  type EvaluationSlugLookup,
+  type EvaluationSlugMatch,
+  type LogBatchEvaluationInput,
 } from "@langwatch/evaluation-contract";
 import {
   eSBatchEvaluationSchema,
@@ -90,10 +92,12 @@ export interface EvaluationExperimentRunWriter {
 }
 
 /** What one batch's rows are written through. */
-export type EvaluationBatchLogDeps = Readonly<{
+type EvaluationBatchLogDeps = Readonly<{
   experiments: EvaluationExperimentDirectory;
   runs: EvaluationExperimentRunWriter;
   report: Pick<EvaluationCommandDispatcherService, "reportEvaluation">;
+  /** The size limits the project's organization answers. */
+  limits: Pick<DatasetApi, "getLimits">;
 }>;
 
 export class EvaluationBatchLogService {
@@ -102,6 +106,24 @@ export class EvaluationBatchLogService {
   }
 
   private constructor(private readonly deps: EvaluationBatchLogDeps) {}
+
+  /**
+   * One batch is sized to carry one full dataset row with its images inline,
+   * so its body answers the organization's row limit. Refused before the body
+   * is parsed.
+   */
+  async assertWithinLimit({
+    projectId,
+    payloadBytes,
+  }: {
+    projectId: string;
+    payloadBytes: number;
+  }): Promise<void> {
+    const { rowBytes: maxBytes } = await this.deps.limits.getLimits({ projectId });
+    if (payloadBytes > maxBytes) {
+      throw new EvaluationLogResultsTooLargeError({ maxBytes });
+    }
+  }
 
   /**
    * The experiment is resolved first, because every row below is written

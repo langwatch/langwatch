@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { visitContentPart } from "../trace-content-part.visitor.ts";
+import { visitContentPart } from "../trace-content-part.dispatcher.ts";
 
 const PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAE=";
 

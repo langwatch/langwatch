@@ -1,19 +1,18 @@
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 
-import type { OrganizationInviteRateLimit } from "../app/organization.members.ts";
 import type { OrganizationScopeGraphReader } from "../services/organization-scope-graph.service.ts";
 import type { PersonalTeamScopeReader } from "../services/personal-team-scope.service.ts";
 import type { GroupRepository } from "./group.repository.ts";
+import type { OrganizationInviteRateLimitRepository } from "./organization-invite-rate-limit.repository.ts";
+import type { OrganizationInviteRepository } from "./organization-invite.repository.ts";
 import type { OrganizationMembershipRepository } from "./organization-membership.repository.ts";
+import type { OrganizationSeatRepository } from "./organization-seat.repository.ts";
+import type { OrganizationUserDirectoryRepository } from "./organization-user-directory.repository.ts";
 import type { OrganizationRepository } from "./organization.repository.ts";
 import type { SignUpPolicyRepository } from "./sign-up-policy.repository.ts";
 import type { TeamRepository } from "./team.repository.ts";
 
-/**
- * The rows the organization module owns and constructs through
- * `OrganizationModule.create`, chosen once at boot. Invitations are still
- * composed on a separate path outside this module's boot (follow-up work).
- */
+/** The rows the organization module owns, chosen once at boot for `OrganizationModule.create`. */
 export interface OrganizationRepositories {
   readonly organization: OrganizationRepository;
   readonly team: TeamRepository;
@@ -29,5 +28,11 @@ export interface OrganizationRepositories {
   /** The installation-wide reads the sign-up policy decides over. */
   readonly signUpPolicy: SignUpPolicyRepository;
   /** The fixed-window counter both invitation throttles spend. */
-  readonly inviteRateLimit: OrganizationInviteRateLimit;
+  readonly inviteRateLimit: OrganizationInviteRateLimitRepository;
+  /** The invitations and what an invitation is validated and settled against. */
+  readonly invite: OrganizationInviteRepository;
+  /** The full, lite and Developer seats an organization holds, as licence and plan count them. */
+  readonly seats: OrganizationSeatRepository;
+  /** The organization's own reads of the people table. */
+  readonly userDirectory: OrganizationUserDirectoryRepository;
 }

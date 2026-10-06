@@ -3,6 +3,8 @@ import { z } from "zod";
 /** A person's sign-in milestones, ids only, which peers react to from their own side (§9). */
 export const SESSION_STARTED_EVENT_TYPE = "lw.auth.session_started" as const;
 export const SSO_AUTO_ADDED_EVENT_TYPE = "lw.auth.sso_auto_added" as const;
+/** A new person, from a Better Auth or passkey sign-up; nurturing derives signed_up. */
+export const SIGNED_UP_EVENT_TYPE = "lw.auth.signed_up" as const;
 
 /** A member of some organization minted a session; the tenant is the person. */
 export const sessionStartedEventDataSchema = z.object({
@@ -21,3 +23,11 @@ export const ssoAutoAddedEventDataSchema = z.object({
   occurredAt: z.number().int().nonnegative(),
 });
 export type SsoAutoAddedEventData = z.infer<typeof ssoAutoAddedEventDataSchema>;
+
+/** A new person's account, minted by a sign-up auth ran; the tenant is the person. */
+export const signedUpEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  userId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
+export type SignedUpEventData = z.infer<typeof signedUpEventDataSchema>;

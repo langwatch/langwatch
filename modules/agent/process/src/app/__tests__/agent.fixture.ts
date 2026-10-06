@@ -1,7 +1,7 @@
 import { agentSchema, type Agent, type AgentServerConfig } from "@langwatch/agent-contract";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
@@ -20,8 +20,6 @@ import {
 import type { AgentRepositories } from "../../repositories/agent.repositories.ts";
 import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";
 import { AgentModule } from "../agent.app.ts";
-
-type AgentAppMembers = Readonly<{ publicBaseUrl: string | undefined }>;
 
 export function agentFixture(overrides: Partial<Agent> = {}): Agent {
   return agentSchema.parse({
@@ -67,8 +65,8 @@ export function secretStoreFixture(initial: Record<string, string> = {}) {
 
 export function createAgentAppFixture(
   options: {
-    apiKeys?: ApiKeyApi;
     auditLog?: AuditLogApi;
+    featureFlags?: FeatureFlagApi;
     permissions?: AuthzApi;
     projects?: ProjectApi;
     scenarios?: ScenarioApi;
@@ -77,7 +75,6 @@ export function createAgentAppFixture(
     users?: UserApi;
     workflows?: WorkflowApi;
     repositories?: AgentRepositories;
-    members?: Partial<AgentAppMembers>;
     config?: AgentServerConfig;
   } = {},
 ) {
@@ -85,8 +82,8 @@ export function createAgentAppFixture(
   const resources = new ResourceScope();
   const app = AgentModule.create({
     dependencies: {
-      apiKeys: options.apiKeys ?? createApiFixture<ApiKeyApi>(),
       auditLog: options.auditLog ?? createApiFixture<AuditLogApi>(),
+      featureFlags: options.featureFlags ?? createApiFixture<FeatureFlagApi>(),
       permissions: options.permissions ?? createApiFixture<AuthzApi>(),
       projects: options.projects ?? createApiFixture<ProjectApi>(),
       scenarios: options.scenarios ?? createApiFixture<ScenarioApi>(),
@@ -95,11 +92,11 @@ export function createAgentAppFixture(
       users: options.users ?? createApiFixture<UserApi>(),
       workflows: options.workflows ?? createApiFixture<WorkflowApi>(),
     },
-    members: {
+    config: options.config ?? {
+      replicaCount: 1,
+      relayMaxPayloadMb: void 0,
       publicBaseUrl: "https://langwatch.test",
-      ...options.members,
     },
-    config: options.config ?? { replicaCount: 1, relayMaxPayloadMb: void 0 },
     resources,
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories,

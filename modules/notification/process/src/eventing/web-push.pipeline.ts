@@ -36,7 +36,7 @@ import {
   webPushPruneWake,
 } from "./web-push.process.ts";
 
-export const WEB_PUSH_PIPELINE_NAME = "notification_web_push" as const;
+const WEB_PUSH_PIPELINE_NAME = "notification_web_push" as const;
 
 /** A push that cannot go out in about a day is not worth sending: the TTL has lapsed. */
 const WEB_PUSH_MAX_ATTEMPTS = 8;
@@ -48,11 +48,17 @@ export function webPushRetryDelayMs({ attempt }: { attempt: number }): number {
 
 /** The outbox, as Web Push's queue: one idempotent row per send. */
 export class OutboxWebPushQueue implements WebPushQueue {
-  static create(processStore: ProcessStore): OutboxWebPushQueue {
-    return new OutboxWebPushQueue(processStore);
+  static create(
+    processStore: ProcessStore,
+    notifyOutbox?: (processName: string) => void,
+  ): OutboxWebPushQueue {
+    return new OutboxWebPushQueue(processStore, notifyOutbox);
   }
 
-  private constructor(private readonly processStore: ProcessStore) {}
+  private constructor(
+    private readonly processStore: ProcessStore,
+    private readonly notifyOutbox?: (processName: string) => void,
+  ) {}
 
   async enqueue({
     userId,
@@ -72,11 +78,12 @@ export class OutboxWebPushQueue implements WebPushQueue {
       })),
       now: nowInstant().epochMilliseconds,
     });
+    if (result.insertedMessageKeys.length > 0) this.notifyOutbox?.(WEB_PUSH_PROCESS_NAME);
     return { queued: result.insertedMessageKeys.length };
   }
 }
 
-export interface WebPushPipelineDeps {
+interface WebPushPipelineDeps {
   webPush: WebPushService;
   processStore: ProcessStore;
 }
@@ -129,6 +136,10 @@ export function buildWebPushPipeline({
 
 export const webPushEventing = defineEventingModule({
   pipeline: WEB_PUSH_PIPELINE_NAME,
-  build: ({ app, processStore }: EventingSetup<NotificationRepositories, NotificationModule>) =>
-    app.webPushPipeline({ processStore }),
+  build: ({
+    app,
+    processStore,
+    notifyOutbox,
+  }: EventingSetup<NotificationRepositories, NotificationModule>) =>
+    app.webPushPipeline({ processStore, notifyOutbox }),
 });

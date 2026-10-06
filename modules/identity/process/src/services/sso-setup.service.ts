@@ -26,13 +26,15 @@ const CLOSED_STATES = new Set(["DISCARDED", "REJECTED", "TORN_DOWN"]);
 /** How many stragglers the setup read carries; the section pages for more. */
 const MIGRATION_PAGE_SIZE = 25;
 
-export interface SsoSetupServiceDeps {
+interface SsoSetupServiceDeps {
   connections: SsoConnectionReadRepository;
   breakGlass: SsoBreakGlassRepository;
   /** The trail a sign-in through the connection leaves, which is what says
    *  the test sign-in happened. */
   activity: SsoMigrationEvidenceRepository;
   migrations: SsoMigrationProgressService;
+  /** Whether the organization's plan carries single sign-on (Enterprise). */
+  entitled: (args: { organizationId: string }) => Promise<boolean>;
   now?: () => number;
 }
 
@@ -53,13 +55,14 @@ export class SsoSetupService {
   }
 
   async getSetup({ organizationId }: { organizationId: string }): Promise<SsoSetupView> {
-    const [held, { migration }] = await Promise.all([
+    const [held, { migration }, entitled] = await Promise.all([
       this.deps.connections.findForOrganization({ organizationId }),
       this.deps.migrations.getProgress({
         organizationId,
         cursor: null,
         limit: MIGRATION_PAGE_SIZE,
       }),
+      this.deps.entitled({ organizationId }),
     ]);
     const open = held.filter((connection) => !CLOSED_STATES.has(connection.state));
     const legacy = open.find(
@@ -94,6 +97,7 @@ export class SsoSetupService {
           }
         : null,
       migration,
+      enterpriseRequired: !entitled,
     };
   }
 

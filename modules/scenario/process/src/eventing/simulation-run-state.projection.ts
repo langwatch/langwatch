@@ -148,7 +148,7 @@ function buildMessageRestJson(messageFields: Record<string, unknown>): string {
  * A single message row stored in the Messages parallel arrays.
  * Maps to `Messages.*` Nested columns in ClickHouse.
  */
-export interface SimulationMessageRow {
+interface SimulationMessageRow {
   Id: string; // opaque message ID, empty string if absent
   Role: string; // "user" | "assistant" | "system" | "tool"
   Content: string; // message content, empty string if null

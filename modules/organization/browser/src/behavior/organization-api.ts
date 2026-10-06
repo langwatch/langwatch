@@ -28,7 +28,10 @@ import type {
   EnrichedAuditLog,
   groupTrpc,
   licenseEnforcementTrpc,
+  JoinRequestAdmitted,
+  JoinRequestApiOrigin,
   JoinRequestAutomaticJoins,
+  JoinRequestJoining,
   JoinRequestMine,
   JoinRequestPending,
   OrganizationDirectoryCounts,
@@ -37,6 +40,7 @@ import type {
   OrganizationMemberProvenance,
   OrganizationMemberRecord,
   OrganizationMemberUser,
+  PendingInvitationsForCaller,
   ScopeGraphOrganization,
 } from "@langwatch/organization-contract";
 
@@ -211,6 +215,8 @@ export type JoinRequestReading = {
   domain: string;
   requestedAt: JoinRequestPending[number]["requestedAt"];
   expiresAt: NonNullable<JoinRequestPending[number]["expiresAt"]>;
+  /** The seat approval lands (ADR-171 v6). */
+  seat: JoinRequestPending[number]["seat"];
 };
 
 /** `licenseEnforcement.*` and `group.*` derive from organization contracts; the rest is here. */
@@ -332,6 +338,13 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
     };
 
     invite: {
+      /** The invitations waiting on the caller's own PROVED addresses (ADR-171 v6). */
+      pendingForMe: {
+        query: { input: Record<string, never>; output: PendingInvitationsForCaller };
+      };
+      acceptInvite: {
+        mutation: { input: { inviteCode: string }; output: unknown };
+      };
       getOrganizationPendingInvites: {
         query: { input: { organizationId: string }; output: OrganizationInviteReading[] };
       };
@@ -373,7 +386,7 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
     limits: {
       /**
        * TWO READERS, ONE ENTRY: the audit page's Enterprise gate reads
-       * `activePlan.type`, and the seat meter reads the two counts — same
+       * `activePlan.type`, and the seat meter reads the seat counts — same
        * procedure, same cache key, one round trip.
        */
       getUsage: {
@@ -383,6 +396,7 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
             activePlan: { type: string };
             membersCount: number;
             membersLiteCount: number;
+            membersDeveloperCount: number;
           };
         };
       };
@@ -551,9 +565,13 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
       dismissOffer: {
         mutation: { input: Record<string, never>; output: { success: true } };
       };
+      /** Walks through an automatic door; `cli` lands a Developer (ADR-171 v6). */
+      admitAutomatically: {
+        mutation: { input: { origin?: JoinRequestApiOrigin }; output: JoinRequestAdmitted };
+      };
       request: {
         mutation: {
-          input: { organizationId: string };
+          input: { organizationId: string; origin?: JoinRequestApiOrigin };
           output: { joinRequestId: string; state: "PENDING" | "APPROVED" };
         };
       };
@@ -568,7 +586,7 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
       joining: {
         query: {
           input: { organizationId: string };
-          output: { domainJoin: DomainJoinSetting; joinDomains: string[] };
+          output: JoinRequestJoining;
         };
       };
       setJoining: {
@@ -577,6 +595,7 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
             organizationId: string;
             domainJoin: DomainJoinSetting;
             domains: string[];
+            joinerRole?: JoinRequestJoining["joinerRole"];
           };
           output: { next: DomainJoinSetting };
         };

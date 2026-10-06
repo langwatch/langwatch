@@ -33,15 +33,15 @@ contract (<name>Trpc)  --ContractApiMap-->  createModuleApi()  -->  hooks (useQu
 
 Each rule lives in the record or an ADR; this table only points at it.
 
-| Rule                                                                                          | Source                                          |
-| --------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| Derived from `ContractApiMap<typeof <name>Trpc>`, never hand-written, never `AppRouter`       | ADR-130 (`130-the-api-router-type-is-declared`) |
-| Holds the derived hooks plus a few thin ones, never a component                               | §3.4                                            |
-| Imports its own contract and `@langwatch/api/web` only; a two-module hook lives in the screen | §3.4                                            |
-| One call per request over `httpLink`; no batching, the server refuses it                      | §10                                             |
-| Caching is the contract's and kernel's; no per-read `staleTime`; no credential in a query     | §10                                             |
-| One entity, one key: opaque id plus tenant scope; hints never enter a key                     | §10.2                                           |
-| A procedure another module owns sits in a `BorrowedProcedures` type: debt, not a pattern      | (convention)                                    |
+| Rule                                                                                                                                           | Source                                          |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Derived from `ContractApiMap<typeof <name>Trpc>`, never hand-written, never `AppRouter`                                                        | ADR-130 (`130-the-api-router-type-is-declared`) |
+| Holds the derived hooks plus a few thin ones, never a component                                                                                | §3.4                                            |
+| Imports its own contract and `@langwatch/api/web` only; a two-module hook lives in the screen                                                  | §3.4                                            |
+| One call per request over `httpLink`; no batching, the server refuses it                                                                       | §10                                             |
+| Every read is mirrored to disk by default (`UI_QUERY_MIRROR_EXCLUDED` names the exceptions); no per-read `staleTime`; no credential in a query | §10, §10.2                                      |
+| One entity, one key: opaque id plus tenant scope; hints never enter a key                                                                      | §10.2                                           |
+| A procedure another module owns sits in a `BorrowedProcedures` type: debt, not a pattern                                                       | (convention; the record is silent)              |
 
 ## Worked example
 
@@ -65,7 +65,8 @@ has `main` and one `exports["."]`, dependencies `@langwatch/api` and
 `@langwatch/prompt-contract` only. A consuming browser package lists
 `@langwatch/prompt-client` and calls `promptClient.<proc>.useQuery(...)`
 inside its own `behavior/` hook; its declaration still names its own api
-(`.withApi(...)`), so the contract's cache policy reaches the browser.
+(`.withApi(...)`, §10). There is no per-contract cache policy: every read is
+mirrored by default (§10.2), and `TrpcCachePolicy` is deleted (§15).
 
 To add one: copy `modules/dataset/client`, rename, point `ContractApiMap` at
 every `*Trpc` object the contract exports, run `pnpm sync:references`

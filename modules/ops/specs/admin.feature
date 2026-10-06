@@ -10,10 +10,17 @@ Feature: Platform administration package boundary
   @unit
   Scenario: Operator gates ask the platform-operator grant
     Given authz answers ops:view and ops:manage at the platform tier per user
-    When a read gate, a write gate, the staff gate and the operator scope are asked
+    When a procedure's platform permission, an instance-admin write and the operator scope are asked
     Then reads need ops:view and writes need ops:manage
     And an impersonating operator is read by the impersonator's own grant
     And a caller who holds nothing is refused, or answered as no scope
+
+  @unit
+  Scenario: Instance admin answers a refused caller the hidden 404 at its door
+    Given the admin routes sit behind the browser door, asked at the platform tier
+    When a caller with no session, a customer, or a view-only operator on an impersonation route asks
+    Then the door answers 404 not_found before the body is read
+    And no application operation runs
 
   @unit
   Scenario: An admin cannot impersonate another admin
@@ -161,3 +168,41 @@ Feature: Platform administration package boundary
     Given an operator holding the manage grant
     When they update a record whose prior state carries fields the update does not touch
     Then the audit entry records the prior values of the changed fields only
+
+  # The largest file a dataset image or file cell accepts is 20 MB unless an
+  # operator raises it for one organization. Customers never see or set it.
+
+  @unit
+  Scenario: An operator sets an organization's max dataset file size in the Back office
+    Given an operator holding the manage grant
+    When they set an organization's max dataset file size to 100 MB through the Back office
+    Then the organization stores 100 MB and the change is audited before it is written
+    And clearing the field stores no limit, so the organization is back on the default
+
+  @unit
+  Scenario: The Back office refuses a max dataset file size outside the allowed range
+    Given an operator holding the manage grant
+    When they write a max dataset file size below 20 MB, above 1024 MB, or one that is not a whole number
+    Then the write is refused with validation_error naming the field and the allowed range
+    And no organization row is written and nothing is audited
+
+  @integration
+  Scenario: The max dataset file size an operator sets reaches the organization's stored row
+    Given an organization stored with no max dataset file size
+    When an operator sets it to 100 MB through the Back office
+    Then the organization's row holds 100 MB and the Back office reads it back
+    And an out-of-range value is refused and leaves the row as it was
+
+  @integration
+  Scenario: The organization drawer offers the max dataset file size
+    Given an operator has opened an organization in the Back office
+    When they enter a max dataset file size of 100 MB and save
+    Then the organization is updated with 100 MB
+    And clearing a stored value saves no limit
+
+  @integration
+  Scenario: The organization drawer refuses a max dataset file size outside the allowed range
+    Given an operator has opened an organization in the Back office
+    When they enter a max dataset file size below 20 MB or above 1024 MB and save
+    Then the field shows the allowed range and nothing is sent
+    And a refusal from the server for that field is shown on the field

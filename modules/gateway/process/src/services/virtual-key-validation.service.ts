@@ -31,7 +31,7 @@ import {
 import type { ProjectApi } from "@langwatch/project-contract";
 import { type Instant, nowInstant } from "@langwatch/time";
 
-import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
+import type { GatewayPersistenceTransaction } from "../repositories/gateway-transaction.repository.ts";
 import type { GatewayVirtualKeyRepository } from "../repositories/gateway-virtual-key.repository.ts";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
 

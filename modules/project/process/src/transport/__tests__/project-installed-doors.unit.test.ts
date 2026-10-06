@@ -1,10 +1,13 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { SessionReader } from "@langwatch/api/hosting";
 import { TrpcHost } from "@langwatch/api/trpc";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
+import { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 /**
  * @vitest-environment node
@@ -18,7 +21,6 @@ import { describe, expect, it } from "vitest";
 
 import { projectProcessModule } from "../../project.module.ts";
 import { projectTrpcTransport } from "../project.trpc.ts";
-import { SessionReader } from "@langwatch/api/hosting";
 
 const ACTOR = { id: "user-1" };
 const PROJECT_ID = "project_1";
@@ -47,7 +49,8 @@ function recordingAuditLog(recorded: RecordAuditLogCommand[]): AuditLogApi {
 
 function installed(peers: Peers) {
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(projectProcessModule)])
+    .withModules([projectProcessModule])
+    .withStores(memoryStores())
     .withConfig({ project: undefined })
     .withMembers({
       encryption: { encrypt: (plaintext: string) => `cipher(${plaintext})` },
@@ -131,6 +134,25 @@ async function call(
 }
 
 describe("given the project module installed over memory repositories", () => {
+  describe("when a feature asks the process for project behaviour", () => {
+    /** @scenario "A feature needs project behaviour" */
+    it("hands it the one ProjectApi the module provided, with no repository member on it", async () => {
+      const { runtime } = await doors();
+
+      try {
+        const first = runtime.service(ProjectApi);
+
+        expect(runtime.service(ProjectApi)).toBe(first);
+        expect(first).toBe(runtime.module(projectProcessModule).provided);
+        expect(
+          Object.keys(first).filter((name) => /repositor|prisma|persistence/i.test(name)),
+        ).toEqual([]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
   describe("when a project admin calls the removed key procedures", () => {
     /** @scenario The procedures that revealed or rotated the project key are gone */
     it.each(["project.getProjectAPIKey", "project.regenerateApiKey"])(

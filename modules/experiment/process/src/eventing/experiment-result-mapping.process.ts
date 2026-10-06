@@ -49,7 +49,7 @@ export const parseNodeId = (nodeId: string): { targetId: string; evaluatorId?: s
 /**
  * Checks if a node ID represents an evaluator node.
  */
-export const isEvaluatorNode = (nodeId: string): boolean => {
+const isEvaluatorNode = (nodeId: string): boolean => {
   return nodeId.includes(".");
 };
 

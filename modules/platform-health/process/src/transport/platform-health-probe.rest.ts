@@ -14,12 +14,12 @@ import {
 } from "@langwatch/platform-health-contract";
 
 /** The operations the probe doors reach. */
-export interface PlatformHealthProbeApi {
+interface PlatformHealthProbeApi {
   probeWithProjectKey(request: ProjectKeyedProbeRequest): Promise<Response>;
   probeLangy(key: LangyKeyCaller): Promise<Response>;
 }
 
-export const PlatformHealthProbeApi = moduleApi<PlatformHealthProbeApi>()("platform-health");
+const PlatformHealthProbeApi = moduleApi<PlatformHealthProbeApi>()("platform-health");
 
 const canary = publicRoute({
   reason:

@@ -44,6 +44,7 @@ import {
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { workflowApi, type RouterOutputs } from "../../../behavior/workflow-api.ts";
 import { publishedWorkflowSchema } from "../../../model/published-workflow.ts";
+import { exportedDatasetCutNotice } from "../../../model/workflow-export-dataset.ts";
 import {
   datasetDatabaseRecordsToInMemoryDataset,
   inMemoryDatasetToNodeDataset,
@@ -212,6 +213,11 @@ const exportWorkflow = async (
     document.body.appendChild(link);
     link.click();
     link.remove();
+
+    const cutNotice = datasetData ? exportedDatasetCutNotice(datasetData) : null;
+    if (cutNotice) {
+      toaster.create({ ...cutNotice, type: "warning", duration: 15_000 });
+    }
   } catch (error) {
     toaster.create({
       error,
@@ -734,14 +740,12 @@ EOF`}
               isCreating={minting.isMinting}
               scopeNote={minting.scopeNote}
               onCreate={() =>
-                void minting
-                  .mint()
-                  .catch((error: unknown) =>
-                    showErrorToast({
-                      error,
-                      fallbackTitle: "Couldn't create the personal access token",
-                    }),
-                  )
+                void minting.mint().catch((error: unknown) =>
+                  showErrorToast({
+                    error,
+                    fallbackTitle: "Couldn't create the personal access token",
+                  }),
+                )
               }
             />
           </Box>

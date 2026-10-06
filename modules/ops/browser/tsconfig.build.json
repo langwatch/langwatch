@@ -8,9 +8,7 @@
       "@langwatch/identity-contract": ["../../identity/contract/src/index.ts"]
     }
   },
-  "files": [
-    "./src/ui/sections/impersonation/index.ts"
-  ],
+  "files": ["./src/ui/sections/impersonation/index.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",

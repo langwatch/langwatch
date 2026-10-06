@@ -116,6 +116,25 @@ describe("binding a server to a contract at runtime", () => {
       /no implementation for procedure "archive"/,
     );
   });
+
+  /** @scenario "A tRPC procedure with no access declaration fails the sweep" */
+  it("refuses to mount a procedure that was selected but never given an access decision, naming it", () => {
+    const decided = defineTrpcRouter(ReviewApi, contract)
+      .procedure("getById")
+      .withPermission("annotations:view")
+      .handle(async () => ({ id: "annotation-1", comment: "read" }));
+
+    // `archive` is selected and stops there: no permission, no public reason, no handler.
+    decided.procedure("archive");
+
+    const declaration: {
+      router(factory: TrpcProcedureFactory<object>, app: () => ReviewApi): object;
+    } = Reflect.apply(Reflect.get(decided, "build"), decided, []);
+
+    expect(() => declaration.router(inertRuntime, () => ({}) as ReviewApi)).toThrow(
+      /tRPC router "review" has no implementation for procedure "archive"/,
+    );
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -230,7 +249,7 @@ describe("a mounted contract procedure", () => {
 
       const args = seen[0]!;
       expect(Object.keys(args).toSorted()).toEqual(["actor", "app", "input", "scope", "signal"]);
-      expect(args.scope).toEqual({ tier: "project", id: "project-1" });
+      expect(args.scope).toEqual({ tier: "project", id: "project-1", organizationId: null });
       expect(args.actor).toEqual({ type: "user", id: "reviewer-1" });
       expect(args.input).toEqual({ projectId: "project-1", id: "annotation-1" });
       expect(Object.keys(args.input as object)).not.toContain("scope");
@@ -293,6 +312,7 @@ describe("a mounted contract procedure", () => {
 
   describe("given the handler throws", () => {
     /** @scenario "Handled failures cross the boundary as handled errors" */
+    /** @scenario "The transport owns the failure" */
     it("carries a handled code and status, and degrades a plain Error to unknown with a trace id", async () => {
       const { runtime } = harness();
       const app: ReviewApi = { read: async () => Promise.reject(new Error("boom")) };
@@ -456,6 +476,19 @@ describe("the tRPC error formatter", () => {
         meta: { fieldErrors: { email: expect.any(Array) } },
       });
       expect(formatted.data).not.toHaveProperty("zodError");
+    });
+  });
+
+  describe("given a handled 5xx whose class declares no fault", () => {
+    /** @scenario "A presumed platform fault goes on the wire as itself" */
+    it("serializes its fault as presumed_platform", () => {
+      class UndeclaredBoom extends HandledError {
+        constructor() {
+          super("undeclared_boom", "upstream timed out", { httpStatus: 503 });
+        }
+      }
+
+      expect(format(new UndeclaredBoom()).data.error).toMatchObject({ fault: "presumed_platform" });
     });
   });
 

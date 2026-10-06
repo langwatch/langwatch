@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
 import type {
@@ -67,6 +68,7 @@ describe("DatasetService", () => {
       generateId: () => "record_1",
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
+      inlineAttachments: createDatasetTestInlineAttachments(),
     });
 
     const dataset = await service.upsertDataset({
@@ -87,6 +89,7 @@ describe("DatasetService", () => {
       records,
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
+      inlineAttachments: createDatasetTestInlineAttachments(),
     });
 
     await expect(
@@ -106,6 +109,7 @@ describe("DatasetService", () => {
       records,
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
+      inlineAttachments: createDatasetTestInlineAttachments(),
     });
 
     await expect(
@@ -128,6 +132,7 @@ describe("DatasetService", () => {
       records,
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
+      inlineAttachments: createDatasetTestInlineAttachments(),
     });
 
     await expect(
@@ -193,6 +198,7 @@ describe("DatasetService", () => {
       content: new MemoryContent(),
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
+      inlineAttachments: createDatasetTestInlineAttachments(),
     });
 
     const result = await service.getDatasetWithRecords({
@@ -206,6 +212,7 @@ describe("DatasetService", () => {
     expect(calls).toEqual(["read:dataset_1"]);
   });
 
+  /** @scenario "Upload storage remains an injected Dataset seam" */
   it("enqueues normalization after a stored-object import through the queue port", async () => {
     const { repository, records } = seeded();
     const queueCalls: { projectId: string; datasetId: string }[] = [];
@@ -245,6 +252,7 @@ describe("DatasetService", () => {
       queue: new Queue(),
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
+      inlineAttachments: createDatasetTestInlineAttachments(),
     });
 
     await service.createDatasetFromStoredObject({

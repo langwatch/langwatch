@@ -13,11 +13,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createSupportContactOrganizations } from "../../__tests__/testing.ts";
 import { createGovernanceTestConnection } from "../../app/__tests__/governance-database.fixture.ts";
-import type {
-  CliAdminContactReader,
-  CliBudgetOverviewReader,
-} from "../../app/governance.members.ts";
 import { PrismaOrganizationSupportContactRepository } from "../../repositories/prisma/prisma.organization-support-contact.repository.ts";
+import type { CliAdminContactReader } from "../cli-admin-contact.service.ts";
+import type { CliBudgetOverviewReader } from "../governance-cli-tool-bootstrap.service.ts";
 import { DefaultGovernanceCliBootstrapService } from "../governance-cli-tool-bootstrap.service.ts";
 import { OrganizationSupportContactService } from "../organization-support-contact.service.ts";
 

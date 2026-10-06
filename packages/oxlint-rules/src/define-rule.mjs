@@ -1,12 +1,20 @@
 import { classify } from "./classify.mjs";
 
 // The one shape a langwatch rule is written in. A message is not prose here:
-// it is `what` (names the offending symbol) plus `fix` (one imperative the
-// reader can apply without opening another file). `why` is documentation and
-// is deliberately not part of what the linter prints.
+// `what` (names the offending symbol), `why` (one line: why the shape is wrong)
+// and `fix` (one imperative the reader can apply without opening another file).
+// Every finding prints all three (ARCHITECTURE.md §17).
 
 /**
- * @typedef {{ what: string, why?: string, fix: string }} MessageDefinition
+ * @typedef {{ what: string, why: string, fix: string }} MessageDefinition
+ */
+
+/** The longest `why` that still prints as one line. */
+export const WHY_MAX_LENGTH = 120;
+
+/**
+ * A rule opting in to a justified disable names the framework the disable must say it cannot use.
+ * @typedef {{ framework: string }} EscapeDefinition
  */
 
 /**
@@ -14,9 +22,37 @@ import { classify } from "./classify.mjs";
  *   default?: unknown, description?: string }} OptionDefinition
  */
 
-/** `what` and `fix` joined; `why` stays out of the printed message on purpose. */
-export function renderTemplate({ fix, what }) {
-  return `${what.trim()} ${fix.trim()}`.trim();
+/** `what`, `why` and `fix` joined, in that order. */
+export function renderTemplate({ fix, what, why }) {
+  return `${what.trim()} ${why.trim()} ${fix.trim()}`.trim();
+}
+
+function assertWhy({ id, name, why }) {
+  if (typeof why !== "string" || why.trim() === "") {
+    throw new TypeError(`defineRule: ${name}/${id} gives no \`why\`; every finding prints one.`);
+  }
+  if (why.includes("\n") || why.trim().length > WHY_MAX_LENGTH) {
+    throw new TypeError(
+      `defineRule: ${name}/${id}'s \`why\` is longer than one line (${WHY_MAX_LENGTH} characters).`,
+    );
+  }
+}
+
+/** The one sentence an escapable rule prints after `what` + `fix`. */
+export function renderEscapeTail({ framework }) {
+  return (
+    `If ${framework} genuinely cannot express this case, extend it, or disable this line with` +
+    " `-- <why it cannot>`; if the case is confusing, stop and ask the human before disabling."
+  );
+}
+
+function escapeFor(escape) {
+  if (escape === undefined) return undefined;
+  if (typeof escape?.framework !== "string" || escape.framework.trim() === "") {
+    throw new TypeError("defineRule: `escape.framework` names the framework a disable cannot use.");
+  }
+
+  return { framework: escape.framework.trim() };
 }
 
 /** Substitutes `{{name}}` from `data`, the way oxlint and ESLint do. */
@@ -24,6 +60,18 @@ export function renderMessage(template, data = {}) {
   return template.replace(/\{\{\s*([\w$]+)\s*\}\}/g, (whole, key) =>
     Object.hasOwn(data, key) ? String(data[key]) : whole,
   );
+}
+
+/** Each message's printed template; an escapable rule's ends with the escape sentence. */
+function templatesFor({ escapable, messages, name }) {
+  const tail = escapable ? ` ${renderEscapeTail(escapable)}` : "";
+  const templates = {};
+  for (const [id, definition] of Object.entries(messages)) {
+    assertWhy({ id, name, why: definition.why });
+    templates[id] = `${renderTemplate(definition)}${tail}`;
+  }
+
+  return templates;
 }
 
 function schemaFor(options) {
@@ -62,21 +110,21 @@ function defaultsFor(options) {
  * @param {(file: import("./classify.mjs").FileClassification) => boolean} [declaration.applies]
  * @param {Record<string, MessageDefinition>} declaration.messages
  * @param {Record<string, OptionDefinition>} [declaration.options]
+ * @param {EscapeDefinition} [declaration.escape] Accept a disable that gives a reason.
  * @param {(context: object, file: object, options: object) => object} declaration.create
  */
 export function defineRule({
   applies,
   create,
+  escape,
   fixable,
   kind = "problem",
   messages,
   name,
   options,
 }) {
-  const templates = {};
-  for (const [id, definition] of Object.entries(messages)) {
-    templates[id] = renderTemplate(definition);
-  }
+  const escapable = escapeFor(escape);
+  const templates = templatesFor({ escapable, messages, name });
 
   const defaults = defaultsFor(options);
   // Options arrive as the same object for every file, so the merge is done once per object.
@@ -105,6 +153,7 @@ export function defineRule({
 
   if (schema) rule.meta.schema = schema;
   if (fixable) rule.meta.fixable = fixable;
+  if (escapable) rule.meta.docs.escape = escapable;
 
   return rule;
 }

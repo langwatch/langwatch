@@ -1,4 +1,4 @@
-import type { CodingAgentApi, LogContentCategory } from "@langwatch/coding-agent-contract";
+import { type LogContentCategory, logContentKeys } from "@langwatch/coding-agent-contract";
 /**
  * Shared mapping/redaction layer for both trace-view transports (authenticated
  * and anonymous). Single implementation ensures a redaction cannot drift between
@@ -32,7 +32,7 @@ import {
   resolveNonBilledCost,
 } from "@langwatch/trace-contract";
 
-import { TraceAttributeRedactionService } from "../services/trace-attribute-redaction.service.ts";
+import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";
 
 // ---------------------------------------------------------------------------
 // Ports
@@ -535,12 +535,12 @@ function redactHiddenAttributes<T extends RedactableV2Dto>({
   ];
   if (hidden.length === 0) return;
 
-  const redactor = TraceAttributeRedactionService.create(hidden);
+  const redactor = createAttributeRedactor({ hidden });
   if (dto.attributes) {
-    redacted.attributes = redactor.redact(dto.attributes);
+    redacted.attributes = redactor(dto.attributes);
   }
   if (dto.params) {
-    redacted.params = redactor.redact(dto.params);
+    redacted.params = redactor(dto.params);
   }
 
   // Span-detail events carry their own attribute records (list-item events
@@ -549,7 +549,7 @@ function redactHiddenAttributes<T extends RedactableV2Dto>({
   if (!events?.some((event) => event.attributes)) return;
 
   (redacted as Record<string, unknown>).events = events.map((event) =>
-    event.attributes ? { ...event, attributes: redactor.redact(event.attributes) } : event,
+    event.attributes ? { ...event, attributes: redactor(event.attributes) } : event,
   );
 }
 
@@ -857,17 +857,15 @@ function formatVisibleToLabel(
 export function redactTraceLogContent({
   row,
   protections,
-  codingAgents,
   derivedAttrPrefixes,
 }: {
   row: TraceLogRecordDto;
   protections: LogVisibility;
-  codingAgents: Pick<CodingAgentApi, "logContentKeys">;
   derivedAttrPrefixes: TraceDerivedAttrPrefixes;
 }): TraceLogRecordDto {
   const eventName = row.attributes[LOG_EVENT_NAME_ATTR] ?? "";
 
-  const contentKeys = codingAgents.logContentKeys(eventName);
+  const contentKeys = logContentKeys(eventName);
   const hiddenKeys = contentKeys.filter((entry) => {
     const value = row.attributes[entry.key];
     return (
@@ -917,7 +915,6 @@ export function gateTraceLogVisibility({
   row,
   protections,
   visibilityCutoffMs,
-  codingAgents,
   derivedAttrPrefixes,
 }: {
   row: TraceLogRecordDto;
@@ -928,7 +925,6 @@ export function gateTraceLogVisibility({
     capturedOutputVisibleTo?: string | null;
   };
   visibilityCutoffMs: number | null;
-  codingAgents: Pick<CodingAgentApi, "logContentKeys">;
   derivedAttrPrefixes: TraceDerivedAttrPrefixes;
 }): TraceLogRecordDto {
   const isBeforeCutoff = visibilityCutoffMs !== null && row.timeUnixMs < visibilityCutoffMs;
@@ -937,7 +933,6 @@ export function gateTraceLogVisibility({
     protections: isBeforeCutoff
       ? { canSeeCapturedInput: false, canSeeCapturedOutput: false }
       : protections,
-    codingAgents,
     derivedAttrPrefixes,
   });
 }

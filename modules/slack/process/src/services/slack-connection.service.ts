@@ -1,7 +1,7 @@
 import { PermissionDeniedError } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   InvalidSlackConnectionInputError,
@@ -39,7 +39,7 @@ import type {
 import { slackSecretFingerprint } from "../rules/slack-secret-fingerprint.rules.ts";
 
 /** Where a project sits: what an ORGANIZATION connection is checked against. */
-export interface SlackProjectScope {
+interface SlackProjectScope {
   projectId: string;
   projectName: string;
   organizationId: string;
@@ -49,25 +49,32 @@ export interface SlackProjectScope {
 /** A secret's stored form: ciphertext, fingerprint, hint and Slack workspace. */
 type StoredSecret = Pick<
   SlackConnectionRecord,
-  | "botTokenEncrypted"
-  | "webhookUrlEncrypted"
-  | "secretFingerprint"
-  | "secretHint"
-  | "slackTeamId"
-  | "slackTeamName"
+  "botToken" | "webhookUrl" | "secretFingerprint" | "secretHint" | "slackTeamId" | "slackTeamName"
 >;
 
 /** The repositories, peer slices, channel and keys the service is composed from. */
-export type SlackConnectionServiceDeps = Readonly<{
+type SlackConnectionServiceDeps = Readonly<{
   connections: SlackConnectionRepository;
   claims: SlackConnectionClaimRepository;
   projects: Pick<ProjectApi, "listNamesByIds">;
   organizations: Pick<OrganizationApi, "getSettings">;
   authorization: Pick<AuthzApi, "hasPermission">;
   webApi: SlackWebApiChannel;
-  cipher: Encryption;
   fingerprintKey: string;
+  /** The key a rotation retired: it finds a stored fingerprint, and none is written under it. */
+  previousFingerprintKey?: string | undefined;
 }>;
+
+/**
+ * One secret's fingerprints: `current` is the only one ever written, `retired`
+ * are the ones a row stored before a key rotation may still carry.
+ */
+interface SecretIdentity {
+  current: string;
+  retired: string[];
+}
+
+const logger = createLogger("langwatch:slack:connections");
 
 /**
  * Named Slack connections (ADR-093 §5a): a bot token or incoming webhook per
@@ -188,7 +195,7 @@ export class SlackConnectionService {
     const guard = {
       organizationId: scope.organizationId,
       target,
-      secretFingerprint: stored.secretFingerprint,
+      identity: this.identity({ secret }),
     };
     await this.assertSecretFree(guard);
     const [row] = await this.deps.connections.create({
@@ -258,7 +265,7 @@ export class SlackConnectionService {
     const guard = {
       organizationId: connection.organizationId,
       target,
-      secretFingerprint: changes.secretFingerprint ?? connection.secretFingerprint,
+      identity: this.heldIdentity({ connection, replacement: value }),
       exceptId: connection.id,
     };
     await this.assertNarrowingStrandsNothing({ connection, target, force });
@@ -328,8 +335,9 @@ export class SlackConnectionService {
     actorId: string;
   }): Promise<{ id: string; wasCreated: boolean }> {
     const value = secret.trim();
-    const secretFingerprint = this.fingerprint({ secret: value });
-    const reach = { organizationId, projectId, secretFingerprint };
+    const held = this.identity({ secret: value });
+    const secretFingerprint = held.current;
+    const reach = { organizationId, projectId, identity: held };
     const [existing] = await this.findReachableHolders(reach);
     if (existing) return { id: existing.id, wasCreated: false };
 
@@ -343,7 +351,7 @@ export class SlackConnectionService {
         scopeType: "PROJECT",
         scopeId: projectId,
         organizationId,
-        ...this.encryptedSecret({ kind, secret: value }),
+        ...this.secretFields({ kind, secret: value }),
         secretFingerprint,
         secretHint: slackSecretHint({ secret: value }),
         slackTeamId: identity?.teamId ?? null,
@@ -370,7 +378,7 @@ export class SlackConnectionService {
     const [connection] = await this.deps.connections.findById({ id });
     if (!connection) return [];
     if (!(await this.reaches({ connection, projectId }))) return [];
-    return this.decryptedSecret({ connection });
+    return this.connectionSecret({ connection });
   }
 
   /** Claim counts per connection id (absent = none), all but `exceptProjectId`'s. */
@@ -466,21 +474,69 @@ export class SlackConnectionService {
   private async findReachableHolders({
     organizationId,
     projectId,
-    secretFingerprint,
+    identity,
   }: {
     organizationId: string;
     projectId: string;
-    secretFingerprint: string;
+    identity: SecretIdentity;
   }): Promise<SlackConnectionRow[]> {
-    const holders = await this.deps.connections.findAllByFingerprint({
+    const holders = await this.findHolders({
       organizationId,
-      secretFingerprint,
+      identity,
       scopes: reachableScopes({ organizationId, projectId }),
     });
     return [
       ...holders.filter((holder) => holder.scopeType === "PROJECT"),
       ...holders.filter((holder) => holder.scopeType !== "PROJECT"),
     ];
+  }
+
+  /**
+   * The connections holding a secret in `scopes`, under the current key or a
+   * retired one. A row found under a retired key is restamped under the current
+   * one, so the previous key can later be removed.
+   */
+  private async findHolders({
+    organizationId,
+    identity,
+    scopes,
+  }: {
+    organizationId: string;
+    identity: SecretIdentity;
+    scopes: SlackScope[];
+  }): Promise<SlackConnectionRow[]> {
+    const [current, ...retired] = await Promise.all(
+      [identity.current, ...identity.retired].map((secretFingerprint) =>
+        this.deps.connections.findAllByFingerprint({ organizationId, secretFingerprint, scopes }),
+      ),
+    );
+    const stale = retired.flat();
+    await Promise.all(
+      stale.map((row) => this.restamp({ row, secretFingerprint: identity.current })),
+    );
+    return [...(current ?? []), ...stale];
+  }
+
+  /** Best effort: a row left under a retired key is restamped by the next lookup that finds it. */
+  private async restamp({
+    row,
+    secretFingerprint,
+  }: {
+    row: SlackConnectionRow;
+    secretFingerprint: string;
+  }): Promise<void> {
+    try {
+      await this.deps.connections.replaceFingerprint({
+        id: row.id,
+        organizationId: row.organizationId,
+        secretFingerprint,
+      });
+    } catch (error) {
+      logger.warn(
+        { error, connectionId: row.id },
+        "a Slack connection found under the previous fingerprint key could not be moved to the current one; the next lookup tries again",
+      );
+    }
   }
 
   /** A typed secret's stored form; a bot token must be accepted by Slack first. */
@@ -493,7 +549,7 @@ export class SlackConnectionService {
   }): Promise<StoredSecret> {
     const identity = kind === "BOT" ? [await this.verifyBotToken({ token: secret })] : [];
     return {
-      ...this.encryptedSecret({ kind, secret }),
+      ...this.secretFields({ kind, secret }),
       secretFingerprint: this.fingerprint({ secret }),
       secretHint: slackSecretHint({ secret }),
       slackTeamId: identity[0]?.teamId ?? null,
@@ -524,17 +580,17 @@ export class SlackConnectionService {
   private async assertSecretFree({
     organizationId,
     target,
-    secretFingerprint,
+    identity,
     exceptId,
   }: {
     organizationId: string;
     target: SlackScope;
-    secretFingerprint: string;
+    identity: SecretIdentity;
     exceptId?: string;
   }): Promise<void> {
-    const holders = await this.deps.connections.findAllByFingerprint({
+    const holders = await this.findHolders({
       organizationId,
-      secretFingerprint,
+      identity,
       scopes:
         target.scopeType === "ORGANIZATION"
           ? [target]
@@ -553,34 +609,56 @@ export class SlackConnectionService {
     return slackSecretFingerprint({ secret, key: this.deps.fingerprintKey });
   }
 
-  private encryptedSecret({ kind, secret }: { kind: SlackConnectionKind; secret: string }): {
-    botTokenEncrypted: string | null;
-    webhookUrlEncrypted: string | null;
-  } {
-    const ciphertext = this.deps.cipher.encrypt(secret);
-    return kind === "BOT"
-      ? { botTokenEncrypted: ciphertext, webhookUrlEncrypted: null }
-      : { botTokenEncrypted: null, webhookUrlEncrypted: ciphertext };
+  /** A secret's fingerprint under the current key, and under the previous key when one is set. */
+  private identity({ secret }: { secret: string }): SecretIdentity {
+    const previousKey = this.deps.previousFingerprintKey;
+    const current = this.fingerprint({ secret });
+    if (!previousKey || previousKey === this.deps.fingerprintKey) return { current, retired: [] };
+    return { current, retired: [slackSecretFingerprint({ secret, key: previousKey })] };
   }
 
-  private decryptedSecret({
+  /**
+   * The identity of the secret an edited connection ends up holding. One keeping
+   * its secret is also looked up by its stored fingerprint, which a rotation may
+   * have left behind the current key.
+   */
+  private heldIdentity({
+    connection,
+    replacement,
+  }: {
+    connection: SlackConnectionRow;
+    replacement: string | undefined;
+  }): SecretIdentity {
+    if (replacement) return this.identity({ secret: replacement });
+    const secret = connection.botToken ?? connection.webhookUrl;
+    if (!secret) return { current: connection.secretFingerprint, retired: [] };
+    const { current, retired } = this.identity({ secret });
+    return {
+      current,
+      retired: [...new Set([...retired, connection.secretFingerprint])].filter(
+        (fingerprint) => fingerprint !== current,
+      ),
+    };
+  }
+
+  private secretFields({ kind, secret }: { kind: SlackConnectionKind; secret: string }): {
+    botToken: string | null;
+    webhookUrl: string | null;
+  } {
+    return kind === "BOT"
+      ? { botToken: secret, webhookUrl: null }
+      : { botToken: null, webhookUrl: secret };
+  }
+
+  private connectionSecret({
     connection,
   }: {
     connection: SlackConnectionRow;
   }): SlackConnectionSecret[] {
     if (connection.kind === "BOT") {
-      return connection.botTokenEncrypted
-        ? [{ kind: "BOT", token: this.deps.cipher.decrypt(connection.botTokenEncrypted) }]
-        : [];
+      return connection.botToken ? [{ kind: "BOT", token: connection.botToken }] : [];
     }
-    return connection.webhookUrlEncrypted
-      ? [
-          {
-            kind: "INCOMING_WEBHOOK",
-            url: this.deps.cipher.decrypt(connection.webhookUrlEncrypted),
-          },
-        ]
-      : [];
+    return connection.webhookUrl ? [{ kind: "INCOMING_WEBHOOK", url: connection.webhookUrl }] : [];
   }
 }
 

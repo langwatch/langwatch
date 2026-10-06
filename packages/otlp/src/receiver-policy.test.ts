@@ -61,6 +61,7 @@ describe("applyOtlpReceiverPolicy", () => {
     expect(link.attributes).toEqual([attribute("link")]);
   });
 
+  /** @scenario "Metrics cannot hide keys in points or exemplars" */
   it("filters metric scopes and scrubs data point and exemplar attributes", () => {
     const request = {
       resourceMetrics: [
@@ -198,6 +199,8 @@ describe("applyOtlpReceiverPolicy", () => {
     expect(logs.resourceLogs).toEqual([]);
   });
 
+  /** @scenario "A credential without an API key row leaves no key attribute" */
+  /** @scenario "Receiver protection preserves future wire fields" */
   it("preserves wire fields while removing duplicate and nested forged identities", () => {
     const span = {
       traceId: "trace-original",
@@ -243,6 +246,8 @@ describe("applyOtlpReceiverPolicy", () => {
     });
   });
 
+  /** @scenario "Metrics cannot hide keys in points or exemplars" */
+  /** @scenario "Receiver protection preserves future wire fields" */
   it.each(["gauge", "sum", "histogram", "exponentialHistogram", "summary"] as const)(
     "protects attributes in %s without changing metric values",
     (kind) => {
@@ -283,4 +288,55 @@ describe("applyOtlpReceiverPolicy", () => {
     expect(result).toEqual({ droppedScopes: 1 });
     expect(request.resourceSpans).toEqual([]);
   });
+
+  /** @scenario "Receiver identity wins over sender and configured policy" */
+  it.each(["traces", "logs", "metrics"] as const)(
+    "leaves one authenticated key attribute on every %s resource and none nested",
+    (signal) => {
+      const forged = () => [attribute("langwatch.api_key.id", "forged"), attribute("kept")];
+      const resourceKey = {
+        traces: "resourceSpans",
+        logs: "resourceLogs",
+        metrics: "resourceMetrics",
+      }[signal];
+      const scopeKey = { traces: "scopeSpans", logs: "scopeLogs", metrics: "scopeMetrics" }[signal];
+      const contents = {
+        traces: { spans: [{ attributes: forged(), events: [{ attributes: forged() }] }] },
+        logs: { logRecords: [{ attributes: forged() }] },
+        metrics: {
+          metrics: [{ attributes: forged(), gauge: { dataPoints: [{ attributes: forged() }] } }],
+        },
+      }[signal];
+      const resources = [
+        {
+          resource: { attributes: forged() },
+          [scopeKey]: [{ scope: { attributes: forged() }, ...contents }],
+        },
+        { [scopeKey]: [] },
+      ];
+      const request = { [resourceKey]: resources };
+
+      applyOtlpReceiverPolicy({
+        request,
+        signal,
+        apiKeyId: "key_real",
+        policy: {
+          resourceAttributeKeysToRemove: ["langwatch.api_key.id"],
+          resourceAttributes: [attribute("langwatch.api_key.id", "policy")],
+        },
+      });
+
+      const forgedAnywhere = JSON.stringify(request).match(/"forged"|"policy"/g);
+      expect(forgedAnywhere).toBeNull();
+      for (const group of resources) {
+        const keys = (group.resource?.attributes ?? []).filter(
+          (candidate) => candidate.key === "langwatch.api_key.id",
+        );
+        expect(keys).toEqual([attribute("langwatch.api_key.id", "key_real")]);
+      }
+      expect(JSON.stringify(request).match(/langwatch\.api_key\.id/g)).toHaveLength(
+        resources.length,
+      );
+    },
+  );
 });

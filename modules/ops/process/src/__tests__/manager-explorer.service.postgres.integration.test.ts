@@ -20,6 +20,7 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { OpsEventingIntrospection } from "../app/ops.app.ts";
@@ -30,7 +31,6 @@ import type {
   DeadMessageRedrive,
 } from "../repositories/process-ops.repository.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
-import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 /** The audit log this suite records on: the same rows, written straight to Postgres. */
 class PrismaAuditLogTestSink implements AuditLogApi {
@@ -67,10 +67,6 @@ class PrismaAuditLogTestSink implements AuditLogApi {
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
 class NoopIntrospection implements OpsEventingIntrospection {
-  killSwitches() {
-    return [];
-  }
-
   projections() {
     return [];
   }

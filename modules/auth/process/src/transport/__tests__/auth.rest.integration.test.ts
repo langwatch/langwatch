@@ -170,7 +170,43 @@ describe("given the /api/auth family mounted on a process's own doors", () => {
       });
 
       expect(response.status).toBe(302);
-      expect(response.headers.get("location")).toBe("/auth/signin");
+      expect(response.headers.get("location")).toBe("/auth/signin?signedOut=1");
+    });
+
+    it.each(["GET", "POST"])(
+      "answers a %s whose revocation failed with an error, clearing nothing",
+      async (method) => {
+        const federatedLogout = vi.fn(async () => null);
+        const world = authWorld({ federatedLogout });
+        world.revokeSessionFromCookies.mockRejectedValueOnce(
+          new Error("session store unavailable"),
+        );
+
+        const response = await world.app.request(`${BASE_URL}/api/auth/logout`, {
+          method,
+          headers: { cookie: "better-auth.session_token=abc" },
+        });
+
+        expect(response.status).toBe(500);
+        expect(response.headers.get("location")).toBeNull();
+        expect(response.headers.getSetCookie()).toEqual([]);
+        expect(federatedLogout).not.toHaveBeenCalled();
+      },
+    );
+
+    it("lets the same cookie retry after a temporary revocation failure", async () => {
+      const world = authWorld();
+      world.revokeSessionFromCookies.mockRejectedValueOnce(new Error("session store unavailable"));
+      const logout = () =>
+        world.app.request(`${BASE_URL}/api/auth/logout`, {
+          headers: { cookie: "better-auth.session_token=abc" },
+        });
+
+      expect((await logout()).status).toBe(500);
+      const retry = await logout();
+
+      expect(retry.status).toBe(302);
+      expect(world.revokeSessionFromCookies).toHaveBeenCalledTimes(2);
     });
 
     it("follows the federated target where the deployment resolves one", async () => {

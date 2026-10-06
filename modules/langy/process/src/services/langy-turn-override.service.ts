@@ -3,7 +3,7 @@ import { LANGY_PROMPT_HANDLES } from "@langwatch/langy-contract";
 import { LangyPromptRegistryService, type LangyPrompt } from "./langy-prompt-registry.service.ts";
 import { LANGY_OVERRIDE } from "./langy-turn-shared.service.ts";
 
-export type LangyTurnOverride = {
+type LangyTurnOverride = {
   text: string;
   source: "unconfigured" | "registry" | "cached" | "fallback";
 };

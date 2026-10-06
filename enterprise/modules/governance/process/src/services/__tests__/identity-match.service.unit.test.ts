@@ -389,6 +389,7 @@ describe("Feature: turning a suggestion into a link", () => {
 
   describe("given a stored suggestion for a person who has since been linked", () => {
     /** @scenario "Confirming a suggestion for somebody since linked is refused" */
+    /** @scenario "A person can only have one open link at a time" */
     it("refuses, saying the person already holds a link", async () => {
       const world = buildWorld();
       const personId = await world.seedPerson({ rawActorId: "user_opaque" });

@@ -26,15 +26,13 @@ import {
 } from "@langwatch/trace-contract";
 
 import {
-  type TraceIoExtraction,
-  type TraceMediaReferenceResolver,
-  type TraceModelCost,
-  type TraceSpanNormalization,
-} from "../app/trace.members.ts";
-import {
   clampSpanShardCount,
   spanCommandGroupKey,
 } from "../rules/trace-span-command-shard.rules.ts";
+import type { TraceSpanNormalization } from "../services/span-normalization.service.ts";
+import type { TraceIoExtraction } from "../services/trace-io-extraction.service.ts";
+import type { TraceMediaReferenceResolver } from "../services/trace-media-reference.service.ts";
+import type { TraceModelCost } from "../services/trace-model-cost.service.ts";
 import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 import { EventingRecordSpanAdapter, RECORD_SPAN_DEDUPLICATION } from "./record-span.commands.ts";
 import { SpanStorageMapProjection } from "./span-storage.projection.ts";
@@ -99,6 +97,8 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
       });
   }
 
+  // The annotation commands edit one trace's annotation set, so they share
+  // the trace's lane: on separate groups a delete could precede its add.
   const commands = EventingTraceProcessingAdapter.create();
 
   return definePipeline({
@@ -163,9 +163,15 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
       coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
     })
     .withCommand("resolveOrigin", EventingTraceOriginAdapter)
-    .withCommand("addAnnotation", commands.addAnnotationCommand)
-    .withCommand("removeAnnotation", commands.removeAnnotationCommand)
-    .withCommand("bulkSyncAnnotations", commands.bulkSyncAnnotationsCommand)
+    .withCommand("addAnnotation", commands.addAnnotationCommand, {
+      serializeByAggregate: true,
+    })
+    .withCommand("removeAnnotation", commands.removeAnnotationCommand, {
+      serializeByAggregate: true,
+    })
+    .withCommand("bulkSyncAnnotations", commands.bulkSyncAnnotationsCommand, {
+      serializeByAggregate: true,
+    })
     .withCommand("changeTraceName", commands.changeTraceNameCommand);
 }
 

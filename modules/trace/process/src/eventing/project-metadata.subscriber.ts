@@ -6,14 +6,30 @@
 
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import type {
+  Project,
+  UpdateProjectMetadataInput,
+  OrgAdminResolution,
+} from "@langwatch/project-contract";
 import {
   LANGY_TRACE_ORIGIN,
   type TraceSummaryData,
   type TraceProcessingEvent,
 } from "@langwatch/trace-contract";
 
-import type { TraceProjectMetadata } from "../app/trace.members.ts";
 import type { TraceProjectMilestonesService } from "../services/trace-project-milestones.service.ts";
+
+/** The three things the projectMetadata subscriber does to a project. Narrowed
+ * from the full ProjectApi so background processes can compose just this. */
+export interface TraceProjectMetadata {
+  findById(id: string): Promise<Project | null>;
+  updateMetadata(input: UpdateProjectMetadataInput): Promise<void>;
+  /**
+   * The org admin's user id, which is also the distinct_id posthog-js
+   * identifies the same person with in the browser.
+   */
+  resolveOrgAdmin(projectId: string): Promise<OrgAdminResolution>;
+}
 
 const logger = createLogger("langwatch:trace-processing:project-metadata");
 
@@ -35,11 +51,6 @@ export interface ProjectMetadataSubscriberDeps {
   bootstrapTopicClustering?: (projectId: string) => Promise<void>;
   /** Records the first and later traces as trace's own events (§9); a failure is only logged. */
   milestones: Pick<TraceProjectMilestonesService, "recordFirstTrace" | "recordTraceReceived">;
-  /**
-   * Marks the project active for the day of this trace, once a day. Injected
-   * so trace never imports billing's process package (structurally typed).
-   */
-  trackActiveDay?: (input: { projectId: string; occurredAt: number }) => Promise<void>;
 }
 
 /**
@@ -58,7 +69,8 @@ async function trackFirstTraceIntegrated({
   tenantId: string;
   attrs: Record<string, string>;
 }): Promise<void> {
-  const { userId } = await deps.projects.resolveOrgAdmin(tenantId);
+  const { userId, organizationCreatedAt, onboardingVariant } =
+    await deps.projects.resolveOrgAdmin(tenantId);
   if (!userId) return;
 
   try {
@@ -69,6 +81,8 @@ async function trackFirstTraceIntegrated({
       sdkLanguage: attrs["sdk.language"] ?? "unknown",
       sdkFramework: attrs["langwatch.sdk.framework"] ?? "unknown",
       occurredAt: source.occurredAt,
+      organizationCreatedAt: organizationCreatedAt?.epochMilliseconds,
+      onboardingVariant,
     });
   } catch (error) {
     logger.error({ tenantId, error }, "Failed to record the first trace (non-fatal)");
@@ -89,7 +103,8 @@ async function trackTraceReceived({
   tenantId: string;
 }): Promise<void> {
   try {
-    const { userId } = await deps.projects.resolveOrgAdmin(tenantId);
+    const { userId, organizationCreatedAt, onboardingVariant } =
+      await deps.projects.resolveOrgAdmin(tenantId);
     if (!userId) return;
 
     await deps.milestones.recordTraceReceived({
@@ -97,6 +112,8 @@ async function trackTraceReceived({
       projectId: tenantId,
       userId,
       occurredAt: source.occurredAt,
+      organizationCreatedAt: organizationCreatedAt?.epochMilliseconds,
+      onboardingVariant,
     });
   } catch (error) {
     logger.error({ tenantId, error }, "Failed to record a later trace (non-fatal)");
@@ -232,8 +249,6 @@ export function createProjectMetadataHandler(
     const { tenantId, state: foldState } = context;
 
     if (!isRealFirstIngest(foldState)) return;
-
-    await deps.trackActiveDay?.({ projectId: tenantId, occurredAt: event.occurredAt });
 
     try {
       await syncProjectMetadata({ deps, source: event, tenantId, foldState });

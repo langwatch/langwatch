@@ -47,4 +47,22 @@ describe("LangWatch design system", () => {
     ).toBeDefined();
     expect(layer[".feature &"]?.["--chakra-colors-bg-surface"]).toBe("rebeccapurple");
   });
+
+  /** @scenario Solid orange stays the brand orange when a feature theme restyles it */
+  it("keeps the base orange.solid when an extension sets it for one condition", () => {
+    const extension = defineConfig({
+      conditions: { feature: ".feature &" },
+      theme: {
+        semanticTokens: {
+          colors: { orange: { solid: { value: { _feature: "#112233" } } } },
+        },
+      },
+    });
+    const layer = tokens(createDesignSystem(extension));
+    const dark = layer[".dark &, .dark .chakra-theme:not(.light) &"];
+
+    expect(layer[":root &, .light &"]?.["--chakra-colors-orange-solid"]).toBe("#ED8926");
+    expect(dark?.["--chakra-colors-orange-solid"]).toBe("#ED8926");
+    expect(layer[".feature &"]?.["--chakra-colors-orange-solid"]).toBe("#112233");
+  });
 });

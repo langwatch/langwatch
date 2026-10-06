@@ -1,3 +1,4 @@
+import type { LangyRelayConnection } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * The egress allow-list door, through the composition production uses.
@@ -35,6 +36,7 @@ function composed(credentials: LangyCredentialService) {
     messages: createApiFixture<LangyMessageService>({}),
     credentials,
     feedbackPrompt: { shouldPrompt: () => false } as never,
+    openRelay: () => createApiFixture<LangyRelayConnection>(),
   });
 }
 

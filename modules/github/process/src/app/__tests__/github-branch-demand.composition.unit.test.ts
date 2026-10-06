@@ -187,7 +187,10 @@ describe("the GitHub branch demand path composed from Postgres alone", () => {
       });
     });
 
-    /** @scenario "Branch demand runs on two project facts rather than a project service" */
+    /**
+     * @scenario "Branch demand runs on two project facts rather than a project service"
+     * @scenario "Connecting GitHub records the backfilled pull requests on their projects"
+     */
     it("records the project as having had a pull request mapped", async () => {
       const { client } = database();
       const project = new RecordingProjectActivity();

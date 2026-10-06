@@ -14,7 +14,7 @@ import type { DatasetRow } from "../dataset.repository.ts";
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type DatasetContentDatabase = Pick<
+type DatasetContentDatabase = Pick<
   PrismaClient,
   "dataset" | "datasetRecord" | "$transaction" | "$queryRaw" | "$executeRaw"
 >;

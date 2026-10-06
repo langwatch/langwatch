@@ -8,8 +8,8 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import type { UsageCounter, UsageCount } from "../../app/entitlement.members.ts";
 import type { UsageMembershipRepository } from "../../repositories/usage-membership.repository.ts";
+import type { UsageCounter, UsageCount } from "../usage-enforcement.service.ts";
 import { UNCAPPED_MONTHLY_USAGE_LIMIT, UsageStatsService } from "../usage-stats.service.ts";
 
 const UNLIMITED_MESSAGES = 999_999_999;
@@ -55,7 +55,7 @@ function serviceOn(plan: Plan, count: UsageCount = 4_200): UsageStatsService {
   return UsageStatsService.create({
     membership: new StubMembership(),
     seats: createApiFixture<Pick<OrganizationApi, "countMemberSeats">>({
-      countMemberSeats: async () => ({ fullMembers: 3, liteMembers: 1 }),
+      countMemberSeats: async () => ({ fullMembers: 3, liteMembers: 1, developers: 2 }),
     }),
     counter: new StubCounter(count),
     plans,
@@ -95,6 +95,18 @@ describe("UsageStatsService", () => {
 
       expect(stats.messageLimitInfo.max).toBe(10_000);
       expect(stats.messageLimitInfo.status).toBe("warning");
+      expect(() => usageStatsSchema.parse(stats)).not.toThrow();
+    });
+  });
+
+  describe("given an organization holding Developer seats", () => {
+    /** @scenario Developers are counted and never capped */
+    it("reports the Developer count beside the metered seats", async () => {
+      const stats = await serviceOn(planWith(10_000)).getUsageStats("org-1", { id: "user-1" });
+
+      expect(stats.membersCount).toBe(3);
+      expect(stats.membersLiteCount).toBe(1);
+      expect(stats.membersDeveloperCount).toBe(2);
       expect(() => usageStatsSchema.parse(stats)).not.toThrow();
     });
   });

@@ -1,5 +1,5 @@
 import { type FoldProjectionStore, RedisCachedFoldStore } from "@langwatch/eventing";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { TraceSummaryFoldCacheRepository } from "../trace-summary-fold-cache.repository.ts";
 
@@ -9,9 +9,9 @@ const TRACE_SUMMARY_FOLD_CACHE_KEY_PREFIX = "trace_summaries";
 const TRACE_SUMMARY_FOLD_CACHE_TTL_SECONDS = 300;
 
 export class RedisTraceSummaryFoldCacheRepository implements TraceSummaryFoldCacheRepository {
-  private constructor(private readonly redis: ProcessMembers["redis"]) {}
+  private constructor(private readonly redis: RedisConnection) {}
 
-  static create(redis: ProcessMembers["redis"]): RedisTraceSummaryFoldCacheRepository {
+  static create(redis: RedisConnection): RedisTraceSummaryFoldCacheRepository {
     return new RedisTraceSummaryFoldCacheRepository(redis);
   }
 

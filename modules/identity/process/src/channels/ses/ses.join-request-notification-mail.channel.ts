@@ -8,7 +8,7 @@ import {
   type MailSender,
 } from "@langwatch/mail";
 
-import type { JoinRequestNotificationMail } from "../../app/identity.members.ts";
+import type { JoinRequestNotificationMail } from "../join-request-notification-mail.channel.ts";
 import { JoinRequestNotificationMailChannel } from "../join-request-notification-mail.channel.ts";
 
 type Input<Name extends keyof JoinRequestNotificationMail> = Parameters<

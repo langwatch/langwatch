@@ -300,20 +300,8 @@ func (state *bootState) havenWaitReady(ctx context.Context, instance *Instance) 
 	state.logf("haven %s: waiting for the backend lane of %q (up to %s)", instance.Name, plan.slug, timeout)
 	progress := newHavenProgress(deadline)
 	for {
-		report, err := state.havenStatus(ctx, plan)
-		if err == nil {
-			if baseURL, ready := havenStackReady(report, plan.slug); ready {
-				for _, stack := range report.Stacks {
-					if stack.Slug == plan.slug {
-						rememberAppOrigin(baseURL, stack)
-					}
-				}
-				havenrun.TrustLocalRoute()
-				instance.URL = baseURL
-				instance.MailURL = havenMailURL(report, plan.slug)
-				state.logf("haven %s: %s ready at %s", instance.Name, plan.slug, baseURL)
-				return nil
-			}
+		if state.adoptIfReady(ctx, instance, plan) {
+			return nil
 		}
 		if time.Now().After(deadline) {
 			return fmt.Errorf("haven %s: stack %q had no healthy backend lane within %s\n%s",
@@ -326,6 +314,29 @@ func (state *bootState) havenWaitReady(ctx context.Context, instance *Instance) 
 		case <-time.After(pollDelay(deadline)):
 		}
 	}
+}
+
+// adoptIfReady points the instance at its stack once haven reports the
+// backend lane listening, and reports whether it did.
+func (state *bootState) adoptIfReady(ctx context.Context, instance *Instance, plan havenPlan) bool {
+	report, err := state.havenStatus(ctx, plan)
+	if err != nil {
+		return false
+	}
+	baseURL, ready := havenStackReady(report, plan.slug)
+	if !ready {
+		return false
+	}
+	for _, stack := range report.Stacks {
+		if stack.Slug == plan.slug {
+			rememberAppOrigin(baseURL, stack)
+		}
+	}
+	havenrun.TrustLocalRoute()
+	instance.URL = baseURL
+	instance.MailURL = havenMailURL(report, plan.slug)
+	state.logf("haven %s: %s ready at %s", instance.Name, plan.slug, baseURL)
+	return true
 }
 
 // havenProgress reports at most once per havenProgressInterval, so a five

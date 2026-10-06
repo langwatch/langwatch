@@ -8,7 +8,8 @@ import {
   type ProjectSpendRollup,
 } from "@langwatch/entitlement-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -79,7 +80,8 @@ describe("entitlement app installation", () => {
   /**
    * @scenario "The core baseline works without enterprise sources"
    * @scenario "An organization's month volume is counted from its projects in its metering unit"
-   * `EntitlementModule` declares `reads = ["logger"]` and no subscription
+   * @scenario "The entitlement installer constructs its private service"
+   * `EntitlementModule` reads no members and declares no subscription
    * dependency at all, and its declared `license` dependency is answered
    * here with a source that never grants — so a plain boot, with no
    * Enterprise billing composed and no active license, still resolves a
@@ -93,9 +95,9 @@ describe("entitlement app installation", () => {
       const { logger } = createTestLogger();
       const warned: Parameters<BillingApi["sendUsageWarning"]>[0][] = [];
       const runtime = await createApp({ role })
-        .withModules([withMemoryRepositories(entitlementProcessModule)])
-        .withConfig({ entitlement: { requestBounds: undefined } })
-        .withMembers({ isSaas: true, processName: "test" })
+        .withModules([entitlementProcessModule])
+        .withConfig({ entitlement: { requestBounds: undefined, isSaas: true } })
+        .withStores(memoryStores())
         .withObservability((observability) => observability.withLogging(logger))
         .provide({
           user: createEntitlementTestUsers(),
@@ -114,7 +116,7 @@ describe("entitlement app installation", () => {
               projectIds.map((projectId) => ({ projectId, count: 7 })),
           }),
           organization: createApiFixture<OrganizationApi>({
-            countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0 }),
+            countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
           }),
           project: createApiFixture<ProjectApi>({
             listIdsByOrganization: async () => ["project-1"],
@@ -174,16 +176,16 @@ describe("entitlement app installation", () => {
     async function bootWithLicense(source: EntitlementSource) {
       const { logger } = createTestLogger();
       const runtime = await createApp({ role: "api" })
-        .withModules([withMemoryRepositories(entitlementProcessModule)])
-        .withConfig({ entitlement: { requestBounds: undefined } })
-        .withMembers({ isSaas: true, processName: "test" })
+        .withModules([entitlementProcessModule])
+        .withConfig({ entitlement: { requestBounds: undefined, isSaas: true } })
+        .withStores(memoryStores())
         .withObservability((observability) => observability.withLogging(logger))
         .provide({
           user: createEntitlementTestUsers(),
           billing: createApiFixture<BillingApi>({ getActiveSubscriptionPlan: async () => free }),
           trace: createApiFixture<TraceApi>({}),
           organization: createApiFixture<OrganizationApi>({
-            countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0 }),
+            countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
           }),
           project: createApiFixture<ProjectApi>({}),
           licensing: createApiFixture<LicensingApi>({
@@ -316,7 +318,7 @@ describe("entitlement app installation", () => {
     it("looks the impersonator's address up before the sources see it", async () => {
       const seen: (string | null | undefined)[] = [];
       const app = createEntitlementTestApp({
-        members: {
+        infrastructure: {
           baseline: free,
           authorization: {
             resolve: (user) => {
@@ -361,7 +363,7 @@ describe("entitlement app installation", () => {
         sentAt,
       });
       const app = createEntitlementTestApp({
-        members: { baseline: free, warnings },
+        infrastructure: { baseline: free, warnings },
       });
 
       await expect(
@@ -375,7 +377,7 @@ describe("entitlement app installation", () => {
       expect(warnings.sent).toHaveLength(1);
 
       const quiet = createEntitlementTestApp({
-        members: { baseline: free, warnings: TestUsageWarnings.create() },
+        infrastructure: { baseline: free, warnings: TestUsageWarnings.create() },
       });
 
       await expect(
@@ -418,7 +420,7 @@ describe("entitlement app installation", () => {
           membership: MemoryUsageMembershipRepository.create({ memory: database }),
           spend: MemoryOrganizationSpendRepository.create({ memory: database }),
         },
-        members: { baseline: free },
+        infrastructure: { baseline: free },
       });
 
       await expect(
@@ -450,7 +452,7 @@ describe("entitlement app installation", () => {
           }),
           spend,
         },
-        members: { baseline: free },
+        infrastructure: { baseline: free },
       });
 
       const now = Date.now();

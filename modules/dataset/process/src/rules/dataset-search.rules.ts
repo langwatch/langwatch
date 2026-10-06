@@ -5,16 +5,11 @@ import { DatasetTooLargeToSearchError } from "@langwatch/dataset-contract";
  */
 
 /**
- * How many rows one search will read. Legacy postgres-backed datasets carry
- * a null `sizeBytes` (only s3_jsonl chunking writes it), so this row limit
- * is the only one that can hold on that path at all.
+ * What one search may read, as the project's organization answers for a read
+ * holding a whole dataset in memory. A recorded size can be missing or stale,
+ * so the byte limit is measured during the scan too.
  */
-export const DATASET_SEARCH_MAX_ROWS = 50_000;
-
-/** Row cost isn't measured by count; byte limit necessary. Measured during
- * scan, not from dataset metadata (which can be missing/stale).
- */
-export const DATASET_SEARCH_MAX_BYTES = 100 * 1024 * 1024;
+export type DatasetSearchCaps = { maxRows: number; maxBytes: number };
 
 /**
  * How many postgres-backed rows are read per scan round. s3_jsonl is
@@ -97,17 +92,17 @@ const safeStringifyValue = (value: unknown): string => {
 };
 
 /** Refuses a search scan once it has read more rows or bytes than one search may. */
-export function refuseSearchScan(rowsRead: number, bytesRead: number): void {
-  if (rowsRead > DATASET_SEARCH_MAX_ROWS) {
+export function refuseSearchScan(rowsRead: number, bytesRead: number, caps: DatasetSearchCaps): void {
+  if (rowsRead > caps.maxRows) {
     throw new DatasetTooLargeToSearchError({
       rowCount: rowsRead,
-      maxRows: DATASET_SEARCH_MAX_ROWS,
+      maxRows: caps.maxRows,
     });
   }
-  if (bytesRead > DATASET_SEARCH_MAX_BYTES) {
+  if (bytesRead > caps.maxBytes) {
     throw new DatasetTooLargeToSearchError({
       sizeBytes: bytesRead,
-      maxBytes: DATASET_SEARCH_MAX_BYTES,
+      maxBytes: caps.maxBytes,
     });
   }
 }

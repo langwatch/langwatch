@@ -18,27 +18,28 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  type IngestionPullMetricsSink,
-  type IngestionPullOutcomeChannel,
-  type IngestionPullRunner,
-  type IngestionPullScheduler,
-  type PulledUsageLedgerRepository,
-  type PulledUsageLedgerRow,
-} from "../../app/governance.members.ts";
-import {
   type IngestionPullRunStatusData,
   IngestionPullRunStatusEventingProjection,
 } from "../../eventing/ingestion-pull-run-status-eventing.projection.ts";
 import { IngestionPullEventingAdapter } from "../../eventing/ingestion-pull.pipeline.ts";
 import {
+  type IngestionPullScheduler,
   INGESTION_PULL_PROCESS_NAME,
   type IngestionPullProcessState,
   IngestionPullProcess,
 } from "../../eventing/ingestion-pull.process.ts";
-import { PulledUsageLedgerIntent } from "../../eventing/pulled-usage-ledger.intent.ts";
+import {
+  PulledUsageLedgerIntent,
+  type PulledUsagePricingDeps,
+} from "../../eventing/pulled-usage-ledger.intent.ts";
 import { PulledUsageEventingAdapter } from "../../eventing/pulled-usage.pipeline.ts";
 import { IngestionPullListingService } from "../ingestion-pull-listing.service.ts";
-import { IngestionPullService } from "../ingestion-pull.service.ts";
+import type { IngestionPullMetricsSink } from "../ingestion-pull-metrics.service.ts";
+import {
+  type IngestionPullOutcomeChannel,
+  type IngestionPullRunner,
+  IngestionPullService,
+} from "../ingestion-pull.service.ts";
 
 class FixedSchedule implements IngestionPullScheduler {
   nextRunAt(input: { cron: string; after: number }): number {
@@ -117,12 +118,12 @@ class RecordingPullMetrics implements IngestionPullMetricsSink {
   }
 }
 
-class RecordingPulledUsageLedger implements PulledUsageLedgerRepository {
-  readonly rows: PulledUsageLedgerRow[] = [];
-  insert(rows: PulledUsageLedgerRow[]): Promise<void> {
-    this.rows.push(...rows);
+class RecordingPulledUsageLedger implements PulledUsagePricingDeps {
+  readonly rows: Parameters<PulledUsagePricingDeps["sendRecordPulledUsagePriced"]>[0][] = [];
+  sendRecordPulledUsagePriced: PulledUsagePricingDeps["sendRecordPulledUsagePriced"] = (data) => {
+    this.rows.push(data);
     return Promise.resolve();
-  }
+  };
 }
 
 function processEvent(
@@ -412,7 +413,7 @@ describe("ingestion pull retry outcomes", () => {
 });
 
 describe("pulled usage ledger process", () => {
-  it("writes integer nano-USD and all quantities without changing scope", async () => {
+  it("records the priced fact in integer nano-USD with all quantities and its scope", async () => {
     const ledger = new RecordingPulledUsageLedger();
     const intent = PulledUsageLedgerIntent.create(ledger);
     await intent.execute({

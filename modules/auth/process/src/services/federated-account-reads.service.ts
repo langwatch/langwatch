@@ -3,7 +3,7 @@ import { HandledError } from "@langwatch/handled-error";
 
 import type { BetterAuthHooksRepository } from "../repositories/better-auth-hooks.repository.ts";
 
-export interface FederatedAccountReadsServiceDeps {
+interface FederatedAccountReadsServiceDeps {
   accounts: BetterAuthHooksRepository;
 }
 

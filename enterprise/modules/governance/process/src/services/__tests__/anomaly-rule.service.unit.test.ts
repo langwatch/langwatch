@@ -61,6 +61,7 @@ function validInput(overrides: Partial<CreateAnomalyRuleInput> = {}): CreateAnom
 }
 
 describe("AnomalyRuleService", () => {
+  /** @scenario "Anomaly rules are validated before persistence" */
   it("validates configuration before creating a rule", async () => {
     const { store, repository } = seeded();
     const service = AnomalyRuleService.create({ repository });

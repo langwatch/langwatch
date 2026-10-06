@@ -2,10 +2,8 @@
 
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 
-import type {
-  GovernanceHttpClient,
-  IngestionPullDiagnosticsSink,
-} from "../../app/governance.members.ts";
+import type { IngestionPullDiagnosticsSink } from "../../services/ingestion-pull-log.service.ts";
+import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 /**
  * Anthropic (Claude) Compliance reference puller — built on top of
  * the HttpPollingPullerAdapter with the URL + auth shape locked to

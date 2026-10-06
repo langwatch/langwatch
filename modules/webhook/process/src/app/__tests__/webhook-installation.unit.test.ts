@@ -4,11 +4,10 @@
  * repositories, with no repository class or tier named here.
  */
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
@@ -29,37 +28,28 @@ const entitledPlan: Plan = {
   prices: { USD: 0, EUR: 0 },
 };
 
-/** The stores this feature reads, answered the way opened stores answer. */
-function stores() {
-  const prisma = new PrismaClient({ accelerateUrl: "prisma://localhost/test" });
-  const rateLimiter = { check: async () => ({ allowed: true }) };
-  const members: Record<string, unknown> = {
-    prisma,
-    rateLimiter,
-    redis: memoryRedisDouble(),
-  };
-
-  return {
-    order: ["prisma", "rateLimiter", "redis"],
-    read: (name: string) => members[name],
-  };
-}
-
-function process(role: "api" | "worker") {
+function process(role: "api" | "worker", plan: Plan = entitledPlan) {
   return createApp({ role })
-    .withModules([withMemoryRepositories(webhookProcessModule)])
+    .withModules([webhookProcessModule])
     .withConfig({
       webhook: {
         allowInsecureLocalUrls: false,
         allowAmbientAwsCredentials: false,
+        isSaas: false,
+        outboundProxy: {
+          HTTPS_PROXY: undefined,
+          https_proxy: undefined,
+          HTTP_PROXY: undefined,
+          http_proxy: undefined,
+          NO_PROXY: undefined,
+          no_proxy: undefined,
+        },
       },
     })
-    .withStores(stores())
-    .withMember("isSaas", false)
-    .withMember("outboundProxy", {})
+    .withStores(memoryStores())
     .provide({
       entitlement: createApiFixture<EntitlementApi>({
-        getActivePlan: async () => entitledPlan,
+        getActivePlan: async () => plan,
         requestBound: async () => 10,
       }),
       project: createApiFixture<ProjectApi>({ listIdsByOrganization: async () => [] }),
@@ -87,6 +77,31 @@ describe("webhook app installation", () => {
           { id: endpoint.id },
         ]);
         await expect(app.getAll({ organizationId: "other-organization" })).resolves.toEqual([]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("given an organization whose plan lacks webhook endpoints", () => {
+    /** @scenario The plan gate answers on a deployment with no Enterprise governance application */
+    it("refuses the gate as forbidden, naming the plan, with only entitlement composed", async () => {
+      const runtime = await process("api", {
+        ...entitledPlan,
+        webhookEndpointsEnabled: false,
+      }).boot();
+
+      try {
+        const error = await runtime
+          .service(WebhookApi)
+          .assertEndpointsEntitled(ORGANIZATION_ID)
+          .catch((caught: unknown) => caught);
+
+        expect(error).toMatchObject({
+          code: "webhook_endpoints_not_entitled",
+          httpStatus: 403,
+          message: expect.stringContaining("plan"),
+        });
       } finally {
         await runtime.stop();
       }

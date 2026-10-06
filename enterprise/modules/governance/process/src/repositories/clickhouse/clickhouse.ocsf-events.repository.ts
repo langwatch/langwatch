@@ -8,8 +8,8 @@ import type {
   GovernanceOcsfEvent,
   GovernanceOcsfEventsReader,
   GovernanceOcsfEventWriter,
-} from "../../app/governance.members.ts";
-import type { GovernanceClickHouseTenantResolver } from "../governance.repositories.ts";
+  GovernanceClickHouseTenantResolver,
+} from "../governance.repositories.ts";
 
 /**
  * ClickHouseOcsfEventsRepository — read and write side of the
@@ -61,8 +61,6 @@ export const OCSF_SEVERITY = {
   CRITICAL: 6,
 } as const;
 
-export type OcsfSeverity = (typeof OCSF_SEVERITY)[keyof typeof OCSF_SEVERITY];
-
 /**
  * OCSF v1.1 ActivityId values for ClassUid 6003 (API Activity).
  *   1 = Create
@@ -79,8 +77,6 @@ export const OCSF_ACTIVITY = {
   INVOKE: 6,
 } as const;
 
-export type OcsfActivity = (typeof OCSF_ACTIVITY)[keyof typeof OCSF_ACTIVITY];
-
 const OCSF_CLASS_API_ACTIVITY = 6003;
 const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;
 
@@ -93,7 +89,7 @@ const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;
  *
  * Migration: 00028_add_ocsf_schema_version.sql
  */
-export const OCSF_SCHEMA_VERSION = "1.1.0" as const;
+const OCSF_SCHEMA_VERSION = "1.1.0" as const;
 
 /** Cursor-paginated read of `governance_ocsf_events`, ordered EventTime ASC. */
 export interface FindOcsfEventsInput {

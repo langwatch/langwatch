@@ -13,7 +13,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GovernanceHttpClient } from "../../app/governance.members.ts";
+import type { GovernanceHttpClient } from "../../channels/governance-http.channel.ts";
 import {
   copilotBotsAsAgents,
   HttpCopilotBotsChannel,

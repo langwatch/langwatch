@@ -1,4 +1,4 @@
-import type { LangyStreamEntry } from "@langwatch/langy-contract";
+import type { CliResultDigest, CliToolResult, LangyStreamEntry } from "@langwatch/langy-contract";
 import type { Redis } from "ioredis";
 
 /** An entry paired with the Redis stream id it was read at. */
@@ -80,6 +80,70 @@ export abstract class LangyTokenBufferRepository {
     payload: unknown;
   }): Promise<void>;
 
+  /** One answer-text delta; coalesced before it reaches the edge. */
+  abstract appendChunk(input: {
+    conversationId: string;
+    turnId: string;
+    text: string;
+  }): Promise<void>;
+
+  /** Live-only reasoning text, never part of the durable answer. */
+  abstract appendReasoning(input: {
+    conversationId: string;
+    turnId: string;
+    text: string;
+  }): Promise<void>;
+
+  /** Ephemeral "sub update": how far through a subtask the agent is. */
+  abstract appendProgress(input: {
+    conversationId: string;
+    turnId: string;
+    message?: string;
+    progress?: number;
+    current?: number;
+    total?: number;
+    batchItems?: number;
+    batchDurationMs?: number;
+  }): Promise<void>;
+
+  /** Mirrors a durable milestone onto the live edge. */
+  abstract appendMilestone(input: {
+    conversationId: string;
+    turnId: string;
+    kind: string;
+    detail?: string;
+  }): Promise<void>;
+
+  /** Mirrors the plan snapshot onto the live edge (whole list, last wins). */
+  abstract appendPlan(input: {
+    conversationId: string;
+    turnId: string;
+    items: { content: string; status: string }[];
+  }): Promise<void>;
+
+  /** Mirrors one tool call's start or end onto the live edge. */
+  abstract appendTool(input: {
+    conversationId: string;
+    turnId: string;
+    id: string;
+    name: string;
+    phase: "start" | "end";
+    title?: string;
+    input?: unknown;
+    output?: string;
+    isError?: boolean;
+    digest?: CliResultDigest;
+    result?: CliToolResult;
+    local?: boolean;
+  }): Promise<void>;
+
+  /** A live-only navigate to an already-resolved same-app path. */
+  abstract appendNavigate(input: {
+    conversationId: string;
+    turnId: string;
+    href: string;
+  }): Promise<void>;
+
   /** Ephemeral "major update" — which tool/action the agent is picking. */
   abstract appendStatus(input: {
     conversationId: string;
@@ -101,7 +165,7 @@ export abstract class LangyTokenBufferRepository {
   }): Promise<{ present: boolean; stale: boolean; lastBeatAt: number | null }>;
 }
 
-/** The connection a stream's blocking tail borrows, handed to `open()` below. */
+/** The connection a stream's blocking tail borrows. */
 export type LangyTokenBufferConnection = {
   redis: LangyStreamRedis;
   blockingRedis?: LangyStreamBlockingRedis;

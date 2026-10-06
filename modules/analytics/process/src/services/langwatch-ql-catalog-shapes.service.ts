@@ -75,7 +75,7 @@ export interface LangWatchQLViewColumn {
  * The tenant boundary covers both: the joined table is a source table too, so a
  * row policy is created on it. Only a ClickHouse-resident view may declare one.
  */
-export interface LangWatchQLViewJoin {
+interface LangWatchQLViewJoin {
   /** The joined table, in the same source database as the primary. */
   readonly table: string;
   /** Alias the view body gives the joined table, used in {@link on}. */
@@ -112,7 +112,7 @@ export interface LangWatchQLViewJoin {
 }
 
 /** What identifies one row of a view, and how the source's versions collapse to it. */
-export interface LangWatchQLViewDedup {
+interface LangWatchQLViewDedup {
   /**
    * The source table's `ORDER BY` — the key its engine collapses on.
    */

@@ -18,8 +18,6 @@ import { z } from "zod";
 import type {
   CustomKeysRead,
   ModelProviderCredentialCodec,
-} from "../../app/model-provider.members.ts";
-import type {
   ModelProviderLegacyColumns,
   ModelProviderLegacyColumnsUpdate,
   ModelProviderRepository,
@@ -277,7 +275,13 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
     await this.database.modelProvider.update({
       where: { id },
       data: {
-        ...(customKeys === undefined ? {} : { customKeys }),
+        ...(customKeys === undefined
+          ? {}
+          : {
+              customKeys: PrismaModelProviderRepository.toPrismaInputJson(
+                this.credentials.encode(customKeys),
+              ),
+            }),
         ...(customModels === undefined
           ? {}
           : { customModels: PrismaModelProviderRepository.toPrismaInputJson(customModels) }),

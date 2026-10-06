@@ -114,6 +114,15 @@ describe("formatError", () => {
       expect(body.docsUrl).toBe("https://docs.langwatch.ai/traces");
     });
 
+    /** @scenario "A presumed platform fault goes on the wire as itself" */
+    it("serializes an undeclared fault at 5xx as presumed_platform", () => {
+      const { body } = formatError({
+        err: new TestError("upstream_unavailable", "Upstream unavailable", { httpStatus: 503 }),
+      });
+
+      expect(body.fault).toBe("presumed_platform");
+    });
+
     it("carries an explicit retryability decision", () => {
       const err = new TestError("provider_unavailable", "Provider unavailable", {
         httpStatus: 503,

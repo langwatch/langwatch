@@ -22,7 +22,6 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { OrganizationSettingsSecret } from "../app/organization.members.ts";
 import { PrismaGroupRepository } from "../repositories/prisma/prisma.group.repository.ts";
 import { PrismaOrganizationRepository } from "../repositories/prisma/prisma.organization.repository.ts";
 import { PrismaTeamRepository } from "../repositories/prisma/prisma.team.repository.ts";
@@ -32,11 +31,6 @@ import { PersonalWorkspaceIdentityService } from "../services/personal-workspace
 import { TeamIdentityService } from "../services/team-identity.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
-
-const passthroughSecrets: OrganizationSettingsSecret = {
-  encrypt: (value) => value,
-  decrypt: (value) => value,
-};
 
 describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
   const connection: PrismaConnection = PrismaConnectionService.create({
@@ -96,7 +90,10 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
   const authzApi = createApiFixture<AuthzApi>({ ...authz, ...grants });
 
   const organizations = OrganizationService.create({
-    repository: PrismaOrganizationRepository.create(prisma),
+    repository: PrismaOrganizationRepository.create({
+      database: prisma,
+      cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+    }),
     teams: PrismaTeamRepository.create(prisma),
     groups: PrismaGroupRepository.create(prisma),
     identities: PersonalWorkspaceIdentityService.create(),
@@ -104,7 +101,6 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
     groupIdentities: GroupIdentityService.create(),
     authz: authzApi,
     grants: authzApi,
-    settingsSecrets: passthroughSecrets,
   });
 
   const ns = `team-last-admin-${nanoid(8)}`;
@@ -210,6 +206,7 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
 
   describe("when both are removed at the same time", () => {
     /** @scenario Two team admins removed at the same time cannot both succeed */
+    /** @scenario "Concurrent team membership edits race" */
     it("refuses one of the two and leaves the team with an admin", async () => {
       const teamId = await seedTeamWithTwoAdmins();
       revocationDelayMs = 0;

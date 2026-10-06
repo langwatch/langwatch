@@ -12,7 +12,6 @@ import { ABSENT_UI_COPY_TARGETS, UiCopyTargets, type UiCopyTarget } from "./copy
 import { NO_UI_DECLARATIONS, type UiDeclarations } from "./declarations.ts";
 import { UiScope, type UiActiveScope } from "./scope.ts";
 import type { UiSessionSnapshot } from "./session.ts";
-import type { UiSlots } from "./slots.tsx";
 
 /** Scope is a capability of its own; this file stays the one ports barrel. */
 export { UiScope, type UiActiveScope };
@@ -160,13 +159,21 @@ export type UiActor = {
 };
 
 /**
- * Who is here and what they may do — `hasPermission` and `isFeatureEnabled`
- * answer synchronously and fail closed, so a loading screen renders the same
- * as a "no" screen. Where they are is `UiScope`, a capability of its own.
+ * Who is here and what they may do — `hasPermission`, `hasOrganizationPermission`
+ * and `isFeatureEnabled` answer synchronously and fail closed, so a loading screen
+ * renders the same as a "no" screen. Where they are is `UiScope`, a capability of its own.
  */
 export abstract class UiSession {
   abstract currentUser(): UiActor | null;
   abstract hasPermission(permission: string): boolean;
+
+  /**
+   * Whether the reader holds a permission in the active organization, apart
+   * from any project grant. Ports that cannot answer it fail by name.
+   */
+  hasOrganizationPermission(_permission: string): boolean {
+    throw new UiCapabilityUnavailableError("session organization permission");
+  }
 
   /**
    * Whether the answers above have arrived — a guard needs the
@@ -216,6 +223,10 @@ class UnavailableUiSession extends UiSession {
   }
 
   hasPermission(): never {
+    throw new UiCapabilityUnavailableError("session");
+  }
+
+  override hasOrganizationPermission(): never {
     throw new UiCapabilityUnavailableError("session");
   }
 
@@ -328,14 +339,14 @@ export type UiCapabilities = {
   /**
    * Where every module's named events go. Absent and "installed no
    * destination" are the same reading — `useUiAnalytics` degrades to the
-   * inert destination either way, exactly as `useUiSlots` does.
+   * inert destination either way.
    */
   analytics?: UiAnalytics;
   /** Where the reader could replicate a thing to. Absent reads as no answer. */
   copyTargets?: UiCopyTargets;
   /**
    * What installed modules declared through `withCapabilities`. Optional:
-   * absent reads as nothing declared, exactly as `slots` does.
+   * absent reads as nothing declared.
    */
   declarations?: UiDeclarations;
   /**
@@ -360,12 +371,6 @@ export type UiCapabilities = {
    */
   scope?: UiScope;
   session: UiSession;
-  /**
-   * The blocks a core screen leaves for the composition to fill. Optional
-   * because absent and "filled nothing" are the same reading — `useUiSlots`
-   * degrades to the core defaults either way.
-   */
-  slots?: UiSlots;
 };
 
 /** What the composing application chose to answer itself. */
@@ -420,7 +425,6 @@ export function resolveUiCapabilities({
     rpc: install.rpc ?? rpc ?? UNAVAILABLE_UI_RPC,
     scope: install.scope ?? scope ?? UNAVAILABLE_UI_SCOPE,
     session: install.session ?? session ?? UNAVAILABLE_UI_SESSION,
-    slots: install.slots,
   };
 }
 

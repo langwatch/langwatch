@@ -217,6 +217,9 @@
       "path": "enterprise/modules/demo-data/process/tsconfig.json"
     },
     {
+      "path": "enterprise/modules/digest/process/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/enterprise-gateway/contract/tsconfig.json"
     },
     {
@@ -697,6 +700,9 @@
       "path": "apps/ui/tsconfig.test.json"
     },
     {
+      "path": "packages/upgrade/tsconfig.test.json"
+    },
+    {
       "path": "modules/usage/contract/tsconfig.json"
     },
     {
@@ -725,6 +731,9 @@
     },
     {
       "path": "modules/webhook/process/tsconfig.json"
+    },
+    {
+      "path": "packages/webhook-verify/tsconfig.json"
     },
     {
       "path": "apps/worker/tsconfig.test.json"

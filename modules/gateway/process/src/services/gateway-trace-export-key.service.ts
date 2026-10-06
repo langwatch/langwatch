@@ -6,22 +6,19 @@
 import { type ApiKeyApi, TRACE_EXPORT_API_KEY_NAME } from "@langwatch/api-key-contract";
 
 import type { GatewayTraceExportKeyRepository } from "../repositories/gateway-trace-export-key.repository.ts";
-import type { GatewayConnectUpstreamCipher } from "./gateway-connect-upstream.service.ts";
 
-export const TRACE_EXPORT_PERMISSIONS: readonly string[] = ["traces:create"];
+const TRACE_EXPORT_PERMISSIONS: readonly string[] = ["traces:create"];
 
 export class GatewayTraceExportKeyService {
   private constructor(
     private readonly options: {
       repository: GatewayTraceExportKeyRepository;
-      cipher: GatewayConnectUpstreamCipher;
       apiKeys: Pick<ApiKeyApi, "create">;
     },
   ) {}
 
   static create(options: {
     repository: GatewayTraceExportKeyRepository;
-    cipher: GatewayConnectUpstreamCipher;
     apiKeys: Pick<ApiKeyApi, "create">;
   }): GatewayTraceExportKeyService {
     return new GatewayTraceExportKeyService(options);
@@ -36,7 +33,7 @@ export class GatewayTraceExportKeyService {
   /** The project's export token, minted on first use. */
   async tokenFor(input: { organizationId: string; projectId: string }): Promise<string> {
     const [stored] = await this.options.repository.findForProject(input.projectId);
-    if (stored) return this.options.cipher.decrypt(stored.encryptedToken);
+    if (stored) return stored.token;
 
     const { token, apiKey } = await this.options.apiKeys.create({
       isSystemManaged: true,
@@ -49,13 +46,13 @@ export class GatewayTraceExportKeyService {
       permissions: [...TRACE_EXPORT_PERMISSIONS],
       bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: input.projectId }],
     });
-    // ponytail: a pod losing a concurrent first mint leaves its key unused; a system revoke on
-    // ApiKeyApi would retire it.
+    // ponytail: a pod losing a concurrent first mint leaves its key unused;
+    // a system revoke on ApiKeyApi would retire it.
     const kept = await this.options.repository.saveFirst({
       projectId: input.projectId,
       apiKeyId: apiKey.id,
-      encryptedToken: this.options.cipher.encrypt(token),
+      token,
     });
-    return this.options.cipher.decrypt(kept.encryptedToken);
+    return kept.token;
   }
 }

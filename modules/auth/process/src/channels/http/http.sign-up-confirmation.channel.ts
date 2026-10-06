@@ -8,7 +8,7 @@ import { setSessionCookie } from "better-auth/cookies";
 const logger = createLogger("langwatch:better-auth:sign-up-confirmation");
 
 /** Where the sign-up screen posts a spent link, under the auth base path. */
-export const SIGN_UP_CONFIRM_ADDRESS_PATH = "/sign-up/confirm-address";
+const SIGN_UP_CONFIRM_ADDRESS_PATH = "/sign-up/confirm-address";
 
 /** Spending the link: what it confirmed, and whether THIS request was the one that spent it. */
 export interface SignUpAddressConfirmation {

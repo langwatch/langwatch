@@ -1,7 +1,7 @@
 /**
  * The run's counters, folded from its own events onto the row a caller polls. It
  * folds counters only: the definition is written once, when the run is accepted.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type { StateProjectionDefinition, StateProjectionStore } from "@langwatch/eventing";

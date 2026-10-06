@@ -28,7 +28,7 @@ type LogFacts = Record<string, string | number | boolean>;
 type ResponseContent = Pick<TraceApi, "deriveClaudeResponseContent">;
 
 /** A received record either contributes session facts or is no coding-agent session's. */
-export type LogContribution =
+type LogContribution =
   | { outcome: "contributes"; contribution: ContributeLogFactsCommandData }
   | { outcome: "ignored" };
 

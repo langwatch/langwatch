@@ -18,15 +18,30 @@ import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { type TopicApi, type TopicClusteringStatus } from "@langwatch/topic-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { initTRPC } from "@trpc/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProjectModule } from "../../app/project.app.ts";
+import { MemoryProjectStorageSettingsRepository } from "../../repositories/memory/memory.project-storage-settings.repository.ts";
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
 import type { ProjectBrowserApi } from "../project.trpc.ts";
 import { projectTrpcTransport } from "../project.trpc.ts";
 import type { ProjectTrpcTestContext } from "./project.trpc.harness.ts";
 import { TestApiKeyService } from "./support/test-api-key-service.ts";
+
+const reported = vi.hoisted(() => ({
+  entries: [] as { payload: Readonly<Record<string, unknown>>; message: string }[],
+}));
+
+const logger = {
+  error: (payload: Readonly<Record<string, unknown>>, message: string) => {
+    reported.entries.push({ payload, message });
+  },
+};
+
+beforeEach(() => {
+  reported.entries.length = 0;
+});
 
 const ACTOR_ID = "user-1";
 const ORGANIZATION_ID = "organization-1";
@@ -144,8 +159,8 @@ function application(
     },
   });
 
-  const logged: { payload: Readonly<Record<string, unknown>>; message: string }[] = [];
   const app = ProjectModule.create({
+    logger,
     dependencies: {
       apiKeys: new TestApiKeyService(),
       authorization,
@@ -162,17 +177,9 @@ function application(
       ),
       dataPrivacy: createApiFixture<DataPrivacyApi>({}, "dataPrivacy"),
     },
-    repositories: { projects: MemoryProjectRepository.create({ memory: database }) },
-    members: {
-      now: () => NOW.getTime(),
-      // The deployment's cipher, named so the assertion can see it was the one
-      // the procedure reached rather than any encryption at all.
-      encryption: { encrypt: (plaintext) => `cipher(${plaintext})` },
-      logger: {
-        error: (payload, message) => {
-          logged.push({ payload, message });
-        },
-      },
+    repositories: {
+      projects: MemoryProjectRepository.create({ memory: database }),
+      storageSettings: MemoryProjectStorageSettingsRepository.create({ memory: database }),
     },
     config: undefined,
     resources: new ResourceScope(),
@@ -182,9 +189,12 @@ function application(
   app.connectLifecycle({
     recordProjectCreated: { send: async () => undefined },
     recordProjectLegacyKeyRevoked: { send: options.revoked ?? (async () => undefined) },
+    recordPresenceSettingChanged: { send: async () => undefined },
+    recordProjectMoved: { send: async () => undefined },
+    recordProjectArchived: { send: async () => undefined },
   });
 
-  return { app, database, asked, logged };
+  return { app, database, asked, logged: reported.entries };
 }
 
 /**
@@ -200,7 +210,6 @@ function mount(options: Parameters<typeof application>[0] = {}) {
 
   const browser: ProjectBrowserApi = {
     projects: () => app.projects(),
-    encryptProjectSecret: (value) => app.encryptProjectSecret(value),
     probePermission: (input) => app.probePermission(input),
     archiveOtherProject: (input) => app.archiveOtherProject(input),
     revokeProjectApiKey: (input) => app.revokeProjectApiKey(input),
@@ -221,8 +230,7 @@ function mount(options: Parameters<typeof application>[0] = {}) {
 
 describe("the project tRPC namespace over the application the composition builds", () => {
   describe("when the settings form carries stored-object credentials", () => {
-    /** @scenario "stored-object credentials are written through the deployment's cipher" */
-    it("writes each one through the process's own encryption member", async () => {
+    it("writes each one through the storage settings repository, which memory holds as given", async () => {
       const { caller, database } = mount();
 
       await caller.update({
@@ -237,9 +245,10 @@ describe("the project tRPC namespace over the application the composition builds
       });
 
       expect(database.findProject("project_1")).toMatchObject({
-        s3Endpoint: "cipher(https://s3.example)",
-        s3AccessKeyId: "cipher(access-key)",
-        s3SecretAccessKey: "cipher(secret-key)",
+        s3Endpoint: "https://s3.example",
+        s3AccessKeyId: "access-key",
+        s3SecretAccessKey: "secret-key",
+        s3Bucket: "bucket",
       });
     });
   });
@@ -364,6 +373,44 @@ describe("the project tRPC namespace over the application the composition builds
       ).rejects.toMatchObject({ cause: { code: "project_permission_denied", httpStatus: 403 } });
 
       expect(database.findProject(OTHER_PROJECT_ID)?.archivedAt).toBeNull();
+    });
+  });
+
+  describe("given the hidden governance project", () => {
+    const GOVERNANCE_ID = "project_governance";
+    const governance = (database: ReturnType<typeof application>["database"]) =>
+      database.putProject(
+        project({
+          id: GOVERNANCE_ID,
+          name: "Governance (internal)",
+          slug: "governance-organization-1",
+          apiKey: "sk-lw-base-key-of-the-governance",
+          kind: "internal_governance",
+        }),
+      );
+
+    /** @scenario The governance area cannot be archived through the projects API */
+    it("refuses an archive from the browser door and leaves it live", async () => {
+      const { caller, database } = mount();
+      governance(database);
+
+      await expect(
+        caller.archiveById({ projectId: "project_1", projectToArchiveId: GOVERNANCE_ID }),
+      ).rejects.toMatchObject({ cause: { code: "forbidden", httpStatus: 403 } });
+
+      expect(database.findProject(GOVERNANCE_ID)?.archivedAt).toBeNull();
+    });
+
+    /** @scenario The governance area cannot be renamed or moved through the projects API */
+    it("refuses a settings update from the browser door and writes nothing", async () => {
+      const { caller, database } = mount();
+      governance(database);
+
+      await expect(
+        caller.update({ projectId: GOVERNANCE_ID, name: "Renamed", traceSharingEnabled: false }),
+      ).rejects.toMatchObject({ cause: { code: "forbidden", httpStatus: 403 } });
+
+      expect(database.findProject(GOVERNANCE_ID)?.name).toBe("Governance (internal)");
     });
   });
 

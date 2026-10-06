@@ -1,11 +1,11 @@
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant } from "@langwatch/time";
 
-import type { OrganizationInviteRateLimit } from "../../app/organization.members.ts";
+import type { OrganizationInviteRateLimitRepository } from "../organization-invite-rate-limit.repository.ts";
 
 /** The process's ONE fixed-window counter, over process Redis, as the invitation throttle
  * spends it: same shape as the model-provider connection limiter's own Redis adapter. */
-export class RedisOrganizationInviteRateLimitRepository implements OrganizationInviteRateLimit {
+export class RedisOrganizationInviteRateLimitRepository implements OrganizationInviteRateLimitRepository {
   static create(redis: RedisConnection): RedisOrganizationInviteRateLimitRepository {
     return new RedisOrganizationInviteRateLimitRepository(redis);
   }

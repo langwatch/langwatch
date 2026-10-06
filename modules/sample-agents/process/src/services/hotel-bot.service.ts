@@ -1,6 +1,6 @@
 import { ProjectMissingCredentialsError } from "@langwatch/api";
 import { generate } from "@langwatch/ksuid";
-import type { MembersRead } from "@langwatch/process-stores/members";
+import type { Logger } from "@langwatch/observability";
 import {
   HotelBotDeclinedError,
   type HotelBotReply,
@@ -48,7 +48,7 @@ type TurnTrace = Readonly<{
 export class HotelBotService {
   readonly #chat: OpenAiChatChannel;
   readonly #collector: TraceCollectorChannel;
-  readonly #logger: MembersRead<["logger"]>["logger"];
+  readonly #logger: Logger;
   readonly #random: () => number;
   readonly #nowMs: () => number;
 
@@ -63,7 +63,7 @@ export class HotelBotService {
   static create(deps: {
     chat: OpenAiChatChannel;
     collector: TraceCollectorChannel;
-    logger: MembersRead<["logger"]>["logger"];
+    logger: Logger;
     random: () => number;
     nowMs: () => number;
   }): HotelBotService {

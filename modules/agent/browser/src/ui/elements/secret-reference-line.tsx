@@ -16,7 +16,12 @@ export function SecretReferenceLine({ name, onReplace }: SecretReferenceLineProp
         Secrets
       </Link>
       {onReplace && (
-        <Button size="xs" variant="outline" onClick={onReplace} data-testid="secret-reference-replace">
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={onReplace}
+          data-testid="secret-reference-replace"
+        >
           Replace
         </Button>
       )}

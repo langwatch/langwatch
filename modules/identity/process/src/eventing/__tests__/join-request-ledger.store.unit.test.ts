@@ -18,7 +18,10 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { IdentityEventing, IdentityPipelineCommand } from "../../app/identity.members.ts";
+import type {
+  IdentityEventing,
+  IdentityPipelineCommand,
+} from "../identity-command-senders.store.ts";
 import { JoinRequestLedgerStore } from "../join-request-ledger.store.ts";
 import type { JoinRequestFoldState } from "../join-request-state.projection.ts";
 
@@ -105,6 +108,7 @@ function requestJoin(): { command: JoinRequestCommand; facts: JoinRequestFactInp
     matchedVia: "verified-identifier-domain" as const,
     expiresAtMs: T0 + 1_000,
     notifyAdmins: true,
+    origin: "web" as const,
   };
   return {
     command: { type: REQUEST_JOIN_COMMAND_TYPE, data },
@@ -119,6 +123,7 @@ function requestJoin(): { command: JoinRequestCommand; facts: JoinRequestFactInp
           matchedVia: "verified-identifier-domain",
           expiresAtMs: T0 + 1_000,
           notifyAdmins: true,
+          origin: "web",
           actor: ACTOR,
         },
       },

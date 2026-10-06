@@ -257,7 +257,10 @@ describe("LangyTurnRelayAdapter", () => {
       });
     });
 
-    /** @scenario "A heartbeat still counts when the revival record cannot be reached" */
+    /**
+     * @scenario "A heartbeat still counts when the revival record cannot be reached"
+     * @scenario "A revival record that already aged out is not recreated"
+     */
     it("still counts the heartbeat when the handoff store refuses", async () => {
       const refreshHandoffTtl = vi.fn(async () => {
         throw new Error("redis unavailable");
@@ -537,6 +540,66 @@ describe("LangyTurnRelayAdapter", () => {
       expect(buffer.appendTool).not.toHaveBeenCalled();
       expect(conversations.recordToolCallStarted).not.toHaveBeenCalled();
       expect(conversations.recordToolCallCompleted).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A navigate run in the shared folder opens the resource just the same" */
+    it("navigates to the platform link for a lookup run in the shared folder, drawing no card of its own", async () => {
+      const { relay, buffer, conversations } = makeRelay();
+      const inFolder = (payload: Record<string, unknown>) => frame({ ...payload, local: true });
+      const lookup = "langwatch trace get run_1";
+      const open = "langwatch navigate open run_1";
+      const platformUrl = "https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1";
+      await handleAll({
+        relay,
+        frames: [
+          inFolder({
+            type: "tool",
+            id: "c1",
+            name: "bash",
+            phase: "start",
+            input: { command: lookup },
+          }),
+          inFolder({
+            type: "tool",
+            id: "c1",
+            name: "bash",
+            phase: "end",
+            input: { command: lookup },
+            output: JSON.stringify({ trace_id: "run_1", platformUrl }),
+          }),
+        ],
+      });
+      buffer.appendTool.mockClear();
+      conversations.recordToolCallStarted.mockClear();
+
+      await handleAll({
+        relay,
+        frames: [
+          inFolder({
+            type: "tool",
+            id: "c2",
+            name: "bash",
+            phase: "start",
+            input: { command: open },
+          }),
+          inFolder({
+            type: "tool",
+            id: "c2",
+            name: "bash",
+            phase: "end",
+            input: { command: open },
+            output: "ok",
+          }),
+        ],
+      });
+
+      expect(buffer.appendNavigate).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+        href: "/acme/simulations/set_1/batch_1?openRun=run_1",
+      });
+      expect(buffer.appendTool).not.toHaveBeenCalled();
+      expect(conversations.recordToolCallStarted).not.toHaveBeenCalled();
     });
 
     /** @scenario "A resource surfaced in an earlier turn can still be opened" */
@@ -985,6 +1048,10 @@ describe("LangyTurnRelayAdapter", () => {
       );
     });
 
+    /**
+     * @scenario "A live-watched failure shows the same card a reload shows"
+     * @scenario "A handled stream error renders a useful explanation, not a raw string"
+     */
     it("marks the stream error with the CLASSIFIED domain error, not the raw prose", async () => {
       const { relay, buffer, conversations } = makeRelay();
       const out = await relay.handle(
@@ -1119,6 +1186,7 @@ describe("LangyTurnRelayAdapter", () => {
 describe("LangyTurnRelayAdapter", () => {
   describe("given the run-token handoff races the projection", () => {
     describe("when a frame arrives before the projection has landed", () => {
+      /** @scenario "The first frames of a new turn authenticate against the handoff before the projection lands" */
       it("authenticates it against the handoff token", async () => {
         // First-turn reality: the async RunToken projection is still queued
         // (null), but the synchronous handoff carries the token the worker
@@ -1171,6 +1239,7 @@ describe("LangyTurnRelayAdapter", () => {
     });
 
     describe("when the first lookup misses and a later frame arrives", () => {
+      /** @scenario "A transient runToken miss does not poison the whole connection" */
       it("re-reads the token instead of reusing the cached miss", async () => {
         // No handoff wired; the projection is null on the first read, then lands.
         const conversations = fakeConversations();

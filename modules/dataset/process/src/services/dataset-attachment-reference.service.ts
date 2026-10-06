@@ -1,6 +1,5 @@
 /** The stored-file references a record write brings in, checked before it lands (ADR-158 §6). */
 import {
-  DATASET_ATTACHMENT_MAX_BYTES,
   DatasetAttachmentReferenceRefusedError,
   DatasetAttachmentTooLargeError,
   DatasetAttachmentTypeRefusedError,
@@ -30,6 +29,8 @@ export class DatasetAttachmentReferenceService {
     columnTypes: DatasetColumns;
     entries: readonly Record<string, unknown>[];
     findHeld?: () => Promise<readonly Record<string, unknown>[]>;
+    /** The per-file limit the organization answers, asked for only when a new reference arrives. */
+    maxBytes: () => Promise<number>;
   }): Promise<void> {
     let held: Set<string> | undefined;
     const checked = new Set<string>();
@@ -44,15 +45,22 @@ export class DatasetAttachmentReferenceService {
         ),
       );
       if (held.has(cell.value)) continue;
-      await this.assertCellAccepted(input.projectId, cell, ref);
+      await this.assertCellAccepted({
+        projectId: input.projectId,
+        cell,
+        ref,
+        maxBytes: await input.maxBytes(),
+      });
     }
   }
 
-  private async assertCellAccepted(
-    projectId: string,
-    cell: AttachmentCell,
-    ref: DatasetAttachmentRef,
-  ): Promise<void> {
+  private async assertCellAccepted(input: {
+    projectId: string;
+    cell: AttachmentCell;
+    ref: DatasetAttachmentRef;
+    maxBytes: number;
+  }): Promise<void> {
+    const { projectId, cell, ref, maxBytes } = input;
     const refused = (reason: "not_found" | "not_confirmed" | "wrong_purpose") =>
       new DatasetAttachmentReferenceRefusedError({ reason, column: cell.column });
     if (ref.projectId !== projectId) throw refused("not_found");
@@ -66,13 +74,14 @@ export class DatasetAttachmentReferenceService {
       purpose: metadata.provenance.purpose,
       mediaType: metadata.mediaType,
       byteLength: metadata.byteLength,
+      maxBytes,
     });
     if (verdict.accepted) return;
     if (verdict.refusal === "wrong_purpose") throw refused("wrong_purpose");
     if (verdict.refusal === "type_refused") {
       throw new DatasetAttachmentTypeRefusedError(metadata.mediaType);
     }
-    throw new DatasetAttachmentTooLargeError(DATASET_ATTACHMENT_MAX_BYTES);
+    throw new DatasetAttachmentTooLargeError(maxBytes);
   }
 
   private async getMetadata(

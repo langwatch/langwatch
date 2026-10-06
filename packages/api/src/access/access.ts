@@ -5,14 +5,16 @@
  */
 
 // The permission vocabulary is `@langwatch/authorization`'s; nothing here mirrors it.
-import type { Actor } from "@langwatch/authorization";
 import {
+  type Actor,
   BlankScopeIdError,
+  isPlatformTierPermission,
   permissionGrantTiers,
   PermissionDeniedError,
   SCOPE_TIER_BY_FIELD,
   SCOPE_TIER_FIELDS,
   type AuthzDeclaredScopeId,
+  type AuthzHandlerScope,
   type AuthzDenialReason,
   type AuthzGetDecisionInput,
   type AuthzGetProjectAnyDecisionInput,
@@ -21,17 +23,24 @@ import {
   type AuthzScopeLineageResult,
   type DeclaredScopeTier,
   type PermissionDecision,
+  type PlatformTierPermission,
   type ScopeTierField,
 } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 
-import { EnterprisePlanRequiredError, ScopeInputMismatchError } from "../errors.ts";
+import {
+  EnterprisePlanRequiredError,
+  PlatformPermissionDeniedError,
+  PlatformSurfaceHiddenError,
+  ScopeInputMismatchError,
+} from "../errors.ts";
 import { resolveDeclaredScope } from "./declaration.ts";
 import {
   AUTHZ_DECLARATION,
   declareAuthzMiddleware,
   type AuthzDeclaration,
 } from "./declared-middleware.ts";
+import { permissionsOfChoice, valueAtPath, type InputPermission } from "./input-permission.ts";
 
 const logger = createLogger("langwatch:authz");
 
@@ -46,15 +55,44 @@ export type PermissionAllDeclaration = Readonly<
   }
 >;
 
+/** A permission chosen from the parsed input; `via` is where a bare entry is asked. */
+export type InputPermissionDeclaration = InputPermission & Readonly<{ via?: ScopeTierField }>;
+
+/**
+ * Where a platform-tier permission is asked (E4): of the operator's PLATFORM grant. `hidden`
+ * answers every refusal 404 `not_found`; `denied` is 401 or 403. `hiddenWithout` (Q42) answers
+ * 404 to a caller lacking that staff permission, 403 to staff lacking this one, 401 anonymous.
+ */
+export type PlatformPermissionTarget = Readonly<
+  | { at: "platform"; refusal?: "denied" | "hidden"; hiddenWithout?: never }
+  | { at: "platform"; hiddenWithout: PlatformTierPermission; refusal?: never }
+>;
+
+/** A platform-tier permission asked at the platform, with how its refusal answers. */
+export type PlatformPermissionDeclaration = Readonly<{
+  kind: "permission-platform";
+  permission: PlatformTierPermission;
+  refusal: "denied" | "hidden";
+  /** The staff permission a caller must hold before the route admits it exists (Q42). */
+  hiddenWithout?: PlatformTierPermission;
+}>;
+
 export type AccessDeclaration =
   | Exclude<AuthzDeclaration, { kind: "custom" | "public" | "permission-all" }>
-  | PermissionAllDeclaration;
+  | PermissionAllDeclaration
+  | InputPermissionDeclaration
+  | PlatformPermissionDeclaration;
 
 export function declareAccessMiddleware<M extends (params: never) => Promise<unknown>>(
   declaration: AccessDeclaration | PublicRouteAccess,
   middleware: M,
 ): M {
-  if (declaration.kind !== "permission-all" && declaration.kind !== "public") {
+  if (
+    declaration.kind !== "permission-all" &&
+    declaration.kind !== "public" &&
+    declaration.kind !== "permission-by-input" &&
+    declaration.kind !== "permission-platform"
+  ) {
     return declareAuthzMiddleware(declaration, middleware);
   }
 
@@ -77,6 +115,34 @@ export function sharedGrantTiers(
   );
 }
 
+/**
+ * Several permissions asked together, at one scope. A set that names fewer than two, repeats
+ * one, or shares no tier it could all be asked at is refused where it is written.
+ */
+export function permissionsTogether({
+  address,
+  permissions,
+}: {
+  address: string;
+  permissions: readonly AuthzPermission[];
+}): readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]] {
+  if (permissions.length < 2) {
+    throw new Error(`${address} names ${permissions.length} permissions to check together`);
+  }
+
+  if (new Set(permissions).size !== permissions.length) {
+    throw new Error(`${address} names one permission twice among the ones it checks together`);
+  }
+
+  if (sharedGrantTiers(permissions).length === 0) {
+    throw new Error(
+      `${address} checks ${permissions.join(" and ")} together, and no one scope grants them all`,
+    );
+  }
+
+  return permissions as readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]];
+}
+
 /** Which credential reaches a REST route, as the document names it. */
 export type Credential =
   | "browser"
@@ -96,6 +162,8 @@ export type AccessActor = Actor & Readonly<{ id: string }>;
 export type Caller = Readonly<{
   actor: AccessActor | null;
   scope?: AuthzDeclaredScopeId | null;
+  /** A person in a browser session, the caller the second-factor gate holds (Q184). */
+  browserSession?: Readonly<{ id: string | null }>;
 }>;
 
 /** The authorization decisions one request asks for, and nothing else. */
@@ -103,6 +171,177 @@ export interface Authorize {
   getDecision(input: AuthzGetDecisionInput): Promise<PermissionDecision>;
   getProjectAnyDecision(input: AuthzGetProjectAnyDecisionInput): Promise<PermissionDecision>;
   checkScopeLineage(input: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult>;
+  /** The organization holding a project or team (AuthzApi.getScope); absent hands a null one. */
+  organizationOf?(
+    scope: Readonly<{ tier: "project" | "team"; id: string }>,
+  ): Promise<string | null>;
+  /** Whether this user holds a platform-tier permission at the PLATFORM (E4); absent refuses. */
+  getPlatformDecision?(input: {
+    userId: string;
+    permission: PlatformTierPermission;
+  }): Promise<PlatformDecision>;
+  /** Refuses a person the organization holds at its second-factor gate; absent asks nothing. */
+  assertSecondFactor?(input: {
+    userId: string;
+    sessionId: string | null;
+    organizationId: string;
+    scope: AuthzDeclaredScopeId;
+  }): Promise<void>;
+}
+
+/** The platform question's answer: a platform grant carries no organization role. */
+export type PlatformDecision = Readonly<{ permitted: boolean }>;
+
+/**
+ * Who a platform permission is asked of: the operator behind an impersonated caller, else the
+ * caller (record §8, ADR-092). Null for an actor that is no person.
+ */
+export function platformPrincipalOf(actor: Actor | null): string | null {
+  if (actor?.type !== "user") return null;
+
+  return actor.impersonatorId ?? actor.id;
+}
+
+/**
+ * A platform-tier permission at the platform, and nowhere else; refused where it is written.
+ * Returns the declaration both transports carry.
+ */
+export function platformPermissionOf({
+  address,
+  permission,
+  target,
+}: {
+  address: string;
+  permission: AuthzPermission;
+  target: PlatformPermissionTarget;
+}): PlatformPermissionDeclaration {
+  if (!isPlatformTierPermission(permission)) {
+    throw new Error(
+      `${address} asks "${permission}" at the platform, and only a platform-tier permission is granted there`,
+    );
+  }
+
+  const refusal = target.refusal ?? "denied";
+
+  if (refusal !== "denied" && refusal !== "hidden") {
+    throw new Error(`${address} names "${String(refusal)}", which is no platform refusal`);
+  }
+
+  const declared = {
+    kind: "permission-platform",
+    permission: permission as PlatformTierPermission,
+    refusal,
+  } as const;
+
+  if (target.hiddenWithout === void 0) return declared;
+
+  return { ...declared, hiddenWithout: staffPermissionOf({ address, target }) };
+}
+
+/** A staff route's own refusal is fixed, and its staff permission is granted at the platform. */
+function staffPermissionOf({
+  address,
+  target,
+}: {
+  address: string;
+  target: PlatformPermissionTarget;
+}): PlatformTierPermission {
+  const staff = target.hiddenWithout as AuthzPermission;
+
+  if (target.refusal !== void 0) {
+    throw new Error(`${address} hides from non-staff, so it names no refusal of its own`);
+  }
+
+  if (!isPlatformTierPermission(staff)) {
+    throw new Error(
+      `${address} hides without "${staff}", and only a platform-tier permission marks staff`,
+    );
+  }
+
+  return staff as PlatformTierPermission;
+}
+
+/** A platform-tier permission asked anywhere but the platform is refused where it is written. */
+export function assertNotPlatformPermission({
+  address,
+  permissions,
+}: {
+  address: string;
+  permissions: readonly AuthzPermission[];
+}): void {
+  const platform = permissions.find((permission) => isPlatformTierPermission(permission));
+
+  if (!platform) return;
+
+  throw new Error(
+    `${address} asks "${platform}", which is granted only at the platform: declare { at: "platform" }`,
+  );
+}
+
+/** The refusal a platform route gives: the hidden family's 404, or 403 naming the permission. */
+export function platformRefusal(declaration: PlatformPermissionDeclaration): Error {
+  return declaration.refusal === "hidden"
+    ? new PlatformSurfaceHiddenError()
+    : new PlatformPermissionDeniedError(declaration.permission);
+}
+
+/**
+ * Asks the platform question for one caller. An actor that is no person, or a holder the
+ * process says lacks the grant, is refused; a process that cannot answer refuses too.
+ */
+export async function decidePlatform({
+  declaration,
+  actor,
+  ask,
+}: {
+  declaration: PlatformPermissionDeclaration;
+  actor: Actor | null;
+  ask:
+    | ((input: {
+        userId: string;
+        permission: PlatformTierPermission;
+      }) => Promise<PlatformDecision> | PlatformDecision)
+    | undefined;
+}): Promise<void> {
+  if (!ask) {
+    throw new Error(
+      `"${declaration.permission}" is asked at the platform, and this process supplied no platform decision`,
+    );
+  }
+
+  const userId = platformPrincipalOf(actor);
+  const holds = async (permission: PlatformTierPermission) =>
+    userId ? (await ask({ userId, permission })).permitted : false;
+  const staff = declaration.hiddenWithout;
+
+  if (staff !== void 0 && !(await holds(staff))) {
+    throw refusedPlatform({ actor, permission: staff, refusal: new PlatformSurfaceHiddenError() });
+  }
+
+  if (staff === declaration.permission || (await holds(declaration.permission))) return;
+
+  throw refusedPlatform({
+    actor,
+    permission: declaration.permission,
+    refusal: platformRefusal(declaration),
+  });
+}
+
+function refusedPlatform({
+  actor,
+  permission,
+  refusal,
+}: {
+  actor: Actor | null;
+  permission: PlatformTierPermission;
+  refusal: Error;
+}): Error {
+  logger.warn(
+    { permission, impersonated: actor?.type === "user" && actor.impersonatorId !== undefined },
+    "a platform-tier permission was refused",
+  );
+
+  return refusal;
 }
 
 /**
@@ -114,6 +353,8 @@ export interface AccessDenial {
   membershipDisabled(): Error;
   /** The organization role does not reach this feature at all. */
   liteMemberRestricted(resource: string): Error;
+  /** A Developer seat (ADR-171) reached outside its personal project. */
+  developerSeatRestricted?(resource: string): Error;
 }
 
 /** What the handler is handed beside its input. */
@@ -289,10 +530,40 @@ export async function decide({
   authorize?: Authorize;
   denials?: AccessDenial;
 }): Promise<AccessDecision> {
+  // A platform permission names no tenant, so no input scope is checked before it is asked.
+  if (declaration.kind === "permission-platform") {
+    return decidePlatformCaller({ declaration, caller, ...(authorize ? { authorize } : {}) });
+  }
+
   const credentialScope = caller.scope ?? null;
   assertInputScope({ input, scope: credentialScope });
 
   if (authorize) await assertScopeLineage({ declaration, input, authorize });
+
+  const decision = await decideDeclared({ declaration, caller, input, authorize, denials });
+  if (authorize) {
+    for (const scope of secondFactorScopes({ declaration, input, decision })) {
+      await assertSecondFactor({ caller, scope, authorize });
+    }
+  }
+
+  return decision;
+}
+
+async function decideDeclared({
+  declaration,
+  caller,
+  input,
+  authorize,
+  denials,
+}: {
+  declaration: Exclude<AccessDeclaration, PlatformPermissionDeclaration>;
+  caller: Caller;
+  input: unknown;
+  authorize: Authorize | undefined;
+  denials: AccessDenial | undefined;
+}): Promise<AccessDecision> {
+  const credentialScope = caller.scope ?? null;
 
   switch (declaration.kind) {
     case "permission":
@@ -301,12 +572,89 @@ export async function decide({
       return decidePermissionAny({ declaration, caller, input, authorize, denials });
     case "permission-all":
       return decidePermissionAll({ declaration, caller, input, authorize, denials });
+    case "permission-by-input":
+      return decidePermissionByInput({ declaration, caller, input, authorize, denials });
     case "no-permission":
       assertNoSensitiveScope({ declaration, input });
       return { actor: caller.actor, scope: credentialScope };
     case "service-authorized":
       return { actor: caller.actor, scope: credentialScope };
   }
+}
+
+/**
+ * Where an organization's second-factor requirement is asked, after the permit (main's mfa-gate):
+ * the scope a permission was granted at, or each allowed scope a no-permission input names.
+ * The service-authorized handler and the declared recovery read are not gated.
+ */
+function secondFactorScopes({
+  declaration,
+  input,
+  decision,
+}: {
+  declaration: Exclude<AccessDeclaration, PlatformPermissionDeclaration>;
+  input: unknown;
+  decision: AccessDecision;
+}): AuthzDeclaredScopeId[] {
+  if (declaration.kind === "service-authorized") return [];
+  if (declaration.kind !== "no-permission") return decision.scope ? [decision.scope] : [];
+  if (declaration.mfaRecovery || typeof input !== "object" || input === null) return [];
+
+  const named = input as Record<string, unknown>;
+
+  return Object.keys(declaration.allow ?? {}).flatMap((field) => {
+    const tier = SCOPE_TIER_BY_FIELD[field as ScopeTierField];
+    const id = named[field];
+
+    return tier !== undefined && typeof id === "string" && id !== "" ? [{ tier, id }] : [];
+  });
+}
+
+async function assertSecondFactor({
+  caller,
+  scope,
+  authorize,
+}: {
+  caller: Caller;
+  scope: AuthzDeclaredScopeId;
+  authorize: Authorize;
+}): Promise<void> {
+  const session = caller.browserSession;
+  if (!session || !authorize.assertSecondFactor || caller.actor?.type !== "user") return;
+
+  const organizationId =
+    scope.tier === "organization"
+      ? scope.id
+      : ((await authorize.organizationOf?.({ tier: scope.tier, id: scope.id })) ?? null);
+  if (organizationId === null) return;
+
+  await authorize.assertSecondFactor({
+    userId: caller.actor.id,
+    sessionId: session.id,
+    organizationId,
+    scope,
+  });
+}
+
+/**
+ * The scope a handler is handed: the one the door asked at, with the organization holding it
+ * (Alex, 2026-10-06, lineage D1). An organization holds itself; nothing is asked for it.
+ */
+export async function scopeWithOrganization({
+  scope,
+  authorize,
+}: {
+  scope: AuthzDeclaredScopeId | null;
+  authorize?: Authorize;
+}): Promise<AuthzHandlerScope | null> {
+  if (scope === null) return null;
+  if (scope.tier === "organization") return { ...scope, organizationId: scope.id };
+
+  const organizationId = authorize?.organizationOf
+    ? await authorize.organizationOf({ tier: scope.tier, id: scope.id })
+    : null;
+
+  return { ...scope, organizationId };
 }
 
 /**
@@ -342,6 +690,27 @@ export function securityRequirement(credential: Credential): readonly Record<str
           "so it cannot be advertised in the published document",
       );
   }
+}
+
+/** A platform procedure: an anonymous caller is refused as the declaration says, scope none. */
+async function decidePlatformCaller({
+  declaration,
+  caller,
+  authorize,
+}: {
+  declaration: PlatformPermissionDeclaration;
+  caller: Caller;
+  authorize?: Authorize;
+}): Promise<AccessDecision> {
+  if (!caller.actor && declaration.refusal !== "hidden") throw new AuthenticationRequiredError();
+
+  await decidePlatform({
+    declaration,
+    actor: caller.actor,
+    ask: authorize?.getPlatformDecision?.bind(authorize),
+  });
+
+  return { actor: caller.actor, scope: null };
 }
 
 async function decidePermission({
@@ -448,12 +817,83 @@ async function decidePermissionAll({
   return { actor, scope };
 }
 
+async function decidePermissionByInput({
+  declaration,
+  caller,
+  input,
+  authorize,
+  denials,
+}: {
+  declaration: InputPermissionDeclaration;
+  caller: Caller;
+  input: unknown;
+  authorize?: Authorize;
+  denials?: AccessDenial;
+}): Promise<AccessDecision> {
+  const { actor } = requireCaller(caller);
+  const decisions = requireAuthorize({ authorize, kind: declaration.kind });
+  const { permission, scope: named } = chosenPermission({ declared: declaration, input });
+
+  const scope =
+    named ??
+    requireDeclaredScope({
+      permission,
+      input,
+      ...(declaration.via ? { via: declaration.via } : {}),
+    });
+
+  const decision = await decisions.getDecision({ userId: actor.id, permission, scope });
+
+  if (!decision.permitted) throw denied({ permission, scope, decision, denials });
+
+  return { actor, scope };
+}
+
 /**
- * What a declaration may ask the process to confirm the tenant behind the
- * request holds. One name today; the union is the runtime's own so a route
- * cannot invent one no process answers for.
+ * The permission the parsed input chose, and the scope its entry names; `null` when the entry
+ * is the permission alone and is asked where the declaration's own target says.
  */
-export type ApiEntitlement = "enterprise";
+export function chosenPermission({
+  declared,
+  input,
+}: {
+  declared: InputPermission;
+  input: unknown;
+}): Readonly<{ permission: AuthzPermission; scope: AuthzDeclaredScopeId | null }> {
+  const value = valueAtPath(input, declared.field);
+  const entry =
+    typeof value === "string" && Object.hasOwn(declared.map, value)
+      ? declared.map[value]
+      : undefined;
+
+  // The schema refused every value the map does not name, so this is a declaration and a
+  // schema that disagree: ours, never the caller's.
+  if (entry === undefined) {
+    logger.error({ field: declared.field }, "an input-chosen permission read an unmapped value");
+    throw new AccessWiringError();
+  }
+
+  if (typeof entry === "string") return { permission: entry, scope: null };
+
+  const id = valueAtPath(input, entry.field);
+
+  if (typeof id === "string" && id.trim() !== "") {
+    return { permission: entry.permission, scope: { tier: entry.tier, id } };
+  }
+
+  if (typeof id === "string") throw new BlankScopeIdError({ field: entry.field });
+
+  logger.error({ field: entry.field }, "an input-chosen permission's scope field was not parsed");
+
+  throw new AccessWiringError();
+}
+
+/**
+ * What a declaration may ask the process to confirm the tenant behind the request holds. The
+ * union is the runtime's own so a route cannot invent one no process answers for; each name
+ * is a capability, never a field of billing's plan.
+ */
+export type ApiEntitlement = "enterprise" | "webhook_endpoints";
 
 /** One declared plan question: the entitlement, the capability a refusal names, and when to ask. */
 export type EntitlementGate = Readonly<{
@@ -462,6 +902,11 @@ export type EntitlementGate = Readonly<{
   feature?: string;
   /** Asked only for an input this holds for; absent, every call asks. */
   when?: (input: unknown) => boolean;
+  /**
+   * `"permission"`: the door identifies, the plan is asked at the credential's scope, then the
+   * permission (Q31: main's CLI answers 402 before 403). Absent, refused access never reaches it.
+   */
+  before?: "permission";
 }>;
 
 export type EntitlementOptions = Omit<EntitlementGate, "entitlement">;
@@ -470,7 +915,7 @@ export type EntitlementOptions = Omit<EntitlementGate, "entitlement">;
 export interface Entitlements {
   holds(input: { entitlement: ApiEntitlement; scope: AuthzDeclaredScopeId }): Promise<boolean>;
   /** The process's own refusal for the capability; the framework's when absent. */
-  refusal?(input: { feature: string | undefined }): Error;
+  refusal?(input: { entitlement: ApiEntitlement; feature: string | undefined }): Error;
 }
 
 export async function decideEntitlement({
@@ -498,7 +943,9 @@ export async function decideEntitlement({
 
   if (await entitlements.holds({ entitlement, scope })) return;
 
-  throw entitlements.refusal?.({ feature }) ?? new EnterprisePlanRequiredError(feature);
+  throw (
+    entitlements.refusal?.({ entitlement, feature }) ?? new EnterprisePlanRequiredError(feature)
+  );
 }
 
 /**
@@ -652,6 +1099,10 @@ function denied({
     return denials.liteMemberRestricted(permission.split(":")[0] ?? "unknown");
   }
 
+  if (denials?.developerSeatRestricted && decision.organizationRole === "DEVELOPER") {
+    return denials.developerSeatRestricted(permission.split(":")[0] ?? "unknown");
+  }
+
   return new PermissionDeniedError({
     permission,
     scope: { type: scope.tier, id: scope.id },
@@ -666,11 +1117,14 @@ function denialReasonOf(decision: PermissionDecision): AuthzDenialReason {
 function declaredPermissionOf(declaration: AccessDeclaration): string {
   switch (declaration.kind) {
     case "permission":
+    case "permission-platform":
       return declaration.permission;
     case "permission-any":
     case "permission-all":
     case "service-authorized":
       return declaration.permissions[0] ?? "";
+    case "permission-by-input":
+      return permissionsOfChoice(declaration)[0] ?? "";
     case "no-permission":
       return "";
   }

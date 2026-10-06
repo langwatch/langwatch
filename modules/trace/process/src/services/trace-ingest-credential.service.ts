@@ -17,6 +17,7 @@ import {
   type TraceLegacyRequestCredentials,
 } from "../rules/trace-request-credentials.rules.ts";
 import type { CollectorCredential } from "../transport/collector.rest.ts";
+import type { TraceIngestSourceBillingService } from "./trace-ingest-source-billing.service.ts";
 
 /** Exactly the API-key directory operations an ingestion door reaches. */
 type TraceIngestApiKeys = Pick<ApiKeyApi, "findResolvedToken" | "markUsed">;
@@ -30,35 +31,35 @@ type TraceIngestResolution = Readonly<{
   markUsed: () => void;
 }>;
 
-/** The two peers this door reads, and nothing else. */
+/** The two peers this door reads, and trace's own fold of the source billing fact. */
 type TraceIngestCredentialOptions = Readonly<{
   /** Narrowed to what this door calls: it resolves a token and stamps its clock. */
   apiKeys: TraceIngestApiKeys;
   authz: Pick<AuthzApi, "hasApiKeyPermission">;
+  sourceBilling: Pick<TraceIngestSourceBillingService, "receiverPolicies">;
   logger?: Pick<Logger, "error"> | undefined;
 }>;
 
 export class TraceIngestCredentialService {
   static create(options: TraceIngestCredentialOptions): TraceIngestCredentialService {
-    return new TraceIngestCredentialService(
-      options.apiKeys,
-      options.authz,
-      options.logger ?? createLogger("langwatch:trace:ingest-credential"),
-    );
+    return new TraceIngestCredentialService({
+      ...options,
+      logger: options.logger ?? createLogger("langwatch:trace:ingest-credential"),
+    });
   }
 
   #apiKeys: TraceIngestApiKeys;
   #authz: Pick<AuthzApi, "hasApiKeyPermission">;
+  #sourceBilling: Pick<TraceIngestSourceBillingService, "receiverPolicies">;
   #logger: Pick<Logger, "error">;
 
   private constructor(
-    apiKeys: TraceIngestApiKeys,
-    authz: Pick<AuthzApi, "hasApiKeyPermission">,
-    logger: Pick<Logger, "error">,
+    options: TraceIngestCredentialOptions & Readonly<{ logger: Pick<Logger, "error"> }>,
   ) {
-    this.#apiKeys = apiKeys;
-    this.#authz = authz;
-    this.#logger = logger;
+    this.#apiKeys = options.apiKeys;
+    this.#authz = options.authz;
+    this.#sourceBilling = options.sourceBilling;
+    this.#logger = options.logger;
   }
 
   /** The collector's credential; a refusal is thrown for the door to render. */
@@ -73,23 +74,32 @@ export class TraceIngestCredentialService {
     const { resolved } = await this.#authenticateCredentials(extractTraceIngestCredentials(input));
     const project = projectOf(resolved);
 
-    return {
-      project,
-      identity:
-        resolved.type === "apiKey"
-          ? {
-              apiKeyId: resolved.apiKeyId,
-              organizationId: resolved.organizationId,
-              ingestSourceType: resolved.ingestSourceType,
-              ingestionTemplateId: resolved.ingestionTemplateId,
-            }
-          : {
-              apiKeyId: null,
-              organizationId: project.organizationId,
-              ingestSourceType: null,
-              ingestionTemplateId: null,
-            },
+    if (resolved.type !== "apiKey") {
+      return {
+        project,
+        identity: {
+          apiKeyId: null,
+          organizationId: project.organizationId,
+          ingestSourceType: null,
+          ingestionTemplateId: null,
+        },
+      };
+    }
+
+    const identity = {
+      apiKeyId: resolved.apiKeyId,
+      organizationId: resolved.organizationId,
+      ingestSourceType: resolved.ingestSourceType,
+      ingestionTemplateId: resolved.ingestionTemplateId,
     };
+    if (!resolved.ingestSourceType) return { project, identity };
+    // Every ingestion-source key is admitted; trace's billing row only decides the marker.
+    const policies = await this.#sourceBilling.receiverPolicies({
+      organizationId: resolved.organizationId,
+      sourceType: resolved.ingestSourceType,
+      templateId: resolved.ingestionTemplateId,
+    });
+    return { project, identity: { ...identity, sourcePolicy: { status: "ready", policies } } };
   }
 
   /** The receiver calls this only after it has parsed a valid signal body. */

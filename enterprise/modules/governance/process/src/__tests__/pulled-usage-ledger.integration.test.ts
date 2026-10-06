@@ -24,12 +24,9 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
-import type {
-  PulledUsageLedgerRepository,
-  PulledUsageLedgerRow,
-} from "../app/governance.members.ts";
 import {
   PulledUsageLedgerIntent,
+  type PulledUsagePricingDeps,
   type WritePulledUsagePayload,
 } from "../eventing/pulled-usage-ledger.intent.ts";
 
@@ -63,14 +60,26 @@ let gateway: GatewayService;
 let writePulledUsage: (payload: WritePulledUsagePayload) => Promise<void>;
 let clickhouse: ClickHouseClient;
 
-/** The ledger as the composition wires it: the intent's port over the
- *  gateway's ClickHouse repository. */
-class LedgerOverGatewayBudgets implements PulledUsageLedgerRepository {
+/** The priced fact, debited into gateway's ClickHouse ledger as gateway's peer subscriber does. */
+class LedgerOverGatewayBudgets implements PulledUsagePricingDeps {
   constructor(private readonly repository: GatewayBudgetSpend) {}
 
-  insert(rows: PulledUsageLedgerRow[]): Promise<void> {
-    return this.repository.insertPulledUsageRows(rows);
-  }
+  sendRecordPulledUsagePriced: PulledUsagePricingDeps["sendRecordPulledUsagePriced"] = (fact) =>
+    this.repository.insertPulledUsageRows([
+      {
+        tenantId: fact.tenantId,
+        scopeId: fact.scopeId,
+        restatementKey: fact.restatementKey,
+        amountNanoUsd: fact.amountNanoUsd,
+        tokensInput: fact.tokensInput,
+        tokensOutput: fact.tokensOutput,
+        tokensCacheRead: fact.tokensCacheRead,
+        tokensCacheWrite: fact.tokensCacheWrite,
+        model: fact.model,
+        occurredAt: Temporal.Instant.fromEpochMilliseconds(fact.occurredAtMs),
+        observedAt: Temporal.Instant.fromEpochMilliseconds(fact.observedAtMs),
+      },
+    ]);
 }
 
 /** The two project reads the decision path makes, answered from this suite's rows. */
@@ -280,10 +289,11 @@ describe.skipIf(!databaseUrl)(
       gateway = PrismaGatewayAdapter.create({
         database: prisma,
         projects: suiteProjects(),
-        // The principal belongs to no group, so only the team budget applies.
-        organizations: createApiFixture<OrganizationApi>({
-          listGroupsForMember: async () => [],
-        }),
+        // The key's principal reads its groups; this suite seeds none, so no group budget applies.
+        organizations: createApiFixture<OrganizationApi>(
+          { listGroupsForMember: async () => [] },
+          "OrganizationApi",
+        ),
         evaluators: {} as never,
         monitors: {} as never,
         changes: {} as never,
@@ -466,6 +476,7 @@ describe.skipIf(!databaseUrl)(
 
     describe("given a team whose spending is already at its limit", () => {
       /** @scenario "Pulled cost never blocks spending" */
+      /** @scenario "A homed pulled row still never counts against spending limits" */
       it("records the pulled cost, does not trip the limit with it, and still allows the team's requests", async () => {
         // The team is at $0.99 of a $1 limit through the gateway.
         await writeGatewayDebit(NEARLY_SPENT_NANO);

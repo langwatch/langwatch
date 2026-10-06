@@ -23,7 +23,7 @@ const VERIFIED_IDENTIFIER_STATES = ["VERIFIED", "PRIMARY"] as const;
 const MATCH_CEILING = 50;
 
 /** The models this surface reads, and no others. */
-export type PrismaIdentityLookupDatabase = Pick<
+type PrismaIdentityLookupDatabase = Pick<
   PrismaClient,
   | "identifier"
   | "user"

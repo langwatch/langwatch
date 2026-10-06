@@ -1,10 +1,14 @@
-import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
+import type {
+  SystemMigration,
+  TenantMigrationOutcome,
+  TenantSource,
+} from "@langwatch/system-migrations";
 
 import type { IdentitySecretCarryService } from "./identity-secret-carry.service.ts";
 
 /** Its own state-table key, separate from the backfill's on purpose — see
  *  the class docblock. Never rename. */
-export const IDENTITY_SECRET_HEAL_MIGRATION_NAME = "identity-d01-secret-heal" as const;
+const IDENTITY_SECRET_HEAL_MIGRATION_NAME = "identity-d01-secret-heal" as const;
 
 /**
  * ## Why this is a second migration rather than a step in the first The user this leg exists for is
@@ -25,14 +29,26 @@ export class IdentitySecretHealMigrationService implements SystemMigration {
   // Paced with the backfill it repairs after, for the same reason: a user
   // outside the backfill's cohort has nothing to heal.
   readonly enrolledAutomatically = false;
+  /** Only users whose legacy secrets could have drifted (Q64): a pass over the whole
+   *  user table costs a claim and two state writes per user, twice before serving. */
+  readonly candidateTenants: TenantSource;
 
   static create(
-    secrets: Pick<IdentitySecretCarryService, "carryForUser">,
+    secrets: Pick<IdentitySecretCarryService, "carryForUser" | "findDriftedUserIdsAfter">,
   ): IdentitySecretHealMigrationService {
     return new IdentitySecretHealMigrationService(secrets);
   }
 
-  private constructor(private readonly secrets: Pick<IdentitySecretCarryService, "carryForUser">) {}
+  private constructor(
+    private readonly secrets: Pick<
+      IdentitySecretCarryService,
+      "carryForUser" | "findDriftedUserIdsAfter"
+    >,
+  ) {
+    this.candidateTenants = {
+      findTenantIdsAfter: (args) => this.secrets.findDriftedUserIdsAfter(args),
+    };
+  }
 
   async migrateTenant({ tenantId }: { tenantId: string }): Promise<TenantMigrationOutcome> {
     const outcome = await this.secrets.carryForUser({ userId: tenantId });

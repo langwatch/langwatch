@@ -29,6 +29,9 @@ import { SAMPLE_CHOICE_KEY } from "../../../elements/governance-sample-mode.ts";
 const harness = vi.hoisted(() => ({ requested: [] as string[] }));
 
 vi.mock("@paper-design/shaders-react", () => ({ MeshGradient: () => null }));
+vi.mock("../../../../behavior/lent-hero-ask-field.tsx", () => ({
+  HeroAskField: ({ placeholder }: { placeholder: string }) => <input placeholder={placeholder} />,
+}));
 vi.mock("../../../../features/overview/ui/sections/quarantine-fill-panel.tsx", () => ({
   QuarantineFillAlert: () => null,
 }));
@@ -164,6 +167,25 @@ describe("given a delegated viewer who may not manage sources", () => {
     for (const name of ["Add department", "Add agent", "Add tool"]) {
       expect(screen.getByRole("link", { name })).toBeInTheDocument();
     }
+  });
+});
+
+describe("given the overview renders for someone who may or may not ask Langy", () => {
+  const SHORTCUTS = ["Add department", "Add agent", "Add tool"];
+
+  /** @scenario "The field offers Langy to whoever may ask" */
+  it("offers to ask Langy when the viewer may, and search alone when not, with the same shortcuts", () => {
+    renderOverview({ permissions: [...VIEWER, "langy:create"] });
+    expect(
+      screen.getByPlaceholderText(/Ask Langy, search, or jump to anything/),
+    ).toBeInTheDocument();
+    for (const name of SHORTCUTS) expect(screen.getByRole("link", { name })).toBeInTheDocument();
+    cleanup();
+
+    renderOverview();
+    expect(screen.queryByPlaceholderText(/Ask Langy/)).toBeNull();
+    expect(screen.getByPlaceholderText(/Search, or jump to anything/)).toBeInTheDocument();
+    for (const name of SHORTCUTS) expect(screen.getByRole("link", { name })).toBeInTheDocument();
   });
 });
 

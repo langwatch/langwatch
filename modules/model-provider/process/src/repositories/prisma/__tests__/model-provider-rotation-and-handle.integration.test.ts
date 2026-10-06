@@ -20,7 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   ModelProviderCredentialCodec,
   type CustomKeysRead,
-} from "../../../app/model-provider.members.ts";
+} from "../../model-provider.repository.ts";
 import { PrismaModelProviderRepository } from "../prisma.model-provider.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {

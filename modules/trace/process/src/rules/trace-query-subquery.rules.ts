@@ -61,3 +61,25 @@ export function scenarioRunSubquery(innerWhere: string): string {
       )
   )`;
 }
+
+/**
+ * Match traces with an evaluation whose latest stored version passes
+ * `innerWhere`: `evaluation_runs` keeps a row per state change until a merge.
+ * IN-tuple dedup, no FINAL, as the evaluation run repository does.
+ */
+export function latestEvaluationRunsSubquery({
+  timeCol,
+  scopeWhere,
+  innerWhere,
+}: {
+  timeCol: string;
+  /** Narrows both the rows and the dedup scan, e.g. to one evaluator. */
+  scopeWhere: string;
+  innerWhere: string;
+}): string {
+  const bounds = `TenantId = {tenantId:String} AND ${timeCol} >= fromUnixTimestamp64Milli({timeFrom:Int64}) AND ${timeCol} <= fromUnixTimestamp64Milli({timeTo:Int64}) AND ${scopeWhere}`;
+  return (
+    `TraceId IN (SELECT DISTINCT TraceId FROM evaluation_runs WHERE ${bounds} AND ${innerWhere}` +
+    ` AND (TenantId, EvaluationId, UpdatedAt) IN (SELECT TenantId, EvaluationId, max(UpdatedAt) FROM evaluation_runs WHERE ${bounds} GROUP BY TenantId, EvaluationId))`
+  );
+}

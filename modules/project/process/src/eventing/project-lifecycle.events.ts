@@ -4,8 +4,17 @@ import {
   PROJECT_CREATED_EVENT_VERSION,
   PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE,
   PROJECT_LEGACY_KEY_REVOKED_EVENT_VERSION,
+  PROJECT_PRESENCE_SETTING_CHANGED_EVENT_TYPE,
+  PROJECT_PRESENCE_SETTING_CHANGED_EVENT_VERSION,
+  PROJECT_MOVED_EVENT_TYPE,
+  PROJECT_MOVED_EVENT_VERSION,
+  PROJECT_ARCHIVED_EVENT_TYPE,
+  PROJECT_ARCHIVED_EVENT_VERSION,
+  projectArchivedEventDataSchema,
+  projectMovedEventDataSchema,
   projectCreatedEventDataSchema,
   projectLegacyKeyRevokedEventDataSchema,
+  projectPresenceSettingChangedEventDataSchema,
 } from "@langwatch/project-contract";
 import { z } from "zod";
 
@@ -38,3 +47,50 @@ export const projectLegacyKeyRevokedEventSchema = z.object({
   data: projectLegacyKeyRevokedEventDataSchema,
 });
 export type ProjectLegacyKeyRevokedEvent = z.infer<typeof projectLegacyKeyRevokedEventSchema>;
+
+export const RECORD_PROJECT_PRESENCE_SETTING_CHANGED_COMMAND_TYPE =
+  "lw.project.record_presence_setting_changed" as const;
+
+export const recordProjectPresenceSettingChangedCommandDataSchema =
+  projectPresenceSettingChangedEventDataSchema;
+export type RecordProjectPresenceSettingChangedCommandData = z.infer<
+  typeof recordProjectPresenceSettingChangedCommandDataSchema
+>;
+
+export const projectPresenceSettingChangedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(PROJECT_PRESENCE_SETTING_CHANGED_EVENT_TYPE),
+  version: z.literal(PROJECT_PRESENCE_SETTING_CHANGED_EVENT_VERSION),
+  data: projectPresenceSettingChangedEventDataSchema,
+});
+export type ProjectPresenceSettingChangedEvent = z.infer<
+  typeof projectPresenceSettingChangedEventSchema
+>;
+
+export const RECORD_PROJECT_MOVED_COMMAND_TYPE = "lw.project.record_moved" as const;
+
+export const recordProjectMovedCommandDataSchema = projectMovedEventDataSchema;
+export type RecordProjectMovedCommandData = z.infer<typeof recordProjectMovedCommandDataSchema>;
+
+export const projectMovedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(PROJECT_MOVED_EVENT_TYPE),
+  version: z.literal(PROJECT_MOVED_EVENT_VERSION),
+  data: projectMovedEventDataSchema,
+});
+export type ProjectMovedEvent = z.infer<typeof projectMovedEventSchema>;
+
+export const RECORD_PROJECT_ARCHIVED_COMMAND_TYPE = "lw.project.record_archived" as const;
+
+export const recordProjectArchivedCommandDataSchema = projectArchivedEventDataSchema;
+export type RecordProjectArchivedCommandData = z.infer<
+  typeof recordProjectArchivedCommandDataSchema
+>;
+
+export const projectArchivedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(PROJECT_ARCHIVED_EVENT_TYPE),
+  version: z.literal(PROJECT_ARCHIVED_EVENT_VERSION),
+  data: projectArchivedEventDataSchema,
+});
+export type ProjectArchivedEvent = z.infer<typeof projectArchivedEventSchema>;

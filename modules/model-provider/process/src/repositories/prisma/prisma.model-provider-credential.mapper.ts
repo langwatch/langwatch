@@ -5,7 +5,7 @@ import type {
   CustomKeysRead,
   ModelProviderCredentialCipher,
   ModelProviderCredentialCodec,
-} from "../../app/model-provider.members.ts";
+} from "../model-provider.repository.ts";
 
 const logger = createLogger("langwatch:model-provider:credentials");
 

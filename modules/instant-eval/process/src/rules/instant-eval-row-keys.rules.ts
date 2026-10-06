@@ -1,7 +1,7 @@
 /**
  * How a page's rows are addressed: by the trace and span pair when the
  * statement projects `SpanId`, by the trace alone otherwise.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {

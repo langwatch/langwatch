@@ -101,7 +101,7 @@ function buildApi(overrides: Partial<TestOptions> = {}) {
   const bounds = PromptExecuteBoundsService.create({
     entitlement: createApiFixture<EntitlementApi>({ requestBound }),
     projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "organization_1" }),
-    rateLimiter: createApiFixture<RateLimiter>({ check: rateLimiterCheck }),
+    rateLimits: { check: rateLimiterCheck },
   });
   const execution = PromptExecutionService.create({
     workflow: createApiFixture<WorkflowApi>({

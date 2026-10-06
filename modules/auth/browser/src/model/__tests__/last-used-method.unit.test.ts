@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   promotePendingMethod,
   readLastUsedMethodId,
+  rememberLastUsedMethod,
   rememberPendingMethod,
 } from "../last-used-method.ts";
 
@@ -26,6 +27,18 @@ describe("given a social provider dialled from the door", () => {
       promotePendingMethod();
 
       expect(readLastUsedMethodId()).toBe("google");
+    });
+  });
+
+  describe("when the person signs in another way instead", () => {
+    /** @scenario A method I abandoned cannot take the badge from the one that got me in */
+    it("badges the password and keeps it badged once a session exists", () => {
+      rememberPendingMethod({ id: "google" });
+
+      rememberLastUsedMethod({ id: "password" });
+      promotePendingMethod();
+
+      expect(readLastUsedMethodId()).toBe("password");
     });
   });
 });

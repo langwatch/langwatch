@@ -5,7 +5,6 @@
  */
 import {
   AgentOfflineError,
-  AgentRegisterRefusedError,
   AgentSessionUnknownError,
   PRESENCE_TTL_SECONDS,
   PROTOCOL_VERSION,
@@ -17,7 +16,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { callKey, httpSessionKey, pendingKey } from "../rules/connected-agent-keys.rules.ts";
 import type { AgentService } from "../services/agent.service.ts";
-import type { ConnectedAgentCredentials } from "../services/connected-agent-credential.service.ts";
 import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
 import { AgentSessionService } from "../services/connected-agent-session.service.ts";
 import { createConnectedAgentFixture, createLongPollFixture } from "./connected-agent.fixture.ts";
@@ -27,25 +25,13 @@ const instanceId = "inst_poll";
 const agentId = "agent_poll";
 const seededToken = "ait_test_token";
 
-const credentials = {
-  authorization: "Bearer sk-lw-test",
-  projectId,
-};
-
 const fakeAgents = createConnectedAgentFixture();
-const fakeCredentials: ConnectedAgentCredentials = {
-  resolve: async () => {
-    throw new Error("Credential lookup is not configured for this test");
-  },
-};
-
 function build({ pollWaitMs }: { pollWaitMs: number }) {
   const store = memorySessionState();
   const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
   const transport = createLongPollFixture({
     runtime,
     agents: fakeAgents,
-    credentials: fakeCredentials,
     publicBaseUrl: "https://example.test",
     replicaCount: 1,
     pollWaitMs,
@@ -115,6 +101,7 @@ const resolved = {
   principalId: "key:test",
   userId: null,
 };
+const credentials = { caller: resolved };
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -125,7 +112,6 @@ describe("LongPollTransportService with a memory store", () => {
     /** @scenario "A poll with nothing pending answers empty after the poll wait" */
     it("answers no frame once the poll wait passes", async () => {
       const { store, transport } = build({ pollWaitMs: 120 });
-      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
       vi.spyOn(AgentSessionService.prototype, "refreshPresence").mockResolvedValue(undefined);
       await seedSession(store);
 
@@ -146,7 +132,6 @@ describe("LongPollTransportService with a memory store", () => {
     /** @scenario "A poll delivers a parked call once" */
     it("hands the call to the first poll and never again", async () => {
       const { store, transport } = build({ pollWaitMs: 50 });
-      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
       vi.spyOn(AgentSessionService.prototype, "refreshPresence").mockResolvedValue(undefined);
       await seedSession(store);
       await parkCall(store, "call_1");
@@ -185,7 +170,6 @@ describe("LongPollTransportService with a memory store", () => {
       const transport = createLongPollFixture({
         runtime,
         agents: fakeAgents,
-        credentials: fakeCredentials,
         publicBaseUrl: "https://example.test",
         replicaCount: 3,
       });
@@ -231,7 +215,6 @@ describe("LongPollTransportService registration and polling, against a memory st
   describe("when an SDK process whose network blocks WebSockets registers", () => {
     /** @scenario "A register over HTTP creates the rows and answers with an instance token" */
     it("creates an agent row for each agent of the frame and answers with an instance token", async () => {
-      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
       const agents = registeringAgentService();
       const registerSpy = vi.spyOn(agents, "registerConnected");
       const runtime = ConnectedAgentRuntimeService.create({
@@ -241,7 +224,6 @@ describe("LongPollTransportService registration and polling, against a memory st
       const registeringTransport = createLongPollFixture({
         runtime,
         agents,
-        credentials: fakeCredentials,
         publicBaseUrl: "https://example.test",
         replicaCount: 1,
       });
@@ -254,58 +236,6 @@ describe("LongPollTransportService registration and polling, against a memory st
       expect(answer.instanceToken).toMatch(/^ait_/);
       expect(registerSpy).toHaveBeenCalledTimes(1);
       await registeringTransport.close();
-    });
-  });
-
-  describe("when the credentials are refused the same way the socket refuses them", () => {
-    /** @scenario "The HTTP transport refuses the same credentials as the socket" */
-    it("answers a refused frame naming the reason", async () => {
-      const runtime = ConnectedAgentRuntimeService.create({
-        podId: "pod_solo",
-        store: memorySessionState(),
-      });
-      const permissionDenied = createLongPollFixture({
-        runtime,
-        agents: fakeAgents,
-        credentials: {
-          resolve: async () => {
-            throw new AgentRegisterRefusedError({
-              reason: "permission_denied",
-              message: "The API key needs the scenarios:manage permission to connect an agent.",
-            });
-          },
-        },
-        publicBaseUrl: "https://example.test",
-        replicaCount: 1,
-      });
-      const viewOnly = await permissionDenied.register({
-        credentials,
-        body: registerFrameBody(),
-      });
-      expect(viewOnly.frame).toMatchObject({ type: "refused", code: "permission_denied" });
-      await permissionDenied.close();
-
-      const ingestion = createLongPollFixture({
-        runtime,
-        agents: fakeAgents,
-        credentials: {
-          resolve: async () => {
-            throw new AgentRegisterRefusedError({
-              reason: "key_type_not_allowed",
-              message: "An ingestion key or a Langy session key cannot connect an agent.",
-            });
-          },
-        },
-        publicBaseUrl: "https://example.test",
-        replicaCount: 1,
-      });
-      const ingestAnswer = await ingestion.register({ credentials, body: registerFrameBody() });
-      expect(ingestAnswer.frame).toMatchObject({
-        type: "refused",
-        code: "key_type_not_allowed",
-      });
-      await ingestion.close();
-      await runtime.store.close?.();
     });
   });
 
@@ -323,13 +253,11 @@ describe("LongPollTransportService registration and polling, against a memory st
       const transport = createLongPollFixture({
         runtime,
         agents,
-        credentials: fakeCredentials,
         publicBaseUrl: "https://example.test",
         replicaCount: 1,
         pollWaitMs: 20,
         now: () => now,
       });
-      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
 
       const registered = await transport.register({ credentials, body: registerFrameBody() });
       const registeredAgentId = (registered.frame as { agents: { id: string }[] }).agents[0]?.id;
@@ -360,7 +288,6 @@ describe("LongPollTransportService registration and polling, against a memory st
     /** @scenario "A poll with an unknown instance token asks the process to register again" */
     it("answers agent_session_unknown", async () => {
       const { transport } = build({ pollWaitMs: 50 });
-      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
 
       const failure = await transport
         .poll({ credentials, token: "ait_unknown", inFlightCallIds: [] })
@@ -385,12 +312,10 @@ describe("LongPollTransportService registration and polling, against a memory st
       const transport = createLongPollFixture({
         runtime,
         agents,
-        credentials: fakeCredentials,
         publicBaseUrl: "https://example.test",
         replicaCount: 1,
         pollWaitMs: 10,
       });
-      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
 
       const registered = await transport.register({ credentials, body: registerFrameBody() });
       const registeredAgentId = (registered.frame as { agents: { id: string }[] }).agents[0]
@@ -447,12 +372,10 @@ async function registerAndDispatch(signal?: AbortSignal) {
   const transport = createLongPollFixture({
     runtime,
     agents,
-    credentials: fakeCredentials,
     publicBaseUrl: "https://example.test",
     replicaCount: 1,
     pollWaitMs: 200,
   });
-  vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
   const registered = await transport.register({ credentials, body: registerFrameBody() });
   const registeredAgentId = (registered.frame as { agents: { id: string }[] }).agents[0]
     ?.id as string;

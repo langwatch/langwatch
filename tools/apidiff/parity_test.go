@@ -132,14 +132,11 @@ func TestPacketsAndTableOrderByWork(t *testing.T) {
 
 func TestRunTrpcInventoryWritesRunsAndRemovesScript(t *testing.T) {
 	dir := t.TempDir()
-	contractDir := filepath.Join(dir, "packages", "module", "src", "contract")
+	contractDir := filepath.Join(dir, "packages", "api", "src", "contract")
 	if err := os.MkdirAll(contractDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(contractDir, "trpc-contract.ts"), nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Join(dir, "packages", "api"), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	out := filepath.Join(t.TempDir(), "trpc.json")
@@ -167,6 +164,33 @@ func TestRunTrpcInventoryWritesRunsAndRemovesScript(t *testing.T) {
 	}
 	if _, err := detectInventoryLayout(t.TempDir()); err == nil {
 		t.Error("a checkout with no tRPC declarations was accepted")
+	}
+}
+
+func TestInventoryLayoutRecognisesTheStrictLayout(t *testing.T) {
+	for _, contractDir := range []string{"modules/dataset/contract/src", "enterprise/modules/governance/contract/src"} {
+		dir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(dir, filepath.FromSlash(contractDir)), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		layout, err := detectInventoryLayout(dir)
+		if err != nil {
+			t.Fatalf("%s: %v", contractDir, err)
+		}
+		if layout.script != "inventory/branch-trpc.mjs" || layout.subdir != "packages/api" {
+			t.Errorf("%s: layout = %+v", contractDir, layout)
+		}
+	}
+	monolith := t.TempDir()
+	root := filepath.Join(monolith, "platform", "app", "src", "server", "api")
+	if err := os.MkdirAll(root, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "root.ts"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if layout, err := detectInventoryLayout(monolith); err != nil || layout.script != "inventory/main-trpc.mjs" {
+		t.Errorf("the monolith router was not read as main's layout: %+v, %v", layout, err)
 	}
 }
 

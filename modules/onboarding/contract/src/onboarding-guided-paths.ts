@@ -1,3 +1,4 @@
+import { uiTokens } from "@langwatch/module";
 /**
  * The four paths a guided onboarding can set up, shared by process and browser.
  * @see specs/features/onboarding/guided-onboarding-variant.feature
@@ -60,3 +61,20 @@ export const GUIDED_ONBOARDING_KICKOFF_PART_TYPE = "guided-onboarding-kickoff";
  * conversation is created and it sticks, so the brief never reads as a title.
  */
 export const GUIDED_KICKOFF_CONVERSATION_TITLE = "Getting started";
+
+/** Onboarding guided-start pill, lent by token to the spaces that offer it (§10.1). */
+
+/** The product space a guided onboarding offer sits in. */
+export type GuidedSpace = "project" | "me" | "gateway" | "governance";
+
+/**
+ * What a screen hands onboarding's guided offer: the space it sits in, and its own answer to
+ * whether that space is already in use (null while unknown, which keeps the offer hidden).
+ */
+export type GuidedOnboardingOfferProps = {
+  space: GuidedSpace;
+  spaceInUse?: boolean | null;
+};
+
+export const GuidedOnboardingOfferToken =
+  uiTokens("onboarding").component<GuidedOnboardingOfferProps>("guidedOnboardingOffer");

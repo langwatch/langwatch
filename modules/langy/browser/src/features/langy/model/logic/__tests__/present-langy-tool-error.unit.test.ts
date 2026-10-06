@@ -29,10 +29,12 @@ describe("presentLangyToolError", () => {
     // lacking the permission — but is also what a key that omits a permission
     // the caller DOES hold looks like. The response cannot separate the two, so
     // the card states the consequence, which is true either way.
+    /** @scenario "A failure card says what went wrong in the user's terms" */
     it("names what the reader cannot do, in plain words, in one sentence", () => {
       expect(present(denial).message).toBe("You can't manage scenarios in this project.");
     });
 
+    /** @scenario "A failure card says what went wrong in the user's terms" */
     it("never headlines the internal permission name", () => {
       const presentation = present(denial);
       expect(presentation.message).not.toContain("scenarios:manage");
@@ -45,6 +47,7 @@ describe("presentLangyToolError", () => {
 
     // They did not issue the key Langy acts through and cannot re-scope it —
     // the system mints it from their own permissions.
+    /** @scenario "A failure card says what went wrong in the user's terms" */
     it("points at the one person who can change it, and offers no link", () => {
       const presentation = present(denial);
       expect(presentation.detail).toBe("Ask whoever manages access for your team if you need it.");
@@ -71,6 +74,7 @@ describe("presentLangyToolError", () => {
   });
 
   describe("given a denial that named no permission", () => {
+    /** @scenario "A refused permission reads as a permissions problem" */
     it("still says the access does not cover it, with no invented detail", () => {
       const presentation = present(
         failureDocument({
@@ -116,6 +120,7 @@ describe("presentLangyToolError", () => {
       expect(present(atLimit).message).not.toContain("access");
     });
 
+    /** @scenario "A plan limit says what the plan includes and what is in use" */
     it("reports what ran out in the customer's words, never limitType", () => {
       expect(present(atLimit).limit).toMatchObject({
         label: "scenarios",
@@ -155,6 +160,7 @@ describe("presentLangyToolError", () => {
   });
 
   describe("given a 403 that is neither a denial nor a limit", () => {
+    /** @scenario "A refusal on the same status for a different reason keeps its own words" */
     it("keeps the platform's own sentence rather than blaming access", () => {
       const blocked = failureDocument({
         code: "policy_violation",
@@ -333,6 +339,28 @@ describe("presentLangyToolError", () => {
   });
 
   describe("given the developer's own gh in the shared folder", () => {
+    /** @scenario "A shell command that ran in the shared folder keeps gh's own instruction" */
+    it("shows what gh said and claims no missing App, while an unmarked shell still does", () => {
+      const ghOutput = "To get started with GitHub CLI, please run: gh auth login";
+      const shared = presentLangyToolError({
+        title: "Running a command",
+        errorText: ghOutput,
+        toolName: "local_bash",
+      });
+      const unmarked = presentLangyToolError({
+        title: "Running a command",
+        errorText: ghOutput,
+        toolName: "bash",
+      });
+
+      expect(shared.detail).toContain("gh auth login");
+      expect(shared.title).not.toContain("GitHub App");
+      expect(shared.message).not.toContain("GitHub App");
+      expect(shared.code).toBeUndefined();
+      expect(unmarked.code).toBe("langy_github_not_connected");
+      expect(unmarked.title).toBe("Install the GitHub App to continue");
+    });
+
     /** @scenario "The developer's own gh keeps its own instruction" */
     it("keeps gh's instruction, because that shell is theirs", () => {
       const presentation = presentLangyToolError({
@@ -343,6 +371,51 @@ describe("presentLangyToolError", () => {
 
       expect(presentation.code).toBeUndefined();
       expect(presentation.detail).toContain("gh auth login");
+    });
+  });
+
+  describe("given the failures the card reads in whole", () => {
+    /** @scenario "A failure with nothing to add still says something useful" */
+    it("names what failed, shows the text it was given and claims no code", () => {
+      const presentation = present("✖ Failed to reach the API: socket hang up (ECONNRESET)");
+
+      expect(presentation.title).toBe("Creating scenario failed");
+      expect(presentation.detail).toBe("Failed to reach the API: socket hang up (ECONNRESET)");
+      expect(presentation.code).toBeUndefined();
+    });
+
+    /** @scenario "A failure the card has copy for still shows its code" */
+    it("explains a known failure in its words and still shows the platform's code", () => {
+      const presentation = present(
+        failureDocument({
+          code: "dataset_not_found",
+          message: "Dataset support-questions does not exist",
+          httpStatus: 404,
+          meta: {},
+          isHandled: true,
+        }),
+        "Loading dataset",
+      );
+
+      expect(presentation.message).toBe("Dataset support-questions does not exist");
+      expect(presentation.code).toBe("dataset_not_found");
+    });
+
+    /** @scenario "A failure the card has no copy for names itself" */
+    it("shows what the platform said about an unseen failure and its code", () => {
+      const presentation = present(
+        failureDocument({
+          code: "clickhouse_unavailable",
+          message: "Analytics storage is temporarily unavailable.",
+          httpStatus: 503,
+          meta: {},
+          isHandled: false,
+        }),
+        "Counting traces",
+      );
+
+      expect(presentation.message).toBe("Analytics storage is temporarily unavailable.");
+      expect(presentation.code).toBe("clickhouse_unavailable");
     });
   });
 });

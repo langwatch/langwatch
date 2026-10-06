@@ -195,6 +195,7 @@ describe("daemon over a unix socket", () => {
 
   describe("given no daemon is running", () => {
     describe("when a command is dispatched", () => {
+      /** @scenario "No daemon is running" */
       it("reports that it was not served, so the CLI runs in-process", async () => {
         const { outcome, stdout } = await exec(["trace", "search"]);
 
@@ -216,6 +217,7 @@ describe("daemon over a unix socket", () => {
     });
 
     describe("when a command is dispatched", () => {
+      /** @scenario "The socket file is stale after a crash" */
       it("falls back instead of hanging on the dead socket", async () => {
         const { outcome } = await exec(["trace", "search"]);
         expect(outcome).toMatchObject({ served: false });
@@ -223,6 +225,7 @@ describe("daemon over a unix socket", () => {
     });
 
     describe("when the stale socket is cleaned", () => {
+      /** @scenario "The socket file is stale after a crash" */
       it("removes the file", async () => {
         expect(await cleanStaleSocket(socketPath)).toBe(true);
         expect(fs.existsSync(socketPath)).toBe(false);
@@ -267,6 +270,7 @@ describe("daemon over a unix socket", () => {
 
   describe("given a live daemon", () => {
     describe("when it binds its socket", () => {
+      /** @scenario "The socket is private to the user" */
       it("creates it 0600, so no other local user can drive our credentials", async () => {
         await startDaemon();
 
@@ -488,6 +492,7 @@ describe("daemon over a unix socket", () => {
     });
 
     describe("when several commands are dispatched at once", () => {
+      /** @scenario "Concurrent commands" */
       it("serves them concurrently, each with its own output and exit code", async () => {
         // A TIMEOUT HERE MEANS THE DAEMON SERIALISED THESE: the five commands are held at a
         // rendezvous, so a daemon serving one at a time never gets past the first. Nothing
@@ -559,6 +564,7 @@ describe("daemon over a unix socket", () => {
     });
 
     describe("when the client asks it to stop", () => {
+      /** @scenario "Stopping a daemon" */
       it("shuts down and removes its socket", async () => {
         const running = await startDaemon();
 
@@ -573,6 +579,7 @@ describe("daemon over a unix socket", () => {
 
   describe("given a daemon that has been idle", () => {
     describe("when the idle timeout elapses", () => {
+      /** @scenario "The daemon self-exits when idle" */
       it("exits and removes its socket, so it can never leak", async () => {
         const running = await startDaemon({ idleTimeoutMs: 20 });
 
@@ -622,6 +629,7 @@ describe("daemon over a unix socket", () => {
 
   describe("given a daemon running a different build of the CLI", () => {
     describe("when a newer client connects", () => {
+      /** @scenario "A stale daemon from a previous CLI version" */
       it("refuses the handshake rather than silently serving old behaviour", async () => {
         await startDaemon({ cliVersion: "0.1.0", build: "0.1.0+1-1" });
 
@@ -635,6 +643,7 @@ describe("daemon over a unix socket", () => {
         expect(stdout).toBe("");
       });
 
+      /** @scenario "A stale daemon from a previous CLI version" */
       it("can then be evicted, leaving a clean socket for a fresh daemon", async () => {
         const stale = await startDaemon({ cliVersion: "0.1.0", build: "0.1.0+1-1" });
 
@@ -683,6 +692,7 @@ describe("daemon over a unix socket", () => {
 
   describe("given a daemon warm for identity A", () => {
     describe("when identity B presents its fingerprint", () => {
+      /** @scenario "A daemon rejects a request from a different identity" */
       it("is refused, so A's credentials can never serve B's request", async () => {
         const executor = vi.fn(scriptedExecutor(() => ({ stdout: "leaked\n" })));
         await startDaemon({ executor });
@@ -703,6 +713,7 @@ describe("daemon over a unix socket", () => {
 
   describe("given a client that is interrupted", () => {
     describe("when it sends a cancel", () => {
+      /** @scenario "Ctrl-C during a daemon-served command" */
       it("stops the command and settles the caller at 130", async () => {
         let cancelledWith: number | undefined;
         await startDaemon({
@@ -815,6 +826,7 @@ describe("daemon over a unix socket", () => {
    */
   describe("given a socket the caller cannot trust", () => {
     describe("when its directory is writable by other users", () => {
+      /** @scenario "A socket that is not demonstrably private is not used" */
       it("refuses to connect and reports not-served, so the CLI runs in-process", async () => {
         const executor = vi.fn(scriptedExecutor(() => ({ stdout: "leaked\n" })));
         await startDaemon({ executor });
@@ -835,6 +847,7 @@ describe("daemon over a unix socket", () => {
     });
 
     describe("when the socket itself is world-connectable", () => {
+      /** @scenario "A socket that is not demonstrably private is not used" */
       it("refuses it rather than drive a daemon anyone else can drive too", async () => {
         const executor = vi.fn(scriptedExecutor(() => ({ stdout: "leaked\n" })));
         await startDaemon({ executor });
@@ -849,6 +862,7 @@ describe("daemon over a unix socket", () => {
     });
 
     describe("when it is owned by another user", () => {
+      /** @scenario "A socket owned by another user is not used" */
       it("refuses it, and reports no daemon for status and stop as well", async () => {
         const executor = vi.fn(scriptedExecutor(() => ({ stdout: "leaked\n" })));
         await startDaemon({ executor });
@@ -999,6 +1013,7 @@ describe("daemon over a unix socket", () => {
 
   describe("given a daemon asked to stop while it is still serving", () => {
     describe("when a request is in flight", () => {
+      /** @scenario "The daemon is stopped while it is still serving" */
       it("waits for it before tearing the execution window down", async () => {
         // Without the drain, `window.reset()` restores the daemon's OWN cwd and environment
         // underneath a command that has not finished, so it resolves paths and reads
@@ -1055,6 +1070,7 @@ describe("daemon over a unix socket", () => {
     });
 
     describe("when the in-flight request will not finish in time", () => {
+      /** @scenario "An in-flight command outlasts the shutdown grace period" */
       it("cuts the connection so the client falls back instead of trusting the result", async () => {
         const running = await startDaemon({
           shutdownGraceMs: 30,
@@ -1078,6 +1094,7 @@ describe("daemon over a unix socket", () => {
     });
 
     describe("when the in-flight request has already flushed output to the caller", () => {
+      /** @scenario "An in-flight command outlasts the shutdown grace period after printing" */
       it("reports the truncation honestly instead of pretending it can re-run", async () => {
         // What the drain-timeout guarantee does NOT cover: once output
         // crosses the buffer cap it's already on the caller's real stdout,
@@ -1200,6 +1217,7 @@ describe("given a daemon that dies mid-command", () => {
   };
 
   describe("when it dies before any output reaches the caller", () => {
+    /** @scenario "The daemon dies while serving a command" */
     it("reports not-served, so the CLI reruns in-process with no duplicate output", async () => {
       await startRogue(null);
       const out = collector();
@@ -1223,6 +1241,7 @@ describe("given a daemon that dies mid-command", () => {
   });
 
   describe("when it dies after output was buffered but never committed", () => {
+    /** @scenario "The daemon dies while serving a command" */
     it("discards the partial output rather than half-printing it", async () => {
       await startRogue("partial output that must not be printed\n");
       const out = collector();

@@ -7,7 +7,14 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 
-import type { PulledUsageRateReader } from "../app/governance.members.ts";
+import type { PulledUsageRateInput } from "../rules/pulled-usage-rate.rules.ts";
+
+export interface PulledUsageRateReader {
+  rate(input: PulledUsageRateInput): {
+    costNanoUsd: number;
+    rateVersion: string;
+  };
+}
 
 export type PulledUsageQuantities = {
   tokensInput: number;
@@ -21,7 +28,7 @@ export type PulledUsageQuantities = {
  * amount and the code naming it arrive and are consumed together — split
  * across two call sites, a euro figure reads as dollars.
  */
-export type ProviderReportedPriceInput = {
+type ProviderReportedPriceInput = {
   basis: typeof PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED;
   /**
    * The provider's amount as a decimal string, in ITS OWN currency. Named for

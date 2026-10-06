@@ -1,10 +1,18 @@
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
+import { applyPlanTypeEntitlements } from "@langwatch/enterprise-licensing-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { buildEntitlementInfrastructure } from "../entitlement-composition.build.ts";
-import { USAGE_UNKNOWN, type ProjectUsageCounts } from "../entitlement.members.ts";
+import { coreBaselinePlan } from "../../rules/plan-baseline.rules.ts";
+import { EntitlementService } from "../../services/entitlement.service.ts";
+import {
+  USAGE_UNKNOWN,
+  UsageService,
+  type ProjectUsageCounts,
+} from "../../services/usage-enforcement.service.ts";
+import { UsageWarningService } from "../../services/usage-warning.service.ts";
 
 function warningsOver(counts: ProjectUsageCounts) {
   const sent: Parameters<BillingApi["sendUsageWarning"]>[0][] = [];
@@ -23,22 +31,33 @@ function warningsOver(counts: ProjectUsageCounts) {
       return { sent: true, notificationId: "notification-1" };
     },
   });
-  const { warnings } = buildEntitlementInfrastructure({
-    logger: createTestLogger().logger,
-    isSaas: false,
-    processName: "test",
-    license: { resolve: async () => ({ granted: false }) },
+  const peers = {
     billing,
-    usage: {
-      billing,
-      traces: {
-        countTracesByProjects: async () => {
-          throw new Error("a free plan off Cloud is metered in events");
-        },
+    traces: {
+      countTracesByProjects: async () => {
+        throw new Error("a free plan off Cloud is metered in events");
       },
-      organizations: createApiFixture({}),
-      projects: { listIdsByOrganization: async () => ["project-1", "project-2"] },
     },
+    organizations: createApiFixture<OrganizationApi>({}),
+    projects: { listIdsByOrganization: async () => ["project-1", "project-2"] },
+  };
+  const plans = EntitlementService.create({
+    baseline: coreBaselinePlan({ isSaas: false }),
+    license: { resolve: async () => ({ granted: false }) },
+    enrichers: [{ enrich: applyPlanTypeEntitlements }],
+  });
+  const counter = UsageService.overPeers({
+    isSaas: false,
+    planResolver: (organizationId) => plans.getActivePlan({ organizationId }),
+    peers,
+  });
+  const warnings = UsageWarningService.create({
+    billing,
+    counter,
+    plans,
+    peers,
+    isSaas: false,
+    logger: createTestLogger().logger,
   });
   return { warnings, sent, counted };
 }

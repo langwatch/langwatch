@@ -11,16 +11,26 @@ import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 const drawer = vi.hoisted(() => ({ closeDrawer: vi.fn(), goBack: vi.fn(), canGoBack: false }));
 const stack = vi.hoisted(() => ({ entries: [] as { drawer: string }[] }));
 const listed = vi.hoisted(() => ({ rows: [] as unknown[] }));
+const opener = vi.hoisted(() => ({
+  props: {} as Record<string, unknown>,
+  onInputMappingsChange: undefined as ((...args: unknown[]) => void) | undefined,
+}));
 const fetched = vi.hoisted(() => ({ agent: undefined as unknown, workflow: undefined as unknown }));
 const calls = vi.hoisted(() => ({
   navigate: [] as string[],
   workflowCreated: [] as unknown[],
   agentCreated: [] as unknown[],
+  listInvalidated: [] as unknown[],
 }));
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ ...drawer, openDrawer: vi.fn() }),
   getDrawerStack: () => stack.entries,
+  getComplexProps: () => opener.props,
+  getFlowCallbacks: (name: string) =>
+    name === "agentWorkflowTargetEditor" && opener.onInputMappingsChange
+      ? { onInputMappingsChange: opener.onInputMappingsChange }
+      : undefined,
 }));
 
 vi.mock("../../../model/agent-management-host.ts", () => ({
@@ -37,7 +47,16 @@ vi.mock("../../../behavior/agent-api.ts", () => {
   });
   return {
     agentApi: {
-      useUtils: () => ({ agents: { getAll: { invalidate: () => Promise.resolve() } } }),
+      useUtils: () => ({
+        agents: {
+          getAll: {
+            invalidate: (input: unknown) => {
+              calls.listInvalidated.push(input);
+              return Promise.resolve();
+            },
+          },
+        },
+      }),
       agents: {
         getAll: { useQuery: () => ({ data: listed.rows, isLoading: false }) },
         getById: { useQuery: () => ({ data: fetched.agent, isLoading: false, isError: false }) },
@@ -127,6 +146,8 @@ afterEach(() => {
   listed.rows = [];
   fetched.agent = undefined;
   fetched.workflow = undefined;
+  opener.props = {};
+  opener.onInputMappingsChange = undefined;
   drawer.closeDrawer.mockReset();
   drawer.goBack.mockReset();
   drawer.canGoBack = false;
@@ -134,6 +155,7 @@ afterEach(() => {
   calls.navigate.length = 0;
   calls.workflowCreated.length = 0;
   calls.agentCreated.length = 0;
+  calls.listInvalidated.length = 0;
 });
 
 describe("the connected agent drawer opened by address", () => {
@@ -205,6 +227,21 @@ describe("the agent editors opened by address", () => {
     expect(screen.getByTestId("agent-code-preview")).toBeInTheDocument();
   });
 
+  /** @scenario "Saving a new code agent adds it to the project's agents" */
+  it("creates a code agent, has the project's agent list read again and closes", async () => {
+    render(<RoutedAgentCodeEditorDrawer />, { wrapper });
+    const user = userEvent.setup();
+
+    await user.type(screen.getByTestId("agent-name-input"), "Code Processor");
+    await user.click(screen.getByTestId("save-agent-button"));
+
+    await vi.waitFor(() => expect(drawer.closeDrawer).toHaveBeenCalled());
+    expect(calls.agentCreated).toEqual([
+      expect.objectContaining({ type: "code", name: "Code Processor" }),
+    ]);
+    expect(calls.listInvalidated).toEqual([{ projectId: "project_1" }]);
+  });
+
   /** @scenario "Clicking Workflow Agent in the type selector opens the workflow selector drawer" */
   it("mounts the workflow selector, which creates the workflow, then its agent, then opens it", async () => {
     render(<RoutedWorkflowSelectorDrawer />, { wrapper });
@@ -272,6 +309,40 @@ const workflowAgent = {
   config: { name: "Workflow agent", isCustom: true, workflow_id: "workflow_1" },
 };
 
+const linkedWorkflow = {
+  id: "workflow_1",
+  name: "Support triage",
+  icon: "🧭",
+  updatedAt: "2026-10-01T10:00:00.000Z",
+  currentVersion: {
+    dsl: {
+      spec_version: "1.5",
+      name: "Support triage",
+      icon: "🧭",
+      description: "",
+      version: "1.0",
+      nodes: [
+        {
+          id: "entry",
+          type: "entry",
+          position: { x: 0, y: 0 },
+          data: { name: "Entry", outputs: [{ identifier: "question", type: "str" }] },
+        },
+      ],
+      edges: [],
+    },
+  },
+};
+
+const datasetSources = [
+  {
+    id: "dataset_1",
+    name: "Customer questions",
+    type: "dataset",
+    fields: [{ name: "user_question", type: "str" }],
+  },
+];
+
 describe("the workflow agent editor opened by address", () => {
   it("reads the agent its address names and draws its form", () => {
     fetched.agent = workflowAgent;
@@ -290,6 +361,41 @@ describe("the workflow agent target editor opened by address", () => {
     expect(screen.getByText("Workflow Agent")).toBeTruthy();
     await userEvent.setup().click(screen.getByTestId("close-drawer-button"));
     expect(drawer.closeDrawer).toHaveBeenCalled();
+  });
+
+  /** @scenario "Editing the target opens a mapping drawer, not a dead end" */
+  it("shows the linked workflow, a new-tab link into Studio and its real inputs with mapping", () => {
+    fetched.agent = workflowAgent;
+    fetched.workflow = linkedWorkflow;
+    opener.props = { availableSources: datasetSources, inputMappings: {} };
+    render(<RoutedAgentWorkflowTargetEditorDrawer agentId="agent_wf" />, { wrapper });
+
+    expect(screen.getByText("Support triage")).toBeTruthy();
+    const link = screen.getByTestId("open-workflow-link");
+    expect(link.getAttribute("href")).toBe("/acme/studio/workflow_1");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(screen.getByText("Input Variables")).toBeTruthy();
+    expect(screen.getByTestId("variable-name-question").textContent).toBe("question");
+    expect(screen.getByTestId("mapping-input-question")).toBeTruthy();
+  });
+
+  /** @scenario "Mapping a dataset column to a workflow input field" */
+  it("saves a dataset column picked for the workflow's input at once, with no save step", async () => {
+    const saved: unknown[][] = [];
+    fetched.agent = workflowAgent;
+    fetched.workflow = linkedWorkflow;
+    opener.props = { availableSources: datasetSources, inputMappings: {} };
+    opener.onInputMappingsChange = (...args) => saved.push(args);
+    render(<RoutedAgentWorkflowTargetEditorDrawer agentId="agent_wf" />, { wrapper });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("mapping-input-question"));
+    await user.click(await screen.findByTestId("field-option-user_question"));
+
+    expect(saved).toEqual([
+      ["question", { type: "source", sourceId: "dataset_1", path: ["user_question"] }],
+    ]);
+    expect(screen.queryByRole("button", { name: /save/i })).toBeNull();
   });
 
   it("says the lookup failed when the agent names no workflow", () => {

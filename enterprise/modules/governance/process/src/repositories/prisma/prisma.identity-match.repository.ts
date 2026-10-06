@@ -9,7 +9,7 @@ import {
   type OpenIdentityMatch,
 } from "../identity-match.repository.ts";
 
-export type IdentityMatchDatabase = Pick<PrismaClient, "identityMatch">;
+type IdentityMatchDatabase = Pick<PrismaClient, "identityMatch">;
 
 type StoredIdentityMatch = Omit<IdentityMatchRow, "validFrom" | "validTo"> & {
   validFrom: Date;

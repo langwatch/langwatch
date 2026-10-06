@@ -9,10 +9,6 @@ import {
   RedisBillingOrganizationCacheRepository,
   type BillingOrganizationCacheRedis,
 } from "../redis/redis.billing-organization-cache.repository.ts";
-import {
-  RedisBillingTenantOrganizationCacheRepository,
-  type BillingTenantOrganizationCacheRedis,
-} from "../redis/redis.tenant-organization-cache.repository.ts";
 
 /** Billing's rows over Postgres, the month's billable total over ClickHouse, the cache over Redis. */
 export class LiveBillingRepositories {
@@ -25,13 +21,12 @@ export class LiveBillingRepositories {
   }: Readonly<{
     prisma: Parameters<typeof PostgresBillingRepositories.create>[0]["prisma"];
     clickhouse: ClickHouseQueryClient;
-    redis: BillingOrganizationCacheRedis & BillingTenantOrganizationCacheRedis;
+    redis: BillingOrganizationCacheRedis;
   }>): BillingRepositories {
     return {
       ...PostgresBillingRepositories.create({ prisma }),
       billableEvents: BillableEventsClickHouseRepository.create(clickhouse),
       organizationCache: RedisBillingOrganizationCacheRepository.create({ redis }),
-      tenantOrganizationCache: RedisBillingTenantOrganizationCacheRepository.create({ redis }),
     };
   }
 }

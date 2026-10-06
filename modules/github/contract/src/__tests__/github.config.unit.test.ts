@@ -1,7 +1,8 @@
 import { parseProcessConfig } from "@langwatch/config";
+import { credentialsSecret, sessionSecret } from "@langwatch/secrets/shared-secrets";
 import { describe, expect, it } from "vitest";
 
-import { githubConfig } from "../github.config.ts";
+import { githubConfig, githubSecrets } from "../github.config.ts";
 
 const read = (source: Record<string, string | undefined>) =>
   parseProcessConfig({
@@ -20,6 +21,13 @@ describe("github server configuration", () => {
           appSlug: undefined,
         },
       );
+    });
+  });
+
+  describe("given the install-state signing key", () => {
+    it("holds the shared CREDENTIALS_SECRET and NEXTAUTH_SECRET handles, so a double claim passes", () => {
+      expect(githubSecrets.signingKey).toBe(credentialsSecret);
+      expect(githubSecrets.signingKeyFallback).toBe(sessionSecret);
     });
   });
 });

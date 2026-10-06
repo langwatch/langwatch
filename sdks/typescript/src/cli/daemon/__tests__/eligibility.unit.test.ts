@@ -28,12 +28,14 @@ const piped = (overrides: Partial<EligibilityInput> = {}): EligibilityInput => (
 
 describe("evaluateEligibility", () => {
   describe("given an agent piping the CLI output", () => {
+    /** @scenario "An agent pipes the CLI output" */
     it("allows the daemon to serve the command", () => {
       expect(evaluateEligibility(piped())).toEqual({ eligible: true });
     });
   });
 
   describe("given a human at a terminal", () => {
+    /** @scenario "A human is running the CLI in a terminal" */
     it("refuses when stdout is a TTY", () => {
       expect(evaluateEligibility(piped({ stdoutIsTty: true }))).toEqual({
         eligible: false,
@@ -57,6 +59,7 @@ describe("evaluateEligibility", () => {
   });
 
   describe("when the user opts out via LANGWATCH_NO_DAEMON", () => {
+    /** @scenario "The user opts out" */
     it("refuses", () => {
       expect(evaluateEligibility(piped({ env: { LANGWATCH_NO_DAEMON: "1" } }))).toEqual({
         eligible: false,
@@ -72,6 +75,7 @@ describe("evaluateEligibility", () => {
   });
 
   describe("when the user opts out persistently (`config set daemon off`)", () => {
+    /** @scenario "The user opts out persistently" */
     it("refuses", () => {
       expect(evaluateEligibility(piped({ daemonDisabledByConfig: true }))).toEqual({
         eligible: false,
@@ -189,6 +193,7 @@ describe("evaluateEligibility", () => {
   });
 
   describe("when the command mutates identity or takes over stdio", () => {
+    /** @scenario "Commands that must never be served by the daemon" */
     it.each([
       ["login"],
       ["logout"],

@@ -8,20 +8,17 @@ import { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { inertReceivedFacts } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
-import { TestClock } from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import type {
-  CodingAgentProjectActivity,
-  CodingAgentPullRequestMapping,
-} from "../../app/coding-agent.members.ts";
 import { LiveCodingAgentRepositories } from "../../repositories/live/live.coding-agent.repositories.ts";
 import { SystemCodingAgentClockService } from "../../services/coding-agent-clock.service.ts";
 import { OtelCodingAgentCostMetricsService } from "../../services/coding-agent-cost-metrics.service.ts";
 import { CodingAgentProjectionPersistenceService } from "../../services/coding-agent-projection-persistence.service.ts";
+import type { CodingAgentProjectActivity } from "../../services/coding-agent-session-seen.service.ts";
 import { ModelCatalogCostEstimatorService } from "../../services/model-catalog-cost-estimator.service.ts";
 import {
   type CodingAgentProcessingPipeline,
   EventingCodingAgentProcessingAdapter,
 } from "../coding-agent-processing.pipeline.ts";
+import type { CodingAgentPullRequestMapping } from "../pull-request-mapping.subscriber.ts";
 
 /**
  * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.
@@ -123,8 +120,6 @@ function compose(
 
   const repositories = LiveCodingAgentRepositories.create({
     clickhouse: clickhouse as never,
-    clock: new TestClock(),
-    telemetry: { observe: () => undefined },
     redis: redis as never,
   });
   const github =

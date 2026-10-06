@@ -1,7 +1,6 @@
 import { ForbiddenError, NotFoundError } from "@langwatch/api/rest";
 import {
   LangyApiRequestInvalidError,
-  LangyRelayUnavailableError,
   type LangyRelayConnection,
   type RelayTally,
   type LangyTurnResultInput,
@@ -28,20 +27,14 @@ export type LangyRelayFrameMetrics = Readonly<{
 export class LangyInternalService {
   readonly #langy: LangyService;
   readonly #metrics: LangyRestMetrics;
-  readonly #hasLiveBuffer: boolean;
 
-  private constructor(langy: LangyService, metrics: LangyRestMetrics, hasLiveBuffer: boolean) {
+  private constructor(langy: LangyService, metrics: LangyRestMetrics) {
     this.#langy = langy;
     this.#metrics = metrics;
-    this.#hasLiveBuffer = hasLiveBuffer;
   }
 
-  static create(
-    langy: LangyService,
-    metrics: LangyRestMetrics,
-    hasLiveBuffer: boolean,
-  ): LangyInternalService {
-    return new LangyInternalService(langy, metrics, hasLiveBuffer);
+  static create(langy: LangyService, metrics: LangyRestMetrics): LangyInternalService {
+    return new LangyInternalService(langy, metrics);
   }
 
   async ingestTurnResult(input: LangyTurnResultInput): Promise<{ status: "accepted" }> {
@@ -73,7 +66,6 @@ export class LangyInternalService {
   }
 
   async receiveFrames(body: ReadableStream<Uint8Array> | null): Promise<RelayTally> {
-    if (!this.#hasLiveBuffer) throw new LangyRelayUnavailableError();
     if (!body)
       throw new LangyApiRequestInvalidError([
         { path: [], message: "A frame stream must carry a request body" },

@@ -232,6 +232,7 @@ type SealContext = {
   budget: UiQueryMirrorBudget;
   now: () => number;
   manifest: Map<string, UiMirrorEntry>;
+  learned: Promise<void> | undefined;
   unflushed: Set<string>;
   flushTimer: ReturnType<typeof setTimeout> | undefined;
 };
@@ -242,8 +243,22 @@ async function removeRow({ context, key }: { context: SealContext; key: string }
   await context.store.delete(key);
 }
 
+/** Rows this document never opened still count: their sizes are read in clear, once, unopened. */
+function learnManifest(context: SealContext): Promise<void> {
+  context.learned ??= (async () => {
+    const keys = await context.store.keys();
+    for (const key of keys.filter((k) => k.startsWith(STORE_KEY_PREFIX))) {
+      if (context.manifest.has(key)) continue;
+      const entry = mirrorEntryOf(await context.store.get(key));
+      if (entry && !context.manifest.has(key)) context.manifest.set(key, entry);
+    }
+  })();
+  return context.learned;
+}
+
 /** Removes the least recently read rows until the mirror is back within its budget. */
 async function evictToBudget(context: SealContext): Promise<void> {
+  await learnManifest(context);
   const { manifest, budget } = context;
   let bytes = [...manifest.values()].reduce((sum, entry) => sum + entry.bytes, 0);
   const coldestFirst = [...manifest].toSorted(([, a], [, b]) => a.readAt - b.readAt);
@@ -368,6 +383,7 @@ export function sealedUiQueryStore({
     budget,
     now,
     manifest: new Map(),
+    learned: void 0,
     unflushed: new Set(),
     flushTimer: void 0,
   };
@@ -424,7 +440,7 @@ export async function readStoredQuery({
   await store.delete(key).catch(() => void 0);
 }
 
-/** Puts one mirrored read in the cache unless a newer copy is already held. */
+/** Puts one mirrored read in the cache unless a newer copy is already held; true when it did. */
 function restoreStoredQuery({
   entry,
   queryClient,
@@ -435,13 +451,24 @@ function restoreStoredQuery({
   queryClient: QueryClient;
   versions: UiQueryVersions;
   restoredAt: Map<string, number>;
-}): void {
+}): boolean {
   const hash = hashKey(entry.queryKey);
   const held = queryClient.getQueryCache().get(hash)?.state.dataUpdatedAt ?? 0;
-  if (held >= entry.updatedAt) return;
+  if (held >= entry.updatedAt) return false;
   restoredAt.set(hash, entry.updatedAt);
   queryClient.setQueryData(entry.queryKey, entry.data, { updatedAt: entry.updatedAt });
   if (entry.version !== undefined) versions.set(hash, entry.version);
+  return true;
+}
+
+/** The read a row was written for, from its key alone (a query hash is the key's JSON). */
+function pathOfStoredKey({ key, prefix }: { key: string; prefix: string }): string | undefined {
+  try {
+    const queryKey: unknown = JSON.parse(key.slice(prefix.length));
+    return Array.isArray(queryKey) ? procedurePathOf(queryKey) : undefined;
+  } catch {
+    return;
+  }
 }
 
 /**
@@ -503,9 +530,9 @@ function mirrorQuery({
 }
 
 /**
- * Restores this user's mirrored reads, then keeps mirroring them. Another user's are removed
- * first, and the session read never mirrors. Returns the unsubscribe and the restore, which settles
- * once the restored reads were revalidated. `versions` is shared with the tab sync.
+ * Mirrors this user's reads; each is restored when first asked for, never all at start-up, and
+ * fetched again behind its painted copy. `swept` settles once other users' rows and rows no planned
+ * read can ask for are gone. The session read never mirrors; `versions` is shared with tab sync.
  */
 export function persistUiQueries({
   queryClient,
@@ -526,46 +553,60 @@ export function persistUiQueries({
   versions?: UiQueryVersions;
   /** The `x-lw-schema` the server last answered a read's path under, if any. */
   servedSchemaHashFor?: (path: string) => string | undefined;
-}): { unsubscribe: () => void; restored: Promise<void> } {
+}): { unsubscribe: () => void; swept: Promise<void> } {
   const sessionHash = hashKey(sessionQueryKey);
   const isPersisted = (query: Query) =>
     query.queryHash !== sessionHash && plan.persisted.has(procedurePathOf(query.queryKey) ?? "");
   const restoredAt = restoredAtOf(queryClient);
+  const prefix = storedQueryKey({ userId, queryHash: "" });
   let stopped = false;
-  const stopMirroring = queryClient
-    .getQueryCache()
-    .subscribe((event) =>
-      mirrorQuery({
-        event,
-        isPersisted,
-        plan,
-        servedSchemaHashFor,
-        restoredAt,
-        versions,
-        store,
-        userId,
-      }),
+
+  const sweep = async () => {
+    const orphaned = (await store.keys()).filter(
+      (key) =>
+        key.startsWith(prefix) && !plan.persisted.has(pathOfStoredKey({ key, prefix }) ?? ""),
     );
+    await Promise.all(orphaned.map((key) => store.delete(key)));
+  };
+  const swept = clearPersistedUiQueries({ store, keepUserId: userId }).then(sweep);
+
+  const restoreAsked = async (query: Query) => {
+    await swept;
+    if (stopped || query.state.data !== undefined) return;
+    const key = storedQueryKey({ userId, queryHash: query.queryHash });
+    const entry = await readStoredQuery({ store, key, plan });
+    if (!entry || stopped) return;
+    if (!restoreStoredQuery({ entry, queryClient, versions, restoredAt })) return;
+    store.touch(key);
+    await queryClient.invalidateQueries(
+      { queryKey: query.queryKey, exact: true },
+      { cancelRefetch: false },
+    );
+  };
+  const askedBeforeStart = queryClient
+    .getQueryCache()
+    .findAll({ predicate: (query) => isPersisted(query) && query.state.data === undefined });
+  for (const query of askedBeforeStart) void restoreAsked(query).catch(() => void 0);
+
+  const stopMirroring = queryClient.getQueryCache().subscribe((event) => {
+    if (event.type === "added" && isPersisted(event.query)) {
+      void restoreAsked(event.query).catch(() => void 0);
+    }
+    mirrorQuery({
+      event,
+      isPersisted,
+      plan,
+      servedSchemaHashFor,
+      restoredAt,
+      versions,
+      store,
+      userId,
+    });
+  });
   const unsubscribe = () => {
     stopped = true;
     stopMirroring();
   };
 
-  const restore = async () => {
-    const prefix = storedQueryKey({ userId, queryHash: "" });
-    const owned = (await store.keys()).filter((key) => key.startsWith(prefix));
-    const entries = await Promise.all(owned.map((key) => readStoredQuery({ store, key, plan })));
-    for (const entry of entries) {
-      if (stopped) return;
-      if (entry) {
-        restoreStoredQuery({ entry, queryClient, versions, restoredAt });
-      }
-    }
-  };
-
-  const restored = clearPersistedUiQueries({ store, keepUserId: userId })
-    .then(restore)
-    .then(() => (stopped ? void 0 : queryClient.invalidateQueries({ predicate: isPersisted })));
-
-  return { unsubscribe, restored };
+  return { unsubscribe, swept };
 }

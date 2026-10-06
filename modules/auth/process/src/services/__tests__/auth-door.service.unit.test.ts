@@ -13,6 +13,7 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { IdTokenIssuerRefusalChannel } from "../../channels/http/http.id-token-issuer-refusal.channel.ts";
+import { OAuthProfileEmailChannel } from "../../channels/http/http.oauth-profile-email.channel.ts";
 import { AuthDoorService, type AuthDoorDeps } from "../auth-door.service.ts";
 
 const loggerSpies = vi.hoisted(() => ({
@@ -60,6 +61,8 @@ function door(overrides: Partial<AuthDoorDeps> = {}) {
     revokeBrowserSession,
     idTokenIssuerRefusals: IdTokenIssuerRefusalChannel.create(),
     connectionIssuers: { findIssuersForConnection: async () => [] },
+    oauthProfileEmails: OAuthProfileEmailChannel.create(),
+    governingConnections: { findGoverningConnections: async () => [] },
     deriveQueryCacheKey: ({ sessionId, impersonatorId, epoch }) =>
       `key-for-${sessionId}-${impersonatorId}-${epoch}`,
     // Two epochs and a day in: the server's clock alone names the epoch.
@@ -96,6 +99,25 @@ describe("AuthDoorService", () => {
       await expect(stated.text()).resolves.toBe(
         JSON.stringify({ email: "sam@acme.com", password: "hunter2" }),
       );
+    });
+
+    /** @scenario "Every public auth entrance resolves its caller the same way" */
+    it("states the resolved caller on an account registration too, not the one it claimed", async () => {
+      const world = door();
+      const request = new Request(`${BASE_URL}/api/auth/sign-up/email`, {
+        method: "POST",
+        headers: {
+          origin: BASE_URL,
+          "content-type": "application/json",
+          "x-forwarded-for": "10.9.9.9, 203.0.113.8",
+        },
+        body: JSON.stringify({ email: "new@acme.com", password: "hunter2hunter2", name: "New" }),
+      });
+      ClientAddress.classifyByAddress().handle({ request, socketAddress: "198.51.100.11" });
+
+      await world.service.betterAuthHandshake(request);
+
+      expect(world.handler.mock.calls[0]![0].headers.get("x-forwarded-for")).toBe("198.51.100.11");
     });
 
     it("strips the claim when no caller could be resolved, so it cannot pick a bucket", async () => {
@@ -254,17 +276,27 @@ describe("AuthDoorService", () => {
       expect(world.revokeBrowserSession).toHaveBeenCalledWith({ sessionId: "session-1" });
     });
 
-    it("still resolves when the session lookup fails, so the cookies are cleared", async () => {
+    it("reports a failed session lookup instead of confirming the sign-out", async () => {
       const world = door({
         verifyBrowserSession: async () => {
-          throw new Error("store down");
+          throw new Error("session lookup unavailable");
         },
       });
 
       await expect(
         world.service.revokeSessionFromCookies({ cookie: SESSION_COOKIE }),
-      ).resolves.toBeUndefined();
+      ).rejects.toThrow("session lookup unavailable");
       expect(world.revokeBrowserSession).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Logout reports a revocation failure instead of confirming success" */
+    it("reports a failed revocation instead of confirming the sign-out", async () => {
+      const world = door();
+      world.revokeBrowserSession.mockRejectedValueOnce(new Error("session store unavailable"));
+
+      await expect(
+        world.service.revokeSessionFromCookies({ cookie: SESSION_COOKIE }),
+      ).rejects.toThrow("session store unavailable");
     });
 
     it("looks nothing up for a caller carrying no session cookie", async () => {
@@ -405,6 +437,89 @@ describe("given a single sign-on callback whose ID token the engine refused for 
   describe("when the logger notes a refusal outside any request", () => {
     it("ignores the line", () => {
       expect(() => IdTokenIssuerRefusalChannel.create().note([issRefusal(RECEIVED)])).not.toThrow();
+    });
+  });
+});
+
+describe("given an OAuth sign-in Better Auth would not link to the account holding its address", () => {
+  const NOT_LINKED_AT = `${BASE_URL}/auth/error?error=account_not_linked`;
+  const callback = () => new Request(`${BASE_URL}/api/auth/callback/google?code=c&state=s`);
+
+  /** Better Auth maps the provider's profile in the callback, then refuses the link. */
+  function doorRefusingLink({
+    governing,
+    location = NOT_LINKED_AT,
+  }: {
+    governing: Record<string, string[]>;
+    location?: string;
+  }) {
+    const oauthProfileEmails = OAuthProfileEmailChannel.create();
+    const google = oauthProfileEmails.capturing({ clientId: "google" });
+    const asked: string[] = [];
+    const handler = vi.fn(async () => {
+      await google.mapProfileToUser({ email: "andrei@acme.com", sub: "g-1" });
+      return new Response(null, { status: 302, headers: { location } });
+    });
+    const { service } = door({
+      betterAuth: async () => ({ handler }),
+      oauthProfileEmails,
+      governingConnections: {
+        findGoverningConnections: async ({ email }) => {
+          asked.push(email);
+          return governing[email] ?? [];
+        },
+      },
+    });
+    return { service, asked };
+  }
+
+  describe("when an organization's connection governs the provider's address", () => {
+    /** @scenario "Signing in with the wrong method explains what to do and names the right method" */
+    it("names that connection in error_description on the redirect to the error page", async () => {
+      const { service, asked } = doorRefusingLink({
+        governing: { "andrei@acme.com": ["ssoc_acme"] },
+      });
+
+      const response = await service.betterAuthHandshake(callback());
+      const target = new URL(response.headers.get("location") ?? "");
+
+      expect(asked).toEqual(["andrei@acme.com"]);
+      expect(target.pathname).toBe("/auth/error");
+      expect(target.searchParams.get("error")).toBe("account_not_linked");
+      expect(target.searchParams.get("error_description")).toBe("ssoc_acme");
+    });
+  });
+
+  describe("when no connection governs the address", () => {
+    /** @scenario "Recovery works the same when the org's required method is not yet known" */
+    it("leaves the redirect naming no connection", async () => {
+      const { service } = doorRefusingLink({ governing: {} });
+
+      const response = await service.betterAuthHandshake(callback());
+
+      expect(response.headers.get("location")).toBe(NOT_LINKED_AT);
+    });
+  });
+
+  describe("when the redirect is some other refusal", () => {
+    it("asks nobody who governs the address", async () => {
+      const { service, asked } = doorRefusingLink({
+        governing: { "andrei@acme.com": ["ssoc_acme"] },
+        location: `${BASE_URL}/auth/error?error=DIFFERENT_EMAIL_NOT_ALLOWED`,
+      });
+
+      await service.betterAuthHandshake(callback());
+
+      expect(asked).toEqual([]);
+    });
+  });
+
+  describe("when a profile is mapped outside any request", () => {
+    it("keeps nothing", async () => {
+      const channel = OAuthProfileEmailChannel.create();
+      await channel.capturing({}).mapProfileToUser({ email: "andrei@acme.com" });
+
+      expect(channel.findEmail()).toBeUndefined();
     });
   });
 });

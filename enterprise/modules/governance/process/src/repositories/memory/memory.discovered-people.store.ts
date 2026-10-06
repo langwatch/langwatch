@@ -8,7 +8,7 @@ import type { ErasedIdentifierSuppressionRow } from "../erased-identifier-suppre
 import type { IdentityMatchSuggestionRow } from "../identity-match-suggestion.repository.ts";
 import type { IdentityMatchRow } from "../identity-match.repository.ts";
 
-export type MemoryDiscoveredAgent = {
+type MemoryDiscoveredAgent = {
   id: string;
   organizationId: string;
   provider: string;
@@ -19,7 +19,7 @@ export type MemoryDiscoveredAgent = {
   lastSeenAt: Instant;
 };
 
-export type MemoryGovernanceTenant = {
+type MemoryGovernanceTenant = {
   organizationId: string;
   tenantId: string;
   firstUsedAt: Instant;

@@ -19,7 +19,7 @@ import type {
   GatewayBudgetCheckInput,
   GatewayBudgetCheckResult,
 } from "@langwatch/gateway-contract";
-import type { ProjectIdentity, TraceDestinationProject } from "@langwatch/project-contract";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
 export type ArchiveBudgetInput = ArchiveGatewayBudgetInput;
@@ -32,7 +32,7 @@ export type BudgetPageWithHealth = GatewayBudgetPageWithHealth;
 export type CreateBudgetInput = CreateGatewayBudgetInput;
 export type UpdateBudgetInput = UpdateGatewayBudgetInput;
 
-export type GatewayProjectBudgetScopeInput = {
+type GatewayProjectBudgetScopeInput = {
   organizationId: string;
   teamId: string;
   projectId: string;
@@ -71,11 +71,6 @@ export type GatewayBudgetScope = {
     | "GROUP"
     | "ATTRIBUTED_USER";
   scopeId: string;
-};
-
-export type GatewayBudgetReachInput = {
-  candidates: GatewayKeyReachCandidate[];
-  traceProjects: TraceDestinationProject[];
 };
 
 export type GatewayOrganizationBudgetReadInput = {

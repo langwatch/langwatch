@@ -103,6 +103,7 @@ function finish(event: SimulationProcessingEvent, state = INITIAL_SCENARIO_EVALU
 describe("the scenario evaluations process", () => {
   describe("when a run finishes with evaluators pinned", () => {
     /** @scenario "A finished run with attached evaluators is graded on the platform" */
+    /** @scenario "The grading job is queued with the run's ids, not its attachments" */
     it("queues the run's grading once, carrying ids only", () => {
       const evolution = finish(
         finishedEvent({
@@ -126,6 +127,7 @@ describe("the scenario evaluations process", () => {
       expect(finish(event, first.state).intents ?? []).toEqual([]);
     });
 
+    /** @scenario "The grading process keeps no field values or definitions of the run" */
     it("keeps nothing of the conversation or the evaluator settings", () => {
       expect(Object.keys(finishedRunViewOf(finishedEvent()))).toEqual([
         "scenarioId",

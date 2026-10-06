@@ -68,6 +68,7 @@ describe("the seat lane", () => {
   });
 
   describe("given the seat read failed", () => {
+    /** @scenario "A failed seat read reads differently from one not yet taken" */
     it("says the data could not be read, and not that it is yet to arrive, with no digit", () => {
       renderLane({ status: "read_failed" });
 

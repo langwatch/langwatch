@@ -1,3 +1,4 @@
+import { canonicalErrorResponse } from "@langwatch/api/rest";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { SimulationRunStatus, SimulationVerdict } from "@langwatch/scenario-contract";
 import type { SimulationRunData, SimulationService } from "@langwatch/scenario-contract";
@@ -9,7 +10,6 @@ import {
   createScenarioRestTestRuntime,
   ORGANIZATION_ID,
   PROJECT_ID,
-  scenarioRestTestErrors,
 } from "./scenario-rest.harness.ts";
 
 async function buildSimulationRunsFamily(
@@ -34,7 +34,7 @@ async function buildSimulationRunsFamily(
   const declaration = createSimulationRunsRest();
   const mounted = runtime.mount(declaration.router(), {
     app: () => world.app,
-    onError: scenarioRestTestErrors,
+    onError: canonicalErrorResponse,
     facts: [projectFacts],
   });
 
@@ -124,7 +124,7 @@ describe("the simulation-runs REST declaration", () => {
       expect(response.status).toBe(404);
       // The code, not the sentence: the sentence is copy and the registry owns
       // what a customer reads for `batch_run_not_found`.
-      await expect(response.json()).resolves.toMatchObject({ error: "batch_run_not_found" });
+      await expect(response.json()).resolves.toMatchObject({ code: "batch_run_not_found" });
     });
   });
 

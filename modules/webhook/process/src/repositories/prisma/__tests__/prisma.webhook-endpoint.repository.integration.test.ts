@@ -25,6 +25,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { nowInstant, Temporal } from "@langwatch/time";
 import { WebhookEndpointValidationError } from "@langwatch/webhook-contract";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -36,7 +37,6 @@ import {
   type WebhookEndpointConfiguration,
 } from "../../../rules/webhook-endpoint-policy.rules.ts";
 import { PrismaWebhookEndpointRepository } from "../prisma.webhook-endpoint.repository.ts";
-import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

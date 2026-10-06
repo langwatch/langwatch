@@ -3,10 +3,10 @@ Feature: The audit log port
   capability. The implementation is core and every process installs it.
 
   @unit
-  Scenario: An installation without the Enterprise audit log records nothing
-    Given a process that installed no Enterprise audit log
+  Scenario: An installation with no Enterprise module still records management writes
+    Given a process composed from the audit log module alone
     When a management write is recorded
-    Then the write is accepted and the entity's history is empty
+    Then the write is accepted and the entity's history holds it
 
   @unit
   Scenario: Operator actions reach the audit log through its port

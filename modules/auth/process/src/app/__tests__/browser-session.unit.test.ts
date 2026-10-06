@@ -11,6 +11,7 @@ import type {
   SessionExpiry,
   StoredBrowserSession,
 } from "../../repositories/auth-session.repository.ts";
+import type { StoredImpersonationClaims } from "../../rules/impersonation-claims.rules.ts";
 import { signInSecurityFixture } from "../../services/__tests__/sign-in-security.fixture.ts";
 import { BrowserSessionService } from "../../services/browser-session.service.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
@@ -49,7 +50,7 @@ const LIVE_SESSION: StoredBrowserSession = {
   id: "session-1",
   userId: "user-1",
   sessionToken: "token-1",
-  impersonating: null,
+  impersonation: null,
   createdAt: NOW,
   lastSeenAt: NOW,
   updatedAt: NOW,
@@ -101,6 +102,10 @@ class Sessions implements AuthSessionRepository {
   async findExpiryByToken(): Promise<SessionExpiry[]> {
     return [];
   }
+
+  async writeImpersonation(): Promise<void> {}
+
+  async clearImpersonation(): Promise<void> {}
 
   async findAmrForSession(): Promise<string[]> {
     return [];
@@ -162,10 +167,20 @@ function service(
   };
 }
 
-/** One stored session carrying the impersonation a case is about. */
-function impersonating(value: unknown): Sessions {
+/** The operator's own stored session, carrying the claims a case is about. */
+function impersonating(claims: Partial<StoredImpersonationClaims>): Sessions {
   const sessions = new Sessions();
-  sessions.stored = { ...LIVE_SESSION, impersonating: value };
+  sessions.stored = {
+    ...LIVE_SESSION,
+    userId: "admin-1",
+    impersonation: {
+      actorUserId: "admin-1",
+      subjectUserId: "target-1",
+      reason: "Debugging trace 42",
+      expiresAt: Temporal.Instant.from("2030-01-01T00:00:00.000Z"),
+      ...claims,
+    },
+  };
 
   return sessions;
 }
@@ -226,13 +241,7 @@ describe("BrowserSessionService", () => {
           ["target-1", "target-identity@example.com"],
         ]),
       );
-      const sessions = impersonating({
-        id: "target-1",
-        name: "Target",
-        email: "target-stale@example.com",
-        image: null,
-        expires: "2030-01-01T00:00:00.000Z",
-      });
+      const sessions = impersonating({});
 
       await expect(
         service({ sessions, identityEmails }).service.resolveBrowserSession({ verified }),
@@ -249,27 +258,9 @@ describe("BrowserSessionService", () => {
     });
 
     it.each([
-      ["malformed", { garbage: true }],
-      [
-        "expired",
-        {
-          id: "target-1",
-          name: "Target",
-          email: "target@example.com",
-          image: null,
-          expires: "2020-01-01T00:00:00.000Z",
-        },
-      ],
-      [
-        "inactive target",
-        {
-          id: "inactive-target",
-          name: "Target",
-          email: "target@example.com",
-          image: null,
-          expires: "2030-01-01T00:00:00.000Z",
-        },
-      ],
+      ["half-written", { subjectUserId: null }],
+      ["expired", { expiresAt: Temporal.Instant.from("2020-01-01T00:00:00.000Z") }],
+      ["inactive target", { subjectUserId: "inactive-target" }],
     ])("keeps the real actor for %s impersonation", async (_label, value) => {
       await expect(
         service({ sessions: impersonating(value) }).service.resolveBrowserSession({ verified }),
@@ -402,6 +393,34 @@ describe("BrowserSessionService", () => {
         expect(order.lastIndexOf("rows")).toBeLessThan(order.indexOf("cache"));
       },
     );
+  });
+
+  describe("when a sign-out cannot revoke its session from one of the two stores", () => {
+    /** @scenario "Logout reports a revocation failure instead of confirming success" */
+    it("still clears the cached session and reports the database failure", async () => {
+      const cache = new Cache();
+      const sessions = new Sessions();
+      sessions.deletedById.mockRejectedValueOnce(new Error("database unavailable"));
+
+      await expect(
+        service({ sessions, cache }).service.revokeBrowserSession({ sessionId: "session-1" }),
+      ).rejects.toThrow("database unavailable");
+      expect(cache.deleted).toHaveBeenCalledWith("better-auth:token-1");
+    });
+
+    /** @scenario "Logout reports a revocation failure instead of confirming success" */
+    it("still deletes the session row and reports the cache failure", async () => {
+      const cache = new Cache();
+      cache.deleted.mockImplementation(() => {
+        throw new Error("session cache unavailable");
+      });
+      const sessions = new Sessions();
+
+      await expect(
+        service({ sessions, cache }).service.revokeBrowserSession({ sessionId: "session-1" }),
+      ).rejects.toThrow("session cache unavailable");
+      expect(sessions.deletedById).toHaveBeenCalledWith({ id: "session-1" });
+    });
   });
 
   describe("when somebody reads the browsers they are signed in on", () => {

@@ -1,11 +1,9 @@
-export type { PostgresModelProviderAdapterOptions } from "./model-provider.module.ts";
-export type { ModelCostCatalogDatabase } from "./model-provider.module.ts";
 export type { ModelCostCatalogService } from "./services/model-cost-catalog.service.ts";
+export type { CustomKeysRead } from "./repositories/model-provider.repository.ts";
 export type {
-  CustomKeysRead,
   ModelProviderEgressRequest,
   ModelProviderEgressResponse,
-} from "./app/model-provider.members.ts";
+} from "./services/ssrf-model-provider-egress.service.ts";
 export { modelProviderConnectionPingChannels } from "./channels/model-provider-connection-ping-channels.registry.ts";
 export type { ModelCostPreviewSpanReader } from "./services/model-cost-preview.service.ts";
 export type {
@@ -17,22 +15,6 @@ export type {
 } from "./app/model-provider.app.ts";
 export { modelProviderProcessModule } from "./model-provider.module.ts";
 
-// --------------------------------------------------------------------------- Model Provider's
-// composition seam: how a process composes the gateway from its own substrates, without naming
-// one of the module's adapters, services or repositories.
-// ---------------------------------------------------------------------------
-export {
-  createModelProviderCodexDeviceFlow,
-  createModelProviderCostCatalog,
-  createModelProviderRuntime,
-  readModelProviderCustomKeys,
-  resolveModelProviderExecutionHandle,
-  type ModelProviderExecutionHandle,
-  type ModelProviderExecutionHandleRequest,
-  type ModelProviderRuntime,
-  type ModelProviderRuntimeInput,
-  type ModelProviderTranslationSurface,
-} from "./model-provider.module.ts";
 export { modelProviderRest } from "./transport/model-provider.rest.ts";
 export { modelDefaultsRest, modelDefaultsRestCredential } from "./transport/model-defaults.rest.ts";
 export { playgroundRest } from "./transport/playground.rest.ts";

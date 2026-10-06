@@ -28,6 +28,15 @@ export const scimWeb = defineBrowserModule("scim")
       load: () => import("./ui/sections/directory-sync-view.screen.tsx"),
     },
   })
+  // Opened by token from the single sign-on go-live step (Q61).
+  .withDrawers({
+    provisioningSetup: {
+      load: async () => ({
+        default: (await import("./ui/sections/provisioning-setup-drawer.tsx"))
+          .ProvisioningSetupDrawer,
+      }),
+    },
+  })
   // How accounts arrive, drawn on organization's Authentication overview.
   .withCapabilities({
     authenticationOverviewCard: {

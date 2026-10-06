@@ -1,8 +1,12 @@
 import { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { RestIdentity } from "@langwatch/api/hosting";
+import { BearerIdentity } from "@langwatch/api/rest";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { LangyApi, type LangyKeyCaller } from "@langwatch/langy-contract";
 import {
   PlatformHealthApi,
+  platformHealthConfig,
+  type PlatformHealthServerConfig,
   type PlatformHealthApi as PlatformHealthApiContract,
   type PlatformHealthCheckName,
   type PlatformHealthCheckInput,
@@ -20,7 +24,6 @@ import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { HttpSubsystemProbeChannel } from "../channels/http/http.subsystem-probe.channel.ts";
 import { LangyCanaryService } from "../services/langy-canary.service.ts";
-import { PlatformHealthKeyService } from "../services/platform-health-key.service.ts";
 import { PlatformHealthService } from "../services/platform-health.service.ts";
 import { ProjectKeyedProbeService } from "../services/project-keyed-probe.service.ts";
 import { ScenarioCanaryService } from "../services/scenario-canary.service.ts";
@@ -32,24 +35,16 @@ import {
 
 export type PlatformHealthInfrastructure = SubsystemProbeCollaborators;
 
-/**
- * Shapes restated rather than imported from `@langwatch/process-stores`: a
- * module depends on contracts. `publicBaseUrl` is the process's own fact,
- * drilled in — absent where the deployment named no `BASE_HOST`.
- */
-type PlatformHealthMembers = Readonly<{
-  publicBaseUrl: string | undefined;
-}>;
-
 type PlatformHealthSetup = FeatureSetup<
   typeof PlatformHealthModule.dependencies,
-  PlatformHealthMembers,
-  undefined
+  never,
+  PlatformHealthServerConfig
 >;
 
 /** The process-owned platform-health capability. */
 export class PlatformHealthModule implements PlatformHealthApiContract {
   static readonly contract = PlatformHealthApi;
+  static readonly config = platformHealthConfig;
   static readonly dependencies = {
     automation: AutomationApi,
     workflow: WorkflowApi,
@@ -66,38 +61,38 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
     probeApiKey: Secret.load("PLATFORM_HEALTH_PROBE_API_KEY", { optional: true }),
     apiKey: Secret.load("PLATFORM_HEALTH_API_KEY", { optional: true }),
   };
-  /** The name is from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["publicBaseUrl"] as const;
 
   readonly #health: PlatformHealthService;
-  readonly #key: PlatformHealthKeyService;
+  readonly #monitorDoor: RestIdentity;
   readonly #projectKeyed: ProjectKeyedProbeService;
   readonly #langyCanary: LangyCanaryService;
 
   private constructor(services: {
     health: PlatformHealthService;
-    key: PlatformHealthKeyService;
+    monitorDoor: RestIdentity;
     projectKeyed: ProjectKeyedProbeService;
     langyCanary: LangyCanaryService;
   }) {
     this.#health = services.health;
-    this.#key = services.key;
+    this.#monitorDoor = services.monitorDoor;
     this.#projectKeyed = services.projectKeyed;
     this.#langyCanary = services.langyCanary;
   }
 
   static async create({
     dependencies,
-    members,
+    config,
     secrets,
   }: PlatformHealthSetup): Promise<PlatformHealthModule> {
     const probeApiKey = await secrets.into(
       PlatformHealthModule.secrets.probeApiKey,
       (value) => value ?? "",
     );
-    const apiKey = await secrets.into(PlatformHealthModule.secrets.apiKey, (value) => value ?? "");
+    const monitorDoor = await secrets.into(PlatformHealthModule.secrets.apiKey, (token) =>
+      BearerIdentity.create({ name: "platform-health", token }),
+    );
     const collaborators: SubsystemProbeCollaborators = {
-      canaries: HttpSubsystemProbeChannel.create({ publicBaseUrl: members.publicBaseUrl ?? "" }),
+      canaries: HttpSubsystemProbeChannel.create({ publicBaseUrl: config.publicBaseUrl ?? "" }),
       automation: () => ({
         findById: (input) => dependencies.automation.findById(input),
         getRecentFires: async (input) =>
@@ -123,9 +118,7 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
           SubsystemProbeRunService.create({ name, probes, credential }),
         ),
       }),
-      key: PlatformHealthKeyService.create({
-        apiKey,
-      }),
+      monitorDoor,
       projectKeyed: ProjectKeyedProbeService.create({
         probes,
         resolveProject: async (input) =>
@@ -159,7 +152,11 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
     return this.#health.checkOne(name, query);
   }
 
-  acceptsKey(presented: string | null | undefined): boolean {
-    return this.#key.accepts(presented);
+  /**
+   * The monitoring family's door: the deployment's key as a bearer. Unset, the
+   * family answers 404 as though it were not there; blank, it answers 500.
+   */
+  get monitorDoor(): RestIdentity {
+    return this.#monitorDoor;
   }
 }

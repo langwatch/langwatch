@@ -18,6 +18,7 @@ export {
   FeatureSecretsUnavailableError,
   MissingProviderError,
   RoleContributionError,
+  StoreTierUnstatedError,
 } from "./boot-errors.ts";
 export {
   buildClaimedMembers,
@@ -107,8 +108,11 @@ export {
   ShutdownPhaseTimeoutError,
   type ShutdownSignalHost,
 } from "./graceful-shutdown.ts";
-export { Server } from "./server-factory.ts";
-export { hostedRuntime } from "./hosted-runtime.ts";
+export {
+  loadTaskModules,
+  parseTaskModuleSpecifiers,
+  type TaskModuleExports,
+} from "./task-modules-loader.ts";
 export {
   type ApplicationHandler,
   type HealthRoute,
@@ -118,10 +122,17 @@ export {
   type ServerLogger,
   type ServerOptions,
   type UpgradeDoor,
+  hostedRuntime,
 } from "./server.ts";
 export { processOwner } from "./owner.ts";
 export { observabilityOwner } from "./observability-owner.ts";
-export { ServerPreamble, type Metrics, type PreambleOwner, type Telemetry } from "./preamble.ts";
+export {
+  Server,
+  ServerPreamble,
+  type Metrics,
+  type PreambleOwner,
+  type Telemetry,
+} from "./preamble.ts";
 export { ProcessServer } from "./process-server.ts";
 export {
   ApiProcessContainer,

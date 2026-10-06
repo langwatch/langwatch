@@ -45,6 +45,8 @@ export {
   type TrpcRouterImplementation,
   type TrpcRouterMount,
   type TrpcRuntime,
+  type TrpcAuditedScope,
+  type TrpcAuditTarget,
   type TrpcRuntimeAuditEntry,
   type TrpcRuntimeContext,
   type TrpcRuntimeMembers,
@@ -117,3 +119,16 @@ export {
   type TrpcSessionUser,
 } from "./host.ts";
 export { SseLane } from "./sse.ts";
+
+// Named by every router's inferred type, so a module's declaration emit can name them.
+export type {
+  ApiEntitlement,
+  EntitlementOptions,
+  PlatformPermissionTarget,
+} from "../access/access.ts";
+export type {
+  ExactInputPermission,
+  InputPermission,
+  PermissionChoice,
+  PermissionMap,
+} from "../access/input-permission.ts";

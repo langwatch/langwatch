@@ -1,6 +1,9 @@
 import type { LimitCheckResult, LimitType } from "@langwatch/organization-contract";
 
-import type { OrganizationPlanUser, OrganizationSeatLicense } from "../app/organization.members.ts";
+import type {
+  OrganizationPlanUser,
+  OrganizationSeatLicense,
+} from "./organization-seat-license.service.ts";
 import type { SeatLimitNoticeService } from "./seat-limit-notice.service.ts";
 
 type LicenseLimitDependencies = {

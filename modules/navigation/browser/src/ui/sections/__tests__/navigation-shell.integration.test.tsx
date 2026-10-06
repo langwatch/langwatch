@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Spec: specs/navigation/product-switcher-navigation.feature
+ * Spec: modules/navigation/specs/product-switcher-navigation.feature
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -263,6 +263,60 @@ afterEach(async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
 });
 
+describe("the seat gate on a page", () => {
+  afterEach(() => cleanup());
+
+  describe("given a Developer who holds the page's permission in their own project", () => {
+    describe("when the page belongs to an organization-wide product", () => {
+      /** @scenario A Developer cannot open an organisation-wide product by address */
+      it("refuses the page with the standard permission alert", () => {
+        renderShell({
+          readings: { organizationRole: "DEVELOPER", pathname: "/gateway/virtual-keys" },
+        });
+
+        expect(screen.queryByTestId("page-body")).toBeNull();
+        expect(screen.getByText("Access Restricted")).toBeInTheDocument();
+        expect(screen.getByText("Missing permission: virtualKeys:view")).toBeInTheDocument();
+      });
+    });
+
+    describe("when the page belongs to their own Me workspace", () => {
+      /** @scenario A Developer cannot open an organisation-wide product by address */
+      it("opens the page", () => {
+        renderShell({
+          readings: { organizationRole: "DEVELOPER", pathname: "/me/sessions" },
+          personalScope: true,
+        });
+
+        expect(screen.getByTestId("page-body")).toBeInTheDocument();
+        expect(screen.queryByText("Access Restricted")).toBeNull();
+      });
+    });
+
+    describe("when the page belongs to no product", () => {
+      it("opens the page, leaving it to the permission gate", () => {
+        renderShell({
+          readings: { organizationRole: "DEVELOPER", pathname: "/settings/profile" },
+        });
+
+        expect(screen.getByTestId("page-body")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a Full member who holds the page's permission", () => {
+    describe("when the page belongs to an organization-wide product", () => {
+      it("opens the page, because the seat gate is for the Developer seat only", () => {
+        renderShell({
+          readings: { organizationRole: "MEMBER", pathname: "/gateway/virtual-keys" },
+        });
+
+        expect(screen.getByTestId("page-body")).toBeInTheDocument();
+      });
+    });
+  });
+});
+
 describe("the product-switcher top bar", () => {
   describe("when the product switcher opens", () => {
     /** @scenario The product switcher lists the reachable products with their pitch lines */
@@ -292,6 +346,19 @@ describe("the product-switcher top bar", () => {
       expect(
         screen.queryByText("Every AI tool, license, agent and dollar"),
       ).not.toBeInTheDocument();
+    });
+
+    /** @scenario A Developer is offered the Me product and nothing organisation-wide */
+    it("offers a Developer the Me product and no organization-wide one, whatever the flags and permissions say", async () => {
+      renderShell({
+        readings: { organizationRole: "DEVELOPER", pathname: "/me" },
+        personalScope: true,
+      });
+      await openProductSwitcher();
+
+      expect(screen.getByText("Track your coding assistants")).toBeInTheDocument();
+      expect(screen.queryByText("Gateway")).not.toBeInTheDocument();
+      expect(screen.queryByText("Governance")).not.toBeInTheDocument();
     });
 
     /** @scenario Switching product opens that product's home */

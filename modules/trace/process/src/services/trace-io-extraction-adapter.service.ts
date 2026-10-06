@@ -1,10 +1,10 @@
 import type { TraceCanonicalisationService, NormalizedSpan } from "@langwatch/trace-contract";
 
-import {
-  type TraceIoExtraction,
-  type TraceIoSide,
-  type TraceIoValue,
-} from "../app/trace.members.ts";
+import type {
+  TraceIoExtraction,
+  TraceIoSide,
+  TraceIoValue,
+} from "./trace-io-extraction.service.ts";
 import { TraceIOExtractionService } from "./trace-io-extraction.service.ts";
 
 /**

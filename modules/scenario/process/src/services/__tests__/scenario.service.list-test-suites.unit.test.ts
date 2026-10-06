@@ -15,7 +15,6 @@ describe("ScenarioService.listTestSuites", () => {
         ids: {} as ScenarioServiceOptions["ids"],
         testSuiteIds: {} as ScenarioServiceOptions["testSuiteIds"],
         clock: {} as ScenarioServiceOptions["clock"],
-        secretCipher: {} as ScenarioServiceOptions["secretCipher"],
       });
 
       await expect(

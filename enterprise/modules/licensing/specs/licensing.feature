@@ -109,12 +109,6 @@ Feature: Enterprise licensing lifecycle
       When an operator lists the self-hosted instances
       Then the install is listed with no organization name
 
-    @unit
-    Scenario: A process that composes no stores refuses the instance registry by name
-      Given a process composed without stores or an instance registry
-      When an operator lists the self-hosted instances
-      Then the read is refused naming the self-hosted instance registry
-
   Rule: Every deployment composes the licence registry from its own stores
 
     Main built the licence registry, activation codes and licence sync from
@@ -209,6 +203,7 @@ Feature: Enterprise licensing lifecycle
       When it asks for a hosted judgement
       Then it passes the gateway's door and is refused as connect_service_not_entitled
 
+  @unit
   Scenario: Import licensing without side effects
     When a runtime imports the licensing contract or server package
     Then it reads no environment and registers no route, job, or subscriber

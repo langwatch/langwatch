@@ -8,7 +8,7 @@ import {
   httpNodeParametersWithoutCredentials,
   httpNodeParametersWithoutSecrets,
   isCredentialHeader,
-  secretReferenceOf,
+  readSecretReference,
   withoutLiteralCredential,
 } from "../http-node.ts";
 
@@ -115,7 +115,7 @@ describe("a credential typed into an HTTP node", () => {
       const read = withoutLiteralCredential(" bearer {{secrets.PARTNER_TOKEN}} ");
 
       expect(read).toBe("Bearer {{ secrets.PARTNER_TOKEN }}");
-      expect(secretReferenceOf(read)).toBe("PARTNER_TOKEN");
+      expect(readSecretReference(read)).toEqual({ isReference: true, name: "PARTNER_TOKEN" });
     });
   });
 
@@ -125,13 +125,13 @@ describe("a credential typed into an HTTP node", () => {
       ["Bearer {{ secrets.PARTNER_TOKEN }}", "PARTNER_TOKEN"],
       ["Basic {{ secrets.HTTP_A_AUTH_PASSWORD_2 }}", "HTTP_A_AUTH_PASSWORD_2"],
     ])("reads %s as the secret %s", (value, name) => {
-      expect(secretReferenceOf(value)).toBe(name);
+      expect(readSecretReference(value)).toEqual({ isReference: true, name });
     });
 
     it.each([["tok_live_123"], ["abc{{ secrets.PARTNER_TOKEN }}"], [""]])(
       "reads %s as no reference",
       (value) => {
-        expect(secretReferenceOf(value)).toBeUndefined();
+        expect(readSecretReference(value)).toEqual({ isReference: false });
       },
     );
   });

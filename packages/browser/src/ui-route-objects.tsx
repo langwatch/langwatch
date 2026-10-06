@@ -10,7 +10,7 @@ import {
   resolveUiPageLoader,
   type UiPageLoader,
   type UiPageLoaderRegistry,
-} from "./ui-feature-install.ts";
+} from "./ui-page-loaders.ts";
 import { UiPrefixRedirect } from "./ui-prefix-redirect.tsx";
 import {
   uiRouteDescriptors,

@@ -244,5 +244,44 @@ describe.skipIf(!DB_URL)(
         ).toBe(0);
       });
     });
+
+    describe("when the config id resolves to no scope attachments", () => {
+      /** @scenario A model-defaults config with no scope attachments is treated as not found */
+      it("answers model_default_not_found and never runs the per-scope write check", async () => {
+        let scopeChecks = 0;
+        const checked = createTestAuthzApi(async () => {
+          scopeChecks += 1;
+          return { permitted: true, organizationRole: null };
+        });
+        const checkedWriter = ModelProviderDefaultsWriteService.create({
+          defaults,
+          catalog,
+          writeAuthorization: ModelProviderWriteAuthorizationService.create(
+            ModelProviderAuthorizationService.create(checked),
+          ),
+          ids: idService,
+          scopes,
+        });
+        const orphan = await writer.save({
+          config: { FAST: "openai/gpt-5.4-mini" },
+          scopes: [{ scopeType: "TEAM", scopeId: fixture.teamId }],
+          authorId: null,
+        } as never);
+        await prisma.modelDefaultConfigScope.deleteMany({ where: { configId: orphan.id } });
+
+        await expect(
+          checkedWriter.save({
+            id: orphan.id,
+            config: { FAST: "openai/gpt-5.5" },
+            actorId: "admin-user",
+          } as never),
+        ).rejects.toMatchObject({ code: "model_default_not_found", httpStatus: 404 });
+        await expect(
+          checkedWriter.delete({ id: orphan.id, actorId: "admin-user" } as never),
+        ).rejects.toMatchObject({ code: "model_default_not_found", httpStatus: 404 });
+
+        expect(scopeChecks).toBe(0);
+      });
+    });
   },
 );

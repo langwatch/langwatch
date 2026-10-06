@@ -1,12 +1,10 @@
 import type { LangWatchQLSchema } from "@langwatch/analytics-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import { resolveRequestBound } from "@langwatch/plans";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * The eval-function gate is Analytics' own answer, read from the project's
@@ -18,8 +16,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
-import type { LwqlProvisioningDatabase } from "../../tasks/lwql-provision.task.ts";
 import { AnalyticsModule } from "../analytics.app.ts";
 
 const PROJECT_ID = "project-judging";
@@ -52,14 +50,7 @@ async function harness(flagAnswer: boolean) {
       traces: createApiFixture<TraceApi>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
-    members: {
-      clickhouse: createApiFixture<ClickHouseQueryClient>(),
-      rateLimiter: { check: () => Promise.resolve({ allowed: true }) } satisfies RateLimiter,
-      publicBaseUrl: "https://app.langwatch.test",
-      clickhouseAdmin: { configured: false },
-      databaseTarget: { configured: false },
-      prisma: createApiFixture<LwqlProvisioningDatabase>({}, "prisma"),
-    },
+    repositories: MemoryAnalyticsRepositories.create(),
     config: {
       langwatchQl: {
         url: void 0,
@@ -70,6 +61,7 @@ async function harness(flagAnswer: boolean) {
         accessModelMode: void 0,
         sqlSingleNode: void 0,
       },
+      publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: {} as never,

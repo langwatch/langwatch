@@ -194,9 +194,9 @@ describe("given the LangWatchQL schema catalog when a column is withheld from th
 
 describe("given the LangWatchQL schema catalog when the published availability is checked against the validator", () => {
   /**
-   * The consistency claim, run over every column of every dataset for three
-   * permission shapes: the endpoint and the gate must never disagree about a
-   * single column, in either direction.
+   * The consistency claim over every column of every dataset, for three
+   * permission shapes: the endpoint and the gate never disagree about a column.
+   * About 5,700 parses, hence the explicit timeout past vitest's 5s default.
    */
   it("accepts exactly the columns it advertises, and refuses exactly the rest", () => {
     for (const protections of [FULLY_PERMITTED, WITHOUT_CONTENT, WITHOUT_ANYTHING]) {
@@ -212,7 +212,7 @@ describe("given the LangWatchQL schema catalog when the published availability i
         ).toBe(column.available);
       }
     }
-  });
+  }, 60_000);
 });
 
 describe("given the LangWatchQL schema catalog when a dataset's example query is read", () => {

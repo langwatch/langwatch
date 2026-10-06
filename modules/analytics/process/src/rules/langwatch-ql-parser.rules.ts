@@ -17,7 +17,7 @@ export interface SqlAstNode {
 }
 
 /** Outcome of parsing. A parser that throws reports `ok: false`, never escapes. */
-export type SqlParseOutcome =
+type SqlParseOutcome =
   | { readonly ok: true; readonly statements: readonly SqlAstNode[] }
   | { readonly ok: false; readonly at?: SqlSourcePosition };
 

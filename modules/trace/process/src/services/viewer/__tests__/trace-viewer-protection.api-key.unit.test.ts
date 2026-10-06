@@ -41,7 +41,6 @@ function serviceWith(can: AuthzApi["can"]) {
     plans: {} as PlanProvider,
     dataPrivacy: {} as DataPrivacyApi,
     fallbackVisibilityDays: 30,
-    processName: "test",
   });
   const resolve = vi.fn<() => Promise<Protections>>(async () => anonymous);
   Object.defineProperty(service, "resolve", { value: resolve });
@@ -97,6 +96,7 @@ describe("TraceViewerProtectionService.resolveForApiKey", () => {
   });
 
   describe("when the key is refused cost:view", () => {
+    /** @scenario A key without the cost grant reads traces with costs redacted */
     it("answers the anonymous protections with costs hidden", async () => {
       const { service } = serviceWith(vi.fn<AuthzApi["can"]>(async () => false));
 

@@ -7,7 +7,7 @@ export const STORAGE_STATS_PROCESS_NAME = "storageStats";
 /** Outbox rows are bookkeeping, one per measurement, pruned like every recurring process's. */
 const MEASUREMENT_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
-export interface StorageStatsDeps {
+interface StorageStatsDeps {
   /** One pass over every endpoint, saved for every process's gauges to read. */
   measure: () => Promise<void>;
   deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;

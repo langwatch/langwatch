@@ -379,6 +379,7 @@ describe("the size the request body cap is willing to trust", () => {
   describe("given a Content-Length that is not a non-negative integer", () => {
     describe("when the body exceeds the cap", () => {
       for (const [description, value] of Object.entries(UNUSABLE_LENGTHS)) {
+        /** @scenario "A body past the cap under a non-integer Content-Length is refused" */
         it(`refuses a body whose length arrived as ${description}`, async () => {
           const result = await capped({
             maxSize: 16,
@@ -428,6 +429,35 @@ describe("the size the request body cap is willing to trust", () => {
         expect(result.reachedRoute).toBe(true);
         expect(result.drained).toBe(true);
         expect(result.body).toBe(payload);
+      });
+    });
+
+    describe("when a chunked body exceeds the cap", () => {
+      /** @scenario "A chunked body past the cap is refused without being buffered" */
+      it("refuses it and stops reading at the cap", async () => {
+        let pulled = 0;
+        const chunks = 200;
+        const body = new ReadableStream<Uint8Array>({
+          pull(controller) {
+            if (pulled === chunks) return controller.close();
+
+            pulled += 1;
+            controller.enqueue(new TextEncoder().encode("x".repeat(8)));
+          },
+        });
+        const incoming = new Request(ECHO_URL, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body,
+          // @ts-expect-error: half-duplex streaming request (undici)
+          duplex: "half",
+        });
+
+        const result = await capped({ maxSize: 16, incoming });
+
+        expect(result.status).toBe(413);
+        expect(result.reachedRoute).toBe(false);
+        expect(pulled).toBeLessThan(chunks / 4);
       });
     });
 

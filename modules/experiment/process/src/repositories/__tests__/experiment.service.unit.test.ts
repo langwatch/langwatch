@@ -20,6 +20,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ExperimentExecution } from "../../services/experiment-run-command-dispatcher.service.ts";
 import { NoopExperimentWorkbenchUpdates } from "../../services/experiment-workbench.service.ts";
 import { ExperimentService } from "../../services/experiment.service.ts";
+import type { ExperimentDspyRetentionRepository } from "../experiment-dspy-retention.repository.ts";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import type { ExperimentRepository, ExperimentRowState } from "../experiment.repository.ts";
@@ -317,7 +318,7 @@ class MemoryExperimentExecution extends ExperimentExecution {
 class MemoryExperimentDspyRepository extends ExperimentDspyRepository {
   values: ExperimentDspyStep[] = [];
 
-  async upsert(input: ExperimentDspyStep): Promise<void> {
+  async upsert({ step: input }: { step: ExperimentDspyStep }): Promise<void> {
     this.values = this.values.filter(
       (value) =>
         !(
@@ -384,6 +385,7 @@ const build = (
       repository,
       runRepository,
       dspyRepository,
+      dspyRetention: createApiFixture<ExperimentDspyRetentionRepository>(),
       execution,
       slugify: (value) => value.toLowerCase().replaceAll(" ", "-"),
       newId: () => "generated",
@@ -564,6 +566,38 @@ describe("ExperimentService", () => {
     });
     expect(restored.state?.name).toBe("Original");
     expect(restored.state?.results?.runId).toBe("run_1");
+  });
+
+  /** @scenario "An agent edits an experiment through the REST surface" */
+  it("lists both saves and the restore, newest first", async () => {
+    const { service } = build();
+    const created = await service.createEvaluationsV3({
+      projectId: "project_1",
+      state: workbenchState("Original"),
+      actor: { label: "api" },
+    });
+    await service.saveWorkbenchState({
+      projectId: "project_1",
+      id: created.experimentId,
+      state: workbenchState("Changed"),
+      expectedVersion: created.version,
+      actor: { label: "api" },
+    });
+    await service.restoreWorkbenchVersion({
+      projectId: "project_1",
+      id: created.experimentId,
+      version: created.version,
+      actor: { label: "api" },
+    });
+
+    const page = await service.listWorkbenchVersions({
+      projectId: "project_1",
+      id: created.experimentId,
+    });
+
+    const versions = page.versions.map((entry) => entry.version);
+    expect(versions.length).toBeGreaterThanOrEqual(3);
+    expect(versions).toEqual(versions.toSorted((a, b) => b - a));
   });
 
   /** @scenario "DSPy steps use the Experiment service" */

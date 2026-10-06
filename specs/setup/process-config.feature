@@ -46,15 +46,16 @@ Feature: One generated Zod parse per process
 
   @unit
   Scenario: A module config schema may not declare a connection string
-    Given an installed module whose schema binds a variable classified as composite
-    When the process configuration is declared
-    Then it refuses naming the module, the field and the variable
+    Given an owner that declares a connection string as a secret
+    And an installed module whose config schema binds that same variable
+    When the process configuration is parsed
+    Then it refuses naming the variable, the module and the owner that declares the secret
 
   @unit
-  Scenario: The process root may read a classified variable through the secrets chain
-    Given a process schema that binds a variable classified as a secret
-    When the process configuration is declared
-    Then it is accepted, because the boot seam resolves that variable through the secrets chain
+  Scenario: The process root may declare a secret that is read through the secrets chain
+    Given a process owner that declares a secret and binds no config leaf for it
+    When the process configuration is parsed
+    Then it is accepted and the process root carries no value for that secret
 
   @unit
   Scenario: One shared deployment fact may be claimed by several modules
@@ -68,7 +69,9 @@ Feature: One generated Zod parse per process
     When the process configuration is declared
     Then it refuses naming the variable and both claimants
 
-  @unit
+  # Gap: owners are keyed by name with no duplicate check, so a second owner named
+  # "process" silently replaces the first. Alex 2026-10-06: never built.
+  @unit @unimplemented
   Scenario: A module may not take the process's own root key
     Given an installed module named after the process root
     When the process configuration is declared

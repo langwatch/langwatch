@@ -15,10 +15,10 @@ import { SidebarResizeHandle } from "../../../elements/explorer/filter-sidebar/s
 import { SampleDataBanner } from "../../../elements/explorer/onboarding/sample-data-banner.tsx";
 import { AuroraSvg } from "../../../elements/explorer/traces-page/aurora-svg.tsx";
 import { useTracesPresence } from "../../presence/hooks/use-traces-v2-presence.ts";
+import { FindBar } from "../../trace-find-bar.tsx";
 import { DensityProvider } from "../density-provider.tsx";
 import { ExportConfigDialog } from "../export-config-dialog.tsx";
 import { FilterSidebar } from "../filter-sidebar/filter-sidebar.tsx";
-import { FindBar } from "../find-bar/index.ts";
 import { useExplorerCounts } from "../hooks/use-explorer-counts.ts";
 import { useInstantEvalRunWatch } from "../hooks/use-instant-eval-run-watch.ts";
 import { useLensFilterDirtySync } from "../hooks/use-lens-filter-dirty-sync.ts";

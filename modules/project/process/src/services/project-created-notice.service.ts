@@ -2,8 +2,11 @@ import type { EventingCommandSender } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
 import type {
+  RecordProjectArchivedCommandData,
+  RecordProjectMovedCommandData,
   RecordProjectCreatedCommandData,
   RecordProjectLegacyKeyRevokedCommandData,
+  RecordProjectPresenceSettingChangedCommandData,
 } from "../eventing/project-lifecycle.events.ts";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 
@@ -13,6 +16,12 @@ export type ProjectLifecycleSenders = Readonly<{
     EventingCommandSender<RecordProjectLegacyKeyRevokedCommandData>,
     "send"
   >;
+  recordPresenceSettingChanged: Pick<
+    EventingCommandSender<RecordProjectPresenceSettingChangedCommandData>,
+    "send"
+  >;
+  recordProjectMoved: Pick<EventingCommandSender<RecordProjectMovedCommandData>, "send">;
+  recordProjectArchived: Pick<EventingCommandSender<RecordProjectArchivedCommandData>, "send">;
 }>;
 
 type NoticeLogger = Readonly<{
@@ -21,7 +30,7 @@ type NoticeLogger = Readonly<{
 
 type NoticeDependencies = Readonly<{
   logger: NoticeLogger;
-  projects: Pick<ProjectRepository, "findWithOrgAdmin" | "findIdsByOrganization">;
+  projects: Pick<ProjectRepository, "findWithOrgAdmin" | "findIdsByOrganization" | "findWithTeam">;
 }>;
 
 /**
@@ -101,6 +110,108 @@ export class ProjectCreatedNoticeService {
         "recording the legacy key revocation failed; the status read refreshes on its own",
       );
     }
+  }
+
+  /** Best effort, as a revocation's record is: the setting is saved, so a failure is logged. */
+  async presenceSettingChanged(
+    input: Readonly<{
+      projectId: string;
+      organizationId: string;
+      presenceEnabled: boolean;
+      changedByUserId: string | null;
+    }>,
+  ): Promise<void> {
+    try {
+      await this.#sendPresenceSetting(input);
+    } catch (error) {
+      this.dependencies.logger.error(
+        { projectId: input.projectId, error },
+        "recording the presence setting change failed; presence keeps the previous value",
+      );
+    }
+  }
+
+  /** Best effort: the move is saved, so a failed record is logged; held lineage ages out. */
+  async moved(
+    input: Readonly<{
+      projectId: string;
+      organizationId: string;
+      fromTeamId: string;
+      toTeamId: string;
+    }>,
+  ): Promise<void> {
+    try {
+      await this.#connected().recordProjectMoved.send({
+        tenantId: input.projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+        ...input,
+      });
+    } catch (error) {
+      this.dependencies.logger.error(
+        { projectId: input.projectId, error },
+        "recording the project move failed; authz's held lineage ages out within a minute",
+      );
+    }
+  }
+
+  /** Best effort, as a move's record is. */
+  async archived(input: Readonly<{ projectId: string; organizationId: string }>): Promise<void> {
+    try {
+      await this.#connected().recordProjectArchived.send({
+        tenantId: input.projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+        ...input,
+      });
+    } catch (error) {
+      this.dependencies.logger.error(
+        { projectId: input.projectId, error },
+        "recording the project archive failed; authz's held lineage ages out within a minute",
+      );
+    }
+  }
+
+  /** Records each project's stored presence setting, marked backfilled and keyed per project. */
+  async recordExistingPresenceSettings(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<number> {
+    const projectIds = await this.dependencies.projects.findIdsByOrganization(input.organizationId);
+    let recorded = 0;
+    for (const projectId of projectIds) {
+      const project = await this.dependencies.projects.findWithTeam(projectId);
+      if (!project) continue;
+      await this.#sendPresenceSetting({
+        projectId,
+        organizationId: project.team.organizationId,
+        presenceEnabled: project.presenceEnabled,
+        backfilled: true,
+      });
+      recorded += 1;
+    }
+    return recorded;
+  }
+
+  #connected(): ProjectLifecycleSenders {
+    const senders = this.#senders;
+    if (!senders) throw new Error("project_lifecycle is not registered in this process");
+    return senders;
+  }
+
+  async #sendPresenceSetting(
+    input: Readonly<{
+      projectId: string;
+      organizationId: string;
+      presenceEnabled: boolean;
+      changedByUserId?: string | null;
+      backfilled?: boolean;
+    }>,
+  ): Promise<void> {
+    const senders = this.#senders;
+    if (!senders) throw new Error("project_lifecycle is not registered in this process");
+    await senders.recordPresenceSettingChanged.send({
+      tenantId: input.projectId,
+      occurredAt: nowInstant().epochMilliseconds,
+      ...input,
+    });
   }
 
   async #send(

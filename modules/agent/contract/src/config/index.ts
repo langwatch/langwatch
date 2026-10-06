@@ -1,18 +1,15 @@
 import { z } from "zod";
 
-import { codeAgentConfigSchema } from "./code.ts";
+import { codeAgentConfigSchema, workflowAgentConfigSchema } from "./code.ts";
 import { connectedAgentConfigSchema } from "./connected.ts";
 import { httpAgentConfigSchema } from "./http.ts";
 import { signatureAgentConfigSchema } from "./signature.ts";
 import { voiceAgentConfigSchema } from "./voice.ts";
-import { workflowAgentConfigSchema } from "./workflow.ts";
 
-export * from "./base.ts";
 export * from "./code.ts";
 export * from "./connected.ts";
 export * from "./http.ts";
 export * from "./signature.ts";
-export * from "./workflow.ts";
 export * from "./voice.ts";
 
 /**

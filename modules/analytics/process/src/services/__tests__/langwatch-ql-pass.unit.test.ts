@@ -1,7 +1,7 @@
 /**
  * A pass re-validates the caller's statement with the full policy, then runs it
  * inside a wrapper Analytics composes from the pass's kind; the caller never
- * writes wrapper SQL. @see specs/instant-evals/instant-eval-pipeline.feature
+ * writes wrapper SQL. @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 import {
   LWQL_HYDRATION_TRACE_IDS_PARAMETER,

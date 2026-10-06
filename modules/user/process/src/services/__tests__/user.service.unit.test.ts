@@ -7,11 +7,11 @@ import { USER_AVATAR_MAX_BYTES, type UserFullProfile } from "@langwatch/user-con
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
-import type { UserAvatarStorage } from "../../app/user.members.ts";
 import type {
   UserDeactivationOutcome,
   UserRepository,
 } from "../../repositories/user.repository.ts";
+import type { UserAvatarStorage } from "../user-avatar-object.service.ts";
 import { UserLifecycleNoticeService } from "../user-lifecycle-notice.service.ts";
 import { UserService } from "../user.service.ts";
 
@@ -21,12 +21,12 @@ function lifecyclePeers() {
   lifecycle.connect({
     recordUserDeactivated: { send: async () => undefined },
     recordUserReactivated: { send: async () => undefined },
+    recordUserRegistered: { send: async () => undefined },
   });
 
   return {
     platformOperators: createApiFixture<AuthzApi>({ listPlatformOperators: async () => [] }),
     lifecycle,
-    cliCredentials: { revokeForUser: async () => undefined },
   };
 }
 
@@ -66,7 +66,11 @@ class StubRepository implements UserRepository {
   create = vi.fn(async () => user);
   updateProfile = vi.fn(async () => user);
   findAccountInfo = vi.fn(async () => ({ createdAt: user.createdAt }));
-  createCredentialUser = vi.fn(async () => ({ id: user.id }));
+  createCredentialUser = vi.fn(async () => ({
+    id: user.id,
+    accountId: "acc_1",
+    accountCreatedAtMs: 0,
+  }));
   createPasskeyUser = vi.fn(async () => ({ id: user.id }));
   hasPassword = vi.fn(async () => true);
   setFirstPassword = vi.fn(async () => "set" as const);
@@ -249,6 +253,7 @@ describe("UserService", () => {
     const revokeAllBrowserSessions = vi.fn(async () => undefined);
     const auth = createApiFixture<AuthApi>({
       revokeAllBrowserSessions,
+      revokeCliTokens: async () => ({ revokedCount: 0 }),
     });
     const { service, repository } = createService({ auth });
     await service.deactivate({ id: "user-1", actor: { type: "system", id: null } });
@@ -269,6 +274,7 @@ describe("UserService", () => {
     });
   });
 
+  /** @scenario "Changing an email refreshes authenticated identity" */
   it("normalizes a changed email, then ends every one of the user's sessions", async () => {
     const revokeAllBrowserSessions = vi.fn(async () => undefined);
     const { service, repository } = createService({
@@ -637,11 +643,15 @@ describe("the lifecycle facts' clock", () => {
           sent.push({ type: "reactivated", occurredAt });
         },
       },
+      recordUserRegistered: { send: async () => undefined },
     });
     const service = UserService.create({
       repository,
       organizations: createApiFixture<OrganizationApi>({}),
-      auth: createApiFixture<AuthApi>({ revokeAllBrowserSessions: async () => undefined }),
+      auth: createApiFixture<AuthApi>({
+        revokeAllBrowserSessions: async () => undefined,
+        revokeCliTokens: async () => ({ revokedCount: 0 }),
+      }),
       avatarStorage: new StubAvatarStorage(),
       credentialIssuer: ISSUER,
       now: () => NOW,

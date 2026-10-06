@@ -31,7 +31,6 @@ import {
   httpSessionKey,
   pendingKey,
 } from "../rules/connected-agent-keys.rules.ts";
-import type { ResolvedConnectCredential } from "./connected-agent-credential.service.ts";
 import { InstanceWatchService, type Watch } from "./connected-agent-instance-watch.service.ts";
 import { type AgentSessionService, type SessionInfo } from "./connected-agent-session.service.ts";
 
@@ -76,7 +75,7 @@ const storedSessionSchema = z.object({
 type StoredSession = z.infer<typeof storedSessionSchema>;
 
 /** What one pod keeps per instance it has served: the channel, and who waits on it. */
-export interface LongPollTransportOptions {
+interface LongPollTransportOptions {
   session: AgentSessionService;
   /** How long a poll waits for a frame before it answers empty. */
   pollWaitMs?: number;
@@ -131,12 +130,7 @@ export class LongPollTransportService {
       return this.#refused(findReplicaRefusal);
     }
 
-    let resolved: ResolvedConnectCredential;
-    try {
-      resolved = await this.#core.authenticate(credentials);
-    } catch (error) {
-      return this.#refused(error);
-    }
+    const resolved = credentials.caller;
 
     const parsed = registerFrameSchema.safeParse(body);
     if (!parsed.success) {
@@ -316,7 +310,7 @@ export class LongPollTransportService {
     credentials: AgentConnectCredentials;
     token: string | undefined;
   }): Promise<{ session: SessionInfo; stored: StoredSession }> {
-    const resolved = await this.#core.authenticate(credentials);
+    const resolved = credentials.caller;
     if (!token) {
       throw new AgentSessionUnknownError();
     }

@@ -27,7 +27,7 @@ const EMPTY_BACKOFF_MS = [
 ] as const;
 const ACTIVE_BRANCH_MAX_BACKOFF_MS = EMPTY_BACKOFF_MS[0];
 
-export type BranchMappingOrigin = "demand" | "sweep";
+type BranchMappingOrigin = "demand" | "sweep";
 type BranchAddress = {
   organizationId: string;
   repositoryHost: string;

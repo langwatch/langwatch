@@ -461,9 +461,7 @@ async function resolveSessionCredential(
     saveConfig(cfg);
     // Current servers send no personal key: the login key is the session's only credential.
     const apiKey = loginKey ?? personalKeyNow;
-    return apiKey
-      ? { apiKey, projectId: project.id, isLoginKey: apiKey === loginKey }
-      : undefined;
+    return apiKey ? { apiKey, projectId: project.id, isLoginKey: apiKey === loginKey } : undefined;
   } catch (err) {
     if (err instanceof SessionApiError && (err.status === 401 || err.status === 403)) {
       // Session revoked, expired or refused: 403 counts the same as 401.

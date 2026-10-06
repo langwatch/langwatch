@@ -9,6 +9,11 @@ import {
   CHART_FRAME_MAX_HEIGHT_PX,
   CHART_FRAME_MIN_HEIGHT_PX,
 } from "./chart-frame-protocol.ts";
+import {
+  createChartQueryRunner,
+  planChartQueryRetry,
+  reduceChartQueryState,
+} from "./chart-frame-query-runner.ts";
 
 export function buildShimScript(): string {
   return `
@@ -114,6 +119,10 @@ export function buildShimScript(): string {
     return messageOf(err);
   }
 
+  var createChartQueryRunner = ${createChartQueryRunner.toString()};
+  var planChartQueryRetry = ${planChartQueryRetry.toString()};
+  var reduceChartQueryState = ${reduceChartQueryState.toString()};
+
   // Wraps whatever LW.query rejects with (a {code,title,message} payload, or
   // anything else) into a real Error, carrying 'code'/'title' through as
   // extra properties when present — the hook's contract promises an Error
@@ -123,6 +132,7 @@ export function buildShimScript(): string {
     if (err && typeof err === "object") {
       if (typeof err.code === "string") wrapped.code = err.code;
       if (typeof err.title === "string") wrapped.title = err.title;
+      if (err.retryable === true) wrapped.retryable = true;
     }
     return wrapped;
   }
@@ -142,6 +152,12 @@ export function buildShimScript(): string {
    *    setState-on-unmounted race;
    *  - 'params' is compared by value (JSON), not identity, so an inline
    *    object literal in the widget's JSX does not cause a refetch loop.
+   *  - a refetch that fails keeps the rows already on screen: 'data' and
+   *    'status' stay as they were and the failure is reported apart, as
+   *    'refetchError' / 'isRefetchError'. 'isError' means there is nothing
+   *    to show, never that a refresh over a good chart failed;
+   *  - a failure the host marks retryable (the query service was busy) is
+   *    retried a few times with backoff and jitter before it counts.
    * It also refetches on its own whenever the dashboard context (time
    * window, granularity) changes, via the same feed LW.onDashboardContextChange
    * exposes directly - a widget using this hook stays live without its
@@ -156,6 +172,7 @@ export function buildShimScript(): string {
       status: "pending",
       data: null,
       error: null,
+      refetchError: null,
       isFetching: true
     });
     var state = stateHook[0];
@@ -163,38 +180,34 @@ export function buildShimScript(): string {
     var runRef = React.useRef(null);
 
     React.useEffect(function () {
-      var cancelled = false;
+      var runner = createChartQueryRunner({
+        query: function () { return LW.query(name, effectiveParams); },
+        emit: function (event) {
+          setState(function (previous) {
+            return reduceChartQueryState({ previous: previous, event: event });
+          });
+        },
+        toError: toChartQueryError,
+        planRetry: function (args) {
+          return planChartQueryRetry({
+            rejection: args.rejection,
+            retriesUsed: args.retriesUsed,
+            random: Math.random
+          });
+        },
+        setTimer: function (callback, delayMs) { return setTimeout(callback, delayMs); },
+        clearTimer: function (timer) { clearTimeout(timer); }
+      });
 
-      function run() {
-        if (cancelled) return;
-        // Keeps whatever data/error/status is already there while a
-        // refetch is in flight (window change, manual refetch()) — only
-        // isFetching flips, so a widget's chart doesn't flash back to its
-        // loading state on every background refresh.
-        setState(function (prev) {
-          return { status: prev.status, data: prev.data, error: prev.error, isFetching: true };
-        });
-        LW.query(name, effectiveParams).then(
-          function (result) {
-            if (cancelled) return;
-            setState({ status: "success", data: result.rows, error: null, isFetching: false });
-          },
-          function (err) {
-            if (cancelled) return;
-            setState({ status: "error", data: null, error: toChartQueryError(err), isFetching: false });
-          }
-        );
-      }
-
-      runRef.current = run;
+      runRef.current = runner.run;
       // A genuine identity change (new name/params) starts over from
       // scratch rather than keeping the previous query's stale data/error.
-      setState({ status: "pending", data: null, error: null, isFetching: true });
-      run();
-      var unsubscribe = LW.onDashboardContextChange(run);
+      setState({ status: "pending", data: null, error: null, refetchError: null, isFetching: true });
+      runner.run();
+      var unsubscribe = LW.onDashboardContextChange(runner.run);
 
       return function () {
-        cancelled = true;
+        runner.cancel();
         unsubscribe();
       };
       // paramsKey stands in for effectiveParams: same dependency semantics,
@@ -208,6 +221,8 @@ export function buildShimScript(): string {
       isFetching: state.isFetching,
       isError: state.status === "error",
       error: state.error,
+      isRefetchError: state.refetchError !== null,
+      refetchError: state.refetchError,
       status: state.status,
       refetch: function () {
         if (runRef.current) runRef.current();

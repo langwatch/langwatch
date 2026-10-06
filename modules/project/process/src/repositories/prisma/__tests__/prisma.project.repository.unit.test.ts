@@ -26,6 +26,7 @@ function repositoryWithQueries(options: {
 }
 
 describe("PrismaProjectRepository trace destinations", () => {
+  /** @scenario "A peer lists full project paths for copied entities" */
   it("lists full project paths for exactly the requested ids without hiding archived relations", async () => {
     const { repository, project } = repositoryWithQueries({
       findFirst: [],
@@ -182,6 +183,7 @@ describe("PrismaProjectRepository coding-agent activity", () => {
 
 describe("PrismaProjectRepository.findOrganizationId", () => {
   /** @scenario The organization is resolved through the project's team */
+  /** @scenario "A compatibility caller resolves a project tenant target" */
   it("preserves optional tenant resolution for archived and missing projects", async () => {
     const findUnique = vi
       .fn()

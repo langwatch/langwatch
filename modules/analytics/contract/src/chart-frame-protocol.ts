@@ -75,6 +75,8 @@ export interface ChartQueryError {
   readonly code: string;
   readonly title: string;
   readonly message: string;
+  /** Set when the same request is expected to succeed shortly; the hook retries it. */
+  readonly retryable?: boolean;
 }
 
 // ---------------------------------------------------------------------------

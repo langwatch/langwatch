@@ -8,10 +8,8 @@ import {
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import type {
-  CodingAgentCostEstimator,
-  CodingAgentCostMetrics,
-} from "../app/coding-agent.members.ts";
+import type { CodingAgentCostMetrics } from "../services/coding-agent-cost-metrics.service.ts";
+import type { CodingAgentCostEstimator } from "../services/model-catalog-cost-estimator.service.ts";
 import { CodingAgentSessionLogProjection } from "./coding-agent-session-log.projection.ts";
 import { CodingAgentSessionSpanProjection } from "./coding-agent-session-span.projection.ts";
 import { CodingAgentSessionStateProjection } from "./coding-agent-session-state.projection.ts";

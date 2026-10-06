@@ -24,14 +24,14 @@ import { CanonicalLogRecordStore } from "./canonical-log-record.store.ts";
 import { CanonicalLogStorageMapProjection } from "./canonical-log-storage.projection.ts";
 import { RecordCanonicalLogCommand } from "./log.intent.ts";
 
-export interface LogProcessingPipelineDeps {
+interface LogProcessingPipelineDeps {
   canonicalLogAppendStore: AppendStore<CanonicalLogRecord>;
   logCommandShardCount: number;
   /** Each tenant's retention, stamped on the log rows in place of the default (§9). */
   retention?: RetentionPolicyResolver;
 }
 
-export interface LogProcessingAdapterOptions {
+interface LogProcessingAdapterOptions {
   repository: CanonicalLogRecordAppendRepository;
   defaultRetentionDays: number;
   logCommandShardCount: number;

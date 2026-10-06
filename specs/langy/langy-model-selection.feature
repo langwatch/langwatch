@@ -184,3 +184,11 @@ Feature: Langy runs on the model the project chose
     Given the project's Langy model resolves to a model on a disabled provider
     When a turn resolves its model
     Then the resolution is refused
+
+  # Riding beside a drawer (trace details, the online evaluation editor) the
+  # panel is raised above the drawer, which put it above its own model list.
+  @integration
+  Scenario: The model list opens above the panel when Langy rides beside a drawer
+    Given Langy is open beside a drawer
+    When the composer's model picker opens
+    Then the model list is drawn on the overlay layer, above the panel and the drawer

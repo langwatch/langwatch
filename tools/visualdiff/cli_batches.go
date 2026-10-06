@@ -50,7 +50,7 @@ func batchesCommand(ctx context.Context, args []string, streams Streams) int {
 	}
 	waitCtx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
-	path, err := waitForBatch(waitCtx, root, *after, time.Second)
+	path, err := waitForBatch(waitCtx, batchWait{root: root, after: *after, poll: time.Second})
 	if err != nil {
 		fmt.Fprintln(streams.Err, "visualdiff batches:", err)
 		return ExitOperational
@@ -77,9 +77,18 @@ func readyBatches(root string, after int) []string {
 	return paths
 }
 
+// batchWait is what waitForBatch waits for: a batch under root numbered after
+// after, polled every poll.
+type batchWait struct {
+	root  string
+	after int
+	poll  time.Duration
+}
+
 // waitForBatch polls root every poll until a batch after after is ready.
-func waitForBatch(ctx context.Context, root string, after int, poll time.Duration) (string, error) {
-	ticker := time.NewTicker(poll)
+func waitForBatch(ctx context.Context, wait batchWait) (string, error) {
+	root, after := wait.root, wait.after
+	ticker := time.NewTicker(wait.poll)
 	defer ticker.Stop()
 	for {
 		if ready := readyBatches(root, after); len(ready) > 0 {

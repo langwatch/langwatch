@@ -1,10 +1,14 @@
+import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import { moduleApi } from "@langwatch/module";
+import type { StoredObjectsCreateUploadOutput } from "@langwatch/stored-object-contract";
 
 import type { BatchEvaluationRecord, BatchEvaluationSummary } from "./batch-record.trpc.ts";
+import type { DatasetLimits } from "./dataset-limits.ts";
 import type { DatasetApiDeleteInput } from "./dataset.schemas.ts";
 import type {
   AppendStoredObjectToDatasetInput,
   CopyDatasetInput,
+  CreateDatasetAttachmentUploadInput,
   CreateDatasetFromStoredObjectInput,
   CreateDatasetFromUploadInput,
   CreateDatasetFromUploadResult,
@@ -107,10 +111,17 @@ export interface DatasetApi {
       entrySelection?: DatasetEntrySelection;
     },
   ) => Promise<DatasetWithRecords>;
-  /** The whole dataset, refused with a 400 when it exceeds `limitMb` rather than truncated. */
-  getDatasetWithinLimit: (
-    input: DatasetLookupInput & { limitMb: number },
-  ) => Promise<DatasetWithRecords>;
+  /**
+   * The whole dataset in one answer, refused rather than truncated when it is
+   * larger than the organization answers inline.
+   */
+  getDatasetWithinLimit: (input: DatasetLookupInput) => Promise<DatasetWithRecords>;
+  /** The size limits the project's organization answers. */
+  getLimits(input: { projectId: string }): Promise<DatasetLimits>;
+  /** The signed upload a cell's file is sent to, within the organization's per-file limit. */
+  createAttachmentUpload(
+    input: CreateDatasetAttachmentUploadInput,
+  ): Promise<StoredObjectsCreateUploadOutput>;
   getDatasetPage(input: DatasetPageInput): Promise<DatasetPage>;
   findDatasetPage(input: DatasetPageInput): Promise<DatasetPage | null>;
   getDatasetHead(input: DatasetLookupInput): Promise<DatasetHead>;
@@ -161,3 +172,10 @@ export interface DatasetApi {
 }
 
 export const DatasetApi = moduleApi<DatasetApi>()("dataset");
+
+/** Dataset's settings: only the shared deployment origin its platform links are built on. */
+export const datasetConfig = Config.define(() => ({
+  publicBaseUrl,
+}));
+
+export type DatasetServerConfig = ConfigOf<typeof datasetConfig>;

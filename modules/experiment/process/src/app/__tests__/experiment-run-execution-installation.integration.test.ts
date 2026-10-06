@@ -21,7 +21,6 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import type { ModelCost, ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import {
@@ -296,6 +295,8 @@ describe.skipIf(!connection)("given a saved workbench with one row and one promp
   };
 
   /** @scenario "A polled run answers at once and is read back completed from the fold" */
+  /** @scenario "A run started with no browser covers what the workbench holds" */
+  /** @scenario "A run started with no browser fills the cells the workbench shows" */
   it("answers the run at once, writes the board, then reads it completed", async () => {
     const boardHeldAtCompletion: boolean[] = [];
     await withPair(
@@ -699,20 +700,32 @@ describe.skipIf(!connection)(
         ownerUserId: "user_2",
         ownerName: "Someone",
       });
+      const personalAgent = createApiFixture<AgentOverview>({
+        id: "agent_1",
+        name: "Someone's laptop",
+        projectId: ids.project,
+        type: "connected",
+        environment: "development",
+        ownerUserId: "user_2",
+        archivedAt: null,
+      });
+      const agent = createApiFixture<AgentApi>({
+        getById: async () => personalAgent,
+        ownersOf: async () => new Map([["user_2", { userId: "user_2", name: "Someone" }]]),
+      });
+      const target: TargetConfig = {
+        id: "target_personal",
+        type: "agent",
+        dbAgentId: "agent_1",
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+        mappings: {},
+      };
       await withPair(
-        {
-          answer: answersEveryNode,
-          api: {
-            suite: createApiFixture<SuiteApi>({
-              assertConnectedAgentsRunnable: async () => {
-                throw refusal;
-              },
-            }),
-          },
-        },
+        { answer: answersEveryNode, api: { agent }, worker: { agent } },
         async (pair) => {
           const answer = await pair.api.executeWorkbenchRun(
-            execution({ questions: ["first"] }),
+            execution({ questions: ["first"], targets: [target] }),
             person,
           );
           const frames = await collect(answer.events).ended;
@@ -922,8 +935,8 @@ describe.skipIf(!connection)("given a target on a model the engine reports witho
               attrs["langwatch.model.inputCostPerToken"] === 0.001 ? 0.5 : 0,
           }),
           "api-key": createApiFixture<ApiKeyApi>({
-            mintRunKey: async ({ projectId, permissions }) => {
-              if (!permissions.includes("agentCache:manage")) return "run-key";
+            mintRunKey: async () => "run-key",
+            mintAgentSandboxKey: async ({ projectId }) => {
               minted.push(projectId);
               return "project-sandbox-key";
             },

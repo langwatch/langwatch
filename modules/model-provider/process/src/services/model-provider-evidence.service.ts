@@ -1,8 +1,8 @@
 import { HandledError } from "@langwatch/handled-error";
 import { modelProviderListProjectInputSchema } from "@langwatch/model-provider-contract";
 
-import type { ModelCostProjectScope } from "../app/model-provider.members.ts";
 import type { ModelProviderEvidenceRepository } from "../repositories/model-provider-evidence.repository.ts";
+import type { ModelCostProjectScope } from "./model-provider-project-scope.service.ts";
 
 /**
  * Whether a project has a model provider attached and switched on — kept

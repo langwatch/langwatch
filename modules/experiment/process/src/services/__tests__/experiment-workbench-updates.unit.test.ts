@@ -15,6 +15,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ExperimentDspyRetentionRepository } from "../../repositories/experiment-dspy-retention.repository.ts";
 import type { ExperimentDspyRepository } from "../../repositories/experiment-dspy.repository.ts";
 import type { ExperimentRunRepository } from "../../repositories/experiment-run.repository.ts";
 import type { ExperimentRepository } from "../../repositories/experiment.repository.ts";
@@ -211,6 +212,7 @@ describe("given a workflow evaluation refreshing its experiment", () => {
         repository,
         runRepository: createApiFixture<ExperimentRunRepository>(),
         dspyRepository: createApiFixture<ExperimentDspyRepository>(),
+        dspyRetention: createApiFixture<ExperimentDspyRetentionRepository>(),
         slugify: (value) => value,
         newId: () => "generated-id",
         references,

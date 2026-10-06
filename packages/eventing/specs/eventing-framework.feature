@@ -7,7 +7,7 @@ Feature: Eventing framework boundary and pipeline authoring
   So that its consistency guarantees are visible and invalid combinations are
   rejected before the application starts
 
-  @typecheck @architecture
+  @typecheck @architecture @unit
   Scenario: An aggregate declares its type once
     Given an aggregate definition with its identifier and allowed events
     When a pipeline is defined for that aggregate
@@ -27,7 +27,7 @@ Feature: Eventing framework boundary and pipeline authoring
     When the application builds its event catalogue
     Then construction fails with both conflicting owners identified
 
-  @typecheck @projection
+  @typecheck @projection @unimplemented
   Scenario: A ClickHouse map projection requires its consistency dependencies
     Given an inline ClickHouse map projection
     When its definition omits a stable key, repository or Redis cache
@@ -41,7 +41,7 @@ Feature: Eventing framework boundary and pipeline authoring
     Then the event is mapped without reading prior projection state
     And the latest document is written to ClickHouse and its Redis cache
 
-  @typecheck @projection
+  @typecheck @projection @unimplemented
   Scenario: A ClickHouse fold projection requires a Redis-backed read path
     Given an inline ClickHouse fold projection
     When its definition omits initial state, evolution, repository, cache or version
@@ -56,14 +56,14 @@ Feature: Eventing framework boundary and pipeline authoring
     Then the pure evolution receives the cached version
     And the evolved document is persisted and written through to the cache
 
-  @typecheck @projection
+  @typecheck @projection @unimplemented
   Scenario: A Postgres projection exposes only its own substrate contract
     Given an inline Postgres projection
     When its definition supplies initial state, evolution, version and repository
     Then the projection can be built without a Redis projection cache
     And ClickHouse cache and append options are not offered
 
-  @architecture @projection
+  @unit @architecture @projection
   Scenario: Projection evolution stays deterministic and bounded
     Given production source is named as an Eventing projection
     When architecture lint checks the projection
@@ -78,7 +78,7 @@ Feature: Eventing framework boundary and pipeline authoring
     Then the subscriber is staged with the event context
     And no projection document is present in its handler contract
 
-  @typecheck @subscriber
+  @typecheck @subscriber @unit
   Scenario: A projection subscriber infers its committed document
     Given a projection registered earlier in the pipeline
     When a projection subscriber is declared after that projection by name
@@ -93,7 +93,7 @@ Feature: Eventing framework boundary and pipeline authoring
     When the projection later commits successfully on retry
     Then the subscriber is staged with exactly that committed document
 
-  @architecture @subscriber @idempotency
+  @unit @architecture @subscriber @idempotency
   Scenario: A strict-package subscriber proves redelivery safety
     Given a feature subscriber performs an externally visible action
     When architecture lint checks the feature package
@@ -101,7 +101,7 @@ Feature: Eventing framework boundary and pipeline authoring
     And the test observes one externally visible result
     And queue deduplication alone does not satisfy the rule
 
-  @architecture @subscriber
+  @unit @architecture @subscriber
   Scenario: A subscriber emits durable state through a command
     Given a subscriber reaction needs to create another durable domain event
     When its source is checked
@@ -124,7 +124,7 @@ Feature: Eventing framework boundary and pipeline authoring
     And resulting intents are persisted through its outbox contract
     And a retry does not apply the same event twice
 
-  @architecture @process-manager
+  @unit @architecture @process-manager
   Scenario: Process evolution and external work remain separate
     Given a feature owns a durable process manager
     When architecture lint checks its process and intent source
@@ -165,14 +165,17 @@ Feature: Eventing framework boundary and pipeline authoring
     And the signal retries a revision loss against the winning state
     And exactly one transition's intents are inserted
 
-  @typecheck @architecture
+  # Gap: src/server/adapters/postgres/prisma-process-store.ts imports
+  # @langwatch/prisma-client, so "no Prisma import" does not hold today, and no
+  # test pins the remaining import and deep-export rules.
+  @unimplemented @typecheck @architecture
   Scenario: Eventing is sealed from application infrastructure
     Given the Eventing package dependency graph and public exports
     Then it contains no application, product, enterprise or Prisma import
     And consumers cannot deep-import repositories or executors
     And Eventing depends on Group Queue only through its public API
 
-  @architecture @documentation
+  @unimplemented @architecture @documentation
   Scenario: Framework rationale and behavior live with the owning package
     Given an ADR or feature spec about Eventing or Group Queue mechanics
     When its ownership is classified

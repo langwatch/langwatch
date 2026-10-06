@@ -6,13 +6,13 @@
 
 import {
   useUiCapabilities,
-  useUiDeclarations,
   useUiScope,
   type UiFeedback,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
-import type { UiProjectSwitcherProps } from "@langwatch/browser-host/declarations";
-import { lazy, Suspense, useMemo, type ComponentType, type ReactNode } from "react";
+import { useLent } from "@langwatch/browser-host/lent";
+import { ProjectSwitcherToken, type ProjectSwitcherProps } from "@langwatch/project-contract";
+import { Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 
 import {
   SecretHostApi,
@@ -25,13 +25,13 @@ class CapabilitySecretHost extends SecretHostApi {
   private readonly projectId: string | undefined;
   private readonly session: UiSession;
   private readonly feedback: UiFeedback;
-  private readonly Switcher: ComponentType<UiProjectSwitcherProps> | undefined;
+  private readonly Switcher: ComponentType<ProjectSwitcherProps> | undefined;
 
   constructor(options: {
     projectId: string | undefined;
     session: UiSession;
     feedback: UiFeedback;
-    Switcher: ComponentType<UiProjectSwitcherProps> | undefined;
+    Switcher: ComponentType<ProjectSwitcherProps> | undefined;
   }) {
     super();
     this.projectId = options.projectId;
@@ -72,12 +72,7 @@ class CapabilitySecretHost extends SecretHostApi {
 export default function SecretHostMount({ children }: { children?: ReactNode }) {
   const { session, feedback } = useUiCapabilities();
   const { projectId } = useUiScope().activeScope();
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so the switcher is not remounted.
-  const Switcher = useMemo(() => {
-    const [lent] = declarations.declared("projectSwitcher");
-    return lent ? lazy(lent.capability.load) : void 0;
-  }, [declarations]);
+  const Switcher = useLent(ProjectSwitcherToken);
   const host = useMemo(
     () => new CapabilitySecretHost({ projectId: projectId ?? void 0, session, feedback, Switcher }),
     [projectId, session, feedback, Switcher],

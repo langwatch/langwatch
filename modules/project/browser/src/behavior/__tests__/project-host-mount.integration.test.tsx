@@ -11,7 +11,9 @@ import {
   type UiActor,
   type UiCapabilities,
 } from "@langwatch/browser-host/capabilities";
+import { uiDeclarations, type UiDeclaringModule } from "@langwatch/browser-host/declarations";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { ProjectSwitcherToken } from "@langwatch/project-contract";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -102,13 +104,28 @@ class TestScope extends UiScope {
   }
 }
 
-function harness(scope: UiActiveScope) {
+/** Project as the shell installs it: lending its switcher by token. */
+const PROJECT_LENDING_SWITCHER: UiDeclaringModule = {
+  name: "project",
+  installation: {
+    capabilities: {},
+    lends: [
+      {
+        token: ProjectSwitcherToken,
+        load: async () => ({ default: () => <button type="button">Switch project</button> }),
+      },
+    ],
+  },
+};
+
+function harness(scope: UiActiveScope, modules: readonly UiDeclaringModule[] = []) {
   const capabilities: UiCapabilities = {
     ...createUiCapabilitiesFromHost(
       { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
       new SignedInSession(),
     ),
     scope: new TestScope(scope),
+    declarations: uiDeclarations(modules),
   };
 
   return function Harness({ children }: { children: ReactNode }) {
@@ -135,6 +152,11 @@ function OrganizationReader() {
       <span data-testid="project">{project?.name ?? "(none)"}</span>
     </div>
   );
+}
+
+/** Stands in for the settings screen's header, where the switcher sits. */
+function SwitcherSlot() {
+  return <div data-testid="switcher">{useProjectHost().projectSwitcher()}</div>;
 }
 
 /** Stands in for the settings screen's "Set up project" button. */
@@ -184,6 +206,25 @@ describe("given a project host mounted above a screen that renders from it", () 
       fireEvent.click(screen.getByRole("button", { name: "Set up project" }));
 
       expect(drawer.openDrawer).toHaveBeenCalledWith("createProject", { navigateOnCreate: true });
+    });
+  });
+
+  describe("when the screen draws the project switcher", () => {
+    it("renders the switcher project lends by token", async () => {
+      const scope = { organizationId: ORGANIZATION_ID, projectId: PROJECT_ID };
+      const Harness = harness(scope, [PROJECT_LENDING_SWITCHER]);
+
+      render(<SwitcherSlot />, { wrapper: Harness });
+
+      expect(await screen.findByRole("button", { name: "Switch project" })).toBeInTheDocument();
+    });
+
+    it("draws nothing where no module lends one", () => {
+      const Harness = harness({ organizationId: ORGANIZATION_ID, projectId: PROJECT_ID });
+
+      render(<SwitcherSlot />, { wrapper: Harness });
+
+      expect(screen.getByTestId("switcher")).toBeEmptyDOMElement();
     });
   });
 });

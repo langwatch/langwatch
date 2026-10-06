@@ -11,11 +11,15 @@ import {
   type OrganizationMfaStanding,
   satisfiesOrganizationMfaRequirement,
 } from "@langwatch/identity-contract";
+import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 
-import type { TwoStepVerificationRepository } from "../repositories/two-step-verification.repository.ts";
+import type {
+  OrganizationMfaSetting,
+  TwoStepVerificationRepository,
+} from "../repositories/two-step-verification.repository.ts";
 import type { OrganizationMfaNotifierService } from "./organization-mfa-notifier.service.ts";
 
-export type OrganizationMfaServiceDeps = {
+type OrganizationMfaServiceDeps = {
   accounts: TwoStepVerificationRepository;
   /** What a session proved, the provider's assertions, and whether the deployment offers it. */
   auth: Pick<
@@ -39,8 +43,9 @@ export class OrganizationMfaService {
   private constructor(private readonly deps: OrganizationMfaServiceDeps) {}
 
   /**
-   * Membership first, as a tenancy boundary: a stranger gets a member-with-nothing's shape and
-   * no name, or the procedure is an existence oracle over every tenant.
+   * The cheap answer first: an organization that requires nothing is satisfied after one
+   * read. Only a required organization pays for membership, the session and the factors, and
+   * membership still decides before any name or factor is shown to a stranger.
    */
   async getStanding({
     userId,
@@ -51,31 +56,49 @@ export class OrganizationMfaService {
     organizationId: string;
     sessionId: string | null;
   }): Promise<OrganizationMfaStanding> {
-    const amr = sessionId ? await this.deps.auth.findSessionAmr({ sessionId }) : null;
+    const organization = this.deps.auth.offersTwoStepVerification()
+      ? await this.findOrganizationSetting({ organizationId })
+      : null;
+    if (!organization?.mfaRequired) return this.notRequired({ organizationId });
+
     if (!(await this.deps.accounts.isActiveMember({ userId, organizationId }))) {
-      return {
-        organizationId,
-        organizationName: null,
-        required: false,
-        satisfaction: satisfiesOrganizationMfaRequirement({
-          mfaRequired: false,
-          evidence: { accountEnrollmentEnabled: false, amr },
-        }),
-        holdsPasskey: false,
-      };
+      return this.notRequired({ organizationId });
     }
-    const organization = await this.deps.accounts.getOrganizationSetting({ organizationId });
-    const required = this.deps.auth.offersTwoStepVerification() && organization.mfaRequired;
+    const amr = sessionId ? await this.deps.auth.findSessionAmr({ sessionId }) : null;
     const account = await this.deps.accounts.getAccountFactors({ userId });
     return {
       organizationId,
       organizationName: organization.name,
-      required,
+      required: true,
       satisfaction: satisfiesOrganizationMfaRequirement({
-        mfaRequired: required,
+        mfaRequired: true,
         evidence: { accountEnrollmentEnabled: account.accountEnrollmentEnabled, amr },
       }),
       holdsPasskey: account.passkeyCount > 0,
+    };
+  }
+
+  /** A missing organization reads as one that requires nothing: no existence oracle. */
+  private async findOrganizationSetting({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<OrganizationMfaSetting | null> {
+    try {
+      return await this.deps.accounts.getOrganizationSetting({ organizationId });
+    } catch (error) {
+      if (error instanceof OrganizationNotFoundError) return null;
+      throw error;
+    }
+  }
+
+  private notRequired({ organizationId }: { organizationId: string }): OrganizationMfaStanding {
+    return {
+      organizationId,
+      organizationName: null,
+      required: false,
+      satisfaction: { satisfied: true, by: "not_required" },
+      holdsPasskey: false,
     };
   }
 

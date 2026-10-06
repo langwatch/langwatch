@@ -15,13 +15,13 @@ import type { ActivityMonitorService } from "./ingestion-source-activity.service
 import type { IngestionSourceService } from "./ingestion-source.service.ts";
 
 /** One source as the CLI's Activity Monitor lists it. */
-export type GovernanceCliSourceSummary = Readonly<{
+type GovernanceCliSourceSummary = Readonly<{
   id: string;
   name: string;
   status: string;
 }>;
 
-export type GovernanceCliSourceHealth = Readonly<{
+type GovernanceCliSourceHealth = Readonly<{
   source: GovernanceCliSourceSummary;
   health: SourceHealthMetrics;
 }>;

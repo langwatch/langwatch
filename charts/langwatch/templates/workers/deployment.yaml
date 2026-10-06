@@ -78,6 +78,13 @@ spec:
         {{- with (coalesce .Values.workers.pod.annotations .Values.global.podAnnotations) }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+        {{- if .Values.app.telemetry.metrics.enabled }}
+        {{- /* What the langwatch-workers scrape job keeps on. The port is the
+               worker's health and metrics listener, the one the probes below
+               use. */}}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "2999"
+        {{- end }}
     spec:
       # Workers do not call the Kubernetes API, so don't mount the SA token.
       {{- with (include "langwatch.serviceAccountName" .) }}
@@ -168,11 +175,8 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
-          {{- $envFrom := concat (default (list) .Values.app.extraEnvFrom) (default (list) .Values.workers.extraEnvFrom) }}
-          {{- with $envFrom }}
-          envFrom:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+          {{- $extraEnvFrom := concat (default (list) .Values.app.extraEnvFrom) (default (list) .Values.workers.extraEnvFrom) }}
+          {{- include "langwatch.envFromWithOfflineDefaults" (dict "root" $ "extraEnvFrom" $extraEnvFrom) | nindent 10 }}
 
           # Probe the worker's HTTP listener (the metrics server port, 2999)
           # rather than just PID 1 liveness — an answered request proves the

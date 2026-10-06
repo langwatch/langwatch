@@ -6,13 +6,11 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import type {
-  TraceSpanContentDrop,
-  TraceSpanCostEnrichment,
-  TraceSpanPiiRedaction,
-  TraceSpanTokenEstimation,
-} from "../../app/trace.members.ts";
 import {
+  type TraceSpanContentDrop,
+  type TraceSpanCostEnrichment,
+  type TraceSpanPiiRedaction,
+  type TraceSpanTokenEstimation,
   EventingRecordSpanAdapter,
   type RecordSpanCommandOptions,
 } from "../record-span.commands.ts";

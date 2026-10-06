@@ -85,4 +85,26 @@ describe("GithubFeatureService.receiveWebhook", () => {
       );
     });
   });
+
+  describe("when the signed announcement is one this instance has nothing to do with", () => {
+    /** @scenario "Every announcement is acknowledged, applied or not" */
+    it("still acknowledges the delivery", async () => {
+      const { github } = harness({ webhookSecret: "real-secret" });
+      const body = JSON.stringify({
+        action: "opened",
+        installation: { id: 987654 },
+        pull_request: { number: 1, head: { ref: "feat/x", repo: { full_name: "acme/other" } } },
+        repository: { full_name: "acme/other" },
+      });
+
+      const receipt = await github.receiveWebhook({
+        rawBody: body,
+        signature: sign({ body, secret: "real-secret" }),
+        eventType: "pull_request",
+        deliveryId: "delivery-4",
+      });
+
+      expect(receipt).toEqual({ received: true });
+    });
+  });
 });

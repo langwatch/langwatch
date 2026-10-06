@@ -3,8 +3,8 @@
 The server-side runtime of the identity platform
 ([ADR-101](../../dev/docs/adr/101-identity-pipeline-and-identifiers.md),
 [ADR-115](../../dev/docs/adr/115-identity-ships-as-packages.md)), in the
-app-layer service/repository shape: **service classes over repository
-interfaces**, with no storage engine and no event-sourcing framework in the
+module's service/repository shape (ARCHITECTURE.md §3.2): **service classes
+over repository interfaces**, with no storage engine and no event-sourcing framework in the
 package.
 
 ```text
@@ -45,9 +45,8 @@ package.
 Nothing here reads the environment or a database. The write gate, the
 clock and the command-id minter arrive as closures; this package implements
 the five interfaces with Prisma and its event-sourcing pipeline
-(`repositories/prisma/`, `adapters/`), and
-`apps/api/src/app/api-trpc-collaborators.identity.composition.ts` composes
-every service once. The pure half — vocabulary, facts, the reducer, the
+(`repositories/prisma/`, `eventing/`), and the process container builds every
+service once from the module's registries (ARCHITECTURE.md §5). The pure half — vocabulary, facts, the reducer, the
 refusal errors — is
 [`@langwatch/identity-contract`](../contract/README.md).
 

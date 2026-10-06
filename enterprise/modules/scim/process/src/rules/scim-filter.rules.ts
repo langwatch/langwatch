@@ -6,7 +6,7 @@
  */
 
 /** Attributes a listing can actually match on. */
-export type ScimFilterAttribute = "userName" | "externalId" | "displayName";
+type ScimFilterAttribute = "userName" | "externalId" | "displayName";
 
 /** One `attribute eq "value"` term — the whole of what we honour. */
 export interface ScimFilterTerm {
@@ -14,7 +14,7 @@ export interface ScimFilterTerm {
   value: string;
 }
 
-export type ScimFilterParse =
+type ScimFilterParse =
   /** No filter, or one we can honour. `term` is null for "list everybody". */
   | { ok: true; term: ScimFilterTerm | null }
   /** A filter we will not answer. `detail` is customer-safe. */

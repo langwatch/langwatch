@@ -10,7 +10,6 @@ import {
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import type { TraceFullIo } from "../../app/trace.members.ts";
 import {
   applyTraceFullReadProtections,
   internalTraceFullReadProtections,
@@ -26,13 +25,14 @@ import {
   mapTraceMetadata,
   withoutEventReferences,
 } from "../../rules/trace-full-record.rules.ts";
+import type { TraceFullIo } from "../../services/trace-read-full-io.service.ts";
 import { TraceFullRecordRepository } from "../trace-full-record.repository.ts";
 import type { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
 import type {
   TraceClickHouseClient,
   TraceClickHouse,
 } from "./clickhouse.trace-member-client.repository.ts";
-import { chBoolean, chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
+import { chBoolean, chNumber, chString, chStringMap } from "./stored-span-row.mapper.ts";
 
 const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 const MAX_SPANS = 10_000;

@@ -5,7 +5,7 @@ import {
   type AnnotationScore,
 } from "@langwatch/annotation-contract";
 
-export type MemoryAnnotationQueue = AnnotationQueueRecord &
+type MemoryAnnotationQueue = AnnotationQueueRecord &
   Readonly<{
     userIds: readonly string[];
     scoreTypeIds: readonly string[];

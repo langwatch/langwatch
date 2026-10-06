@@ -6,8 +6,19 @@
 import { z } from "zod";
 
 import { AggregateTypeSchema } from "./aggregateType.ts";
-import { EventTypeSchema } from "./eventType.ts";
 import { TenantIdSchema } from "./tenantId.ts";
+
+/**
+ * Event type format: `<provenance>.<domain>.<aggregate-type>.<event-name>`,
+ * e.g. "lw.obs.trace.span_received". Applications register installed types
+ * in EventCatalogue.
+ */
+export const EventTypeSchema = z.string().trim().min(1);
+
+/**
+ * Strongly-typed event type identifiers. Applications register types in EventCatalogue.
+ */
+export type EventType = z.infer<typeof EventTypeSchema>;
 
 /**
  * Zod schema for event metadata base: `processingTraceparent` is the W3C

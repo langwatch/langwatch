@@ -26,7 +26,7 @@ import { mintVerificationToken, safeEqual, sha256Hex } from "../rules/pkce.rules
 import { newSsoConnectionCommandId } from "../rules/sso-connection-id.rules.ts";
 import type { SsoConnectionService } from "./sso-connection.service.ts";
 
-export interface SsoDomainCeremonyServiceDeps {
+interface SsoDomainCeremonyServiceDeps {
   connections: () => SsoConnectionService;
   reads: SsoConnectionReadRepository;
   proofs: SsoDomainProofChannel;
@@ -37,7 +37,7 @@ export interface SsoDomainCeremonyServiceDeps {
 }
 
 /** One domain, on one connection, at one administrator's hand. */
-export interface SsoDomainProofCommand {
+interface SsoDomainProofCommand {
   organizationId: string;
   connectionId: string;
   domain: string;
@@ -46,16 +46,14 @@ export interface SsoDomainProofCommand {
 
 /** What a claim did: verified at once by the licence, or waiting for a person when
  *  somebody else proved it first. */
-export interface SsoDomainClaimOutcome {
+interface SsoDomainClaimOutcome {
   waitsForReview: boolean;
   disputed: boolean;
   verified: boolean;
 }
 
 /** A ceremony already closed, or the record still to publish. */
-export type SsoDomainProofIssue =
-  | { proved: true }
-  | { proved: false; record: SelfServeIssuedDnsRecord };
+type SsoDomainProofIssue = { proved: true } | { proved: false; record: SelfServeIssuedDnsRecord };
 
 /**
  * The domain ceremony an administrator runs themselves (ADR-123, D05 tier 3).

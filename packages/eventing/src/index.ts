@@ -7,11 +7,14 @@ export type {
   EventingParticipation,
   FeatureEventing,
   FeatureEventingSetup,
+  OwnEventsAppend,
+  OwnEventStore,
   PriorEventsQuery,
   PriorEventsRead,
   ReadHintMap,
   ReadHintTarget,
 } from "./pipeline/feature-eventing.ts";
+export { PipelineEventStore, type OwnEventLog } from "./stores/pipelineEventStore.ts";
 
 // Commands
 export type { Command, CommandHandler, CommandHandlerResult } from "./commands/command.ts";
@@ -28,27 +31,11 @@ export { AggregateTypeSchema, type AggregateType } from "./domain/aggregateType.
 export { createEventCatalogue, defineAggregate, EventCatalogue } from "./domain/definitions.ts";
 export type { AggregateDefinition, EventDefinition } from "./domain/definitions.ts";
 export type { PipelineEventSchema } from "./domain/eventSchemas.ts";
-export type { EventType } from "./domain/eventType.ts";
 export type { TenantId } from "./domain/tenantId.ts";
 export { createTenantId, TenantIdSchema } from "./domain/tenantId.ts";
-export type { Event, Projection } from "./domain/types.ts";
+export type { Event, EventType, Projection } from "./domain/types.ts";
 export { EventMetadataBaseSchema, EventSchema, ProjectionSchema } from "./domain/types.ts";
 export type { ExecutionTarget, RetentionPolicy, RetentionPolicyResolver } from "./runtime.types.ts";
-export type {
-  EsKillSwitchKey,
-  KillSwitchComponent,
-  KillSwitchComponentSource,
-  KillSwitchComponentType,
-  KillSwitchDescriptor,
-  KillSwitchOptions,
-  KillSwitchQuery,
-} from "./kill-switch/index.ts";
-export {
-  generateKillSwitchKey,
-  isComponentKilled,
-  killSwitchDescriptorsFor,
-  KillSwitch,
-} from "./kill-switch/index.ts";
 export type { EventSourcingOptions } from "./eventSourcing.ts";
 // Runtime
 export { EventSourcing } from "./eventSourcing.ts";

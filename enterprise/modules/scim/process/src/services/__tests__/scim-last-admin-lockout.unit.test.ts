@@ -15,6 +15,7 @@ import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import type { ScimRepository } from "../../repositories/scim.repository.ts";
@@ -111,6 +112,7 @@ function stack({ provenOffboarding, refuses }: { provenOffboarding: boolean; ref
     writer,
     organization,
     service: ScimService.create({
+      connections: HeldConnectionsFake.of([CONNECTION]),
       prisma: repository,
       writer,
       users: userService,

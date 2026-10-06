@@ -3,7 +3,7 @@
  */
 
 import type { WireOf } from "@langwatch/api/web";
-import { UiSlot } from "@langwatch/browser-host/slots";
+import { Lent } from "@langwatch/browser-host/lent";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -19,6 +19,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ContactSalesToken } from "@langwatch/enterprise-billing-contract";
 import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
 
 /** An audit row as the browser receives it: its instant is an ISO string. */
@@ -135,7 +136,7 @@ export default function AuditLogScreen() {
           </Alert.Content>
         </Alert.Root>
         <Box width="full">
-          <UiSlot name="contactSales" props={{}} />
+          <Lent of={ContactSalesToken} props={{}} />
         </Box>
       </VStack>
     );

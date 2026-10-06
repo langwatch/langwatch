@@ -77,7 +77,7 @@ export const AZURE_COST_REREAD_DAYS = 7;
  * is what makes this cost nothing to schedule: there is no new timer, only a
  * different window on a run that was going to happen anyway.
  */
-export const AZURE_COST_DEEP_READ_DAYS = 30;
+const AZURE_COST_DEEP_READ_DAYS = 30;
 
 /**
  * The meter categories this source treats as AI spend.
@@ -245,7 +245,7 @@ export interface AzureDailyCost {
   currencyCode: string;
 }
 
-export interface AzureCostRead {
+interface AzureCostRead {
   days: AzureDailyCost[];
   /**
    * Rows that could not be read. Counted rather than dropped silently: a
@@ -284,7 +284,7 @@ export interface AzureCostRead {
  * single row mixes numbers and strings and one bad row must not cost the rest
  * of the reply.
  */
-export const azureCostQueryResponseSchema = z.object({
+const azureCostQueryResponseSchema = z.object({
   properties: z.object({
     columns: z.array(z.object({ name: z.string() })).default([]),
     rows: z.array(z.array(z.unknown())).default([]),
@@ -305,7 +305,7 @@ const DEFAULT_CURRENCY_CODE = "USD";
  * refused rather than silently normalised into a neighbouring day and filed
  * under the wrong bill.
  */
-export function convertAzureUsageDateToDay(packed: unknown): string | null {
+function convertAzureUsageDateToDay(packed: unknown): string | null {
   const value = typeof packed === "number" ? packed : Number(packed);
   if (!Number.isInteger(value) || value < 1_000_101 || value > 99_991_231) {
     return null;
@@ -584,7 +584,7 @@ export const AZURE_REPLY_UNREADABLE = "azure_reply_unreadable" as const;
  * a discriminated union because callers read `outcome` first and the field is
  * only meaningful on the two that are not `priced`.
  */
-export interface AzureCostReadVerdict {
+interface AzureCostReadVerdict {
   outcome: "priced" | "held" | "failed";
   code?: typeof AZURE_NO_AI_METERS | typeof AZURE_REPLY_UNREADABLE;
   retryable?: boolean;
@@ -616,7 +616,7 @@ export function azureCostReadVerdict({ read }: { read: AzureCostRead }): AzureCo
 }
 
 /** The verb these events carry, so a reader can tell them from a conversation. */
-export const AZURE_COST_ACTION = "cost_report" as const;
+const AZURE_COST_ACTION = "cost_report" as const;
 
 /** ISO 4217 for the currency `costMinor` is already denominated in as dollars. */
 const USD = "USD";

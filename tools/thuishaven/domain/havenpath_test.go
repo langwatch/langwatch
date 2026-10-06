@@ -24,7 +24,7 @@ func TestShellRCPathPerShell(t *testing.T) {
 		{"an unknown shell yields nothing to edit", "/bin/nu", "/home/dev", "", "", ""},
 		{"no shell at all yields nothing to edit", "", "/home/dev", "", "", ""},
 	} {
-		got := ShellRCPath(ShellKindOf(tc.shell), tc.home, tc.zdotdir, tc.xdgConfig)
+		got := ShellRCPath(ShellKindOf(tc.shell), ShellDirs{Home: tc.home, ZDotDir: tc.zdotdir, XDGConfig: tc.xdgConfig})
 		if got != tc.want {
 			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)
 		}

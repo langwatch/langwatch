@@ -128,6 +128,45 @@ describe("EventExplorerClickHouseRepository.searchAggregates", () => {
     });
   });
 
+  describe("given a process holding the install's shared endpoint", () => {
+    describe("when an operator searches for an aggregate", () => {
+      /** @scenario "The operator searches the event log through the composed explorer" */
+      it("reads event_log and returns the matching aggregates", async () => {
+        const statements: QueryRequest[] = [];
+        const clickhouse = clickHouseQueryClientDouble({
+          query: async (request: QueryRequest) => {
+            statements.push(request);
+            return {
+              rows: [
+                {
+                  aggregateId: "trace-1",
+                  aggregateType: "trace",
+                  tenantId: "project-1",
+                  eventCount: "3",
+                  lastEventTime: "2026-10-06 10:00:00",
+                },
+              ],
+            };
+          },
+        });
+        const repo = EventExplorerClickHouseRepository.create({ clickhouse });
+
+        const found = await repo.searchAggregates({ query: "trace-1" });
+
+        expect(capturedQuery(statements).query).toContain("FROM event_log");
+        expect(found).toEqual([
+          {
+            aggregateId: "trace-1",
+            aggregateType: "trace",
+            tenantId: "project-1",
+            eventCount: 3,
+            lastEventTime: "2026-10-06 10:00:00",
+          },
+        ]);
+      });
+    });
+  });
+
   describe("given the upfront guard is satisfied but no sinceMs is supplied", () => {
     describe("when searchAggregates is called", () => {
       it("stays unbounded on time so non-UI callers (integration tests, scripts) can scan full history knowingly", async () => {

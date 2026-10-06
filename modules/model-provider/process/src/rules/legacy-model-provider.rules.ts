@@ -4,12 +4,9 @@
 import {
   customModelEntrySchema,
   type CustomModelEntry,
-  getAllModels,
-  pickParameterConstraints,
   getSchemaShape,
   modelProviders,
   type Model,
-  type ModelMetadataForFrontend,
   type ModelProviderExecution,
   type ModelProviderApi,
   type ModelProviderSummary,
@@ -142,13 +139,6 @@ export function toLegacyExecutionProvider(
   return toLegacyExecutionShape(provider);
 }
 
-/** Adapts a canonical summary DTO, whose credentials have already been masked. */
-export function toLegacyProviderSummary(
-  provider: ModelProviderSummary,
-): LegacyModelProviderExecution {
-  return toLegacyExecutionShape(provider);
-}
-
 export const getProjectModelProviders = async (
   service: Pick<ModelProviderApi, "getExecutionProviders">,
   projectId: string,
@@ -160,71 +150,6 @@ export const getProjectModelProviders = async (
       toLegacyExecutionProvider(value),
     ]),
   );
-};
-
-/**
- * Get model metadata for all models, formatted for frontend consumption
- */
-export const getModelMetadataForFrontend = (): Record<string, ModelMetadataForFrontend> => {
-  const allModels = getAllModels();
-
-  return Object.fromEntries(
-    Object.entries(allModels).map(([id, model]) => [
-      id,
-      {
-        id: model.id,
-        name: model.name,
-        provider: model.provider,
-        supportedParameters: model.supportedParameters,
-        contextLength: model.contextLength,
-        maxCompletionTokens: model.maxCompletionTokens,
-        defaultParameters: model.defaultParameters,
-        supportsImageInput: model.supportsImageInput,
-        supportsAudioInput: model.supportsAudioInput,
-        pricing: model.pricing,
-        reasoningConfig: model.reasoningConfig,
-        parameterConstraints: pickParameterConstraints(model.id),
-      },
-    ]),
-  );
-};
-
-/**
- * Merges custom model entries from providers into the model metadata record.
- * This allows consumers like LLMConfigPopover to look up custom model parameters
- * by their full model ID (e.g., "openai/my-model").
- */
-export const mergeCustomModelMetadata = (
-  existingMetadata: Record<string, ModelMetadataForFrontend>,
-  providers: Record<string, LegacyModelProviderExecution>,
-): Record<string, ModelMetadataForFrontend> => {
-  const merged = { ...existingMetadata };
-
-  for (const [providerKey, providerConfig] of Object.entries(providers)) {
-    const allCustomModels = [
-      ...(providerConfig.customModels ?? []),
-      ...(providerConfig.customEmbeddingsModels ?? []),
-    ];
-
-    for (const entry of allCustomModels) {
-      const fullId = `${providerKey}/${entry.modelId}`;
-      merged[fullId] = {
-        id: fullId,
-        name: entry.displayName,
-        provider: providerKey,
-        supportedParameters: entry.supportedParameters ?? [],
-        contextLength: 0,
-        maxCompletionTokens: entry.maxTokens ?? null,
-        defaultParameters: null,
-        supportsImageInput: entry.multimodalInputs?.includes("image") ?? false,
-        supportsAudioInput: entry.multimodalInputs?.includes("audio") ?? false,
-        pricing: { inputCostPerToken: 0, outputCostPerToken: 0 },
-        parameterConstraints: pickParameterConstraints(fullId),
-      };
-    }
-  }
-
-  return merged;
 };
 
 const getModelOrDefaultEnvKey = ({

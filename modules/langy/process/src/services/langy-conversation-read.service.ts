@@ -26,7 +26,7 @@ import {
 } from "../rules/langy-conversation-shape.rules.ts";
 import {
   pickLatestControlRequest,
-  type LatestControlRequest,
+  type LatestControlRequestReading,
 } from "../rules/langy-local-control-request-state.rules.ts";
 import type { LangyConversationEventsReader } from "./langy-conversation.service.ts";
 
@@ -279,8 +279,8 @@ export class LangyConversationReadService {
   }: {
     projectId: string;
     conversationId: string;
-  }): Promise<LatestControlRequest | null> {
-    if (!this.deps.events) return null;
+  }): Promise<LatestControlRequestReading> {
+    if (!this.deps.events) return { kind: "no_request_recorded" };
     const all = await this.deps.events.getEventsOccurredSince({
       aggregateId: conversationId,
       context: { tenantId: createTenantId(projectId) },

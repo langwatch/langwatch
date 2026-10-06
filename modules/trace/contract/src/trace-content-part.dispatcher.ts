@@ -2,8 +2,7 @@ import {
   decodeOpenAiFilePayloadToBinaryPart,
   mapMediaTypeToAudioFormat,
 } from "./trace-content-part.file-decoder.ts";
-import { toMediaPart } from "./trace-content-part.provider-source.ts";
-import { parseRecord } from "./trace-content-part.record-schema.ts";
+import { parseRecord, toMediaPart } from "./trace-content-part.provider-source.ts";
 import type { AsyncContentPartVisitor, ContentPartVisitor } from "./trace-content-part.types.ts";
 
 /** The tool name a `tool_use` / `tool_call` part carries, under either spelling. */
@@ -230,4 +229,11 @@ function extractImageUrlFromPart(o: Record<string, unknown>): string | null {
   if (typeof carrier === "string" && carrier) return carrier;
   const record = parseRecord(carrier);
   return record && typeof record.url === "string" ? record.url : null;
+}
+
+export async function visitContentPartAsync<R>(
+  part: unknown,
+  visitor: AsyncContentPartVisitor<R>,
+): Promise<R | undefined> {
+  return visitAnyContentPart(part, visitor);
 }

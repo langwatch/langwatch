@@ -6,12 +6,12 @@ import { DispatchError } from "@langwatch/eventing";
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
+import type { IngestionPullMetricsSink } from "../ingestion-pull-metrics.service.ts";
 import type {
-  IngestionPullMetricsSink,
   IngestionPullOutcomeChannel,
   IngestionPullRun,
   IngestionPullRunResult,
-} from "../../app/governance.members.ts";
+} from "../ingestion-pull.service.ts";
 import { IngestionPullService } from "../ingestion-pull.service.ts";
 
 type Failed = Parameters<IngestionPullOutcomeChannel["failed"]>[0];

@@ -41,12 +41,16 @@ Feature: The observability stack runs without a container runtime
       Then the native tier is used anyway
       And pinning "container" on a machine with no runtime fails saying why
 
+    # Gap: the native observability tier was never built and main has none; only the container stack and LANGWATCH_HAVEN_OBS=0 exist.
+    @unimplemented
     Scenario: Turning observability off still turns it off
       When LANGWATCH_HAVEN_OBS is "0"
       Then no tier is selected and nothing is started
 
   Rule: The native tier presents the same endpoints as the container
 
+    # Gap: the native observability tier was never built and main has none; only the container stack and LANGWATCH_HAVEN_OBS=0 exist.
+    @unimplemented
     Scenario: One OTLP endpoint, on the same port
       Given the native tier is running
       Then OTLP over HTTP and gRPC answer on the ports the container used
@@ -54,11 +58,15 @@ Feature: The observability stack runs without a container runtime
       # The app, the Go services and browser telemetry all export to one
       # endpoint. A tier that moved it would be a tier that broke them.
 
+    # Gap: the native observability tier was never built and main has none; only the container stack and LANGWATCH_HAVEN_OBS=0 exist.
+    @unimplemented
     Scenario: Grafana can query both stores
       Given the native tier is running
       Then Grafana is provisioned with a Loki datasource and a Prometheus one
       And neither is named Tempo, because there is nothing behind it
 
+    # Gap: the native observability tier was never built and main has none; only the container stack and LANGWATCH_HAVEN_OBS=0 exist.
+    @unimplemented
     Scenario: Profiling is off, not broken
       Given the native tier is running
       Then no Pyroscope endpoint is published
@@ -66,12 +74,16 @@ Feature: The observability stack runs without a container runtime
 
   Rule: Traces are refused honestly, not dropped quietly
 
+    # Gap: the native observability tier was never built and main has none; only the container stack and LANGWATCH_HAVEN_OBS=0 exist.
+    @unimplemented
     Scenario: Spans are accepted and discarded
       Given the native tier is running
       When a service exports a span
       Then the export succeeds rather than erroring the exporter
       And the span is not stored
 
+    # Gap: the native observability tier was never built and main has none; only the container stack and LANGWATCH_HAVEN_OBS=0 exist.
+    @unimplemented
     Scenario: The developer is told once, where they will see it
       When the native tier starts
       Then it says logs and metrics are collected and traces are not
@@ -79,6 +91,8 @@ Feature: The observability stack runs without a container runtime
 
   Rule: What the tier needs is something haven install can offer
 
+    # Gap: the native observability tier was never built and main has none; only the container stack and LANGWATCH_HAVEN_OBS=0 exist.
+    @unimplemented
     Scenario: The native tier's formulae are a prerequisite haven knows
       When the developer runs "haven install --list"
       Then the native observability stack is listed as an optional prerequisite
@@ -86,17 +100,23 @@ Feature: The observability stack runs without a container runtime
 
   Rule: The stack is shared, capped and disposable, exactly as the container was
 
+    # Gap: the native observability tier was never built and main has none; only the container stack and LANGWATCH_HAVEN_OBS=0 exist.
+    @unimplemented
     Scenario: A second worktree reuses the running stack
       Given the native tier is already running for another worktree
       When a second stack comes up
       Then it exports to the same processes rather than starting a second set
 
+    # Gap: the native observability tier was never built and main has none; only the container stack and LANGWATCH_HAVEN_OBS=0 exist.
+    @unimplemented
     Scenario: Retention is capped
       Given the native tier is running
       Then Loki and Prometheus are configured with haven's retention window
       # A debugging window, not an archive — the same promise the container
       # made by keeping no volume.
 
+    # Gap: the native observability tier was never built and main has none; only the container stack and LANGWATCH_HAVEN_OBS=0 exist.
+    @unimplemented
     Scenario: Stopping it reclaims what it collected
       When the observability stack is stopped
       Then every native process is stopped

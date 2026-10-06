@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 )
 
@@ -52,44 +53,54 @@ func splitNames(value string) []string {
 // replaces one, name+=flags appends flags to one already in the suite.
 func suiteTools(names, specs []string) ([]*tool, error) {
 	var tools []*tool
-	find := func(name string) *tool {
-		for _, tool := range tools {
-			if tool.name == name {
-				return tool
-			}
-		}
-		return nil
-	}
 	for _, name := range names {
-		index := -1
-		for candidate := range defaultTools {
-			if defaultTools[candidate].name == name {
-				index = candidate
-			}
+		copied, err := defaultTool(name)
+		if err != nil {
+			return nil, err
 		}
-		if index < 0 {
-			return nil, fmt.Errorf("-tools: no default tool %q (have %s)", name, strings.Join(allNames(), ", "))
-		}
-		copied := defaultTools[index]
-		tools = append(tools, &copied)
+		tools = append(tools, copied)
 	}
 	for _, spec := range specs {
-		name, command, ok := strings.Cut(spec, "=")
-		name, extend := strings.CutSuffix(name, "+")
-		if !ok || name == "" || command == "" {
-			return nil, fmt.Errorf("%q is not name=command or name+=flags", spec)
+		var err error
+		if tools, err = applySpec(tools, spec); err != nil {
+			return nil, err
 		}
-		existing := find(name)
-		switch {
-		case extend && existing == nil:
-			return nil, fmt.Errorf("%s+=: no tool %q in the suite", name, name)
-		case extend:
-			existing.command += " " + command
-		case existing != nil:
-			existing.command, existing.binary = command, ""
-		default:
-			tools = append(tools, &tool{name: name, command: command})
+	}
+	return tools, nil
+}
+
+// defaultTool is a copy of the last default tool called name.
+func defaultTool(name string) (*tool, error) {
+	index := -1
+	for candidate := range defaultTools {
+		if defaultTools[candidate].name == name {
+			index = candidate
 		}
+	}
+	if index < 0 {
+		return nil, fmt.Errorf("-tools: no default tool %q (have %s)", name, strings.Join(allNames(), ", "))
+	}
+	copied := defaultTools[index]
+	return &copied, nil
+}
+
+// applySpec applies one name=command or name+=flags spec to tools.
+func applySpec(tools []*tool, spec string) ([]*tool, error) {
+	name, command, ok := strings.Cut(spec, "=")
+	name, extend := strings.CutSuffix(name, "+")
+	if !ok || name == "" || command == "" {
+		return nil, fmt.Errorf("%q is not name=command or name+=flags", spec)
+	}
+	index := slices.IndexFunc(tools, func(each *tool) bool { return each.name == name })
+	switch {
+	case extend && index < 0:
+		return nil, fmt.Errorf("%s+=: no tool %q in the suite", name, name)
+	case extend:
+		tools[index].command += " " + command
+	case index >= 0:
+		tools[index].command, tools[index].binary = command, ""
+	default:
+		tools = append(tools, &tool{name: name, command: command})
 	}
 	return tools, nil
 }

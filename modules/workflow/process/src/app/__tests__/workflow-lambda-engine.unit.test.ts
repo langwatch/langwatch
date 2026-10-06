@@ -13,9 +13,6 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -24,9 +21,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
 import type { WorkflowRepositories } from "../../repositories/workflow-repositories.registry.ts";
+import {
+  buildStudioLambdaConfig,
+  studioLambdaConfigFingerprint,
+} from "../../rules/nlp-lambda-config.rules.ts";
 import { NLP_LAMBDA_ARN_CACHE_PREFIX } from "../../services/nlp-lambda-runtime.service.ts";
 import { WorkflowModule } from "../workflow.app.ts";
-import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 const lambda = vi.hoisted(() => {
   const sent: unknown[] = [];
@@ -82,17 +82,7 @@ function appWith({
   fleetSecret: string;
   repositories?: WorkflowRepositories;
 }): Promise<WorkflowModule> {
-  const members = createWorkflowTestInfrastructure();
-
   return WorkflowModule.create({
-    members: {
-      ...members,
-      prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-      nlpCodeBlockTimeoutSeconds: void 0,
-      nlpInternalSecret: void 0,
-      nlpServiceUrl: "http://engine.test:5561",
-      publicBaseUrl: "https://app.test",
-    },
     dependencies: {
       evaluators: createApiFixture<EvaluatorApi>({}, "EvaluatorApi"),
       modelProviders: createApiFixture<ModelProviderApi>(
@@ -102,21 +92,47 @@ function appWith({
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
       apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
-      projects: createApiFixture<ProjectApi>({}, "ProjectApi"),
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
       monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
       secrets: createApiFixture<SecretApi>({}, "SecretApi"),
-      organizations: createApiFixture<OrganizationApi>({}, "OrganizationApi"),
     },
     config: {
+      nlpServiceUrl: "http://engine.test:5561",
       stagingThresholdBytes: void 0,
       stagingTtlSeconds: 600,
+      relayTurnCeilingMs: void 0,
+      publicBaseUrl: "https://app.test",
+      nlpCodeBlockTimeoutSeconds: void 0,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
-    secrets: new ScopedSecrets(async (_handle, build) => build(fleetSecret)),
+    secrets: new ScopedSecrets(async (handle, build) =>
+      build(handle === WorkflowModule.secrets.nlpLambdaFleet ? fleetSecret : undefined),
+    ),
     repositories,
   });
+}
+
+/** The fingerprint the app derives from `fleet` and the config above. */
+function fleetFingerprint(): string {
+  return studioLambdaConfigFingerprint(
+    buildStudioLambdaConfig({
+      fields: {
+        region: fleet.AWS_REGION,
+        accessKeyId: fleet.AWS_ACCESS_KEY_ID,
+        secretAccessKey: fleet.AWS_SECRET_ACCESS_KEY,
+        roleArn: fleet.role_arn,
+        imageUri: fleet.image_uri,
+        cacheBucket: fleet.cache_bucket,
+        subnetIds: fleet.subnet_ids,
+        securityGroupIds: fleet.security_group_ids,
+      },
+      langwatchEndpoint: "https://app.test",
+      codeBlockTimeoutRawValue: undefined,
+      stagingThresholdBytesRawValue: undefined,
+      stagingTtlSecondsRawValue: 600,
+    }),
+  );
 }
 
 const aliveEvent = { type: "is_alive", payload: {} } as const;
@@ -138,7 +154,11 @@ describe("a deployment that describes its per-project fleet", () => {
     const repositories = MemoryWorkflowRepositories.create();
     await repositories.nlpLambdaArns.set({
       key: `${NLP_LAMBDA_ARN_CACHE_PREFIX}project_1`,
-      value: JSON.stringify({ arn: FUNCTION_ARN, imageUri: fleet.image_uri }),
+      value: JSON.stringify({
+        arn: FUNCTION_ARN,
+        imageUri: fleet.image_uri,
+        configFingerprint: fleetFingerprint(),
+      }),
       ttlSeconds: 600,
     });
     const app = await appWith({ fleetSecret: JSON.stringify(fleet), repositories });
@@ -186,5 +206,19 @@ describe("a deployment that names a fleet it does not describe", () => {
     ).rejects.toThrow(/fleet configuration is missing required fields/);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(lambda.sent).toEqual([]);
+  });
+});
+
+describe("when a scenario asks whether this deployment has per-project engines", () => {
+  it("answers yes once a fleet is described", async () => {
+    const app = await appWith({ fleetSecret: JSON.stringify(fleet) });
+
+    expect(app.hasPerProjectEngines()).toBe(true);
+  });
+
+  it("answers yes for a named but unusable fleet, so the turn relays and refuses by name", async () => {
+    const app = await appWith({ fleetSecret: "{" });
+
+    expect(app.hasPerProjectEngines()).toBe(true);
   });
 });

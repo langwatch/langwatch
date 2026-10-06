@@ -8,7 +8,7 @@ import type { AuthzPrincipalRef, CollectedBinding } from "@langwatch/authz-contr
 import type { Instant } from "@langwatch/time";
 
 /** OrganizationUser.role, or null when no membership row exists. */
-export type OrganizationRole = "ADMIN" | "MEMBER" | "EXTERNAL";
+export type OrganizationRole = "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
 
 /**
  * OrganizationUser row: role + disabled flag. Both are facts; collector
@@ -56,7 +56,7 @@ type FindManyDelegate = {
  * but generated client types and values never cross this package boundary.
  */
 export type AuthzDatabase = Readonly<{
-  organizationUser: FindFirstDelegate;
+  organizationUser: FindFirstDelegate & FindManyDelegate;
   roleBinding: FindManyDelegate;
   teamUser: FindManyDelegate;
   customRole: FindManyDelegate;
@@ -82,14 +82,14 @@ export abstract class ScopeLineageRepository {
   // mock built to this class and assert on these members via
   // `expect(...).toHaveBeenCalledWith`, which is unsafe against a
   // method-shorthand member under `unbound-method`.
-  /** A project's team + organization, or null when the project is unknown. */
+  /** A project's team + organization, or null when the project is unknown or archived. */
   abstract findProjectLineage: (args: {
     projectId: string;
   }) => Promise<{ teamId: string; organizationId: string } | null>;
-  /** A team's organization, or null when the team is unknown. */
+  /** A team's organization, personal flag and name, or null when the team is unknown. */
   abstract findTeamOrganization: (args: {
     teamId: string;
-  }) => Promise<{ organizationId: string } | null>;
+  }) => Promise<{ organizationId: string; isPersonal?: boolean; name?: string } | null>;
 }
 
 export abstract class AuthzReadRepository extends ScopeLineageRepository {

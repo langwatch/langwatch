@@ -4,8 +4,19 @@ import type {
   LogPreparation,
 } from "@langwatch/log-contract";
 
-import type { LogPreparer } from "../app/log.members.ts";
 import type { CanonicalLogRecordRepository } from "../repositories/canonical-log-record.repository.ts";
+
+export type LogPreparationInput = {
+  tenantId: string;
+  organizationId: string;
+  request: unknown;
+  piiRedactionLevel: LogPiiRedactionLevel;
+  acceptedAt?: number;
+};
+
+export interface LogPreparer {
+  prepare(input: LogPreparationInput): Promise<LogPreparation>;
+}
 
 /** Canonical log preparation and the trace-scoped read, over one repository. */
 export class LogService {

@@ -24,7 +24,7 @@ import type { SignUpVerificationTokenRepository } from "../repositories/signup-v
  */
 
 /** What an address already is to us: no account, an unconfirmed one, or a confirmed one. */
-export type SignUpAddressState = "unknown" | "awaiting_confirmation" | "confirmed";
+type SignUpAddressState = "unknown" | "awaiting_confirmation" | "confirmed";
 
 export interface SignUpVerificationDeps {
   tokens: SignUpVerificationTokenRepository;
@@ -38,7 +38,7 @@ export interface SignUpVerificationDeps {
   /** Whether the installation admits a new account for this address. */
   checkSignUp: OrganizationApi["checkSignUp"];
   /** Builds the link the email carries, from a minted token. */
-  buildVerificationUrl(input: { token: string }): string;
+  buildVerificationUrl(input: { token: string; callbackUrl?: string }): string;
   /** No email configured at all; a named but unusable provider is a misconfiguration, not this. */
   isEmailUnconfigured(): Promise<boolean>;
   now?: () => Instant;
@@ -109,8 +109,15 @@ export class SignUpVerificationService {
   }
 
   /** Sends a fresh confirmation link; asking twice sends twice and both links work. */
-  async requestVerification({ email }: { email: string }): Promise<void> {
-    await this.issueLink({ email, passwordHash: null });
+  async requestVerification({
+    email,
+    callbackUrl,
+  }: {
+    email: string;
+    /** Rides on the link, so a fresh tab lands where the first one was headed. */
+    callbackUrl?: string;
+  }): Promise<void> {
+    await this.issueLink({ email, passwordHash: null, callbackUrl });
   }
 
   /**
@@ -120,8 +127,10 @@ export class SignUpVerificationService {
    */
   async requestNewAccountVerification({
     email,
+    callbackUrl,
   }: {
     email: string;
+    callbackUrl?: string;
   }): Promise<SignUpVerificationRequest> {
     const decision = await this.deps.route({ identifier: email, breakGlass: false });
     if (isOrganizationManagedDecision(decision)) {
@@ -153,7 +162,7 @@ export class SignUpVerificationService {
     if (withoutEmail) {
       return { sent: false, addressProof: await this.issueUnconfirmedAddressProof({ email }) };
     }
-    await this.requestVerification({ email });
+    await this.requestVerification({ email, callbackUrl });
     return { sent: true };
   }
 
@@ -289,9 +298,11 @@ export class SignUpVerificationService {
   private async issueLink({
     email,
     passwordHash,
+    callbackUrl,
   }: {
     email: string;
     passwordHash: string | null;
+    callbackUrl?: string;
   }): Promise<void> {
     const normalized = normalizeIdentifierValue(email);
     const token = this.mintToken();
@@ -304,7 +315,7 @@ export class SignUpVerificationService {
 
     await this.deps.mailer.sendVerificationLink({
       email: normalized,
-      verificationUrl: this.deps.buildVerificationUrl({ token }),
+      verificationUrl: this.deps.buildVerificationUrl({ token, callbackUrl }),
     });
   }
 

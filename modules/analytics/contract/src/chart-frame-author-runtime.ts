@@ -4,6 +4,7 @@
  * bare specifier is rewritten, and a blob URL `import()` loads the module.
  */
 
+import { buildChartFrameImportMap } from "./chart-frame-import-map.ts";
 import {
   CHART_FRAME_BUILTIN_MODULES,
   resolveImportSpecifier,
@@ -18,6 +19,13 @@ export function buildAuthorRuntimeScript(): string {
   // renames the source function can't desync it from the call site below.
   var resolveImportSpecifier = ${resolveImportSpecifier.toString()};
   var BUILTINS = ${JSON.stringify(CHART_FRAME_BUILTIN_MODULES)};
+  // A built-in the widget itself imports is pointed straight at the module the
+  // import map names, so it loads even where the engine ignored the map.
+  var BUILTIN_URLS = ${JSON.stringify(buildChartFrameImportMap().imports)};
+  function resolve(specifier) {
+    var resolved = resolveImportSpecifier(specifier, BUILTINS);
+    return Object.prototype.hasOwnProperty.call(BUILTIN_URLS, resolved) ? BUILTIN_URLS[resolved] : resolved;
+  }
 
   function showError(title, detail) {
     var panel = document.getElementById("lw-compile-error");
@@ -77,12 +85,12 @@ export function buildAuthorRuntimeScript(): string {
   }
 
   // Rewrites the source specifier of a static import/export declaration in
-  // place, so any bare package points at esm.sh (React externalised) while the
-  // frame's built-ins and any URL/path are left untouched.
+  // place: a bare package points at esm.sh (React externalised), a built-in at
+  // the frame's own module, and any URL/path is left untouched.
   function rewrite(path) {
     var src = path.node.source;
     if (src && typeof src.value === "string") {
-      src.value = resolveImportSpecifier(src.value, BUILTINS);
+      src.value = resolve(src.value);
     }
   }
 
@@ -91,7 +99,7 @@ export function buildAuthorRuntimeScript(): string {
   function rewriteDynamicImport(path) {
     var args = path.node.arguments;
     if (args && args.length > 0 && args[0].type === "StringLiteral") {
-      args[0].value = resolveImportSpecifier(args[0].value, BUILTINS);
+      args[0].value = resolve(args[0].value);
     }
   }
 
@@ -122,8 +130,8 @@ export function buildAuthorRuntimeScript(): string {
           ["typescript", { isTSX: true, allExtensions: true }]
         ],
         // ESM out (no transform-modules-commonjs): the import/export syntax
-        // stays, so the compiled module's imports resolve through the frame's
-        // import map when it is loaded below.
+        // stays, and an esm.sh package's own "react" import resolves through
+        // the frame's import map when the module is loaded below.
         plugins: [{
           visitor: {
             ImportDeclaration: rewrite,

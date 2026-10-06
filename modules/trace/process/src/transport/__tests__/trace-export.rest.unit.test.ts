@@ -3,22 +3,14 @@
  * authenticated actor and converts the prepared bytes into a download.
  * @vitest-environment node
  */
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { traceExportRest } from "../trace-export.rest.ts";
-
-const boundaryErrorHandler: RestErrorHandler = (error, context) => {
-  if (HandledError.isHandled(error)) {
-    return context.json({ code: error.code }, (error.httpStatus ?? 500) as ContentfulStatusCode);
-  }
-  return context.json({ error: "internal_server_error" }, 500);
-};
 
 async function* downloadStream(contents: string): AsyncGenerator<Uint8Array> {
   const encoder = new TextEncoder();
@@ -55,7 +47,7 @@ function buildApi({
   });
   const hono = runtime.mount(traceExportRest.router(), {
     app: () => app,
-    onError: boundaryErrorHandler,
+    onError: canonicalErrorResponse,
   });
 
   return {

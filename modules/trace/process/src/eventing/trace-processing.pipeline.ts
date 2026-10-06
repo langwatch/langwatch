@@ -9,12 +9,9 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
   type TraceProcessingEvent,
   type TraceSummaryData,
-  spanReceivedEventSchema,
-  originResolvedEventSchema,
 } from "@langwatch/trace-contract";
 
 import type { TraceModule } from "../app/trace.app.ts";
-import type { TraceProcessingPipelineDefinition } from "../app/trace.members.ts";
 import {
   CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
   CUSTOM_EVAL_SYNC_DELAY_MS,
@@ -22,14 +19,11 @@ import {
   hasSyncableEvaluations,
 } from "./custom-evaluation-sync.subscriber.ts";
 import {
-  DEFERRED_ORIGIN_INITIAL_STATE,
-  DEFERRED_ORIGIN_PROCESS_NAME,
-  deferredOriginStateSchema,
-  deferredOriginWake,
-  onOriginResolvedDisarm,
-  onSpanReceivedArmOrigin,
-  resolveDeferredOriginIntentSchema,
-} from "./deferred-origin.process.ts";
+  DEFERRED_ORIGIN_DEDUP,
+  DEFERRED_ORIGIN_DELAY_MS,
+  DEFERRED_ORIGIN_SUBSCRIBER_NAME,
+  needsOriginResolution,
+} from "./deferred-origin.subscriber.ts";
 import {
   EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
   EXPERIMENT_METRICS_SYNC_DELAY_MS,
@@ -42,7 +36,10 @@ import {
   projectMetadataGroupKey,
 } from "./project-metadata.subscriber.ts";
 import { SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS } from "./span-storage-broadcast.subscriber.ts";
-import type { EventingTracePipelineAdapter } from "./trace-processing-projections.pipeline.ts";
+import type {
+  TraceProcessingPipelineDefinition,
+  EventingTracePipelineAdapter,
+} from "./trace-processing-projections.pipeline.ts";
 import { TRACE_UPDATE_BROADCAST_WINDOW_MS } from "./trace-update-broadcast.subscriber.ts";
 import {
   TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
@@ -73,22 +70,24 @@ interface TraceProcessingReactions {
   broadcastDisabled: boolean;
 }
 
-/** The consuming definition: projections, main's subscribers and the deferred-origin manager. */
+/** The consuming definition: projections and main's subscribers, deferred origin included. */
 export function buildTraceProcessingConsumer(
   projections: ReturnType<EventingTracePipelineAdapter["build"]>,
   reactions: TraceProcessingReactions,
 ): TraceProcessingPipelineDefinition {
   return projections
-    .withProcessManager(DEFERRED_ORIGIN_PROCESS_NAME, (pm) =>
-      pm
-        .state(deferredOriginStateSchema, DEFERRED_ORIGIN_INITIAL_STATE)
-        .intent("resolveDeferredOrigin", resolveDeferredOriginIntentSchema, (payload) =>
-          reactions.resolveDeferredOrigin(payload),
-        )
-        .on(spanReceivedEventSchema, onSpanReceivedArmOrigin)
-        .on(originResolvedEventSchema, onOriginResolvedDisarm)
-        .onWake(deferredOriginWake),
-    )
+    .withProjectionSubscriber(DEFERRED_ORIGIN_SUBSCRIBER_NAME, {
+      fold: "traceSummary",
+      events: [SPAN_RECEIVED_EVENT_TYPE],
+      when: (event, context) => needsOriginResolution({ event, foldState: context.state }),
+      delay: DEFERRED_ORIGIN_DELAY_MS,
+      dedup: DEFERRED_ORIGIN_DEDUP,
+      handler: (_event, context) =>
+        reactions.resolveDeferredOrigin({
+          tenantId: context.tenantId,
+          traceId: context.aggregateId,
+        }),
+    })
     .withProjectionSubscriber(reactions.evaluationTrigger.name, reactions.evaluationTrigger.spec)
     .withProjectionSubscriber("customEvaluationSync", {
       fold: "traceSummary",

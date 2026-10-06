@@ -87,7 +87,7 @@ type SocialProviders = NonNullable<BetterAuthOptions["socialProviders"]>;
 type SocialProviderBuildConfiguration = SocialProviderConfiguration & { baseUrl?: string };
 
 /** What a social provider calls out to while a sign-in is in flight. */
-export type SocialProviderHooks = Readonly<{
+type SocialProviderHooks = Readonly<{
   /** Given the Microsoft id token claims before better-auth's lookup; a throw stops the sign-in. */
   onMicrosoftProfile?: (profile: Record<string, unknown>) => Promise<void>;
 }>;
@@ -452,7 +452,7 @@ export function discoveryUrlFor(issuer: string, envName: string): string {
   return discoveryUrlImplementation.build(issuer, envName);
 }
 
-export function oidcProviderConfig(input: {
+function oidcProviderConfig(input: {
   providerId: string;
   clientId: string;
   clientSecret: string;

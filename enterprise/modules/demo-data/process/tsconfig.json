@@ -25,13 +25,13 @@
       "path": "../../../../packages/module/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/observability/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/organization/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/process-stores/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/task/tsconfig.build.json"

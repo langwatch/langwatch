@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { ConfigCollisionError, ConfigParseError } from "../config.errors.ts";
 import { Config, parseProcessConfig } from "../config.ts";
-import { langevalsStagingTtlSeconds } from "../deployment-facts.ts";
+import { langevalsStagingTtlSeconds, nlpServiceUrl, publicBaseUrl } from "../deployment-facts.ts";
 
 const github = {
   name: "github",
@@ -121,6 +121,38 @@ describe("parseProcessConfig", () => {
     });
   });
 
+  describe("given an owner holding the public origin leaf", () => {
+    const automation = { name: "automation", config: { publicBaseUrl } } as const;
+    const read = (environment: Record<string, string | undefined>) =>
+      parseProcessConfig({ owners: [automation], environment }).automation.publicBaseUrl;
+
+    /** @scenario "A blank public origin reads as absent" */
+    it("reads a blank or unset BASE_HOST as no public origin", () => {
+      expect(read({ BASE_HOST: "   " })).toBeUndefined();
+      expect(read({ BASE_HOST: "" })).toBeUndefined();
+      expect(read({})).toBeUndefined();
+      expect(read({ BASE_HOST: " https://app.langwatch.test " })).toBe(
+        "https://app.langwatch.test",
+      );
+    });
+  });
+
+  describe("given an owner holding the engine address leaf", () => {
+    const evaluation = { name: "evaluation", config: { nlpServiceUrl } } as const;
+    const read = (environment: Record<string, string | undefined>) =>
+      parseProcessConfig({ owners: [evaluation], environment }).evaluation.nlpServiceUrl;
+
+    /** @scenario "A blank engine address reads as absent" */
+    it("reads a blank or unset LANGWATCH_NLP_SERVICE as no engine address", () => {
+      expect(read({ LANGWATCH_NLP_SERVICE: "   " })).toBeUndefined();
+      expect(read({ LANGWATCH_NLP_SERVICE: "" })).toBeUndefined();
+      expect(read({})).toBeUndefined();
+      expect(read({ LANGWATCH_NLP_SERVICE: " http://nlp.langwatch.test " })).toBe(
+        "http://nlp.langwatch.test",
+      );
+    });
+  });
+
   /** @scenario "The parsed configuration cannot be mutated" */
   it("returns frozen slices — the parse's answer is what the process holds", () => {
     const config = parseProcessConfig({ owners: [github], environment: {} });
@@ -150,6 +182,39 @@ describe("config and secrets stay separate", () => {
     expect(() => parseProcessConfig({ owners: [security, sneaky], environment: {} })).toThrowError(
       /"sneaky" declares "SIGNING_KEY" as config, but "security" declares it as a secret/,
     );
+  });
+
+  /** @scenario "A module config schema may not declare a connection string" */
+  it("refuses a module binding a connection string another owner declares as a secret", () => {
+    const stores = {
+      name: "stores",
+      secrets: { databaseUrl: { id: "DATABASE_URL" } },
+    } as const;
+    const sneaky = {
+      name: "sneaky",
+      config: Config.define((c) => ({ url: c.env("DATABASE_URL", z.string().optional()) })),
+    } as const;
+
+    expect(() => parseProcessConfig({ owners: [stores, sneaky], environment: {} })).toThrow(
+      expect.objectContaining({ code: "config_claims_secret" }),
+    );
+  });
+
+  /** @scenario "The process root may declare a secret that is read through the secrets chain" */
+  it("accepts a process owner that declares a secret and carries no value for it", () => {
+    const processRoot = {
+      name: "process",
+      config: Config.define((c) => ({ port: c.env("PORT", z.string().default("5560")) })),
+      secrets: { signingKey: { id: "SIGNING_KEY" } },
+    } as const;
+
+    const config = parseProcessConfig({
+      owners: [processRoot],
+      environment: { SIGNING_KEY: "never-on-config" },
+    });
+
+    expect(config.process.port).toBe("5560");
+    expect(JSON.stringify(config)).not.toContain("never-on-config");
   });
 
   /** @scenario "A config leaf under a declared family prefix refuses naming both owners" */

@@ -174,40 +174,56 @@ func PrintReport(w io.Writer, a Analysis) {
 		printEnforced(w, r)
 	}
 
-	if len(a.Legacy) > 0 {
-		fmt.Fprintln(w, "\nLegacy (tolerated — not failing CI):")
-		fmt.Fprintf(w, "  %d file(s), %d/%d bound, %d unbound\n", len(a.Legacy),
-			sum(a.Legacy, func(r LegacyReport) int { return r.Bound }),
-			sum(a.Legacy, func(r LegacyReport) int { return r.Total }),
-			sum(a.Legacy, func(r LegacyReport) int { return r.Unbound }))
-		for _, r := range a.Legacy {
-			fmt.Fprintf(w, "  · %s  %d/%d bound, %d unbound\n", r.Feature, r.Bound, r.Total, r.Unbound)
-		}
-		fmt.Fprintln(w, "\n  Shrink this list by binding scenarios, flagging @unimplemented, or removing stale scenarios. See dev/docs/TESTING_PHILOSOPHY.md.")
-	}
-
-	if len(a.ExemptInert) > 0 {
-		parked := sum(a.ExemptInert, func(r InertReport) int { return r.Unimplemented })
-		tail := "."
-		if parked > 0 {
-			tail = fmt.Sprintf(" (%d of them parked as @unimplemented).", parked)
-		}
-		fmt.Fprintln(w, "\nInert (no enforced scenarios — tolerated via LEGACY_INERT):")
-		fmt.Fprintf(w, "  %d file(s) hold %d scenario(s) this check cannot see%s\n", len(a.ExemptInert),
-			sum(a.ExemptInert, func(r InertReport) int { return r.TotalScenarios }), tail)
-		fmt.Fprintln(w, "  Tag them @unit/@integration to measure them, or @unimplemented to declare the gap. See dev/docs/TESTING_PHILOSOPHY.md.")
-	}
-
-	if len(a.NewInert) > 0 {
-		fmt.Fprintln(w, "\nFeature files that enforce no scenario at all:")
-		for _, r := range a.NewInert {
-			fmt.Fprintf(w, "  ✗ %s\n      %s\n", r.Feature, describeInert(r))
-			fmt.Fprintln(w, "      Tag the scenarios @unit / @integration / @e2e / @regression and bind them, or add this file to LEGACY_INERT with a reason.")
-		}
-	}
+	printLegacy(w, a)
+	printExemptInert(w, a)
+	printNewInert(w, a)
 
 	for _, l := range FormatUnknownAnnotations(a.Unknown) {
 		fmt.Fprintln(w, l)
+	}
+}
+
+// printLegacy prints the tolerated legacy files and how far each is bound.
+func printLegacy(w io.Writer, a Analysis) {
+	if len(a.Legacy) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "\nLegacy (tolerated — not failing CI):")
+	fmt.Fprintf(w, "  %d file(s), %d/%d bound, %d unbound\n", len(a.Legacy),
+		sum(a.Legacy, func(r LegacyReport) int { return r.Bound }),
+		sum(a.Legacy, func(r LegacyReport) int { return r.Total }),
+		sum(a.Legacy, func(r LegacyReport) int { return r.Unbound }))
+	for _, r := range a.Legacy {
+		fmt.Fprintf(w, "  · %s  %d/%d bound, %d unbound\n", r.Feature, r.Bound, r.Total, r.Unbound)
+	}
+	fmt.Fprintln(w, "\n  Shrink this list by binding scenarios, flagging @unimplemented, or removing stale scenarios. See dev/docs/TESTING_PHILOSOPHY.md.")
+}
+
+// printExemptInert prints the LEGACY_INERT files and the scenarios they hide.
+func printExemptInert(w io.Writer, a Analysis) {
+	if len(a.ExemptInert) == 0 {
+		return
+	}
+	parked := sum(a.ExemptInert, func(r InertReport) int { return r.Unimplemented })
+	tail := "."
+	if parked > 0 {
+		tail = fmt.Sprintf(" (%d of them parked as @unimplemented).", parked)
+	}
+	fmt.Fprintln(w, "\nInert (no enforced scenarios — tolerated via LEGACY_INERT):")
+	fmt.Fprintf(w, "  %d file(s) hold %d scenario(s) this check cannot see%s\n", len(a.ExemptInert),
+		sum(a.ExemptInert, func(r InertReport) int { return r.TotalScenarios }), tail)
+	fmt.Fprintln(w, "  Tag them @unit/@integration to measure them, or @unimplemented to declare the gap. See dev/docs/TESTING_PHILOSOPHY.md.")
+}
+
+// printNewInert prints each feature file that enforces no scenario.
+func printNewInert(w io.Writer, a Analysis) {
+	if len(a.NewInert) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "\nFeature files that enforce no scenario at all:")
+	for _, r := range a.NewInert {
+		fmt.Fprintf(w, "  ✗ %s\n      %s\n", r.Feature, describeInert(r))
+		fmt.Fprintln(w, "      Tag the scenarios @unit / @integration / @e2e / @regression and bind them, or add this file to LEGACY_INERT with a reason.")
 	}
 }
 

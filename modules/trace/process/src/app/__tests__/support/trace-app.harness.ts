@@ -14,10 +14,14 @@ export function createTraceAppHarness({
 }: Partial<Omit<TraceAppDependencies, "traces">> & {
   traces?: Partial<TraceReaders>;
 } = {}): TraceModule {
-  return TraceModule.create({
+  return TraceModule.fromDependencies({
     storedObjects: createApiFixture<TraceAppDependencies["storedObjects"]>({}, "storedObjects"),
     topics: createApiFixture<TraceAppDependencies["topics"]>({}, "topics"),
     broadcast: createApiFixture<TraceAppDependencies["broadcast"]>({}, "broadcast"),
+    spanCostSuggestions: createApiFixture<TraceAppDependencies["spanCostSuggestions"]>(
+      {},
+      "spanCostSuggestions",
+    ),
     evaluations: createApiFixture<TraceAppDependencies["evaluations"]>({}, "evaluations"),
     codingAgents: createApiFixture<TraceAppDependencies["codingAgents"]>({}, "codingAgents"),
     share: createApiFixture<TraceAppDependencies["share"]>({}, "share"),

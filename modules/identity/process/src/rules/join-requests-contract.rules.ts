@@ -3,7 +3,12 @@
  * often somebody may ask and look, how long a rejection holds them off, and the narrow
  * collaborator shapes the service is given rather than reaching for.
  */
-import { type DomainJoinSetting, type JoinSettingChange } from "@langwatch/identity-contract";
+import {
+  type DomainJoinSetting,
+  type JoinerRole,
+  type JoinRequestOrigin,
+  type JoinSettingChange,
+} from "@langwatch/identity-contract";
 
 import type {
   JoinCandidateRepository,
@@ -74,6 +79,10 @@ export interface JoinMembership {
     commandId: string;
     /** The approving admin, or nobody when the policy approved. */
     approvedByUserId: string | null;
+    /** The seat decided from the request's origin and the joiner seat (ADR-171 v6). */
+    role: JoinerRole;
+    /** Where the request was made, for the audit row. */
+    origin: JoinRequestOrigin;
   }) => Promise<void>;
   isMember(args: { userId: string; organizationId: string }): Promise<boolean>;
   /** Which of these organizations the person is already in, in one read. */
@@ -90,11 +99,12 @@ export interface JoinOfferDismissals {
 export interface JoinSetting {
   read(args: {
     organizationId: string;
-  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }>;
+  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[]; joinerRole: JoinerRole }>;
   write: (args: {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     joinDomains: string[];
+    joinerRole: JoinerRole;
   }) => Promise<void>;
 }
 

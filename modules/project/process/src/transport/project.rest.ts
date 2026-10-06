@@ -20,6 +20,7 @@ import type {
 } from "@langwatch/data-privacy-contract";
 import { moduleApi } from "@langwatch/module";
 import {
+  isGovernanceProject,
   PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
   projectApiKeyRotationSchema,
@@ -338,7 +339,11 @@ function projectResponse(
   };
 }
 
-/** The project this route addresses, refusing anything outside the organization. */
+/**
+ * The project this route addresses, refusing anything outside the organization.
+ * The hidden governance project reads as absent: it is left out of every list,
+ * so answering a read would be the one thing left that confirms it exists.
+ */
 async function projectInOrganization({
   app,
   id,
@@ -350,7 +355,11 @@ async function projectInOrganization({
 }): Promise<ProjectWithTeam> {
   const project = await app.findWithTeam(id);
 
-  if (!project || project.team.organizationId !== organizationId) {
+  if (
+    !project ||
+    project.team.organizationId !== organizationId ||
+    isGovernanceProject(project.kind)
+  ) {
     throw new NotFoundError("Project not found");
   }
 

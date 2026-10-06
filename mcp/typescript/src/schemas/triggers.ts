@@ -279,10 +279,9 @@ export const notificationCadenceSchema = z
   );
 
 /**
- * What a read answers with. Permissive on purpose: an MCP client talks to
- * whichever LangWatch it is pointed at, so an unknown field is carried through
- * rather than dropped, and a field a given deployment does not send yet is
- * absent rather than fatal.
+ * What a read answers with. Permissive on purpose: an MCP client talks to whichever LangWatch it
+ * is pointed at, so an unknown field is carried through and a field a deployment does not send
+ * yet is absent rather than fatal.
  */
 export const triggerSchema = z
   .object({

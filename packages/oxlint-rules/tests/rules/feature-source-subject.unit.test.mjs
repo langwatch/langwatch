@@ -34,6 +34,7 @@ function report(filename) {
 describe("given a strict feature source file claiming another feature's subject", () => {
   describe("when the claimed subject belongs to a different singular feature", () => {
     /** @scenario "A foreign subject claim is reported with its owning feature and a move fix" */
+    /** @scenario "A new governance subject is deliberate" */
     it("reports foreignSubject naming the owner and the move fix", () => {
       const found = report("modules/agent/process/src/services/project.service.ts");
 
@@ -48,7 +49,7 @@ describe("given a strict feature source file claiming another feature's subject"
       });
       expect(found[0].line).toBe(1);
       expect(found[0].message).toContain("modules/project/process/src/services/project.service.ts");
-      expect(found[0].message).not.toContain("skill");
+      expect(found[0].message).toContain("Read the `module` skill.");
     });
 
     /** @scenario "A foreign subject claim is reported with its owning feature and a move fix" */

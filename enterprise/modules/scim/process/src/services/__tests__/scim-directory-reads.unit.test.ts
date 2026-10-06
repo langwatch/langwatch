@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import type { ScimOrganizationUserRecord } from "../../repositories/scim.repository.ts";
@@ -135,6 +136,7 @@ function userService(): ScimUserProvisioning {
 
 function serviceOver(repository: ReturnType<typeof directory>) {
   return ScimService.create({
+    connections: HeldConnectionsFake.of([CONNECTION, OTHER_CONNECTION]),
     prisma: repository,
     writer: new GrantsFake(),
     users: userService(),

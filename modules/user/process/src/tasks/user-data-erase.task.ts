@@ -1,10 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
-import {
-  PrismaGdprUserDataEraseRepository,
-  type GdprUserDataEraseDatabase,
-} from "../repositories/prisma/prisma.user-data-erase.repository.ts";
 import type { GdprUserDataEraseRepository } from "../repositories/user-data-erase.repository.ts";
 
 const logger = createLogger("langwatch:task:user-data-erase");
@@ -170,15 +166,9 @@ export class UserDataEraseTask extends Task {
   }
 }
 
-/**
- * The task, over the process's own Prisma-backed repository. Part of the
- * private-runtime-export drive (dev/docs/plans/private-runtime-export-drive.md
- * §3b): the catalogue calls this instead of naming the repository class.
- */
+/** The task, over the erasure repository the container built from user's registry. */
 export function createGdprUserDataEraseRunner(options: {
-  database: GdprUserDataEraseDatabase;
+  repository: GdprUserDataEraseRepository;
 }): UserDataEraseTask {
-  return UserDataEraseTask.create({
-    repository: () => PrismaGdprUserDataEraseRepository.create({ database: options.database }),
-  });
+  return UserDataEraseTask.create({ repository: () => options.repository });
 }

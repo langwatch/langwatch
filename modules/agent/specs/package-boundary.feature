@@ -5,21 +5,12 @@ Feature: Agents package boundary
   I want one portable contract and one implementation behind internal RPC and legacy REST
   So that agent definitions can move out of the app without duplicating behaviour
 
-  @architecture @typecheck
+  @unit @architecture @typecheck
   Scenario: Agent contract values are portable
     Given a browser or another feature needs an agent definition
     When it imports @langwatch/agent-contract
     Then agent types, config schemas, commands, queries and errors are available
     And the dependency graph contains no Prisma, React, app alias or server implementation
-
-  @architecture @typecheck
-  Scenario: Agents is the strict layout reference feature
-    Given Agents declares layoutVersion 0 in feature.json
-    Then contract artifacts use subject.artifact.ts names
-    And the server uses app, services, repositories and flat transport directories
-    And Prisma implementations use prisma.subject.repository.ts names
-    And AgentModule owns private services which receive private repository interfaces
-    And the installer selects a repository backend without the App importing Prisma
 
   @unit @agents
   Scenario: Persisted rows are mapped into contract agents
@@ -67,10 +58,10 @@ Feature: Agents package boundary
 
   @integration @rest
   Scenario: Legacy REST is documented as deprecated
-    Given the Agents REST compatibility interface is mounted
-    When the OpenAPI document is generated
-    Then every legacy Agents operation is marked deprecated
-    And its documentation directs new clients to the Agents RPC interface
+    Given the Agents REST compatibility interface is declared
+    When its route declarations are read
+    Then the family is deprecated and names /api/v1/agents as its successor
+    And every legacy Agents operation is kept out of the published OpenAPI document
     And the legacy operation remains functional
 
   @unit @openapi @typecheck
@@ -110,22 +101,14 @@ Feature: Agents package boundary
     Then it invokes the complete WorkflowApi supplied by the composition root
     And Agents server imports no Workflows server or repository implementation
 
-  @architecture @web @typecheck
+  @unit @architecture @web @typecheck
   Scenario: Agents web is browser safe
     Given the app composes an Agents screen
     Then the screen reaches behaviour through an injected browser client
     And it depends on Agents contract and the design system
     And it imports no Agents server, Prisma, Node runtime or app source
 
-  @architecture @web @typecheck
-  Scenario: Agent web private presentation has named ownership
-    Given Agent browser presentation is not part of a public screen or surface
-    Then presentation lives in ui and browser state and actions live in behavior
-    And reusable browser values live in model
-    And named root entries expose controlled management and editor composition
-    And the package has no nested private feature buckets or forwarding classes
-
-  @architecture @web
+  @unit @architecture @web
   Scenario: Agent owns reusable editor presentation
     Given the Agent Management screen, history drawer, type selector, and editors are package-owned
     Then the browser application composes their project, route, transport, replication targets, and notices
@@ -179,7 +162,7 @@ Feature: Agents package boundary
       Then that team's projects are listed and cannot be chosen
       And a team the reader holds no membership on contributes no projects at all
 
-  @web @http-agent
+  @integration @web @http-agent
   Scenario: HTTP editor preserves stored and default scenario mappings
     Given an existing HTTP agent has persisted scenario mappings
     When its editor opens
@@ -187,7 +170,7 @@ Feature: Agents package boundary
     When the persisted mapping set is empty
     Then the app-supplied default mappings are shown instead
 
-  @web @http-agent
+  @unit @web @http-agent
   Scenario: HTTP request testing preserves the compatibility result
     Given an HTTP agent editor has a configured endpoint and headers
     When the user tests the request
@@ -195,7 +178,7 @@ Feature: Agents package boundary
     And only header keys and values cross the transport boundary
     And the editor receives the established response, output, error, status, duration, header, rendered body, and warning fields
 
-  @architecture @registration
+  @unit @architecture @registration
   Scenario: Each runtime composes one Agent graph
     Given no Agents installer has been called
     Then importing an Agents package registers no route or background work
@@ -240,7 +223,7 @@ Feature: Agents package boundary
     When they select Test agent
     Then the browser client invokes the declared test-run procedure for the active project
 
-  @architecture
+  @unit @architecture
   Scenario: Coding-agent observability remains a separate feature
     Given the Agents package is extracted
     Then coding-agent sessions, projections, trace normalization and pull-request usage do not move into it

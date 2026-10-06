@@ -13,10 +13,10 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { Prisma } from "@langwatch/prisma-client/generated";
+import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PrismaApiKeyRepository } from "../prisma.api-key.repository.ts";
-import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

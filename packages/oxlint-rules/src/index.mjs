@@ -37,6 +37,7 @@ import { moduleClassesRule } from "./rules/module-classes.rule.mjs";
 import { moduleLayersRule } from "./rules/module-layers.rule.mjs";
 import { namespaceClassRule } from "./rules/namespace-class.rule.mjs";
 import { noAliasReexportRule } from "./rules/no-alias-reexport.rule.mjs";
+import { noAmbientContextRule } from "./rules/no-ambient-context.rule.mjs";
 import { noBootHookOutsideGuardRule } from "./rules/no-boot-hook-outside-guard.rule.mjs";
 import { noFormWatchInChildRule } from "./rules/no-form-watch-in-child.rule.mjs";
 import { noHandRolledPlanGateRule } from "./rules/no-hand-rolled-plan-gate.rule.mjs";
@@ -54,6 +55,7 @@ import { planLiteralsRule } from "./rules/plan-literals.rule.mjs";
 import { prismaCountInListQueryRule } from "./rules/prisma-count-in-list-query.rule.mjs";
 import { queryDataInStateRule } from "./rules/query-data-in-state.rule.mjs";
 import { refusalIsAHandledErrorRule } from "./rules/refusal-is-a-handled-error.rule.mjs";
+import { requestDeliveryFromAnIntentRule } from "./rules/request-delivery-from-an-intent.rule.mjs";
 import { requireFetchTimeoutRule } from "./rules/require-fetch-timeout.rule.mjs";
 import { restRouteRule } from "./rules/rest-route.rule.mjs";
 import { schemaOutsideContractRule } from "./rules/schema-outside-contract.rule.mjs";
@@ -63,6 +65,7 @@ import { sharedSetupIsAHookRule } from "./rules/shared-setup-is-a-hook.rule.mjs"
 import { signatureMirrorRule } from "./rules/signature-mirror.rule.mjs";
 import { standInCastRule } from "./rules/stand-in-cast.rule.mjs";
 import { storeContainmentRule } from "./rules/store-containment.rule.mjs";
+import { suppressionStatesWhyRuleFor } from "./rules/suppression-states-why.rule.mjs";
 import { temporalOnlyRule } from "./rules/temporal-only.rule.mjs";
 import { testDescriptionIsAnActionRule } from "./rules/test-description-is-an-action.rule.mjs";
 import { transportDeclaresRule } from "./rules/transport-declares.rule.mjs";
@@ -79,7 +82,7 @@ import { zodObjectIntersectionRule } from "./rules/zod-object-intersection.rule.
 import { zodSchemaPerCallRule } from "./rules/zod-schema-per-call.rule.mjs";
 import { zodValidateForBooleanRule } from "./rules/zod-validate-for-boolean.rule.mjs";
 
-const RULES = [
+const HOUSE_RULES = [
   enterpriseLicenseHeaderRule,
   eventingRolePurityRule,
   signatureMirrorRule,
@@ -116,6 +119,8 @@ const RULES = [
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
+  noAmbientContextRule,
+  requestDeliveryFromAnIntentRule,
   noInlineDynamicImportRule,
   noLoggerSpyRule,
   noPortVocabularyRule,
@@ -147,10 +152,15 @@ const RULES = [
   queryDataInStateRule,
 ];
 
+/** Judges disables of the house rules above, so it is built from them rather than listed. */
+const suppressionStatesWhyRule = suppressionStatesWhyRuleFor({ houseRules: HOUSE_RULES });
+const RULES = [...HOUSE_RULES, suppressionStatesWhyRule];
+
 /** Every registered rule, keyed by the name its own `defineRule` declaration carries. */
 export const rules = Object.fromEntries(RULES.map((rule) => [rule.meta.docs.name, rule]));
 
 export {
+  suppressionStatesWhyRule,
   browserStoreContainmentRule,
   effectDerivesStateRule,
   noReduxRule,
@@ -203,6 +213,8 @@ export {
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
+  noAmbientContextRule,
+  requestDeliveryFromAnIntentRule,
   noInlineDynamicImportRule,
   noLoggerSpyRule,
   noPortVocabularyRule,

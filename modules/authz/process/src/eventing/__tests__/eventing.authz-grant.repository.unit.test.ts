@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AuthzReadRepository } from "../../repositories/authz-read.repository.ts";
 import { EventingAuthzGrantRepository } from "../../repositories/eventing/eventing.authz-grant.repository.ts";
 import { EventingAuthzReadRepository } from "../../repositories/eventing/eventing.authz-read.repository.ts";
+import { PrismaAuthzLedgerReadRepository } from "../../repositories/prisma/prisma.authz-ledger-read.repository.ts";
 import type { EventingAuthzLedgerAdapter } from "../authz-grant.store.ts";
 
 const ORG_ID = "org_ledger";
@@ -64,7 +65,11 @@ function harness(writerOverrides: Partial<EventingAuthzLedgerAdapter> = {}) {
   return {
     db,
     writer,
-    repository: EventingAuthzGrantRepository.create({ database: db as never, writer }),
+    repository: EventingAuthzGrantRepository.create({
+      reads: PrismaAuthzLedgerReadRepository.create({ prisma: db as never }),
+      lineage: EventingAuthzReadRepository.create(db as never),
+      writer,
+    }),
   };
 }
 
@@ -186,7 +191,7 @@ describe("given a replace whose broad grant has already gone", () => {
   describe("when the existence pre-read finds nothing", () => {
     it("answers the writer's missing binding and never revokes or attaches anything", async () => {
       const { db, repository, writer } = harness();
-      db.grant.findFirst.mockResolvedValueOnce(null);
+      db.grant.findMany.mockResolvedValueOnce([]);
 
       await expect(
         repository.replaceBinding({
@@ -290,7 +295,11 @@ function buildRepository({
     offboardMember,
   };
   return {
-    repository: EventingAuthzGrantRepository.create({ database: prisma, writer }),
+    repository: EventingAuthzGrantRepository.create({
+      reads: PrismaAuthzLedgerReadRepository.create({ prisma: prisma }),
+      lineage: EventingAuthzReadRepository.create(prisma),
+      writer,
+    }),
     offboardMember,
     grantFindMany: tx.grant.findMany,
     tx,

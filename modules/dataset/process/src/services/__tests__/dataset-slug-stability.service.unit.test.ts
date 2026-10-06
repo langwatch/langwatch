@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
 import { MemoryDatasetRecordRepository } from "../../repositories/memory/memory.dataset-record.repository.ts";
@@ -24,6 +25,7 @@ function setup() {
     records: MemoryDatasetRecordRepository.create({ database }),
     requestBounds: createDatasetTestRequestBounds(),
     attachments: createDatasetTestAttachments(),
+    inlineAttachments: createDatasetTestInlineAttachments(),
   });
   const seed = ({ name, slug }: { name: string; slug: string }) =>
     repository.create({ projectId: PROJECT_ID, name, slug, columnTypes: COLUMNS });

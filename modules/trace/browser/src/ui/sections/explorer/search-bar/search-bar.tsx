@@ -1,4 +1,3 @@
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { Kbd } from "@langwatch/design-system/kbd";
 import {
   Box,
@@ -24,6 +23,7 @@ import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding
 import { setFilterChipLabels } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
 import { useFacetHoverStore } from "../../../../behavior/facet-hover.store.ts";
 import { useInstantEvalRunStore } from "../../../../behavior/instant-eval-run.store.ts";
+import { registerInstantEvalRoute } from "../../../../behavior/langy/instant-eval-route.bridge.ts";
 import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
 import { useSearchSubmitRequestStore } from "../../../../behavior/search-submit-request.store.ts";
 import { useFloatRect } from "../../../../behavior/use-float-rect.ts";
@@ -37,6 +37,7 @@ import { explainAnyError } from "../../errors/index.ts";
 import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
 import { useModelProvidersSettings } from "../../use-model-providers-settings.ts";
 import { AskAiButton } from "../ai/ask-ai-button.tsx";
+import { useInstantEvalAccess } from "../hooks/use-instant-eval-access.ts";
 import { useInstantEvalRuns } from "../hooks/use-instant-eval-runs.ts";
 import { useTraceFacets } from "../hooks/use-trace-facets.ts";
 import { InstantEvalConfirmDialog } from "../instant-eval-confirm-dialog.tsx";
@@ -54,7 +55,6 @@ import {
   statusBorderColor,
 } from "./search-bar-indicators.tsx";
 import { SearchFallbackNotice } from "./search-fallback-notice.tsx";
-import { searchSubmitProgress } from "./search-submit-progress.ts";
 import { SearchedAsNotice } from "./searched-as-notice.tsx";
 import { SyntaxHelpDrawerHost } from "./syntax-help-drawer.tsx";
 import { TokenValuePicker, type TokenValuePickerAnchor } from "./token-value-picker.tsx";
@@ -62,6 +62,25 @@ import { useAskLangyFromSearch } from "./use-ask-langy-from-search.ts";
 import type { ValueResolver } from "./use-filter-editor.ts";
 import { useInstantEvalRoute } from "./use-instant-eval-route.ts";
 import { useSubmitSearch } from "./use-submit-search.ts";
+
+/**
+ * What the bar says between Enter and the result: routing, then an Instant
+ * Eval's estimate and start, so Enter is never followed by a still page.
+ */
+export function searchSubmitProgress({
+  isRouting,
+  isEstimating,
+  isStarting,
+}: {
+  isRouting: boolean;
+  isEstimating: boolean;
+  isStarting: boolean;
+}): string | null {
+  if (isRouting) return "Searching";
+  if (isEstimating) return "Estimating the Instant Eval";
+  if (isStarting) return "Starting the Instant Eval";
+  return null;
+}
 
 const MAX_DYNAMIC_ITEMS = 10;
 
@@ -257,16 +276,19 @@ export const SearchBar: React.FC = () => {
   // and a judgement goes to the cost rule (specs/traces-v2/instant-eval-search.feature). While the
   // flag read is in flight the submit counts as available: a server refusal then says why, so a
   // slow flag read never hides a feature the project actually has.
-  const { enabled: instantEvalsReleased, isLoading: instantEvalsFlagLoading } = useFeatureFlag(
-    "release_instant_evals",
-    {
-      projectId: project?.id,
-      organizationId: organization?.id,
-      enabled: !!project?.id && !!organization?.id,
-    },
-  );
-  const isInstantEvalAvailable = instantEvalsReleased || instantEvalsFlagLoading;
-  const instantEval = useInstantEvalRoute({ isInstantEvalAvailable });
+  // The organization's own switch is read beside the flag; it names a refused reader's offer.
+  const instantEvalAccess = useInstantEvalAccess({
+    projectId: project?.id,
+    organizationId: organization?.id,
+  });
+  const isInstantEvalAvailable = instantEvalAccess.isAvailable;
+  const instantEval = useInstantEvalRoute({
+    isInstantEvalAvailable,
+    optInOffer: instantEvalAccess.optInOffer,
+  });
+  // Langy's explorer.runInstantEval reaches the same route, and so the same cost rule.
+  const { onInstantEvalRoute } = instantEval;
+  useEffect(() => registerInstantEvalRoute(onInstantEvalRoute), [onInstantEvalRoute]);
   const { submitSearch, isRouting } = useSubmitSearch({
     isLangyAvailable: langyRoutesAsk,
     isInstantEvalAvailable,
@@ -339,7 +361,12 @@ export const SearchBar: React.FC = () => {
       <SyntaxHelpDrawerHost />
       {/* Anchored to a point at the bar's bottom-left: an anchor around the editor would remount
           the popover on every keystroke. */}
-      <InstantEvalRefusalPopover refusal={instantEval.refusal} onClose={instantEval.dismissRefusal}>
+      <InstantEvalRefusalPopover
+        refusal={instantEval.refusal}
+        onClose={instantEval.dismissRefusal}
+        onEnable={instantEval.enableInstantEvals}
+        isEnabling={instantEval.isEnabling}
+      >
         <Box position="absolute" left={3} bottom={0} width="1px" height="1px" aria-hidden="true" />
       </InstantEvalRefusalPopover>
       <InstantEvalConfirmDialog

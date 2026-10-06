@@ -15,19 +15,19 @@ import type {
   TopicClusteringRunCompletedEvent,
   TopicClusteringRunFailedEvent,
   TopicClusteringRunStartedEvent,
-} from "../services/topic-events.service.ts";
+} from "../rules/topic-clustering-events.rules.ts";
 import {
   TopicClusteringRunCompletedEventSchema,
   TopicClusteringRunFailedEventSchema,
   TopicClusteringRunStartedEventSchema,
-} from "../services/topic-events.service.ts";
+} from "../rules/topic-clustering-events.rules.ts";
 
 /**
  * One run in the project's history, accumulated across the run's pages. The raw error text is
  * deliberately NOT part of this read model — the same
  * disclosure reasoning as the status service (ADR-051 §8): `errorCode` is
  */
-export const topicClusteringRunHistoryProjectionEntrySchema = z.object({
+const topicClusteringRunHistoryProjectionEntrySchema = z.object({
   runId: z.string(),
   /** manual | bootstrap-scheduled runs both read as "scheduled" here. */
   trigger: z.string(),

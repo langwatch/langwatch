@@ -1,7 +1,17 @@
 import { createLogger } from "@langwatch/observability";
-import { Temporal } from "@langwatch/time";
+import { type Instant, Temporal } from "@langwatch/time";
 
-import type { CodingAgentProjectActivity, CodingAgentClock } from "../app/coding-agent.members.ts";
+import type { CodingAgentClock } from "./coding-agent-clock.service.ts";
+
+/** Single throttled write to mark projects as having seen agent activity. */
+export interface CodingAgentProjectActivity {
+  /**
+   * Records that this project has just seen coding-agent session activity.
+   * The staleness window it's throttled by belongs to the implementation, not
+   * the caller — both graphs must skip the same writes, not merely agree by chance.
+   */
+  touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<void>;
+}
 
 const logger = createLogger("langwatch:coding-agent-processing:session-seen-touch");
 export const CODING_AGENT_SESSION_SEEN_WINDOW_MS = 5 * 60 * 1000;

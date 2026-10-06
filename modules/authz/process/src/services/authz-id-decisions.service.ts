@@ -1,7 +1,7 @@
 /**
  * The decision family a caller reaches with ids it already holds, not a
  * resolved scope: one question, "any of these", and two batch forms. Each
- * collects the principal's grants ONCE and answers every candidate from it.
+ * reads the principal's epoch-checked snapshot ONCE and answers every candidate from it.
  */
 import { type AuthzPermission } from "@langwatch/authorization";
 import {
@@ -69,22 +69,11 @@ export class AuthzIdDecisionsService {
       throw error;
     }
 
-    const scopeOrg = scopeOrganizationId(scope);
-    const pass = this.deps.collector.beginPass();
-    const [grants, ownerGrants] = await Promise.all([
-      this.deps.collector.collectGrants({
-        principal,
-        organizationId: scopeOrg,
-        reader: pass,
-      }),
-      ceiling
-        ? this.deps.snapshots.findOwnerGrantsFor({
-            principal,
-            organizationId: scopeOrg,
-            reader: pass,
-          })
-        : Promise.resolve(null),
-    ]);
+    const { grants, ownerGrants } = await this.deps.snapshots.collectWithOwnerCeiling({
+      principal,
+      organizationId: scopeOrganizationId(scope),
+      ceiling,
+    });
     const decision = this.deps.engine.decideWithCeiling({
       keyGrants: grants,
       ownerGrants,
@@ -127,23 +116,13 @@ export class AuthzIdDecisionsService {
 
     // Same api-key owner ceiling every other decision path applies: an api-key principal is
     // capped at its owner's grants, so demoting the owner shrinks the key here too.
-    // `ownerGrantsFor` returns null for a user principal, and `decideWithCeiling` with a null
+    // The owner ceiling is null for a user principal, and `decideWithCeiling` with a null
     // ceiling is a plain decide — so this is a no-op for the user callers this has today and
     // closes the hole before an api-key caller reaches it.
-    const scopeOrg = scopeOrganizationId(scope);
-    const pass = this.deps.collector.beginPass();
-    const [grants, ownerGrants] = await Promise.all([
-      this.deps.collector.collectGrants({
-        principal,
-        organizationId: scopeOrg,
-        reader: pass,
-      }),
-      this.deps.snapshots.findOwnerGrantsFor({
-        principal,
-        organizationId: scopeOrg,
-        reader: pass,
-      }),
-    ]);
+    const { grants, ownerGrants } = await this.deps.snapshots.collectWithOwnerCeiling({
+      principal,
+      organizationId: scopeOrganizationId(scope),
+    });
     const demoProjectId = this.deps.snapshots.findDemoProjectId();
     let matched: AuthzPermission | undefined;
     let firstDenied: AuthzDecision | undefined;
@@ -243,15 +222,10 @@ export class AuthzIdDecisionsService {
     // The api-key owner ceiling, off the same snapshot as the key's grants —
     // see `canAnyByIds`. Null for a user or service-key principal, and
     // `decideWithCeiling` with a null ceiling is a plain decide.
-    const pass = this.deps.collector.beginPass();
-    const [grants, ownerGrants] = await Promise.all([
-      this.deps.collector.collectGrants({
-        principal,
-        organizationId,
-        reader: pass,
-      }),
-      this.deps.snapshots.findOwnerGrantsFor({ principal, organizationId, reader: pass }),
-    ]);
+    const { grants, ownerGrants } = await this.deps.snapshots.collectWithOwnerCeiling({
+      principal,
+      organizationId,
+    });
     const demoProjectId = this.deps.snapshots.findDemoProjectId();
     const allowedAt = (permission: AuthzPermission, scope: AuthzScopeRef | null): boolean =>
       scope

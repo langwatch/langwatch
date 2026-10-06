@@ -13,7 +13,7 @@ const BASE64_LINE_LENGTH = 76;
  * cleaning caller-supplied headers so a crafted name cannot inject another
  * field, and building the raw multipart message SES needs for attachments.
  */
-export function sanitizeHeaderValue(value: string): string {
+function sanitizeHeaderValue(value: string): string {
   return value.replace(/[\r\n]+/g, " ").trim();
 }
 
@@ -22,7 +22,7 @@ export function sanitizeHeaderValue(value: string): string {
  * (RFC 5322 §3.6.8) - stripping them stops a crafted name from injecting
  * another field, which sanitizing the value alone would not prevent.
  */
-export function sanitizeHeaderName(name: string): string {
+function sanitizeHeaderName(name: string): string {
   return name.replace(/[^\x21-\x39\x3B-\x7E]/g, "").trim();
 }
 

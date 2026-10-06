@@ -15,7 +15,7 @@ export const demoDataRunSchema = z.object({ scheduledFor: z.number().int() });
 export const demoDataRunStateSchema = z.object({
   lastRunAt: z.number().nullable(),
 });
-export type DemoDataRunState = z.infer<typeof demoDataRunStateSchema>;
+type DemoDataRunState = z.infer<typeof demoDataRunStateSchema>;
 
 type DemoDataIntents = {
   run: IntentSpec<typeof demoDataRunSchema>;

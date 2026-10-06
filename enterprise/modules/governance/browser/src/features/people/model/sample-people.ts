@@ -40,7 +40,7 @@ export const SAMPLE_DEPARTMENTS = ["Engineering", "Customer Support", "Finance",
  * how many days ago instead of a date. `null` is the person nothing has ever
  * metered, who has no last activity at all.
  */
-type SamplePerson = Omit<PeopleRow, "lastActiveIso"> & {
+type SamplePerson = Omit<PeopleRow, "lastActiveIso" | "kind" | "firstSeenIso" | "lastSeenIso"> & {
   lastActiveDaysAgo: number | null;
 };
 
@@ -178,6 +178,9 @@ const SAMPLE_PEOPLE: readonly SamplePerson[] = [
 export function samplePeopleRows(nowMs: number = nowInstant().epochMilliseconds): PeopleRow[] {
   return SAMPLE_PEOPLE.map(({ lastActiveDaysAgo, ...person }) => ({
     ...person,
+    kind: null,
+    firstSeenIso: null,
+    lastSeenIso: null,
     lastActiveIso: lastActiveDaysAgo === null ? null : daysAgo(lastActiveDaysAgo, nowMs),
   }));
 }

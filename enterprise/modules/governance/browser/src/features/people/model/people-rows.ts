@@ -81,6 +81,11 @@ export interface PeopleRow {
   /** The provider that named them, when one did. Never set for an erased person. */
   provider: string | null;
   status: PersonMatchStatus;
+  /** What the provider called them: a person or a service account. Never set for an erased person. */
+  kind: string | null;
+  /** When a provider first and last named them. Null when none did, and for an erased person. */
+  firstSeenIso: string | null;
+  lastSeenIso: string | null;
   /** How we know the account, in the reader's words. Null when we do not. */
   matchDetail: string | null;
   /** The engine's proof, when a link is what told us. */
@@ -189,6 +194,9 @@ function spendRowFor({
     displayName: person?.displayText ?? spend.actor,
     identifier: person ? person.rawActorId : spend.actor,
     provider: person?.provider ?? null,
+    kind: person?.kind ?? null,
+    firstSeenIso: person?.firstSeenAt ?? null,
+    lastSeenIso: person?.lastSeenAt ?? null,
     status,
     matchDetail,
     evidenceKind,
@@ -226,6 +234,9 @@ function discoveredRowFor(person: DiscoveredFacts): PeopleRow {
     // a value survived upstream that erasure was supposed to blank.
     identifier: erased ? null : person.rawActorId,
     provider: erased ? null : person.provider,
+    kind: erased ? null : person.kind,
+    firstSeenIso: erased ? null : person.firstSeenAt,
+    lastSeenIso: erased ? null : person.lastSeenAt,
     status,
     matchDetail,
     evidenceKind,

@@ -4,7 +4,7 @@
  * @see specs/agents/connected-agents.feature
  */
 import { AgentCallForeignProjectError, CALL_KEY_SLACK_SECONDS } from "@langwatch/agent-contract";
-import type { StoredCall } from "@langwatch/agent-contract";
+import type { AgentConnectCaller, StoredCall } from "@langwatch/agent-contract";
 import { memorySessionState } from "@langwatch/process-stores";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,7 +16,6 @@ import {
   pendingKey,
   resultKey,
 } from "../rules/connected-agent-keys.rules.ts";
-import type { ConnectedAgentCredentials } from "../services/connected-agent-credential.service.ts";
 import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
 import {
   AgentSessionService,
@@ -32,10 +31,10 @@ const callId = "call_victim";
 const token = "ait_attacker_token";
 
 const fakeAgents = createConnectedAgentFixture();
-const fakeCredentials: ConnectedAgentCredentials = {
-  resolve: async () => {
-    throw new Error("Credential lookup is not configured for this test");
-  },
+const fakeCredentials: AgentConnectCaller = {
+  project: { id: "proj_1", slug: "proj-one" },
+  principalId: "key:test",
+  userId: null,
 };
 
 type MemoryStore = SessionStateStore;
@@ -190,11 +189,6 @@ describe("the project fence of connected agent state", () => {
     it("answers no frame and leaves the parked call waiting", async () => {
       const { store, options } = build();
       const transport = createLongPollFixture({ ...options, pollWaitMs: 40 });
-      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue({
-        project: { id: attackerProjectId, slug: "attacker" },
-        principalId: "key:test",
-        userId: null,
-      });
       vi.spyOn(AgentSessionService.prototype, "refreshPresence").mockResolvedValue(undefined);
       await parkCall({ store, writtenBy: victimProjectId, readableBy: victimProjectId });
       await store.set(
@@ -212,7 +206,13 @@ describe("the project fence of connected agent state", () => {
       );
 
       const answer = await transport.poll({
-        credentials: { authorization: "Bearer sk-lw-test", projectId: attackerProjectId },
+        credentials: {
+          caller: {
+            project: { id: attackerProjectId, slug: "attacker" },
+            principalId: "key:test",
+            userId: null,
+          },
+        },
         token,
         inFlightCallIds: [],
       });

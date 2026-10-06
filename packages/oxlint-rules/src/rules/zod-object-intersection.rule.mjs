@@ -35,7 +35,8 @@ export const zodObjectIntersectionRule = defineRule({
     },
     keepRefinements: {
       what: "`{{call}}` intersects a refined Zod object with a plain one.",
-      fix: "Write `left.safeExtend(right.shape)`, which keeps the left side's refinements and parses once.",
+      why: "An intersection parses the value twice and types it as a harder-to-read intersection.",
+      fix: "Write `left.safeExtend(right.shape)`, which keeps the left side's refinements and parses once. Read the `contract` skill.",
     },
   },
   create(context, file) {

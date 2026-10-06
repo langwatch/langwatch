@@ -17,13 +17,14 @@ import {
 } from "@langwatch/github-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import type { CodingAgentBillingPolicy, CodingAgentClock } from "../app/coding-agent.members.ts";
 import type { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
 import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
 import {
   assignablePullRequests,
   pullRequestIdentity,
 } from "../rules/coding-agent-pull-request.rules.ts";
+import type { CodingAgentClock } from "./coding-agent-clock.service.ts";
+import type { CodingAgentBillingPolicy } from "./coding-agent-cost-attribution.service.ts";
 import {
   CodingAgentPersonalPullRequestReadService,
   USAGE_SESSION_WINDOW_MS,
@@ -42,7 +43,7 @@ import type { CodingAgentSessionReadService } from "./coding-agent-session-read.
 
 export const SESSIONS_LIST_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 export const SESSIONS_LIST_LIMIT = 200;
-export const DETAIL_SESSIONS_LIMIT = 50;
+const DETAIL_SESSIONS_LIMIT = 50;
 
 /** Private owner of GitHub-enriched coding-agent session and pull-request reads. */
 export class CodingAgentPullRequestReadService {

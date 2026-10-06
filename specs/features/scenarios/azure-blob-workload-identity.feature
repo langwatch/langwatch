@@ -341,10 +341,11 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     Then the bytes round-trip through Azure Blob
 
   @unit
-  Scenario: Out-of-band maintenance tasks authenticate the same way as the services
-    Given a migration or backfill task that writes bytes outside the request path
-    Then it obtains Azure credentials from the same shared resolver
-    And the deployment documentation states it must run with the same identity as the services
+  Scenario: The storage migration task builds its own Azure credentials and shares the services' token-transport guards
+    Given the storage migration task configured for a token auth mode
+    When its Azure endpoint is plaintext, or sovereign without an authority host
+    Then it refuses to build the migration, as the services do
+    And an https public-cloud endpoint is accepted
 
   # ---------------------------------------------------------------
   # Helm surface

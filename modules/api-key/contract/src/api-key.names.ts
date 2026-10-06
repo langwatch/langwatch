@@ -2,9 +2,9 @@
 export const LANGY_SESSION_API_KEY_NAME = "Langy session";
 
 /**
- * Name of the short-lived key put in a code agent's sandbox. One is minted per
- * run and expires by itself, so the same listing rule as the Langy session key
- * applies.
+ * Name of the short-lived key put in a code agent's sandbox. The runs of one
+ * project share it and it expires by itself, so the same listing rule as the
+ * Langy session key applies.
  */
 export const AGENT_SANDBOX_API_KEY_NAME = "Agent sandbox run";
 

@@ -104,7 +104,7 @@ const FREE_PART_NUMBER_STEMS = ["FREE", "VIRAL", "TRIAL", "_DEV", "DEVELOPER"];
  * a record of a tenant's licences is not the place to keep fields nothing
  * asked for.
  */
-export const subscribedSkuSchema = z.object({
+const subscribedSkuSchema = z.object({
   skuId: z.string(),
   skuPartNumber: z.string(),
   /** "User" or "Company" — Microsoft's own casing. */
@@ -134,7 +134,7 @@ const subscribedSkusResponseSchema = z.object({
   value: z.array(z.unknown()),
 });
 
-export interface SubscribedSkuRead {
+interface SubscribedSkuRead {
   skus: SubscribedSku[];
   /**
    * Pools that could not be read. Counted rather than dropped silently: a

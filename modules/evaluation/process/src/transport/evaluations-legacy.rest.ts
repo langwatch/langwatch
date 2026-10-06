@@ -4,10 +4,21 @@
  * @see specs/monitors/guardrails-api-compatibility.feature
  */
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION, resolver } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  resolver,
+  type RestProtocolRefusal,
+} from "@langwatch/api/rest";
 import { mapZodIssuesToLogContext } from "@langwatch/config";
 import {
+  DATASET_CEILING_LIMITS,
+  DATASET_DEFAULT_LIMITS,
+  formatDatasetByteLimit,
+} from "@langwatch/dataset-contract";
+import {
   EvaluationApi,
+  EvaluationLogResultsTooLargeError,
   EvaluationRestExperimentNotFoundError,
   EvaluatorMissingFieldError,
   acknowledgementSchema,
@@ -83,7 +94,12 @@ const BATCH_EVALUATION_KSUID_PREFIX = "batchevaluation";
 const DEFAULT_MODEL = "openai/gpt-5";
 const DEFAULT_EMBEDDINGS_MODEL = "openai/text-embedding-3-small";
 
-const BATCH_LOG_MAX_BYTES = 20 * 1024 * 1024;
+/**
+ * The largest batch any organization can be raised to. The route has no
+ * project in reach when the body is read, so it declares this ceiling and the
+ * handler then holds the body to the organization's own limit.
+ */
+const BATCH_LOG_MAX_BYTES = DATASET_CEILING_LIMITS.rowBytes;
 const EVALUATE_MAX_BYTES = 30 * 1024 * 1024;
 
 /**
@@ -97,12 +113,33 @@ const PRODUCES_JSON = "application/json";
  * A `POST /api/dataset/evaluate` named an experiment slug this project holds no
  * experiment for.
  */
+/** The refusal a batch log past the ceiling earns, by the code the handler's own check uses. */
+const batchLogTooLarge = (): Error =>
+  new EvaluationLogResultsTooLargeError({ maxBytes: BATCH_LOG_MAX_BYTES });
+
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>
   new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 const LEGACY_PROTOCOL_REASON =
   "Released SDKs parse these doors' own statuses and bodies, refusals included";
+
+/**
+ * Main's 400 for a body not sent as JSON, in the sentence each door has always written;
+ * every other refusal (401, 403, 413) stays on the family's boundary, as before.
+ */
+function malformedBodyAnswers(body: unknown): RestProtocolRefusal {
+  return ({ failure, response }) =>
+    HandledError.isHandled(failure) && failure.code === "malformed_request"
+      ? response.write({ status: 400, mediaType: PRODUCES_JSON, body: JSON.stringify(body) })
+      : response.decline();
+}
+
+/** `log_results`' sentence for a body that is not JSON. */
+const LOG_RESULTS_MALFORMED = malformedBodyAnswers({ message: "Invalid body, expecting json" });
+
+/** The evaluate doors' sentence for a body that is not JSON. */
+const EVALUATE_MALFORMED = malformedBodyAnswers({ message: "Bad request" });
 
 /** One protocol answer, in the shape `c.json(body, status)` used to write. */
 type LegacyAnswer = Readonly<{
@@ -192,15 +229,21 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   })
 
   .post("/api/evaluations/batch/log_results", "postApiEvaluationsBatchLogResults")
-  .withRawBody("text", { mediaType: PRODUCES_JSON })
+  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
-  .withBodyLimit({ maxBytes: BATCH_LOG_MAX_BYTES, onExceeded: payloadTooLarge })
-  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
+  .withBodyLimit({ maxBytes: BATCH_LOG_MAX_BYTES, onExceeded: batchLogTooLarge })
+  .withResponse("protocol", {
+    produces: PRODUCES_JSON,
+    because: LEGACY_PROTOCOL_REASON,
+    refusal: LOG_RESULTS_MALFORMED,
+  })
   .withDocs({
     summary: "Report batch evaluation results",
     requestBody: { schema: eSBatchEvaluationRESTParamsSchema },
     description:
-      "Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.",
+      "Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. " +
+      `Bodies up to ${formatDatasetByteLimit(DATASET_DEFAULT_LIMITS.rowBytes)} are accepted, sized for one dataset row with ten 20 MB images inline. ` +
+      "A larger body is refused with `evaluation_log_results_too_large`.",
     tags: ["Evaluations"],
     responses: {
       200: {
@@ -220,18 +263,26 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
         description: "The API key lacks evaluations:manage",
         content: { [PRODUCES_JSON]: { schema: resolver(evaluateErrorSchema) } },
       },
+      413: {
+        description:
+          "The body is larger than the organization accepts in one request; `error.code` is `evaluation_log_results_too_large` and `error.meta.maxBytes` is the limit",
+      },
     },
   })
-  .handle(async ({ app, raw, request, scope, response }) =>
-    response.write(await logBatchResults({ app, raw, request, projectId: scope.id })),
+  .handle(async ({ app, raw, scope, response }) =>
+    response.write(await logBatchResults({ app, raw, projectId: scope.id })),
   )
 
   .post("/api/evaluations/:evaluator/evaluate", "postApiEvaluationsByEvaluatorEvaluate")
   .withParams(evaluatorParamsSchema)
-  .withRawBody("text", { mediaType: PRODUCES_JSON })
+  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES, onExceeded: payloadTooLarge })
-  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
+  .withResponse("protocol", {
+    produces: PRODUCES_JSON,
+    because: LEGACY_PROTOCOL_REASON,
+    refusal: EVALUATE_MALFORMED,
+  })
   .withDocs({
     summary: "Run an evaluator",
     requestBody: { schema: evaluationInputSchema },
@@ -257,10 +308,14 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     "postApiEvaluationsByEvaluatorBySubpathEvaluate",
   )
   .withParams(namespacedEvaluatorParamsSchema)
-  .withRawBody("text", { mediaType: PRODUCES_JSON })
+  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES, onExceeded: payloadTooLarge })
-  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
+  .withResponse("protocol", {
+    produces: PRODUCES_JSON,
+    because: LEGACY_PROTOCOL_REASON,
+    refusal: EVALUATE_MALFORMED,
+  })
   .withDocs({
     summary: "Run a namespaced evaluator",
     requestBody: { schema: evaluationInputSchema },
@@ -283,10 +338,14 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
 
   .post("/api/guardrails/:evaluator/evaluate", "postApiGuardrailsByEvaluatorEvaluate")
   .withParams(evaluatorParamsSchema)
-  .withRawBody("text", { mediaType: PRODUCES_JSON })
+  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES, onExceeded: payloadTooLarge })
-  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
+  .withResponse("protocol", {
+    produces: PRODUCES_JSON,
+    because: LEGACY_PROTOCOL_REASON,
+    refusal: EVALUATE_MALFORMED,
+  })
   .withDocs({
     summary: "Run an evaluator as a guardrail",
     requestBody: { schema: evaluationInputSchema },
@@ -308,10 +367,14 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   )
 
   .post("/api/dataset/evaluate", "postApiDatasetEvaluate")
-  .withRawBody("text", { mediaType: PRODUCES_JSON })
+  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES, onExceeded: payloadTooLarge })
-  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
+  .withResponse("protocol", {
+    produces: PRODUCES_JSON,
+    because: LEGACY_PROTOCOL_REASON,
+    refusal: EVALUATE_MALFORMED,
+  })
   .withDocs({
     summary: "Evaluate a dataset",
     requestBody: { schema: batchEvaluationInputSchema },
@@ -357,25 +420,16 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
 async function logBatchResults({
   app,
   raw,
-  request,
   projectId,
 }: {
   app: EvaluationApi;
   raw: string;
-  request: Request;
   projectId: string;
 }): Promise<LegacyAnswer> {
-  const contentType = request.headers.get("content-type");
-
-  if (!contentType?.includes(PRODUCES_JSON)) {
-    logger.warn({ contentType }, "log_results request body is not json");
-
-    return answer({ message: "Invalid body, expecting json" }, 400);
-  }
-
   // Size comes from the wire bytes, not a re-serialisation of the parsed body —
   // these payloads carry full dataset entries and LLM outputs.
   const payloadSize = Buffer.byteLength(raw, "utf8");
+  await app.assertBatchLogWithinLimit({ projectId, payloadBytes: payloadSize });
   const body = parseJson(raw);
 
   if (!body) return answer({ message: "Invalid body, expecting json" }, 400);
@@ -1173,7 +1227,7 @@ type EvaluatorIncludingCustom =
  * A built-in or project custom evaluator by type; throws `EvaluatorNotFoundError` when neither
  * has it.
  */
-export const getEvaluatorIncludingCustom = async (
+const getEvaluatorIncludingCustom = async (
   app: EvaluationApi,
   projectId: string,
   checkType: EvaluatorTypes,
@@ -1212,7 +1266,7 @@ export const getEvaluatorIncludingCustom = async (
  * the `{ defaultModel, embeddingsModel }` shape `getEvaluatorDefaultSettings`
  * consumes for its `model` / `embeddings_model` fields.
  */
-export const resolveEvaluatorSettingsDefaults = async (
+const resolveEvaluatorSettingsDefaults = async (
   app: EvaluationApi,
   projectId: string,
 ): Promise<{ defaultModel: string | null; embeddingsModel: string | null }> => {

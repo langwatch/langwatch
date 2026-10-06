@@ -6,16 +6,16 @@ import { webhookDeliveryEventing } from "./eventing/webhook-delivery.pipeline.ts
 import { webhookRepositories } from "./repositories/webhook-repositories.registry.ts";
 import { WebhookEnvelopeService } from "./services/webhook-envelope.service.ts";
 import { webhookEndpointTrpcTransport } from "./transport/webhook-endpoint.trpc.ts";
+import { webhookSpendReplayRest } from "./transport/webhook-spend-replay.rest.ts";
 import { webhookRest } from "./transport/webhook.rest.ts";
 
-export type { WebhookAppDependencies, WebhookTestDispatch } from "./app/webhook.app.ts";
 export type { WebhookLiveDatabase } from "./repositories/prisma/prisma.webhook.repositories.ts";
 
 /** The canonical outbound-webhook feature declaration. */
 export const webhookProcessModule = defineProcessModule("webhook")
   .withRepositories(webhookRepositories)
   .withApi(WebhookModule)
-  .withTransports(webhookEndpointTrpcTransport, webhookRest)
+  .withTransports(webhookEndpointTrpcTransport, webhookRest, webhookSpendReplayRest)
   .withEventing(webhookDeliveryEventing);
 
 /**

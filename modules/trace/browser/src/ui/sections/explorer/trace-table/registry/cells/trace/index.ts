@@ -14,26 +14,26 @@ import { LabelsCell } from "./labels-cell.tsx";
 import { ModelCell } from "./model-cell.tsx";
 import { OutputCell } from "./output-cell.tsx";
 import { PromptCell } from "./prompt-cell.tsx";
-import { RootSpanNameCell } from "./root-span-name-cell.tsx";
-import { RootSpanTypeCell } from "./root-span-type-cell.tsx";
-import { ServiceCell } from "./service-cell.tsx";
 import {
   ConversationIdCell,
   OriginCell,
+  RootSpanNameCell,
+  RootSpanTypeCell,
+  ServiceCell,
+  SpanCountCell,
   StatusCell,
   TokensInCell,
   TokensOutCell,
+  TraceIdCell,
+  TraceNameCell,
   UserIdCell,
 } from "./simple-cells.tsx";
 import { SinceCell } from "./since-cell.tsx";
 import { SizeCell } from "./size-cell.tsx";
-import { SpanCountCell } from "./span-count-cell.tsx";
 import { TimeCell } from "./time-cell.tsx";
 import { TimestampCell } from "./timestamp-cell.tsx";
 import { TokensCell } from "./tokens-cell.tsx";
 import { TraceCell } from "./trace-cell.tsx";
-import { TraceIdCell } from "./trace-id-cell.tsx";
-import { TraceNameCell } from "./trace-name-cell.tsx";
 import { TtftCell } from "./ttft-cell.tsx";
 
 /**

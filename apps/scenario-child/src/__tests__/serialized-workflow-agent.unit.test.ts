@@ -113,12 +113,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
   /** NLP service /studio/execute_sync response format. */
   const nlpResponse = (result: Record<string, unknown> | null) => ({
     ok: true,
-    json: vi.fn().mockResolvedValue({
-      trace_id: "trace_abc123",
-      status: "success",
-      result,
-    }),
-    text: vi.fn().mockResolvedValue(""),
+    status: 200,
+    // The adapter reads the body once, as text, and parses it itself (lw#3439).
+    text: vi
+      .fn()
+      .mockResolvedValue(JSON.stringify({ trace_id: "trace_abc123", status: "success", result })),
   });
 
   const defaultInput: AgentInput = {

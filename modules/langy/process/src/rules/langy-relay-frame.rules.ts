@@ -4,6 +4,7 @@
 import {
   type HandledError,
   type HerrEnvelope,
+  handledErrorFaultSchema,
   handledErrorFromHerr,
 } from "@langwatch/handled-error";
 import { cliToolResultSchema } from "@langwatch/langy-contract";
@@ -33,7 +34,7 @@ const herrEnvelopeWireSchema: z.ZodType<HerrEnvelope> = z.lazy(() =>
     meta: z.record(z.string(), z.unknown()).optional(),
     trace_id: z.string().optional(),
     span_id: z.string().optional(),
-    fault: z.enum(["customer", "platform", "provider"]).optional(),
+    fault: handledErrorFaultSchema.optional(),
     retryable: z.boolean().optional(),
     tips: z.array(z.string()).optional(),
     docs_url: z.string().optional(),
@@ -74,7 +75,7 @@ const TOOL_CALL_ID_MAX_LENGTH = 256;
 
 /** Strip a model provider's round-trip payload from tool call ids. Normalize here to keep
  * start/end/cards/events aligned (specs/langy/langy-tool-call-identity.feature). */
-export function normalizeToolCallId(id: string): string {
+function normalizeToolCallId(id: string): string {
   const separator = id.indexOf(TOOL_CALL_ID_SIGNATURE_SEPARATOR);
   if (separator <= 0) return id;
   const suffix = id.slice(separator + TOOL_CALL_ID_SIGNATURE_SEPARATOR.length);
@@ -88,14 +89,14 @@ export function normalizeToolCallId(id: string): string {
  * AFTER stripping, so a legitimate id wearing a signature isn't rejected
  * for the blob's length; a value still over it is REJECTED, never truncated.
  */
-export const langyToolCallIdSchema = z
+const langyToolCallIdSchema = z
   .string()
   .min(1)
   .transform(normalizeToolCallId)
   .pipe(z.string().min(1).max(TOOL_CALL_ID_MAX_LENGTH));
 
 /** A tool call the agent ran, in the compact shape the durable final carries. */
-export const langyRelayToolCallSchema = z.object({
+const langyRelayToolCallSchema = z.object({
   id: langyToolCallIdSchema,
   name: z.string().min(1),
   input: z.unknown().optional(),
@@ -212,4 +213,3 @@ export const langyRelayFrameSchema: z.ZodType<LangyRelayFrame> = z.discriminated
   "type",
   langyRelayFrameVariants,
 );
-export type LangyRelayToolCall = z.infer<typeof langyRelayToolCallSchema>;

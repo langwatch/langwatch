@@ -18,12 +18,12 @@ export {
   integrationsCheckStatusSchema,
   type OrganizationInitialized,
 } from "./onboarding.responses.ts";
-export { integrationsChecksTrpc } from "./integrations-checks.trpc.ts";
+export { integrationsChecksTrpc } from "./onboarding.trpc.ts";
 export * from "./onboarding.api.ts";
-export * from "./onboarding.errors.ts";
-export * from "./onboarding-rest.schemas.ts";
+export * from "./onboarding-schemas.ts";
 export * from "./onboarding-attribution.ts";
 export * from "./onboarding-experiment.ts";
 export * from "./onboarding-guided-paths.ts";
-export * from "./onboarding-schemas.ts";
 export * from "./onboarding-guided-events.ts";
+export * from "./onboarding-guided-kickoff.ts";
+export * from "./onboarding-guided-tour.ts";

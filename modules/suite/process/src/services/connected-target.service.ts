@@ -23,7 +23,7 @@ type ConnectedAgentRow = {
 };
 
 /** The read `resolveConnectedReferences` needs, and nothing more. */
-export type ConnectedTargetReferenceReader = Pick<
+type ConnectedTargetReferenceReader = Pick<
   AgentApi,
   "getConnectedByNameAndEnvironment" | "getConnectedByName"
 >;

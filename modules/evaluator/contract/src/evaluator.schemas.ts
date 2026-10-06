@@ -1,3 +1,4 @@
+import { uiTokens } from "@langwatch/module";
 /**
  * The inputs the `evaluators.*` tRPC surface publishes, kept in the
  * contract so the wire shape a client is typed against is stated once,
@@ -12,6 +13,7 @@ import {
   newEvaluatorId,
 } from "./evaluator.ts";
 import type { Evaluator, EvaluatorWithFields } from "./evaluator.ts";
+import { evaluatorsSchema } from "./evaluators.generated.ts";
 
 /** One project. The list read names it and nothing else. */
 export const evaluatorApiProjectInputSchema = z.object({ projectId: z.string() });
@@ -162,3 +164,33 @@ export type EvaluatorRelatedEntities = z.infer<typeof evaluatorRelatedEntitiesSc
 export type EvaluatorCascadeArchive = z.infer<typeof evaluatorCascadeArchiveSchema>;
 export type EvaluatorPushToCopiesResult = z.infer<typeof evaluatorPushToCopiesSchema>;
 export type EvaluatorSyncFromSourceResult = z.infer<typeof evaluatorSyncFromSourceSchema>;
+
+/** The settings form evaluator lends the studio's inline evaluator node (§10, §10.1). */
+
+/** What the studio hands evaluator's settings form for an inline evaluator node. */
+export type EvaluatorSettingsFormProps = {
+  evaluatorType: string;
+  initialSettings: Record<string, unknown>;
+  /** Fill in the evaluator's default settings on first render. */
+  applyDefaults: boolean;
+  onChange: (settings: Record<string, unknown>) => void;
+};
+
+export const EvaluatorSettingsFormToken =
+  uiTokens("evaluator").component<EvaluatorSettingsFormProps>("evaluatorSettingsForm");
+
+type SettingsSchema = z.ZodType<Record<string, unknown>, Record<string, unknown>>;
+
+const settingsSchemas: Readonly<Record<string, SettingsSchema>> = Object.fromEntries(
+  Object.entries(evaluatorsSchema.shape).map(([type, schema]) => [type, schema.shape.settings]),
+);
+
+/** A built-in evaluator's settings schema; custom and retired evaluators have none. */
+export type EvaluatorSettingsSchemaLookup =
+  | { found: true; schema: SettingsSchema }
+  | { found: false };
+
+export function evaluatorSettingsSchemaFor(checkType: string): EvaluatorSettingsSchemaLookup {
+  const schema = settingsSchemas[checkType];
+  return schema ? { found: true, schema } : { found: false };
+}

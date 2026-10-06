@@ -102,7 +102,7 @@ export const CONTRACT_ARTIFACT_ONLY = new RegExp(`^(?:${CONTRACT_ARTIFACTS})\\.t
  * file prints. A test pins it to `PROCESS_PATTERNS` so the two cannot drift.
  */
 export const PROCESS_HOMES =
-  "index.ts, <feature>.module.ts, app/<feature>.app.ts, app/<feature>.members.ts, " +
+  "index.ts, <feature>.module.ts, app/<feature>.app.ts, app/<feature>.members.ts (deleted, §15: conversion debt that only shrinks), " +
   "transport/<feature>.<rest|trpc|ws>.ts, services/<name>.service.ts, " +
   "repositories/ (interfaces, the bundle, the registry, and a backend folder beside them), " +
   "channels/ (the interface, the bundle, the registry, and a tier folder beside them), " +
@@ -110,7 +110,7 @@ export const PROCESS_HOMES =
   "tasks/<name>.task.ts, migrations/, " +
   "features/<concern>/ holding that concern's own services/, rules/, repositories/ and eventing/ " +
   "(one level, nothing else nests), " +
-  "app/<feature>-composition.build.ts (the ported process composition a converted module still carries; it only shrinks)";
+  "app/<feature>-composition.build.ts (deleted, §15: the ported process composition a converted module still carries; it only shrinks)";
 
 /**
  * One level of concern nesting (ARCHITECTURE.md, "Process and contract nest

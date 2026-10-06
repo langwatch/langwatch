@@ -1,11 +1,15 @@
 import { createHash } from "node:crypto";
 
+import {
+  evaluationInputKey,
+  isEvaluationInputKeyOf,
+} from "../../rules/evaluation-input-object.rules.ts";
 import type {
   EvaluationInputRepository,
   StoredEvaluationInput,
 } from "../evaluation-input.repository.ts";
 
-/** The memory twin of the object-storage input repository: same ids, same unknown-id answer. */
+/** The memory twin of the object-storage input repository: same keys, same unknown-key answer. */
 export class MemoryEvaluationInputRepository implements EvaluationInputRepository {
   static create(): MemoryEvaluationInputRepository {
     return new MemoryEvaluationInputRepository();
@@ -15,19 +19,23 @@ export class MemoryEvaluationInputRepository implements EvaluationInputRepositor
 
   private constructor() {}
 
-  async store(input: {
-    tenantId: string;
-    evaluationId: string;
-    bytes: Uint8Array;
-  }): Promise<{ id: string }> {
-    const id = createHash("sha256").update(input.evaluationId).digest("hex");
-    this.#objects.set(`${input.tenantId}/${id}`, input.bytes.slice());
+  async store(
+    input: Parameters<EvaluationInputRepository["store"]>[0],
+  ): Promise<{ key: string; sha256: string }> {
+    const sha256 = createHash("sha256").update(input.bytes).digest("hex");
+    const key = evaluationInputKey({
+      retentionClass: input.retentionClass,
+      tenantId: input.tenantId,
+      sha256,
+    });
+    this.#objects.set(`${input.tenantId}\0${key}`, input.bytes.slice());
 
-    return { id };
+    return { key, sha256 };
   }
 
-  async read(input: { tenantId: string; id: string }): Promise<StoredEvaluationInput> {
-    const bytes = this.#objects.get(`${input.tenantId}/${input.id}`);
+  async read(input: { tenantId: string; key: string }): Promise<StoredEvaluationInput> {
+    if (!isEvaluationInputKeyOf(input)) return { kind: "absent" };
+    const bytes = this.#objects.get(`${input.tenantId}\0${input.key}`);
     return bytes ? { kind: "stored", body: once(bytes) } : { kind: "absent" };
   }
 }

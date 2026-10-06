@@ -21,12 +21,12 @@
 
 import { z } from "zod";
 
-import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import type { DiscoveredPersonRecord, PeopleListing } from "../../rules/people-listing.rules.ts";
 import { peopleListed, peopleRefused } from "../../rules/people-listing.rules.ts";
 import type { ListingRefusal } from "../../rules/provider-listing.rules.ts";
 import { refusalFromStatus, refusalFromThrown } from "../../rules/provider-listing.rules.ts";
 import type { AdminApiUsersChannel } from "../admin-api-users.channel.ts";
+import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 
 const LISTING_TIMEOUT_MS = 15_000;
 const PAGE_SIZE = 100;

@@ -1,8 +1,13 @@
 import type {
+  InviteStatus,
   JoinRequestJoining,
+  Organization,
+  OrganizationJsonValue,
+  OrganizationCurrency,
   OrganizationIntent,
   OrganizationUserRole,
   PersonalFeatures,
+  PricingModel,
   TeamUserRole,
 } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
@@ -21,6 +26,9 @@ export interface MemoryOrganizationRow {
   s3SecretAccessKey: string | null;
   s3Bucket: string | null;
   stripeCustomerId: string | null;
+  /** Absent reads as the twin's own projection: SEAT_EVENT in USD. */
+  pricingModel?: PricingModel;
+  currency?: OrganizationCurrency;
   sentPlanLimitAlert?: Instant | null;
   /** Every sign-up answer the organization carries, guided onboarding among
    *  them. Shapeless here for the reason it is shapeless in Postgres. */
@@ -28,8 +36,15 @@ export interface MemoryOrganizationRow {
   /** How colleagues on a matching domain get in; absent reads as asking. */
   domainJoin?: JoinRequestJoining["domainJoin"];
   joinDomains?: string[];
+  /** The seat a joiner without an invitation lands on (ADR-171); absent reads as MEMBER. */
+  joinerRole?: "MEMBER" | "DEVELOPER";
   /** The CLI/device session ceiling in days; absent reads as unbounded. */
   maxSessionDurationDays?: number;
+  /** The per-file dataset limit an operator set, in mebibytes. */
+  datasetAttachmentMaxMb?: number | null;
+  /** The organization's own Instant Evals consent; absent reads as not given. */
+  instantEvalsEnabledAt?: Instant | null;
+  instantEvalsEnabledByUserId?: string | null;
   createdAt: Instant;
   updatedAt: Instant;
 }
@@ -67,10 +82,31 @@ export interface MemoryUserRow {
   name: string | null;
   email: string | null;
   deactivatedAt: Instant | null;
+  /** The legacy verified-email flag; absent reads as unverified. */
+  emailVerified?: boolean;
+}
+
+/** One invitation row, every column the invite repository reads or writes. */
+export interface MemoryOrganizationInviteRow {
+  id: string;
+  email: string;
+  inviteCode: string;
+  expiration: Instant | null;
+  status: InviteStatus;
+  organizationId: string;
+  teamIds: string;
+  teamAssignments: OrganizationJsonValue | null;
+  role: OrganizationUserRole;
+  requestedBy: string | null;
+  subscriptionId: string | null;
+  acceptedByUserId: string | null;
+  acceptedViaIdentifierId: string | null;
+  createdAt: Instant;
+  updatedAt: Instant;
 }
 
 /** One team-scoped membership row (the `TeamUser` join table). */
-export interface MemoryTeamUserRow {
+interface MemoryTeamUserRow {
   teamId: string;
   userId: string;
   role: TeamUserRole;
@@ -80,7 +116,7 @@ export interface MemoryTeamUserRow {
 }
 
 /** One custom role, the fields a seat's assignability check reads. */
-export interface MemoryCustomRoleRow {
+interface MemoryCustomRoleRow {
   id: string;
   organizationId: string;
   name: string;
@@ -105,10 +141,13 @@ export interface MemoryAuditLogRow {
   targetId: string | null;
   before: unknown;
   after: unknown;
+  /** Who really acted, where that is not `userId`; absent reads as nobody else. */
+  actorUserId?: string | null;
+  metadata?: unknown;
 }
 
 /** One project row, only the columns the personal workspace needs. */
-export interface MemoryProjectRow {
+interface MemoryProjectRow {
   id: string;
   name: string;
   slug: string;
@@ -137,6 +176,47 @@ export interface MemoryGroupRow {
   updatedAt: Instant;
 }
 
+/** The contract's organization over a memory row, every column the row lacks at its default. */
+export function organizationOfRow(row: MemoryOrganizationRow): Organization {
+  return {
+    id: row.id,
+    name: row.name,
+    phoneNumber: null,
+    slug: row.slug,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    usageSpendingMaxLimit: null,
+    maxSessionDurationDays: 30,
+    mfaRequired: false,
+    signupData: null,
+    signedDPA: false,
+    elasticsearchNodeUrl: null,
+    elasticsearchApiKey: null,
+    useCustomElasticsearch: false,
+    s3Endpoint: row.s3Endpoint,
+    s3AccessKeyId: row.s3AccessKeyId,
+    s3SecretAccessKey: row.s3SecretAccessKey,
+    s3Bucket: row.s3Bucket,
+    useCustomS3: false,
+    sentPlanLimitAlert: null,
+    ssoDomain: null,
+    ssoProvider: null,
+    domainJoin: "invite_only",
+    joinDomains: [],
+    presenceEnabled: row.presenceEnabled,
+    traceSharingEnabled: row.traceSharingEnabled,
+    supportContact: row.supportContact,
+    primaryIntent: row.primaryIntent,
+    promoCode: null,
+    stripeCustomerId: row.stripeCustomerId,
+    currency: "USD",
+    pricingModel: "SEAT_EVENT",
+    license: null,
+    licenseExpiresAt: null,
+    licenseLastValidatedAt: null,
+  };
+}
+
 /**
  * The rows the organization, team and group memory repositories share — one
  * instance per boot, the way `MemoryProjectDatabase` shares tables across the
@@ -154,6 +234,7 @@ export class MemoryOrganizationDatabase {
   readonly teamUsers: MemoryTeamUserRow[] = [];
   readonly customRoles = new Map<string, MemoryCustomRoleRow>();
   readonly auditLogs: MemoryAuditLogRow[] = [];
+  readonly invites = new Map<string, MemoryOrganizationInviteRow>();
 
   static create(): MemoryOrganizationDatabase {
     return new MemoryOrganizationDatabase();

@@ -138,43 +138,58 @@ func (s *Server) serveConsoleAPI(w http.ResponseWriter, r *http.Request, path st
 	case path == "/info" && r.Method == http.MethodGet:
 		writeJSON(w, map[string]any{"sim": "llm", "stack": s.cfg.Stack, "models": Models, "capacity": s.cfg.MaxCalls, "settings": s.settings()})
 	case path == "/calls" && r.Method == http.MethodGet:
-		calls := s.calls.newest()
-		for i := range calls {
-			calls[i].Request, calls[i].Response = nil, nil
-		}
-		writeJSON(w, map[string]any{"calls": calls})
+		writeJSON(w, map[string]any{"calls": s.callSummaries()})
 	case path == "/calls" && r.Method == http.MethodDelete:
 		s.calls.mu.Lock()
 		s.calls.items, s.calls.next = s.calls.items[:0], 0
 		s.calls.mu.Unlock()
 		w.WriteHeader(http.StatusNoContent)
 	case strings.HasPrefix(path, "/calls/") && r.Method == http.MethodGet:
-		id := strings.TrimPrefix(path, "/calls/")
-		calls := s.calls.newest()
-		for i := range calls {
-			if calls[i].ID == id {
-				writeJSON(w, calls[i])
-				return
-			}
-		}
-		writeError(w, false, http.StatusNotFound, "no recent call "+id)
+		s.serveConsoleCall(w, strings.TrimPrefix(path, "/calls/"))
 	case path == "/settings" && r.Method == http.MethodGet:
 		writeJSON(w, s.settings())
 	case path == "/settings" && r.Method == http.MethodPut:
-		var next Settings
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&next); err != nil {
-			writeError(w, false, http.StatusBadRequest, "settings body is not JSON: "+err.Error())
-			return
-		}
-		if next.ForcedError != 0 && (next.ForcedError < 400 || next.ForcedError > 599) {
-			writeError(w, false, http.StatusBadRequest, "forcedError is 0 (off) or a 4xx/5xx status")
-			return
-		}
-		s.mu.Lock()
-		s.set = next
-		s.mu.Unlock()
-		writeJSON(w, next)
+		s.putConsoleSettings(w, r)
 	default:
-		writeError(w, false, http.StatusNotFound, "no console route "+r.Method+" "+path)
+		writeError(w, providerError{status: http.StatusNotFound, message: "no console route " + r.Method + " " + path})
 	}
+}
+
+// callSummaries is the recent calls, newest first, without their bodies.
+func (s *Server) callSummaries() []record {
+	calls := s.calls.newest()
+	for i := range calls {
+		calls[i].Request, calls[i].Response = nil, nil
+	}
+	return calls
+}
+
+// serveConsoleCall answers one recent call by id, bodies included.
+func (s *Server) serveConsoleCall(w http.ResponseWriter, id string) {
+	calls := s.calls.newest()
+	for i := range calls {
+		if calls[i].ID == id {
+			writeJSON(w, calls[i])
+			return
+		}
+	}
+	writeError(w, providerError{status: http.StatusNotFound, message: "no recent call " + id})
+}
+
+// putConsoleSettings replaces the settings, refusing a forced error that is
+// not a 4xx or 5xx status.
+func (s *Server) putConsoleSettings(w http.ResponseWriter, r *http.Request) {
+	var next Settings
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&next); err != nil {
+		writeError(w, providerError{status: http.StatusBadRequest, message: "settings body is not JSON: " + err.Error()})
+		return
+	}
+	if next.ForcedError != 0 && (next.ForcedError < 400 || next.ForcedError > 599) {
+		writeError(w, providerError{status: http.StatusBadRequest, message: "forcedError is 0 (off) or a 4xx/5xx status"})
+		return
+	}
+	s.mu.Lock()
+	s.set = next
+	s.mu.Unlock()
+	writeJSON(w, next)
 }

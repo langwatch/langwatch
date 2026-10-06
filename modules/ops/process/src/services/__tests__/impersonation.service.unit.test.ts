@@ -1,8 +1,8 @@
+import type { SessionImpersonation, SessionImpersonationState } from "@langwatch/auth-contract";
 import {
   CannotImpersonateAdminError,
   CannotImpersonateDeactivatedUserError,
   CannotImpersonateWithoutSecondFactorError,
-  CannotReimpersonateWhileImpersonatingError,
   UserToImpersonateNotFoundError,
 } from "@langwatch/ops-contract";
 import { Temporal } from "@langwatch/time";
@@ -12,13 +12,20 @@ import { platformOperatorAuthz } from "../../app/__tests__/ops.fixture.ts";
 import {
   ImpersonationRepository,
   type ImpersonationTarget,
-  type ImpersonationWindow,
 } from "../../repositories/impersonation.repository.ts";
 import { AdminAccessService } from "../admin-access.service.ts";
-import { AdminAuditSink, ImpersonationService } from "../impersonation.service.ts";
+import {
+  AdminAuditSink,
+  ImpersonationService,
+  type ImpersonationSessions,
+} from "../impersonation.service.ts";
 
-class InMemoryImpersonationRepository extends ImpersonationRepository {
-  window: ImpersonationWindow | null = null;
+/** Auth's claims as ops sees them through its peer: `window` is the live impersonation, if any. */
+class InMemoryImpersonationRepository
+  extends ImpersonationRepository
+  implements ImpersonationSessions
+{
+  window: SessionImpersonation | null = null;
   operatorsAsked: string[] = [];
   targetsAsked: string[] = [];
 
@@ -35,21 +42,26 @@ class InMemoryImpersonationRepository extends ImpersonationRepository {
     return Promise.resolve(this.target);
   }
 
-  findWindow(): Promise<ImpersonationWindow | null> {
-    return Promise.resolve(this.window);
-  }
-
   hasSecondFactor(userId: string): Promise<boolean> {
     this.operatorsAsked.push(userId);
     return Promise.resolve(this.operatorHasSecondFactor);
   }
 
-  setWindow(_sessionId: string, window: ImpersonationWindow): Promise<void> {
-    this.window = window;
+  getImpersonation(): Promise<SessionImpersonationState> {
+    return Promise.resolve(
+      this.window ? { kind: "impersonating", impersonation: this.window } : { kind: "none" },
+    );
+  }
+
+  startImpersonation({
+    sessionId: _sessionId,
+    ...claims
+  }: SessionImpersonation & { sessionId: string; reason: string }): Promise<void> {
+    this.window = claims;
     return Promise.resolve();
   }
 
-  clearWindow(): Promise<void> {
+  stopImpersonation(): Promise<void> {
     this.window = null;
     return Promise.resolve();
   }
@@ -89,6 +101,7 @@ const serviceFor = (repository: InMemoryImpersonationRepository) => {
     audit,
     service: ImpersonationService.create({
       repository,
+      sessions: repository,
       access: AdminAccessService.create({
         authz: platformGrants,
         users: { findByEmail: async () => null },
@@ -108,7 +121,10 @@ const input = {
 };
 
 describe("ImpersonationService", () => {
-  /** @scenario "A healthy target receives a bounded session window" */
+  /**
+   * @scenario "A healthy target receives a bounded session window"
+   * @scenario Starting an impersonation still takes a reason
+   */
   it("audits before installing a one-hour impersonation window", async () => {
     const repository = new InMemoryImpersonationRepository(target());
     const { audit, service } = serviceFor(repository);
@@ -124,9 +140,12 @@ describe("ImpersonationService", () => {
         req: input.req,
       },
     ]);
-    expect(repository.window?.expires.toString({ fractionalSecondDigits: 3 })).toBe(
-      "2026-01-01T01:00:00.000Z",
-    );
+    expect(repository.window).toEqual({
+      actorUserId: "user_admin",
+      subjectUserId: "user_target",
+      reason: "Debugging trace 42",
+      expiresAt: Temporal.Instant.from("2026-01-01T01:00:00.000Z"),
+    });
   });
 
   /** @scenario An administrator cannot impersonate another administrator */
@@ -148,6 +167,17 @@ describe("ImpersonationService", () => {
         new InMemoryImpersonationRepository(target({ id: PLATFORM_OPERATOR_ID })),
       ).service.start(input),
     ).rejects.toBeInstanceOf(CannotImpersonateAdminError);
+  });
+
+  /** @scenario "An admin cannot impersonate another admin" */
+  it("reports cannot_impersonate_admin and leaves the session as it was", async () => {
+    const repository = new InMemoryImpersonationRepository(target({ id: PLATFORM_OPERATOR_ID }));
+    const { audit, service } = serviceFor(repository);
+
+    await expect(service.start(input)).rejects.toMatchObject({ code: "cannot_impersonate_admin" });
+
+    expect(repository.window).toBeNull();
+    expect(audit.entries).toEqual([]);
   });
 
   describe("when the target belongs to an organization that requires a second factor", () => {
@@ -177,7 +207,7 @@ describe("ImpersonationService", () => {
 
       await service.start(input);
 
-      expect(repository.window?.id).toBe("user_target");
+      expect(repository.window?.subjectUserId).toBe("user_target");
     });
 
     /** @scenario "Looking up the requirement decides the request rather than failing it" */
@@ -188,45 +218,37 @@ describe("ImpersonationService", () => {
       await service.start(input);
 
       expect(repository.operatorsAsked).toEqual([]);
-      expect(repository.window?.id).toBe("user_target");
+      expect(repository.window?.subjectUserId).toBe("user_target");
     });
   });
 
   describe("when the acting session is already impersonating somebody", () => {
-    const openWindow = (overrides: Partial<ImpersonationWindow> = {}): ImpersonationWindow => ({
-      id: "user_other_subject",
-      name: "Other",
-      email: "other@example.com",
-      image: null,
-      expires: Temporal.Instant.from("2026-01-01T00:30:00.000Z"),
-      ...overrides,
+    const openWindow = (): SessionImpersonation => ({
+      actorUserId: "user_admin",
+      subjectUserId: "user_other_subject",
+      reason: "Earlier ticket",
+      expiresAt: Temporal.Instant.from("2026-01-01T00:30:00.000Z"),
     });
 
     /** @scenario An operator already impersonating cannot jump straight to another account */
+    /** @scenario "An operator cannot hop from one impersonation straight into another" */
     it("refuses the hop before looking the target up or auditing anything", async () => {
       const repository = new InMemoryImpersonationRepository(target());
       repository.window = openWindow();
       const { audit, service } = serviceFor(repository);
 
-      await expect(service.start(input)).rejects.toBeInstanceOf(
-        CannotReimpersonateWhileImpersonatingError,
-      );
+      await expect(service.start(input)).rejects.toMatchObject({
+        code: "cannot_reimpersonate_while_impersonating",
+      });
       expect(repository.targetsAsked).toEqual([]);
       expect(audit.entries).toEqual([]);
       expect(repository.window).toEqual(openWindow());
     });
 
-    /** @scenario An operator already impersonating cannot jump straight to another account */
-    it("allows the start once the window has lapsed or names the operator themselves", async () => {
-      const lapsed = new InMemoryImpersonationRepository(target());
-      lapsed.window = openWindow({ expires: Temporal.Instant.from("2025-12-31T23:59:59.000Z") });
-      await serviceFor(lapsed).service.start(input);
-      expect(lapsed.window?.id).toBe("user_target");
-
-      const own = new InMemoryImpersonationRepository(target());
-      own.window = openWindow({ id: "user_admin" });
-      await serviceFor(own).service.start(input);
-      expect(own.window?.id).toBe("user_target");
+    it("starts once auth reads the session as the operator's own again", async () => {
+      const repository = new InMemoryImpersonationRepository(target());
+      await serviceFor(repository).service.start(input);
+      expect(repository.window?.subjectUserId).toBe("user_target");
     });
   });
 

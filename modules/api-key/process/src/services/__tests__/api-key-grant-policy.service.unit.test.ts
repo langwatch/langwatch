@@ -6,6 +6,7 @@
 
 import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
 import type { ApiKeyScope } from "@langwatch/api-key-contract";
+import { MemberNotFoundError } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
 import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
@@ -18,6 +19,7 @@ type Fakes = {
   scopeBindings?: { apiKeyId: string; role: string; expiresAt?: Date | null }[];
   customRoles?: { id: string; permissions: unknown }[];
   team?: "found" | "missing";
+  seat?: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER" | "absent";
   project?: { archivedAt?: Date | null; team: { id: string; organizationId: string } };
   personalOwner?: string | null;
   attached?: { attached: string[]; duplicates: string[] };
@@ -52,6 +54,10 @@ function policyWith(fakes: Fakes = {}) {
       getTeam: async () => {
         if (fakes.team === "missing") throw new Error("no such team");
         return { id: "team-1" };
+      },
+      getMember: async (input: { userId: string }) => {
+        if (fakes.seat === "absent") throw new MemberNotFoundError(input.userId);
+        return { role: fakes.seat ?? "ADMIN" };
       },
     },
     projects: {
@@ -92,7 +98,8 @@ const scope = (over: Partial<ApiKeyScope> = {}): ApiKeyScope => ({
 describe("ApiKeyGrantPolicyService", () => {
   describe("assertCeiling()", () => {
     describe("given a user who does not hold the permission being granted", () => {
-      /** @scenario Service rejects permissions above creator ceiling */
+      /** @scenario "Service rejects permissions above creator ceiling" */
+      /** @scenario "A personal key cannot exceed its owner's live grants" */
       it("refuses to mint a key above its owner's ceiling", async () => {
         const { service } = policyWith({ can: false });
 
@@ -167,7 +174,7 @@ describe("ApiKeyGrantPolicyService", () => {
     });
 
     describe("given an organization key as the granting credential", () => {
-      /** @scenario A key-authenticated request grants at most what the requesting key holds */
+      /** @scenario "A key-authenticated request grants at most what the requesting key holds" */
       it("asks the ceiling of the key, not of its owner", async () => {
         const { service, calls } = policyWith({});
 
@@ -215,6 +222,7 @@ describe("ApiKeyGrantPolicyService", () => {
         });
       }
 
+      /** @scenario "A built-in role is checked as every permission it confers" */
       it("refuses an organization Member key to someone who holds only organization:view", async () => {
         const { service } = policyWith({
           allow: (permission) => permission === "organization:view",
@@ -299,7 +307,7 @@ describe("ApiKeyGrantPolicyService", () => {
     });
 
     describe("given a project owned by another organization", () => {
-      /** @scenario Service validates scope belongs to organization */
+      /** @scenario "Service validates scope belongs to organization" */
       it("refuses it, rather than resolving a scope across the tenant boundary", async () => {
         const { service } = policyWith({
           project: { archivedAt: null, team: { id: "team-1", organizationId: "other-org" } },
@@ -353,8 +361,8 @@ describe("ApiKeyGrantPolicyService", () => {
       });
     });
 
-    /** @scenario "Only a platform-minted key with no owner may be bound to a personal workspace it is not owned in" */
     describe("given a system-managed key with no owner", () => {
+      /** @scenario "Only a platform-minted key with no owner may be bound to a personal workspace it is not owned in" */
       it("allows a personal workspace without making the key the owner's", async () => {
         const { service } = policyWith({ personalOwner: "user-2" });
 
@@ -508,7 +516,7 @@ describe("ApiKeyGrantPolicyService", () => {
     });
 
     describe("given an organization admin grant past its end moment", () => {
-      /** @scenario An expired organization admin is not an admin for API key management */
+      /** @scenario "An expired organization admin is not an admin for API key management" */
       it("does not count it", async () => {
         const { service } = policyWith({
           userBindings: [
@@ -519,6 +527,45 @@ describe("ApiKeyGrantPolicyService", () => {
               expiresAt: new Date("2020-01-01T00:00:00.000Z"),
             },
           ],
+        });
+
+        await expect(service.isOrgAdmin({ userId: "user-1", organizationId: ORG })).resolves.toBe(
+          false,
+        );
+      });
+    });
+
+    describe("given an organization admin binding left on a Developer seat", () => {
+      it("does not count it", async () => {
+        const { service } = policyWith({
+          seat: "DEVELOPER",
+          userBindings: [{ scopeType: "ORGANIZATION", scopeId: ORG, role: "ADMIN" }],
+        });
+
+        await expect(service.isOrgAdmin({ userId: "user-1", organizationId: ORG })).resolves.toBe(
+          false,
+        );
+      });
+    });
+
+    describe("given an organization admin binding left on a Lite Member seat", () => {
+      it("does not count it", async () => {
+        const { service } = policyWith({
+          seat: "EXTERNAL",
+          userBindings: [{ scopeType: "ORGANIZATION", scopeId: ORG, role: "ADMIN" }],
+        });
+
+        await expect(service.isOrgAdmin({ userId: "user-1", organizationId: ORG })).resolves.toBe(
+          false,
+        );
+      });
+    });
+
+    describe("given an organization admin binding for someone no longer a member", () => {
+      it("does not count it", async () => {
+        const { service } = policyWith({
+          seat: "absent",
+          userBindings: [{ scopeType: "ORGANIZATION", scopeId: ORG, role: "ADMIN" }],
         });
 
         await expect(service.isOrgAdmin({ userId: "user-1", organizationId: ORG })).resolves.toBe(
@@ -542,7 +589,7 @@ describe("ApiKeyGrantPolicyService", () => {
 
   describe("isOrgAdminApiKey()", () => {
     describe("given the key's organization admin grant past its end moment", () => {
-      /** @scenario An expired organization admin is not an admin for API key management */
+      /** @scenario "An expired organization admin is not an admin for API key management" */
       it("does not count it", async () => {
         const { service } = policyWith({
           scopeBindings: [
@@ -568,7 +615,7 @@ describe("ApiKeyGrantPolicyService", () => {
     };
 
     describe("given a key created by a person", () => {
-      /** @scenario A service key's grants are bounded by the person who creates it */
+      /** @scenario "A service key's grants are bounded by the person who creates it" */
       it("asks authz's ceiling as that person for built-in roles, and as the system for the key's own role", async () => {
         const { service, calls } = policyWith({});
 
@@ -603,7 +650,7 @@ describe("ApiKeyGrantPolicyService", () => {
       // changing its name. Everything comes back as a duplicate and nothing is
       // freshly attached — and the bindings to keep are exactly those
       // duplicates, so they have to survive the revoke.
-      /** @scenario Editing a key without changing its scopes keeps them */
+      /** @scenario "Editing a key without changing its scopes keeps them" */
       it("keeps the bindings it just confirmed, rather than revoking them all", async () => {
         const { service, calls } = policyWith({
           attached: { attached: [], duplicates: ["binding-1"] },
@@ -619,6 +666,20 @@ describe("ApiKeyGrantPolicyService", () => {
     });
 
     describe("given a replace that attaches some and repeats others", () => {
+      /** @scenario "Replacing grants is fail-safe" */
+      it("revokes the previous grants only after the new ones are attached", async () => {
+        const { service, calls } = policyWith({
+          attached: { attached: ["binding-2"], duplicates: ["binding-1"] },
+        });
+
+        await service.writeBindings(input);
+
+        const order = calls.map((call) => call.method);
+        expect(order.indexOf("revokeBindingsWhere")).toBeGreaterThan(
+          order.lastIndexOf("attachBindings"),
+        );
+      });
+
       it("keeps both", async () => {
         const { service, calls } = policyWith({
           attached: { attached: ["binding-2"], duplicates: ["binding-1"] },
@@ -685,7 +746,7 @@ describe("ApiKeyGrantPolicyService", () => {
         permissions: ["project:view", "organization:view"],
       };
 
-      /** @scenario Service stores CustomRole permissions as sorted array */
+      /** @scenario "Service stores CustomRole permissions as sorted array" */
       it("stores them sorted, so the same grant has one spelling on the role", async () => {
         const { service, calls } = policyWith({});
 
@@ -696,7 +757,7 @@ describe("ApiKeyGrantPolicyService", () => {
         });
       });
 
-      /** @scenario Creating a restricted key creates a CustomRole and links it to bindings */
+      /** @scenario "Creating a restricted key creates a CustomRole and links it to bindings" */
       it("mints the key's own role and points its CUSTOM bindings at it", async () => {
         const { service, calls } = policyWith({});
 
@@ -709,7 +770,7 @@ describe("ApiKeyGrantPolicyService", () => {
         expect(result[0]?.customRoleId).toBe("apikey:key-1");
       });
 
-      /** @scenario Updating a key from All to Restricted upserts a CustomRole */
+      /** @scenario "Updating a key from All to Restricted upserts a CustomRole" */
       it("reuses the same role id when an existing key becomes restricted", async () => {
         // The update path names no role id, so a key that gains permissions
         // later lands on the one derived from its own id rather than a second

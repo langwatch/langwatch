@@ -9,6 +9,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   AlreadyOrganizationMemberError,
   DuplicateInviteError,
+  DeveloperSeatNoSharedAccessError,
   LiteMemberViewerOnlyError,
   MemberSeatLimitReachedError,
   OrganizationUserRole,
@@ -20,7 +21,7 @@ import {
 } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { OrganizationInviteMail } from "../app/organization.members.ts";
+import type { OrganizationInviteMail } from "../channels/organization-invite-mail.channel.ts";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import {
   INVITE_BATCH_TXN_MAX_WAIT_MS,
@@ -142,7 +143,12 @@ export class InviteCreationService {
       });
 
     if (!subscriptionLimits.overrideAddingLimitations) {
-      if (currentFullMembers + newFullMembers > subscriptionLimits.maxMembers) {
+      // A pool this batch adds nobody to is not checked: a Developer-only batch
+      // enters neither, so a plan at its cap still admits it (ADR-171).
+      if (
+        newFullMembers > 0 &&
+        currentFullMembers + newFullMembers > subscriptionLimits.maxMembers
+      ) {
         throw new MemberSeatLimitReachedError({
           meta: {
             limitType: "members",
@@ -152,7 +158,10 @@ export class InviteCreationService {
         });
       }
 
-      if (currentMembersLite + newLiteMembers > subscriptionLimits.maxMembersLite) {
+      if (
+        newLiteMembers > 0 &&
+        currentMembersLite + newLiteMembers > subscriptionLimits.maxMembersLite
+      ) {
         throw new MemberSeatLimitReachedError({
           meta: {
             limitType: "membersLite",
@@ -175,6 +184,10 @@ export class InviteCreationService {
     role: OrganizationUserRole;
     teamAssignments?: TeamAssignmentInput[];
   }): void {
+    if (role === OrganizationUserRole.DEVELOPER) {
+      if ((teamAssignments ?? []).length > 0) throw new DeveloperSeatNoSharedAccessError();
+      return;
+    }
     if (role !== OrganizationUserRole.EXTERNAL) {
       return;
     }
@@ -221,6 +234,7 @@ export class InviteCreationService {
         ? { teamAssignments: input.teamAssignments }
         : {}),
       role: input.role,
+      requestedBy: input.requestedBy ?? null,
     });
   }
 
@@ -292,11 +306,14 @@ export class InviteCreationService {
     organizationId,
     invites,
     user,
+    requestedBy,
     validation,
   }: {
     organizationId: string;
     invites: CreateInvitesInviteInput[];
     user?: PlanProviderUser;
+    /** The user the invitations are recorded as sent by; none for a service. */
+    requestedBy?: string;
     validation: "strict" | "lenient";
   }): Promise<{
     organization: Organization & { members: OrganizationUser[] };
@@ -332,7 +349,7 @@ export class InviteCreationService {
       (transaction) =>
         this.persistInvites({
           transaction,
-          invites: validInvites,
+          invites: validInvites.map((invite) => ({ ...invite, requestedBy: requestedBy ?? null })),
           organization,
           isStrict,
         }),

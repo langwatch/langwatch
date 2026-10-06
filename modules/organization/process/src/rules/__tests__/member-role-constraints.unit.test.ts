@@ -1,8 +1,11 @@
 import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
 
+import { resolveInviteTeamMemberships } from "../invite-memberships.rules.ts";
 import type { TeamRoleValue } from "../member-role-constraints.rules.ts";
 import {
+  holdsOrganizationBinding,
+  holdsSharedAccess,
   getAutoCorrectedTeamRoleForOrganizationRole,
   getDefaultTeamRoleForOrganizationRole,
   getOrganizationRoleLabel,
@@ -281,5 +284,42 @@ describe("memberRoleConstraints", () => {
         ).toBe(TeamUserRole.ADMIN);
       });
     });
+  });
+});
+
+describe("given a Developer seat", () => {
+  /** @scenario A Developer cannot be given a role on a shared team */
+  it("allows no role on a shared team and stores no shared row", () => {
+    for (const teamRole of [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER]) {
+      expect(
+        isTeamRoleAllowedForOrganizationRole({
+          organizationRole: OrganizationUserRole.DEVELOPER,
+          teamRole,
+        }),
+      ).toBe(false);
+      expect(
+        isBindingRoleAllowedForOrganizationRole({
+          organizationRole: OrganizationUserRole.DEVELOPER,
+          role: teamRole,
+        }),
+      ).toBe(false);
+    }
+  });
+
+  it("holds neither shared access nor the organization binding", () => {
+    expect(holdsSharedAccess(OrganizationUserRole.DEVELOPER)).toBe(false);
+    expect(holdsOrganizationBinding(OrganizationUserRole.DEVELOPER)).toBe(false);
+    expect(holdsOrganizationBinding(OrganizationUserRole.EXTERNAL)).toBe(false);
+    expect(holdsOrganizationBinding(OrganizationUserRole.MEMBER)).toBe(true);
+  });
+
+  it("lands an accepted invitation on no team, whatever it promised", () => {
+    expect(
+      resolveInviteTeamMemberships({
+        role: OrganizationUserRole.DEVELOPER,
+        teamIds: "team-1,team-2",
+        teamAssignments: [{ teamId: "team-3", role: TeamUserRole.ADMIN }],
+      }),
+    ).toEqual([]);
   });
 });

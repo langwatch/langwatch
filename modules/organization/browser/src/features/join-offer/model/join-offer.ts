@@ -4,7 +4,16 @@
  */
 import type { JoinLookupDecision, JoinOffer } from "@langwatch/identity-contract";
 
+/** An invitation already waiting on one of the person's proven addresses (ADR-171 v6). */
+export type JoinOfferInvitation = Readonly<{
+  inviteCode: string;
+  organizationName: string;
+  role: string;
+}>;
+
 export type JoinOfferView =
+  | Readonly<{ kind: "invitation"; invitation: JoinOfferInvitation }>
+  | Readonly<{ kind: "admitting"; organizationName: string }>
   | Readonly<{ kind: "waiting"; organizationName: string | null }>
   | Readonly<{ kind: "offer"; organizations: readonly JoinOffer[] }>
   | Readonly<{ kind: "nothing" }>;
@@ -18,11 +27,23 @@ export function joinOfferView({
   decision,
   waitingOn,
   currentOrganizationId,
+  invitation = null,
+  askHeldDown = false,
+  admitting = false,
 }: {
   decision: JoinLookupDecision | undefined;
   waitingOn: readonly { organizationId: string }[];
   currentOrganizationId: string | null;
+  /** Only the welcome screen is handed one; it leads even over an open request. */
+  invitation?: JoinOfferInvitation | null;
+  /** An invitation may stand behind the ask: set aside this visit, or a failed read. */
+  askHeldDown?: boolean;
+  /** The welcome screen is walking through an automatic door right now. */
+  admitting?: boolean;
 }): JoinOfferView {
+  // Accepting withdraws an open request, while waiting on it would land the joiner seat.
+  if (invitation) return { kind: "invitation", invitation };
+
   const waiting = waitingOn.find(
     (request) => currentOrganizationId === null || request.organizationId === currentOrganizationId,
   );
@@ -33,7 +54,14 @@ export function joinOfferView({
     };
   }
 
-  if (decision?.outcome !== "ask" || decision.organizations.length === 0) {
+  // An automatic match is not an offer to weigh: the arrival admits them.
+  if (decision?.outcome === "auto") {
+    return admitting
+      ? { kind: "admitting", organizationName: decision.organization.name }
+      : { kind: "nothing" };
+  }
+
+  if (decision?.outcome !== "ask" || decision.organizations.length === 0 || askHeldDown) {
     return { kind: "nothing" };
   }
 

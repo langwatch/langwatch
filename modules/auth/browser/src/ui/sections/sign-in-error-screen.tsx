@@ -10,13 +10,17 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { isSameOrigin, signIn, useSession } from "../../behavior/auth-client.tsx";
 import { hardNavigate } from "../../behavior/browser-navigation.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
-import { bounceConnectionFrom, cutoverSignInRefusal } from "../../model/sign-in-error-code.ts";
+import {
+  bounceConnectionFrom,
+  cutoverSignInRefusal,
+  governingConnectionFrom,
+} from "../../model/sign-in-error-code.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { FrontDoorShell } from "./front-door-shell.tsx";
 
@@ -80,6 +84,41 @@ export default function Error() {
   );
 }
 
+/**
+ * Dials the connection the refusal named, answering it while the dial is live and null once the
+ * server refused or the dial threw: a refused dial falls through to the stable refusal copy
+ * instead of a card waiting on a provider that never answers (native-social-at-a-claimed-domain).
+ */
+function useConnectionBounce({
+  error,
+  target,
+}: {
+  error: ReturnType<typeof normalizeSignInErrorCode>;
+  target: string | null | undefined;
+}): string | null {
+  const connectionId = bounceConnectionFrom({ error, target });
+  const [dialRefused, setDialRefused] = useState(false);
+
+  // Ahead of the five-second timer: this is somebody being taken to the door their
+  // organization chose.
+  useEffect(() => {
+    if (!connectionId) return;
+    let cancelled = false;
+    void signIn(connectionId, { callbackUrl: "/" })
+      .then((result) => {
+        if (!cancelled && result?.error) setDialRefused(true);
+      })
+      .catch(() => {
+        if (!cancelled) setDialRefused(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [connectionId]);
+
+  return dialRefused ? null : connectionId;
+}
+
 export function SignInErrorScreen() {
   const { data: session } = useSession();
   const query = useSearchParams();
@@ -87,14 +126,10 @@ export function SignInErrorScreen() {
   const publicEnv = usePublicEnv();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
   const isAzureAD = publicEnv.data?.NEXTAUTH_PROVIDER === "azure-ad";
-  const bounceTo = bounceConnectionFrom({ error, target: query?.get("error_description") });
-
-  // The bounce goes ahead of the five-second timer: this is somebody being taken to the door
-  // their organization chose (specs/identity/native-social-at-a-claimed-domain.feature).
-  useEffect(() => {
-    if (!bounceTo) return;
-    void signIn(bounceTo, { callbackUrl: "/" });
-  }, [bounceTo]);
+  const bounceTo = useConnectionBounce({
+    error,
+    target: query?.get("error_description"),
+  });
 
   useEffect(() => {
     if (!publicEnv.data) {
@@ -174,10 +209,35 @@ export function SignInErrorScreen() {
 function SignInErrorDescription({
   error,
   callbackUrl,
+  governingConnection,
 }: {
   error: string;
   callbackUrl: string | undefined;
+  governingConnection: string | null;
 }) {
+  if (governingConnection) {
+    return (
+      <Alert.Description>
+        <VStack gap={1} align="start">
+          <Text>
+            An account with this email address already exists, and your organization requires its
+            single sign-on for it. Sign in with your organization&apos;s single sign-on instead.
+          </Text>
+          <Button
+            marginTop={4}
+            color="white"
+            onClick={() => void signIn(governingConnection, { callbackUrl: callbackUrl ?? "/" })}
+          >
+            Continue with your organization&apos;s sign-in
+          </Button>
+          <Button asChild variant="outline">
+            <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
+          </Button>
+        </VStack>
+      </Alert.Description>
+    );
+  }
+
   if (error === "OAuthAccountNotLinked") {
     return (
       <Alert.Description>
@@ -279,6 +339,10 @@ export function SignInError({ error: rawError }: { error: string }) {
   const query = useSearchParams();
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
   const error = normalizeSignInErrorCode(rawError) ?? rawError;
+  const governingConnection = governingConnectionFrom({
+    error,
+    target: query?.get("error_description"),
+  });
   // The handle on a cause we deliberately did not name, so the person has something to quote.
   const trace = query?.get("trace") ?? null;
 
@@ -290,7 +354,11 @@ export function SignInError({ error: rawError }: { error: string }) {
       >
         <Alert.Indicator />
         <Alert.Content gap={4}>
-          <SignInErrorDescription error={error} callbackUrl={callbackUrl} />
+          <SignInErrorDescription
+            error={error}
+            callbackUrl={callbackUrl}
+            governingConnection={governingConnection}
+          />
         </Alert.Content>
       </Alert.Root>
       {trace && (

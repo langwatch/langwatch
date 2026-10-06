@@ -23,6 +23,7 @@ describe("LangWatchQL completion", () => {
   describe("given a schema with several datasets", () => {
     describe("when the cursor sits after FROM", () => {
       /** @scenario "Dataset names complete after FROM in the schema's order" */
+      /** @scenario "Schema documentation and completion use the live response" */
       it("offers every dataset as analytics.<name>, in the schema's order", () => {
         const { items } = complete({ text: "SELECT 1 FROM |" });
         const ordered = items.toSorted((a, b) => a.sortText.localeCompare(b.sortText));
@@ -125,6 +126,7 @@ describe("LangWatchQL hover", () => {
   describe("given a schema whose column carries a type, unit and description", () => {
     describe("when the cursor rests on that column", () => {
       /** @scenario "Hover shows the schema's own description of an identifier" */
+      /** @scenario "Schema documentation and completion use the live response" */
       it("names the type and unit and reproduces the description", () => {
         const text = "SELECT DurationMs FROM analytics.traces";
         const hover = lwqlHoverAt({ schema: SCHEMA, text, offset: text.indexOf("DurationMs") + 2 });

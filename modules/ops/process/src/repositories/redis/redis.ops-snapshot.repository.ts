@@ -15,10 +15,10 @@ import { type OpsSnapshotRead, OpsSnapshotRepository } from "../ops-snapshot.rep
  * the lease and writes the artifact in one Lua call, and on Redis Cluster a
  * script may only touch keys in a single slot.
  */
-export const SNAPSHOT_LIVE_KEY = "ops:{snapshot}:live";
-export const SNAPSHOT_DETAIL_KEY = "ops:{snapshot}:detail";
+const SNAPSHOT_LIVE_KEY = "ops:{snapshot}:live";
+const SNAPSHOT_DETAIL_KEY = "ops:{snapshot}:detail";
 export const SNAPSHOT_LEASE_KEY = "ops:{snapshot}:lease";
-export const SNAPSHOT_EPOCH_KEY = "ops:{snapshot}:epoch";
+const SNAPSHOT_EPOCH_KEY = "ops:{snapshot}:epoch";
 
 /**
  * The lease outlives several write cycles on purpose: too short and a GC

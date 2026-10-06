@@ -67,16 +67,7 @@ func selectTargets(requested []string) ([]buildTarget, []string) {
 	var unknown []string
 	for _, name := range requested {
 		wanted[name] = true
-		found := false
-		for _, target := range buildTargets {
-			if target.name == name {
-				found = true
-				for _, need := range target.needs {
-					wanted[need] = true
-				}
-			}
-		}
-		if !found {
+		if !wantNeeds(wanted, name) {
 			unknown = append(unknown, name)
 		}
 	}
@@ -92,6 +83,22 @@ func selectTargets(requested []string) ([]buildTarget, []string) {
 	return selected, unknown
 }
 
+// wantNeeds marks what every target called name needs, and reports whether
+// any target has that name.
+func wantNeeds(wanted map[string]bool, name string) bool {
+	found := false
+	for _, target := range buildTargets {
+		if target.name != name {
+			continue
+		}
+		found = true
+		for _, need := range target.needs {
+			wanted[need] = true
+		}
+	}
+	return found
+}
+
 func buildOne(root string, target buildTarget, stderr io.Writer) error {
 	dir := filepath.Join(root, target.dir)
 	entry := filepath.Join(dir, target.entry)
@@ -103,13 +110,7 @@ func buildOne(root string, target buildTarget, stderr io.Writer) error {
 		return nil
 	}
 	lock := filepath.Join(dir, "node_modules", ".ensure-built.lock")
-	if info, err := os.Stat(lock); err == nil && time.Since(info.ModTime()) > staleLock {
-		_ = os.RemoveAll(lock)
-	}
-	if os.Mkdir(lock, 0o755) != nil {
-		for i := 0; i < lockPolls && exists(lock); i++ {
-			time.Sleep(lockInterval)
-		}
+	if !acquireBuildLock(lock) {
 		return nil
 	}
 	defer os.RemoveAll(lock)
@@ -120,15 +121,37 @@ func buildOne(root string, target buildTarget, stderr io.Writer) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("pnpm %s: %w", strings.Join(args, " "), err)
 	}
-	now := time.Now()
-	if err := os.Chtimes(entry, now, now); err != nil {
-		reason := err.Error()
-		if errors.Is(err, fs.ErrNotExist) {
-			reason = "ENOENT: no such file or directory, utime '" + entry + "'"
-		}
-		fmt.Fprintf(stderr, "ensure-built: could not stamp %s: %s\n", target.entry, reason)
-	}
+	stampEntry(entry, target, stderr)
 	return nil
+}
+
+// acquireBuildLock takes the build lock, clearing a stale one first. When
+// another build holds it, it waits for that build and reports false.
+func acquireBuildLock(lock string) bool {
+	if info, err := os.Stat(lock); err == nil && time.Since(info.ModTime()) > staleLock {
+		_ = os.RemoveAll(lock)
+	}
+	if os.Mkdir(lock, 0o755) == nil {
+		return true
+	}
+	for i := 0; i < lockPolls && exists(lock); i++ {
+		time.Sleep(lockInterval)
+	}
+	return false
+}
+
+// stampEntry touches the built entry so its mtime passes the source's newest.
+func stampEntry(entry string, target buildTarget, stderr io.Writer) {
+	now := time.Now()
+	err := os.Chtimes(entry, now, now)
+	if err == nil {
+		return
+	}
+	reason := err.Error()
+	if errors.Is(err, fs.ErrNotExist) {
+		reason = "ENOENT: no such file or directory, utime '" + entry + "'"
+	}
+	fmt.Fprintf(stderr, "ensure-built: could not stamp %s: %s\n", target.entry, reason)
 }
 
 // buildWithNx hands the whole set to Nx, which hashes every input a build reads

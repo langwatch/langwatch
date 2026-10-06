@@ -4,6 +4,8 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 
+import { PROJECT_KIND } from "./project.ts";
+
 export class ProjectNotFoundError extends HandledError {
   declare readonly code: "project_not_found";
 
@@ -154,6 +156,28 @@ export class ProjectCallerUnauthenticatedError extends HandledError {
     });
     this.name = "ProjectCallerUnauthenticatedError";
   }
+}
+
+export const GOVERNANCE_PROJECT_ROUTE_REFUSAL =
+  "This project is an internal governance record, not a workspace. It cannot be renamed, moved, archived, or re-keyed through the projects API.";
+
+/** The hidden governance project was aimed at by a route that serves workspaces. */
+export class GovernanceProjectProtectedError extends HandledError {
+  declare readonly code: "forbidden";
+
+  constructor(message: string = GOVERNANCE_PROJECT_ROUTE_REFUSAL) {
+    super("forbidden", message, { httpStatus: 403, fault: "customer" });
+    this.name = "GovernanceProjectProtectedError";
+  }
+}
+
+/** Whether this project kind is the hidden governance record that workspace routes refuse. */
+export function isGovernanceProject(kind: string | null | undefined): boolean {
+  return kind === PROJECT_KIND.INTERNAL_GOVERNANCE;
+}
+
+export function assertNotGovernanceProject(kind: string | null | undefined): void {
+  if (isGovernanceProject(kind)) throw new GovernanceProjectProtectedError();
 }
 
 export const PERSONAL_PROJECT_MOVE_OUT_REFUSAL =

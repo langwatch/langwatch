@@ -3,15 +3,29 @@ import { throttledWindow, type SubscriberSpec, type TriggerContext } from "@lang
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import type { CodingAgentPullRequestMapping } from "../app/coding-agent.members.ts";
 import type { CodingAgentSessionState } from "./coding-agent-session.projection.ts";
+
+/** GitHub demand path; answers two questions for the mapping subscriber. */
+export interface CodingAgentPullRequestMapping {
+  /** Whether this instance's GitHub App can answer for that repository host. */
+  canMapRepositoryHost(repositoryHost: string): boolean;
+
+  /** Asks the organization's connection which pull requests host this branch. */
+  requestBranchMapping(input: {
+    tenantId: string;
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    headBranch: string;
+  }): Promise<void>;
+}
 
 const logger = createLogger("langwatch:coding-agent-processing:pull-request-mapping");
 
 /** Window for branch mapping job; deduplicates session's event stream (30 seconds). */
-export const PULL_REQUEST_MAPPING_WINDOW_MS = 30 * 1000;
+const PULL_REQUEST_MAPPING_WINDOW_MS = 30 * 1000;
 
-export const pullRequestMappingStateSchema = z.object({
+const pullRequestMappingStateSchema = z.object({
   repositoryHost: z.string().nullable(),
   repositoryOwner: z.string().nullable(),
   repositoryName: z.string().nullable(),
@@ -45,7 +59,7 @@ export function shouldMapPullRequests(
 }
 
 /** Dedup id; host absent, owner/name lowercased, branch and tenant verbatim. */
-export function pullRequestMappingJobId({
+function pullRequestMappingJobId({
   tenantId,
   state,
 }: {
@@ -57,7 +71,7 @@ export function pullRequestMappingJobId({
 }
 
 /** Queue group (same as dedup key); enables ZRANK lookup to hit on new payloads. */
-export function pullRequestMappingGroupKey({
+function pullRequestMappingGroupKey({
   tenantId,
   state,
 }: {

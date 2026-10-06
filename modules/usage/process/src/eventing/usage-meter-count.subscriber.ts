@@ -8,7 +8,7 @@ import type { CountMonthCommandData } from "./usage.events.ts";
 
 const logger = createLogger("langwatch:usage:meterCount");
 
-export const USAGE_METER_COUNT_SUBSCRIBER_NAME = "usageMeterCount";
+const USAGE_METER_COUNT_SUBSCRIBER_NAME = "usageMeterCount";
 const SUPPRESS_MS = 300_000;
 /** Days into a month during which last month is still recounted, as billing's dispatch did. */
 const GRACE_PERIOD_DAYS = 3;

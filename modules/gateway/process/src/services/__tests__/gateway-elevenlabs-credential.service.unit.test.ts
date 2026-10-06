@@ -34,8 +34,8 @@ async function baseUrlFor(input: {
 }
 
 describe("GatewayElevenLabsCredentialService.getApiCredential", () => {
-  /** @scenario The product reaches a loopback voice host only under the dev switch */
   describe("when the dev loopback switch is off", () => {
+    /** @scenario "The product reaches a loopback voice host only under the dev switch" */
     it.each(["http://127.0.0.1:5591", "http://localhost:5591", "https://127.0.0.1:5591"])(
       "swaps the loopback host %s for the vendor default",
       async (baseUrl) => {
@@ -46,6 +46,7 @@ describe("GatewayElevenLabsCredentialService.getApiCredential", () => {
       },
     );
 
+    /** @scenario "The product reaches a loopback voice host only under the dev switch" */
     it("keeps a residency host on elevenlabs.io", async () => {
       expect(await baseUrlFor({ baseUrl: "https://api.eu.residency.elevenlabs.io/" })).toBe(
         "https://api.eu.residency.elevenlabs.io",

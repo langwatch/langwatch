@@ -1,9 +1,8 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
-import { credentialsSecret, sessionSecret } from "@langwatch/secrets";
+import { credentialsSecret, credentialsSecretPrevious, sessionSecret } from "@langwatch/secrets";
 import {
   SlackApi,
   type SlackApi as SlackApiContract,
@@ -23,11 +22,9 @@ import type { SlackRepositories } from "../repositories/slack.repositories.ts";
 import { SlackConnectionClaimService } from "../services/slack-connection-claim.service.ts";
 import { SlackConnectionService } from "../services/slack-connection.service.ts";
 
-const slackReads = ["encryption"] as const;
-
 type SlackSetup = FeatureSetup<
   typeof SlackModule.dependencies,
-  MembersRead<typeof slackReads>,
+  never,
   undefined,
   SlackRepositories
 >;
@@ -40,11 +37,12 @@ export class SlackModule implements SlackApiContract {
     organizations: OrganizationApi,
     authorization: AuthzApi,
   };
-  static readonly reads = slackReads;
   static readonly secrets = {
     /** Main's fingerprint key: CREDENTIALS_SECRET, else NEXTAUTH_SECRET. */
     fingerprintKey: credentialsSecret,
     fingerprintKeyFallback: sessionSecret,
+    /** The key a rotation retired: it finds a stored fingerprint, and none is written under it. */
+    fingerprintKeyPrevious: credentialsSecretPrevious,
   } as const;
 
   readonly #connections: SlackConnectionService;
@@ -60,7 +58,6 @@ export class SlackModule implements SlackApiContract {
 
   static async create({
     dependencies,
-    members,
     repositories,
     secrets,
     tier,
@@ -68,6 +65,10 @@ export class SlackModule implements SlackApiContract {
     const fingerprintKey =
       (await secrets.into(SlackModule.secrets.fingerprintKey, (value) => value ?? "")) ||
       (await secrets.into(SlackModule.secrets.fingerprintKeyFallback, (value) => value ?? ""));
+    const previousFingerprintKey = await secrets.into(
+      SlackModule.secrets.fingerprintKeyPrevious,
+      (previous) => previous || void 0,
+    );
     const connections = SlackConnectionService.create({
       connections: repositories.connections,
       claims: repositories.claims,
@@ -76,8 +77,8 @@ export class SlackModule implements SlackApiContract {
       authorization: dependencies.authorization,
       webApi:
         tier === "memory" ? MemorySlackWebApiChannel.create() : HttpSlackWebApiChannel.create(),
-      cipher: members.encryption,
       fingerprintKey,
+      previousFingerprintKey,
     });
     return new SlackModule({
       connections,

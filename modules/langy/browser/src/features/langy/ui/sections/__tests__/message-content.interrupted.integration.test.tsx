@@ -99,6 +99,7 @@ describe("given a settled assistant reply with nothing visible", () => {
   });
 
   describe("when the emptiness has another cause", () => {
+    /** @scenario An empty reply at the end of the conversation still says so */
     it("keeps the plain empty state", () => {
       renderMessage({ interrupted: false });
 

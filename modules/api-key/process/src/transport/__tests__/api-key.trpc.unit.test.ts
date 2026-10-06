@@ -127,6 +127,7 @@ describe("the apiKey tRPC transport", () => {
       ).toBeNull();
     });
 
+    /** @scenario No read after the mint carries the token */
     it("declares a list answer with no room for the lookup id or any secret", () => {
       const output = apiKeyTrpc.members.list.output;
       const entry = {
@@ -190,6 +191,7 @@ describe("the apiKey tRPC transport", () => {
     });
 
     /** The one place a plaintext token ever leaves the server. */
+    /** @scenario Minting a key answers its token once */
     it("returns the plaintext token once, with only the key's identity beside it", async () => {
       const { caller } = harness(minted());
 
@@ -280,6 +282,7 @@ describe("the apiKey tRPC transport", () => {
       expect(app.createKey).not.toHaveBeenCalled();
     });
 
+    /** @scenario Minting and revoking are audited */
     it("records the mint in the audit trail without the token anywhere in it", async () => {
       const { caller, audit } = harness(minted());
 
@@ -328,6 +331,7 @@ describe("the apiKey tRPC transport", () => {
   });
 
   describe("when a member revokes a key", () => {
+    /** @scenario Minting and revoking are audited */
     it("revokes it and records the revocation", async () => {
       const revokeKey = vi.fn(async () => undefined);
       const { caller, audit } = harness({ revokeKey });

@@ -10,9 +10,10 @@ import { type Cluster, Redis } from "ioredis";
 
 import { HostedMcpModule } from "../../../app/hosted-mcp.app.ts";
 import type { McpHandler } from "../../../index.ts";
+import { LiveHostedMcpRepositories } from "../../../repositories/live/live.hosted-mcp.repositories.ts";
+import type { McpSessionCipher } from "../../../repositories/mcp-session.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../../services/authz-mcp-session-grant.service.ts";
 import type { HeaderMcpClientAddressService } from "../../../services/header-mcp-client-address.service.ts";
-import type { McpApiKeyCipher } from "../../../services/mcp-oauth-token.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
@@ -92,7 +93,7 @@ class HarnessSessionGrant implements Pick<AuthzMcpSessionGrantService, "stillGra
 }
 
 /** Identity "encryption", so a suite can read the value it expected to be stored. */
-class HarnessCipher implements McpApiKeyCipher {
+class HarnessCipher implements McpSessionCipher {
   encrypt(text: string): string {
     return `encrypted:${text}`;
   }
@@ -183,11 +184,10 @@ export async function startReplicaPair({
   try {
     for (let i = 0; i < 2; i++) {
       const handler = HostedMcpModule.fromDependencies({
-        redis,
+        repositories: LiveHostedMcpRepositories.create({ redis, encryption: new HarnessCipher() }),
         projects: new HarnessProjectLookup(apiKeys),
         grants: new HarnessSessionGrant(),
         cliSessions: new FakeCliSessions(),
-        cipher: new HarnessCipher(),
         address: new HarnessClientAddress(),
         baseHost: "https://app.langwatch.ai",
       }).createHandler();

@@ -30,6 +30,10 @@
       "types": "./dist/chart-frame-document.d.ts",
       "default": "./src/chart-frame-document.ts"
     },
+    "./chart-frame-import-map": {
+      "types": "./dist/chart-frame-import-map.d.ts",
+      "default": "./src/chart-frame-import-map.ts"
+    },
     "./chart-frame-protocol": {
       "types": "./dist/chart-frame-protocol.d.ts",
       "default": "./src/chart-frame-protocol.ts"

@@ -50,7 +50,7 @@ type Bindings = {
   repositoryNamespaces: Set<string>;
 };
 type ClaimCall = { call: ts.CallExpression; source: "tables" | "repository" };
-type Claim = { feature: string; file: string; model: string; line: number };
+export type Claim = { feature: string; file: string; model: string; line: number };
 
 function issue(file: string, message: string, line?: number): ArchitectureViolation {
   return {
@@ -357,7 +357,7 @@ function readClaim({
     .map((argument) => ({ feature, file, model: argument.text, line }));
 }
 
-function featureClaims(
+export function featureClaims(
   root: string,
   feature: FeatureCatalogueEntry,
   violations: ArchitectureViolation[],

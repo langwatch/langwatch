@@ -106,14 +106,24 @@ func parseOpenAI(body map[string]json.RawMessage) request {
 	}
 	_ = json.Unmarshal(body["stream_options"], &opts)
 	req.includeUsage = opts.IncludeUsage
+	req.turns = openAITurns(body["messages"])
+	req.tools = openAITools(body)
+	applyOpenAIToolChoice(&req, body["tool_choice"])
+	applyOpenAIResponseFormat(&req, body["response_format"])
+	return req
+}
 
+// openAITurns reads chat-completions messages; tool and function results
+// become tool turns and developer messages system ones.
+func openAITurns(raw json.RawMessage) []turn {
 	var msgs []struct {
 		Role         string            `json:"role"`
 		Content      json.RawMessage   `json:"content"`
 		ToolCalls    []json.RawMessage `json:"tool_calls"`
 		FunctionCall json.RawMessage   `json:"function_call"`
 	}
-	_ = json.Unmarshal(body["messages"], &msgs)
+	_ = json.Unmarshal(raw, &msgs)
+	var turns []turn
 	for _, m := range msgs {
 		text, _, _ := content(m.Content)
 		t := turn{role: m.Role, text: text, calls: len(m.ToolCalls)}
@@ -126,9 +136,13 @@ func parseOpenAI(body map[string]json.RawMessage) request {
 		case "developer":
 			t.role = "system"
 		}
-		req.turns = append(req.turns, t)
+		turns = append(turns, t)
 	}
+	return turns
+}
 
+// openAITools reads the offered tools, then the legacy functions.
+func openAITools(body map[string]json.RawMessage) []tool {
 	var tools []struct {
 		Function struct {
 			Name       string         `json:"name"`
@@ -136,8 +150,9 @@ func parseOpenAI(body map[string]json.RawMessage) request {
 		} `json:"function"`
 	}
 	_ = json.Unmarshal(body["tools"], &tools)
+	var out []tool
 	for _, t := range tools {
-		req.tools = append(req.tools, tool{name: t.Function.Name, schema: t.Function.Parameters})
+		out = append(out, tool{name: t.Function.Name, schema: t.Function.Parameters})
 	}
 	var functions []struct {
 		Name       string         `json:"name"`
@@ -145,11 +160,16 @@ func parseOpenAI(body map[string]json.RawMessage) request {
 	}
 	_ = json.Unmarshal(body["functions"], &functions)
 	for _, f := range functions {
-		req.tools = append(req.tools, tool{name: f.Name, schema: f.Parameters})
+		out = append(out, tool{name: f.Name, schema: f.Parameters})
 	}
+	return out
+}
 
+// applyOpenAIToolChoice forces a tool ("required" or a named function) or
+// withdraws them all ("none").
+func applyOpenAIToolChoice(req *request, raw json.RawMessage) {
 	var choice any
-	_ = json.Unmarshal(body["tool_choice"], &choice)
+	_ = json.Unmarshal(raw, &choice)
 	switch c := choice.(type) {
 	case string:
 		switch c {
@@ -163,14 +183,17 @@ func parseOpenAI(body map[string]json.RawMessage) request {
 			req.forced, _ = fn["name"].(string)
 		}
 	}
+}
 
+// applyOpenAIResponseFormat reads a json_schema or json_object response format.
+func applyOpenAIResponseFormat(req *request, raw json.RawMessage) {
 	var format struct {
 		Type       string `json:"type"`
 		JSONSchema struct {
 			Schema map[string]any `json:"schema"`
 		} `json:"json_schema"`
 	}
-	_ = json.Unmarshal(body["response_format"], &format)
+	_ = json.Unmarshal(raw, &format)
 	switch format.Type {
 	case "json_schema":
 		req.schema = format.JSONSchema.Schema
@@ -178,7 +201,6 @@ func parseOpenAI(body map[string]json.RawMessage) request {
 	case "json_object":
 		req.jsonObject = true
 	}
-	return req
 }
 
 // parseAnthropic reads a messages body.
@@ -292,19 +314,7 @@ func (s *Server) markovReply(req request, r *mrand.Rand) reply {
 		b, _ := json.Marshal(g.value(req.schema, 0))
 		return reply{Mode: "json", Text: string(b), Finish: "stop"}
 	case len(req.tools) > 0 && (req.forced != "" || (len(req.last().results) == 0 && r.IntN(2) == 0)):
-		t := req.tools[0]
-		for _, offered := range req.tools {
-			if offered.name == req.forced {
-				t = offered
-			}
-		}
-		args := "{}"
-		if t.schema != nil {
-			g.root = t.schema
-			b, _ := json.Marshal(g.value(t.schema, 0))
-			args = string(b)
-		}
-		return reply{Mode: "tools", Calls: []call{{ID: fmt.Sprintf("%016x", r.Uint64()), Name: t.name, Args: args}}, Finish: "tool_calls"}
+		return toolReply(req, g)
 	case req.jsonObject:
 		text, _ := s.chain.text(r, 8, 0)
 		b, _ := json.Marshal(map[string]string{"answer": text})
@@ -315,6 +325,24 @@ func (s *Server) markovReply(req request, r *mrand.Rand) reply {
 		return reply{Mode: "markov", Text: text, Finish: "length"}
 	}
 	return reply{Mode: "markov", Text: text, Finish: "stop"}
+}
+
+// toolReply calls the forced tool, or the first one offered, with arguments
+// drawn from its schema.
+func toolReply(req request, g *schemaGen) reply {
+	t := req.tools[0]
+	for _, offered := range req.tools {
+		if offered.name == req.forced {
+			t = offered
+		}
+	}
+	args := "{}"
+	if t.schema != nil {
+		g.root = t.schema
+		b, _ := json.Marshal(g.value(t.schema, 0))
+		args = string(b)
+	}
+	return reply{Mode: "tools", Calls: []call{{ID: fmt.Sprintf("%016x", g.r.Uint64()), Name: t.name, Args: args}}, Finish: "tool_calls"}
 }
 
 // step is what one assistant turn of a Langy script says and calls.
@@ -343,27 +371,38 @@ func parseScript(s string) (steps []step, scripted bool) {
 	return append(steps, cur), scripted
 }
 
+// lastUserTurn is the index of the last user message that is not a tool
+// result, or -1.
+func lastUserTurn(turns []turn) int {
+	for i := len(turns) - 1; i >= 0; i-- {
+		if t := turns[i]; t.role == "user" && len(t.results) == 0 {
+			return i
+		}
+	}
+	return -1
+}
+
+// callingTurns counts the turns that made a tool call.
+func callingTurns(turns []turn) int {
+	round := 0
+	for _, t := range turns {
+		if t.calls > 0 {
+			round++
+		}
+	}
+	return round
+}
+
 // langy does what the last user message says: echo it, or run its script,
 // then echo the tool results back once the script has no step left.
 func langy(req request, r *mrand.Rand) reply {
-	user := -1
-	for i := len(req.turns) - 1; i >= 0; i-- {
-		if t := req.turns[i]; t.role == "user" && len(t.results) == 0 {
-			user = i
-			break
-		}
-	}
+	user := lastUserTurn(req.turns)
 	if user < 0 {
 		return reply{Mode: "langy", Text: "llmsim langy mode: there is no user message to follow", Finish: "stop"}
 	}
 	script := req.turns[user].text
 	steps, scripted := parseScript(script)
-	round := 0
-	for _, t := range req.turns[user+1:] {
-		if t.calls > 0 {
-			round++
-		}
-	}
+	round := callingTurns(req.turns[user+1:])
 	switch {
 	case user == len(req.turns)-1 && !scripted:
 		return reply{Mode: "langy", Text: script, Finish: "stop"}

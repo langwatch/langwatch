@@ -1,10 +1,10 @@
 import { useSSESubscription } from "@langwatch/browser-host/sse-subscription";
 import { useCallback, useEffect, useRef } from "react";
 
-import { getTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useRowPulseStore } from "../../../../behavior/row-pulse.store.ts";
 import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
+import { getTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useTraceUpdateListener } from "../../use-trace-update-listener.ts";
 import { useVisibleTraceIds } from "./use-visible-trace-ids.ts";
@@ -156,14 +156,7 @@ export function useTraceFreshness() {
       void trpcUtils.traces.spanTree.invalidate(key);
       void trpcUtils.traces.evals.invalidate(key);
     },
-    [
-      trpcUtils,
-      project?.id,
-      visibleTraceIds,
-      pulse,
-      refreshNewCount,
-      refreshDiscover,
-    ],
+    [trpcUtils, project?.id, visibleTraceIds, pulse, refreshNewCount, refreshDiscover],
   );
 
   const onSpanStored = useSpanStoredInvalidation(project?.id);

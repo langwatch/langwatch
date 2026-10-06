@@ -18,6 +18,7 @@ import {
   MemoryStoredObjectFiles,
   createStoredObjectTestApp,
 } from "../../app/__tests__/stored-object.fixture.ts";
+import { MemoryStoredObjectSealRepository } from "../../repositories/memory/memory.stored-object-seal.repository.ts";
 import { storedObjectRest } from "../stored-object.rest.ts";
 import { storedObjectTrpcTransport } from "../stored-object.trpc.ts";
 
@@ -43,7 +44,7 @@ function installed() {
     stream: Readable.from([BYTES]),
   };
   const app = createStoredObjectTestApp({
-    members: { files },
+    parts: { files },
     permissions: new GrantedStoredObjectPermissions(["traces:view"]),
   });
 
@@ -86,6 +87,7 @@ function installed() {
         throw new Error("The signed read asks no credential of the door.");
       },
     },
+    rateLimiter: { check: async () => ({ allowed: true }) },
   }).mount(storedObjectRest.router(), { app: () => app, onError: renderHandled });
 
   return {
@@ -95,14 +97,16 @@ function installed() {
   };
 }
 
-/** A read seal as the test signer's identity cipher writes one. */
+/** A seal as the process's memory twin writes one, so the claims, not the cipher, are refused. */
 function sealOf(claims: Record<string, unknown>): string {
-  return new URLSearchParams({ sig: JSON.stringify(claims) }).toString();
+  const seals = MemoryStoredObjectSealRepository.create();
+  return new URLSearchParams({ sig: seals.seal(JSON.stringify(claims)) }).toString();
 }
 
 describe("storedObjects.getReadUrl and the signed content route", () => {
   describe("given a session viewer with the object's permission", () => {
     /** @scenario "A signed-in viewer gets a read URL that serves the object's bytes" */
+    /** @scenario "The browser reads stored media through a URL tRPC minted" */
     it("mints a same-origin URL that serves the bytes", async () => {
       const { session, fetch } = installed();
 

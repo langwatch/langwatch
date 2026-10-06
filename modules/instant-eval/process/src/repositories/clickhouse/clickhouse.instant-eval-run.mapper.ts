@@ -46,7 +46,7 @@ export interface InstantEvalRunRecord {
 }
 
 /** The row as it is inserted: dates as dates, so the driver formats them. */
-export interface InstantEvalRunWriteRecord {
+interface InstantEvalRunWriteRecord {
   TenantId: string;
   RunId: string;
   Name: string | null;

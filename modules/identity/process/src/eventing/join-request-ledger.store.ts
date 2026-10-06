@@ -19,8 +19,8 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import { type IdentityEventing } from "../app/identity.members.ts";
 import type { JoinRequestLedger } from "../rules/join-request-ledger.rules.ts";
+import type { IdentityEventing } from "./identity-command-senders.store.ts";
 import { joinRequestEventsFor } from "./join-request-events.intent.ts";
 import type { JoinRequestEvent, JoinRequestFoldState } from "./join-request-state.projection.ts";
 

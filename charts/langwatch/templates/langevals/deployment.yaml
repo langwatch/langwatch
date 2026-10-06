@@ -114,6 +114,7 @@ spec:
             {{- with .Values.langevals.extraEnvs}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          {{- include "langwatch.envFromWithOfflineDefaults" (dict "root" $ "extraEnvFrom" list) | nindent 10 }}
 
           {{- if .Values.langevals.extraLifecycle}}
           lifecycle:

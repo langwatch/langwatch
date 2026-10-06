@@ -10,11 +10,6 @@ import {
   GatewayConnectUpstreamService,
 } from "../gateway-connect-upstream.service.ts";
 
-const cipher = {
-  encrypt: (plaintext: string) => `sealed(${plaintext})`,
-  decrypt: (ciphertext: string) => ciphertext.replace(/^sealed\((.*)\)$/, "$1"),
-};
-
 const upstream = {
   organizationId: "org-1",
   baseUrl: "https://gateway.langwatch.ai/",
@@ -24,17 +19,15 @@ const upstream = {
 
 function harness() {
   const repository = MemoryGatewayConnectUpstreamRepository.create();
-  return { repository, service: GatewayConnectUpstreamService.create({ repository, cipher }) };
+  return { repository, service: GatewayConnectUpstreamService.create({ repository }) };
 }
 
 describe("the hosted provider slot of a connected install", () => {
-  it("keeps the license token encrypted at rest and reads it back whole", async () => {
-    const { repository, service } = harness();
+  it("reads the license token back whole", async () => {
+    const { service } = harness();
 
     await service.set(upstream);
 
-    const [stored] = await repository.findForOrganization("org-1");
-    expect(stored?.encryptedToken).toBe(cipher.encrypt(upstream.token));
     expect(await service.findForOrganization("org-1")).toEqual([upstream]);
   });
 

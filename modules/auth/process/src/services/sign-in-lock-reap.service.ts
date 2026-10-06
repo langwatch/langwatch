@@ -7,7 +7,7 @@ import type { SignInAttemptLockRepository } from "../repositories/sign-in-attemp
  * failures in ten minutes from five in a year, and a day outlasts the longest
  * lock an administrator can set. Spec: specs/identity/org-account-lockout.feature.
  */
-export const SIGN_IN_LOCK_RETENTION = Temporal.Duration.from({ hours: 24 });
+const SIGN_IN_LOCK_RETENTION = Temporal.Duration.from({ hours: 24 });
 
 /** Clears the lock-out rows that have stopped meaning anything. Releases nothing. */
 export class SignInLockReapService {

@@ -1,7 +1,6 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import {
   principalOfCredential,
-  bindRestHeader,
   bindRestMiddleware,
   canonicalErrorResponse,
   createRestRuntime,
@@ -35,8 +34,9 @@ import { fromDate } from "@langwatch/time";
 import { CollapsingRunCommands } from "../../__tests__/support/collapsing-run-commands.ts";
 import { SuiteModule } from "../../app/suite.app.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
+import { MemorySuiteRunProcessingRepository } from "../../repositories/memory/memory.suite.repositories.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
-import { suiteCallerKeyFact, suiteSurfaceFact } from "../../rules/suite-wire-v1.rules.ts";
+import { suiteRunOriginFact } from "../../rules/suite-wire-v1.rules.ts";
 import { SuiteExecutionService } from "../../services/suite-execution.service.ts";
 import { createRunPlansRest } from "../run-plans.rest.ts";
 import { createSuitesAliasRest } from "../suites-alias.rest.ts";
@@ -442,7 +442,10 @@ export function mountSuiteFamilies(
   const scenarios = memoryScenarioApi(world, commands);
 
   const app = SuiteModule.createForTesting({
-    repositories: { suites: MemorySuiteRepository.create({ database }) },
+    repositories: {
+      suites: MemorySuiteRepository.create({ database }),
+      runProcessing: MemorySuiteRunProcessingRepository.create(),
+    },
     dependencies: {
       scenarios,
       agents: memoryAgentApi(world),
@@ -484,20 +487,21 @@ export function mountSuiteFamilies(
         viewerUserId: caller.userId ?? null,
         actorId: caller.userId ?? "project-key-1",
       })),
-      bindRestHeader(suiteSurfaceFact, "x-langwatch-surface"),
-      bindRestMiddleware(suiteCallerKeyFact, () =>
-        caller.apiKeyId === undefined
-          ? null
-          : keyRowOf({
-              type: "apiKey",
-              apiKeyId: caller.apiKeyId,
-              userId: caller.userId ?? null,
-              organizationId: TEST_PROJECT.organizationId,
-              ingestSourceType: null,
-              ingestionTemplateId: null,
-              project: TEST_PROJECT,
-            }),
-      ),
+      bindRestMiddleware(suiteRunOriginFact, (context) => ({
+        surface: context.req.header("x-langwatch-surface") ?? null,
+        callerKey:
+          caller.apiKeyId === undefined
+            ? null
+            : keyRowOf({
+                type: "apiKey",
+                apiKeyId: caller.apiKeyId,
+                userId: caller.userId ?? null,
+                organizationId: TEST_PROJECT.organizationId,
+                ingestSourceType: null,
+                ingestionTemplateId: null,
+                project: TEST_PROJECT,
+              }),
+      })),
     ],
   });
 

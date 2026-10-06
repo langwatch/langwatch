@@ -83,7 +83,7 @@ describe("TieredBlobStore", () => {
 
         const ref = await store.put({ projectId: PROJECT, data });
 
-        const expectedUri = `s3://test-bucket/${PROJECT}/${contentHash(data)}`;
+        const expectedUri = `s3://test-bucket/group-queue/${PROJECT}/${contentHash(data)}`;
         expect(ref.tier).toBe("s3");
         expect(ref).toMatchObject({
           projectId: PROJECT,
@@ -130,9 +130,89 @@ describe("TieredBlobStore", () => {
       // azure-blob rides under it unchanged (BlobRef has no separate
       // "azure" tier).
       expect(ref.tier).toBe("s3");
-      const expectedUri = `azure-blob://lwacct/lw-container/${PROJECT}/${contentHash(data)}`;
+      const expectedUri = `azure-blob://lwacct/lw-container/group-queue/${PROJECT}/${contentHash(data)}`;
       expect([...objectStore.store.keys()]).toEqual([expectedUri]);
       expect(await store.get(ref)).toEqual(data);
+    });
+  });
+
+  describe("given a payload above the S3 threshold for a project", () => {
+    describe("when it is offloaded", () => {
+      /** @scenario "The S3-tier key carries the lifecycle prefix first" */
+      it("writes only under group-queue/<projectId>/<hash>", async () => {
+        const { store, objectStore } = makeStore(8);
+        const data = Buffer.from("a payload well above the tiny threshold");
+
+        await store.put({ projectId: PROJECT, data });
+
+        const [key, ...rest] = [...objectStore.store.keys()];
+        expect(rest).toEqual([]);
+        const segments = new URL(key!).pathname.split("/").filter(Boolean);
+        expect(segments).toEqual(["group-queue", PROJECT, contentHash(data)]);
+      });
+    });
+  });
+
+  describe("given two payloads with byte-identical canonical serializations", () => {
+    describe("when each is offloaded to the S3 tier", () => {
+      /** @scenario "The same bytes always produce the same blob key" */
+      it("resolves both to one key and issues a PUT for each", async () => {
+        const { store, objectStore } = makeStore(8);
+        const puts: string[] = [];
+        const put = objectStore.put.bind(objectStore);
+        objectStore.put = async (uri, bytes, mediaType) => {
+          puts.push(uri);
+          return put(uri, bytes, mediaType);
+        };
+        const data = Buffer.from("identical bytes over the threshold");
+
+        const first = await store.put({ projectId: PROJECT, data });
+        const second = await store.put({ projectId: PROJECT, data: Buffer.from(data) });
+
+        expect(second).toEqual(first);
+        expect(objectStore.store.size).toBe(1);
+        expect(puts).toHaveLength(2);
+        expect(puts[1]).toBe(puts[0]);
+      });
+    });
+  });
+
+  describe("given an S3-tier envelope staged under the old <projectId>/<hash> key", () => {
+    describe("when the new key is missing and the blob is read", () => {
+      /** @scenario "A blob staged before the move is read from its old key" */
+      it("reads the old key and returns the payload intact", async () => {
+        const { store, objectStore } = makeStore(8);
+        const data = Buffer.from("staged before the prefix move");
+        const hash = contentHash(data);
+        objectStore.store.set(`s3://test-bucket/${PROJECT}/${hash}`, data);
+
+        const ref: BlobRef = { tier: "s3", projectId: PROJECT, hash };
+
+        expect(await store.get(ref)).toEqual(data);
+        expect(await store.peek(ref)).toEqual(data);
+      });
+
+      /** @scenario "A blob staged before the move is read from its old key" */
+      it("returns null when the key is missing at both addresses", async () => {
+        const { store } = makeStore(8);
+        const ref: BlobRef = { tier: "s3", projectId: PROJECT, hash: "neverstaged" };
+
+        expect(await store.get(ref)).toBeNull();
+      });
+
+      it("prefers the new key when both addresses hold a blob", async () => {
+        const { store, objectStore } = makeStore(8);
+        const hash = "samehash";
+        objectStore.store.set(`s3://test-bucket/${PROJECT}/${hash}`, Buffer.from("old"));
+        objectStore.store.set(
+          `s3://test-bucket/group-queue/${PROJECT}/${hash}`,
+          Buffer.from("new"),
+        );
+
+        const ref: BlobRef = { tier: "s3", projectId: PROJECT, hash };
+
+        expect((await store.get(ref))?.toString()).toBe("new");
+      });
     });
   });
 
@@ -177,6 +257,30 @@ describe("TieredBlobStore", () => {
     });
   });
 
+  describe("given byte-identical S3-tier payloads under different tenants", () => {
+    describe("when each is offloaded", () => {
+      /** @scenario "Blob keys are namespaced by tenant so tenants never share a blob" */
+      it("keys each under group-queue/<its own projectId> and never resolves across tenants", async () => {
+        const { store, objectStore } = makeStore(8);
+        const data = Buffer.from("identical user content above the threshold");
+        const tenantA = createTenantId("tenant-a");
+        const tenantB = createTenantId("tenant-b");
+
+        const refA = await store.put({ projectId: tenantA, data });
+        const refB = await store.put({ projectId: tenantB, data });
+
+        expect([...objectStore.store.keys()].toSorted()).toEqual([
+          `s3://test-bucket/group-queue/tenant-a/${contentHash(data)}`,
+          `s3://test-bucket/group-queue/tenant-b/${contentHash(data)}`,
+        ]);
+        expect(refA).not.toEqual(refB);
+        objectStore.store.delete(`s3://test-bucket/group-queue/tenant-b/${contentHash(data)}`);
+        expect(await store.get(refB)).toBeNull();
+        expect(await store.get(refA)).toEqual(data);
+      });
+    });
+  });
+
   describe("given a stored blob", () => {
     describe("when it is deleted", () => {
       it("removes it from its tier", async () => {
@@ -214,7 +318,6 @@ describe("TieredBlobStore", () => {
           get: async () => {
             throw new Error("ECONNRESET");
           },
-          delete: async () => {},
         };
         const store = new TieredBlobStore({
           redisBlobs: new InMemoryJobBlobStore(),

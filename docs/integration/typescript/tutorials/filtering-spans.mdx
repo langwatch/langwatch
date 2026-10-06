@@ -161,7 +161,7 @@ setupObservability({
 
 ## Troubleshooting
 
-- Nothing exported: try `filters: []`, then add rules back
+- No spans exported: try `filters: []`, then add rules back
 - Too much noise: apply `excludeHttpRequests`, add specific `exclude` rules
 - Case surprises: add `ignoreCase: true` where needed
 - Check values: log `span.name` and `span.instrumentationScope.name` in dev

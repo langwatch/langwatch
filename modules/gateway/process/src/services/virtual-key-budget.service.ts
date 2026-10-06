@@ -13,27 +13,25 @@ import {
 } from "@langwatch/gateway-contract";
 import { nowInstant } from "@langwatch/time";
 
-import {
-  type GatewayAudit,
-  type GatewayChangeEvents,
-  type GatewayPersistenceTransaction,
-} from "../app/gateway.members.ts";
+import type { GatewayAuditRepository } from "../repositories/gateway-audit.repository.ts";
+import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
 import type {
   GatewayKeyBudgetRepository,
   GatewayKeyBudgetScope,
 } from "../repositories/gateway-key-budget.repository.ts";
+import type { GatewayPersistenceTransaction } from "../repositories/gateway-transaction.repository.ts";
 
 export class VirtualKeyBudgetService {
   private constructor(
     private readonly keyBudgets: GatewayKeyBudgetRepository,
-    private readonly changeEvents: GatewayChangeEvents,
-    private readonly auditLog: GatewayAudit,
+    private readonly changeEvents: GatewayChangeEventsRepository,
+    private readonly auditLog: GatewayAuditRepository,
   ) {}
 
   static create(input: {
     keyBudgets: GatewayKeyBudgetRepository;
-    changeEvents: GatewayChangeEvents;
-    auditLog: GatewayAudit;
+    changeEvents: GatewayChangeEventsRepository;
+    auditLog: GatewayAuditRepository;
   }): VirtualKeyBudgetService {
     return new VirtualKeyBudgetService(input.keyBudgets, input.changeEvents, input.auditLog);
   }

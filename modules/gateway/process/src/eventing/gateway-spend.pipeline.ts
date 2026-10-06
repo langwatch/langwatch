@@ -11,10 +11,10 @@ import {
   type RegisteredCommand,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import type { WebhookApi } from "@langwatch/webhook-contract";
 
 import type { GatewayModule } from "../app/gateway.app.ts";
 import { GatewaySpendEventsRepository } from "../repositories/gateway-spend-events.repository.ts";
+import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
 import {
   GATEWAY_SPEND_AGGREGATE_TYPE,
   GATEWAY_SPEND_PIPELINE_NAME,
@@ -25,10 +25,6 @@ import {
   SPEND_SETTLEMENT_PROCESS_NAME,
   spendSettlementPM,
 } from "./gateway-spend-settlement.process.ts";
-import {
-  GATEWAY_SPEND_WEBHOOK_SUBSCRIBER_NAME,
-  gatewaySpendWebhookSubscriber,
-} from "./gateway-spend-webhook.subscriber.ts";
 import {
   AdmitSpendCommand,
   ConfirmSpendCommand,
@@ -45,7 +41,7 @@ import { GatewaySpendFoldProjection, type GatewaySpendState } from "./gateway-sp
 /** gateway_spend, registered by the module that owns it, with its debit and settlement managers. */
 export const gatewaySpendEventing = defineEventingModule({
   pipeline: GATEWAY_SPEND_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<undefined, GatewayModule>) =>
+  build: ({ app, participation }: EventingSetup<GatewayRepositories, GatewayModule>) =>
     app.spendPipeline({ participation }),
   connect: ({ app, commands }) => app.connectSpend(commands),
 });
@@ -70,8 +66,6 @@ export interface EventingGatewaySpendAdapterOptions {
   cacheStore?: (
     inner: FoldProjectionStore<GatewaySpendState>,
   ) => FoldProjectionStore<GatewaySpendState>;
-  /** Webhook's own delivery op; each committed spend step is handed to it (WP-6c). */
-  webhookSpendDelivery?: Pick<WebhookApi, "requestGatewayEventDelivery">;
   /** The gateway's budget debits (`gatewayDebits`); absent without the
    *  ClickHouse spend path (the ledger is the only spend store). */
   gatewayDebits?: GatewaySpendProcessManagerMount;
@@ -123,12 +117,6 @@ export class EventingGatewaySpendAdapter {
       .withCommand("confirmSpend", ConfirmSpendCommand)
       .withCommand("failSpend", FailSpendCommand)
       .withCommand("settleSpend", SettleSpendCommand);
-    if (this.options.webhookSpendDelivery) {
-      pipeline = pipeline.withEventSubscriber(
-        GATEWAY_SPEND_WEBHOOK_SUBSCRIBER_NAME,
-        gatewaySpendWebhookSubscriber(this.options.webhookSpendDelivery),
-      );
-    }
     if (this.options.gatewayDebits) {
       pipeline = pipeline.withProcessManager(
         this.options.gatewayDebits.name,

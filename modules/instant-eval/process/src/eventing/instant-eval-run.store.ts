@@ -22,10 +22,10 @@ import type { InstantEvalRunProjectionState } from "./instant-eval-run.projectio
 const logger = createLogger("langwatch:instant-eval:run-projection-store");
 
 /** What a row with no recorded version is read as. */
-export const INITIAL_INSTANT_EVAL_PROJECTION_VERSION = "2026-09-18";
+const INITIAL_INSTANT_EVAL_PROJECTION_VERSION = "2026-09-18";
 
 /** The counters a row carries, read back as the projection's state. */
-export function instantEvalStateFromRow(row: InstantEvalRunRow): InstantEvalRunProjectionState {
+function instantEvalStateFromRow(row: InstantEvalRunRow): InstantEvalRunProjectionState {
   return {
     status: row.status,
     total: row.total,

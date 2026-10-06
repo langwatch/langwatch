@@ -1,7 +1,7 @@
 /**
  * The Instant Evals meter's monthly total: read across the organization's
  * projects, bounded to the month, and skipped rather than zeroed when there
- * is no ledger. @see specs/instant-evals/instant-eval-billing.feature
+ * is no ledger. @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { Temporal } from "@langwatch/time";

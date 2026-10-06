@@ -8,6 +8,7 @@ function serviceWithRecordingRepository() {
   const service = AuditLogService.create({
     repository: {
       create,
+      createOnce: async ({ idempotencyKey, occurredAt }) => ({ id: idempotencyKey, occurredAt }),
       hasRecordedSince: async () => false,
       findEntityHistory: async () => [],
     },

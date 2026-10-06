@@ -157,7 +157,10 @@ describe("startSystemMigrations", () => {
         expect(stubs.runPass).toHaveBeenCalledTimes(3);
       });
 
-      /** @scenario "A pass shut out by another process is not convergence" */
+      /**
+       * @scenario "A pass shut out by another process is not convergence"
+       * @scenario "A peer's claims do not keep this process from starting"
+       */
       it("stops when only some tenants were claimed, which is an ordinary pass", async () => {
         stubs.runPass.mockResolvedValue({
           ...summaryOf({ advanced: 0 }),
@@ -186,6 +189,21 @@ describe("startSystemMigrations", () => {
         await drive({ cycles: 8 });
         await stop();
 
+        expect(stubs.runPass).toHaveBeenCalledTimes(2);
+      });
+
+      /** @scenario "A momentary overlap with a peer is still waited out" */
+      it("is ended by the next pass that reads every tenant and still advances nothing", async () => {
+        stubs.runPass
+          .mockResolvedValueOnce({ ...summaryOf({ advanced: 0 }), tenantsSeen: 4, claimed: 4 })
+          .mockResolvedValue({ ...summaryOf({ advanced: 0 }), tenantsSeen: 4, claimed: 0 });
+
+        const { stop } = startSystemMigrations();
+        await drive({ cycles: 8 });
+        await stop();
+
+        // Two: the overlapped pass learned nothing, so the loop went round again, and the
+        // pass that actually read the fleet is the one that ended it.
         expect(stubs.runPass).toHaveBeenCalledTimes(2);
       });
 

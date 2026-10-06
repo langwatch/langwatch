@@ -4,8 +4,12 @@
  */
 import type { StoresMemberSource } from "@langwatch/process-stores";
 
+import type { Tier } from "./tiers.ts";
+
 /** Where a process's members come from. Built by `@langwatch/process-stores`. */
 export interface MemberSource<Members> {
+  /** The store tier stated by whoever opened these members; absent states none (§7). */
+  readonly tier?: Tier;
   /** Every member this source can build, in construction order. */
   readonly order: readonly (keyof Members & string)[];
   /** Builds the member, or refuses naming it. Repeated reads answer once. */
@@ -65,6 +69,7 @@ export function storesBackedMembers(
   ];
 
   return {
+    ...(stores.tier === void 0 ? {} : { tier: stores.tier }),
     order,
     read(name) {
       if (Object.hasOwn(overrides, name)) return overrides[name];
@@ -81,8 +86,10 @@ export class MissingMemberError extends Error {
     readonly member: string,
     options?: { cause?: unknown },
   ) {
+    // The store's own refusal names the setting that would configure it.
+    const remedy = options?.cause instanceof Error ? ` ${options.cause.message}` : "";
     super(
-      `Module "${module}" reads the "${member}" member, which this process cannot supply.`,
+      `Module "${module}" reads the "${member}" member, which this process cannot supply.${remedy}`,
       options,
     );
     this.name = "MissingMemberError";

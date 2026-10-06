@@ -263,13 +263,13 @@ describe.skipIf(!databaseUrl)("virtual key disable and enable (real PG + interna
         organizationId: ORG_ID,
         actorUserId: USER_ID,
       }),
-    ).rejects.toMatchObject({ name: "VirtualKeyRevokedError", code: "bad_request" });
+    ).rejects.toMatchObject({ code: "bad_request", httpStatus: 400 });
     await expect(
       service.enable({
         id: virtualKey.id,
         organizationId: ORG_ID,
         actorUserId: USER_ID,
       }),
-    ).rejects.toMatchObject({ name: "VirtualKeyRevokedError", code: "bad_request" });
+    ).rejects.toMatchObject({ code: "bad_request", httpStatus: 400 });
   });
 });

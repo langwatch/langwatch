@@ -1,0 +1,73 @@
+{
+  "modules": [
+    {
+      "id": "alpha",
+      "tokens": [
+        { "name": "AlphaApi", "type": "AlphaApi", "module": "alpha", "at": { "file": "modules/alpha/contract/src/alpha.api.ts", "line": 12 } },
+        { "name": "AlphaReplayApi", "type": "AlphaReplayDoorApi", "module": "alpha", "at": { "file": "modules/alpha/contract/src/alpha-replay.api.ts", "line": 4 } }
+      ],
+      "api": {
+        "name": "AlphaApi",
+        "doc": "Alpha's items.",
+        "extends": [],
+        "operations": [
+          { "name": "getItem", "params": "input: { id: string }", "returns": "Promise<AlphaItem>", "doc": "", "at": { "file": "modules/alpha/contract/src/alpha.api.ts", "line": 5 } }
+        ],
+        "at": { "file": "modules/alpha/contract/src/alpha.api.ts", "line": 3 }
+      },
+      "peers": [
+        { "name": "gammas", "token": "GammaApi", "module": "gamma", "resolved": true, "at": { "file": "modules/alpha/process/src/app/alpha.app.ts", "line": 9 } },
+        { "name": "...extraPeers", "token": "", "module": "", "resolved": false, "at": { "file": "modules/alpha/process/src/app/alpha.app.ts", "line": 10 } }
+      ],
+      "secrets": [
+        { "name": "signingKey", "value": "ALPHA_SIGNING_KEY", "text": "signingKey", "resolved": true, "at": { "file": "modules/alpha/process/src/app/alpha.app.ts", "line": 14 } }
+      ],
+      "config": [
+        { "name": "region", "value": "ALPHA_REGION", "text": "c.env(\"ALPHA_REGION\", z.string())", "resolved": true, "at": { "file": "modules/alpha/contract/src/alpha.config.ts", "line": 3 } },
+        { "name": "limits", "value": "", "text": "computeLimits()", "resolved": false, "at": { "file": "modules/alpha/contract/src/alpha.config.ts", "line": 4 } }
+      ],
+      "stores": [
+        { "requires": ["prisma", "clickhouse"], "resolved": true, "at": { "file": "modules/alpha/process/src/repositories/prisma/prisma.alpha.repositories.ts", "line": 7 } }
+      ],
+      "prismaClaims": [
+        { "model": "AlphaItem", "at": { "file": "modules/alpha/process/src/repositories/prisma/prisma.alpha-item.repository.ts", "line": 20 } }
+      ],
+      "prismaDelegates": [
+        { "delegate": "$queryRaw", "at": { "file": "modules/alpha/process/src/repositories/prisma/prisma.alpha-item.repository.ts", "line": 8 } },
+        { "delegate": "alphaItem", "at": { "file": "modules/alpha/process/src/repositories/prisma/prisma.alpha-item.repository.ts", "line": 8 } },
+        { "delegate": "gammaThing", "at": { "file": "modules/alpha/process/src/repositories/prisma/prisma.alpha-item.repository.ts", "line": 9 } }
+      ],
+      "clickhouseWrites": [
+        { "table": "alpha_events", "at": { "file": "modules/alpha/process/src/repositories/clickhouse/clickhouse.alpha-event.repository.ts", "line": 31 } }
+      ]
+    },
+    {
+      "id": "gamma",
+      "tokens": [ { "name": "GammaApi", "type": "GammaApi", "module": "gamma", "at": { "file": "modules/gamma/contract/src/gamma.api.ts", "line": 2 } } ],
+      "api": { "name": "GammaApi", "doc": "", "extends": [], "operations": [], "at": { "file": "modules/gamma/contract/src/gamma.api.ts", "line": 1 } },
+      "peers": [],
+      "secrets": [],
+      "config": [],
+      "stores": [],
+      "prismaClaims": [],
+      "prismaDelegates": [],
+      "clickhouseWrites": []
+    },
+    {
+      "id": "beta",
+      "tokens": [],
+      "api": null,
+      "peers": [ { "name": "alphas", "token": "AlphaApi", "module": "alpha", "resolved": true, "at": { "file": "enterprise/modules/beta/process/src/app/beta.app.ts", "line": 6 } } ],
+      "secrets": [],
+      "config": [],
+      "stores": [],
+      "prismaClaims": [],
+      "prismaDelegates": [],
+      "clickhouseWrites": []
+    }
+  ],
+  "packages": [
+    { "name": "@lw/core", "root": "packages/core", "kind": "library", "feature": "" },
+    { "name": "@lw/alpha-process", "root": "modules/alpha/process", "kind": "process", "feature": "alpha" }
+  ]
+}

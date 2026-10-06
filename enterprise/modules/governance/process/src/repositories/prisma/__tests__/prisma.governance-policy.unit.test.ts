@@ -1,16 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  PostgresGovernanceAdapter,
-  type GovernanceDatabase,
-} from "../../../app/governance-policy-composition.build.ts";
+import { PostgresGovernancePolicyService } from "../../../services/governance-policy.service.ts";
+import { PrismaCostAttributionPolicyRepository } from "../prisma.cost-attribution-policy.repository.ts";
 
 class PolicyHarness {
   private constructor(
     readonly findMany: ReturnType<typeof vi.fn>,
-    readonly policy: ReturnType<
-      ReturnType<typeof PostgresGovernanceAdapter.create>["build"]
-    >["policy"],
+    readonly policy: PostgresGovernancePolicyService,
   ) {}
 
   static create(tiles: { config: unknown }[]): PolicyHarness {
@@ -19,10 +15,12 @@ class PolicyHarness {
       aiToolEntry: {
         findMany,
       },
-    } as GovernanceDatabase;
+    };
     return new PolicyHarness(
       findMany,
-      PostgresGovernanceAdapter.create({ database }).build().policy,
+      PostgresGovernancePolicyService.create(
+        PrismaCostAttributionPolicyRepository.create(database),
+      ),
     );
   }
 

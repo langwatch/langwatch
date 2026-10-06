@@ -10,6 +10,8 @@ import type {
   BrowserSessionInventoryEntry,
   BrowserSessionResolution,
   BrowserSessionVerification,
+  SessionImpersonation,
+  SessionImpersonationState,
   VerifiedBrowserSession,
 } from "./browser-session.ts";
 import type {
@@ -117,6 +119,19 @@ export interface AuthApi {
    * One owner, this module: issuer discovery asks rather than redeclaring them.
    */
   findDialableIdentityProviderOrigins(): string[];
+  /** The social providers this deployment mounted, by the id the sign-in rail dials. */
+  findMountedSocialMethodIds(): string[];
+  /**
+   * The impersonation this session carries: a lapsed, half-written or self-naming claim, one whose
+   * actor is not the session's user, or a session that is gone, reads as none.
+   */
+  getImpersonation(input: { sessionId: string }): Promise<SessionImpersonationState>;
+  /** Records the {actor, subject} claims on the session (D06); the actor is its own user. */
+  startImpersonation(
+    input: Readonly<{ sessionId: string; reason: string }> & Omit<SessionImpersonation, "reason">,
+  ): Promise<void>;
+  /** Clears the claims, returning the session to its own user without ending it; idempotent. */
+  stopImpersonation(input: { sessionId: string }): Promise<void>;
   /**
    * Whether Better Auth accepts the token. Carries the RAW auth-session id
    * an impersonation starts/stops against; a process with no sign-in door
@@ -210,7 +225,7 @@ export interface AuthApi {
    * the installation has no email at all, it mails nothing and answers an unconfirmed proof.
    */
   requestNewAccountVerification(
-    input: Readonly<{ email: string }>,
+    input: Readonly<{ email: string; callbackUrl?: string }>,
   ): Promise<SignUpVerificationRequest>;
   /**
    * Starts identity's PKCE ceremony for the signed-in caller's own address, metered per caller;

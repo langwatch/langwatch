@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type {
-  ActivityMonitorRepository,
-  AnomalySpendReader,
-  GovernanceKpiContributionWriter,
-  GovernanceOcsfEventsReader,
-  GovernanceOcsfEventWriter,
-} from "../app/governance.members.ts";
+import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
+import type { Instant } from "@langwatch/time";
+
+import type { ActivityMonitorRepository } from "./activity-monitor.repository.ts";
 import type { AiToolCatalogRepository } from "./ai-tool-catalog.repository.ts";
 import type { AnomalyRuleRepository } from "./anomaly-rule.repository.ts";
 import type {
@@ -20,6 +17,7 @@ import type { DiscoveredPersonRepository } from "./discovered-person.repository.
 import type { ErasedIdentifierSuppressionRepository } from "./erased-identifier-suppression.repository.ts";
 import type { GovernanceCostChargeRepository } from "./governance-cost-charge.repository.ts";
 import type { GovernanceCostRollupRepository } from "./governance-cost-rollup.repository.ts";
+import type { GovernanceRateLimitRepository } from "./governance-rate-limit.repository.ts";
 import type { GovernanceSetupStateRepository } from "./governance-setup-state.repository.ts";
 import type { GovernanceTenantHistoryRepository } from "./governance-tenant-history.repository.ts";
 import type { IdentityMatchSuggestionRepository } from "./identity-match-suggestion.repository.ts";
@@ -32,6 +30,92 @@ import type { OrganizationSupportContactRepository } from "./organization-suppor
 import type { RollupErasureRepository } from "./rollup-erasure.repository.ts";
 import type { SpendSpikeAnomalyRepository } from "./spend-spike-anomaly.repository.ts";
 import type { SuppressionSnapshotRepository } from "./suppression-snapshot.repository.ts";
+
+export type GovernanceKpiContribution = {
+  tenantId: string;
+  sourceId: string;
+  sourceType: string;
+  hourBucket: Instant;
+  traceId: string;
+  spendUsd: number;
+  promptTokens: number;
+  completionTokens: number;
+  lastEventOccurredAt: Instant;
+};
+
+export interface GovernanceKpiContributionWriter {
+  /** Upsert/replacing identity is (tenant, source, hour, trace). */
+  insertContribution(row: GovernanceKpiContribution): Promise<void>;
+}
+
+export type AnomalySpendSourceFilter =
+  | { type: "all" }
+  | { type: "source"; id: string }
+  | { type: "source_type"; id: string };
+
+export interface AnomalySpendReader {
+  findSpendTotals(input: {
+    tenantId: string;
+    windowStart: Instant;
+    windowEnd: Instant;
+    baselineStart: Instant;
+    sourceFilter: AnomalySpendSourceFilter;
+  }): Promise<{ currentSpend: number; baselineSpend: number }>;
+}
+
+export interface GovernanceOcsfEventsReader {
+  findAll(input: {
+    tenantId: string;
+    sinceMs: number;
+    sinceEventId: string;
+    limit: number;
+  }): Promise<GovernanceOcsfExportRow[]>;
+}
+
+export type GovernanceOcsfEventInput = {
+  tenantId: string;
+  eventId: string;
+  traceId: string;
+  sourceId: string;
+  sourceType: string;
+  activityId: 1 | 2 | 3 | 4 | 6;
+  severityId: 1 | 3 | 4 | 5 | 6;
+  eventTime: Instant;
+  actorUserId: string;
+  actorEmail: string;
+  actorEnduserId: string;
+  actionName: string;
+  targetName: string;
+  anomalyAlertId: string;
+  rawOcsfJson: string;
+};
+
+export interface GovernanceOcsfEventSink {
+  insertEvent(input: GovernanceOcsfEventInput): Promise<void>;
+}
+
+export type GovernanceOcsfEvent = {
+  tenantId: string;
+  eventId: string;
+  traceId: string;
+  sourceId: string;
+  sourceType: string;
+  activityId: number;
+  severityId: number;
+  eventTime: Instant;
+  actorUserId: string;
+  actorEmail: string;
+  actorEnduserId: string;
+  actionName: string;
+  targetName: string;
+  anomalyAlertId: string;
+  rawOcsfJson: string;
+};
+
+export interface GovernanceOcsfEventWriter {
+  /** Upsert/replacing identity is (tenant, eventId). */
+  insertEvent(row: GovernanceOcsfEvent): Promise<void>;
+}
 
 /**
  * The rows the governance module owns, chosen once at boot.
@@ -63,6 +147,8 @@ export interface GovernanceRepositories {
   /** The per-charge record the drift check holds the rollup against. */
   readonly costCharges: GovernanceCostChargeRepository;
   readonly ocsfEvents: GovernanceClickHouseRepositories["ocsfEvents"];
+  /** The push receivers' per-caller throttle. */
+  readonly rateLimits: GovernanceRateLimitRepository;
   /** The `governance_kpis` rows the spend-spike evaluator reads and the trace pull writes. */
   readonly anomalySpend: GovernanceClickHouseRepositories["anomalySpend"];
   readonly rollupErasure: RollupErasureRepository;
@@ -99,7 +185,7 @@ export interface GovernanceClickHouseRepositories {
  * two methods every one of them calls. Narrow rather than the vendor client so a
  * member-backed wrapper satisfies it without a cast.
  */
-export interface GovernanceClickHouseTenantClient {
+interface GovernanceClickHouseTenantClient {
   query<Row>(input: {
     query: string;
     query_params?: Record<string, unknown>;

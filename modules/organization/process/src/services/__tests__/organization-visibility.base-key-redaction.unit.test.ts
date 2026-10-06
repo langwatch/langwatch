@@ -120,7 +120,6 @@ function visibility(granted: readonly string[], permissions = testPermissions(gr
       findMemberById: (input) => membership.findMemberById(input),
     },
     permissions: createApiFixture<AuthzApi>(permissions),
-    secrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
     demoProject: { userId: "", projectId: "" },
   });
 }
@@ -153,6 +152,7 @@ describe("given the base key in the organizations payload", () => {
     ["can only view the project", []],
   ])("when the caller %s", (_label, granted) => {
     /** @scenario No query carries a project key or the storage secret */
+    /** @scenario No project read carries a project key or the LangWatchQL key */
     it("leaves the base key blank in the payload", async () => {
       const project = await readProject(granted);
 
@@ -179,6 +179,7 @@ describe("given the base key in the organizations payload", () => {
   /** The LangWatchQL key is a control-plane secret withheld from everyone, managers included. */
   describe("when the LangWatchQL key is on the project", () => {
     /** @scenario No query carries a project key or the storage secret */
+    /** @scenario No project read carries a project key or the LangWatchQL key */
     it.each([
       ["a caller who can manage the project", ["project:manage"]],
       ["a caller who can update but not manage the project", ["project:update"]],

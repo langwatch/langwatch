@@ -17,7 +17,7 @@ import {
   signUpVerificationRequestSchema,
 } from "./front-door.responses.ts";
 import {
-  frontDoorEmailInputSchema,
+  signUpVerificationInputSchema,
   frontDoorInviteCodeInputSchema,
   frontDoorOwnAddressInputSchema,
   frontDoorRouteInputSchema,
@@ -40,7 +40,7 @@ export const authTrpc = defineTrpcContract("auth")
   .withOutput(routingDecisionSchema)
 
   .mutation("requestSignUpVerification")
-  .withInput(frontDoorEmailInputSchema)
+  .withInput(signUpVerificationInputSchema)
   .withOutput(signUpVerificationRequestSchema)
 
   .query("inviteLanding")

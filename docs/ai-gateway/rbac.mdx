@@ -108,7 +108,9 @@ A call with an API key that lacks the route's permission gets HTTP 403 `api_key_
 
 ## Changing the permission matrix
 
-Default roles are code-defined in `modules/authz/contract/src/roles.ts`, declared as differences rather than duplicate lists: `viewer` is the base set, `member` is `viewer` plus its additions, `admin` is `member` plus its additions, and `builtinRolePermissions()` resolves a role key to the permissions it ends up with. **Do not edit the default matrix in production**: a change to those built-in sets affects every team on the instance. Use a **custom role** instead: create it in the UI, assign the permissions you want, and assign it to specific users.
+Default roles are code-defined in `modules/authz/contract/src/roles.ts`, declared as differences rather than duplicate lists: `viewer` is the base set, `member` is `viewer` plus its additions, `admin` is `member` plus its additions, and `builtinRolePermissions()` resolves a role key to the permissions it ends up with.
+
+**Do not edit the default matrix in production**: a change to those built-in sets affects every team on the instance. Use a **custom role** instead: create it in the UI, assign the permissions you want, and assign it to specific users.
 
 ## SCIM + SSO
 

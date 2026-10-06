@@ -23,3 +23,9 @@ Feature: What a process hands its modules
     When the process boots
     Then the module's memory tier is built and no store client is asked for
     And a module that declares no repositories has no memory tier to ask for, and says so
+
+  @unit
+  Scenario: A task binder is handed its module's parsed config
+    Given a module that declares a config slice and builds its tasks with a binder
+    When a process with the "tasks" role boots with that module's config stated
+    Then the binder is handed the module's parsed config beside its app

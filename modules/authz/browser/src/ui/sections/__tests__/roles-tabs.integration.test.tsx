@@ -4,7 +4,7 @@
  * Spec: specs/identity/org-access-cluster.feature, specs/rbac/roles-and-access-ui.feature
  */
 
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -104,9 +104,57 @@ describe("the Roles & access page", () => {
     });
   });
 
+  describe("given a member who holds a role on a team called Platform", () => {
+    /** @scenario A scope is named in full */
+    it("names the scope on the Access tab by its kind and its full name", () => {
+      state.grants = [
+        {
+          id: "gr-1",
+          principal: { type: "user", id: "u1", name: "Sam" },
+          role: { id: "member", name: "Member", builtIn: true },
+          scope: { type: "team", id: "team-1", name: "Platform" },
+          status: "active",
+          expiresAt: null,
+          createdAt: "2026-09-01T00:00:00.000Z",
+        },
+      ];
+      renderWithAuthzHost(<RolesScreen />, new FakeAuthzHost({ query: { tab: "assignments" } }));
+
+      const row = within(screen.getByTestId("grant-row"));
+      expect(row.getByText("Team · Platform")).toBeInTheDocument();
+      expect(row.queryByText("Platform")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given two API keys that hold roles in the organization", () => {
+    /** @scenario Every holder is named, whatever kind of holder it is */
+    it("gives each key its own row, a key with no name says so, and no row is nameless", () => {
+      const keyGrant = (id: string, keyId: string, name: string | null) => ({
+        id,
+        principal: { type: "apiKey", id: keyId, name },
+        role: { id: "viewer", name: "Viewer", builtIn: true },
+        scope: { type: "organization", id: "org-1", name: "Acme" },
+        status: "active",
+        expiresAt: null,
+        createdAt: "2026-09-01T00:00:00.000Z",
+      });
+      state.grants = [keyGrant("gr-1", "key-1", "CI deploy"), keyGrant("gr-2", "key-2", null)];
+      renderWithAuthzHost(<RolesScreen />, new FakeAuthzHost({ query: { tab: "assignments" } }));
+
+      const rows = screen.getAllByTestId("grant-row");
+      expect(rows).toHaveLength(2);
+      expect(within(rows[0]!).getByText("CI deploy")).toBeInTheDocument();
+      expect(within(rows[0]!).getByText("API key")).toBeInTheDocument();
+      expect(within(rows[1]!).getByText("An API key with no name yet")).toBeInTheDocument();
+      for (const row of rows) {
+        expect(within(row).getAllByRole("cell")[0]?.textContent?.trim()).not.toBe("");
+      }
+    });
+  });
+
   describe("given an organization that is not on Enterprise", () => {
     /** @scenario Access is an Enterprise feature */
-    it("offers sales and reads no grant, even on the Access address", () => {
+    it("offers sales and reads no grant, even on the Access address", async () => {
       renderWithAuthzHost(
         <RolesScreen />,
         new FakeAuthzHost({
@@ -115,7 +163,7 @@ describe("the Roles & access page", () => {
         }),
       );
 
-      expect(screen.getByTestId("contact-sales-block")).toBeInTheDocument();
+      expect(await screen.findByTestId("contact-sales-block")).toBeInTheDocument();
       expect(state.bindingReads).toBe(0);
       expect(state.grantReads).toBe(0);
     });

@@ -6,7 +6,7 @@ import type {
 } from "../identity-signin-accounts.repository.ts";
 
 /** The one model the legacy sign-in answer is read through. */
-export type PrismaIdentitySignInAccountsDatabase = Pick<PrismaClient, "user">;
+type PrismaIdentitySignInAccountsDatabase = Pick<PrismaClient, "user">;
 
 /** better-auth's own provider name for an email-and-password sign-in method. */
 const CREDENTIAL_PROVIDER = "credential";

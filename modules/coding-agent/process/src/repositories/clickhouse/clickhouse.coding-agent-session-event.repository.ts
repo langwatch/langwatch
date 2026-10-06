@@ -24,7 +24,7 @@ const logger = createLogger("langwatch:app-layer:coding-agent:session-events-rep
  * written before the session declared where it was working (or before the stamp existed);
  * those unstamped totals are priced under the legacy whole-session rule.
  */
-export interface SessionModelTotalsRow {
+interface SessionModelTotalsRow {
   tenantId: string;
   sessionId: string;
   model: string;
@@ -40,9 +40,9 @@ export interface SessionModelTotalsRow {
 }
 
 /** The event kind that carries a model, its tokens and its cost. */
-export const MODEL_CALL_EVENT_KIND = "model_call";
+const MODEL_CALL_EVENT_KIND = "model_call";
 
-export interface SessionEventsCursor {
+interface SessionEventsCursor {
   timeUnixMs: number;
   recordId: string;
 }
@@ -52,7 +52,7 @@ export interface SessionEventsCursor {
  * is already scoped to one tenant by the caller, so the SELECT never carries
  * the column back and the type must not claim a value the row does not hold.
  */
-export type CodingAgentSessionEventRow = CodingAgentSessionEvent;
+type CodingAgentSessionEventRow = CodingAgentSessionEvent;
 
 interface ClickHouseWriteRecord {
   [key: string]: unknown;

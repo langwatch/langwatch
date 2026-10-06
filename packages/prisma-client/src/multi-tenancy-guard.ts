@@ -1,7 +1,11 @@
 import { z } from "zod";
 
-import { clauseField, isClause } from "./clause-field.ts";
-import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
+import {
+  clauseField,
+  isClause,
+  type GuardMiddleware,
+  type GuardParams,
+} from "./guard-middleware.ts";
 import { ORG_BEARING_MODEL_NAMES } from "./organization-guard.ts";
 
 // Looks for `projectId`, `organizationId`, or `tenantId` anywhere in
@@ -87,8 +91,8 @@ const GLOBAL_MODELS = [
   "WebPushSubscription",
   // The installation's one VAPID key pair, like InstanceIdentity.
   "WebPushVapidKey",
-  // Whether a person is deactivated or erased, keyed by user id like Passkey:
-  // it holds for the person in every organisation, so there is no tenant column.
+  // Authz's record of who is deactivated or erased (ARCHITECTURE.md, "Platform operators are
+  // a grant"): keyed by userId alone and platform-wide, like User; written in raw SQL only.
   "AuthzUserStanding",
 ] as const;
 

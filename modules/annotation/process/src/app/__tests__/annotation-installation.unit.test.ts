@@ -3,7 +3,8 @@ import {
   AnnotationNotFoundError,
   AnnotationQueueItemNotFoundError,
 } from "@langwatch/annotation-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
 import { annotationProcessModule } from "../../annotation.module.ts";
@@ -24,7 +25,8 @@ import {
  */
 function process() {
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(annotationProcessModule)])
+    .withModules([annotationProcessModule])
+    .withStores(memoryStores())
     .provide({
       project: createAnnotationTestProjects(),
       organization: createAnnotationTestOrganizations(),
@@ -65,6 +67,26 @@ describe("annotation app installation", () => {
       await expect(
         app.getById({ projectId: input.projectId, id: created.id }),
       ).rejects.toBeInstanceOf(AnnotationNotFoundError);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "a process composes one annotation capability" */
+  it("answers every caller with the one AnnotationApi, over the repositories chosen at boot", async () => {
+    const runtime = await process().boot();
+
+    try {
+      const writer = runtime.service(AnnotationApi);
+      const reader = runtime.service(AnnotationApi);
+      const created = await writer.createUnattributed(input);
+
+      expect(reader).toBe(writer);
+      expect(runtime.module(annotationProcessModule).provided).toBe(writer);
+
+      await expect(
+        reader.listForProjection({ projectId: input.projectId, traceIds: [input.traceId] }),
+      ).resolves.toEqual([expect.objectContaining({ id: created.id })]);
     } finally {
       await runtime.stop();
     }

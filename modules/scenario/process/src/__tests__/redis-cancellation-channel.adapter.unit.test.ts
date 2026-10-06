@@ -6,15 +6,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { CancellationMessage } from "../app/scenario.app.ts";
-import type {
-  CancellationPublisherClient,
-  CancellationSubscriberClient,
-} from "../channels/redis/redis.scenario-cancellation.channel.ts";
 import {
   CANCELLATION_CHANNEL,
-  RedisScenarioCancellationPublisherChannel,
-  RedisScenarioCancellationSubscriberChannel,
-} from "../channels/redis/redis.scenario-cancellation.channel.ts";
+  type CancellationPublisherClient,
+  type CancellationSubscriberClient,
+  RedisScenarioCancellationRepository,
+} from "../repositories/redis/redis.scenario-cancellation.repository.ts";
 
 function createMockPublisher(): CancellationPublisherClient {
   return {
@@ -30,6 +27,20 @@ function createMockSubscriber(): CancellationSubscriberClient {
   };
 }
 
+/** The live repository over one mocked connection, whose duplicate is the subscriber. */
+function repositoryOver({
+  publisher = createMockPublisher(),
+  subscriber = createMockSubscriber(),
+}: {
+  publisher?: CancellationPublisherClient;
+  subscriber?: CancellationSubscriberClient;
+}) {
+  return RedisScenarioCancellationRepository.create({
+    publish: publisher.publish,
+    duplicate: () => subscriber,
+  });
+}
+
 describe("publishCancellation", () => {
   it("publishes the message to the cancel channel", async () => {
     const publisher = createMockPublisher();
@@ -39,7 +50,7 @@ describe("publishCancellation", () => {
       batchRunId: "batch1",
     };
 
-    await RedisScenarioCancellationPublisherChannel.create(publisher).publish(message);
+    await repositoryOver({ publisher }).publish(message);
 
     expect(publisher.publish).toHaveBeenCalledWith(CANCELLATION_CHANNEL, JSON.stringify(message));
   });
@@ -50,7 +61,7 @@ describe("subscribeToCancellations", () => {
     const subscriber = createMockSubscriber();
     const onCancel = vi.fn();
 
-    await RedisScenarioCancellationSubscriberChannel.create(subscriber).subscribe(onCancel);
+    await repositoryOver({ subscriber }).subscribe(onCancel);
 
     expect(subscriber.subscribe).toHaveBeenCalledWith(CANCELLATION_CHANNEL);
   });
@@ -59,7 +70,7 @@ describe("subscribeToCancellations", () => {
     const subscriber = createMockSubscriber();
     const onCancel = vi.fn();
 
-    await RedisScenarioCancellationSubscriberChannel.create(subscriber).subscribe(onCancel);
+    await repositoryOver({ subscriber }).subscribe(onCancel);
 
     const onCall = (subscriber.on as ReturnType<typeof vi.fn>).mock.calls[0]!;
     expect(onCall[0]).toBe("message");
@@ -79,7 +90,7 @@ describe("subscribeToCancellations", () => {
     const subscriber = createMockSubscriber();
     const onCancel = vi.fn();
 
-    await RedisScenarioCancellationSubscriberChannel.create(subscriber).subscribe(onCancel);
+    await repositoryOver({ subscriber }).subscribe(onCancel);
 
     const handler = (subscriber.on as ReturnType<typeof vi.fn>).mock.calls[0]![1] as (
       channel: string,
@@ -94,7 +105,7 @@ describe("subscribeToCancellations", () => {
     const subscriber = createMockSubscriber();
     const onCancel = vi.fn();
 
-    await RedisScenarioCancellationSubscriberChannel.create(subscriber).subscribe(onCancel);
+    await repositoryOver({ subscriber }).subscribe(onCancel);
 
     const handler = (subscriber.on as ReturnType<typeof vi.fn>).mock.calls[0]![1] as (
       channel: string,
@@ -109,8 +120,7 @@ describe("subscribeToCancellations", () => {
     const subscriber = createMockSubscriber();
     const onCancel = vi.fn();
 
-    const unsubscribe =
-      await RedisScenarioCancellationSubscriberChannel.create(subscriber).subscribe(onCancel);
+    const unsubscribe = await repositoryOver({ subscriber }).subscribe(onCancel);
     await unsubscribe();
 
     expect(subscriber.quit).toHaveBeenCalled();

@@ -47,10 +47,10 @@ const signUp = (email: string, addressProof = "proof_1") => JSON.stringify({ ema
 
 /** Records the announcements without letting one fail the ceremony. */
 class SilentAnnouncements extends BetterAuthAnnouncements {
-  readonly tracked: { userId: string; event: string }[] = [];
+  readonly signedUp: string[] = [];
 
-  trackServerEvent(input: { userId: string; event: string }): void {
-    this.tracked.push({ userId: input.userId, event: input.event });
+  signUpNurturing(input: { userId: string }): void {
+    this.signedUp.push(input.userId);
   }
 
   reportError(): void {}
@@ -97,6 +97,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
   beforeEach(() => {
     vi.clearAllMocks();
     journal.length = 0;
+    announcements.signedUp.length = 0;
     verification.live.clear();
     verification.live.set("proof_1", "someone@example.com");
     verification.live.set("proof_victim", "victim@corp.com");
@@ -146,6 +147,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
      * credential involved.
      */
     /** @scenario A passkey is never registered against an address that already has an account */
+    /** @scenario "An address whose account can be signed into is still refused" */
     it("refuses to start a ceremony for somebody else's address", async () => {
       findByEmail.mockResolvedValue({ id: "someone_else" });
 
@@ -217,6 +219,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
       expect(resolved.id).not.toContain("@");
     });
 
+    /** @scenario A sign-up that died mid-ceremony leaves the address usable */
     it("hands back the same handle every time, so a retry replaces the credential", async () => {
       const first = await resolveUser({
         ctx: fakeContext().ctx,
@@ -230,6 +233,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
       expect(first.id).toBe(second.id);
     });
 
+    /** @scenario A sign-up that died mid-ceremony leaves the address usable */
     it("creates nothing merely for being asked", async () => {
       await resolveUser({
         ctx: fakeContext().ctx,
@@ -249,6 +253,13 @@ describe("given passkey sign-up, which creates an account with no session", () =
       expect(createPasskeyUser).toHaveBeenCalledWith(
         expect.objectContaining({ email: "someone@example.com" }),
       );
+    });
+
+    /** @scenario A sign-up that died mid-ceremony leaves the address usable */
+    it("records one sign-up for nurturing, under the new account's id", async () => {
+      await afterVerification({ ctx: fakeContext().ctx, context: signUp("someone@example.com") });
+
+      expect(announcements.signedUp).toEqual(["user_1"]);
     });
 
     it("attaches the passkey to the account rather than to the handle", async () => {
@@ -337,6 +348,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
 
       expect(result).toEqual({ userId: "user_sam", name: "sam@acme.com" });
       expect(createPasskeyUser).not.toHaveBeenCalled();
+      expect(announcements.signedUp).toEqual([]);
       expect(journal).toEqual([]);
     });
 

@@ -59,7 +59,7 @@ export interface VoiceSocketReceiver {
 }
 
 /** IPC-bearing subset of `process` the receiver needs; eases testing. */
-export interface VoiceSocketProcess {
+interface VoiceSocketProcess {
   on(event: "message", listener: (message: unknown, handle: unknown) => void): unknown;
   off(event: "message", listener: (message: unknown, handle: unknown) => void): unknown;
 }

@@ -141,14 +141,14 @@ func Seed(ctx context.Context, request SeedRequest) (SeedResult, error) {
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.Go(func() error {
 		started := time.Now()
-		ids, err := seedTraces(groupCtx, client, request, now)
+		ids, err := seeding{client: client, request: request, now: now}.traces(groupCtx)
 		result.TraceIDs = ids
 		keep("traces", started, nil, nil)
 		return err
 	})
 	group.Go(func() error {
 		started := time.Now()
-		fixtures, warnings, err := seedDataset(groupCtx, client, request.APIURL, key)
+		fixtures, warnings, err := seeding{client: client, request: request, now: now}.dataset(groupCtx)
 		result.DatasetOK = err == nil
 		keep("dataset", started, fixtures, warnings)
 		return err
@@ -182,8 +182,16 @@ func Seed(ctx context.Context, request SeedRequest) (SeedResult, error) {
 	return result, nil
 }
 
-// seedTraces posts TraceCount deterministic traces at once, and returns their ids in order.
-func seedTraces(ctx context.Context, client *http.Client, request SeedRequest, now int64) ([]string, error) {
+// seeding is one Seed's client, request and clock, shared by its parts.
+type seeding struct {
+	client  *http.Client
+	request SeedRequest
+	now     int64
+}
+
+// traces posts TraceCount deterministic traces at once, and returns their ids in order.
+func (seed seeding) traces(ctx context.Context) ([]string, error) {
+	client, request, now := seed.client, seed.request, seed.now
 	ids := make([]string, request.TraceCount)
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(seedConcurrency)
@@ -200,8 +208,9 @@ func seedTraces(ctx context.Context, client *http.Client, request SeedRequest, n
 	return ids, group.Wait()
 }
 
-// seedDataset posts the dataset, then its rows, and names it as a fixture.
-func seedDataset(ctx context.Context, client *http.Client, apiURL, key string) (map[string]string, []string, error) {
+// dataset posts the dataset, then its rows, and names it as a fixture.
+func (seed seeding) dataset(ctx context.Context) (map[string]string, []string, error) {
+	client, apiURL, key := seed.client, seed.request.APIURL, seed.request.Identity.ProjectKey
 	dataset := map[string]any{
 		"name": "Visual Diff QA",
 		"columnTypes": []map[string]string{
@@ -284,14 +293,14 @@ func postReading(ctx context.Context, client *http.Client, spec postSpec) ([]byt
 	if err != nil {
 		return nil, err
 	}
-	answer, err := sendOnce(ctx, client, spec, encoded)
+	answer, err := sendOnce(ctx, client, encodedPost{spec: spec, encoded: encoded})
 	for attempt := 1; err != nil && neverSent.MatchString(err.Error()) && attempt < sendAttempts; attempt++ {
 		select {
 		case <-ctx.Done():
 			return nil, err
 		case <-time.After(time.Duration(attempt) * time.Second):
 		}
-		answer, err = sendOnce(ctx, client, spec, encoded)
+		answer, err = sendOnce(ctx, client, encodedPost{spec: spec, encoded: encoded})
 	}
 	return answer, err
 }
@@ -302,8 +311,17 @@ const sendAttempts = 3
 
 var neverSent = regexp.MustCompile(`TLS handshake timeout|connection refused`)
 
-func sendOnce(ctx context.Context, client *http.Client, spec postSpec, encoded []byte) ([]byte, error) {
-	method, body := http.MethodPost, io.Reader(bytes.NewReader(encoded))
+// encodedPost is a postSpec with its body already marshalled, so resends
+// send the same bytes.
+type encodedPost struct {
+	spec    postSpec
+	encoded []byte
+}
+
+// sendOnce sends one request and returns the answer's body.
+func sendOnce(ctx context.Context, client *http.Client, request encodedPost) ([]byte, error) {
+	spec := request.spec
+	method, body := http.MethodPost, io.Reader(bytes.NewReader(request.encoded))
 	if spec.method != "" {
 		method = spec.method
 	}

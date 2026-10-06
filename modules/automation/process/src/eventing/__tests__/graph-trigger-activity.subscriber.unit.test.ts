@@ -12,12 +12,12 @@ import {
   SilentLogger,
   TestDispatchErrors,
 } from "../../__tests__/fixtures/graph-activity.fixture.ts";
-import type { AutomationGraphActivity } from "../../app/automation.members.ts";
 import { MemoryAutomationEmailCapRepository } from "../../repositories/memory/memory.automation-email-cap.repository.ts";
 import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.custom-graph.repository.ts";
 import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
 import { PrismaTriggerRepository } from "../../repositories/prisma/prisma.trigger.repository.ts";
+import type { AutomationGraphActivity } from "../../services/automation-graph-activity.service.ts";
 import { AutomationGraphActivityService } from "../../services/automation-graph-activity.service.ts";
 import { AutomationGraphDeliveryService } from "../../services/automation-graph-delivery.service.ts";
 import { AutomationWebhookSecretsService } from "../../services/automation-webhook-secrets.service.ts";
@@ -76,7 +76,7 @@ describe("createGraphTriggerActivityHandler", () => {
       const clock = frozenAt(FROZEN_NOW);
       const delivery = new RecordingDelivery();
       const crypto = { encrypt: (value: string) => value, decrypt: (value: string) => value };
-      const triggers = PrismaTriggerRepository.create(database.prisma, clock);
+      const triggers = PrismaTriggerRepository.create(database.prisma, clock, crypto);
       const handler = createGraphTriggerActivityHandler(
         AutomationGraphActivityService.create({
           triggers,
@@ -90,10 +90,10 @@ describe("createGraphTriggerActivityHandler", () => {
           projects: new OneProject(),
           analytics: breachingAnalytics(),
           delivery,
-          webhooks: AutomationWebhookSecretsService.create(crypto),
+          webhooks: AutomationWebhookSecretsService.create(triggers),
           slackDestinations: SlackDestinationService.create({
             slack: { findUsableSlackSecret: async () => [] },
-            crypto: crypto,
+            triggers,
           }),
           emailCaps: AutomationEmailCapService.create({
             store: MemoryAutomationEmailCapRepository.create(),

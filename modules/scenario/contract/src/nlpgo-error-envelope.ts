@@ -3,6 +3,7 @@
  * the child's execution-error rules alike.
  */
 
+import { handledErrorFaultSchema } from "@langwatch/handled-error";
 import { z } from "zod";
 
 /**
@@ -16,7 +17,7 @@ export const goErrorEnvelopeSchema = z.object({
     meta: z.record(z.string(), z.unknown()).optional(),
     trace_id: z.string().optional(),
     span_id: z.string().optional(),
-    fault: z.enum(["customer", "platform", "provider"]).optional(),
+    fault: handledErrorFaultSchema.optional(),
     tips: z.array(z.string()).optional(),
     docs_url: z.string().optional(),
   }),

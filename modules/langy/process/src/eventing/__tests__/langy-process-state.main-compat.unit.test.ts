@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { langyConversationProcessStateSchema } from "../../app/langy.members.ts";
+import { langyConversationProcessStateSchema } from "../langy-conversation-process.schemas.ts";
 import { langySessionKeyReapStateSchema } from "../langy-session-key-reap.process.ts";
 
 describe("process state stored by the main release", () => {

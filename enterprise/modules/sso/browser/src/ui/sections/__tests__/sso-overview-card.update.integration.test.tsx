@@ -68,6 +68,7 @@ const viewWith = ({
   record: null,
   goLive: null,
   legacyRoute: null,
+  enterpriseRequired: false,
   migration,
   availability: { available: true, proof: "dns-txt" },
   serviceProvider: {

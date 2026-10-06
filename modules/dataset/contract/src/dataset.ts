@@ -1,5 +1,10 @@
 import { resolveRequestBound } from "@langwatch/plans";
-import { storedObjectIdSchema } from "@langwatch/stored-object-contract";
+import {
+  storedObjectByteLengthSchema,
+  storedObjectFilenameSchema,
+  storedObjectIdSchema,
+  storedObjectMediaTypeSchema,
+} from "@langwatch/stored-object-contract";
 import { z } from "zod";
 
 export const datasetColumnTypeSchema = z.enum([
@@ -120,6 +125,19 @@ export const datasetSchema = z
   .strict();
 export type Dataset = z.infer<typeof datasetSchema>;
 
+/**
+ * A dataset as the browser reads it. The stored size is a bigint, which JSON
+ * cannot carry, so it crosses as a number: no dataset comes near 2^53 bytes.
+ */
+export const datasetWireSchema = z.strictObject({
+  ...datasetSchema.shape,
+  sizeBytes: z
+    .bigint()
+    .nullable()
+    .transform((size) => (size === null ? null : Number(size))),
+});
+export type DatasetWire = z.infer<typeof datasetWireSchema>;
+
 export const datasetRecordSchema = z
   .object({
     id: z.string().min(1),
@@ -136,6 +154,12 @@ export const datasetSummarySchema = datasetSchema.safeExtend({
   recordCount: z.number().int().nonnegative(),
 });
 export type DatasetSummary = z.infer<typeof datasetSummarySchema>;
+
+/** One row of the dataset list as the browser reads it. */
+export const datasetSummaryWireSchema = datasetWireSchema.safeExtend({
+  recordCount: z.number().int().nonnegative(),
+});
+export type DatasetSummaryWire = z.infer<typeof datasetSummaryWireSchema>;
 
 export const datasetPaginationSchema = z.object({
   page: z.number().int().positive(),
@@ -154,6 +178,8 @@ export type DatasetListResult = z.infer<typeof datasetListResultSchema>;
 export const datasetRecordPageSchema = z.object({
   data: z.array(datasetRecordSchema),
   pagination: datasetPaginationSchema,
+  /** The dataset the page belongs to, so a paging reader needs no second call for it. */
+  dataset: datasetSchema.optional(),
 });
 export type DatasetRecordPage = z.infer<typeof datasetRecordPageSchema>;
 
@@ -172,7 +198,10 @@ export type DatasetPage = z.infer<typeof datasetPageSchema>;
 export const datasetWithRecordsSchema = z.object({
   dataset: datasetSchema,
   records: z.array(datasetRecordSchema),
+  /** True whenever a row the read asked for was left out of `records`. */
   truncated: z.boolean(),
+  /** How many rows the read asked for, before the byte budget cut it short. */
+  totalRows: z.number().int().nonnegative().optional(),
 });
 export type DatasetWithRecords = z.infer<typeof datasetWithRecordsSchema>;
 
@@ -222,6 +251,10 @@ export const datasetLookupInputSchema = z
 export type DatasetLookupInput = z.infer<typeof datasetLookupInputSchema>;
 
 export const datasetWithRecordsInputSchema = datasetLookupInputSchema.safeExtend({
+  /**
+   * The byte budget in megabytes. Absent, the read is held to what the
+   * organization answers inline in one response; `null` reads every row.
+   */
   limitMb: z.number().nonnegative().nullable().optional(),
   entrySelection: z
     .union([
@@ -325,6 +358,31 @@ export const storedDatasetAttachmentSchema = z
   })
   .meta({ id: "DatasetAttachment" });
 export type StoredDatasetAttachment = z.infer<typeof storedDatasetAttachmentSchema>;
+
+/** A file about to be uploaded into an image or file cell. */
+export const createDatasetAttachmentUploadInputSchema = z
+  .object({
+    projectId: z.string().min(1),
+    filename: storedObjectFilenameSchema,
+    mediaType: storedObjectMediaTypeSchema,
+    byteLength: storedObjectByteLengthSchema,
+  })
+  .strict();
+export type CreateDatasetAttachmentUploadInput = z.infer<
+  typeof createDatasetAttachmentUploadInputSchema
+>;
+
+/** Where a cell's file is sent: one signed address, good until `expiresAt`. */
+export const datasetAttachmentUploadSchema = z
+  .object({
+    objectId: z.string().min(1),
+    uploadUrl: z.string().url(),
+    method: z.literal("PUT"),
+    headers: z.record(z.string(), z.string().min(1)).optional(),
+    expiresAt: z.string().min(1),
+  })
+  .strict();
+export type DatasetAttachmentUpload = z.infer<typeof datasetAttachmentUploadSchema>;
 
 export type CreateDatasetFromUploadResult = Pick<Dataset, "createdAt" | "updatedAt"> & {
   id: string;

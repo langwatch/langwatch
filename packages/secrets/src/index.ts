@@ -5,11 +5,14 @@ export { ScopedSecrets, SecretsResolver } from "./resolver.ts";
 export { Secret, SecretFamilyHandle, SecretHandle, type SecretSchema } from "./secret.ts";
 export {
   credentialsSecret,
+  credentialsSecretPrevious,
   gatewayInternalSecret,
   internalSlackSignupsWebhook,
+  nlpInternalSecret,
   openAiApiKey,
   sessionSecret,
   signInProviderSecrets,
+  telemetryExporterHeaders,
   virtualKeyPepper,
 } from "./shared-secrets.ts";
 export {

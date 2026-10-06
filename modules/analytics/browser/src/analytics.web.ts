@@ -4,7 +4,11 @@
  * Drawer -> Dialog on this branch; the wire name did not change.
  */
 
-import { analyticsLwqlTrpc, analyticsTrpc } from "@langwatch/analytics-contract";
+import {
+  FilterSidebarToken,
+  analyticsLwqlTrpc,
+  analyticsTrpc,
+} from "@langwatch/analytics-contract";
 import { defineBrowserModule } from "@langwatch/browser";
 import { savedViewTrpc } from "@langwatch/dashboard-contract";
 import { createElement } from "react";
@@ -85,9 +89,9 @@ export const analyticsWeb = defineBrowserModule("analytics")
         default: (await import("./ui/sections/custom-graph.tsx")).CustomGraph,
       }),
     },
-    filterSidebar: {
-      load: async () => ({
-        default: (await import("./ui/sections/filter-sidebar.tsx")).FilterSidebar,
-      }),
-    },
+  })
+  .lends(FilterSidebarToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/filter-sidebar.tsx")).FilterSidebar,
+    }),
   });

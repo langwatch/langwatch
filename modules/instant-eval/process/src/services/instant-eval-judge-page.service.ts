@@ -2,7 +2,7 @@
  * Judging one page of a run: what it reads, what it judges, and where it says
  * the next page starts. The only step that spends money, and the only one a
  * cancel or an expiring lease may stop part way.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {
@@ -13,12 +13,12 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { InstantEvalCancellationChannel } from "../channels/instant-eval-cancellation.channel.ts";
 import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judge.channel.ts";
 import type {
   InstantEvalPageOutcome,
   InstantEvalRunExecutor,
 } from "../eventing/instant-eval-processing.intent.ts";
+import type { InstantEvalCancellationRepository } from "../repositories/instant-eval-cancellation.repository.ts";
 import type { InstantEvalJudgmentsRepository } from "../repositories/instant-eval-judgments.repository.ts";
 import {
   assertInstantEvalPageBudget,
@@ -66,7 +66,7 @@ const logger = createLogger("langwatch:instant-eval:judge-page");
  * token bucket, rather than the number of open requests, is what a page waits
  * on: at about 250 ms a call, thirty-two could never reach that rate.
  */
-export const INSTANT_EVAL_PAGE_CONCURRENCY = 128;
+const INSTANT_EVAL_PAGE_CONCURRENCY = 128;
 
 /** What one page's requests sent and what they cost it. */
 interface InstantEvalPageUsage {
@@ -77,7 +77,7 @@ interface InstantEvalPageUsage {
 }
 
 /** One page, judged: the rows as they are written, and what they sent. */
-export interface InstantEvalJudgedPage {
+interface InstantEvalJudgedPage {
   readonly rows: readonly Record<string, unknown>[];
   readonly usage: InstantEvalPageUsage;
   /** Present when a stop reached the page, naming the rows it left unjudged. */
@@ -106,7 +106,7 @@ export class InstantEvalJudgePageService {
   private readonly textSource: InstantEvalTextSource;
   private readonly judge: InstantEvalJudgeChannel;
   private readonly judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
-  private readonly cancellation: InstantEvalCancellationChannel;
+  private readonly cancellation: InstantEvalCancellationRepository;
   private readonly budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
   private readonly readAhead: InstantEvalReadAheadService;
   private readonly concurrency: number;
@@ -118,7 +118,7 @@ export class InstantEvalJudgePageService {
     textSource: InstantEvalTextSource;
     judge: InstantEvalJudgeChannel;
     judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
-    cancellation: InstantEvalCancellationChannel;
+    cancellation: InstantEvalCancellationRepository;
     budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
     readAhead: InstantEvalReadAheadService;
     concurrency: number;
@@ -153,7 +153,7 @@ export class InstantEvalJudgePageService {
     textSource: InstantEvalTextSource;
     judge: InstantEvalJudgeChannel;
     judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
-    cancellation: InstantEvalCancellationChannel;
+    cancellation: InstantEvalCancellationRepository;
     budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
     /** The next page of each run, read while the current one judges. */
     readAhead?: InstantEvalReadAheadService;
