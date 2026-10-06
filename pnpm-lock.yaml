@@ -3829,6 +3829,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
+      '@langwatch/egress':
+        specifier: workspace:*
+        version: link:../../../../packages/egress
       '@langwatch/enterprise-license-signing':
         specifier: workspace:*
         version: link:../../../packages/license-signing
@@ -3895,6 +3898,9 @@ importers:
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2)
+      undici:
+        specifier: 'catalog:'
+        version: 8.10.0
       zod:
         specifier: 'catalog:'
         version: 4.6.5

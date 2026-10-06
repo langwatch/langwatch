@@ -1,5 +1,6 @@
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { releaseVersionOf } from "@langwatch/config";
+import { parseOutboundProxyConfig } from "@langwatch/egress";
 import {
   LicenseGenerationService,
   NodeLicenseCryptographyService,
@@ -74,6 +75,7 @@ import { nowInstant, Temporal } from "@langwatch/time";
 import type { ConnectGatewayChannel } from "../channels/connect-gateway.channel.ts";
 import type { ConnectLicenseChannel } from "../channels/connect-license.channel.ts";
 import { HttpConnectGatewayChannel } from "../channels/http/http.connect-gateway.channel.ts";
+import { connectTransportFor, dispatcherOf } from "../channels/http/http.connect-host.channel.ts";
 import { HttpConnectLicenseChannel } from "../channels/http/http.connect-license.channel.ts";
 import type { ActivationCodeRepository } from "../repositories/activation-code.repository.ts";
 import type { ConnectOrganizationRepository } from "../repositories/connect-organization.repository.ts";
@@ -1004,6 +1006,9 @@ function connectInstallOver({
   instanceLicenseKey: string | undefined;
 }): ConnectInstallInfrastructure {
   const permitted = config.connectDisabled !== true;
+  const transport = permitted
+    ? connectTransportFor({ outboundProxy: parseOutboundProxyConfig(config.outboundProxy) })
+    : undefined;
   return {
     organizations: repositories.connectOrganizations,
     identity: repositories.instanceIdentity,
@@ -1011,9 +1016,11 @@ function connectInstallOver({
       ? {
           gateway: HttpConnectGatewayChannel.create({
             endpoint: config.connectGatewayEndpoint,
+            ...(transport ? dispatcherOf(transport) : {}),
           }),
           licenseHost: HttpConnectLicenseChannel.create({
             endpoint: config.connectLicenseEndpoint,
+            ...(transport ? dispatcherOf(transport) : {}),
           }),
         }
       : {}),

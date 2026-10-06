@@ -25,6 +25,9 @@
       "path": "../../../../packages/config/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/egress/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/license-signing/tsconfig.build.json"
     },
     {

@@ -3,6 +3,7 @@ import {
   type ConfigOf,
   isSaas,
   otelResourceAttributes,
+  outboundProxy,
   serviceVersion,
 } from "@langwatch/config";
 import { Secret } from "@langwatch/secrets/secret";
@@ -70,6 +71,8 @@ export const licensingConfig = Config.define((c) => ({
   /** The release this install reports to Connect, read through `releaseVersionOf`. */
   serviceVersion,
   otelResourceAttributes,
+  /** The proxy spellings (the shared leaf); hosted calls follow them. */
+  outboundProxy,
 }));
 
 export type LicensingServerConfig = ConfigOf<typeof licensingConfig>;

@@ -40,6 +40,14 @@ export const TEST_LICENSING_CONFIG: LicensingServerConfig = {
   isSaas: false,
   serviceVersion: "test",
   otelResourceAttributes: void 0,
+  outboundProxy: {
+    HTTPS_PROXY: void 0,
+    https_proxy: void 0,
+    HTTP_PROXY: void 0,
+    http_proxy: void 0,
+    NO_PROXY: void 0,
+    no_proxy: void 0,
+  },
 };
 
 /**

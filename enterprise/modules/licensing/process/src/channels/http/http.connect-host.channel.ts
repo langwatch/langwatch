@@ -4,6 +4,7 @@
  * request and the refusal mapping live here once, over a supplied pool.
  */
 
+import type { OutboundProxyConfig } from "@langwatch/egress";
 import {
   type ConnectCredential,
   ConnectBudgetExhaustedError,
@@ -15,14 +16,42 @@ import {
   handledErrorFaultSchema,
   handledErrorFromHerr,
 } from "@langwatch/handled-error";
+import { type Dispatcher, EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
 import { z } from "zod";
 
+/** The connection pool one transport calls on: an undici dispatcher. */
+export type ConnectDispatcher = Dispatcher;
+
+/** How calls to LangWatch leave this install: the runtime's own fetch, or a proxy pool. */
+export type ConnectTransport =
+  | { readonly via: "runtime" }
+  | { readonly via: "proxy"; readonly dispatcher: ConnectDispatcher };
+
 /**
- * The connection pool one transport calls on, as the runtime's own fetch takes
- * it. Opaque here on purpose: which agent it is, and whether it proxies, is the
- * composition root's decision and never this module's.
+ * A proxy pool only where the deployment names a proxy, so an unrelated proxy variable never
+ * changes how an install reaches LangWatch.
  */
-export type ConnectDispatcher = NonNullable<RequestInit["dispatcher"]>;
+export function connectTransportFor({
+  outboundProxy,
+}: {
+  outboundProxy: OutboundProxyConfig;
+}): ConnectTransport {
+  const { httpsProxy, httpProxy, noProxy } = outboundProxy;
+  if (!httpsProxy && !httpProxy && !noProxy) return { via: "runtime" };
+  return {
+    via: "proxy",
+    dispatcher: new EnvHttpProxyAgent({
+      httpProxy: httpProxy ?? "",
+      httpsProxy: httpsProxy ?? "",
+      noProxy: noProxy ?? "",
+    }),
+  };
+}
+
+/** The pool a transport names, as a channel's options take it. */
+export function dispatcherOf(transport: ConnectTransport): { dispatcher?: ConnectDispatcher } {
+  return transport.via === "proxy" ? { dispatcher: transport.dispatcher } : {};
+}
 
 /** Whole-request timeout. A hosted judgement is synchronous inside a query. */
 const REQUEST_TIMEOUT_MS = 120_000;
@@ -55,18 +84,24 @@ export interface ConnectHostResponse {
   json(): Promise<unknown>;
 }
 
+/** What this transport sends of a request, and nothing else. */
+export interface ConnectRequestInit {
+  readonly method: string;
+  readonly headers: Record<string, string>;
+  readonly body?: string;
+  readonly dispatcher?: ConnectDispatcher;
+  readonly signal: AbortSignal;
+}
+
 /** The request seam, injected so a suite never opens a socket. */
-export type ConnectFetch = (
-  url: string,
-  init: RequestInit & { signal: AbortSignal },
-) => Promise<ConnectHostResponse>;
+export type ConnectFetch = (url: string, init: ConnectRequestInit) => Promise<ConnectHostResponse>;
 
 export interface ConnectHostOptions {
   /** Origin of the host; the paths are the calling channel's own. */
   readonly endpoint: string;
-  /** The pool calls go out on. Absent leaves the runtime's default. */
+  /** The pool calls go out on. Absent leaves undici's default. */
   readonly dispatcher?: ConnectDispatcher;
-  /** Injected by suites; the runtime's own fetch otherwise. */
+  /** Injected by suites; the runtime's fetch otherwise, or undici's where a proxy pool is named. */
   readonly fetch?: ConnectFetch;
 }
 
@@ -77,7 +112,7 @@ export class ConnectHost {
 
   constructor(private readonly options: ConnectHostOptions) {
     this.origin = new URL(options.endpoint).origin;
-    this.send = options.fetch ?? ((url, init) => fetch(url, init));
+    this.send = options.fetch ?? ((url, init) => sendOverRuntime({ url, init }));
   }
 
   /** One request, from the credential to a parsed answer or a named refusal. */
@@ -189,4 +224,16 @@ function capUsdIn(meta: Record<string, unknown> | undefined): { capUsd?: number 
 function requestSignal(signal?: AbortSignal): AbortSignal {
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
+/** The runtime's own fetch, or undici's when a proxy pool is named (only undici's takes one). */
+function sendOverRuntime({
+  url,
+  init,
+}: {
+  url: string;
+  init: ConnectRequestInit;
+}): Promise<ConnectHostResponse> {
+  const { dispatcher, ...request } = init;
+  return dispatcher ? undiciFetch(url, { ...request, dispatcher }) : fetch(url, request);
 }
