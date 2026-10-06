@@ -4,6 +4,7 @@ import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root"
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
 
+/** Returns a minimal OTLP trace export request with one span named "test-span". */
 export function buildTraceRequest(): {
   resourceSpans: Array<Record<string, unknown>>;
 } {
@@ -61,6 +62,7 @@ export function buildTraceRequest(): {
   };
 }
 
+/** Encodes an OTLP trace request as a protobuf ExportTraceServiceRequest body. */
 export function buildProtobufBody(
   payload: ReturnType<typeof buildTraceRequest>,
 ): ArrayBuffer {
@@ -72,6 +74,7 @@ export function buildProtobufBody(
   ) as ArrayBuffer;
 }
 
+/** Builds a POST Request carrying the OTLP body and optional Content-Encoding header. */
 export function makeRequest(
   body: ArrayBuffer | Buffer,
   headers: Record<string, string>,

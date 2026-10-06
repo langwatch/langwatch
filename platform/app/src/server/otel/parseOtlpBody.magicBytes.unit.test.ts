@@ -20,7 +20,6 @@ import {
   readOtlpBody,
 } from "./parseOtlpBody";
 
-/** Reads the body then parses it, returning the names of the spans found. */
 async function spanNamesFrom(req: Request): Promise<string[]> {
   const body = await readOtlpBody(req);
   const parsed = parseOtlpTraces(body, "application/x-protobuf");
