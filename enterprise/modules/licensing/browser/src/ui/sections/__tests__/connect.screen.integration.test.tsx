@@ -21,7 +21,7 @@ import ConnectScreen from "../connect.screen.tsx";
 const answer: { status: ConnectStatus | undefined } = { status: undefined };
 const mutation = { mutate: vi.fn(), isPending: false };
 const refetch = vi.fn();
-const capSaved: { onSuccess?: () => void } = {};
+const capSaved: { onSuccess?: () => void; onError?: (error: unknown) => void } = {};
 
 vi.mock("../../../behavior/connect-api.ts", () => ({
   connectApi: {
@@ -31,8 +31,9 @@ vi.mock("../../../behavior/connect-api.ts", () => ({
       },
       setService: { useMutation: () => mutation },
       setCap: {
-        useMutation: (options: { onSuccess?: () => void }) => {
+        useMutation: (options: { onSuccess?: () => void; onError?: (error: unknown) => void }) => {
           capSaved.onSuccess = options.onSuccess;
+          capSaved.onError = options.onError;
           return mutation;
         },
       },
@@ -280,6 +281,37 @@ describe("ConnectScreen", () => {
       expect(refetch).toHaveBeenCalledTimes(1);
       expect(screen.getByText("400.00 USD")).toBeDefined();
       expect(screen.queryByText("500.00 USD")).toBeNull();
+    });
+  });
+
+  describe("given an admin who sets a cap above the contract maximum", () => {
+    /** @scenario "A cap above the contract maximum is shown on the field" */
+    it("shows the maximum the server sent on the field and leaves the cap as it was", async () => {
+      const user = userEvent.setup();
+      renderScreen({
+        explains: true,
+        status: connected({ usage: usageOf({ capUsd: 500 }) }),
+      });
+
+      await user.clear(screen.getByTestId("connect-cap-input"));
+      await user.type(screen.getByTestId("connect-cap-input"), "9000");
+      await user.click(screen.getByTestId("connect-cap-save"));
+      act(() =>
+        capSaved.onError?.({
+          data: {
+            error: {
+              code: "connect_budget_above_contract_maximum",
+              httpStatus: 400,
+              fault: "customer",
+              meta: { maximumUsd: 5000 },
+            },
+          },
+        }),
+      );
+
+      expect(screen.getByText(/The highest cap you can set is 5000.00 USD/)).toBeDefined();
+      expect(refetch).not.toHaveBeenCalled();
+      expect(screen.getByText("500.00 USD")).toBeDefined();
     });
   });
 

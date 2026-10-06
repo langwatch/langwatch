@@ -285,6 +285,28 @@ describe("explainHandledError", () => {
     });
   });
 
+  describe("given a cap above the contract maximum", () => {
+    it("names the maximum the server sent", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "connect_budget_above_contract_maximum",
+          httpStatus: 400,
+          meta: { maximumUsd: 5000 },
+        }),
+      );
+
+      expect(description).toContain("The highest cap you can set is 5000.00 USD");
+    });
+
+    it("still points at LangWatch when the server sent no maximum", () => {
+      const { description } = explainHandledError(
+        shape({ code: "connect_budget_above_contract_maximum", httpStatus: 400 }),
+      );
+
+      expect(description).toBe("Contact LangWatch to raise the maximum.");
+    });
+  });
+
   describe("given a deployment whose dataset storage is not writable", () => {
     /** @scenario The customer reads copy written for the code */
     it("says nothing was saved and that an administrator has to act", () => {

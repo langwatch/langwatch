@@ -5741,7 +5741,12 @@ const presentations = {
   },
   connect_budget_above_contract_maximum: {
     title: "Cap above the agreed maximum",
-    describe: () => "Choose a hosted usage cap at or below the maximum agreed for this license.",
+    describe: (error) => {
+      const maximum = num(error, "maximumUsd", 0);
+      return maximum > 0
+        ? `The highest cap you can set is ${maximum.toFixed(2)} USD. Contact LangWatch to raise it.`
+        : "Contact LangWatch to raise the maximum.";
+    },
   },
   connect_budget_not_set: {
     title: "No hosted usage budget yet",
