@@ -7,11 +7,10 @@ import {
 type MemoryRecord = {
   transport: McpSessionTransport;
   apiKey: string;
-  encryptedApiKey: string;
   projectId: string | undefined;
 };
 
-/** Session records held in this process: one replica, so every record is its own. */
+/** Session records held in this process, keys in plaintext: one replica, every record its own. */
 export class MemoryMcpSessionRepository extends McpSessionRepository {
   readonly #records = new Map<string, MemoryRecord>();
 
@@ -31,13 +30,11 @@ export class MemoryMcpSessionRepository extends McpSessionRepository {
     transport: McpSessionTransport;
     sessionId: string;
     apiKey: string;
-    encryptedApiKey: string;
     projectId?: string;
   }): Promise<void> {
     this.#records.set(`${input.transport}:${input.sessionId}`, {
       transport: input.transport,
       apiKey: input.apiKey,
-      encryptedApiKey: input.encryptedApiKey,
       projectId: input.projectId,
     });
     return Promise.resolve();
@@ -54,7 +51,7 @@ export class MemoryMcpSessionRepository extends McpSessionRepository {
     const record = this.#records.get(`${input.transport}:${input.sessionId}`);
     return Promise.resolve(
       record
-        ? { kind: "found", encryptedApiKey: record.encryptedApiKey, projectId: record.projectId }
+        ? { kind: "found", apiKey: record.apiKey, projectId: record.projectId }
         : { kind: "missing" },
     );
   }

@@ -6,6 +6,7 @@ import {
   createDataRetentionTestProjects,
   retentionTestGraph,
 } from "../../app/__tests__/data-retention.fixture.ts";
+import { ClickHouseStorageMeterRepository } from "../../repositories/clickhouse/clickhouse.storage-meter.repository.ts";
 import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.data-retention.repository.ts";
 import { MemoryPinnedTraceRepository } from "../../repositories/memory/memory.pinned-trace.repository.ts";
 import { RedisDataRetentionCacheRepository } from "../../repositories/redis/redis.data-retention-cache.repository.ts";
@@ -62,7 +63,7 @@ function createService(retroactive: RetroactiveRetentionRepository = new Recordi
     retroactive,
     cache: RedisDataRetentionCacheRepository.create({ redis: null, ttlMs: 1_000 }),
     storageMeter: StorageMeterService.create({
-      clickhouse: noopClickHouse,
+      meter: ClickHouseStorageMeterRepository.create({ clickhouse: noopClickHouse }),
       cache: RedisStorageMeterCacheRepository.create({ ttlMs: STORAGE_METER_CACHE_TTL_MS }),
     }),
   });

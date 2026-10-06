@@ -1,9 +1,9 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   DataRetentionApi,
   PLATFORM_DEFAULT_RETENTION_DAYS,
 } from "@langwatch/data-retention-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
 import { dataRetentionProcessModule } from "../../data-retention.module.ts";
@@ -16,29 +16,17 @@ import {
   retentionTestGraph,
 } from "./data-retention.fixture.ts";
 
-/**
- * The ClickHouse member `DataRetentionModule` reads. Memory-tier
- * installation never reaches a store, so the boot only needs the member to
- * EXIST — a stub that refuses on use proves that without opening a client.
- */
-function analyticalWithoutStore(): ClickHouseQueryClient {
-  const client: Partial<ClickHouseQueryClient> = {};
-  return new Proxy(client, {
-    get(_target, property) {
-      throw new Error(`The memory tier must not reach ClickHouse (read "${String(property)}").`);
-    },
-  }) as ClickHouseQueryClient;
-}
-
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(dataRetentionProcessModule)])
+    .withModules([dataRetentionProcessModule])
+    .withStores(memoryStores())
     .withConfig({
-      "data-retention": { platformDefaultDays: undefined, isSaas: true },
+      "data-retention": {
+        platformDefaultDays: undefined,
+        isSaas: true,
+        nodeEnvironment: undefined,
+      },
     })
-    .withMember("nodeEnvironment", undefined)
-    .withAnalytical(analyticalWithoutStore())
-    .withKeyvalue(null)
     .provide({
       project: createDataRetentionTestProjects(),
       organization: createDataRetentionTestOrganizations(),

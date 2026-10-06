@@ -20,10 +20,10 @@ import {
 } from "vitest";
 
 import { HostedMcpModule } from "../../app/hosted-mcp.app.ts";
+import type { McpSessionCipher } from "../../repositories/mcp-session.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
 import { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
 import type { McpHandler } from "../../services/mcp-endpoint.service.ts";
-import type { McpApiKeyCipher } from "../../services/mcp-oauth-token.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
@@ -90,7 +90,7 @@ const sessionGrant = new FakeSessionGrant();
 const cliSessions = new FakeCliSessions();
 
 /** Identity "encryption", so a test can read the value it expected to be stored. */
-class ReversibleTestCipher implements McpApiKeyCipher {
+class ReversibleTestCipher implements McpSessionCipher {
   encrypt(text: string): string {
     return `encrypted:${text}`;
   }

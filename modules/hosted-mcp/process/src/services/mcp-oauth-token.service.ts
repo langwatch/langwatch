@@ -17,12 +17,6 @@ const logger = createLogger("langwatch:mcp");
 /** The label a hosted MCP sign-in carries in the person's session inventory. */
 const MCP_CLIENT_LABEL = "Hosted MCP";
 
-/** Reversible encryption for the credential a session record holds. */
-export interface McpApiKeyCipher {
-  encrypt(plaintext: string): string;
-  decrypt(ciphertext: string): string;
-}
-
 type OAuthError = Readonly<{
   error: string;
   error_description?: string;

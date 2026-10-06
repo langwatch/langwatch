@@ -5,10 +5,10 @@ import { getRoutePolicy } from "@langwatch/api";
 import { describe, expect, it } from "vitest";
 
 import { HostedMcpModule } from "../../app/hosted-mcp.app.ts";
+import type { McpSessionCipher } from "../../repositories/mcp-session.repository.ts";
 import { HOSTED_MCP_FAMILY, hostedMcpRoutePolicies } from "../../rules/mcp-routes.rules.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
 import { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
-import type { McpApiKeyCipher } from "../../services/mcp-oauth-token.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
@@ -27,7 +27,7 @@ class NoGrants implements Pick<AuthzMcpSessionGrantService, "stillGranted"> {
   }
 }
 
-class PlainCipher implements McpApiKeyCipher {
+class PlainCipher implements McpSessionCipher {
   encrypt(value: string): string {
     return value;
   }

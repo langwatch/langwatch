@@ -1,13 +1,18 @@
 import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
-import type { McpSessionRepository } from "../mcp-session.repository.ts";
+import type { McpSessionCipher, McpSessionRepository } from "../mcp-session.repository.ts";
 import { MemoryMcpSessionRepository } from "../memory/memory.mcp-session.repository.ts";
 import { RedisMcpSessionRepository } from "../redis/redis.mcp-session.repository.ts";
 
+/** A reversible seal a test can read at rest. */
+const sealing: McpSessionCipher = {
+  encrypt: (plaintext) => `sealed:${plaintext}`,
+  decrypt: (ciphertext) => ciphertext.replace(/^sealed:/, ""),
+};
+
 /** A Redis whose keyspace answers `exists`, the one command session counting adds. */
-function redisTier(): McpSessionRepository {
-  const store = memoryRedisStore();
+function redisTier(store = memoryRedisStore()): McpSessionRepository {
   const redis = memoryRedisDouble({
     store,
     script: {
@@ -15,7 +20,7 @@ function redisTier(): McpSessionRepository {
         keys.filter((key) => typeof key === "string" && store.strings.has(key)).length,
     },
   });
-  return RedisMcpSessionRepository.create({ redis });
+  return RedisMcpSessionRepository.create({ redis, cipher: sealing });
 }
 
 const TIERS: readonly [string, () => McpSessionRepository][] = [
@@ -25,19 +30,18 @@ const TIERS: readonly [string, () => McpSessionRepository][] = [
 
 describe.each(TIERS)("the %s MCP session records", (_tier, build) => {
   describe("given a Streamable session recorded for a key", () => {
-    it("reads the encrypted key back for that transport only", async () => {
+    it("reads the key back for that transport only", async () => {
       const records = build();
       await records.store({
         transport: "streamable",
         sessionId: "session-1",
         apiKey: "key-a",
-        encryptedApiKey: "sealed-a",
       });
 
       expect(records.isAvailable()).toBe(true);
       await expect(
         records.getRecord({ transport: "streamable", sessionId: "session-1" }),
-      ).resolves.toEqual({ kind: "found", encryptedApiKey: "sealed-a" });
+      ).resolves.toEqual({ kind: "found", apiKey: "key-a", projectId: undefined });
       await expect(
         records.getRecord({ transport: "sse", sessionId: "session-1" }),
       ).resolves.toEqual({ kind: "missing" });
@@ -49,7 +53,6 @@ describe.each(TIERS)("the %s MCP session records", (_tier, build) => {
         transport: "streamable",
         sessionId: "session-1",
         apiKey: "key-a",
-        encryptedApiKey: "sealed-a",
       });
       await records.touch({ transport: "streamable", sessionId: "session-1", apiKey: "key-a" });
       await records.remove({ transport: "streamable", sessionId: "session-1", apiKey: "key-a" });
@@ -64,7 +67,7 @@ describe.each(TIERS)("the %s MCP session records", (_tier, build) => {
     it("counts one key's live sessions of either transport, and drops a removed one", async () => {
       const records = build();
       const open = (transport: "streamable" | "sse", sessionId: string, apiKey: string) =>
-        records.store({ transport, sessionId, apiKey, encryptedApiKey: `sealed-${apiKey}` });
+        records.store({ transport, sessionId, apiKey });
       await open("streamable", "s-1", "key-a");
       await open("sse", "s-2", "key-a");
       await open("streamable", "s-3", "key-b");
@@ -79,14 +82,31 @@ describe.each(TIERS)("the %s MCP session records", (_tier, build) => {
   });
 });
 
+describe("the redis MCP session records at rest", () => {
+  it("holds the key sealed under main's record layout", async () => {
+    const store = memoryRedisStore();
+    const records = redisTier(store);
+    await records.store({
+      transport: "streamable",
+      sessionId: "session-1",
+      apiKey: "key-a",
+      projectId: "project-1",
+    });
+
+    expect(JSON.parse(store.strings.get("mcp:session:session-1") ?? "{}")).toMatchObject({
+      encryptedApiKey: "sealed:key-a",
+      projectId: "project-1",
+    });
+  });
+});
+
 describe("the redis MCP session records with no Redis configured", () => {
   it("keeps nothing and reads every session as missing", async () => {
-    const records = RedisMcpSessionRepository.create({ redis: null });
+    const records = RedisMcpSessionRepository.create({ redis: null, cipher: sealing });
     await records.store({
       transport: "sse",
       sessionId: "session-1",
       apiKey: "key-a",
-      encryptedApiKey: "sealed-a",
     });
 
     expect(records.isAvailable()).toBe(false);

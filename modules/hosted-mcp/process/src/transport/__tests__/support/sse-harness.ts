@@ -10,9 +10,9 @@ import { type Cluster, Redis } from "ioredis";
 
 import { HostedMcpModule } from "../../../app/hosted-mcp.app.ts";
 import type { McpHandler } from "../../../index.ts";
+import type { McpSessionCipher } from "../../../repositories/mcp-session.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../../services/authz-mcp-session-grant.service.ts";
 import type { HeaderMcpClientAddressService } from "../../../services/header-mcp-client-address.service.ts";
-import type { McpApiKeyCipher } from "../../../services/mcp-oauth-token.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
@@ -92,7 +92,7 @@ class HarnessSessionGrant implements Pick<AuthzMcpSessionGrantService, "stillGra
 }
 
 /** Identity "encryption", so a suite can read the value it expected to be stored. */
-class HarnessCipher implements McpApiKeyCipher {
+class HarnessCipher implements McpSessionCipher {
   encrypt(text: string): string {
     return `encrypted:${text}`;
   }

@@ -1,4 +1,4 @@
-import { Config, isSaas, type ConfigOf } from "@langwatch/config";
+import { Config, isSaas, nodeEnvironment, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 import {
@@ -15,6 +15,8 @@ export const dataRetentionConfig = Config.define((c) => ({
   platformDefaultDays: c.env("LANGWATCH_DEFAULT_RETENTION_DAYS", z.string().optional()),
   /** Self-hosted retention is uncapped whatever the plan, as on main. */
   isSaas,
+  /** The shared environment name: only development and test may lower the platform default. */
+  nodeEnvironment,
 }));
 
 export type DataRetentionServerConfig = ConfigOf<typeof dataRetentionConfig>;

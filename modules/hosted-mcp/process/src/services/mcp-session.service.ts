@@ -9,11 +9,11 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
 import type { McpSessionRelayChannel } from "../channels/mcp-session-relay.channel.ts";
 import type {
+  McpSessionRecordLookup,
   McpSessionRepository,
   McpSessionTransport,
 } from "../repositories/mcp-session.repository.ts";
 import type { McpCallerLookup } from "./mcp-caller-auth.service.ts";
-import type { McpApiKeyCipher } from "./mcp-oauth-token.service.ts";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -39,15 +39,9 @@ export type McpOpenSession<T> = {
 export type McpStreamableSession = McpOpenSession<StreamableHTTPServerTransport>;
 export type McpSseSession = McpOpenSession<SSEServerTransport>;
 
-/** A record read: the key and project the session was opened with, or nothing to serve. */
-export type McpSessionKeyLookup =
-  | Readonly<{ kind: "found"; apiKey: string; projectId: string | undefined }>
-  | Readonly<{ kind: "missing" }>;
-
 type McpSessionCollaborators = Readonly<{
   records: McpSessionRepository;
   relay: McpSessionRelayChannel;
-  cipher: McpApiKeyCipher;
   sessionTools: Pick<GovernanceRestApi, "registerMcpTools"> | undefined;
 }>;
 
@@ -156,10 +150,7 @@ export class McpSessionService {
     apiKey: string;
     projectId: string;
   }): Promise<void> {
-    await this.#collaborators.records.store({
-      ...input,
-      encryptedApiKey: this.#collaborators.cipher.encrypt(input.apiKey),
-    });
+    await this.#collaborators.records.store(input);
   }
 
   /** Streamable records are written in the background; a failure is logged, never raised. */
@@ -206,15 +197,11 @@ export class McpSessionService {
   async getRecordKey(input: {
     transport: McpSessionTransport;
     sessionId: string;
-  }): Promise<McpSessionKeyLookup> {
+  }): Promise<McpSessionRecordLookup> {
     try {
       const record = await this.#collaborators.records.getRecord(input);
       if (record.kind === "missing") return record;
-      return {
-        kind: "found",
-        apiKey: this.#collaborators.cipher.decrypt(record.encryptedApiKey),
-        projectId: record.projectId,
-      };
+      return record;
     } catch (err) {
       logger.error({ error: err, transport: input.transport }, "Redis session lookup failed");
       return { kind: "missing" };

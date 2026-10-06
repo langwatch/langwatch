@@ -25,7 +25,7 @@ function process() {
       encrypt: (value: string) => value,
       decrypt: (value: string) => value,
     })
-    .withMember("publicBaseUrl", "https://app.langwatch.ai")
+    .withConfig({ "hosted-mcp": { publicBaseUrl: "https://app.langwatch.ai" } })
     .provide({
       project: createApiFixture<ProjectApi>(),
       auth: createApiFixture<AuthApi>(),

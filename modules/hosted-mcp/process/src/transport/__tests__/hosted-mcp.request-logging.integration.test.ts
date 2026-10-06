@@ -44,7 +44,6 @@ import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-sessi
 import type { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
 import type { McpHandler } from "../../services/mcp-endpoint.service.ts";
 import { McpEndpointService } from "../../services/mcp-endpoint.service.ts";
-import type { McpApiKeyCipher } from "../../services/mcp-oauth-token.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
@@ -67,15 +66,6 @@ class LoggingProjectLookup implements Pick<
 class AlwaysGranted implements Pick<AuthzMcpSessionGrantService, "stillGranted"> {
   stillGranted(): Promise<boolean> {
     return Promise.resolve(true);
-  }
-}
-
-class PassThroughCipher implements McpApiKeyCipher {
-  encrypt(text: string): string {
-    return text;
-  }
-  decrypt(text: string): string {
-    return text;
   }
 }
 
@@ -142,7 +132,6 @@ function sessionRecord({
     transport,
     sessionId,
     apiKey: VALID_API_KEY,
-    encryptedApiKey: VALID_API_KEY,
     ...projectId,
   };
 }
@@ -229,7 +218,6 @@ describe("Feature: MCP request logging", () => {
       projects,
       grants: new AlwaysGranted(),
       cliSessions: new FakeCliSessions(),
-      cipher: new PassThroughCipher(),
       address: new LoopbackAddress(),
       baseHost: "https://app.langwatch.ai",
     });
