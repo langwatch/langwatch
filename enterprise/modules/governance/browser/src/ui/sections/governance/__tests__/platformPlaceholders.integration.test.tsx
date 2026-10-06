@@ -17,7 +17,16 @@ import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
+import {
+  EXPLORE_BREAKDOWNS,
+  EXPLORE_INTERVALS,
+  EXPLORE_MEASURES,
+} from "../../../../model/explore-query.ts";
+import {
+  fakeGovernanceHost,
+  findNativeSelects,
+  renderWithGovernanceHost,
+} from "../../../../testing.tsx";
 
 vi.mock("../../../../behavior/governance-api.ts", () => {
   const node = (): unknown =>
@@ -266,4 +275,28 @@ describe("every screen on the Platform section", () => {
       }
     }
   }, 120_000);
+});
+
+describe("the Analytics screen's query choices", () => {
+  /** @scenario "A choice too long for a pill uses the app's own select" */
+  it("offers Measure, Break down by and Over time through the app's select, listing every option, with no native select", async () => {
+    open(<AnalyticsScreen />);
+
+    expect(findNativeSelects(document.body)).toEqual([]);
+    const choices = [
+      { label: "Measure", options: EXPLORE_MEASURES },
+      { label: "Break down by", options: EXPLORE_BREAKDOWNS },
+      { label: "Over time", options: EXPLORE_INTERVALS },
+    ];
+    for (const { label, options } of choices) {
+      await userEvent.click(screen.getByRole("combobox", { name: label }));
+      const listed = await screen.findAllByRole("option");
+      expect(listed.map((option) => option.textContent)).toEqual(
+        options.map((option) => option.label),
+      );
+      await userEvent.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryAllByRole("option")).toEqual([]));
+    }
+    expect(findNativeSelects(document.body)).toEqual([]);
+  });
 });
