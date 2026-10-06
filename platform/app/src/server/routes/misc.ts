@@ -52,6 +52,7 @@ import {
   requireApiKeyPermission,
   type UnifiedAuthVariables,
 } from "~/server/api-key/auth-middleware";
+import { AggregateProjectHasNoCredentialError } from "~/server/api-key/errors";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
 import { isDemoProject } from "~/server/app-layer/authz/permission-adapters";
 import { createSlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
@@ -66,6 +67,10 @@ import {
 } from "~/server/app-layer/events/track-event.service";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { ProjectService } from "~/server/app-layer/projects/project.service";
+import {
+  isAggregateProjectKind,
+  NON_DESTINATION_PROJECT_KINDS,
+} from "~/server/app-layer/projects/project-kinds";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -932,6 +937,29 @@ secured
       // Single 403 whether the project is missing, archived, or simply
       // inaccessible — never disclose existence of a project the caller can't reach.
       return noAccessResponse();
+    }
+
+    // The code carries the project's base key, so a project that holds no
+    // credential gets none (ADR-144 decision 7). The aggregate is refused
+    // with its registered code, still in the OAuth wire format above; the
+    // hidden governance project reads as not reachable, as everywhere else.
+    if (NON_DESTINATION_PROJECT_KINDS.includes(project.kind)) {
+      if (!isAggregateProjectKind(project.kind)) return noAccessResponse();
+      const refusal = new AggregateProjectHasNoCredentialError({
+        meta: { projectId: project.id },
+      });
+      return c.json(
+        {
+          error: "access_denied",
+          error_description: refusal.message,
+          code: refusal.code,
+          redirect: errorRedirect({
+            error: "access_denied",
+            description: refusal.message,
+          }),
+        },
+        403,
+      );
     }
 
     const code = randomUUID();
