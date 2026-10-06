@@ -1214,6 +1214,17 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly DataPrivacyProjectScope: {
+    readonly projectId: "String";
+    readonly organizationId: "String";
+    readonly teamId: "String?";
+    readonly isPersonal: "Boolean?";
+    readonly departmentId: "String?";
+    readonly teamRecordedAt: "DateTime?";
+    readonly departmentRecordedAt: "DateTime?";
+    readonly archivedAt: "DateTime?";
+    readonly updatedAt: "DateTime";
+  };
   readonly CustomLLMModelCost: {
     readonly id: "String";
     readonly organizationId: "String";
