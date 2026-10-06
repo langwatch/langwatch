@@ -486,6 +486,107 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Decision: no allowlisted page sets up experiments, so the experiment widgets show no setup button
 
   # ---------------------------------------------------------------------------
+  # Boards preloaded for one agent kind
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: AC80 By customer: the board groups by the first key the traces carry
+    Given a project whose traces carry a customer id, or a document type, language, team, flow,
+      segment or topic in their metadata, or labels
+    Then each per-customer widget groups the period's traces by the first of those keys any trace carries
+    And it names the unit by that key, such as "customer" or "document type"
+    And traces without that key are counted on their own "No customer" row
+    # Decision: the keys are the ones the dashboards dev seed sends; a label groups by the first label
+
+  @unit
+  Scenario: AC80b By customer: no grouping key says what to send
+    Given traces in the period, none carrying a customer id, labels or a grouping key in metadata
+    Then the per-customer widgets say that no trace carries one, instead of an empty list
+
+  @unit
+  Scenario: AC81 By customer: conversations by customer with each one's share
+    Then the widget lists the six customers with the most conversations and each one's share of all
+    And it says how many more customers there are
+    # A conversation is a thread; a trace without a thread is a conversation of one
+
+  @unit
+  Scenario: AC82 By customer: one row per customer with pass rate, the period before and AI cost
+    Then each row shows conversations, the judged pass rate, the pass rate the period before,
+      AI cost and cost per conversation
+    And a pass rate from fewer than 30 judged answers shows "-"
+    And the earlier pass rate turns red when the rate fell at least 2 points and beyond chance
+    # Verdicts count at the time of the answer they judged, not when the judge ran
+
+  @unit
+  Scenario: AC83 By customer: pass rate on the newest prompt version against the one before
+    Given a prompt version that first ran in the period, after another version
+    Then the widget names both versions and the day the newest started
+    And it lists each customer's pass rate on the old version and the new, those that fell first
+    And with no new version in the period it says so
+    # Decision: version against version over the period, not 7 fixed days around the change
+
+  @unit
+  Scenario: AC84 By customer: spend by customer, top six
+    Then the widget ranks the six customers that cost the most, untagged traffic as its own row
+    And it sums the rest as "and N more customers" with their cost
+
+  @unit
+  Scenario: AC85 Call quality: reply time by stage
+    Given voice replies, traces with a speech to text or text to speech span
+    Then the widget shows the slowest-5% reply time, the largest stage and its share of the reply
+    And the stage that grew most from the first half of the period to the second
+    And a line per stage over the period
+    # Stages: "stt" spans, LLM spans, "tts" spans, summed per reply
+
+  @unit
+  Scenario: AC86 Call quality: calls not ended and repeated sentences
+    Then the widget counts calls whose last turn ended in an error, per 1,000 calls
+    And calls the "Repeated Sentence Check" failed, per 1,000 calls
+    And without that check it asks for it instead of showing zero
+
+  @unit
+  Scenario: AC87 Field accuracy: accuracy per field and document type
+    Given the "Field accuracy per field" check, which lists wrong fields as "Wrong: a, b"
+    Then the widget shows each field's share of checked documents right, per document type and overall
+    And a cell under 90% is red, and a cell from fewer than 30 documents is faint
+
+  @unit
+  Scenario: AC88 Field accuracy: share sent to human review
+    Given documents whose metadata says sent_to_review, or whose outcome is a hand-over
+    Then the widget shows the share sent to review, against the first half of the period
+    And the document type sent most by share of its own documents
+    And without either key it says what to send
+
+  @unit
+  Scenario: AC89 Outputs users keep: drop-off after generation
+    Given outputs whose metadata reports output_action
+    Then the widget counts generated, kept or edited, and accepted as is, with the drop at each step
+    And it names the step with the biggest drop
+
+  @unit
+  Scenario: AC90 Risk sign-off: sign-off status
+    Then the widget shows the share of traces the weakest guardrail checked,
+      answers a guardrail flagged but did not block against the period before,
+      and review items waiting against the start of the period
+    And it says "Ready to sign." only when no figure calls for action
+    # Thresholds are the prototype's; judge agreement with reviewers is not measured yet
+
+  @unit
+  Scenario: AC91 Risk sign-off: policy checks with their margin
+    Then the widget shows each judge's pass rate with its 95% margin against a 90% minimum, lowest first
+    And guardrails are not listed as policy checks
+
+  @unit
+  Scenario: AC92 Risk sign-off: review queue
+    Then the widget shows annotation queue items that came in, were reviewed and wait,
+      the typical wait, and the pending count over the period
+
+  @unit
+  Scenario: AC93 Risk sign-off: change log
+    Then the widget lists prompt versions, new evaluators and changed online evaluations in the period,
+      newest first, with when each happened
+
+  # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
 
@@ -526,3 +627,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 48: "What users ask: topics people ask about" → Scenario: AC48 What users ask: Topics people ask about shows volume, success and cannot-do per topic
   # AC 49: "What users ask: asked again" → Scenario: AC49 What users ask: Asked again shows misread conversations and returning users
   # AC 60-71: "Where my agent breaks" and "Release check" widgets are built from the prototype's cards → Scenario: AC60 to Scenario: AC71
+  # AC 80-93: "The boards preloaded for one agent kind are built" (By customer, Call quality, Field accuracy, Outputs users keep, Risk sign-off) → Scenario: AC80 By customer: the board groups by the first key the traces carry; Scenario: AC80b By customer: no grouping key says what to send; Scenario: AC81 By customer: conversations by customer with each one's share; Scenario: AC82 By customer: one row per customer with pass rate, the period before and AI cost; Scenario: AC83 By customer: pass rate on the newest prompt version against the one before; Scenario: AC84 By customer: spend by customer, top six; Scenario: AC85 Call quality: reply time by stage; Scenario: AC86 Call quality: calls not ended and repeated sentences; Scenario: AC87 Field accuracy: accuracy per field and document type; Scenario: AC88 Field accuracy: share sent to human review; Scenario: AC89 Outputs users keep: drop-off after generation; Scenario: AC90 Risk sign-off: sign-off status; Scenario: AC91 Risk sign-off: policy checks with their margin; Scenario: AC92 Risk sign-off: review queue; Scenario: AC93 Risk sign-off: change log

@@ -11,6 +11,7 @@ import * as sql from "../../templates/model/question-queries.ts";
 import * as table from "../../templates/model/question-table-widgets.ts";
 import { TABLE_ROWS } from "../../templates/model/template-widget.ts";
 import type { WidgetCode } from "../../templates/model/widget-code-parts.ts";
+import { AGENT_KIND_WIDGET_BUILDS } from "./agent-kind-widgets.ts";
 import { ANSWERS_ASKS_WIDGET_BUILDS } from "./answers-asks-widgets.ts";
 import { BREAKS_RELEASE_WIDGET_BUILDS } from "./breaks-release-widgets.ts";
 import { FLIGHT_DECK_COSTS_BUILDS } from "./flight-deck-costs-widgets.ts";
@@ -212,4 +213,5 @@ export const CATALOGUE_WIDGET_BUILDS: Readonly<Record<string, CatalogueWidgetBui
   ...ANSWERS_ASKS_WIDGET_BUILDS,
   ...BREAKS_RELEASE_WIDGET_BUILDS,
   ...FLIGHT_DECK_COSTS_BUILDS,
+  ...AGENT_KIND_WIDGET_BUILDS,
 };
