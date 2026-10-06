@@ -11,7 +11,7 @@ Feature: OTLP parse failures are the client's error
   Background:
     Given a project with a valid API key
 
-  @unit
+  @unit @regression
   Scenario: A malformed traces body is treated as the client's error
     When the project sends a malformed OTLP body to the traces endpoint
     Then the response status is 400
@@ -20,7 +20,7 @@ Feature: OTLP parse failures are the client's error
     And no error is logged
     And no exception is reported
 
-  @unit
+  @unit @regression
   Scenario: A malformed logs body is treated as the client's error
     When the project sends a malformed OTLP body to the logs endpoint
     Then the response status is 400
@@ -29,7 +29,7 @@ Feature: OTLP parse failures are the client's error
     And no error is logged
     And no exception is reported
 
-  @unit
+  @unit @regression
   Scenario: A malformed metrics body is treated as the client's error
     When the project sends a malformed OTLP body to the metrics endpoint
     Then the response status is 400

@@ -138,7 +138,7 @@ describe("OTLP parse failures", () => {
         expect(parseWarnings).toHaveLength(1);
         expect(mockWarn).toHaveBeenCalledWith(
           expect.objectContaining({
-            error_class: "client",
+            fault: "customer",
             projectId: "project-123",
           }),
           `error parsing ${signal}`,

@@ -585,7 +585,7 @@ secured
           // A body we cannot parse is the client's error: warn, never a PostHog exception (#8481).
           loggerTraces.warn(
             {
-              error_class: "client",
+              fault: "customer",
               error: parsed.error,
               projectId: project.id,
               customerTraceIds,
@@ -669,7 +669,7 @@ secured
           span.recordException(new Error(parsed.error));
           loggerLogs.warn(
             {
-              error_class: "client",
+              fault: "customer",
               error: parsed.error,
               projectId: project.id,
               ...bodyForensics(body),
@@ -763,7 +763,7 @@ secured
           span.recordException(new Error(parsed.error));
           loggerMetrics.warn(
             {
-              error_class: "client",
+              fault: "customer",
               error: parsed.error,
               projectId: project.id,
               ...bodyForensics(body),
