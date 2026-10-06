@@ -12251,6 +12251,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../packages/observability
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../../onboarding/contract
@@ -12297,6 +12300,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../packages/process-stores
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets

@@ -67,7 +67,6 @@ function mount({
   permits?: (permission: string) => boolean;
 } = {}) {
   const reportTopicClusteringFailure = vi.fn();
-  const encryptProjectSecret = vi.fn((value: string) => `encrypted(${value})`);
   const probe = vi.fn(probePermission);
   const application = createApiFixture<ProjectApi>(projects, "ProjectApi");
   const requests = ProjectRequestService.create({
@@ -84,7 +83,6 @@ function mount({
     projects: () => application,
     revokeProjectApiKey,
     getLegacyKeyStatus,
-    encryptProjectSecret,
     probePermission: probe,
     getFieldProtections: async () => fieldProtections,
     archiveOtherProject: (input) => requests.archiveOtherProject(input),
@@ -101,7 +99,6 @@ function mount({
   return {
     router,
     reportTopicClusteringFailure,
-    encryptProjectSecret,
     revokeProjectApiKey,
     getLegacyKeyStatus,
     probePermission: probe,
@@ -209,7 +206,7 @@ describe("the project tRPC namespace", () => {
   });
 
   describe("when the settings form is saved", () => {
-    it("encrypts every stored-object credential before it is persisted", async () => {
+    it("hands every stored-object credential to the application as typed", async () => {
       const update = vi.fn(async () => ({ slug: "my-project" }) as never);
       const { caller } = mount({ projects: { updateSettings: update } });
 
@@ -226,9 +223,9 @@ describe("the project tRPC namespace", () => {
       expect(update).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: "project_123",
-          s3Endpoint: "encrypted(https://s3.example)",
-          s3AccessKeyId: "encrypted(AKIA)",
-          s3SecretAccessKey: "encrypted(shh)",
+          s3Endpoint: "https://s3.example",
+          s3AccessKeyId: "AKIA",
+          s3SecretAccessKey: "shh",
           s3Bucket: "bucket",
         }),
         expect.objectContaining({ id: ACTOR_ID }),

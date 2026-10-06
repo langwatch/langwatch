@@ -27,6 +27,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProjectModule } from "../../app/project.app.ts";
 import type { RecordProjectCreatedCommandData } from "../../eventing/project-lifecycle.events.ts";
+import { MemoryProjectStorageSettingsRepository } from "../../repositories/memory/memory.project-storage-settings.repository.ts";
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
 import { mountProjectRestApplication, ORGANIZATION_ID, USER_ID } from "./project.rest.harness.ts";
@@ -172,13 +173,7 @@ function application(options: { apiKeys?: Partial<TestApiKeyService> } = {}): {
     dependencies: { apiKeys, ...unreachablePeers(), organizations, dataPrivacy },
     repositories: {
       projects: MemoryProjectRepository.create({ memory: database }),
-    },
-    members: {
-      now: () => NOW.getTime(),
-      // Neither member is reached on this door: the management family writes no
-      // stored-object credential and reports no best-effort failure.
-      encryption: { encrypt: (plaintext) => `cipher(${plaintext})` },
-      logger: { error: () => undefined },
+      storageSettings: MemoryProjectStorageSettingsRepository.create({ memory: database }),
     },
     config: undefined,
     resources: new ResourceScope(),

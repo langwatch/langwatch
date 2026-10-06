@@ -41,8 +41,6 @@ export type ProjectFieldProtections = Readonly<{
 export interface ProjectBrowserApi {
   /** This module's own application, as the process composed it. */
   projects(): ProjectApi;
-  /** The deployment's secret encryption, for the stored-object credentials. */
-  encryptProjectSecret(value: string): string;
   /**
    * Whether `by` holds `permission` at a scope the declared check did not
    * resolve — the team/organization a create names, or the OTHER project an
@@ -159,15 +157,11 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
           traceSharingEnabled: input.traceSharingEnabled,
           presenceEnabled: input.presenceEnabled,
           userLinkTemplate: input.userLinkTemplate,
-          s3Endpoint: input.s3Endpoint ? app.encryptProjectSecret(input.s3Endpoint) : null,
-          s3AccessKeyId: input.s3AccessKeyId ? app.encryptProjectSecret(input.s3AccessKeyId) : null,
+          s3Endpoint: input.s3Endpoint || null,
+          s3AccessKeyId: input.s3AccessKeyId || null,
           // A blank secret beside an endpoint leaves the stored one unchanged.
           ...(input.s3SecretAccessKey || !input.s3Endpoint
-            ? {
-                s3SecretAccessKey: input.s3SecretAccessKey
-                  ? app.encryptProjectSecret(input.s3SecretAccessKey)
-                  : null,
-              }
+            ? { s3SecretAccessKey: input.s3SecretAccessKey || null }
             : {}),
           s3Bucket: input.s3Bucket,
         },

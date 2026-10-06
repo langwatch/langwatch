@@ -37,6 +37,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
@@ -54,6 +55,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",

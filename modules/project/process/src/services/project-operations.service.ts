@@ -12,6 +12,10 @@ import {
 import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 
+import type {
+  ProjectStorageSettings,
+  ProjectStorageSettingsRepository,
+} from "../repositories/project-storage-settings.repository.ts";
 import {
   isLegacyKeyRevoked,
   REVOKED_LEGACY_KEY_PREFIX,
@@ -27,6 +31,8 @@ export type ProjectOperationsDirectory = Pick<
 
 type ProjectOperationsDependencies = Readonly<{
   readonly projects: ProjectOperationsDirectory;
+  /** Writes the stored-object columns, sealed by the live tier. */
+  readonly storageSettings: ProjectStorageSettingsRepository;
   readonly auditLog: AuditLogApi;
   readonly lifecycle: Pick<
     ProjectCreatedNoticeService,
@@ -96,16 +102,25 @@ export class ProjectOperationsService {
       ...(input.teamId !== undefined && { teamId: input.teamId }),
       traceSharingEnabled: input.traceSharingEnabled,
       presenceEnabled: input.presenceEnabled,
+    };
+    const settings: ProjectStorageSettings = {
       s3Endpoint: input.s3Endpoint ?? null,
       s3AccessKeyId: input.s3AccessKeyId ?? null,
       ...(input.s3SecretAccessKey !== undefined && { s3SecretAccessKey: input.s3SecretAccessKey }),
       s3Bucket: input.s3Bucket,
     };
-    const updated = await this.dependencies.projects.update({
+    const organizationId = project.team.organizationId;
+    const written = await this.dependencies.projects.update({
       id: input.projectId,
-      organizationId: project.team.organizationId,
+      organizationId,
       data,
     });
+    const stored = await this.dependencies.storageSettings.update({
+      projectId: input.projectId,
+      organizationId,
+      settings,
+    });
+    const updated: Project = { ...written, ...stored };
 
     if (input.traceSharingEnabled === false && project.traceSharingEnabled === true) {
       await this.dependencies.share.revokeAllTraceShares(input.projectId);

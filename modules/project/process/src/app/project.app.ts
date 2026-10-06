@@ -6,6 +6,7 @@ import {
   DataPrivacyApi,
   type DataPrivacyPiiRedactionLevel,
 } from "@langwatch/data-privacy-contract";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import {
@@ -55,24 +56,6 @@ import type {
   ProjectPermissionScope,
 } from "../transport/project.trpc.ts";
 
-export type ProjectInfrastructure = Readonly<{
-  now?: (() => number) | undefined;
-}>;
-
-/**
- * The two process members this application reads, from the closed fourteen-name
- * vocabulary. Their shapes are restated rather than imported from
- * `@langwatch/process-stores`: a module depends on contracts.
- */
-type ProjectProcessMembers = Readonly<{
-  /** The deployment's symmetric cipher, for the stored-object credentials. */
-  encryption: Readonly<{ encrypt(plaintext: string): string }>;
-  /** Where a best-effort failure is reported when nothing can be done about it. */
-  logger: Readonly<{
-    error(payload: Readonly<Record<string, unknown>>, message: string): void;
-  }>;
-}>;
-
 type ProjectDependencies = Readonly<{
   organizations: typeof OrganizationApi;
   apiKeys: typeof ApiKeyApi;
@@ -89,12 +72,7 @@ type ProjectDependencies = Readonly<{
   /** Owns the project's PII level, which `/api/projects` reads and writes by name. */
   dataPrivacy: typeof DataPrivacyApi;
 }>;
-type ProjectSetup = FeatureSetup<
-  ProjectDependencies,
-  ProjectInfrastructure & ProjectProcessMembers,
-  undefined,
-  ProjectRepositories
->;
+type ProjectSetup = FeatureSetup<ProjectDependencies, never, undefined, ProjectRepositories>;
 
 /**
  * The project application: what peer modules, `/api/projects` and the browser
@@ -131,8 +109,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     auditLog: AuditLogApi,
     dataPrivacy: DataPrivacyApi,
   };
-  /** Both names are from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["encryption", "logger"] as const;
 
   readonly #projectService: ProjectApplicationService;
   readonly #operations: ProjectOperationsService;
@@ -141,8 +117,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #authorization: AuthzApi;
   readonly #trace: TraceApi;
   readonly #dataPrivacy: DataPrivacyApi;
-  readonly #encryption: ProjectProcessMembers["encryption"];
-  readonly #logger: ProjectProcessMembers["logger"];
+  readonly #logger: Logger;
   readonly #requests = ProjectRequestService.create({
     projects: this,
     probePermission: (input) => this.probePermission(input),
@@ -157,7 +132,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     authorization,
     trace,
     dataPrivacy,
-    encryption,
     logger,
   }: {
     projectService: ProjectApplicationService;
@@ -167,8 +141,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     authorization: AuthzApi;
     trace: TraceApi;
     dataPrivacy: DataPrivacyApi;
-    encryption: ProjectProcessMembers["encryption"];
-    logger: ProjectProcessMembers["logger"];
+    logger: Logger;
   }) {
     this.#projectService = projectService;
     this.#operations = operations;
@@ -177,13 +150,13 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     this.#authorization = authorization;
     this.#trace = trace;
     this.#dataPrivacy = dataPrivacy;
-    this.#encryption = encryption;
     this.#logger = logger;
   }
 
-  static create({ members, dependencies, repositories }: ProjectSetup): ProjectModule {
+  static create({ dependencies, repositories }: ProjectSetup): ProjectModule {
+    const logger = createLogger("langwatch:project");
     const lifecycle = ProjectCreatedNoticeService.create({
-      logger: members.logger,
+      logger,
       projects: repositories.projects,
     });
     const projects = ProjectApplicationService.create({
@@ -194,12 +167,13 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     });
     const operations = ProjectOperationsService.create({
       projects,
+      storageSettings: repositories.storageSettings,
       auditLog: dependencies.auditLog,
       lifecycle,
-      logger: members.logger,
+      logger,
       share: dependencies.share,
       topics: dependencies.topics,
-      now: members.now ?? (() => nowInstant().epochMilliseconds),
+      now: () => nowInstant().epochMilliseconds,
     });
     return new ProjectModule({
       projectService: projects,
@@ -209,8 +183,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       authorization: dependencies.authorization,
       trace: dependencies.trace,
       dataPrivacy: dependencies.dataPrivacy,
-      encryption: members.encryption,
-      logger: members.logger,
+      logger,
     });
   }
 
@@ -243,11 +216,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   /** Records one organization's projects' stored presence settings, for the backfill task. */
   recordExistingPresenceSettings(input: Readonly<{ organizationId: string }>): Promise<number> {
     return this.#lifecycle.recordExistingPresenceSettings(input);
-  }
-
-  /** The deployment's cipher, for the stored-object credentials on the form. */
-  encryptProjectSecret(value: string): string {
-    return this.#encryption.encrypt(value);
   }
 
   /**

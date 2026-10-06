@@ -11,6 +11,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ProjectStorageSettingsRepository } from "../../repositories/project-storage-settings.repository.ts";
 import type { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
 import {
   ProjectOperationsService,
@@ -132,11 +133,15 @@ type PresenceSettingChange = Parameters<ProjectCreatedNoticeService["presenceSet
 
 function characterizationOperations(options: {
   projects: Partial<ProjectOperationsDirectory>;
+  storageSettings?: ProjectStorageSettingsRepository["update"];
   revokeAllTraceShares: ShareApi["revokeAllTraceShares"];
   presenceChanges?: PresenceSettingChange[];
 }): ProjectOperationsService {
   return ProjectOperationsService.create({
     projects: new CharacterizationProjectDirectory(options.projects),
+    storageSettings: {
+      update: options.storageSettings ?? (async ({ settings }) => settings),
+    },
     share: new CharacterizationShareApi(options.revokeAllTraceShares),
     topics: refusingTopics(),
     auditLog: createApiFixture<AuditLogApi>({
@@ -199,8 +204,8 @@ describe("ProjectOperationsService", () => {
   describe("when the settings form saves an endpoint with a blank secret", () => {
     const storage = {
       projectId: "project_123",
-      s3Endpoint: "cipher(https://s3.example)",
-      s3AccessKeyId: "cipher(AKIA)",
+      s3Endpoint: "https://s3.example",
+      s3AccessKeyId: "AKIA",
     };
 
     /** @scenario A first-time storage setup with a blank secret is refused */
@@ -230,6 +235,63 @@ describe("ProjectOperationsService", () => {
       await operations.updateSettings(storage, MEMBER);
 
       expect(update).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("when the settings form saves stored-object credentials", () => {
+    it("writes them through the storage repository and answers what it stored", async () => {
+      const update = vi.fn(async (_input: unknown) => characterizationProject(false));
+      const storageSettings = vi.fn<ProjectStorageSettingsRepository["update"]>(
+        async ({ settings }) => ({ ...settings, s3Endpoint: "stored(endpoint)" }),
+      );
+      const operations = characterizationOperations({
+        projects: { findWithTeam: async () => characterizationProject(false), update },
+        storageSettings,
+        revokeAllTraceShares: async () => {},
+      });
+
+      const answer = await operations.updateSettings(
+        {
+          projectId: "project_123",
+          s3Endpoint: "https://s3.example",
+          s3AccessKeyId: "AKIA",
+          s3SecretAccessKey: "shh",
+          s3Bucket: "bucket",
+        },
+        MEMBER,
+      );
+
+      expect(storageSettings).toHaveBeenCalledWith({
+        projectId: "project_123",
+        organizationId: "org-1",
+        settings: {
+          s3Endpoint: "https://s3.example",
+          s3AccessKeyId: "AKIA",
+          s3SecretAccessKey: "shh",
+          s3Bucket: "bucket",
+        },
+      });
+      expect(update.mock.calls[0]?.[0]).not.toHaveProperty("data.s3Endpoint");
+      expect(answer.s3Endpoint).toBe("stored(endpoint)");
+    });
+
+    it("leaves the stored secret out of the write when none was sent", async () => {
+      const storageSettings = vi.fn<ProjectStorageSettingsRepository["update"]>(
+        async ({ settings }) => settings,
+      );
+      const held = { ...characterizationProject(false), s3SecretAccessKey: "held" };
+      const operations = characterizationOperations({
+        projects: { findWithTeam: async () => held, update: async () => held },
+        storageSettings,
+        revokeAllTraceShares: async () => {},
+      });
+
+      await operations.updateSettings(
+        { projectId: "project_123", s3Endpoint: "https://s3.example", s3AccessKeyId: "AKIA" },
+        MEMBER,
+      );
+
+      expect(storageSettings.mock.calls[0]?.[0].settings).not.toHaveProperty("s3SecretAccessKey");
     });
   });
 
