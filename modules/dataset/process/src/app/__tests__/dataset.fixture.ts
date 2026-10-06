@@ -119,8 +119,7 @@ export function createDatasetTestApp(
       storedObjects:
         input.dependencies?.storedObjects ?? createApiFixture<StoredObjectApi>({}, "storedObjects"),
     },
-    members: { publicBaseUrl: input.publicBaseUrl },
-    config: undefined,
+    config: { publicBaseUrl: input.publicBaseUrl },
     resources: new ResourceScope(),
     secrets: {} as never,
   });

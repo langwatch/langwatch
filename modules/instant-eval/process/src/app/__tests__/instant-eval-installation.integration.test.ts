@@ -24,7 +24,7 @@ import {
   type InstantEvalRunInput,
 } from "@langwatch/instant-eval-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/process";
+import { createApp, type ModuleSecretsScope } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import {
   type ProjectApi,
@@ -87,8 +87,6 @@ function judgeSecrets(judgeKey: string | undefined): ModuleSecretsScope {
   );
   return (owner, declared) => resolver.scopeTo(owner, declared);
 }
-
-const instantEval = withMemoryRepositories(instantEvalProcessModule);
 
 const CREATED = new Date("2026-01-01T00:00:00.000Z");
 
@@ -179,7 +177,7 @@ function installation({
 } = {}) {
   return (
     createApp({ role: "api", secrets: judgeSecrets(judgeKey ?? undefined) })
-      .withModules([instantEval])
+      .withModules([instantEvalProcessModule])
       .withConfig({
         "instant-eval": {
           classifier,
@@ -190,10 +188,10 @@ function installation({
           isBounded,
           queryTokenBudget: 4_000_000,
           isSaas,
+          nodeEnvironment,
         },
       })
       .withStores(memoryStores())
-      .withMember("nodeEnvironment", nodeEnvironment)
       // The api role sends commands; what drains them is the worker's, and the
       // pipeline has its own tests.
       .withEventing(
@@ -202,8 +200,6 @@ function installation({
           processStore: InMemoryProcessStore.createForTesting(),
         }),
       )
-      // The shared bucket, the holds and the cancel hints each have a twin.
-      .withKeyvalue(null)
       .provide({
         analytics: createApiFixture<AnalyticsApi>({
           isLangWatchQLAvailable: () => true,

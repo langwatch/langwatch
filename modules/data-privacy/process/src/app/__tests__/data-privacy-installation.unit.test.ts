@@ -20,8 +20,13 @@ const ORGANIZATION_ID = dataPrivacyTestGraph.organizationId;
 function process(role: "api" | "worker", googleCredentials?: string) {
   return createApp({ role })
     .withModules([installableDataPrivacy({ googleCredentials })])
-    .withMember("nodeEnvironment", undefined)
-    .withConfig({ "data-privacy": { googleDlpDisabled: undefined, enforcement: undefined } })
+    .withConfig({
+      "data-privacy": {
+        googleDlpDisabled: undefined,
+        enforcement: undefined,
+        nodeEnvironment: undefined,
+      },
+    })
     .provide({
       project: createDataPrivacyTestProjects(),
       organization: createApiFixture<OrganizationApi>(),

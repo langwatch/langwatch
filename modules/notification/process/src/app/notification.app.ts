@@ -41,14 +41,9 @@ import { MailDeliveryService } from "../services/mail-delivery.service.ts";
 import { NotificationService } from "../services/notification.service.ts";
 import { WebPushService, type WebPushQueue } from "../services/web-push.service.ts";
 
-/** A process fact: the SES and Resend calls follow the proxy spellings. */
-type NotificationMembers = Readonly<{
-  outboundProxy: Readonly<Record<string, string | undefined>>;
-}>;
-
 type NotificationSetup = FeatureSetup<
   typeof NotificationModule.dependencies,
-  NotificationMembers,
+  never,
   NotificationServerConfig,
   NotificationRepositories
 >;
@@ -56,7 +51,6 @@ type NotificationSetup = FeatureSetup<
 export class NotificationModule implements NotificationApiContract {
   static readonly contract = NotificationApi;
   static readonly dependencies = {};
-  static readonly reads = ["outboundProxy"] as const;
   static readonly config = notificationConfig;
   static readonly publicConfig = notificationBrowserConfig.project;
   /** Resolved while the module constructs, before boot seals them. */
@@ -92,7 +86,6 @@ export class NotificationModule implements NotificationApiContract {
     repositories,
     config,
     secrets,
-    members,
     resources,
   }: NotificationSetup): Promise<NotificationModule> {
     const settings = await mailGatewaySettings({ config, secrets });
@@ -103,7 +96,7 @@ export class NotificationModule implements NotificationApiContract {
         baseHost: config.publicBaseUrl ?? "",
       }),
     };
-    const outboundProxy = parseOutboundProxyConfig(members.outboundProxy);
+    const outboundProxy = parseOutboundProxyConfig(config.outboundProxy);
     const aws = AwsClientConfiguration.create({ outboundProxy: emailProxyResolver(outboundProxy) });
     resources.own("Notification AWS clients", () => aws.close());
     const delivery = EmailDeliveryService.create({

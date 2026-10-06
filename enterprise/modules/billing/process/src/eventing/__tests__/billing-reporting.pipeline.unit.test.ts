@@ -81,9 +81,13 @@ describe("the monthly billing roll-up's eventing declaration", () => {
       const app = BillingModule.assemble({
         usageWarnings: createApiFixture<UsageWarningService>({}),
         resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
-        nodeEnvironment: "test",
         repositories: MemoryBillingRepositories.create(),
-        config: { bankDetails: undefined, licensePaymentLinkId: undefined, isSaas: false },
+        config: {
+          bankDetails: undefined,
+          licensePaymentLinkId: undefined,
+          isSaas: false,
+          nodeEnvironment: "test",
+        },
         peers,
         stripeSecretKey: undefined,
       });
@@ -103,9 +107,13 @@ describe("the monthly billing roll-up's eventing declaration", () => {
       BillingModule.assemble({
         usageWarnings: createApiFixture<UsageWarningService>({}),
         resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
-        nodeEnvironment: "test",
         repositories: MemoryBillingRepositories.create(),
-        config: { bankDetails: undefined, licensePaymentLinkId: undefined, isSaas: true },
+        config: {
+          bankDetails: undefined,
+          licensePaymentLinkId: undefined,
+          isSaas: true,
+          nodeEnvironment: "test",
+        },
         peers,
         stripeSecretKey: undefined,
       });
@@ -127,9 +135,13 @@ describe("the monthly billing roll-up's eventing declaration", () => {
       const pipeline = BillingModule.assemble({
         usageWarnings: createApiFixture<UsageWarningService>({}),
         resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
-        nodeEnvironment: "test",
         repositories: MemoryBillingRepositories.create(),
-        config: { bankDetails: undefined, licensePaymentLinkId: undefined, isSaas: true },
+        config: {
+          bankDetails: undefined,
+          licensePaymentLinkId: undefined,
+          isSaas: true,
+          nodeEnvironment: "test",
+        },
         peers,
         stripeSecretKey: undefined,
       }).reportingPipeline({ participation: "produce" });

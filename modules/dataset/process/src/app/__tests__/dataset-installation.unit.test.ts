@@ -23,7 +23,7 @@ function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([datasetProcessModule])
     .withStores(memoryStores())
-    .withMember("publicBaseUrl", undefined)
+    .withConfig({ dataset: { publicBaseUrl: undefined } })
     .provide({
       experiment: createDatasetTestExperiments(),
       authz: createDatasetTestAuthz(),

@@ -170,7 +170,7 @@ export function createMonitorTestApp(
 
   return MonitorModule.create({
     repositories: input.repositories ?? createMonitorTestRepositories(),
-    members: { publicBaseUrl: input.publicBaseUrl ?? "https://app.langwatch.test" },
+    config: { publicBaseUrl: input.publicBaseUrl ?? "https://app.langwatch.test" },
     dependencies: {
       permissions:
         input.permissions ?? createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
@@ -189,7 +189,6 @@ export function createMonitorTestApp(
         deleteUncommitted: (reference) => replication.deleteUncommitted(reference),
       }),
     },
-    config: undefined,
     resources: new ResourceScope(),
     secrets: createApiFixture<MonitorTestSetup["secrets"]>(),
   });

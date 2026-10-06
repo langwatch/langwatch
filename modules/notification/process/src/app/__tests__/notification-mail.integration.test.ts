@@ -2,7 +2,8 @@ import { once } from "node:events";
 import { createServer, type Server, type Socket } from "node:net";
 
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -55,8 +56,8 @@ function process(smtp: { host: string | undefined; port: string | undefined; pro
     role: "worker",
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
   })
-    .withModules([withMemoryRepositories(notificationProcessModule)])
-    .withMember("outboundProxy", {})
+    .withModules([notificationProcessModule])
+    .withStores(memoryStores())
     .withEventing(testEventing())
     .withConfig({
       notification: {
@@ -65,6 +66,14 @@ function process(smtp: { host: string | undefined; port: string | undefined; pro
         ses: { enabled: undefined, region: undefined, endpoint: undefined },
         smtp: { host: smtp.host, port: smtp.port, user: "u", secure: "false" },
         publicBaseUrl: "https://app.langwatch.test",
+        outboundProxy: {
+          HTTPS_PROXY: undefined,
+          https_proxy: undefined,
+          HTTP_PROXY: undefined,
+          http_proxy: undefined,
+          NO_PROXY: undefined,
+          no_proxy: undefined,
+        },
       },
     });
 }

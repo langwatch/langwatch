@@ -150,10 +150,7 @@ export interface WebhookAppDependencies {
 
 type WebhookSetup = FeatureSetup<
   typeof WebhookModule.dependencies,
-  Readonly<{
-    /** The proxy spellings, a process fact; SQS deliveries follow them. */
-    outboundProxy: Readonly<Record<string, string | undefined>>;
-  }>,
+  never,
   WebhookServerConfig,
   WebhookRepositories
 >;
@@ -171,7 +168,6 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
   /** The entitlement peer this app's own plan gate reads (`WebhookAccessService`),
    *  and the project peer naming an organization's tenants for the events listing. */
   static readonly dependencies = { entitlement: EntitlementApi, projects: ProjectApi };
-  static readonly reads = ["outboundProxy"] as const;
   static readonly config = webhookConfig;
 
   static create(input: WebhookSetup): WebhookModule {
@@ -185,7 +181,7 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
       }),
     });
     const aws = AwsClientConfiguration.create({
-      outboundProxy: sqsProxyResolver(parseOutboundProxyConfig(input.members.outboundProxy)),
+      outboundProxy: sqsProxyResolver(parseOutboundProxyConfig(input.config.outboundProxy)),
     });
     const deliver = WebhookDeliveryService.dispatchThrough({
       destinations: WebhookDestinationDispatchService.create({

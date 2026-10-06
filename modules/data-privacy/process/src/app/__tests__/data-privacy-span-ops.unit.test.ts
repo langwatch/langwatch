@@ -37,8 +37,9 @@ function spanWith(value: string): OtlpSpan {
 async function boot({ enforcement }: { enforcement?: string }) {
   const runtime = await createApp({ role: "worker" })
     .withModules([installableDataPrivacy()])
-    .withMember("nodeEnvironment", undefined)
-    .withConfig({ "data-privacy": { googleDlpDisabled: undefined, enforcement } })
+    .withConfig({
+      "data-privacy": { googleDlpDisabled: undefined, enforcement, nodeEnvironment: undefined },
+    })
     .provide({
       project: createDataPrivacyTestProjects(),
       organization: createApiFixture<OrganizationApi>(),

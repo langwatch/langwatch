@@ -94,11 +94,6 @@ function spendAttributionOf(
   };
 }
 
-type InstantEvalMembers = Readonly<{
-  /** The raw NODE_ENV; "production" refuses the memory judge. */
-  nodeEnvironment: string | undefined;
-}>;
-
 type InstantEvalDependencies = Readonly<{
   featureFlags: typeof FeatureFlagApi;
   projects: typeof ProjectApi;
@@ -120,7 +115,7 @@ type InstantEvalDependencies = Readonly<{
 
 type InstantEvalSetup = FeatureSetup<
   InstantEvalDependencies,
-  InstantEvalMembers,
+  never,
   InstantEvalServerConfig,
   InstantEvalRepositories
 >;
@@ -143,7 +138,6 @@ export class InstantEvalModule implements InstantEvalApiContract {
   static readonly secrets = {
     classifierApiKey: Secret.load("JEV_API_KEY", { optional: true }),
   } as const;
-  static readonly reads = ["nodeEnvironment"] as const;
 
   private readonly access: InstantEvalAccessService;
   private readonly optIns: InstantEvalOptInService;
@@ -454,7 +448,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
     const kind = instantEvalJudgeKind({
       classifier: setup.config.classifier,
       hasOwnKey: Boolean(apiKey),
-      isProduction: setup.members.nodeEnvironment === "production",
+      isProduction: setup.config.nodeEnvironment === "production",
     });
     if (kind === "none") return MemoryInstantEvalJudgeChannel.create();
     if (kind === "memory") return DeterministicInstantEvalJudgeChannel.create();

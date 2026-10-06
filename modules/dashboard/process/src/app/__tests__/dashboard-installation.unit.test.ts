@@ -1,5 +1,6 @@
 import { DashboardApi, DashboardNotFoundError } from "@langwatch/dashboard-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
 import { dashboardProcessModule } from "../../dashboard.module.ts";
@@ -11,8 +12,9 @@ import {
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(dashboardProcessModule)])
-    .withMember("publicBaseUrl", undefined)
+    .withModules([dashboardProcessModule])
+    .withStores(memoryStores())
+    .withConfig({ dashboard: { publicBaseUrl: undefined } })
     .provide({
       analytics: createDashboardTestAnalytics(),
       automation: createDashboardTestAutomation(),

@@ -1,4 +1,4 @@
-import { Config, isSaas, publicBaseUrl, type ConfigOf } from "@langwatch/config";
+import { Config, isSaas, nodeEnvironment, publicBaseUrl, type ConfigOf } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { Secret } from "@langwatch/secrets/secret";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets/shared-secrets";
@@ -27,6 +27,8 @@ export const billingConfig = Config.define((c) => ({
   isSaas,
   /** The shared leaf: the origin the usage links and notices point back at. */
   publicBaseUrl,
+  /** The shared leaf: which Stripe price mode the deployment bills in. */
+  nodeEnvironment,
 }));
 
 export type BillingServerConfig = ConfigOf<typeof billingConfig>;

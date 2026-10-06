@@ -35,7 +35,7 @@ function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([monitorProcessModule])
     .withStores(memoryStores())
-    .withMember("publicBaseUrl", PUBLIC_BASE_URL)
+    .withConfig({ monitor: { publicBaseUrl: PUBLIC_BASE_URL } })
     .provide({
       authz: createApiFixture<AuthzApiContract>({ hasProjectPermission: async () => true }),
       evaluator: createApiFixture<EvaluatorApi>({

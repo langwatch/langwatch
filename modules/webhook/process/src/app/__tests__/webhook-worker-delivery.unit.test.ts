@@ -48,11 +48,18 @@ function worker() {
         allowInsecureLocalUrls: false,
         allowAmbientAwsCredentials: false,
         isSaas: false,
+        outboundProxy: {
+          HTTPS_PROXY: undefined,
+          https_proxy: undefined,
+          HTTP_PROXY: undefined,
+          http_proxy: undefined,
+          NO_PROXY: undefined,
+          no_proxy: undefined,
+        },
       },
     })
     .withStores(memoryStores())
     .withEventing(eventing)
-    .withMember("outboundProxy", {})
     .provide({
       entitlement: createApiFixture<EntitlementApi>({
         getActivePlan: async () => entitledPlan,

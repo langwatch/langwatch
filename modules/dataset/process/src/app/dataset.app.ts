@@ -5,7 +5,9 @@ import { PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   DatasetApi,
+  datasetConfig,
   DatasetNotFoundError,
+  type DatasetServerConfig,
   type DatasetNormalizePayload,
   type AppendStoredObjectToDatasetInput,
   type BatchEvaluationEntry,
@@ -68,17 +70,10 @@ import { DatasetService } from "../services/dataset.service.ts";
 /** The KSUID resource a new dataset record's id is minted under. */
 const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";
 
-/**
- * `publicBaseUrl` is the process's own fact, absent where the deployment named no `BASE_HOST`;
- * `platformUrl` refuses by name when it is. It moves to the shared leaf once the contract may
- * hold it.
- */
-type DatasetMembers = Readonly<{ publicBaseUrl: string | undefined }>;
-
 type DatasetSetup = FeatureSetup<
   typeof DatasetModule.dependencies,
-  DatasetMembers,
-  undefined,
+  never,
+  DatasetServerConfig,
   DatasetRepositories
 >;
 
@@ -115,8 +110,8 @@ export class DatasetModule implements DatasetApi {
     /** Reads the confirmed files a dataset is imported from (ADR-158 §6). */
     storedObjects: StoredObjectApi,
   };
-  /** `publicBaseUrl` is the process's own fact. */
-  static readonly reads = ["publicBaseUrl"] as const;
+  /** The shared deployment origin; `platformUrl` refuses by name where no `BASE_HOST` was named. */
+  static readonly config = datasetConfig;
 
   #datasets: DatasetService;
   #attachmentUploads: DatasetAttachmentUploadService;
@@ -130,7 +125,7 @@ export class DatasetModule implements DatasetApi {
   private constructor(
     repositories: DatasetRepositories,
     dependencies: DatasetSetup["dependencies"],
-    members: DatasetMembers,
+    config: DatasetServerConfig,
   ) {
     const chunks = repositories.chunks;
 
@@ -173,11 +168,11 @@ export class DatasetModule implements DatasetApi {
     this.#count = repositories.count;
     this.#experiments = dependencies.experiments;
     this.#permissions = dependencies.permissions;
-    this.#publicBaseUrl = members.publicBaseUrl;
+    this.#publicBaseUrl = config.publicBaseUrl;
   }
 
-  static create({ repositories, dependencies, members }: DatasetSetup): DatasetModule {
-    return new DatasetModule(repositories, dependencies, members);
+  static create({ repositories, dependencies, config }: DatasetSetup): DatasetModule {
+    return new DatasetModule(repositories, dependencies, config);
   }
 
   // ── Datasets ─────────────────────────────────────────────────────────────

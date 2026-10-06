@@ -22,6 +22,7 @@ import {
 } from "@langwatch/automation-contract";
 import {
   DashboardApi,
+  dashboardConfig,
   type Dashboard,
   type DashboardGraphCountScope,
   type DashboardSummary,
@@ -33,6 +34,7 @@ import {
   type SavedWorkbenchChart,
   type SavedWorkbenchChartDefinitionUpdate,
   type DashboardUsageCount,
+  type DashboardServerConfig,
 } from "@langwatch/dashboard-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
@@ -51,17 +53,10 @@ type DashboardDependencies = Readonly<{
   projects: typeof ProjectApi;
 }>;
 
-/**
- * Shapes restated rather than imported: a module depends on contracts.
- * `publicBaseUrl` is the process's own fact, drilled in — absent where the
- * deployment named no `BASE_HOST`.
- */
-type DashboardMembers = Readonly<{ publicBaseUrl: string | undefined }>;
-
 type DashboardSetup = FeatureSetup<
   DashboardDependencies,
-  DashboardMembers,
-  undefined,
+  never,
+  DashboardServerConfig,
   DashboardRepositories
 >;
 
@@ -114,7 +109,8 @@ export class DashboardModule implements DashboardApi {
     automation: AutomationApi,
     projects: ProjectApi,
   };
-  static readonly reads = ["publicBaseUrl"] as const;
+  /** The shared deployment origin, absent where the deployment named no `BASE_HOST`. */
+  static readonly config = dashboardConfig;
 
   #dashboards: DashboardService;
   #charts: SavedWorkbenchChartService;
@@ -187,7 +183,7 @@ export class DashboardModule implements DashboardApi {
         projects: setup.dependencies.projects,
       },
       workbench: { access: workbenchAccess, caller: workbenchCaller },
-      publicBaseUrl: setup.members.publicBaseUrl,
+      publicBaseUrl: setup.config.publicBaseUrl,
     });
   }
 

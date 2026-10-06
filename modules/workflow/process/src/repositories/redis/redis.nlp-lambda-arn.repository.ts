@@ -1,8 +1,8 @@
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { NlpLambdaArnCache } from "../../app/workflow.app.ts";
 
-export type NlpLambdaArnRedis = Pick<ProcessMembers["redis"], "get" | "set" | "del">;
+export type NlpLambdaArnRedis = Pick<RedisConnection, "get" | "set" | "del">;
 
 /** Every pod's resolved per-project function, shared through the process's Redis. */
 export class RedisNlpLambdaArnRepository implements NlpLambdaArnCache {

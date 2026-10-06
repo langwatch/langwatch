@@ -1,4 +1,4 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, type ConfigOf, nodeEnvironment } from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -13,6 +13,8 @@ export const dataPrivacyConfig = Config.define((c) => ({
   ),
   /** Anything but the literal `off` enforces the native policy. */
   enforcement: c.env("LANGWATCH_DATA_PRIVACY_ENFORCEMENT", z.string().optional()),
+  /** The shared leaf: production decides whether a missing redaction service refuses. */
+  nodeEnvironment,
 }));
 
 export type DataPrivacyServerConfig = ConfigOf<typeof dataPrivacyConfig>;

@@ -15,6 +15,7 @@ import {
 import { generate } from "@langwatch/ksuid";
 import {
   MonitorApi,
+  monitorConfig,
   MonitorCheckSettingsInvalidError,
   MonitorCheckTypeUnknownError,
   MonitorSourceProjectForbiddenError,
@@ -30,6 +31,7 @@ import {
   type MonitorPerformanceInput,
   type MonitorReplicationInput,
   type MonitorRunnableCheckInput,
+  type MonitorServerConfig,
   type MonitorToggleInput,
   type MonitorUpdateInput,
   type MonitorWithEvaluator,
@@ -54,11 +56,10 @@ const PERFORMANCE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
 /** The app's KSUID resource for a monitor row (`KSUID_RESOURCES.MONITOR`). */
 const MONITOR_KSUID_RESOURCE = "monitor";
 
-/** `publicBaseUrl` is the process's own fact, absent where the deployment named no `BASE_HOST`. */
 type MonitorSetup = FeatureSetup<
   typeof MonitorModule.dependencies,
-  Readonly<{ publicBaseUrl: string | undefined }>,
-  undefined,
+  never,
+  MonitorServerConfig,
   MonitorRepositories
 >;
 
@@ -73,7 +74,8 @@ export class MonitorModule implements MonitorApi {
     /** Removes the workflow a monitor copy replicated when the replica is refused. */
     workflows: WorkflowApi,
   };
-  static readonly reads = ["publicBaseUrl"] as const;
+  /** The shared deployment origin, absent where the deployment named no `BASE_HOST`. */
+  static readonly config = monitorConfig;
 
   #monitors: MonitorService;
   #usage: MonitorRepositories["monitors"];
@@ -106,7 +108,7 @@ export class MonitorModule implements MonitorApi {
   }
 
   static create(setup: MonitorSetup): MonitorModule {
-    return new MonitorModule(setup.repositories, setup.dependencies, setup.members.publicBaseUrl);
+    return new MonitorModule(setup.repositories, setup.dependencies, setup.config.publicBaseUrl);
   }
 
   list(input: Readonly<{ projectId: string }>): Promise<MonitorWithEvaluator[]> {

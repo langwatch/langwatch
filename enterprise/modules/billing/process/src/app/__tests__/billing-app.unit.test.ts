@@ -92,9 +92,13 @@ function billingApp({
   const app = BillingModule.assemble({
     usageWarnings: createApiFixture<UsageWarningService>({}),
     resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
-    nodeEnvironment: "test",
     repositories,
-    config: { bankDetails: undefined, licensePaymentLinkId: undefined, isSaas },
+    config: {
+      bankDetails: undefined,
+      licensePaymentLinkId: undefined,
+      isSaas,
+      nodeEnvironment: "test",
+    },
     peers: registry.peers,
     stripeSecretKey,
     webhook: {
