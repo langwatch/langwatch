@@ -122,6 +122,15 @@ describe("SsoGateService", () => {
     );
   });
 
+  /** @scenario "Self-hosted that never had a license hides SSO and offers email sign-in" */
+  it("reports email, not the configured identity provider, when no license exists anywhere", async () => {
+    const service = create();
+
+    expect(await service.platformAllowed()).toBe(false);
+    expect(await service.resolveProvider()).toBe("email");
+    expect(inspectPlatformAccess).toHaveBeenCalled();
+  });
+
   /** @scenario "A tampered license does not enable SSO" */
   it("rejects a tampered license and explains the failed signature", async () => {
     inspectPlatformAccess.mockResolvedValue({

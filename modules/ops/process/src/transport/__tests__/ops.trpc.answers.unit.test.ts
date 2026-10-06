@@ -176,8 +176,10 @@ describe("the ops surface's declared answers", () => {
       });
     });
 
+    /** @scenario "checkOpsPermission still throws FORBIDDEN for non-ops callers" */
     it("refuses the write at the door, naming ops:manage", async () => {
-      const { outsider } = mount(opsQueueTrpcTransport);
+      const unblockQueueGroup = vi.fn(async () => ({ wasBlocked: true }));
+      const { outsider } = mount(opsQueueTrpcTransport, { unblockQueueGroup });
 
       await expect(
         outsider.unblockGroup({ queueName: "traces", groupId: "g-1" }),
@@ -185,6 +187,7 @@ describe("the ops surface's declared answers", () => {
         code: "FORBIDDEN",
         cause: { code: "permission_denied", meta: { permission: "ops:manage" } },
       });
+      expect(unblockQueueGroup).not.toHaveBeenCalled();
     });
 
     it("refuses a caller with no session as unauthenticated", async () => {

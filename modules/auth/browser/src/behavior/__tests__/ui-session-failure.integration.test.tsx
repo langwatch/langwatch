@@ -44,6 +44,11 @@ const refusedRead: UiAuthClient = {
   signOut: refusesToSignOut,
 };
 
+const unreachable: UiAuthClient = {
+  $fetch: () => Promise.resolve({ error: { status: 503 } }),
+  signOut: refusesToSignOut,
+};
+
 const signedOut: UiAuthClient = {
   $fetch: () => Promise.resolve({ data: null }),
   signOut: refusesToSignOut,
@@ -119,6 +124,7 @@ function SessionProbe({
   });
   return (
     <div>
+      <span data-testid="status">{reading.status}</span>
       <span data-testid="user">{session.currentUser()?.id ?? "nobody"}</span>
       <span data-testid="settled">{String(session.isSettled())}</span>
     </div>
@@ -214,6 +220,25 @@ describe("given a session endpoint that refuses the read", () => {
       });
 
       await waitFor(() => expect(feedback.failures).toHaveLength(1));
+      expect(view.getByTestId("user").textContent).toBe("nobody");
+      expect(departures.to).toEqual([]);
+    });
+  });
+});
+
+describe("given the authentication service cannot be reached", () => {
+  describe("when a screen on a route that needs a session reads it", () => {
+    /** @scenario "Session connectivity failures are not anonymous sessions" */
+    it("reads offline rather than anonymous, and sends the visitor nowhere", async () => {
+      const feedback = new RecordingFeedback();
+
+      const view = renderSession({
+        path: "/acme-app/traces",
+        authClient: unreachable,
+        feedback,
+      });
+
+      await waitFor(() => expect(view.getByTestId("status").textContent).toBe("offline"));
       expect(view.getByTestId("user").textContent).toBe("nobody");
       expect(departures.to).toEqual([]);
     });

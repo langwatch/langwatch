@@ -526,6 +526,7 @@ describe("given the /api/grants family", () => {
 
   describe("when the organization is below Enterprise", () => {
     /** @scenario Both grant families answer 402 below Enterprise, naming the management API */
+    /** @scenario "The role bindings API requires an Enterprise plan" */
     it("refuses every grant route with enterprise_plan_required naming MANAGEMENT_API", async () => {
       const { send, created } = world({ enterprise: false });
 
@@ -536,6 +537,7 @@ describe("given the /api/grants family", () => {
       ]);
 
       for (const answer of answers) {
+        expect(answer.status).toBe(402);
         expect(await answer.json()).toMatchObject({
           code: "enterprise_plan_required",
           meta: { feature: "MANAGEMENT_API" },
