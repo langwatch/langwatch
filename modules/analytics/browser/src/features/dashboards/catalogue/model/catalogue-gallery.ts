@@ -9,7 +9,9 @@ import { CATALOGUE_TEMPLATES, type CatalogueTemplate } from "./catalogue-templat
 import { implementedWidget } from "./widget-implementations.ts";
 
 /** Widgets top to bottom: full-width ones on their own rows, half-width ones in pairs. */
-export function stackWidgets(widgets: readonly BoardTemplateWidget[]): BoardTemplateWidget[] {
+export function stackWidgets<Widget extends Pick<BoardTemplateWidget, "layout">>(
+  widgets: readonly Widget[],
+): Widget[] {
   const half = CHART_GRID_COLUMNS / 2;
   let row = 0;
   let open: { gridRow: number; rowSpan: number } | undefined;

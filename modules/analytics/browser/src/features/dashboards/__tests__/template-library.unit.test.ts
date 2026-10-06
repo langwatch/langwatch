@@ -5,16 +5,21 @@
 
 import { describe, expect, it } from "vitest";
 
-import { CATALOGUE_TEMPLATES, TRUNKS } from "../catalogue/index.ts";
+import { CHART_GRID_COLUMNS } from "../../../model/chart-grid.ts";
+import { CATALOGUE_TEMPLATES, CATALOGUE_WIDGETS, TRUNKS } from "../catalogue/index.ts";
 import {
-  filterTemplates,
+  catalogueChipCounts,
+  type CatalogueFilters,
+  filterCatalogue,
+  NO_CATALOGUE_FILTERS,
+} from "../model/catalogue-filter.ts";
+import {
   type LibraryTemplate,
-  NO_TEMPLATE_FILTERS,
   TEMPLATE_LIBRARY,
-  templateChipCounts,
+  TEMPLATE_PREVIEW_IDS,
   templateFiltersFromQuery,
   templateFiltersQuery,
-  type TemplateLibraryFilters,
+  templatePreviewSrc,
   templateSections,
 } from "../model/template-library.ts";
 
@@ -31,6 +36,7 @@ const entry = ({
   widgetCount: 1,
   status,
   searchText,
+  preview: { kind: "layout", widgets: [] },
 });
 
 const TEMPLATES = [
@@ -41,8 +47,8 @@ const TEMPLATES = [
   entry({ id: "safety", trunk: "Protect", agentKinds: ["regulated"], status: "coming-soon" }),
 ];
 
-const shownIds = (filters: Partial<TemplateLibraryFilters>) =>
-  filterTemplates({ templates: TEMPLATES, filters: { ...NO_TEMPLATE_FILTERS, ...filters } }).map(
+const shownIds = (filters: Partial<CatalogueFilters>) =>
+  filterCatalogue({ items: TEMPLATES, filters: { ...NO_CATALOGUE_FILTERS, ...filters } }).map(
     ({ board }) => board.id,
   );
 
@@ -52,13 +58,13 @@ describe("the templates library", () => {
     it("lists each one once, in trunk order, ready ones first in each section", () => {
       const sections = templateSections({ templates: TEMPLATE_LIBRARY });
 
-      const listed = sections.flatMap(({ templates }) => templates.map(({ board }) => board.id));
+      const listed = sections.flatMap(({ items }) => items.map(({ board }) => board.id));
       expect(listed.toSorted()).toEqual(CATALOGUE_TEMPLATES.map(({ id }) => id).toSorted());
-      expect(sections.map(({ trunk }) => trunk)).toEqual(
-        TRUNKS.filter((trunk) => sections.some((section) => section.trunk === trunk)),
+      expect(sections.map(({ key }) => key)).toEqual(
+        TRUNKS.filter((trunk) => sections.some((section) => section.key === trunk)),
       );
-      for (const { templates } of sections) {
-        const statuses = templates.map(({ status }) => status);
+      for (const { items } of sections) {
+        const statuses = items.map(({ status }) => status);
         const firstSoon = statuses.indexOf("coming-soon");
         expect(statuses.slice(firstSoon === -1 ? statuses.length : firstSoon)).not.toContain(
           "ready",
@@ -75,9 +81,9 @@ describe("the templates library", () => {
       ["a widget question", "which model costs me the most", "costs"],
       ["an agent kind", "VOICE AGENT", "calls"],
     ])("matches %s, ignoring case", (_what, search, id) => {
-      const shown = filterTemplates({
-        templates: TEMPLATE_LIBRARY,
-        filters: { ...NO_TEMPLATE_FILTERS, search },
+      const shown = filterCatalogue({
+        items: TEMPLATE_LIBRARY,
+        filters: { ...NO_CATALOGUE_FILTERS, search },
       });
 
       expect(shown.map(({ board }) => board.id)).toContain(id);
@@ -107,9 +113,9 @@ describe("the templates library", () => {
 
     /** @scenario "AC103 Templates library: filter chips narrow by trunk, agent kind and readiness" */
     it("counts each chip with the search and the other groups applied, never its own", () => {
-      const counts = templateChipCounts({
-        templates: TEMPLATES,
-        filters: { ...NO_TEMPLATE_FILTERS, trunks: ["Profit"], statuses: ["ready"] },
+      const counts = catalogueChipCounts({
+        items: TEMPLATES,
+        filters: { ...NO_CATALOGUE_FILTERS, trunks: ["Profit"], statuses: ["ready"] },
       });
 
       expect(counts.trunks).toEqual({
@@ -125,7 +131,7 @@ describe("the templates library", () => {
   describe("given a view in the address", () => {
     /** @scenario "AC104 Templates library: the search and filters are kept in the address" */
     it("writes the search and chips over the rest of the query, and reads them back", () => {
-      const filters: TemplateLibraryFilters = {
+      const filters: CatalogueFilters = {
         search: "cost",
         trunks: ["Profit", "Growth"],
         agentKinds: ["voice"],
@@ -147,9 +153,40 @@ describe("the templates library", () => {
     /** @scenario "AC104 Templates library: the search and filters are kept in the address" */
     it("drops chip values it does not know", () => {
       expect(templateFiltersFromQuery({ trunk: "Profit,Nope", status: "later" })).toEqual({
-        ...NO_TEMPLATE_FILTERS,
+        ...NO_CATALOGUE_FILTERS,
         trunks: ["Profit"],
       });
+    });
+  });
+
+  describe("given each template's preview", () => {
+    const titles = new Map(CATALOGUE_WIDGETS.map(({ id, title }) => [id, title]));
+    const catalogue = new Map(CATALOGUE_TEMPLATES.map((template) => [template.id, template]));
+
+    /** @scenario "AC107d Templates library: a card previews the template's real board" */
+    it("shows the captured image of a template that has one", () => {
+      expect(TEMPLATE_PREVIEW_IDS.size).toBeGreaterThan(0);
+      for (const { board, preview } of TEMPLATE_LIBRARY) {
+        if (!TEMPLATE_PREVIEW_IDS.has(board.id)) continue;
+        expect(preview, board.id).toEqual({ kind: "image", src: templatePreviewSrc(board.id) });
+      }
+    });
+
+    /** @scenario "AC107d Templates library: a card previews the template's real board" */
+    it("sketches every other template's widgets by title, inside the board's columns", () => {
+      for (const { board, preview } of TEMPLATE_LIBRARY) {
+        if (TEMPLATE_PREVIEW_IDS.has(board.id)) continue;
+        expect(preview.kind, board.id).toBe("layout");
+        if (preview.kind !== "layout") continue;
+        const widgetIds = catalogue.get(board.id)?.widgets ?? [];
+        expect(
+          preview.widgets.map(({ title }) => title),
+          board.id,
+        ).toEqual(widgetIds.map((id) => titles.get(id)));
+        for (const { key, layout } of preview.widgets) {
+          expect(layout.gridColumn + layout.colSpan, key).toBeLessThanOrEqual(CHART_GRID_COLUMNS);
+        }
+      }
     });
   });
 });

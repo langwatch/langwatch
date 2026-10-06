@@ -10,7 +10,12 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
-import { TEMPLATE_LIBRARY } from "../model/template-library.ts";
+import { AGENT_KIND_LABELS } from "../catalogue/index.ts";
+import {
+  TEMPLATE_LIBRARY,
+  TEMPLATE_PREVIEW_IDS,
+  templatePreviewSrc,
+} from "../model/template-library.ts";
 import TemplatesLibraryScreen from "../ui/sections/templates-library.screen.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
@@ -167,6 +172,96 @@ describe("the templates library", () => {
       expect(
         within(card).getByRole("button", { name: `Create a board from ${SOON.name}` }),
       ).toBeDisabled();
+    });
+  });
+
+  describe("given a ready template's card", () => {
+    const READY = TEMPLATE_LIBRARY.find(({ status }) => status === "ready")!;
+
+    /** @scenario "AC107c Templates library: each card reads like the prototype's" */
+    it("shows the name with its trunk badge, the job, the labels and Create board, in order", () => {
+      openLibrary();
+
+      const card = screen.getByRole("article", { name: READY.board.name });
+      const name = within(card).getByRole("heading", { level: 3, name: READY.board.name });
+      const badge = within(card).getByRole("button", { name: `Filter by ${READY.trunk}` });
+      const create = within(card).getByRole("button", {
+        name: `Create a board from ${READY.board.name}`,
+      });
+      const order = [name, badge, create];
+      for (const [index, element] of order.slice(1).entries()) {
+        const before = order[index]!;
+        expect(before.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+          Node.DOCUMENT_POSITION_FOLLOWING,
+        );
+      }
+      expect(within(card).getByText(`${READY.widgetCount} widgets`)).toBeInTheDocument();
+    });
+  });
+
+  describe("given the cards' previews", () => {
+    const sketched = TEMPLATE_LIBRARY.flatMap(({ board, preview }) =>
+      preview.kind === "layout" ? [{ board, widgets: preview.widgets }] : [],
+    );
+
+    /** @scenario "AC107d Templates library: a card previews the template's real board" */
+    it("shows the captured image of a template that has one, hidden from assistive tech", () => {
+      openLibrary();
+
+      const captured = TEMPLATE_LIBRARY.filter(({ board }) => TEMPLATE_PREVIEW_IDS.has(board.id));
+      expect(captured.length).toBeGreaterThan(0);
+      for (const { board } of captured) {
+        const image = screen.getByRole("article", { name: board.name }).querySelector("img");
+        expect(image?.getAttribute("src"), board.id).toBe(templatePreviewSrc(board.id));
+        expect(image?.closest("[aria-hidden='true']"), board.id).not.toBeNull();
+      }
+    });
+
+    /** @scenario "AC107d Templates library: a card previews the template's real board" */
+    it("sketches every other template's widget titles, with no image", () => {
+      openLibrary();
+
+      expect(sketched.length).toBeGreaterThan(0);
+      for (const { board, widgets } of sketched) {
+        const card = screen.getByRole("article", { name: board.name });
+        expect(card.querySelector("img"), board.id).toBeNull();
+        for (const { title } of widgets) {
+          const [shown] = within(card).getAllByText(title);
+          expect(shown?.closest("[aria-hidden='true']"), title).not.toBeNull();
+        }
+      }
+    });
+  });
+
+  describe("when the member clicks a card's labels", () => {
+    const VOICE = TEMPLATE_LIBRARY.find(({ agentKinds }) => agentKinds.includes("voice"))!;
+    const voice = AGENT_KIND_LABELS.voice;
+
+    /** @scenario "AC107e Templates library: a card's trunk and agent kind labels filter the library" */
+    it("writes the agent kind and the trunk into the address, as the chips do", async () => {
+      const user = userEvent.setup();
+      const { host } = openLibrary();
+      const card = screen.getByRole("article", { name: VOICE.board.name });
+
+      await user.click(within(card).getByRole("button", { name: `Filter by ${voice}` }));
+      expect(host.lastQuery).toMatchObject({ agent: "voice" });
+
+      await user.click(within(card).getByRole("button", { name: `Filter by ${VOICE.trunk}` }));
+      expect(host.lastQuery).toMatchObject({ trunk: VOICE.trunk });
+    });
+
+    /** @scenario "AC107e Templates library: a card's trunk and agent kind labels filter the library" */
+    it("shows a picked label as on, and clicking it again clears that chip", async () => {
+      const user = userEvent.setup();
+      const { host } = openLibrary({ query: { agent: "voice" } });
+      const card = screen.getByRole("article", { name: VOICE.board.name });
+      const label = within(card).getByRole("button", { name: `Filter by ${voice}` });
+
+      expect(label).toHaveAttribute("aria-pressed", "true");
+      label.focus();
+      await user.keyboard("{Enter}");
+
+      expect(host.lastQuery).toMatchObject({ agent: undefined });
     });
   });
 });

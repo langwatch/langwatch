@@ -4,23 +4,19 @@
  */
 
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-import {
-  NO_TEMPLATE_FILTERS,
-  templateFiltersFromQuery,
-  templateFiltersQuery,
-  type TemplateLibraryFilters,
-} from "../model/template-library.ts";
+import { type CatalogueFilters, NO_CATALOGUE_FILTERS } from "../model/catalogue-filter.ts";
+import { templateFiltersFromQuery, templateFiltersQuery } from "../model/template-library.ts";
 
 export function useTemplateLibraryFilters() {
   const host = useAnalyticsHost();
   const { query } = host.route();
   const filters = templateFiltersFromQuery(query);
-  const setFilters = (next: TemplateLibraryFilters) =>
+  const setFilters = (next: CatalogueFilters) =>
     host.setQuery(templateFiltersQuery({ query, filters: next }), { replace: true });
 
   return {
     filters,
     setFilters,
-    clearFilters: () => setFilters(NO_TEMPLATE_FILTERS),
+    clearFilters: () => setFilters(NO_CATALOGUE_FILTERS),
   };
 }

@@ -8,12 +8,11 @@ import { describe, expect, it } from "vitest";
 
 import { PICKER_SECTIONS } from "../catalogue/index.ts";
 import { boardPromptDraft, boardSubject } from "../langy/model/board-langy.ts";
-import { searchBlockQuestions } from "../model/block-questions.ts";
 import { BOARD_LWQL_VIEWS } from "../model/board-lwql-views.ts";
 import { addedWidgetSlots, boardWidgetsOf, duplicateSlot } from "../model/board-widgets.ts";
 
 const every = PICKER_SECTIONS.flatMap(({ questions }) => questions).filter(
-  ({ comingSoon }) => comingSoon !== true,
+  ({ status }) => status === "ready",
 );
 
 const PERIOD = {
@@ -66,19 +65,6 @@ describe("the picker's questions", () => {
 
     it("gives every question a unique id", () => {
       expect(new Set(every.map(({ id }) => id)).size).toBe(every.length);
-    });
-  });
-
-  describe("when the member searches", () => {
-    it("keeps only matching questions and drops sections left empty", () => {
-      const found = searchBlockQuestions({ sections: PICKER_SECTIONS, search: "slow" });
-      const matches = found.flatMap(({ title, questions }) =>
-        questions.map(({ question, why }) => `${question} ${why} ${title}`.toLowerCase()),
-      );
-
-      expect(found.every(({ questions }) => questions.length > 0)).toBe(true);
-      expect(matches.length).toBeGreaterThan(0);
-      expect(matches.every((text) => text.includes("slow"))).toBe(true);
     });
   });
 });

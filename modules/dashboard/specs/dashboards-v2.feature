@@ -647,6 +647,29 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And a coming-soon card says how many of its widgets are built and cannot create a board
 
   @integration
+  Scenario: AC107c Templates library: each card reads like the prototype's
+    Given the templates library
+    Then each card shows, in order: the name with its trunk badge, what the board is for,
+      a preview, the agent kinds it suits, then "Create board" with the number of widgets
+    And the trunk colour is on the badge and the section heading only, not across the card
+    And the cards sit two to a row, three on a wide screen
+    # Evidence: screenshot of the library beside the prototype's gallery
+
+  @unit @integration
+  Scenario: AC107d Templates library: a card previews the template's real board
+    Given a template with a captured image of its board
+    Then its preview shows that image from the top, faded at the bottom
+    And a template without an image shows its widgets' titles where they sit on the board
+    And the preview runs no query and cannot be focused
+
+  @integration
+  Scenario: AC107e Templates library: a card's trunk and agent kind labels filter the library
+    When the member clicks a card's trunk badge or one of its agent kind labels
+    Then that chip toggles, and the address carries it as when the chip is clicked
+    And a label whose chip is picked shows it is on
+    And each label is a button the keyboard reaches
+
+  @integration
   Scenario: AC107 Sidebar menu: each board offers its actions in the prototype's order
     Given a member opens the "⋮" menu of a board they may manage
     Then they see Set as default, Rename, Share, Duplicate, a separator and Delete, each with its icon
@@ -763,6 +786,71 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And duplicating it copies the prompt
 
   # ---------------------------------------------------------------------------
+  # Picker filters: the "Add a block" picker narrows like the templates library
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: AC130 Picker filters: the picker offers the library's chips under the search
+    Given the member opens the "Add a block" picker
+    Then under the search box are chips for each trunk, each agent kind, Ready and Coming soon, each with "All"
+    And each chip row stays on one line that scrolls sideways, so the list stays in view
+    And the picker keeps its width and its "Ask Langy" footer
+
+  @unit @integration
+  Scenario: AC131 Picker filters: chips narrow the widgets by trunk, agent kind and readiness
+    When the member picks chips in the picker
+    Then picking several chips in one group shows widgets matching any of them
+    And chips in different groups all apply together
+    And "All" clears that group
+    And a widget that names no agent kind suits every agent kind
+    # Decision: the picker and the templates library narrow with one shared catalogue filter
+
+  @unit @integration
+  Scenario: AC132 Picker filters: each chip counts the widgets it would show
+    Given the picker with a search or chips applied
+    Then each chip counts the widgets it would show with the search and the other groups applied
+    And the counts change as the member searches and picks chips
+
+  @unit
+  Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds
+    When the member types in the picker's search box
+    Then a widget matches on its question, its line, its Langy prompt, its branch or its agent kinds, ignoring case
+
+  @unit @integration
+  Scenario: AC134 Picker filters: sections are branches in trunk order, coloured by trunk
+    Given the picker
+    Then each branch of the question tree is a section, in trunk order: Profit, Growth, Protect, Foundation
+    And each section heading and each row's icon take the trunk's colour, as in the templates library
+    And built widgets come first in each section
+
+  @integration
+  Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt
+    Given the member narrowed the picker with a chip
+    When they pick a built widget
+    Then the picker closes and the widget is stored on the board
+    And Langy opens with the widget's prompt ready to send
+
+  @integration
+  Scenario: AC136 Picker filters: the filters reset when the picker closes
+    Given the member searched and picked chips in the picker
+    When they close the picker and open it again
+    Then the search is empty and every chip group is on "All"
+    And the address does not carry the picker's filters
+
+  @integration
+  Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters
+    Given a search and chips that match no widget
+    Then the picker says no question matches
+    And clearing the search and filters lists every widget again
+
+  @integration
+  Scenario: AC138 Picker filters: a row's trunk or agent kind label filters the picker
+    Given each picker row shows its trunk and the agent kinds it suits as labels
+    When the member clicks one
+    Then that chip in the picker toggles and the list narrows with it
+    And a label whose chip is picked shows it is on
+
+  # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
 
@@ -807,5 +895,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 100-106: "Templates library" → Scenario: AC100 Templates library: the sidebar opens the library; Scenario: AC100b Templates library: the library is behind the dashboards gate; Scenario: AC101 Templates library: every template is listed by trunk, ready ones first; Scenario: AC102 Templates library: search matches name, job, widget questions and agent kinds; Scenario: AC103 Templates library: filter chips narrow by trunk, agent kind and readiness; Scenario: AC104 Templates library: the search and filters are kept in the address; Scenario: AC105 Templates library: no match says so and offers to clear the filters; Scenario: AC106 Templates library: a ready template creates a board, a coming-soon one cannot
   # AC 110-113: "Widget description: the description moves from the stored code to an info tip on the card" → Scenario: AC110 Widget description: a built widget carries its description, not in its code; Scenario: AC111 Widget description: the card shows the description behind an info icon; Scenario: AC112 Widget description: a widget without a description has no info icon; Scenario: AC113 Widget description: the description is stored and kept when the code is edited
   # AC 114-116: "Widget fit: a short card keeps its empty face usable" → Scenario: AC114 Widget fit: the empty face fits a short card; Scenario: AC115 Widget fit: a widget is never shorter than its title and one-row empty face; Scenario: AC116 Widget fit: every built widget is at least the minimum height
+  # AC 107c-107e: "Templates library: cards like the prototype, with labels that filter" → Scenario: AC107c Templates library: each card reads like the prototype's; Scenario: AC107d Templates library: a card previews the template's real board; Scenario: AC107e Templates library: a card's trunk and agent kind labels filter the library
   # AC 107-109b: "Sidebar menu" → Scenario: AC107 Sidebar menu: each board offers its actions in the prototype's order; Scenario: AC107b Sidebar menu: a board the member cannot manage offers only what they may use; Scenario: AC108 Sidebar menu: Share changes who sees the board; Scenario: AC109 Sidebar menu: Duplicate copies the board and its widgets; Scenario: AC109b Sidebar menu: Set as default picks the board the area opens on
   # AC 120-123: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate
+  # AC 130-138: "Picker filters: the 'Add a block' picker narrows like the templates library" → Scenario: AC130 Picker filters: the picker offers the library's chips under the search; Scenario: AC131 Picker filters: chips narrow the widgets by trunk, agent kind and readiness; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: sections are branches in trunk order, coloured by trunk; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row's trunk or agent kind label filters the picker

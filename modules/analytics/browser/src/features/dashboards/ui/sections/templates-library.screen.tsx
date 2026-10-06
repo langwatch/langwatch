@@ -19,35 +19,45 @@ import { useId } from "react";
 import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useTemplateLibraryFilters } from "../../behavior/use-template-library-filters.ts";
-import { AGENT_KIND_LABELS, AGENT_KINDS, TRUNKS } from "../../catalogue/index.ts";
 import {
-  filterTemplates,
+  type CatalogueFilterPick,
+  type CatalogueFilters,
+  catalogueChipCounts,
+  filterCatalogue,
+  toggleCatalogueFilter,
+} from "../../model/catalogue-filter.ts";
+import {
   type LibraryTemplate,
   TEMPLATE_LIBRARY,
-  TEMPLATE_STATUS_LABELS,
-  TEMPLATE_STATUSES,
-  templateChipCounts,
   type TemplateSection,
   templateSections,
 } from "../../model/template-library.ts";
-import { TemplateCard, TRUNK_ICONS, TRUNK_PALETTES } from "../blocks/template-card.tsx";
-import { TemplateFilterChips } from "../blocks/template-filter-chips.tsx";
+import {
+  CatalogueFilterChips,
+  TRUNK_ICONS,
+  TRUNK_PALETTES,
+} from "../blocks/catalogue-filter-chips.tsx";
+import { TemplateCard } from "../blocks/template-card.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 
 function TrunkSection({
   section,
   creatingId,
   onCreate,
+  filters,
+  onFilter,
 }: {
   section: TemplateSection;
   creatingId: string | undefined;
   onCreate: (template: LibraryTemplate) => void;
+  filters: CatalogueFilters;
+  onFilter: (pick: CatalogueFilterPick) => void;
 }) {
   const headingId = useId();
-  const Icon = TRUNK_ICONS[section.trunk];
+  const Icon = TRUNK_ICONS[section.key];
   return (
     <VStack as="section" aria-labelledby={headingId} align="stretch" gap={3}>
-      <HStack gap={2} colorPalette={TRUNK_PALETTES[section.trunk]} color="colorPalette.fg">
+      <HStack gap={2} colorPalette={TRUNK_PALETTES[section.key]} color="colorPalette.fg">
         <Icon size={15} strokeWidth={2.1} aria-hidden />
         <Heading
           as="h2"
@@ -56,19 +66,21 @@ function TrunkSection({
           fontWeight="semibold"
           color="colorPalette.fg"
         >
-          {section.trunk}
+          {section.key}
         </Heading>
         <Text fontSize="12px" color="fg.subtle">
-          {section.templates.length}
+          {section.items.length}
         </Text>
       </HStack>
-      <Grid templateColumns="repeat(auto-fill, minmax(280px, 1fr))" gap={4}>
-        {section.templates.map((template) => (
+      <Grid templateColumns={{ base: "repeat(2, 1fr)", xl: "repeat(3, 1fr)" }} gap={4}>
+        {section.items.map((template) => (
           <TemplateCard
             key={template.board.id}
             template={template}
             isCreating={creatingId === template.board.id}
             onCreate={() => onCreate(template)}
+            filters={filters}
+            onFilter={onFilter}
           />
         ))}
       </Grid>
@@ -80,8 +92,8 @@ function TemplatesLibrary() {
   const { filters, setFilters, clearFilters } = useTemplateLibraryFilters();
   const saved = useSavedDashboards();
   const fromTemplate = useBoardFromTemplate();
-  const shown = filterTemplates({ templates: TEMPLATE_LIBRARY, filters });
-  const counts = templateChipCounts({ templates: TEMPLATE_LIBRARY, filters });
+  const shown = filterCatalogue({ items: TEMPLATE_LIBRARY, filters });
+  const counts = catalogueChipCounts({ items: TEMPLATE_LIBRARY, filters });
   const create = ({ board }: LibraryTemplate) =>
     void fromTemplate.createFromTemplate({
       template: board,
@@ -117,40 +129,7 @@ function TemplatesLibrary() {
             onChange={(event) => setFilters({ ...filters, search: event.target.value })}
           />
         </Box>
-        <TemplateFilterChips
-          groupLabel="Filter by trunk"
-          allCount={counts.trunks.all}
-          picked={filters.trunks}
-          onChange={(trunks) => setFilters({ ...filters, trunks })}
-          chips={TRUNKS.map((trunk) => ({
-            value: trunk,
-            label: trunk,
-            count: counts.trunks.byValue[trunk],
-            colorPalette: TRUNK_PALETTES[trunk],
-          }))}
-        />
-        <TemplateFilterChips
-          groupLabel="Filter by agent kind"
-          allCount={counts.agentKinds.all}
-          picked={filters.agentKinds}
-          onChange={(agentKinds) => setFilters({ ...filters, agentKinds })}
-          chips={AGENT_KINDS.map((kind) => ({
-            value: kind,
-            label: AGENT_KIND_LABELS[kind],
-            count: counts.agentKinds.byValue[kind],
-          }))}
-        />
-        <TemplateFilterChips
-          groupLabel="Filter by readiness"
-          allCount={counts.statuses.all}
-          picked={filters.statuses}
-          onChange={(statuses) => setFilters({ ...filters, statuses })}
-          chips={TEMPLATE_STATUSES.map((status) => ({
-            value: status,
-            label: TEMPLATE_STATUS_LABELS[status],
-            count: counts.statuses.byValue[status],
-          }))}
-        />
+        <CatalogueFilterChips filters={filters} counts={counts} onChange={setFilters} />
       </VStack>
       {shown.length === 0 ? (
         <VStack align="start" gap={2} paddingY={8}>
@@ -164,10 +143,12 @@ function TemplatesLibrary() {
       ) : (
         templateSections({ templates: shown }).map((section) => (
           <TrunkSection
-            key={section.trunk}
+            key={section.key}
             section={section}
             creatingId={fromTemplate.creatingId}
             onCreate={create}
+            filters={filters}
+            onFilter={(pick) => setFilters(toggleCatalogueFilter({ filters, pick }))}
           />
         ))
       )}

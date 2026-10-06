@@ -1,11 +1,11 @@
 /**
- * The "Add a block" picker: every catalogue widget with code, grouped by the question tree.
- * Choosing one adds it to the board, then, when Langy is available, drafts its prompt in
- * Langy to send. A pinned footer asks Langy anything else.
+ * The "Add a block" picker: every catalogue widget, narrowed by the templates library's search
+ * and chips (kept only while open), in branch sections coloured by trunk. Choosing one adds it,
+ * then drafts its prompt in Langy when available. A pinned footer asks Langy anything else.
  */
 
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import {
   Activity,
@@ -26,20 +26,35 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 
-import { PICKER_SECTIONS } from "../../catalogue/index.ts";
+import {
+  AGENT_KIND_LABELS,
+  PICKER_QUESTIONS,
+  type PickerQuestion,
+  type PickerSection,
+  pickerSections,
+} from "../../catalogue/index.ts";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import {
   type BoardSubject,
   boardPromptDraft,
   boardQuestion,
 } from "../../langy/model/board-langy.ts";
-import {
-  type BlockQuestion,
-  type BlockQuestionIcon,
-  type BlockQuestionSection,
-  searchBlockQuestions,
-} from "../../model/block-questions.ts";
+import type { BlockQuestion, BlockQuestionIcon } from "../../model/block-questions.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
+import {
+  type CatalogueFilterPick,
+  type CatalogueFilters,
+  catalogueChipCounts,
+  filterCatalogue,
+  isPicked,
+  NO_CATALOGUE_FILTERS,
+  toggleCatalogueFilter,
+} from "../../model/catalogue-filter.ts";
+import {
+  CatalogueFilterChips,
+  CatalogueFilterLabel,
+  TRUNK_PALETTES,
+} from "../blocks/catalogue-filter-chips.tsx";
 
 const QUESTION_ICONS: Readonly<Record<BlockQuestionIcon, LucideIcon>> = {
   gauge: Gauge,
@@ -71,11 +86,13 @@ export function BlockPickerDialog({
   onClose: () => void;
 }) {
   const langy = useLangyAsk();
-  const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<CatalogueFilters>(NO_CATALOGUE_FILTERS);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const sections = searchBlockQuestions({ sections: PICKER_SECTIONS, search });
-  const typed = search.trim();
+  const shown = filterCatalogue({ items: PICKER_QUESTIONS, filters });
+  const counts = catalogueChipCounts({ items: PICKER_QUESTIONS, filters });
+  const sections = pickerSections({ questions: shown });
+  const typed = filters.search.trim();
   const hasMatches = sections.length > 0;
   const canAskOnEnter = langy.enabled && !hasMatches && typed.length > 0;
 
@@ -88,7 +105,7 @@ export function BlockPickerDialog({
     onClose();
   };
 
-  const choose = (question: BlockQuestion) => void addBlock(question);
+  const choose = (question: PickerQuestion) => void addBlock(question);
 
   const askLangy = (text: string) => {
     const question = text.trim() === "" ? "Help me build a dashboard" : text;
@@ -110,7 +127,7 @@ export function BlockPickerDialog({
           </Dialog.Title>
           <Dialog.CloseTrigger />
         </Dialog.Header>
-        <VStack align="stretch" gap={3} paddingX={5} paddingY={5} borderBottomWidth="1px">
+        <VStack align="stretch" gap={3} paddingX={5} paddingY={4} borderBottomWidth="1px">
           <SearchInput
             ref={searchRef}
             aria-label="Search questions"
@@ -118,27 +135,43 @@ export function BlockPickerDialog({
             height="54px"
             borderRadius="2xl"
             fontSize="15px"
-            boxShadow="0 1px 4px rgb(16 16 32 / 0.06)"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            boxShadow="xs"
+            value={filters.search}
+            onChange={(event) => setFilters({ ...filters, search: event.target.value })}
             onKeyDown={(event) => {
               if (event.key !== "Enter" || !canAskOnEnter) return;
               event.preventDefault();
               askLangy(typed);
             }}
           />
+          <CatalogueFilterChips compact filters={filters} counts={counts} onChange={setFilters} />
         </VStack>
         <Dialog.Body overflowY="auto" paddingY={5}>
           <VStack align="stretch" gap={6}>
             {sections.map((section) => (
-              <QuestionSection key={section.id} section={section} onChoose={choose} />
+              <QuestionSection
+                key={section.id}
+                section={section}
+                filters={filters}
+                onFilter={(pick) => setFilters(toggleCatalogueFilter({ filters, pick }))}
+                onChoose={choose}
+              />
             ))}
             {!hasMatches && (
-              <Text fontSize="13px" color="fg.muted">
-                {langy.enabled
-                  ? "No matching questions. Ask Langy below."
-                  : "No matching questions."}
-              </Text>
+              <VStack align="start" gap={2}>
+                <Text fontSize="13px" color="fg.muted">
+                  {langy.enabled
+                    ? "No matching questions. Ask Langy below."
+                    : "No matching questions."}
+                </Text>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => setFilters(NO_CATALOGUE_FILTERS)}
+                >
+                  Clear search and filters
+                </Button>
+              </VStack>
             )}
           </VStack>
         </Dialog.Body>
@@ -188,7 +221,7 @@ export function BlockPickerDialog({
                 gradientTo="pink.600"
                 color="white"
                 _hover={{ opacity: 0.9 }}
-                onClick={() => askLangy(search)}
+                onClick={() => askLangy(filters.search)}
               >
                 Ask Langy
               </Button>
@@ -208,7 +241,8 @@ function SectionHeading({ title, why, palette }: { title: string; why: string; p
         fontWeight="semibold"
         letterSpacing="0.09em"
         textTransform="uppercase"
-        color={`${palette}.fg`}
+        colorPalette={palette}
+        color="colorPalette.fg"
       >
         {title}
       </Text>
@@ -221,103 +255,138 @@ function SectionHeading({ title, why, palette }: { title: string; why: string; p
 
 function QuestionSection({
   section,
+  filters,
+  onFilter,
   onChoose,
 }: {
-  section: BlockQuestionSection;
-  onChoose: (question: BlockQuestion) => void;
+  section: PickerSection;
+  filters: CatalogueFilters;
+  onFilter: (pick: CatalogueFilterPick) => void;
+  onChoose: (question: PickerQuestion) => void;
 }) {
+  const palette = TRUNK_PALETTES[section.trunk];
   return (
-    <VStack as="section" aria-label={section.title} align="stretch" gap={1.5}>
-      <SectionHeading title={section.title} why={section.why} palette={section.palette} />
+    <VStack
+      as="section"
+      aria-label={section.title}
+      data-trunk={section.trunk}
+      align="stretch"
+      gap={1.5}
+    >
+      <SectionHeading title={section.title} why={section.why} palette={palette} />
       {section.questions.map((question) => (
         <PickerRow
           key={question.id}
-          title={question.question}
-          detail={question.why}
-          icon={QUESTION_ICONS[question.icon]}
-          palette={section.palette}
-          disabled={question.comingSoon === true}
-          badge={question.comingSoon ? "Coming soon" : void 0}
-          onClick={() => onChoose(question)}
+          question={question}
+          palette={palette}
+          filters={filters}
+          onFilter={onFilter}
+          onChoose={() => onChoose(question)}
         />
       ))}
     </VStack>
   );
 }
 
+/** A row: the button that adds the widget, then its trunk and agent kind labels that filter. */
 function PickerRow({
-  title,
-  detail,
-  icon: Icon,
+  question,
   palette,
-  disabled = false,
-  badge,
-  onClick,
+  filters,
+  onFilter,
+  onChoose,
 }: {
-  title: string;
-  detail: string;
-  icon: LucideIcon;
+  question: PickerQuestion;
+  /** The trunk's design-system palette, tinting the icon and the trunk label. */
   palette: string;
-  disabled?: boolean;
-  /** A short status shown at the end of the row, such as "Coming soon". */
-  badge?: string;
-  onClick: () => void;
+  filters: CatalogueFilters;
+  onFilter: (pick: CatalogueFilterPick) => void;
+  onChoose: () => void;
 }) {
+  const Icon = QUESTION_ICONS[question.icon];
+  const comingSoon = question.status === "coming-soon";
+  const label = (pick: CatalogueFilterPick) => ({
+    isActive: isPicked({ filters, pick }),
+    onToggle: () => onFilter(pick),
+  });
   return (
-    <Button
-      variant="outline"
-      height="auto"
-      justifyContent="flex-start"
-      gap={3}
-      paddingX={4}
-      paddingY={3}
+    <VStack
+      align="stretch"
+      gap={0}
+      borderWidth="1px"
       borderRadius="xl"
       borderColor="border"
       background="bg.panel"
-      boxShadow="0 1px 2px rgb(16 16 32 / 0.03)"
-      fontWeight="normal"
-      _hover={{
-        borderColor: "teal.solid/50",
-        background: "bg.panel",
-        boxShadow: "0 2px 8px rgb(16 16 32 / 0.06)",
-      }}
-      disabled={disabled}
-      onClick={onClick}
+      boxShadow="xs"
+      _hover={{ borderColor: "teal.solid/50", boxShadow: "sm" }}
     >
-      <Box
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        boxSize={8}
-        borderRadius="md"
-        background={`${palette}.subtle`}
-        color={`${palette}.fg`}
-        flexShrink={0}
+      <Button
+        variant="plain"
+        height="auto"
+        justifyContent="flex-start"
+        gap={3}
+        paddingX={4}
+        paddingTop={3}
+        paddingBottom={1.5}
+        fontWeight="normal"
+        disabled={comingSoon}
+        onClick={onChoose}
       >
-        <Icon size={16} strokeWidth={2.1} aria-hidden />
-      </Box>
-      <VStack align="stretch" gap={0} minWidth={0} flex={1} textAlign="start">
-        <Text fontSize="13px" lineHeight="1.375" fontWeight="medium" color="fg" truncate>
-          {title}
-        </Text>
-        <Text fontSize="12px" lineHeight="1.625" color="fg.subtle" truncate>
-          {detail}
-        </Text>
-      </VStack>
-      {badge !== void 0 && (
-        <Text
+        <Box
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          boxSize={8}
+          borderRadius="md"
+          colorPalette={palette}
+          background="colorPalette.subtle"
+          color="colorPalette.fg"
           flexShrink={0}
-          fontSize="11px"
-          fontWeight="medium"
-          color="fg.muted"
-          background="bg.muted"
-          borderRadius="full"
-          paddingX={2}
-          paddingY={0.5}
         >
-          {badge}
-        </Text>
-      )}
-    </Button>
+          <Icon size={16} strokeWidth={2.1} aria-hidden />
+        </Box>
+        <VStack align="stretch" gap={0} minWidth={0} flex={1} textAlign="start">
+          <Text fontSize="13px" lineHeight="1.375" fontWeight="medium" color="fg" truncate>
+            {question.question}
+          </Text>
+          <Text fontSize="12px" lineHeight="1.625" color="fg.subtle" truncate>
+            {question.why}
+          </Text>
+        </VStack>
+        {comingSoon && (
+          <Text
+            flexShrink={0}
+            fontSize="11px"
+            fontWeight="medium"
+            color="fg.muted"
+            background="bg.muted"
+            borderRadius="full"
+            paddingX={2}
+            paddingY={0.5}
+          >
+            Coming soon
+          </Text>
+        )}
+      </Button>
+      {/* Lined up under the question text: the row's padding, the icon and the gap. */}
+      <HStack gap={1} wrap="wrap" paddingStart={15} paddingEnd={4} paddingBottom={3}>
+        <CatalogueFilterLabel
+          label={question.trunk}
+          colorPalette={palette}
+          {...label({ group: "trunks", value: question.trunk })}
+        />
+        {question.agentKinds.length === 0 ? (
+          <CatalogueFilterLabel label="Any agent" />
+        ) : (
+          question.agentKinds.map((kind) => (
+            <CatalogueFilterLabel
+              key={kind}
+              label={AGENT_KIND_LABELS[kind]}
+              {...label({ group: "agentKinds", value: kind })}
+            />
+          ))
+        )}
+      </HStack>
+    </VStack>
   );
 }

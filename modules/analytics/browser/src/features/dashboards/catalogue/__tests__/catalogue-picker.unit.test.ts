@@ -28,7 +28,7 @@ describe("given the catalogue picker", () => {
   /** @scenario "AC17 Every widget and template is listed, coming soon until it is built" */
   it("marks a widget coming soon exactly when it has no code", () => {
     expect(built.size).toBeGreaterThan(0);
-    for (const { id, comingSoon } of listed) expect(comingSoon === true, id).toBe(!built.has(id));
+    for (const { id, status } of listed) expect(status === "coming-soon", id).toBe(!built.has(id));
   });
 
   /** @scenario "AC16 The picker offers every catalogue widget that has code, grouped by the question tree" */
@@ -57,7 +57,7 @@ describe("given the catalogue picker", () => {
 
   /** @scenario "AC16 The picker offers every catalogue widget that has code, grouped by the question tree" */
   it("stores a picked built widget under the question it answers", () => {
-    for (const { id, question } of listed.filter(({ comingSoon }) => !comingSoon)) {
+    for (const { id, question } of listed.filter(({ status }) => status === "ready")) {
       const [stored, ...rest] = pickerWidgets(id);
       expect(rest, id).toEqual([]);
       expect(stored?.name, id).toBe(question);
