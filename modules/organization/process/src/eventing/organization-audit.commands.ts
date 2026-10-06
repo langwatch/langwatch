@@ -7,10 +7,10 @@ import {
 } from "@langwatch/organization-contract";
 import { z } from "zod";
 
-import { ORGANIZATION_AGGREGATE_TYPE } from "./organization-lifecycle.events.ts";
-
 /** Organization's audit facts; audit-log writes its rows from its own side (Alex, 2026-10-06). */
 export const ORGANIZATION_AUDIT_PIPELINE_NAME = "organization_audit" as const;
+/** Its own stream type: `organization` belongs to the lifecycle pipeline, one owner per type. */
+export const ORGANIZATION_AUDIT_AGGREGATE_TYPE = "organization_audit" as const;
 
 export const RECORD_AUDIT_COMMAND_TYPE = "lw.organization.record_audit" as const;
 
@@ -40,7 +40,7 @@ export class RecordAuditCommand implements CommandHandler<
     const data = command.data;
     return [
       EventUtils.createEvent<OrganizationAuditRecordedEvent>({
-        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateType: ORGANIZATION_AUDIT_AGGREGATE_TYPE,
         aggregateId: RecordAuditCommand.getAggregateId(data),
         tenantId: createTenantId(command.tenantId),
         type: ORGANIZATION_AUDIT_RECORDED_EVENT_TYPE,

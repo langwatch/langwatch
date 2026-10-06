@@ -31,7 +31,7 @@ import { buildAuditLogPipeline } from "../audit-log.pipeline.ts";
 function organizationStandIn() {
   return definePipeline({
     name: "organization_stand_in",
-    aggregate: defineAggregate({ type: "organization" }),
+    aggregate: defineAggregate({ type: "organization_audit" }),
   })
     .withEvents([
       z.object({
@@ -64,7 +64,7 @@ function harness() {
         {
           id,
           aggregateId: fact.tenantId,
-          aggregateType: "organization",
+          aggregateType: "organization_audit",
           tenantId: createTenantId(fact.tenantId),
           type: ORGANIZATION_AUDIT_RECORDED_EVENT_TYPE,
           version: ORGANIZATION_AUDIT_RECORDED_EVENT_VERSION,

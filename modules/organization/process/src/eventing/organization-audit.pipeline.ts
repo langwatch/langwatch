@@ -19,6 +19,7 @@ import {
   ORGANIZATION_AUDIT_RECORD_INTENT,
 } from "../rules/organization-audit.rules.ts";
 import {
+  ORGANIZATION_AUDIT_AGGREGATE_TYPE,
   ORGANIZATION_AUDIT_PIPELINE_NAME,
   RecordAuditCommand,
   organizationAuditRecordedEventSchema,
@@ -37,7 +38,6 @@ import {
   organizationAuditPruneWake,
   organizationAuditStateSchema,
 } from "./organization-audit.process.ts";
-import { ORGANIZATION_AGGREGATE_TYPE } from "./organization-lifecycle.events.ts";
 
 function auditPipeline(deps: {
   sender: () => OrganizationAuditSender | undefined;
@@ -45,7 +45,7 @@ function auditPipeline(deps: {
 }) {
   return definePipeline({
     name: ORGANIZATION_AUDIT_PIPELINE_NAME,
-    aggregate: defineAggregate({ type: ORGANIZATION_AGGREGATE_TYPE }),
+    aggregate: defineAggregate({ type: ORGANIZATION_AUDIT_AGGREGATE_TYPE }),
   })
     .withEvents([organizationAuditRecordedEventSchema])
     .withCommand("recordAudit", RecordAuditCommand)
