@@ -1,6 +1,6 @@
 # Generated READMEs: one page per app, module, half and package
 
-Date: 2026-10-06. Status: proposal, waiting on Alex's answers to section 9.
+Date: 2026-10-06. Status: ruled (section 9); building.
 
 ## 1. What and why
 
@@ -496,9 +496,9 @@ About 10 to 14 lane-days; R1 and R2 first, then R3 to R6 in parallel lanes.
 - **Ownership gaps.** Prisma claims name 48 of 169 models today. The page shows the rest as
   "accessed, not claimed"; making every model claimed is a follow-up the pages make visible.
 
-## 9. Questions for Alex
+## 9. Rulings (Alex, 2026-10-06)
 
-- Q1. Enterprise modules get the same three pages as core (`enterprise/modules/<id>/{,process,browser}`)?
-- Q2. Contract and client halves: no page of their own (printed on the process page), or a page each?
-- Q3. Go plus an embedded TypeScript extractor (recommended), or Go only with tree-sitter (cgo, lower fidelity)?
-- Q4. Existing hand-written READMEs: keep above the marker and trim, or replace?
+- Q1. Enterprise modules get the same three pages as core, plus the entitlement gate per route.
+- Q2. Contract and client halves get no page of their own; the contract is printed on the process page.
+- Q3. Go plus an embedded TypeScript extractor.
+- Q4. Existing hand-written READMEs are replaced: a fresh one-paragraph description above the generated block; anything worth keeping moves to the module's ADRs.
