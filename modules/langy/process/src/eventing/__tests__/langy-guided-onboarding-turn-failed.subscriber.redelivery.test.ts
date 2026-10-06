@@ -1,50 +1,60 @@
 /**
- * A redelivered turn failure is tracked with the same event uuid as the first delivery, so the
- * analytics sink, which dedups on it, records one guided_onboarding_turn_failed.
+ * A redelivered turn failure is recorded under the same source event id as the first delivery,
+ * and the fact's command keys on it, so langy keeps one guided_onboarding_turn_failed fact.
  * @see specs/analytics/posthog-guided-onboarding.feature
  */
 import type { EventSubscriberContext } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
+import type { GuidedOnboardingTurnFailedEventData } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
 import { createGuidedOnboardingTurnFailedSubscriber } from "../langy-guided-onboarding-turn-failed.subscriber.ts";
+import { RecordGuidedOnboardingTurnFailedCommand } from "../langy-guided-onboarding.commands.ts";
 import { agentResponseFailedEvent, CONVERSATION_ID, PROJECT_ID, T0 } from "./langyEventFixtures.ts";
 
 const context: EventSubscriberContext = { tenantId: PROJECT_ID, aggregateId: CONVERSATION_ID };
 
-function subscriberTracking(uuids: string[]) {
+function subscriberRecording(recorded: GuidedOnboardingTurnFailedEventData[]) {
   return createGuidedOnboardingTurnFailedSubscriber({
     guidedOnboarding: {
       getByProject: async () => ({
         organizationId: "org-1",
         conversationId: CONVERSATION_ID,
         currentPath: "gateway",
-        experimentProperties: {},
+        variant: null,
       }),
     },
     conversations: { getById: async () => ({ ownerUserId: "user-1" }) },
-    analytics: { track: ({ uuid }) => void uuids.push(uuid) },
+    facts: { recordTurnFailed: async (data) => void recorded.push(data) },
   });
 }
 
+function keyOf(data: GuidedOnboardingTurnFailedEventData): string | undefined {
+  const [event] = new RecordGuidedOnboardingTurnFailedCommand().handle({
+    tenantId: createTenantId(PROJECT_ID),
+    aggregateId: data.conversationId,
+    type: "lw.langy_guided_onboarding.record_turn_failed",
+    data,
+  });
+  return event?.idempotencyKey;
+}
+
 describe("createGuidedOnboardingTurnFailedSubscriber redelivery", () => {
-  it("tracks both deliveries of one failure under the same event uuid", async () => {
-    const uuids: string[] = [];
-    const subscriber = subscriberTracking(uuids);
+  it("records both deliveries of one failure under one fact key", async () => {
+    const recorded: GuidedOnboardingTurnFailedEventData[] = [];
+    const subscriber = subscriberRecording(recorded);
     const failed = agentResponseFailedEvent({ id: "evt_failed", occurredAt: T0, turnId: "turn-1" });
 
     await subscriber.handle(failed, context);
     await subscriber.handle(failed, context);
 
-    expect(uuids).toHaveLength(2);
-    expect(new Set(uuids).size).toBe(1);
-    expect(uuids[0]).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
-    );
+    expect(recorded).toHaveLength(2);
+    expect(new Set(recorded.map(keyOf)).size).toBe(1);
   });
 
-  it("tracks a different failure under a different uuid", async () => {
-    const uuids: string[] = [];
-    const subscriber = subscriberTracking(uuids);
+  it("records a different failure under a different fact key", async () => {
+    const recorded: GuidedOnboardingTurnFailedEventData[] = [];
+    const subscriber = subscriberRecording(recorded);
 
     await subscriber.handle(
       agentResponseFailedEvent({ id: "evt_one", occurredAt: T0, turnId: "turn-1" }),
@@ -55,6 +65,6 @@ describe("createGuidedOnboardingTurnFailedSubscriber redelivery", () => {
       context,
     );
 
-    expect(new Set(uuids).size).toBe(2);
+    expect(new Set(recorded.map(keyOf)).size).toBe(2);
   });
 });

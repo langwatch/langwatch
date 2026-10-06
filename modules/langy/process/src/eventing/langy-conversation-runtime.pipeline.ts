@@ -34,7 +34,7 @@ import {
 } from "./langy-conversation.subscriber.ts";
 import {
   createGuidedOnboardingTurnFailedSubscriber,
-  type GuidedOnboardingAnalytics,
+  type GuidedOnboardingFacts,
   type GuidedOnboardingReader,
 } from "./langy-guided-onboarding-turn-failed.subscriber.ts";
 import {
@@ -88,8 +88,8 @@ export interface EventingLangyConversationAdapterOptions {
   sessionKeys: Pick<LangySessionKeyService, "mintForUser" | "revoke">;
   /** The folder's owed connect turn (ADR-129); presence is read at handle time. */
   localConnectTurn: { presence: () => LocalConnectTurnPresence; turns: ControlTurnStarter };
-  /** Onboarding's answer for a project, and the sink its failed turns are tracked to. */
-  guidedOnboarding: { reader: GuidedOnboardingReader; analytics: GuidedOnboardingAnalytics };
+  /** Onboarding's answer for a project, and where its failed turns are recorded as facts. */
+  guidedOnboarding: { reader: GuidedOnboardingReader; facts: GuidedOnboardingFacts };
   /** Who a notification goes to and whether they want it, and notification's Web Push. */
   webPush: Pick<LangyWebPushSubscriberDeps, "users" | "projects" | "notifications">;
 }
@@ -191,7 +191,7 @@ export class EventingLangyConversationAdapter {
     const guidedOnboardingTurnFailedSubscriber = createGuidedOnboardingTurnFailedSubscriber({
       guidedOnboarding: options.guidedOnboarding.reader,
       conversations: conversationReader,
-      analytics: options.guidedOnboarding.analytics,
+      facts: options.guidedOnboarding.facts,
     });
     const localConnectTurnSubscriber = createLocalConnectTurnSubscriber({
       presence: options.localConnectTurn.presence,

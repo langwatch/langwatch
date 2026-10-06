@@ -1,9 +1,12 @@
+import { createHash } from "node:crypto";
+
 import type {
   CioBatchCall,
   CioEventName,
   CioOrgTraits,
   CioPersonTraits,
 } from "@langwatch/enterprise-nurturing-contract";
+import type { GuidedOnboardingTurnFailedEventData } from "@langwatch/langy-contract";
 import {
   onboardingExperimentProperties,
   type GuidedOnboardingState,
@@ -273,6 +276,42 @@ export function fireGuidedOnboardingPostHog({
         onboarding_paths: paths,
         onboarding_primary_path: paths[0],
       },
+    },
+  };
+}
+
+/** The same for every delivery of one source event, so PostHog keeps exactly one of them. */
+function postHogUuidFor(sourceEventId: string): string {
+  const hex = createHash("sha256").update(`nurturing-guided-turn:${sourceEventId}`).digest("hex");
+  const variant = ((Number.parseInt(hex.charAt(16), 16) & 0x3) | 0x8).toString(16);
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    `5${hex.slice(13, 16)}`,
+    `${variant}${hex.slice(17, 20)}`,
+    hex.slice(20, 32),
+  ].join("-");
+}
+
+/** The PostHog event a failed turn of the guided conversation is tracked as, against its owner. */
+export function fireGuidedTurnFailedPostHog(data: GuidedOnboardingTurnFailedEventData): {
+  userId: string;
+  event: string;
+  properties: Record<string, unknown>;
+  uuid: string;
+} {
+  return {
+    userId: data.userId,
+    event: "guided_onboarding_turn_failed",
+    uuid: postHogUuidFor(data.sourceEventId),
+    properties: {
+      code: data.code,
+      path: data.path,
+      conversation_id: data.conversationId,
+      turn_id: data.turnId,
+      organization_id: data.organizationId,
+      ...onboardingExperimentProperties(data.onboardingVariant),
+      projectId: data.tenantId,
     },
   };
 }

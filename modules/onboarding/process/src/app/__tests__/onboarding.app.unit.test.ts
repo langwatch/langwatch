@@ -17,7 +17,6 @@ import {
   type GuidedOnboardingRecord,
   type OrganizationInitialized,
 } from "@langwatch/onboarding-contract";
-import type { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
@@ -75,7 +74,6 @@ function buildApp(
           { userId: "user_admin", name: "Ada", email: "ada@acme.test" },
         ],
       }),
-      ops: createApiFixture<OpsApi>({ findProductAnalyticsTargets: () => [] }),
       gateway: createApiFixture<GatewayApi>({
         getDeploymentAddresses: () => ({
           baseUrl: void 0,

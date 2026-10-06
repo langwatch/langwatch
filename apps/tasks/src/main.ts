@@ -32,6 +32,7 @@ const tasks = new Map<string, () => Promise<TaskRun>>([
     async () => (await import("./system-migrations-pass.ts")).systemMigrationsPass,
   ],
   ["storage-seed", async () => (await import("./storage-seed/storage-seed.ts")).storageSeed],
+  ["upgrade-ledger-seed", async () => (await import("./upgrade-ledger-seed.ts")).upgradeLedgerSeed],
 ]);
 
 /** Tasks that never touch the migration database, so never wait on its advisory lock. */

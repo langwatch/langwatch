@@ -3,6 +3,7 @@ import { defineProcessModule } from "@langwatch/process";
 
 import { LangyModule } from "./app/langy.app.ts";
 import { langyConversationEventing } from "./eventing/langy-conversation.pipeline.ts";
+import { langyGuidedOnboardingEventing } from "./eventing/langy-guided-onboarding.pipeline.ts";
 import { langyMaintenanceEventing } from "./eventing/langy-maintenance.pipeline.ts";
 import { langyRepositories } from "./repositories/langy-repositories.registry.ts";
 import { langyInternalRest } from "./transport/langy-internal.rest.ts";
@@ -47,4 +48,5 @@ export const langyProcessModule = defineProcessModule("langy")
     ];
   })
   .withEventing(langyConversationEventing)
+  .withEventing(langyGuidedOnboardingEventing)
   .withEventing(langyMaintenanceEventing);

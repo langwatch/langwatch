@@ -45,3 +45,4 @@ export * from "./langy.local-notices.ts";
 export * from "./langy.config.ts";
 export * from "./langy.trpc.ts";
 export * from "./langy-notifications.ts";
+export * from "./langy-guided-onboarding-events.ts";

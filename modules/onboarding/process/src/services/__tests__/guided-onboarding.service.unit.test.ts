@@ -9,7 +9,6 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { MemoryPostHogEventsChannel } from "../../channels/memory/memory.posthog-events.channel.ts";
 import {
   GuidedOnboardingService,
   type GuidedOnboardingAnnouncer,
@@ -18,7 +17,6 @@ import {
 function createService(): GuidedOnboardingService {
   return GuidedOnboardingService.create({
     organizations: createApiFixture<OrganizationApi>({}),
-    events: MemoryPostHogEventsChannel.create(),
     announce: async () => {},
   });
 }
@@ -94,7 +92,6 @@ describe("GuidedOnboardingService path guards", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
 
@@ -117,7 +114,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
 
@@ -137,7 +133,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
 
@@ -157,7 +152,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     const announced = collectAnnouncements();
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: announced.announce,
     });
 
@@ -181,7 +175,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
     const actor = { organizationId: "org_1", userId: "user_1" };
@@ -204,7 +197,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
 
@@ -224,7 +216,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
 
@@ -247,7 +238,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
     const actor = { organizationId: "org_1", userId: "user_1" };
@@ -266,7 +256,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: async () => {},
     });
 
@@ -284,11 +273,9 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     const { api } = createOrganizations({
       org_1: { state: { paths: [], donePaths: [] }, variant: "guided" },
     });
-    const events = MemoryPostHogEventsChannel.create();
     const announced = collectAnnouncements();
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events,
       announce: announced.announce,
     });
 
@@ -305,7 +292,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
       previousPaths: [],
       state: { paths: ["gateway", "llmops"] },
     });
-    expect(events.tracked).toEqual([]);
   });
 
   /** @scenario "attaching a conversation tracks nothing" */
@@ -316,7 +302,6 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     const announced = collectAnnouncements();
     const service = GuidedOnboardingService.create({
       organizations: api,
-      events: MemoryPostHogEventsChannel.create(),
       announce: announced.announce,
     });
 
@@ -348,7 +333,6 @@ describe("GuidedOnboardingService attribution of a write with no user", () => {
     const announced = collectAnnouncements();
     const service = GuidedOnboardingService.create({
       organizations,
-      events: MemoryPostHogEventsChannel.create(),
       announce: announced.announce,
     });
     return { service, announced, records };

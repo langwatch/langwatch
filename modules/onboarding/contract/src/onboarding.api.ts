@@ -32,16 +32,6 @@ export type GuidedOnboardingForProject = Readonly<{
   state: GuidedOnboardingState;
 }>;
 
-/** One product-analytics event about guided onboarding, tracked against a person. */
-export type GuidedOnboardingTrackedEvent = Readonly<{
-  userId: string;
-  event: string;
-  projectId?: string;
-  properties: Readonly<Record<string, unknown>>;
-  /** The same for every delivery of one source event, so the sink keeps one. */
-  uuid?: string;
-}>;
-
 /** The onboarding capability. Operations arrive with the port of the process half. */
 export interface OnboardingApi {
   getGuidedState(
@@ -81,8 +71,6 @@ export interface OnboardingApi {
   getGuidedStateByProject(
     input: Readonly<{ projectId: string }>,
   ): Promise<GuidedOnboardingForProject>;
-  /** Fire and forget: the reaction that tracks it must not fail on it. */
-  trackGuidedOnboardingEvent(input: GuidedOnboardingTrackedEvent): void;
 }
 
 export const OnboardingApi = moduleApi<OnboardingApi>()("onboarding");
