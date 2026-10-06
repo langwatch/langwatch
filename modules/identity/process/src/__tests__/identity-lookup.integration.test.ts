@@ -267,6 +267,7 @@ function identifierRow(overrides: {
 
 describe("identity lookup, the repairs and the panels main's surface serves", () => {
   const ended: string[] = [];
+  const resent: string[] = [];
 
   function repairingService(): IdentityLookupService {
     return IdentityLookupService.create({
@@ -298,6 +299,20 @@ describe("identity lookup, the repairs and the panels main's surface serves", ()
         extendInvitation: async ({ inviteId }: { inviteId: string }) => ({
           invite: invitationRow({ inviteId, expiration: new Date(5_000) }),
         }),
+        resendInvitation: async ({
+          organizationId,
+          inviteId,
+        }: {
+          organizationId: string;
+          inviteId: string;
+        }) => {
+          resent.push(`${organizationId}:${inviteId}`);
+          return {
+            invite: invitationRow({ inviteId, expiration: new Date(9_000) }),
+            emailNotSent: false,
+            inviteUrl: "https://app.acme.test/invite/fresh",
+          };
+        },
       }),
       now: () => 1_000,
     });
@@ -305,6 +320,7 @@ describe("identity lookup, the repairs and the panels main's surface serves", ()
 
   beforeEach(() => {
     ended.length = 0;
+    resent.length = 0;
   });
 
   describe("when olive resolves an address", () => {
@@ -335,6 +351,27 @@ describe("identity lookup, the repairs and the panels main's surface serves", ()
         "identityLookup.endSessions",
         "identityLookup.endSessions",
       ]);
+    });
+  });
+
+  describe("when olive resends an expired invitation", () => {
+    /** @scenario "Resending an invitation from here does what resending does anywhere" */
+    it("asks the organization's own resend and records the act against the invitation", async () => {
+      const answer = await repairingService().resendLookupInvitation({
+        organizationId: "org_acme",
+        inviteId: "inv_1",
+        operator: OLIVE,
+      });
+
+      // The operator's resend IS the organization's resend: the same call an
+      // administrator's click makes, answering the fresh invitation's expiry.
+      expect(resent).toEqual(["org_acme:inv_1"]);
+      expect(answer).toEqual({ expiresAtMs: 9_000 });
+      expect(auditLog.rows[0]).toMatchObject({
+        userId: OLIVE.userId,
+        action: "identityLookup.resendInvitation",
+        targetId: "inv_1",
+      });
     });
   });
 
