@@ -1,5 +1,6 @@
 import {
   emptySsoConnection,
+  type BreakGlassBinding,
   SsoConnectionNotFoundError,
   type SsoConnectionState,
   type SsoDomainVerification,
@@ -15,8 +16,12 @@ import { describe, expect, it, vi } from "vitest";
 import { StubBreakGlassBindings } from "../../__tests__/support/in-memory-connections.ts";
 import { identityRepositoriesOverMemory } from "../../repositories/memory/memory.identity.repositories.ts";
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
-import { SsoConnectionReadRepository } from "../../repositories/sso-connection.repository.ts";
+import {
+  SsoConnectionReadRepository,
+  type SsoBreakGlassBindingRepository,
+} from "../../repositories/sso-connection.repository.ts";
 import type { SsoCredentialRepository } from "../../repositories/sso-credential.repository.ts";
+import { SsoBreakGlassRecoveryService } from "../sso-break-glass-recovery.service.ts";
 import type { SsoConnectionService } from "../sso-connection.service.ts";
 import type { SsoIdpRegistrationService } from "../sso-idp-registration.service.ts";
 import type { SsoMigrationFinalizationService } from "../sso-migration-finalization.service.ts";
@@ -35,6 +40,18 @@ const DOMAIN_PROOF: SsoDomainVerification = {
   firstAbsentAtMs: null,
   graceEndsAtMs: null,
   tokenHash: "sha256:proof",
+};
+
+const LIVE_GRANT: BreakGlassBinding = {
+  bindingId: "bg_1",
+  organizationId: ORGANIZATION_ID,
+  userId: "user_ana",
+  grantedByUserId: "user_ops",
+  grantedAtMs: 1_699_000_000_000,
+  expiresAtMs: 1_702_000_000_000,
+  supersededAtMs: null,
+  renewedFromBindingId: null,
+  warnedDays: [],
 };
 
 const connection = (over: Partial<SsoConnectionState> = {}): SsoConnectionState => ({
@@ -71,6 +88,8 @@ function serviceOver({
   row = connection(),
   signIns = [] as { userId: string; providerAccountId: string | null; atMs: number }[],
   wayBackIn = true,
+  passwordDoor = true,
+  breakGlass = new StubBreakGlassBindings(wayBackIn) as SsoBreakGlassBindingRepository,
 } = {}) {
   const store = MemoryIdentityStore.create();
   for (const signIn of signIns) {
@@ -88,7 +107,8 @@ function serviceOver({
     reads: new OneConnection(row),
     activity: identityRepositoriesOverMemory(store).ssoMigrationEvidence,
     credentials: createApiFixture<SsoCredentialRepository>({}),
-    breakGlass: new StubBreakGlassBindings(wayBackIn),
+    breakGlass,
+    passwordDoor: async () => passwordDoor,
     registrations: createApiFixture<SsoIdpRegistrationService>({}),
     finalization: createApiFixture<SsoMigrationFinalizationService>({}),
     now: () => 1_700_000_000_000,
@@ -179,6 +199,53 @@ describe("taking a connection live", () => {
       code: "sso_activation_break_glass_missing",
     });
     expect(activateConnection).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A deployment that mounts no password door cannot promise a way back in" */
+  it("refuses when the deployment hangs no password door, and says so", async () => {
+    const { service, activateConnection } = serviceOver({
+      signIns: [{ userId: "user_ana", providerAccountId: "okta|ana", atMs: 1_699_000_000_000 }],
+      passwordDoor: false,
+    });
+
+    const refusal = await activate(service).catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: "sso_activation_break_glass_missing" });
+    expect((refusal as Error & { reasons: Error[] }).reasons[0]?.message).toContain(
+      "the deployment has no password door for a grant to be a way in through",
+    );
+    expect(activateConnection).not.toHaveBeenCalled();
+  });
+
+  const walkableGrantOver = ({ holdsPassword }: { holdsPassword: boolean }) => {
+    const store = MemoryIdentityStore.create();
+    store.breakGlassBindings.set("bg_1", LIVE_GRANT);
+    return serviceOver({
+      signIns: [{ userId: "user_ana", providerAccountId: "okta|ana", atMs: 1_699_000_000_000 }],
+      breakGlass: SsoBreakGlassRecoveryService.create({
+        bindings: identityRepositoriesOverMemory(store).ssoBreakGlass,
+        holderCanWalkIn: async () => holdsPassword,
+        now: () => 1_700_000_000_000,
+      }),
+    });
+  };
+
+  /** @scenario "Going live counts only a way back in somebody could walk" */
+  it("refuses a live grant whose holder holds no password", async () => {
+    const { service, activateConnection } = walkableGrantOver({ holdsPassword: false });
+
+    await expect(activate(service)).rejects.toMatchObject({
+      code: "sso_activation_break_glass_missing",
+    });
+    expect(activateConnection).not.toHaveBeenCalled();
+  });
+
+  it("goes live on a live grant whose holder holds a password", async () => {
+    const { service, activateConnection } = walkableGrantOver({ holdsPassword: true });
+
+    await activate(service);
+
+    expect(activateConnection).toHaveBeenCalledTimes(1);
   });
 
   /** @scenario "Saying nothing is not an answer, and going live says so" */

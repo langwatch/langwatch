@@ -95,6 +95,7 @@ function scenario(
       connections: repositories.ssoConnections,
       evidence: repositories.ssoMigrationEvidence,
       breakGlass: repositories.ssoBreakGlass,
+      holderCanWalkIn: async () => true,
       memberships: { listActiveMembers: async () => [] },
       legacyAccess: { count: async () => 0 },
       now: () => NOW,

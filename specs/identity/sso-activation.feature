@@ -456,6 +456,13 @@ Feature: Going live with your own identity provider, without asking us
     And the refusal says the deployment has no password door for a grant to be a way in through
 
   @unit
+  Scenario: Going live counts only a way back in somebody could walk
+    Given the only live way back in is held by somebody who holds no password
+    When the administrator tries to turn the connection on
+    Then it is refused with "sso_activation_break_glass_missing"
+    And the connection is not on
+
+  @unit
   Scenario: A way back in names somebody who holds a password, not merely somebody senior
     Given an administrator who has only ever signed in through the identity provider
     When the administrator grants them a way back in

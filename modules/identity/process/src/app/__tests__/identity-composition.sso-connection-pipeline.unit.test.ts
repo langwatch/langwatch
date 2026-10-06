@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   licensingFixture,
+  StubBreakGlassBindings,
   StubPlatformOperators,
 } from "../../__tests__/support/in-memory-connections.ts";
 import { liveRepositories } from "../../__tests__/support/live-repositories.ts";
@@ -63,6 +64,7 @@ const migrationFinalized = migrationFinalizedEventSchema.parse({
 function testGraph(directoryMove: TestDirectoryMove = new TestDirectoryMove()): SsoConnectionGraph {
   return composeSsoConnectionGraph({
     repositories: liveRepositories(testDatabase()),
+    breakGlass: new StubBreakGlassBindings(true),
     // No store kept and no senders: this process has not built the pipeline, so nothing commits.
     eventStore: IdentityEventStores.create().of({ pipeline: SSO_CONNECTION_PIPELINE_NAME }),
     commands: ConnectedIdentityEventing.create(),

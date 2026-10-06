@@ -21,10 +21,8 @@ import type { ZodType } from "zod";
 import type { IdentityModule } from "../app/identity.app.ts";
 import type { SsoDomainProofMail } from "../channels/sso-domain-proof-mail.channel.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
-import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
+import type { SsoBreakGlassBindingRepository } from "../repositories/sso-connection.repository.ts";
 import type { SsoEngineProviderProjection } from "../repositories/sso-engine-provider.repository.ts";
-import { SsoBreakGlassRecoveryService } from "../services/sso-break-glass-recovery.service.ts";
-import { RequiresLocalDoorAndBinding } from "../services/sso-break-glass.service.ts";
 import type { SsoConnectionDirectoryMoveService } from "../services/sso-connection-directory-move.service.ts";
 import type { SsoConnectionGuardsDeps } from "../services/sso-connection-guard-checks.service.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
@@ -436,10 +434,11 @@ export function composeSsoConnectionGraph(options: {
     | "ssoConnectionHeads"
     | "ssoConnections"
     | "ssoRegistrationSlots"
-    | "ssoBreakGlass"
     | "ssoStranding"
     | "joinRequestAudience"
   >;
+  /** The one "is there a way back in" answer, shared with the setup journey. */
+  breakGlass: SsoBreakGlassBindingRepository;
   /** The sso_connection pipeline's own store. */
   eventStore: SsoConnectionEventAppends;
   /** The senders the process connected, which the ledger stages through. */
@@ -461,10 +460,7 @@ export function composeSsoConnectionGraph(options: {
   const guards = SsoConnectionGuardsService.create({
     connections: repositories.ssoConnections,
     registrationSlots: repositories.ssoRegistrationSlots,
-    breakGlass: RequiresLocalDoorAndBinding.create({
-      localDoor: LocalDoorBreakGlassBindingRepository.create(),
-      bindings: SsoBreakGlassRecoveryService.create({ bindings: repositories.ssoBreakGlass }),
-    }),
+    breakGlass: options.breakGlass,
     stranding: repositories.ssoStranding,
     authorization: options.authorization,
     licensing: options.licensing,

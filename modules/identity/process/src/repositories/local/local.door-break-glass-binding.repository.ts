@@ -1,28 +1,21 @@
-import { LOCAL_METHOD_SET } from "@langwatch/identity-contract";
-
 import type { SsoBreakGlassBindingRepository } from "../sso-connection.repository.ts";
 
 /**
- * Activation's break-glass precondition, before break-glass BINDINGS exist.
- * warnings. None of that exists yet, and ADR-117 §5 still makes a live
+ * Activation's first break-glass precondition: the deployment hangs a
+ * password door for a grant to be a way in through. It asks the resolved
+ * method policy, never a list that is always full.
  */
 export class LocalDoorBreakGlassBindingRepository implements SsoBreakGlassBindingRepository {
-  static create(options?: {
-    localMethods?: () => readonly unknown[];
+  static create(options: {
+    passwordDoor: () => Promise<boolean>;
   }): LocalDoorBreakGlassBindingRepository {
-    return new LocalDoorBreakGlassBindingRepository(
-      options?.localMethods ?? (() => LOCAL_METHOD_SET),
-    );
+    return new LocalDoorBreakGlassBindingRepository(options.passwordDoor);
   }
 
-  constructor(
-    /** The instance's local method set. Injected so a test can express an
-     *  instance with no local door without reaching for env. */
-    private readonly localMethods: () => readonly unknown[] = () => LOCAL_METHOD_SET,
-  ) {}
+  private constructor(private readonly passwordDoor: () => Promise<boolean>) {}
 
   async hasLiveBinding(_args: { organizationId: string }): Promise<boolean> {
-    return this.localMethods().length > 0;
+    return this.passwordDoor();
   }
 
   /** The local door has nothing to reserve: it is open or it is not. */

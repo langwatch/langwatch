@@ -57,6 +57,8 @@ export interface SsoSetupCommandsServiceDeps {
   credentials: SsoCredentialRepository;
   /** The same "is there a way back in" answer the sign-in exemption reads. */
   breakGlass: SsoBreakGlassBindingRepository;
+  /** Whether the deployment's resolved method policy hangs a password door. */
+  passwordDoor: () => Promise<boolean>;
   registrations: SsoIdpRegistrationService;
   /** The cutover's last verb, which is a ceremony of its own. */
   finalization: SsoMigrationFinalizationService;
@@ -372,12 +374,17 @@ export class SsoSetupCommandsService {
       );
     }
     await this.testSignInAccountOf(state);
+    if (!(await this.deps.passwordDoor())) {
+      throw new SsoActivationBreakGlassMissingError(
+        `organization ${state.organizationId}: the deployment has no password door for a grant to be a way in through`,
+      );
+    }
     const wayBackIn = await this.deps.breakGlass.hasLiveBinding({
       organizationId: state.organizationId,
     });
     if (!wayBackIn) {
       throw new SsoActivationBreakGlassMissingError(
-        `organization ${state.organizationId}: no live way in without the identity provider`,
+        `organization ${state.organizationId}: no live way in without the identity provider that somebody holding a password could walk`,
       );
     }
     if (state.arrivalPolicyDecidedAtMs === null) {

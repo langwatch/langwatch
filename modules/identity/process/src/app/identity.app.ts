@@ -88,7 +88,10 @@ import { EventingSsoConnectionHistoryRepository } from "../repositories/eventing
 import type { IdentityRateLimitRepository } from "../repositories/identity-rate-limit.repository.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
-import { breakGlassHolderEligibility } from "../rules/break-glass-eligibility.rules.ts";
+import {
+  breakGlassHolderEligibility,
+  passwordDoorMounted,
+} from "../rules/break-glass-eligibility.rules.ts";
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import type {
   JoinMembership,
@@ -501,17 +504,33 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     const joinRequestGuards = JoinRequestGuardsService.create({
       requests: setup.repositories.joinRequests,
     });
+    const signInMethodPolicy = SignInMethodPolicyService.create({
+      resolveAuthProvider: () => setup.dependencies.auth.resolveAuthProvider(),
+      federationLicensed: () => setup.dependencies.licensing.isPlatformSsoLicensed(),
+      offersPasskeys: () => setup.dependencies.auth.offersPasskeys(),
+      issuesOwnPasswords: () => setup.dependencies.auth.issuesOwnPasswords(),
+      selfHosted: () => !setup.config.isSaas,
+    });
+    const passwordDoor = passwordDoorMounted(signInMethodPolicy);
+    const holderCanWalkIn = breakGlassEligibility(
+      setup.dependencies.organizations,
+      setup.dependencies.users,
+    );
     // One answer to "is there a way back in", shared: activation's second
     // precondition and the setup sign-in exemption must not disagree.
     const breakGlass = RequiresLocalDoorAndBinding.create({
-      localDoor: LocalDoorBreakGlassBindingRepository.create(),
-      bindings: SsoBreakGlassRecoveryService.create({ bindings: setup.repositories.ssoBreakGlass }),
+      localDoor: LocalDoorBreakGlassBindingRepository.create({ passwordDoor }),
+      bindings: SsoBreakGlassRecoveryService.create({
+        bindings: setup.repositories.ssoBreakGlass,
+        holderCanWalkIn,
+      }),
     });
     const ssoConnectionReads = OrganizationSsoConnectionsService.create({
       connections: setup.repositories.ssoConnections,
     });
     // One connection service: the back office, the setup journey and the teardown timer share it.
     const ssoConnectionGraph = composeSsoConnectionGraph({
+      breakGlass,
       repositories: setup.repositories,
       eventStore: eventStores.of({ pipeline: SSO_CONNECTION_PIPELINE_NAME }),
       commands: identityEventing,
@@ -653,6 +672,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       connections: setup.repositories.ssoConnections,
       evidence: setup.repositories.ssoMigrationEvidence,
       breakGlass: setup.repositories.ssoBreakGlass,
+      holderCanWalkIn,
       memberships,
       legacyAccess,
     });
@@ -665,6 +685,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
           activity: setup.repositories.ssoMigrationEvidence,
           credentials: setup.repositories.ssoCredentials,
           breakGlass,
+          passwordDoor,
           registrations: SsoIdpRegistrationService.create({ discovery: issuerDiscovery }),
           finalization: SsoMigrationFinalizationService.create({
             connections: () => ssoConnections,
@@ -684,10 +705,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       warnings: ssoBreakGlassWarningChannels.live.create(),
       newBindingId: newSsoBreakGlassBindingId,
       directory: breakGlassDirectory(setup.dependencies.organizations),
-      holderIsEligible: breakGlassEligibility(
-        setup.dependencies.organizations,
-        setup.dependencies.users,
-      ),
+      holderIsEligible: holderCanWalkIn,
     });
     const ssoSetup = SsoSetupService.create({
       connections: setup.repositories.ssoConnections,
@@ -714,13 +732,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
             setup.repositories.ssoEngineProviders.findRegisteredProvider(args),
         }),
       }),
-      policy: SignInMethodPolicyService.create({
-        resolveAuthProvider,
-        federationLicensed: () => setup.dependencies.licensing.isPlatformSsoLicensed(),
-        offersPasskeys: () => auth.offersPasskeys(),
-        issuesOwnPasswords: () => auth.issuesOwnPasswords(),
-        selfHosted: () => !setup.config.isSaas,
-      }),
+      policy: signInMethodPolicy,
       breakGlass: InProcessBreakGlassLimiterService.create(),
       accounts: SignInAccountLookupService.create({
         heads: setup.repositories.heads,

@@ -527,7 +527,7 @@ describe("given a verified local account and a managed SAML connection", () => {
   });
 
   /** @scenario "A signed SAML assertion links a verified local account" */
-  it("links the account, leaves its profile and verification alone, and reuses the binding on repeat", async () => {
+  it("links the account, leaves its profile and verification alone, and continues on repeat", async () => {
     const { store, service } = createWorld({ owners: [], proved: true, confirmed: true });
     const before = structuredClone(store.users.get(USER_ID));
 
@@ -535,10 +535,22 @@ describe("given a verified local account and a managed SAML connection", () => {
     expect(store.users.get(USER_ID)).toEqual(before);
 
     bind({ store });
-    await expect(service.resolveUser(SAML_ASSERTION)).resolves.toEqual(LINKED);
+    await expect(service.resolveUser(SAML_ASSERTION)).resolves.toEqual({ action: "continue" });
 
     expect(store.accounts.get(USER_ID)).toHaveLength(1);
     expect(store.users.get(USER_ID)).toEqual(before);
+  });
+
+  /** @scenario "A repeat SAML sign-in of a linked identity continues, never links" */
+  it.each([
+    ["a verified local account", { owners: [], proved: true, confirmed: true }],
+    ["a directory-provisioned member", {}],
+  ])("continues for %s once the binding exists", async (_name, world) => {
+    const { store, service } = createWorld(world);
+    store.identifiers.set("identifier_1", identifier({}));
+    bind({ store });
+
+    await expect(service.resolveUser(SAML_ASSERTION)).resolves.toEqual({ action: "continue" });
   });
 
   /** @scenario "SAML linking refuses unsuitable local identity evidence" */

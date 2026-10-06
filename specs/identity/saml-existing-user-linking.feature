@@ -14,6 +14,13 @@ Feature: Signed SAML linking to an existing local account
     And the local profile and verification remain unchanged
     And repeating sign-in reuses the same SAML account binding
 
+  @unit
+  Scenario: A repeat SAML sign-in of a linked identity continues, never links
+    Given a SAML identity already linked to a local account
+    When the same identity signs in through the connection again
+    Then the sign-in continues on that account
+    And it is not asked to link again
+
   @integration @regression
   Scenario: The first SAML session stays revocable before projection catches up
     Given a signed SAML callback creates its account before its Identifier projection appears
