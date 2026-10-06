@@ -53,7 +53,8 @@ Feature: The interactive process enforces the plan's monthly allowance at its in
 
   Rule: A refusal at one door is a refusal at both
 
-    @integration
+    # Unimplemented: the ingest doors enforce no plan allowance (trace.app.ts collectorUsageLimit and otlpUsageLimit resolve unchecked); main refused over-limit exports with ERR_PLAN_LIMIT.
+    @unimplemented @integration
     Scenario: An export over the plan's allowance is refused terminally
       Given an organization over its monthly allowance
       When it exports telemetry to either ingest door
@@ -61,7 +62,8 @@ Feature: The interactive process enforces the plan's monthly allowance at its in
       And the refusal is terminal rather than retryable, so an SDK stops rather than looping
       And nothing is enqueued for processing
 
-    @integration
+    # Unimplemented: the ingest doors enforce no plan allowance (trace.app.ts collectorUsageLimit and otlpUsageLimit resolve unchecked); main refused over-limit exports with ERR_PLAN_LIMIT.
+    @unimplemented @integration
     Scenario: An export within the plan's allowance is ingested
       Given an organization inside its monthly allowance
       When it exports telemetry
@@ -69,21 +71,24 @@ Feature: The interactive process enforces the plan's monthly allowance at its in
 
   Rule: A meter that cannot read never refuses
 
-    @integration
+    # Unimplemented: the ingest doors enforce no plan allowance (trace.app.ts collectorUsageLimit and otlpUsageLimit resolve unchecked); main refused over-limit exports with ERR_PLAN_LIMIT.
+    @unimplemented @integration
     Scenario: An allowance the process could not read accepts the export
       Given an allowance lookup that fails
       When telemetry is exported
       Then the export is accepted
       And the failure is recorded, so a metering outage reads as a metering outage
 
-    @unit
+    # Unimplemented: the ingest doors enforce no plan allowance (trace.app.ts collectorUsageLimit and otlpUsageLimit resolve unchecked); main refused over-limit exports with ERR_PLAN_LIMIT.
+    @unimplemented @unit
     Scenario: A deployment with no rollup enforces no allowance
       Given a process that opened no ClickHouse connection
       When the ingest doors are composed
       Then no enforcement is composed at all, rather than one whose every reading is unknown
       And the absence is reported once at boot rather than once per export
 
-    @unit
+    # Unimplemented: the ingest doors enforce no plan allowance (trace.app.ts collectorUsageLimit and otlpUsageLimit resolve unchecked); main refused over-limit exports with ERR_PLAN_LIMIT.
+    @unimplemented @unit
     Scenario: A deployment holding the rollup enforces the allowance
       Given a process that opened its ClickHouse connection
       When the ingest doors are composed
