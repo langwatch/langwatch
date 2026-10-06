@@ -36,7 +36,7 @@ export type ApiDoorPeers = Readonly<{
   /** Where a project-bound CLI access token is read back to its person and project. */
   cliProjects: ApiRestCredentialPeers["cliProjects"];
   /** The decisions both transports authorize through, and the key ceilings the key doors ask. */
-  authz: ApiDoor["authz"] & ApiRestCredentialPeers["authz"] & Pick<AuthzApi, "getScope">;
+  authz: ApiDoor["authz"] & ApiRestCredentialPeers["authz"] & Pick<AuthzApi, "getScope" | "can">;
   organizations: Pick<OrganizationApi, "getSettings" | "getOrganizationIdByTeamId">;
   entitlements: Pick<EntitlementApi, "getActivePlan">;
   auditLog: Pick<AuditLogApi, "record">;
@@ -70,7 +70,7 @@ export class ApiDoorService {
         const answer = await this.#sessions.verify(request);
         return answer.kind === "caller" ? answer.caller : null;
       },
-      authz: this.#peers.authz,
+      authz: this.#authorize(),
       identities: {
         project: this.#projectDoor(),
         organization: this.#organizationDoor(),
@@ -78,6 +78,25 @@ export class ApiDoorService {
       },
       entitlements: this.#planEntitlements(),
       audit: { rest: this.#restAudit(), trpc: this.#trpcAudit() },
+    };
+  }
+
+  /** The decisions both transports ask, and the platform grant asked of the operator (E4). */
+  #authorize(): ApiDoor["authz"] {
+    const authz = this.#peers.authz;
+
+    return {
+      getDecision: (input) => authz.getDecision(input),
+      getProjectAnyDecision: (input) => authz.getProjectAnyDecision(input),
+      checkScopeLineage: (input) => authz.checkScopeLineage(input),
+      getSessionVersion: (input) => authz.getSessionVersion(input),
+      getPlatformDecision: async ({ userId, permission }) => ({
+        permitted: await authz.can({
+          principal: { type: "user", id: userId },
+          permission,
+          scope: { type: "platform" },
+        }),
+      }),
     };
   }
 

@@ -81,6 +81,7 @@ const peers: ApiDoorPeers = {
     checkScopeLineage: refuseEverything,
     getSessionVersion: refuseEverything,
     getScope: refuseEverything,
+    can: refuseEverything,
   },
   organizations: {
     getSettings: ({ organizationId }) =>
@@ -190,6 +191,40 @@ describe("the key doors' actor", () => {
       expect(
         await actorThrough(identities.organization, { authorization: "Bearer sk-lw-org-unowned" }),
       ).toBeNull();
+    });
+  });
+});
+
+describe("the platform question", () => {
+  function platformDoor(holds: boolean) {
+    const can = vi.fn<AuthzApi["can"]>(async () => holds);
+    const { authz } = ApiDoorService.create({ ...peers, authz: { ...peers.authz, can } }).door();
+
+    return { authz, can };
+  }
+
+  describe("given an operator holding the platform grant", () => {
+    it("asks authz for that person at the platform, and admits", async () => {
+      const { authz, can } = platformDoor(true);
+
+      await expect(
+        authz.getPlatformDecision?.({ userId: "operator-1", permission: "ops:view" }),
+      ).resolves.toEqual({ permitted: true });
+      expect(can).toHaveBeenCalledWith({
+        principal: { type: "user", id: "operator-1" },
+        permission: "ops:view",
+        scope: { type: "platform" },
+      });
+    });
+  });
+
+  describe("given a person without it", () => {
+    it("answers not permitted", async () => {
+      const { authz } = platformDoor(false);
+
+      await expect(
+        authz.getPlatformDecision?.({ userId: "user-1", permission: "ops:manage" }),
+      ).resolves.toEqual({ permitted: false });
     });
   });
 });

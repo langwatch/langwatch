@@ -783,6 +783,7 @@ export class GovernanceModule implements GovernanceRestApi {
         if (session.projectLocked) throw new OrganizationInvalidCredentialsError();
         return session;
       },
+      permitted: (input) => this.dependencies.permissions.getDecision(input),
     });
     this.cliAccessService = GovernanceCliAccessService.create({
       sessions: dependencies.auth,
