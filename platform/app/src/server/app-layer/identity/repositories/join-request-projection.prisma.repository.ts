@@ -1,6 +1,7 @@
 import type {
   JoinMatchKind,
   JoinRequestAggregateState,
+  JoinRequestOrigin,
   JoinRequestState,
   JoinResolverType,
   JoinWithdrawalCause,
@@ -70,6 +71,7 @@ export class PrismaJoinRequestProjectionRepository
       domain: state.domain,
       state: state.state,
       matchedVia: state.matchedVia,
+      origin: state.origin,
       expiresAt:
         state.expiresAtMs === null ? null : new Date(state.expiresAtMs),
       resolvedAt:
@@ -108,6 +110,7 @@ export function rowToJoinRequest(row: JoinRequest): JoinRequestAggregateState {
     domain: row.domain,
     state: row.state as JoinRequestState,
     matchedVia: row.matchedVia as JoinMatchKind,
+    origin: row.origin as JoinRequestOrigin,
     createdAtMs: row.createdAt.getTime(),
     updatedAtMs: row.updatedAt.getTime(),
     expiresAtMs: row.expiresAt?.getTime() ?? null,
