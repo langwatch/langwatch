@@ -53,6 +53,8 @@ jobs:
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
+      prs_created: ${{ steps.release.outputs.prs_created }}
+      prs: ${{ steps.release.outputs.prs }}
     steps:
       - name: Release Please
         id: release
@@ -61,3 +63,54 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
+
+  stamp-release-manifest:
+    name: Stamp the app release manifest
+    needs: release-please
+    if: needs.release-please.outputs.prs_created == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Find the app's release PR
+        id: app
+        env:
+          PRS: ${{ needs.release-please.outputs.prs }}
+        run: |
+          set -euo pipefail
+          branch="$(jq -r '.[] | select(.headBranchName | endswith("--components--langwatch")) | .headBranchName' <<< "${PRS}" | head -n1)"
+          echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+      - name: Checkout the release PR
+        if: steps.app.outputs.branch != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ steps.app.outputs.branch }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          fetch-depth: 0
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        if: steps.app.outputs.branch != ''
+        with:
+          version: 12.6.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        if: steps.app.outputs.branch != ''
+        with:
+          node-version: 24
+      - name: Stamp and commit the manifest
+        if: steps.app.outputs.branch != ''
+        env:
+          BRANCH: ${{ steps.app.outputs.branch }}
+        run: |
+          set -euo pipefail
+          CI=true pnpm install --frozen-lockfile --filter "@langwatch/upgrade..."
+          git fetch -q origin 'refs/tags/langwatch@v*:refs/tags/langwatch@v*'
+          node --disable-warning=ExperimentalWarning --experimental-transform-types packages/upgrade/scripts/stamp-release.ts
+          version="$(jq -r '."."' .github/.release-please-manifest.json)"
+          git add "packages/upgrade/releases/${version}.json"
+          if git diff --cached --quiet; then echo "manifest ${version} unchanged"; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "chore(upgrade): stamp release manifest ${version}"
+          git push origin "HEAD:${BRANCH}"
