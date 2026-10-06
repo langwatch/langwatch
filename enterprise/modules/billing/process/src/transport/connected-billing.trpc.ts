@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The server half of `connectedBilling.*` (ADR-156 section 7): gated like the
- * license registry, on the platform-operator grant checked by the application,
- * never an org-scoped RBAC permission, and refused with the shared not-found.
+ * The server half of `connectedBilling.*` (ADR-156 section 7): behind the platform door (Q42/Q44).
+ * Non-staff are answered not-found, staff lacking ops:manage are refused a write by name.
  */
 import { defineTrpcFact, defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
@@ -19,14 +18,8 @@ import {
 /** The signed-in operator, bound by the process under the name ops reads it by. */
 export const operatorFact = defineTrpcFact("opsOperator", opsOperatorSchema.nullable());
 
-const STAFF_LIST = {
-  reason:
-    "back-office surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design",
-  allow: {
-    organizationId:
-      "names the customer organization being billed; the caller's reach is the platform-operator grant and is never derived from this id",
-  },
-} as const;
+/** Staff hold ops:view at the platform; anyone else is answered not-found. */
+const STAFF = { at: "platform", hiddenWithout: "ops:view" } as const;
 
 /**
  * The impersonator where there is one: debugging a customer stays operator work. An impersonator
@@ -46,34 +39,34 @@ export const connectedBillingTrpcTransport: TrpcRouterDeclaration<
 > = defineTrpcRouter(BillingApi, connectedBillingTrpc)
   .procedure("get")
   .withFacts(operatorFact)
-  .noPermission(STAFF_LIST)
+  .withPermission("ops:view", STAFF)
   .handle(({ app, input }, operator) => app.getConnectedBillingOverview(input, getStaff(operator)))
 
   .procedure("onboard")
   .withFacts(operatorFact)
-  .noPermission(STAFF_LIST)
+  .withPermission("ops:manage", STAFF)
   .handle(({ app, input }, operator) => app.onboardConnectedCustomer(input, getStaff(operator)))
 
   .procedure("addCommit")
   .withFacts(operatorFact)
-  .noPermission(STAFF_LIST)
+  .withPermission("ops:manage", STAFF)
   .handle(({ app, input }, operator) => app.addConnectedCommit(input, getStaff(operator)))
 
   .procedure("renew")
   .withFacts(operatorFact)
-  .noPermission(STAFF_LIST)
+  .withPermission("ops:manage", STAFF)
   .handle(({ app, input }, operator) => app.renewConnectedTerm(input, getStaff(operator)))
 
   .procedure("completeRenewalIfDue")
   .withFacts(operatorFact)
-  .noPermission(STAFF_LIST)
+  .withPermission("ops:manage", STAFF)
   .handle(async ({ app, input }, operator) => ({
     outcome: await app.completeConnectedRenewalIfDue(input, getStaff(operator)),
   }))
 
   .procedure("markPaidOutOfBand")
   .withFacts(operatorFact)
-  .noPermission({ reason: STAFF_LIST.reason })
+  .withPermission("ops:manage", STAFF)
   .handle(async ({ app, input }, operator) => {
     await app.markConnectedInvoicePaidOutOfBand(input, getStaff(operator));
     return { stripeInvoiceId: input.stripeInvoiceId };

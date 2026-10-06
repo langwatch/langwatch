@@ -47,7 +47,7 @@ vi.mock("@langwatch/browser-host/errors", () => ({
 vi.mock("../evaluator-code-editor.tsx", () => ({
   EvaluatorCodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
 }));
-vi.mock("../../prompt/variables/variables-section.tsx", async (importOriginal) => ({
+vi.mock("@langwatch/design-system/variable-mapping", async (importOriginal) => ({
   ...(await importOriginal<typeof actualModule>()),
   VariablesSection: () => <div data-testid="variables-section" />,
 }));
@@ -83,7 +83,8 @@ vi.mock("@langwatch/evaluator-client", () => ({
   },
 }));
 
-import type * as actualModule from "../../prompt/variables/variables-section.tsx";
+import type * as actualModule from "@langwatch/design-system/variable-mapping";
+
 import { CodeEvaluatorEditorDrawer } from "../code-evaluator-editor-drawer.tsx";
 
 describe("CodeEvaluatorEditorDrawer", () => {

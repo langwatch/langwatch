@@ -10,6 +10,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
+import { VariableMappingInput } from "@langwatch/design-system/variable-mapping";
 import { ALL_DEFAULT_JUDGE_PROMPTS, pickDefaultJudgePrompt } from "@langwatch/evaluator-contract";
 import { disambiguateNames } from "@langwatch/experiment-contract";
 import { type AvailableSource, type FieldMapping } from "@langwatch/workflow-contract";
@@ -28,7 +29,6 @@ import type {
   TargetConfig,
 } from "../../../../model/experiments-v3/types.ts";
 import { renderSourceTypeIcon } from "../../../elements/workflow/workflow-icons.tsx";
-import { VariableMappingInput } from "../../prompt/variables/variable-mapping-input.tsx";
 
 type Metric = "cost" | "duration";
 type VariantOutputOption = {

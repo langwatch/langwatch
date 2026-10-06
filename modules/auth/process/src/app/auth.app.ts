@@ -27,6 +27,8 @@ import {
   type ReleaseHeldAccountResult,
   type SaveSignInSecurityInput,
   type SaveSignInSecurityResult,
+  type SessionImpersonation,
+  type SessionImpersonationState,
   type SignInSecuritySettings,
   type VerifiedBrowserSession,
   type AuthUsageCount,
@@ -52,6 +54,7 @@ import {
   type EmailIdentifierAdded,
   IdentityApi,
   type IdentityEmailService,
+  organizationConnectionsOf,
   type RoutingDecision,
   type SignedInWith,
   SignInMethodPolicyService,
@@ -75,6 +78,7 @@ import { auth0PasswordChannels } from "../channels/auth0-password-channels.regis
 import { cliDeviceSettlementChannels } from "../channels/cli-device-settlement-channels.registry.ts";
 import type { BetterAuthTransport } from "../channels/http/http.better-auth.channel.ts";
 import { IdTokenIssuerRefusalChannel } from "../channels/http/http.id-token-issuer-refusal.channel.ts";
+import { OAuthProfileEmailChannel } from "../channels/http/http.oauth-profile-email.channel.ts";
 import { passwordResetMailChannels } from "../channels/password-reset-mail-channels.registry.ts";
 import { signUpVerificationMailChannels } from "../channels/sign-up-verification-mail-channels.registry.ts";
 import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
@@ -280,6 +284,8 @@ export class AuthModule implements AuthApiContract {
   #composeBetterAuth: (() => Promise<BetterAuthTransport>) | null = null;
   /** Shared by the Better Auth logger and the door, per request. */
   #idTokenIssuerRefusals = IdTokenIssuerRefusalChannel.create();
+  /** Shared by the providers' profile mapping and the door, per request. */
+  #oauthProfileEmails = OAuthProfileEmailChannel.create();
   #betterAuth: Promise<BetterAuthTransport> | null = null;
   /** The identity {@link AuthModule.create} resolved, held for {@link baseUrl}. */
   #browserSession: BetterAuthDeploymentIdentity | undefined;
@@ -319,6 +325,24 @@ export class AuthModule implements AuthApiContract {
 
   findDialableIdentityProviderOrigins(): string[] {
     return [...this.#dialableIdentityProviderOrigins];
+  }
+
+  findMountedSocialMethodIds(): string[] {
+    return [...this.#mountedSocialMethodIds];
+  }
+
+  getImpersonation(input: { sessionId: string }): Promise<SessionImpersonationState> {
+    return this.#sessions.getImpersonation(input);
+  }
+
+  startImpersonation(
+    input: SessionImpersonation & { sessionId: string; reason: string },
+  ): Promise<void> {
+    return this.#sessions.startImpersonation(input);
+  }
+
+  stopImpersonation(input: { sessionId: string }): Promise<void> {
+    return this.#sessions.stopImpersonation(input);
   }
 
   private constructor({
@@ -390,6 +414,13 @@ export class AuthModule implements AuthApiContract {
       revokeBrowserSession: (input) => this.revokeBrowserSession(input),
       idTokenIssuerRefusals: this.#idTokenIssuerRefusals,
       connectionIssuers,
+      oauthProfileEmails: this.#oauthProfileEmails,
+      governingConnections: {
+        findGoverningConnections: async ({ email }) =>
+          organizationConnectionsOf(
+            await dependencies.identity.routeSignIn({ identifier: email, breakGlass: false }),
+          ),
+      },
       deriveQueryCacheKey: (input) => this.#deriveQueryCacheKey(input),
       now: members.now ?? nowInstant,
     });
@@ -586,6 +617,7 @@ export class AuthModule implements AuthApiContract {
           buildBetterAuth({
             identity,
             idTokenIssuerRefusals: app.#idTokenIssuerRefusals,
+            oauthProfileEmails: app.#oauthProfileEmails,
             signupAnnouncements,
             lifecycle: app.#lifecycle,
             signInLockout: SignInLockoutService.create({

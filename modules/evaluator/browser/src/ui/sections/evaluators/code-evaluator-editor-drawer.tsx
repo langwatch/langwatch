@@ -9,6 +9,7 @@ import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Box, Button, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { type Variable, VariablesSection } from "@langwatch/design-system/variable-mapping";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import {
   type CodeEvaluatorConfig,
@@ -27,7 +28,6 @@ import {
   validCodeEvaluatorFields,
 } from "../../blocks/code-evaluator-editor.tsx";
 import { renderSourceTypeIcon } from "../../elements/workflow/workflow-icons.tsx";
-import { type Variable, VariablesSection } from "../prompt/variables/variables-section.tsx";
 import { EvaluatorCodeEditor } from "./evaluator-code-editor.tsx";
 import {
   type EvaluatorGateConfig,

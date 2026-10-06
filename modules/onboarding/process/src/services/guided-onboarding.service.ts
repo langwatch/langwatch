@@ -19,7 +19,6 @@ import {
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { PostHogEventsChannel } from "../channels/posthog-events.channel.ts";
 import { definedGuidedPayload } from "../rules/guided-onboarding-record.rules.ts";
 
 const logger = createLogger("langwatch:onboarding:guided");
@@ -59,25 +58,21 @@ function assertGuidedPaths(paths: readonly string[]): GuidedPath[] {
 
 export class GuidedOnboardingService {
   private readonly organizations: OrganizationApi;
-  private readonly events: PostHogEventsChannel;
   private readonly announce: GuidedOnboardingAnnouncer;
   private readonly now: () => string;
 
   private constructor(options: {
     organizations: OrganizationApi;
-    events: PostHogEventsChannel;
     announce: GuidedOnboardingAnnouncer;
     now: () => string;
   }) {
     this.organizations = options.organizations;
-    this.events = options.events;
     this.announce = options.announce;
     this.now = options.now;
   }
 
   static create(options: {
     organizations: OrganizationApi;
-    events: PostHogEventsChannel;
     announce: GuidedOnboardingAnnouncer;
     now?: () => string;
   }): GuidedOnboardingService {
@@ -102,25 +97,6 @@ export class GuidedOnboardingService {
   }): Promise<GuidedOnboardingState & { variant: GuidedOnboardingRecord["variant"] }> {
     const record = await this.record(actor.organizationId);
     return { ...record.state, variant: record.variant };
-  }
-
-  /** Tracks one event a peer's reaction names, never failing that reaction. */
-  trackEvent(input: {
-    userId: string;
-    event: string;
-    projectId: string | undefined;
-    properties: Readonly<Record<string, unknown>>;
-    uuid: string | undefined;
-  }): void {
-    this.events.track({
-      userId: input.userId,
-      event: input.event,
-      properties:
-        input.projectId === undefined
-          ? input.properties
-          : { ...input.properties, projectId: input.projectId },
-      ...(input.uuid === undefined ? {} : { uuid: input.uuid }),
-    });
   }
 
   /** The picks from the value screen, in order. The first one starts now. */

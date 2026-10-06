@@ -92,6 +92,7 @@ describe("a process scraped through its health door", () => {
   });
 
   describe("given no metrics key and a production environment", () => {
+    /** @scenario "In production an unset key leaves the process with no metrics endpoint" */
     it("mounts no metrics endpoint rather than an open one", async () => {
       const request = await serve({ ...prometheus, NODE_ENV: "production" });
 

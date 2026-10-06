@@ -9,7 +9,11 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { EventingParticipation, StaticPipelineDefinition } from "@langwatch/eventing";
+import type {
+  EventingCommands,
+  EventingParticipation,
+  StaticPipelineDefinition,
+} from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 /**
  * The Langy feature's application: what its doors call. It holds every service and process
@@ -116,6 +120,10 @@ import { EventingLangyConversationAdapter } from "../eventing/langy-conversation
 import { LangyConversationCommandSenders } from "../eventing/langy-conversation.commands.ts";
 import type { LangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
 import type { LangyConversationDefinition } from "../eventing/langy-conversation.pipeline.ts";
+import {
+  buildLangyGuidedOnboardingPipeline,
+  type LangyGuidedOnboardingPipeline,
+} from "../eventing/langy-guided-onboarding.pipeline.ts";
 import { buildLangyMaintenancePipeline } from "../eventing/langy-maintenance.pipeline.ts";
 import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
@@ -212,6 +220,11 @@ type LangyAppDependencies = {
   conversationCommands: LangyConversationCommandSenders;
   /** The consume half of the pipeline: its folds, process manager and reactions. */
   conversationProcessing: EventingLangyConversationAdapter;
+  /** langy_guided_onboarding, built once; its senders are bound when the process registers it. */
+  guidedOnboarding: {
+    pipeline: LangyGuidedOnboardingPipeline;
+    senders: { commands?: EventingCommands<LangyGuidedOnboardingPipeline> };
+  };
 };
 
 /** The local-control runtime, its durable commands, its peer reads and this origin. */
@@ -350,8 +363,15 @@ export class LangyModule implements LangyApiContract {
       skipGate: (gate) => workspace.canSkipPermissions(gate),
     });
     const persistence = adapter.eventing();
+    const guidedOnboardingSenders: LangyAppDependencies["guidedOnboarding"]["senders"] = {};
     const guidedOnboarding = LangyGuidedOnboardingService.create({
       onboarding: setup.dependencies.onboarding,
+      record: async (data) => {
+        if (!guidedOnboardingSenders.commands) {
+          throw new Error("langy_guided_onboarding pipeline senders are not connected yet");
+        }
+        await guidedOnboardingSenders.commands.recordGuidedOnboardingTurnFailed.send(data);
+      },
     });
     const conversationProcessing = EventingLangyConversationAdapter.create({
       langyConversationProjectionStore: persistence.langyConversationState,
@@ -382,7 +402,7 @@ export class LangyModule implements LangyApiContract {
           turns: langy,
         }),
       },
-      guidedOnboarding: { reader: guidedOnboarding, analytics: guidedOnboarding },
+      guidedOnboarding: { reader: guidedOnboarding, facts: guidedOnboarding },
       webPush: {
         users: setup.dependencies.users,
         projects: setup.dependencies.projects,
@@ -483,6 +503,10 @@ export class LangyModule implements LangyApiContract {
       panelEgress: LangyPanelEgressService.create({ access, langy }),
       conversationCommands: commands,
       conversationProcessing,
+      guidedOnboarding: {
+        pipeline: buildLangyGuidedOnboardingPipeline(),
+        senders: guidedOnboardingSenders,
+      },
     });
   }
 
@@ -604,6 +628,16 @@ export class LangyModule implements LangyApiContract {
       failAgentResponse: (data) => senders.failAgentResponse(data),
       generateConversationTitle: (data) => senders.generateConversationTitle(data),
     });
+  }
+
+  /** The pipeline `langy_guided_onboarding` registers, built once by {@link create}. */
+  guidedOnboardingPipeline(): LangyGuidedOnboardingPipeline {
+    return this.dependencies.guidedOnboarding.pipeline;
+  }
+
+  /** Binds the built pipeline's own senders. */
+  connectGuidedOnboardingCommands(commands: EventingCommands<LangyGuidedOnboardingPipeline>): void {
+    this.dependencies.guidedOnboarding.senders.commands = commands;
   }
 
   /**

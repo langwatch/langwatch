@@ -1,3 +1,4 @@
+import type { SessionImpersonation } from "@langwatch/auth-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 
 import type {
@@ -50,11 +51,31 @@ export class MemoryAuthSessionRepository implements AuthSessionRepository {
       id: session.id,
       userId: session.userId,
       sessionToken: session.sessionToken,
-      impersonating: session.impersonating,
+      impersonation: session.impersonation,
       createdAt: session.createdAt ?? EPOCH,
       lastSeenAt: session.lastSeenAt ?? null,
       updatedAt: session.updatedAt ?? EPOCH,
     };
+  }
+
+  async writeImpersonation({
+    sessionId,
+    claims,
+  }: {
+    sessionId: string;
+    claims: SessionImpersonation;
+  }): Promise<void> {
+    const session = this.memory.sessions.get(sessionId);
+    if (!session) return;
+
+    this.memory.sessions.set(sessionId, { ...session, impersonation: { ...claims } });
+  }
+
+  async clearImpersonation({ sessionId }: { sessionId: string }): Promise<void> {
+    const session = this.memory.sessions.get(sessionId);
+    if (!session) return;
+
+    this.memory.sessions.set(sessionId, { ...session, impersonation: null });
   }
 
   async touch({ sessionId, at }: { sessionId: string; at: Instant }): Promise<void> {
@@ -75,7 +96,7 @@ export class MemoryAuthSessionRepository implements AuthSessionRepository {
         id: session.id,
         userId: session.userId,
         sessionToken: session.sessionToken,
-        impersonating: session.impersonating,
+        impersonation: session.impersonation,
         createdAt: session.createdAt ?? EPOCH,
         lastSeenAt: session.lastSeenAt ?? null,
         updatedAt: session.updatedAt ?? EPOCH,

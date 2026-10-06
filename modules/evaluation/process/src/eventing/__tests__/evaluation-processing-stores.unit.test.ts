@@ -8,7 +8,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { EvaluationRunProjectionRepository } from "../../repositories/evaluation-run-projection.repository.ts";
-import { MemoryEvaluationAnalyticsFoldCacheRepository } from "../../repositories/memory/memory.evaluation-analytics-fold-cache.repository.ts";
+import { MemoryEvaluationAnalyticsFoldCacheRepository } from "../../repositories/memory/memory.evaluation.repositories.ts";
 import { EvaluationAnalyticsFoldProjection } from "../evaluation-analytics-fold.projection.ts";
 import {
   EvaluationProcessingStoresAdapter,

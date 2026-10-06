@@ -82,6 +82,29 @@ describe("usage's limit decision", () => {
     });
   });
 
+  describe("given a trace-metered organization whose month's traces reach its allowance", () => {
+    describe("when usage counts the organization's month", () => {
+      /** @scenario "A trace-metered organization past its allowance records the limit as reached" */
+      it("records limit_reached with the trace count and the unit traces", async () => {
+        const { recorded } = await decideAndRecord(
+          { month: null, reached: false },
+          {
+            ...counted(40, 1_000),
+            traces: 1_000,
+            limit: { ...counted(0, 1_000).limit, unit: "traces" },
+          },
+        );
+
+        expect(recorded.map(({ type, data }) => ({ type, data }))).toEqual([
+          {
+            type: USAGE_LIMIT_REACHED_EVENT_TYPE,
+            data: expect.objectContaining({ count: 1_000, allowance: 1_000, unit: "traces" }),
+          },
+        ]);
+      });
+    });
+  });
+
   describe("given the limit is already recorded as reached this month", () => {
     describe("when usage counts the organization's month again", () => {
       /** @scenario "Counting again past the allowance records nothing new" */

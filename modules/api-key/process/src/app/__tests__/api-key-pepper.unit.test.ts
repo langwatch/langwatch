@@ -118,6 +118,7 @@ describe("given a key main hashed under the deployment's credentials secret", ()
   });
 
   describe("when none of the chain is set", () => {
+    /** @scenario A process configured with no API-key pepper refuses to boot, naming the setting */
     it("refuses to build, naming the secrets it looked for", async () => {
       const refused = appOver({ environment: { API_KEY_PEPPER: "" }, hashedUnder: "" });
 

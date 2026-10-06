@@ -2,6 +2,7 @@ import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { getThreadAvailableSources, getTraceAvailableSources } from "@langwatch/dataset-contract";
 import { Box, Text } from "@langwatch/design-system/primitives";
+import { VariablesSection } from "@langwatch/design-system/variable-mapping";
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-contract/mapping-validation";
 import { createLogger } from "@langwatch/observability/browser";
 import {
@@ -12,7 +13,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useProjectSpanNames } from "../../../behavior/use-project-span-names.ts";
 import { renderSourceTypeIcon } from "../../elements/workflow/workflow-icons.tsx";
-import { VariablesSection } from "../prompt/variables/variables-section.tsx";
 
 const logger = createLogger("EvaluatorMappingsSection");
 

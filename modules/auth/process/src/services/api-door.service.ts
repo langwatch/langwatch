@@ -103,6 +103,14 @@ export class ApiDoorService {
           scope: { type: "platform" },
         }),
       }),
+      organizationOf: async (scope) => {
+        const ids = scope.tier === "project" ? { projectId: scope.id } : { teamId: scope.id };
+        const resolved = await authz.getScope(ids).catch((error: unknown) => {
+          if (AuthzScopeNotFoundError.is(error)) return null;
+          throw error;
+        });
+        return resolved?.type === scope.tier ? resolved.organizationId : null;
+      },
     };
   }
 

@@ -10,12 +10,7 @@ paths:
 
 # Database
 
-Before any migration, load `postgres-migration` or `clickhouse-migration`. A
-migration is applied to the live database before the new image rolls, so it
-must keep the previous image working and survive a rollback (ADR-155): add
-columns nullable or with `DEFAULT`; remove one only a full release after the
-code stopped using it, with `-- contract: retired in <release>`; never rename
-in place. Never edit a deployed migration; write a new one.
+Before any migration, load the `migration` skill; it routes to `postgres-migration`, `clickhouse-migration` or `migration-data-step`. Every release from the LTS floor to head must keep running on every later schema (dev/docs/plans/migrations-rethink-2026-10-06.md 6.12): add columns nullable or with `DEFAULT`; drop only what no release at or above the floor reads, with `-- contract: retired in <release>`; never rename in place. No new foreign keys and no new `@relation` (Alex, 2026-10-06); existing ones stay. Never edit a merged migration; write a new one.
 
 Read `dev/docs/best_practices/clickhouse-queries.md` before writing or changing a
 ClickHouse query.

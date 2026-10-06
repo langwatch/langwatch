@@ -14,6 +14,7 @@ import {
   SCOPE_TIER_BY_FIELD,
   SCOPE_TIER_FIELDS,
   type AuthzDeclaredScopeId,
+  type AuthzHandlerScope,
   type AuthzDenialReason,
   type AuthzGetDecisionInput,
   type AuthzGetProjectAnyDecisionInput,
@@ -168,6 +169,10 @@ export interface Authorize {
   getDecision(input: AuthzGetDecisionInput): Promise<PermissionDecision>;
   getProjectAnyDecision(input: AuthzGetProjectAnyDecisionInput): Promise<PermissionDecision>;
   checkScopeLineage(input: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult>;
+  /** The organization holding a project or team (AuthzApi.getScope); absent hands a null one. */
+  organizationOf?(
+    scope: Readonly<{ tier: "project" | "team"; id: string }>,
+  ): Promise<string | null>;
   /** Whether this user holds a platform-tier permission at the PLATFORM (E4); absent refuses. */
   getPlatformDecision?(input: {
     userId: string;
@@ -541,6 +546,27 @@ export async function decide({
     case "service-authorized":
       return { actor: caller.actor, scope: credentialScope };
   }
+}
+
+/**
+ * The scope a handler is handed: the one the door asked at, with the organization holding it
+ * (Alex, 2026-10-06, lineage D1). An organization holds itself; nothing is asked for it.
+ */
+export async function scopeWithOrganization({
+  scope,
+  authorize,
+}: {
+  scope: AuthzDeclaredScopeId | null;
+  authorize?: Authorize;
+}): Promise<AuthzHandlerScope | null> {
+  if (scope === null) return null;
+  if (scope.tier === "organization") return { ...scope, organizationId: scope.id };
+
+  const organizationId = authorize?.organizationOf
+    ? await authorize.organizationOf({ tier: scope.tier, id: scope.id })
+    : null;
+
+  return { ...scope, organizationId };
 }
 
 /**

@@ -9,6 +9,7 @@ import {
   type Actor,
   declaredScopeIdSchema,
   type AuthzDeclaredScopeId,
+  type AuthzHandlerScope,
   type AuthzPermission,
   type PlatformTierPermission,
   type ScopeTierField,
@@ -49,6 +50,7 @@ import { z } from "zod";
 import {
   AuthenticationRequiredError,
   decide,
+  scopeWithOrganization,
   decideEntitlement,
   declareAccessMiddleware,
   SCOPE_INPUT_FIELDS,
@@ -272,12 +274,15 @@ export const callerAddressFact = defineTrpcFact("callerAddress", z.string().null
 /** A feature API token is the runtime identity a router binds to. */
 export type TrpcFeatureApiWitness<Api> = ModuleApiToken<Api>;
 
-/** What a governed handler is handed. There is no `ctx`, request or response. */
+/**
+ * What a governed handler is handed. There is no `ctx`, request or response. Its scope carries
+ * the organization holding it (Alex, 2026-10-06, lineage D1).
+ */
 export type TrpcContractHandlerArguments<Input, App> = Omit<
   ApiHandlerArguments<Input, App>,
-  "actor"
+  "actor" | "scope"
 > &
-  Readonly<{ actor: TrpcHandlerActor }>;
+  Readonly<{ actor: TrpcHandlerActor; scope: AuthzHandlerScope | null }>;
 
 /**
  * What a procedure that runs with no caller is handed. Both halves are null
@@ -1451,7 +1456,10 @@ function check<TContext extends object>({
     const handlerArguments: ResolvedAccess = {
       app: app(ctx),
       actor: decision.actor,
-      scope: decision.scope,
+      scope: await scopeWithOrganization({
+        scope: decision.scope,
+        authorize: members.authorization.forRequest(ctx),
+      }),
       facts: await resolveFacts({ facts, ctx }),
     };
 

@@ -10,6 +10,10 @@ import { getActiveTraceId } from "@langwatch/observability/tracing";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
+import {
+  accountNotLinkedRedirectOf,
+  isAccountNotLinkedRedirect,
+} from "../rules/account-not-linked.rules.ts";
 import { isAllowedAuthOrigin, parseOrigin } from "../rules/auth-origin.rules.ts";
 import { sessionPollOf, type AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { issuerMismatchRedirectOf } from "../rules/id-token-issuer-mismatch.rules.ts";
@@ -42,6 +46,15 @@ export interface AuthDoorDeps {
   /** The issuer the connection a callback names holds, for the mismatch redirect. */
   connectionIssuers: Readonly<{
     findIssuersForConnection(args: { connectionId: string }): Promise<string[]>;
+  }>;
+  /** The address the OAuth provider's profile carried on this request, if one was mapped. */
+  oauthProfileEmails: Readonly<{
+    runWithScope<T>(run: () => Promise<T>): Promise<T>;
+    findEmail(): string | undefined;
+  }>;
+  /** The organization connections that govern an address, for a refused link's redirect. */
+  governingConnections: Readonly<{
+    findGoverningConnections(args: { email: string }): Promise<readonly string[]>;
   }>;
   /** The key a signed-in browser seals its mirrored reads under in one epoch. */
   deriveQueryCacheKey(input: QueryCacheKeyOwner & { epoch: number }): string;
@@ -133,6 +146,23 @@ export class AuthDoorService {
     return new Response(response.body, { status: response.status, headers });
   }
 
+  /** A refused link, answered with the connection that governs the provider's address
+   *  (specs/auth/sso-wrong-provider-recovery.feature). */
+  private async nameGoverningConnection(response: Response): Promise<Response> {
+    const location = response.headers.get("location");
+    if (!isAccountNotLinkedRedirect({ location })) return response;
+    const email = this.deps.oauthProfileEmails.findEmail();
+    if (email === undefined) return response;
+    const [connectionId] = await this.deps.governingConnections.findGoverningConnections({
+      email,
+    });
+    const redirect = accountNotLinkedRedirectOf({ location, connectionId });
+    if (redirect.kind === "pass") return response;
+    const headers = new Headers(response.headers);
+    headers.set("location", redirect.location);
+    return new Response(response.body, { status: response.status, headers });
+  }
+
   /** Better Auth's own fetch handler, behind the origin gate. */
   async betterAuthHandshake(request: Request): Promise<Response> {
     const origin = request.headers.get("origin");
@@ -170,8 +200,12 @@ export class AuthDoorService {
       caller: ClientAddress.resolvedFor(request),
     });
 
-    const answered = await this.deps.idTokenIssuerRefusals.runWithScope(async () =>
-      this.nameIssuerMismatch({ request, response: await betterAuth.handler(stated) }),
+    const answered = await this.deps.oauthProfileEmails.runWithScope(async () =>
+      this.deps.idTokenIssuerRefusals.runWithScope(async () =>
+        this.nameGoverningConnection(
+          await this.nameIssuerMismatch({ request, response: await betterAuth.handler(stated) }),
+        ),
+      ),
     );
     // Each acts on a different status (a 3xx to the error page, a 5xx on a callback).
     const errorPageUrl = `${baseUrl}/auth/error`;

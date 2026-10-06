@@ -1,7 +1,7 @@
-# Migrations rethink: plan for Alex (2026-10-06, revision 3)
+# Migrations rethink: plan for Alex (2026-10-06, revision 4)
 
-Status: design ruled by Alex on 2026-10-06 (section 9 lists his answers); three genuinely new
-questions remain (section 9). No code has changed.
+Status: design ruled by Alex on 2026-10-06 (section 9 lists his answers); one genuinely new question
+remains (section 9). No code has changed.
 Ruling it answers: Q215, `.claude/coordinator/rulings-2026-10-05.md:168` ("rethink how migrations
 work rather than restore the one task: version-aware, schema-aware, and no held or stuck runs. Big
 work: plan it carefully first"). The question that prompted it is
@@ -12,6 +12,13 @@ version-by-version stepping, per Alex's answer to Q1: "prisma/clickhouse migrati
 version they're attached to, so if you're upgrading multiple versions at once it upgrades to a version,
 runs the scripts, then upgrades the next version and runs its scripts, et cetera". Section 6.5 states
 what stepping needs and the cheapest design that makes it true.
+
+Revision 4 answers N1 with Alex's "the app has no control over scaling images, so there must be
+another way: gradual non-breaking migrations?": every schema change inside the supported window is
+expand/contract, and a destructive step may only remove what no release at or above the LTS floor
+reads (6.12). That rule keeps old pods safe while the Job steps, replaces revision 3's narrower floor
+rule (answering N3), and leaves N2 as archive-or-fail (6.8). It also folds in Alex's ruling that
+identity owns its migration's per-tenant state and ops reads it through the runner (6.6, 6.8).
 
 Every claim cites a file and line on this branch (or a commit on `origin/main` at `2687513eaa`).
 Where a claim is an inference rather than an observation it says so.
@@ -35,10 +42,16 @@ The ruled design:
    Prisma and goose migrations, then that release's blocking steps, then the next release (6.4).
    To make that true with an image that carries only the newest code, a blocking step is frozen SQL
    pinned to its own release's schema; anything that needs live domain code is a background step that
-   runs after the last release, and a later drop of its source waits for the LTS floor (6.5).
-4. **Ledger in runner-owned tables** beside `_prisma_migrations` and `goose_db_version` (Q4); ops'
-   page reads them through the runner.
-5. **No holds.** Only the pre-roll Job and the api's first boot on a fresh install migrate (Q5, Q10);
+   runs after the last release (6.5).
+4. **Non-breaking inside the window** (N1). Every schema change is expand/contract, and a destructive
+   step (drop, rename, type change, `NOT NULL` on a populated column, a constraint old writers can
+   violate) may only remove what no release at or above the LTS floor reads. Every supported release
+   keeps running on every later schema, so old pods serve unharmed while the Job steps, and no image
+   scaling is needed. Enforced by the existing migration-safety scanners plus a floor check (6.12).
+5. **Ledger in runner-owned tables** beside `_prisma_migrations` and `goose_db_version` (Q4); ops'
+   page reads them through the runner. Per-tenant state stays with the owning module (identity owns
+   its own), read through the runner too.
+6. **No holds.** Only the pre-roll Job and the api's first boot on a fresh install migrate (Q5, Q10);
    api and worker read the ledger and refuse by name if behind. A held tenant fails visibly, named and
    alerted, and never blocks the floor or cleanup (Q7). The floor is a named LTS release (Q2).
 
@@ -57,7 +70,9 @@ The ruled design:
   runner, one command, one ops page.
 - **G5 Observable.** "What release is this database on, what ran, what is outstanding, what failed and
   why" from the ops page and one CLI command.
-- **G6 Keeps ADR-155**, with one gap stepping exposes (6.7, question N1).
+- **G6 Non-breaking inside the window.** ADR-155's expand/contract, widened from "the previous
+  release" to "every release at or above the LTS floor" (6.12). Check: CI boots the LTS floor's image
+  against a database upgraded to head and runs its smoke suite.
 
 Non-goals: replacing Prisma or goose as SQL appliers; down migrations; changing what any existing
 migration does.
@@ -273,7 +288,7 @@ Installation recorded at 3.20.1, image 3.23.0, LTS floor 3.19.0 (illustrative):
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 3.21.0  | `prisma:..._add_storage_key` (expand), `dataset:...-copy-keys` (data, blocking, frozen SQL), `dataset:content-to-object-storage` (data, background) |
 | 3.22.0  | `prisma:..._add_identifier`, `clickhouse:00110`, `identity:identifier-backfill` (tenant, background)                                                |
-| 3.23.0  | `prisma:..._drop_legacy_key` (contract, retired in 3.22.0)                                                                                          |
+| 3.23.0  | `prisma:..._drop_legacy_key` (contract, retired in 3.18.0, below the 3.19.0 LTS floor)                                                              |
 
 `upgrade` (pre-roll Job of 3.23.0):
 
@@ -283,7 +298,8 @@ Installation recorded at 3.20.1, image 3.23.0, LTS floor 3.19.0 (illustrative):
    3.21.0; `goose up-to` 3.21.0's last version; then 3.21.0's blocking steps (`dataset:...-copy-keys`);
    record 3.21.0.
 4. **3.22.0**: the same, up to 3.22.0; no blocking steps; record.
-5. **3.23.0**: the same; before the contract, check its preconditions (6.5); record.
+5. **3.23.0**: the same; the drop is safe because no release from the 3.19.0 floor up reads the key
+   (6.12), so the 3.20.1 pods still serving are untouched; record.
 6. Reconcilers (TTL, LangWatchQL); record the run done. api and worker, which only read the ledger,
    now start.
 7. The worker runs background and tenant steps of 3.21.0 to 3.23.0 in release order.
@@ -295,7 +311,8 @@ release as the newest manifest whose schema ids are all applied, marked `inferre
 ### 6.5 What stepping needs, and the cheapest way to make it true
 
 The image carries only the newest code and the newest generated Prisma client. When 3.21.0's blocking
-step runs, the schema is at 3.21.0, not 3.23.0. Four things follow.
+step runs, the schema is at 3.21.0, not 3.23.0. Four things follow; the window rule of 6.12 is what
+keeps the old pods safe while it happens.
 
 1. **Prisma over a subset directory.** `apps/tasks/prisma.config.ts:10-11` names the migrations path;
    the runner writes a temporary directory per release (the manifest's folders plus every earlier one,
@@ -324,18 +341,17 @@ step runs, the schema is at 3.21.0, not 3.23.0. Four things follow.
    storage or event pipelines; tenant migrations emit events. They cannot be frozen SQL. They run on
    the worker after the last release, against the newest schema and code, which is what they are
    written for.
-4. **A drop must not remove what a pending background step reads.** In stepping, a 3.23 contract runs
-   before 3.21's background step. So the floor rule survives in exactly one case: a contract that
-   retires a background or tenant step's source may ship only in a release whose LTS floor is at or
-   above that step's release, so every supported installation has finished the step before it can
-   reach the drop. The contract names the step it retires (`-- contract: retired in 3.22.0; retires
-dataset:content-to-object-storage`), and the stamp fails the release otherwise. Contracts that
-   retire nothing a background step reads (most of them) keep ADR-155's one release. A blocking step's
-   source can be dropped in the very next release: stepping guarantees the step already ran.
+4. **A drop never removes what a pending background step reads.** In stepping, a 3.23 drop runs
+   before 3.21's background step. The window rule (6.12) already prevents harm: a drop may only remove
+   what no release at or above the LTS floor reads, and a background step's code is part of some release
+   at or above the floor until it is deleted, so its source cannot be dropped while it can still run.
+   This is revision 3's narrower floor rule, generalised (N3 is answered by it). A blocking step is no
+   exception: its source is also read by the releases around it, so it waits for the floor like any
+   other.
 
-**Held tenants at a drop** (Q7: never blocking). If a tenant step's legacy source reaches its drop while
-some tenants are held, the drop proceeds and those tenants fail visibly (named, alerted, `failed` in the
-ledger). Whether their legacy rows are archived first is question N2.
+**Held tenants at a drop** (Q7: never blocking; N2). Drops wait for the floor, so a tenant still held
+when its legacy source is dropped has been held, alerted and named for at least a whole LTS cycle.
+The drop proceeds; the plan's recommendation is archive-or-fail (6.8).
 
 ### 6.6 The ledger (Q4)
 
@@ -345,8 +361,8 @@ finished, outcome, plan) and `_langwatch_upgrade_step` (id, kind, release, mode,
 `pending | running | done | not-needed | failed | gated`, attempt, last error, checkpoint report), plus
 the installation's origin release and the current lease. Ops' page reads them through a reader the
 runner package exports, as ops already drives `packages/eventing`'s `ReplayService`
-(`modules/ops/process/src/services/replay.service.ts`). `SystemMigrationTenantState` stays ops' per-tenant
-truth; the ledger holds each tenant step's summary.
+(`modules/ops/process/src/services/replay.service.ts`). The ledger holds each tenant step's summary,
+never its per-tenant rows: those belong to the owning module (6.8).
 
 ### 6.7 Locking without holds (Q5, Q10)
 
@@ -360,10 +376,12 @@ truth; the ledger holds each tenant step's summary.
 - **DDL timeouts**: migration sessions set `lock_timeout` and retry with backoff.
 - **ClickHouse under the same lease**; the file lock stays for tests.
 - **Background and tenant steps run on the worker**, under today's per-tenant leases; never in a boot.
-- **Old pods during a multi-release jump.** ADR-155 promises the previous image works on the new schema,
-  one release apart. In a jump from N to N+3 the old N pods keep serving while the pre-roll Job steps to
-  N+3, and a contract retired in N+2 drops something N still uses. The runner can see it (the contract
-  note names its retired-in release, above the installed one). What it should then do is question N1.
+- **Old pods during a multi-release jump** (N1, answered). The app cannot scale images (Alex), so the
+  schema carries the safety: inside the window every change is non-breaking (6.12). While the Job steps
+  from N to N+3 the N pods see each intermediate schema in turn, and every one of them is a schema N
+  runs on, because expands are additive and nothing N reads is dropped (N is at or above the floor).
+  The rollout then replaces the pods; no scale-to-0, no refused jump. An installation below the floor
+  is the one unsupported case, and `upgrade` refuses it before touching the schema.
 
 ### 6.8 Tenant migrations: fail visibly, never block (Q7)
 
@@ -374,6 +392,24 @@ truth; the ledger holds each tenant step's summary.
   floor, not cleanup.
 - Cloud pacing stays on the step (`enrolledAutomatically`, `runsAutomaticallyOnSelfHosted`,
   `packages/system-migrations/src/system-migration.ts:52,59`); a gated step is `gated`, not `pending`.
+- **Per-tenant state belongs to the owning module** (Alex, `rulings-2026-10-05.md:216`, "identity owns
+  its migration's per-tenant state and records 'finalized' at adoption; ops reads it through the
+  runner"). Today every tenant migration writes ops' shared `SystemMigrationTenantState`
+  (`schema.prisma:6240-6258`) through the runner's state port
+  (`packages/system-migrations/src/state.repository.ts:30-48`). Target: the port stays the contract,
+  and each owning module implements it over its own table, declared with its step through
+  `.withMigrations`; identity goes first (D01: a user arriving by SAML is recorded `finalized` at
+  adoption by identity itself, so no pass ever has to visit them; identity's newborn sweep is today's
+  stand-in, `modules/identity/process/src/app/identity.app.ts:503`). The runner asks each step's port;
+  ops' page reads the runner, never another module's table. Ops keeps `SystemMigrationEnrollment`
+  (cloud pacing is its operator surface) and keeps `SystemMigrationTenantState` only for steps whose
+  owner has not moved yet, until the last one has.
+- **Archive-or-fail at a drop** (N2, recommendation). When a destructive step retires a tenant step's
+  legacy source, it first copies held tenants' legacy rows into a retained `_retired_<table>` with the
+  tenant id and the drop's release, marks those tenants `failed` in the owner's state (named, alerted),
+  then drops. If a source cannot be archived (a ClickHouse table too large to copy, say), the step says
+  so in its declaration and the tenants fail without an archive, still named and alerted. Nothing waits.
+  The archive is itself a retired table, dropped one LTS later.
 
 ### 6.9 How it runs: cloud, self-hosted, local dev
 
@@ -401,6 +437,68 @@ held tenant counts and the oldest held age.
 - ClickHouse DDL uses `IF NOT EXISTS` / `IF EXISTS` forms (a migration-safety rule beside
   `packages/clickhouse-migrations/src/__tests__/migration-safety.rules.ts`).
 - Inline DML in a Prisma migration stays allowed: under stepping it is the simplest blocking data step.
+
+### 6.12 Non-breaking inside the window (N1, N3)
+
+**The rule.** The supported window is every release from the LTS floor to head. Inside it, every step
+is expand/contract: a step may add, but a destructive step (drop of a column, table, view or index a
+release reads; rename; type change; `NOT NULL` or a new constraint on a column old writers may leave
+empty or violate; a view replaced with different columns) may only remove what no release at or above
+the LTS floor reads or writes. It is ADR-155 rule 2 (`adr/155...:38-42`) with "one full release later"
+widened to "no longer read by anything at or above the floor".
+
+**Stepping re-checked under it.** During a jump from N (at or above the floor) to N+3 the old N pods
+run against each intermediate schema and finally N+3's:
+
+- every expand of N+1 to N+3 is additive (nullable or defaulted columns, new tables, new views under new
+  names), which N does not name, so N's reads and inserts are unchanged;
+- every destructive step in N+1 to N+3 removes only what no release from the floor up reads, and N is
+  one of those releases, so nothing N touches disappears;
+- a blocking frozen-SQL step of N+1 rewrites data only into new places (copy, never move; 6.5), so N's
+  data stays where N reads it.
+
+So stepping and old pods compose, and stepping adds what the window rule does not: each blocking step
+runs against its own release's schema with its predecessors done. Background and tenant steps run after
+the rollout, against the newest schema, and their sources are protected by the same rule (6.5 point 4).
+
+**Recipes, per kind.**
+
+| Kind                             | Expand (any release)                                                                                                                                       | Migrate                                                                                                                                                                              | Contract (destructive)                                                                            |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Prisma add column                | nullable or `DEFAULT`; never bare `NOT NULL`                                                                                                               | none                                                                                                                                                                                 | none                                                                                              |
+| Prisma remove column or table    | none                                                                                                                                                       | release A stops reading and writing; `schema.prisma` marks it `/// retired: unread since A` (`.claude/skills/postgres-migration/SKILL.md:59-74`)                                     | drop in the first release whose LTS floor is at or above A, with `-- contract: retired in A`      |
+| Prisma rename                    | add the new name                                                                                                                                           | dual-write; a blocking frozen-SQL step copies old to new; readers switch in release A                                                                                                | drop the old name under the floor rule                                                            |
+| Prisma type change               | add a new column of the new type                                                                                                                           | as rename                                                                                                                                                                            | as rename                                                                                         |
+| Prisma `NOT NULL`                | add with a `DEFAULT` (non-destructive)                                                                                                                     | every writer sets it from release A; a step fills the gaps                                                                                                                           | set `NOT NULL` once the floor is at or above A                                                    |
+| Prisma new unique or foreign key | add `NOT VALID` / a non-unique index first                                                                                                                 | a step repairs violators; writers comply from A                                                                                                                                      | validate or make unique under the floor rule                                                      |
+| ClickHouse add column            | with `DEFAULT` (variable-size types must, `adr/155...:51-55`)                                                                                              | historic values by a background `MATERIALIZE` step, not an operator comment                                                                                                          | none                                                                                              |
+| ClickHouse type change or drop   | new column, or a new table or view under a new name                                                                                                        | background step backfills; readers switch in A                                                                                                                                       | `MODIFY`/`DROP` under the floor rule, with the note                                               |
+| ClickHouse view change           | new view under a new name (LWQL catalogue in step, `.claude/skills/clickhouse-migration/SKILL.md:123-133`)                                                 | readers switch in A                                                                                                                                                                  | drop the old view under the floor rule                                                            |
+| Data step                        | write only to new places; copy, never move (the dataset backfill keeps Postgres rows as a fallback, `docs/self-hosting/upgrade-dataset-storage.mdx:9,134`) | level-triggered: re-runs pick up what old pods wrote since (old pods do not know the new place, `upgrade-dataset-storage.mdx:128`)                                                   | deleting the old copy is a destructive step under the floor rule                                  |
+| Tenant step                      | per-tenant gate; legacy path served until `finalized` (`types.ts:41-48`)                                                                                   | the proof re-runs each pass, so legacy writes from old pods are re-proved (ADR-101's "the backfill restates every pass", `dev/docs/adr/101-identity-pipeline-and-identifiers.md:26`) | the legacy source and legacy path go under the floor rule, archive-or-fail for held tenants (6.8) |
+
+**Enforcement.** Most of this is already scanned, per package, by name and with the fix in the message
+(`packages/prisma-client/src/__tests__/migration-safety.rules.ts`,
+`packages/clickhouse-migrations/src/__tests__/migration-safety.rules.ts`; ADR-155's enforcement,
+`adr/155...:79-100`; scenarios at `specs/ops/migration-safety.feature:26-99`): a drop without a retirement
+note, a new `NOT NULL` without a default, `SET NOT NULL` without a backfill beside it, a rename in place,
+a ClickHouse drop or type change without a note, a variable-size column without a default, more than
+one statement in a goose block, an uncommented down migration. What changes:
+
+1. **The note is checked against the floor.** `-- contract: retired in A` passes only if A is at or below
+   the LTS floor declared in the tree; the message names the floor and the first release the drop may
+   ship in. Checkable at PR time, since A is a past release.
+2. **More statements count as destructive**: `SET NOT NULL` on a populated column (replacing "without a
+   backfill beside it", which is too weak once old pods are the floor, not the previous release), a new
+   unique or validated foreign key, a ClickHouse view replaced in place.
+3. **Data steps**: the frozen-step lint rule and immutability check (6.5 point 2); a data step whose
+   declaration says it deletes from a source is a destructive step and needs the note.
+4. **The direct test**: ADR-155's "still to land" CI job (`adr/155...:119-122`), widened: boot the LTS
+   floor's image (and the previous release's) against a database upgraded to head and run their smoke
+   suites. That proves "no breaking change inside the window" rather than its syntactic shadow.
+
+The baseline and the from-main list stay as they are (`adr/155...:91-107`): shipped migrations are not
+re-judged.
 
 ## 7. Migration path
 
@@ -431,16 +529,21 @@ Lane-sized, each with its own scenarios, each green on its own. S1 to S4 before 
   collision with the merge drive.
 - **S5 Tenant steps off the boot** (Q7). Held reason split, `heldSince`, alert, visible failure; delete
   `runStartup` and the `startup` execution mode; rewrite the runner spec (section 5 items 2, 3).
-- **S6 `.withMigrations`** (Q3). Framework declaration beside `.withTasks`; tenant migrations move to it;
-  the three `registeredMigrations()` operations retire; ARCHITECTURE.md §7 amended in the same change.
+- **S6 `.withMigrations`** (Q3). Framework declaration beside `.withTasks`; tenant migrations move to it,
+  each declaring its own per-tenant state port, identity first with `finalized` recorded at SAML
+  adoption (`rulings-2026-10-05.md:216`); the three `registeredMigrations()` operations retire;
+  ARCHITECTURE.md §7 amended in the same change.
 - **S7 Steps.** The lint rule and immutability check for frozen blocking steps; K4 backfills become
   background steps (first `dataset-content-backfill`, resolving section 5 item 6); K2 comment backfills
   become steps; the ClickHouse idempotent-DDL scanner rule.
 - **S8 Procedures.** Stored-object declares the provider move as a `procedure` step (needs the
   inventory's peer data ruled, questions file `:264`); decide `ClickHouseImportStoredObjectMigration`.
-- **S9 LTS floor and contracts.** The floor and its refusal; the contract note's `retires` check in the
-  stamp (6.5 point 4); the old-pod check (N1).
-- **S10 Cleanup.** When a new LTS is named: delete manifests, steps and legacy paths below it; squash
+- **S9 Window enforcement** (6.12). The LTS floor and the refusal below it; the retirement note checked
+  against the floor in both migration-safety scanners; the wider destructive list; the floor-image CI
+  job (ADR-155's "still to land", widened); ADR-155 amended to say "at or above the LTS floor" instead
+  of "one full release".
+- **S10 Cleanup and archive-or-fail.** When a new LTS is named: archive-or-fail held tenants of steps
+  whose legacy source is retired, delete manifests, steps and legacy paths below the floor, and squash
   the Prisma and goose history below it into a baseline.
 
 ## 9. Questions
@@ -450,31 +553,44 @@ release. Q3 (B) `.withMigrations`, one mechanism. Q4 runner-owned infrastructure
 them through the runner. Q5 only the pre-roll Job and first boot migrate; api and worker refuse by name
 if behind. Q6 each step declares blocking or background. Q7 a held tenant fails visibly, named and
 alerted, and blocks nothing. Q8 nothing lands before the redesign. Q9 S1 to S4 land before this branch's
-first release. Q10 on a Helm first install the api's first boot migrates once.
+first release. Q10 on a Helm first install the api's first boot migrates once. N1 no image scaling and
+no refused jumps: gradual non-breaking migrations inside the window (6.12), which also settles N3.
+Identity owns its migration's per-tenant state and ops reads it through the runner
+(`rulings-2026-10-05.md:216`; 6.8).
 
-**New, raised by stepping:**
+**Recommendation to confirm:** N2, archive-or-fail for held tenants at a drop (6.8): copy their legacy
+rows to a retained `_retired_<table>`, mark them failed and alert, then drop; fail without an archive
+only where the step declares the source cannot be copied.
 
-1. **N1 Old pods during a multi-release jump.** While the pre-roll Job steps from N to N+3, the N pods
-   still serve, and a contract retired in N+2 can drop something N still uses (6.7). Options: (a) when
-   the plan contains such a contract, the Job scales the app and workers to 0 first and says so (the
-   chart already has a Job that scales workers to 0, `charts/langwatch/templates/app/stored-objects-serialize-upgrade.yaml:20-24`),
-   accepting downtime for that jump; (b) refuse such jumps and require an intermediate image; (c) accept
-   errors on old pods until the rollout. The lane leans to (a).
-2. **N2 Held tenants at a drop.** When cleanup or a contract removes a tenant step's legacy source while
-   tenants are held, archive their legacy rows to a retained table before the drop, or accept losing them
-   after the alert? The lane leans to archiving.
-3. **N3 The one surviving floor rule.** Is it acceptable that a drop of a background or tenant step's
-   source waits until the LTS floor passes that step (6.5 point 4), or should such data moves be forced
-   into frozen blocking steps instead, at the cost of rewriting them as SQL?
+**New:**
+
+1. **N4 LTS cadence.** The window rule makes every drop wait until a named LTS is at or above the
+   release that stopped using the thing, so how often an LTS is named sets how long retired columns,
+   tables and legacy paths live (and how long a held tenant has before archive-or-fail). Is there a
+   cadence (for example one LTS per minor, or per quarter), or is it named case by case?
 
 ## 10. Risks
 
 - S4 may show Prisma does not tolerate successive subset deploys; then stepping needs our own applier
   writing `_prisma_migrations`-compatible rows, a larger slice.
-- Frozen SQL steps are harder to write than service code; most moves will choose background, which N3
-  makes slower to clean up.
+- Drops wait for the LTS floor, so retired columns and legacy paths live longer than ADR-155's one
+  release; with a slow LTS cadence (N4) dead schema accumulates.
+- Frozen SQL steps are harder to write than service code; most moves will choose background.
+- The window rule is only as good as its checks: a destructive change the scanners do not recognise
+  (say, a semantic change to a column's meaning) passes them; the floor-image CI job is the backstop.
 - Refusing to start when behind turns a forgotten `upgrade` into new pods that will not start; old pods
   keep serving and the refusal names the command, but the chart notes must say it loudly.
 - Seeding from existing records can misread a hand-patched database; the seed is marked `inferred`.
+- Moving per-tenant state from ops' shared table to each owner is a data move of its own (a step per
+  owner, copying its rows), and the runner reads both until the last owner has moved.
 - Tenant passes off the boot finalize tenants later after a deploy; the legacy path stays correct
   meanwhile (`system-migrations-runner.feature:220-226`).
+
+## 11. The upgrade UI
+
+The surfaces over this mechanism (the ops page, the fleet view, the CLI and the checkup rows) are
+planned in `dev/docs/plans/upgrade-ui-2026-10-06.md` (Alex, 2026-10-06 afternoon, item 4). It merges
+today's migrations, enrolment, backfill, replay-for-a-release and storage-move notions into steps of
+one upgrade, adds UI slices U1 to U9 after S2, and raises two gaps this plan does not cover:
+ClickHouse schema is applied per dataplane (its Q-U1) and serving processes refusing below the
+ledger's floor after a rollback (its Q-U5).

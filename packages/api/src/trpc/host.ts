@@ -428,6 +428,8 @@ function decidingOnce(authz: Authorize): Authorize {
   const lineages = new Map<string, Promise<AuthzScopeLineageResult>>();
   const platform = new Map<string, Promise<PlatformDecision>>();
   const askPlatform = authz.getPlatformDecision?.bind(authz);
+  const organizations = new Map<string, Promise<string | null>>();
+  const askOrganization = authz.organizationOf?.bind(authz);
 
   return {
     getDecision: (input) =>
@@ -444,6 +446,12 @@ function decidingOnce(authz: Authorize): Authorize {
       : {
           getPlatformDecision: (input) =>
             askOnce(platform, JSON.stringify(input), () => askPlatform(input)),
+        }),
+    ...(askOrganization === void 0
+      ? {}
+      : {
+          organizationOf: (scope) =>
+            askOnce(organizations, `${scope.tier}:${scope.id}`, () => askOrganization(scope)),
         }),
   };
 }

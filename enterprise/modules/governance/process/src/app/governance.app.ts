@@ -187,6 +187,7 @@ import {
   type IngestionPullDefinition,
 } from "../eventing/ingestion-pull.pipeline.ts";
 import { IngestionPullProcess } from "../eventing/ingestion-pull.process.ts";
+import { PulledUsageLedgerProcess } from "../eventing/pulled-usage-ledger.process.ts";
 import {
   PulledUsageEventingAdapter,
   type PulledUsageDefinition,
@@ -994,7 +995,27 @@ export class GovernanceModule implements GovernanceRestApi {
         costCharges: this.repositories.costCharges,
       }),
     );
-    return PulledUsageEventingAdapter.create({ costRollup, costCharges, costRollupWatch }).build();
+    // Main's PulledUsageLedgerProcess; gateway's budget ledger debits the priced fact it records.
+    const ledger = PulledUsageLedgerProcess.create({
+      pricing: {
+        sendRecordPulledUsagePriced: (input) =>
+          this.pulledUsageSender("recordPulledUsagePriced").send(input),
+      },
+      retraction: {
+        sendRetractPulledUsage: (input) => this.pulledUsageSender("retractPulledUsage").send(input),
+        retractionEnabled: (organizationId) =>
+          this.dependencies.featureFlags.isEnabled("release_pulled_usage_retraction_enabled", {
+            kind: "organization",
+            organizationId,
+          }),
+      },
+    });
+    return PulledUsageEventingAdapter.create({
+      ledger,
+      costRollup,
+      costCharges,
+      costRollupWatch,
+    }).build();
   }
 
   connectPulledUsage(commands: EventingSenders): void {

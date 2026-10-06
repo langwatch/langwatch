@@ -1,6 +1,7 @@
 // Target input variables and their sources (datasets and chained target outputs).
 
 import { Text, VStack } from "@langwatch/design-system/primitives";
+import { VariablesSection, type Variable } from "@langwatch/design-system/variable-mapping";
 import { getUsedFields } from "@langwatch/experiment-contract/mapping-validation";
 import type { Field, FieldMapping as VariableFieldMapping } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
@@ -13,7 +14,6 @@ import type {
   TargetConfig,
 } from "../../../../model/experiments-v3/types.ts";
 import { renderSourceTypeIcon } from "../../../elements/workflow/workflow-icons.tsx";
-import { VariablesSection, type Variable } from "../../prompt/variables/variables-section.tsx";
 
 interface TargetVariablesPanelProps {
   target: TargetConfig;

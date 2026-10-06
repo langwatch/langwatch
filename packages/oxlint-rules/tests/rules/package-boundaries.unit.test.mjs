@@ -116,6 +116,17 @@ describe("given package-boundaries", () => {
     });
   });
 
+  describe("when a file imports the process package's test peer seam", () => {
+    /** @scenario "The process test peer seam is imported only by tests" */
+    it("leaves a test alone and reports production code as testSeamOutsideTest", () => {
+      const seam = 'import { testPeer } from "@langwatch/process/testing";';
+
+      expect(ids(SERVICE_TEST, seam)).toEqual([]);
+      expect(ids(SERVICE, seam)).toEqual(["testSeamOutsideTest"]);
+      expect(ids("apps/api/src/main.ts", seam)).toEqual(["testSeamOutsideTest"]);
+    });
+  });
+
   describe("when a module's own test imports its own process package", () => {
     /** @scenario "A module's own tests import its own process package" */
     it("reports nothing", () => {

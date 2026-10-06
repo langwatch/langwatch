@@ -19,6 +19,19 @@ export function usageUnitOf({
   return pricingModel === PricingModel.SEAT_EVENT || plan.free ? "events" : "traces";
 }
 
+/** Whether the limit caps anything; an uncapped plan is never counted for enforcement. */
+export function isCapped(limit: UsageLimit): boolean {
+  return limit.allowance < UNLIMITED_ALLOWANCE;
+}
+
+/** The month's count in the limit's own unit, or that its meter was not read. */
+export type UnitCount = Readonly<{ read: true; count: number }> | Readonly<{ read: false }>;
+
+export function countInUnit(counted: MonthCountedEventData): UnitCount {
+  const count = counted.limit.unit === "traces" ? counted.traces : counted.billableEvents;
+  return count === undefined ? { read: false } : { read: true, count };
+}
+
 /** The limit a month is held against, as the plan states it. */
 export function usageLimitOf({ plan, unit }: { plan: Plan; unit: UsageUnit }): UsageLimit {
   return { allowance: plan.maxMessagesPerMonth, planName: plan.name, unit };
@@ -39,11 +52,11 @@ export function decideLimit({
 }): { state: LimitState; decision: LimitDecision } {
   if (state.month !== null && counted.month < state.month) return { state, decision: "none" };
   const reached = state.month === counted.month && state.reached;
-  const { allowance, unit } = counted.limit;
-  // ponytail: only the events meter lives here yet; a traces plan decides
-  // nothing until the trace meter moves.
-  const over =
-    unit === "events" && allowance < UNLIMITED_ALLOWANCE && counted.billableEvents >= allowance;
+  const inUnit = countInUnit(counted);
+  const capped = isCapped(counted.limit);
+  // A capped month whose meter was not read (an event recorded before traces were counted).
+  if (capped && !inUnit.read) return { state, decision: "none" };
+  const over = capped && inUnit.read && inUnit.count >= counted.limit.allowance;
   if (over === reached) return { state: { month: counted.month, reached: over }, decision: "none" };
   const decision: LimitDecision = over ? "reached" : "cleared";
   return { state: { month: counted.month, reached: over }, decision };

@@ -11,7 +11,7 @@ import {
   type ReplayStatus,
 } from "@langwatch/ops-contract";
 
-import type { ImpersonationTarget, ImpersonationWindow } from "../impersonation.repository.ts";
+import type { ImpersonationTarget } from "../impersonation.repository.ts";
 import type { StorageStatsReading } from "../storage-stats-readings.repository.ts";
 
 /** One event as the in-memory event log keeps it, with the columns the explorer reads by. */
@@ -93,10 +93,9 @@ export class MemoryOpsStore {
     AdminOperationInput["resource"],
     Map<string, Record<string, unknown>>
   >();
-  /** Who may be impersonated, who holds a second factor, and each session's window. */
+  /** Who may be impersonated and who holds a second factor. */
   readonly impersonationTargets = new Map<string, ImpersonationTarget>();
   readonly secondFactorUserIds = new Set<string>();
-  readonly impersonationWindows = new Map<string, ImpersonationWindow>();
   replayStatus: ReplayStatus = { ...IDLE_STATUS };
   replayLockHolder: string | null = null;
   replayCancelled = false;

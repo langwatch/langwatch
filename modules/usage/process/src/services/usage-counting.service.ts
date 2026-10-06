@@ -1,32 +1,41 @@
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 import type { MonthCountedEventData } from "@langwatch/usage-contract";
 
 import type { BillableEventsMeterRepository } from "../repositories/billable-events-meter.repository.ts";
-import { usageLimitOf, usageUnitOf } from "../rules/usage-limit.rules.ts";
+import type { TraceMeterRepository } from "../repositories/trace-meter.repository.ts";
+import { isCapped, usageLimitOf, usageUnitOf } from "../rules/usage-limit.rules.ts";
 
-const logger = createLogger("langwatch:usage:count");
+const defaultLogger = createLogger("langwatch:usage:count");
 
-/** Counts an organization's month from its own meter, against the plan the month is held to. */
+type UsageCountingDependencies = Readonly<{
+  meter: BillableEventsMeterRepository;
+  traceMeter: TraceMeterRepository;
+  entitlement: Pick<EntitlementApi, "getActivePlan">;
+  billing: Pick<BillingApi, "getPricingModel">;
+  logger?: Pick<Logger, "warn">;
+}>;
+
+/** Counts an organization's month from its own meters, against the plan the month is held to. */
 export class UsageCountingService {
-  private constructor(
-    private readonly meter: BillableEventsMeterRepository,
-    private readonly entitlement: Pick<EntitlementApi, "getActivePlan">,
-    private readonly billing: Pick<BillingApi, "getPricingModel">,
-  ) {}
+  private readonly meter: BillableEventsMeterRepository;
+  private readonly traceMeter: TraceMeterRepository;
+  private readonly entitlement: Pick<EntitlementApi, "getActivePlan">;
+  private readonly billing: Pick<BillingApi, "getPricingModel">;
+  private readonly logger: Pick<Logger, "warn">;
 
-  static create({
-    meter,
-    entitlement,
-    billing,
-  }: {
-    meter: BillableEventsMeterRepository;
-    entitlement: Pick<EntitlementApi, "getActivePlan">;
-    billing: Pick<BillingApi, "getPricingModel">;
-  }): UsageCountingService {
-    return new UsageCountingService(meter, entitlement, billing);
+  private constructor(deps: UsageCountingDependencies) {
+    this.meter = deps.meter;
+    this.traceMeter = deps.traceMeter;
+    this.entitlement = deps.entitlement;
+    this.billing = deps.billing;
+    this.logger = deps.logger ?? defaultLogger;
+  }
+
+  static create(deps: UsageCountingDependencies): UsageCountingService {
+    return new UsageCountingService(deps);
   }
 
   /** `YYYY-MM` for an instant, in UTC as billing's checkpoints key it. */
@@ -38,7 +47,10 @@ export class UsageCountingService {
       .toString();
   }
 
-  /** A meter that cannot answer throws, so nothing is decided and the command retries. */
+  /**
+   * Billable events are always counted, for billing's Stripe report; traces only when a capped
+   * plan is held in them. A meter that cannot answer throws, so nothing is decided and it retries.
+   */
   async countMonth(input: {
     organizationId: string;
     month: string;
@@ -55,9 +67,11 @@ export class UsageCountingService {
         startDate: `${start.toString()}-01 00:00:00.000`,
         endDate: `${start.add({ months: 1 }).toString()}-01 00:00:00.000`,
       });
-      return { ...input, billableEvents, limit };
+      if (limit.unit !== "traces" || !isCapped(limit)) return { ...input, billableEvents, limit };
+      const traces = await this.traceMeter.findTotal({ organizationId, month });
+      return { ...input, billableEvents, traces, limit };
     } catch (error) {
-      logger.warn(
+      this.logger.warn(
         { organizationId, plan: plan.name, error },
         "usage meter cannot be read, deciding nothing",
       );

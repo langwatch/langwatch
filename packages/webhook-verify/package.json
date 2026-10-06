@@ -1,0 +1,84 @@
+{
+  "name": "@langwatch/webhook-verify",
+  "version": "0.1.0",
+  "description": "Verify LangWatch webhook signatures, with Hono and Express middleware",
+  "keywords": [
+    "express",
+    "hmac",
+    "hono",
+    "langwatch",
+    "signature",
+    "webhook",
+    "zero-dependency"
+  ],
+  "homepage": "https://github.com/langwatch/langwatch/tree/main/packages/webhook-verify",
+  "bugs": "https://github.com/langwatch/langwatch/issues",
+  "license": "MIT",
+  "author": "LangWatch (https://langwatch.ai)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/langwatch/langwatch.git",
+    "directory": "packages/webhook-verify"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./hono": {
+      "types": "./dist/hono.d.ts",
+      "default": "./src/hono.ts"
+    },
+    "./express": {
+      "types": "./dist/express.d.ts",
+      "default": "./src/express.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./hono": {
+        "types": "./dist/hono.d.ts",
+        "import": "./dist/hono.js",
+        "require": "./dist/hono.cjs"
+      },
+      "./express": {
+        "types": "./dist/express.d.ts",
+        "import": "./dist/express.js",
+        "require": "./dist/express.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "scripts": {
+    "build": "tsup && tsc -p tsconfig.publish.json",
+    "typecheck": "pnpm -w exec tsc -b packages/webhook-verify",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:sdk-toolchain",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

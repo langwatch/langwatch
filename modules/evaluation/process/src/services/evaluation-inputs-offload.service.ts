@@ -1,15 +1,21 @@
-import { createHash } from "node:crypto";
-
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import type { EvaluationInputRepository } from "../repositories/evaluation-input.repository.ts";
+import type { EvaluationRetentionLookup } from "../repositories/evaluation.repository.ts";
+import {
+  isSha256Hex,
+  legacyEvaluationInputKey,
+  retentionClassOf,
+} from "../rules/evaluation-input-object.rules.ts";
 
 export const STORED_OBJECT_MARKER_KEY = "__lw_stored_object" as const;
 
 interface StoredObjectInputsMarker {
   [STORED_OBJECT_MARKER_KEY]: {
     id: string;
+    /** The full object key, so a retention change never strands it. Absent on main-era markers. */
+    key?: string;
     sizeBytes: number;
     sha256: string | null;
     preview: string;
@@ -32,7 +38,7 @@ const logger = createLogger("langwatch:evaluation:inputs-offload");
 export const EVAL_INPUTS_INLINE_MAX_BYTES = 1024 * 1024;
 export const EVAL_INPUTS_HARD_CEILING_BYTES = 50 * 1024 * 1024;
 export const EVAL_INPUTS_PREVIEW_BYTES = 16 * 1024;
-export const EVAL_INPUTS_STORED_OBJECT_PURPOSE = "evaluation_inputs" as const;
+const EVALUATION_RUNS_TABLE = "evaluation_runs";
 
 type EvaluationInputOffloadConfig = Readonly<{
   inlineMaxBytes: number;
@@ -43,9 +49,10 @@ type EvaluationInputOffloadConfig = Readonly<{
 export class EvaluationInputsOffloadService {
   static create(input: {
     storage: EvaluationInputRepository;
+    retention: EvaluationRetentionLookup;
     config: EvaluationInputOffloadConfig;
   }): EvaluationInputsOffloadService {
-    return new EvaluationInputsOffloadService(input.storage, input.config);
+    return new EvaluationInputsOffloadService(input.storage, input.retention, input.config);
   }
 
   /** Whether a stored inputs payload is the marker standing in for an offload. */
@@ -55,6 +62,7 @@ export class EvaluationInputsOffloadService {
 
   private constructor(
     private readonly storage: EvaluationInputRepository,
+    private readonly retention: EvaluationRetentionLookup,
     private readonly config: EvaluationInputOffloadConfig,
   ) {}
 
@@ -94,15 +102,16 @@ export class EvaluationInputsOffloadService {
       const bytes = Buffer.from(serialized, "utf8");
       const stored = await this.storage.store({
         tenantId: input.tenantId,
-        evaluationId: input.evaluationId,
+        retentionClass: await this.retentionClass(input.tenantId),
         bytes,
       });
 
       return this.marker({
         sizeBytes,
         preview,
-        id: stored.id,
-        sha256: createHash("sha256").update(bytes).digest("hex"),
+        id: stored.sha256,
+        key: stored.key,
+        sha256: stored.sha256,
       });
     } catch (error) {
       logger.warn(
@@ -133,18 +142,16 @@ export class EvaluationInputsOffloadService {
     }
 
     const marker = input.inputs[STORED_OBJECT_MARKER_KEY];
-    if (!marker.id) {
+    const key = this.keyOf({ tenantId: input.tenantId, marker });
+    if (key === null) {
       return input.inputs;
     }
 
     try {
-      const stored = await this.storage.read({
-        tenantId: input.tenantId,
-        id: marker.id,
-      });
+      const stored = await this.storage.read({ tenantId: input.tenantId, key });
       if (stored.kind === "absent") {
         logger.warn(
-          { tenantId: input.tenantId, storedObjectId: marker.id },
+          { tenantId: input.tenantId, objectKey: key },
           "Offloaded evaluation inputs object missing on read; returning marker with preview",
         );
 
@@ -163,7 +170,7 @@ export class EvaluationInputsOffloadService {
       logger.warn(
         {
           tenantId: input.tenantId,
-          storedObjectId: marker.id,
+          objectKey: key,
           error: error instanceof Error ? error.message : String(error),
         },
         "Failed to resolve offloaded evaluation inputs; returning marker with preview",
@@ -171,6 +178,34 @@ export class EvaluationInputsOffloadService {
 
       return input.inputs;
     }
+  }
+
+  /** The marker's own key, else main's address for its hash; a preview-only marker has none. */
+  private keyOf({
+    tenantId,
+    marker,
+  }: {
+    tenantId: string;
+    marker: StoredObjectInputsMarker[typeof STORED_OBJECT_MARKER_KEY];
+  }): string | null {
+    if (!marker.id) return null;
+    if (typeof marker.key === "string") return marker.key;
+    if (isSha256Hex(marker.sha256)) {
+      return legacyEvaluationInputKey({ tenantId, sha256: marker.sha256 });
+    }
+
+    return null;
+  }
+
+  private async retentionClass(tenantId: string) {
+    const [days] = await this.retention.findRetentionDays({
+      tenantId,
+      table: EVALUATION_RUNS_TABLE,
+    });
+
+    return retentionClassOf({
+      retentionDays: days ?? this.retention.getPlatformDefaultRetentionDays(),
+    });
   }
 
   private preview(serialized: string): { value: string; truncated: boolean } {
@@ -190,6 +225,7 @@ export class EvaluationInputsOffloadService {
     sizeBytes: number;
     preview: { value: string; truncated: boolean };
     id: string | null;
+    key?: string;
     sha256: string | null;
     ceilingExceeded?: boolean;
     offloadFailed?: boolean;
@@ -197,6 +233,7 @@ export class EvaluationInputsOffloadService {
     return {
       [STORED_OBJECT_MARKER_KEY]: {
         id: input.id ?? "",
+        ...(input.key ? { key: input.key } : {}),
         sizeBytes: input.sizeBytes,
         sha256: input.sha256,
         preview: input.preview.value,

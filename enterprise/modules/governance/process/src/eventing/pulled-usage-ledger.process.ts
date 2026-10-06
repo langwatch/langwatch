@@ -9,13 +9,16 @@ import type { Event, ProcessManagerApplier } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import type { PulledUsageLedgerRepository } from "../repositories/pulled-usage-ledger.repository.ts";
 import {
   filedCellSchema,
   filedCellFor,
   isReissuedElsewhere,
 } from "../rules/pulled-usage-reissue.rules.ts";
-import { PulledUsageLedgerIntent, writePulledUsageSchema } from "./pulled-usage-ledger.intent.ts";
+import {
+  PulledUsageLedgerIntent,
+  type PulledUsagePricingDeps,
+  writePulledUsageSchema,
+} from "./pulled-usage-ledger.intent.ts";
 import {
   type PulledUsageRetractionDeps,
   PulledUsageRetractionIntent,
@@ -53,7 +56,7 @@ const INITIAL_PULLED_USAGE_LEDGER_STATE: PulledUsageLedgerState = { filedCell: n
 type PulledUsageEvent = (PulledUsageObservedEvent | PulledUsageRetractedEvent) & Event;
 
 /**
- * The sole writer of pulled cost into the usage ledger, one instance per restatement key:
+ * The sole pricer of pulled cost for the usage ledger, one instance per restatement key:
  * the one place the cell a charge sits in and the cell its next pull lands in meet (ADR-088).
  */
 export class PulledUsageLedgerProcess {
@@ -63,14 +66,14 @@ export class PulledUsageLedgerProcess {
   ) {}
 
   static create({
-    ledger,
+    pricing,
     retraction,
   }: {
-    ledger: PulledUsageLedgerRepository;
+    pricing: PulledUsagePricingDeps;
     retraction: PulledUsageRetractionDeps;
   }): PulledUsageLedgerProcess {
     return new PulledUsageLedgerProcess(
-      PulledUsageLedgerIntent.create(ledger),
+      PulledUsageLedgerIntent.create(pricing),
       PulledUsageRetractionIntent.create(retraction),
     );
   }

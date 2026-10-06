@@ -176,7 +176,6 @@ var (
 		"specs/data-retention/ttl-activation.feature",
 		"specs/data-retention/visibility-window-teaser-redaction.feature",
 		"specs/dependencies/supply-chain-age-gates.feature",
-		"specs/evaluations/evaluation-payload-offload.feature",
 		"specs/evaluations/experiments-online-evaluations-separation.feature",
 		"specs/evaluators/create-workflow-evaluator.feature",
 		"specs/evaluators/evaluator-cli.feature",

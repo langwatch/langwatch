@@ -8,6 +8,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { Secret, type SecretsChain } from "@langwatch/secrets";
+import type { UpgradePostgres } from "@langwatch/upgrade";
 import { z } from "zod";
 
 /** The migration runner's own controls. Connection strings are not among them. */
@@ -53,6 +54,8 @@ export function resolveTasksEnvironment(
  */
 export interface TasksDatabase {
   readonly client: PrismaClient;
+  /** The same database as plain SQL, for the runner-owned upgrade ledger (packages/upgrade). */
+  readonly sql: UpgradePostgres;
   /** Runs the sequence under this database's advisory lock. */
   hold(run: () => Promise<void>): Promise<void>;
   close(): Promise<void>;

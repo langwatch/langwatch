@@ -1,4 +1,5 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { SessionImpersonation, SessionImpersonationState } from "@langwatch/auth-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -6,11 +7,10 @@ import { platformOperatorAuthz } from "../../app/__tests__/ops.fixture.ts";
 import {
   ImpersonationRepository,
   type ImpersonationTarget,
-  type ImpersonationWindow,
 } from "../../repositories/impersonation.repository.ts";
 import { AdminAccessService } from "../admin-access.service.ts";
 import { AdminAuditService } from "../admin-audit.service.ts";
-import { ImpersonationService } from "../impersonation.service.ts";
+import { ImpersonationService, type ImpersonationSessions } from "../impersonation.service.ts";
 
 const TARGET: ImpersonationTarget = {
   id: "user_target",
@@ -21,8 +21,8 @@ const TARGET: ImpersonationTarget = {
   mfaRequiredOrganizationSlugs: [],
 };
 
-class OneTargetRepository extends ImpersonationRepository {
-  window: ImpersonationWindow | null = null;
+class OneTargetRepository extends ImpersonationRepository implements ImpersonationSessions {
+  window: SessionImpersonation | null = null;
 
   getTarget(): Promise<ImpersonationTarget> {
     return Promise.resolve(TARGET);
@@ -32,16 +32,21 @@ class OneTargetRepository extends ImpersonationRepository {
     return Promise.resolve(false);
   }
 
-  findWindow(): Promise<ImpersonationWindow | null> {
-    return Promise.resolve(this.window);
+  getImpersonation(): Promise<SessionImpersonationState> {
+    return Promise.resolve(
+      this.window ? { kind: "impersonating", impersonation: this.window } : { kind: "none" },
+    );
   }
 
-  setWindow(_sessionId: string, window: ImpersonationWindow): Promise<void> {
-    this.window = window;
+  startImpersonation({
+    sessionId: _sessionId,
+    ...claims
+  }: SessionImpersonation & { sessionId: string; reason: string }): Promise<void> {
+    this.window = claims;
     return Promise.resolve();
   }
 
-  clearWindow(): Promise<void> {
+  stopImpersonation(): Promise<void> {
     this.window = null;
     return Promise.resolve();
   }
@@ -54,6 +59,7 @@ describe("AdminAuditService", () => {
     const repository = new OneTargetRepository();
     const service = ImpersonationService.create({
       repository,
+      sessions: repository,
       access: AdminAccessService.create({
         authz: platformOperatorAuthz({ holders: { user_operator: ["ops:view"] } }),
         users: { findByEmail: async () => null },
@@ -78,13 +84,14 @@ describe("AdminAuditService", () => {
       ipAddress: "203.0.113.7",
       userAgent: "agent/1",
     });
-    expect(repository.window?.id).toBe(TARGET.id);
+    expect(repository.window?.subjectUserId).toBe(TARGET.id);
   });
 
   it("refuses the impersonation when the audit log cannot record it", async () => {
     const repository = new OneTargetRepository();
     const service = ImpersonationService.create({
       repository,
+      sessions: repository,
       access: AdminAccessService.create({
         authz: platformOperatorAuthz({ holders: {} }),
         users: { findByEmail: async () => null },

@@ -1,9 +1,10 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 /**
  * The backoffice's organization edit, with the routing flip on. The
  * refusal is raised in the ops service graph, and its copy is read from
  * the presentation registry. Spec: specs/identity/sso-onboarding-tiers.feature
  */
-import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
@@ -45,6 +46,7 @@ function backoffice(connectionDecides = true) {
     },
     database: refuseEveryQuery as never,
     audit: new AuditStub(),
+    sessions: createApiFixture<AuthApi>(),
     auditLog: createApiFixture<AuditLogApi>(),
     authz: createApiFixture<AuthzApi>(),
     users: new TestUserApi(),

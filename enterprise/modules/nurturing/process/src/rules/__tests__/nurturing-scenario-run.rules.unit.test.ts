@@ -7,7 +7,7 @@
 import type { SimulationRunFinishedEventData } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
-import { isConnectedAgentRunSucceeded } from "../nurturing-scenario-run.rules.ts";
+import { isConnectedAgentRunSucceeded } from "../nurturing-owner-signals.rules.ts";
 
 function finishedEvent(
   data: Partial<SimulationRunFinishedEventData> = {},

@@ -35,6 +35,11 @@ import {
   experimentRanEventDataSchema,
 } from "@langwatch/experiment-contract";
 import {
+  GUIDED_ONBOARDING_TURN_FAILED_EVENT_TYPE,
+  type GuidedOnboardingTurnFailedEventData,
+  guidedOnboardingTurnFailedEventDataSchema,
+} from "@langwatch/langy-contract";
+import {
   GUIDED_ONBOARDING_RECORDED_EVENT_TYPE,
   guidedOnboardingRecordedEventDataSchema,
 } from "@langwatch/onboarding-contract";
@@ -121,6 +126,7 @@ export type NurturingPipeline = StaticPipelineDefinition<
 export function buildNurturingPipeline(deps: {
   deliver: (input: { key: string; signal: NurturingSignal }) => Promise<void>;
   projectCreated: (data: ProjectCreatedEventData) => Promise<void>;
+  guidedTurnFailed: (data: GuidedOnboardingTurnFailedEventData) => Promise<void>;
   evaluationCompleted: (input: {
     data: EvaluationLifecycleCompletedEventData;
     aggregateId: string;
@@ -148,6 +154,11 @@ export function buildNurturingPipeline(deps: {
         const signal = guidedOnboardingSignal({ data, aggregateId });
         return deps.deliver({ key: nurturingSignalKey(signal), signal });
       },
+    })
+    .withPeerSubscriber("guidedOnboardingTurnFailed", {
+      eventType: GUIDED_ONBOARDING_TURN_FAILED_EVENT_TYPE,
+      data: guidedOnboardingTurnFailedEventDataSchema,
+      handle: (data) => deps.guidedTurnFailed(data),
     })
     .withPeerSubscriber("experimentRan", {
       eventType: EXPERIMENT_RAN_EVENT_TYPE,

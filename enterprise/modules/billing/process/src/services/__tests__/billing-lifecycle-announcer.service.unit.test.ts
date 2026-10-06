@@ -35,6 +35,7 @@ function announcerOver(input: { remaining: boolean }) {
     subscriptions: { findLastNonCancelled: async () => (input.remaining ? { id: "sub-2" } : null) },
     organizations: { getAllMembers: async () => [{ id: "user-1" }, { id: "user-2" }] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
+    planLimitAlerts: { notifyPlanLimitReached: async () => {} },
   });
   service.connect({
     recordSubscriptionChanged: recorder(changed),
@@ -126,6 +127,7 @@ describe("BillingLifecycleAnnouncerService", () => {
         },
       },
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
+      planLimitAlerts: { notifyPlanLimitReached: async () => {} },
     });
     service.connect({
       recordSubscriptionChanged: recorder(changed),
@@ -143,6 +145,7 @@ describe("BillingLifecycleAnnouncerService", () => {
       subscriptions: { findLastNonCancelled: async () => null },
       organizations: { getAllMembers: async () => [] },
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
+      planLimitAlerts: { notifyPlanLimitReached: async () => {} },
     });
 
     await expect(service.subscriptionActivated(activation)).resolves.toBeUndefined();

@@ -26,6 +26,13 @@ Feature: Design system foundations and boundary
     And the feature conditions are added after the base config
     And the design-system package has no dependency on the feature
 
+  @unit @theme
+  Scenario: Solid orange stays the brand orange when a feature theme restyles it
+    Given a feature-owned config that gives orange.solid a value for one condition only
+    When the app creates a design system with that extension
+    Then orange.solid still resolves to #ED8926 outside that condition
+    And the feature value applies inside it
+
   @integration @theme
   Scenario: Every provider uses the composed system
     Given the app has composed its installed feature theme extensions

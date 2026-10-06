@@ -1,10 +1,6 @@
 import { PricingModel } from "@langwatch/entitlement-contract";
 import type { UsageUnit } from "@langwatch/entitlement-contract";
 
-export const USAGE_UNIT_DISPLAY_LABELS: Record<UsageUnit, string> = {
-  traces: "Monthly Traces",
-  events: "Monthly Events",
-} as const;
 export interface MeterDecision {
   usageUnit: UsageUnit;
   reason: string;

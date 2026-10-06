@@ -134,6 +134,19 @@ describe("ClickHouseEvaluationRepository", () => {
     expect(String(record.Error)).toContain("[lw-truncated]");
   });
 
+  /** @scenario evaluation rows stay merge-safe regardless of input size */
+  it("replaces inputs beyond the row cap with a bounded truncation marker", async () => {
+    const { client, repository } = harness();
+    await repository.upsert({
+      tenantId: "org_1",
+      data: { ...run, inputs: { blob: "x".repeat(8 * 1024 * 1024 + 10) } },
+    });
+
+    const record = client.inserts[0] as Record<string, unknown>;
+    expect(Buffer.byteLength(String(record.Inputs), "utf8")).toBeLessThan(1024);
+    expect(JSON.parse(String(record.Inputs))).toHaveProperty("__lw_truncated");
+  });
+
   it("validates tenants before writes and rejects mixed batches", async () => {
     const { client, repository } = harness();
     await expect(repository.upsert({ tenantId: "", data: run })).rejects.toThrow(SecurityError);

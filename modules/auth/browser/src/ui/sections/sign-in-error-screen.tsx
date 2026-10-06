@@ -16,7 +16,11 @@ import { isSameOrigin, signIn, useSession } from "../../behavior/auth-client.tsx
 import { hardNavigate } from "../../behavior/browser-navigation.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
-import { bounceConnectionFrom, cutoverSignInRefusal } from "../../model/sign-in-error-code.ts";
+import {
+  bounceConnectionFrom,
+  cutoverSignInRefusal,
+  governingConnectionFrom,
+} from "../../model/sign-in-error-code.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { FrontDoorShell } from "./front-door-shell.tsx";
 
@@ -174,10 +178,35 @@ export function SignInErrorScreen() {
 function SignInErrorDescription({
   error,
   callbackUrl,
+  governingConnection,
 }: {
   error: string;
   callbackUrl: string | undefined;
+  governingConnection: string | null;
 }) {
+  if (governingConnection) {
+    return (
+      <Alert.Description>
+        <VStack gap={1} align="start">
+          <Text>
+            An account with this email address already exists, and your organization requires its
+            single sign-on for it. Sign in with your organization&apos;s single sign-on instead.
+          </Text>
+          <Button
+            marginTop={4}
+            color="white"
+            onClick={() => void signIn(governingConnection, { callbackUrl: callbackUrl ?? "/" })}
+          >
+            Continue with your organization&apos;s sign-in
+          </Button>
+          <Button asChild variant="outline">
+            <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
+          </Button>
+        </VStack>
+      </Alert.Description>
+    );
+  }
+
   if (error === "OAuthAccountNotLinked") {
     return (
       <Alert.Description>
@@ -279,6 +308,10 @@ export function SignInError({ error: rawError }: { error: string }) {
   const query = useSearchParams();
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
   const error = normalizeSignInErrorCode(rawError) ?? rawError;
+  const governingConnection = governingConnectionFrom({
+    error,
+    target: query?.get("error_description"),
+  });
   // The handle on a cause we deliberately did not name, so the person has something to quote.
   const trace = query?.get("trace") ?? null;
 
@@ -290,7 +323,11 @@ export function SignInError({ error: rawError }: { error: string }) {
       >
         <Alert.Indicator />
         <Alert.Content gap={4}>
-          <SignInErrorDescription error={error} callbackUrl={callbackUrl} />
+          <SignInErrorDescription
+            error={error}
+            callbackUrl={callbackUrl}
+            governingConnection={governingConnection}
+          />
         </Alert.Content>
       </Alert.Root>
       {trace && (

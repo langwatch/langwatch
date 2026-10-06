@@ -411,6 +411,7 @@ export class EvaluationModule implements EvaluationApiContract {
     const azureSafety = AzureSafetyCredentialsService.create(dependencies.modelProviders);
     const inputs = EvaluationInputsOffloadService.create({
       storage: repositories.inputs,
+      retention: EvaluationRetentionDaysService.create(dependencies.retention),
       config: {
         inlineMaxBytes: EVAL_INPUTS_INLINE_MAX_BYTES,
         hardCeilingBytes: EVAL_INPUTS_HARD_CEILING_BYTES,

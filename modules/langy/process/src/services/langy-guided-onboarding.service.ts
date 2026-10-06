@@ -1,29 +1,32 @@
 /**
- * The guided onboarding a failed turn is checked against, and the event it is tracked as, both
- * answered by onboarding. @see specs/analytics/posthog-guided-onboarding.feature
+ * The guided onboarding a failed turn is checked against, answered by onboarding, and the fact
+ * it is recorded as on langy's own pipeline. @see specs/analytics/posthog-guided-onboarding.feature
  */
-import { onboardingExperimentProperties, type OnboardingApi } from "@langwatch/onboarding-contract";
+import type { GuidedOnboardingTurnFailedEventData } from "@langwatch/langy-contract";
+import type { OnboardingApi } from "@langwatch/onboarding-contract";
 
 import type {
-  GuidedOnboardingAnalytics,
+  GuidedOnboardingFacts,
   GuidedOnboardingForProject,
   GuidedOnboardingReader,
 } from "../eventing/langy-guided-onboarding-turn-failed.subscriber.ts";
 
-export class LangyGuidedOnboardingService
-  implements GuidedOnboardingReader, GuidedOnboardingAnalytics
-{
+/** Sends one failed-turn fact to the `langy_guided_onboarding` pipeline. */
+export type GuidedOnboardingTurnFailedRecorder = (
+  data: GuidedOnboardingTurnFailedEventData,
+) => Promise<void>;
+
+export class LangyGuidedOnboardingService implements GuidedOnboardingReader, GuidedOnboardingFacts {
   private constructor(
-    private readonly onboarding: Pick<
-      OnboardingApi,
-      "getGuidedStateByProject" | "trackGuidedOnboardingEvent"
-    >,
+    private readonly onboarding: Pick<OnboardingApi, "getGuidedStateByProject">,
+    private readonly record: GuidedOnboardingTurnFailedRecorder,
   ) {}
 
   static create(input: {
-    onboarding: Pick<OnboardingApi, "getGuidedStateByProject" | "trackGuidedOnboardingEvent">;
+    onboarding: Pick<OnboardingApi, "getGuidedStateByProject">;
+    record: GuidedOnboardingTurnFailedRecorder;
   }): LangyGuidedOnboardingService {
-    return new LangyGuidedOnboardingService(input.onboarding);
+    return new LangyGuidedOnboardingService(input.onboarding, input.record);
   }
 
   async getByProject({ projectId }: { projectId: string }): Promise<GuidedOnboardingForProject> {
@@ -33,17 +36,11 @@ export class LangyGuidedOnboardingService
       organizationId: guided.organizationId,
       conversationId: guided.state.conversationId,
       currentPath: guided.state.currentPath,
-      experimentProperties: onboardingExperimentProperties(guided.variant),
+      variant: guided.variant,
     };
   }
 
-  track(input: {
-    userId: string;
-    event: string;
-    projectId: string;
-    properties: Record<string, unknown>;
-    uuid: string;
-  }): void {
-    this.onboarding.trackGuidedOnboardingEvent(input);
+  recordTurnFailed(data: GuidedOnboardingTurnFailedEventData): Promise<void> {
+    return this.record(data);
   }
 }

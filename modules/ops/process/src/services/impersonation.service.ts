@@ -1,3 +1,4 @@
+import type { AuthApi } from "@langwatch/auth-contract";
 import {
   CannotImpersonateAdminError,
   CannotImpersonateDeactivatedUserError,
@@ -7,7 +8,7 @@ import {
   type StopImpersonationInput,
   type AdminAuditRequest,
 } from "@langwatch/ops-contract";
-import { type Instant, nowInstant, Temporal } from "@langwatch/time";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 import type {
   ImpersonationRepository,
@@ -26,8 +27,15 @@ export abstract class AdminAuditSink {
   }): Promise<void>;
 }
 
+/** The session's {actor, subject} claims are auth's (D06); ops asks for them through its peer. */
+export type ImpersonationSessions = Pick<
+  AuthApi,
+  "getImpersonation" | "startImpersonation" | "stopImpersonation"
+>;
+
 interface ImpersonationServiceOptions {
   repository: ImpersonationRepository;
+  sessions: ImpersonationSessions;
   access: AdminAccess;
   audit: AdminAuditSink;
   now?: (() => Instant) | undefined;
@@ -35,17 +43,20 @@ interface ImpersonationServiceOptions {
 
 export class ImpersonationService {
   private readonly repository: ImpersonationRepository;
+  private readonly sessions: ImpersonationSessions;
   private readonly access: AdminAccess;
   private readonly audit: AdminAuditSink;
   private readonly now: () => Instant;
 
   private constructor(deps: {
     repository: ImpersonationRepository;
+    sessions: ImpersonationSessions;
     access: AdminAccess;
     audit: AdminAuditSink;
     now: () => Instant;
   }) {
     this.repository = deps.repository;
+    this.sessions = deps.sessions;
     this.access = deps.access;
     this.audit = deps.audit;
     this.now = deps.now;
@@ -54,6 +65,7 @@ export class ImpersonationService {
   static create(options: ImpersonationServiceOptions): ImpersonationService {
     return new ImpersonationService({
       repository: options.repository,
+      sessions: options.sessions,
       access: options.access,
       audit: options.audit,
       now: options.now ?? nowInstant,
@@ -85,27 +97,25 @@ export class ImpersonationService {
       req: input.req,
     });
 
-    await this.repository.setWindow(input.sessionId, {
-      id: target.id,
-      name: target.name,
-      email: target.email,
-      image: target.image,
-      expires: this.now().add({ milliseconds: IMPERSONATION_TTL_MS }),
+    await this.sessions.startImpersonation({
+      sessionId: input.sessionId,
+      actorUserId: input.impersonatorUserId,
+      subjectUserId: target.id,
+      reason: input.reason,
+      expiresAt: this.now().add({ milliseconds: IMPERSONATION_TTL_MS }),
     });
   }
 
   /**
    * Read FIRST, so a refused hop writes no audit entry and touches no session
-   * row. A lapsed window reads as an ordinary session, and so does one naming
-   * the operator: neither is an impersonation to stop.
+   * row. Auth reads a lapsed claim, and one naming the operator, as an
+   * ordinary session: neither is an impersonation to stop.
    */
   private async assertSessionIsNotAlreadyImpersonating(
     input: StartImpersonationInput,
   ): Promise<void> {
-    const window = await this.repository.findWindow(input.sessionId);
-    if (!window) return;
-    if (window.id === input.impersonatorUserId) return;
-    if (Temporal.Instant.compare(window.expires, this.now()) <= 0) return;
+    const state = await this.sessions.getImpersonation({ sessionId: input.sessionId });
+    if (state.kind === "none") return;
 
     throw new CannotReimpersonateWhileImpersonatingError();
   }
@@ -138,6 +148,6 @@ export class ImpersonationService {
   }
 
   async stop(input: StopImpersonationInput): Promise<void> {
-    await this.repository.clearWindow(input.sessionId);
+    await this.sessions.stopImpersonation({ sessionId: input.sessionId });
   }
 }

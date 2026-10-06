@@ -62,3 +62,22 @@ export function bounceConnectionFrom({
   if (!target || !looksLikeSsoConnectionId(target)) return null;
   return target;
 }
+
+/** The refusal of a link that a connection may name: an account exists under another method. */
+export const ACCOUNT_NOT_LINKED_ERROR = "OAuthAccountNotLinked";
+
+/**
+ * The connection that governs the refused address, named by the server on a refused link
+ * (specs/auth/sso-wrong-provider-recovery.feature). Read as an IDENTIFIER, never navigated to.
+ */
+export function governingConnectionFrom({
+  error,
+  target,
+}: {
+  error: string | null | undefined;
+  target: string | null | undefined;
+}): string | null {
+  if (error !== ACCOUNT_NOT_LINKED_ERROR) return null;
+  if (!target || !looksLikeSsoConnectionId(target)) return null;
+  return target;
+}

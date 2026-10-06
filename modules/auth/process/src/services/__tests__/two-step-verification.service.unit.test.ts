@@ -21,7 +21,7 @@ function twoStep(protocol: Partial<TwoStepProtocol> = {}) {
     memory.sessions.set(id, {
       id,
       sessionToken: id,
-      impersonating: null,
+      impersonation: null,
       expires: id.startsWith("lapsed") ? NOW.subtract({ hours: 1 }) : NOW.add({ hours: 1 }),
       ...rest,
     });

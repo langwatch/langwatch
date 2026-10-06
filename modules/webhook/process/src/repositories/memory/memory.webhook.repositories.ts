@@ -1,13 +1,30 @@
 import { generate } from "@langwatch/ksuid";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 import { type WebhookId, type WebhookSecret } from "../../app/webhook.app.ts";
+import type { WebhookRetentionRepository } from "../webhook-retention.repository.ts";
 import type { WebhookRepositories } from "../webhook.repositories.ts";
 import { MemoryWebhookDispatchCapRepository } from "./memory.webhook-dispatch-cap.repository.ts";
 import { MemoryWebhookEndpointRepository } from "./memory.webhook-endpoint.repository.ts";
 import { MemoryWebhookEventsRepository } from "./memory.webhook-events.repository.ts";
 import { MemoryWebhookRateLimitRepository } from "./memory.webhook-rate-limit.repository.ts";
-import { MemoryWebhookRetentionRepository } from "./memory.webhook-retention.repository.ts";
 import { MemoryWebhookDatabase } from "./memory.webhook.database.ts";
+
+class MemoryWebhookRetentionRepository implements WebhookRetentionRepository {
+  private constructor(private readonly database: MemoryWebhookDatabase) {}
+
+  static create(input: { database: MemoryWebhookDatabase }): MemoryWebhookRetentionRepository {
+    return new MemoryWebhookRetentionRepository(input.database);
+  }
+
+  async pruneDeliveries({ now = nowInstant() }: { now?: Instant } = {}): Promise<number> {
+    return this.database.pruneDeliveriesBefore(now.subtract({ hours: 30 * 24 }));
+  }
+
+  async pruneExpiredIdempotencyReceipts(): Promise<number> {
+    return 0;
+  }
+}
 
 class MemoryWebhookIds implements WebhookId {
   newEndpointId(): string {

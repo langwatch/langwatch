@@ -29,10 +29,15 @@ export class HttpPostHogChannel extends PostHogChannel {
     return new HttpPostHogChannel(options.targets);
   }
 
-  track({ userId, event, properties }: PostHogEventInput): void {
+  track({ userId, event, properties, uuid }: PostHogEventInput): void {
     try {
       for (const client of this.clients()) {
-        client.capture({ distinctId: userId, event, properties });
+        client.capture({
+          distinctId: userId,
+          event,
+          properties,
+          ...(uuid === undefined ? {} : { uuid }),
+        });
       }
     } catch (error) {
       logger.warn({ error, event }, "a product milestone did not reach PostHog");

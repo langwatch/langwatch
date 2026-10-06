@@ -60,6 +60,7 @@ const refuseEverything = () => Promise.reject(new Error("an identified caller as
 const peers: ApiDoorPeers = {
   sessions: { verifyBrowserSession: refuseEverything, resolveBrowserSession: refuseEverything },
   apiKeys: {
+    getOrgProjects: () => Promise.resolve([]),
     findResolvedToken: ({ token }: ApiKeyTokenResolutionInput) =>
       Promise.resolve(projectTokens.get(token) ?? null),
     resolveOrganizationToken: ({ token }) =>
@@ -694,5 +695,32 @@ describe("the tRPC audit sink", () => {
         }),
       );
     });
+  });
+});
+
+describe("the door's organization of a scope", () => {
+  const getScope: AuthzApi["getScope"] = async (ids) => {
+    if (ids.projectId === "project-1") {
+      return { type: "project", id: "project-1", teamId: "team-1", organizationId: "org-1" };
+    }
+    if (ids.teamId === "team-1") return { type: "team", id: "team-1", organizationId: "org-1" };
+    throw new AuthzScopeNotFoundError(ids);
+  };
+  const { authz } = ApiDoorService.create({ ...peers, authz: { ...peers.authz, getScope } }).door();
+
+  it("answers the organization holding a project", async () => {
+    await expect(authz.organizationOf?.({ tier: "project", id: "project-1" })).resolves.toBe(
+      "org-1",
+    );
+  });
+
+  it("answers the organization holding a team", async () => {
+    await expect(authz.organizationOf?.({ tier: "team", id: "team-1" })).resolves.toBe("org-1");
+  });
+
+  it("answers null for a scope authz does not know", async () => {
+    await expect(authz.organizationOf?.({ tier: "project", id: "project-gone" })).resolves.toBe(
+      null,
+    );
   });
 });

@@ -148,7 +148,7 @@ export const designSystemConfig = defineConfig({
           focusRing: { value: "{colors.blue.500}" },
         },
         orange: {
-          solid: { value: "#ED8926" },
+          solid: { value: { _light: "#ED8926", _dark: "#ED8926" } },
           hover: {
             value: {
               _light: "{colors.orange.600}",

@@ -28,6 +28,10 @@ import {
   type RecordSubscriptionStartedCommandData,
 } from "./billing-lifecycle.events.ts";
 import {
+  BILLING_PLAN_LIMIT_REACHED_SUBSCRIBER_NAME,
+  planLimitReachedSubscriber,
+} from "./plan-limit-reached.subscriber.ts";
+import {
   BILLING_SEAT_LIMIT_REACHED_SUBSCRIBER_NAME,
   seatLimitReachedSubscriber,
 } from "./seat-limit-reached.subscriber.ts";
@@ -43,10 +47,12 @@ export type BillingLifecyclePipeline = StaticPipelineDefinition<
 /** billing_lifecycle: billing records its facts; peers react from their own side (§9). */
 export type BuildBillingLifecyclePipelineInput = Readonly<{
   alerts: Parameters<typeof seatLimitReachedSubscriber>[0]["alerts"];
+  planLimitAlerts: Parameters<typeof planLimitReachedSubscriber>[0]["alerts"];
 }>;
 
 export function buildBillingLifecyclePipeline({
   alerts,
+  planLimitAlerts,
 }: BuildBillingLifecyclePipelineInput): BillingLifecyclePipeline {
   return definePipeline({
     name: BILLING_LIFECYCLE_PIPELINE_NAME,
@@ -63,6 +69,10 @@ export function buildBillingLifecyclePipeline({
     .withPeerSubscriber(
       BILLING_SEAT_LIMIT_REACHED_SUBSCRIBER_NAME,
       seatLimitReachedSubscriber({ alerts }),
+    )
+    .withPeerSubscriber(
+      BILLING_PLAN_LIMIT_REACHED_SUBSCRIBER_NAME,
+      planLimitReachedSubscriber({ alerts: planLimitAlerts }),
     )
     .build();
 }

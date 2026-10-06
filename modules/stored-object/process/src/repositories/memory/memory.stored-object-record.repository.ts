@@ -61,6 +61,31 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
       .toSorted((left, right) => left.id.localeCompare(right.id))
       .slice(0, input.limit);
   }
+
+  async findPageByPurpose(input: {
+    purpose: string;
+    after?: Readonly<{ tenantId: StoredObjectProjectId; id: StoredObjectId }>;
+    limit: number;
+  }): Promise<StoredObjectRecord[]> {
+    const { after } = input;
+    return [...this.#values.values()]
+      .filter(
+        (value) =>
+          value.purpose === input.purpose &&
+          (!after ||
+            value.tenantId > after.tenantId ||
+            (value.tenantId === after.tenantId && value.id > after.id)),
+      )
+      .toSorted(
+        (left, right) =>
+          left.tenantId.localeCompare(right.tenantId) || left.id.localeCompare(right.id),
+      )
+      .slice(0, input.limit);
+  }
+
+  async delete(input: { tenantId: StoredObjectProjectId; id: StoredObjectId }): Promise<void> {
+    this.#values.delete(key(input));
+  }
 }
 
 /**

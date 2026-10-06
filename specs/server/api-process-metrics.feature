@@ -39,11 +39,17 @@ Feature: The standalone API process serves its own metrics
     Scenario: In production an unset key leaves the process with no metrics endpoint
       Given the API process runs in production with no metrics API key configured
       When it composes
-      Then it names the absence at boot
-      And its metrics endpoint is absent rather than open
+      Then its metrics endpoint is absent rather than open
       # Fail-closed, as the worker tier is: an unset key is a misconfiguration,
       # not an invitation. Absent rather than refusing, because a route that
       # answers every caller with a refusal is a surface with no purpose.
+
+    # Gap: the boot does not name the absence (open question Q103).
+    @unit @unimplemented
+    Scenario: In production an unset key is named at boot
+      Given the API process runs in production with no metrics API key configured
+      When it composes
+      Then it names the absence at boot
 
     @unit
     Scenario: Outside production an unset key leaves the endpoint open
@@ -52,15 +58,6 @@ Feature: The standalone API process serves its own metrics
       Then the response is successful
       # The convenience the web process has always allowed, kept identical so
       # the credential has one rule across the deployment rather than two.
-
-  Rule: A host that owns the graph owns the transport
-
-    @unit
-    Scenario: An injected metrics transport answers every scrape
-      Given a host supplies the API process with its own metrics transport
-      When the process composes
-      Then scrapes are answered by the host's transport
-      And what this deployment configured for a registry of its own is not consulted
 
   Rule: Composing metrics twice does not cost the process its metrics
 

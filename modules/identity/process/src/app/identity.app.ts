@@ -655,7 +655,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       connections: setup.repositories.ssoConnections,
       memberships: arrivalMemberships(setup.dependencies.organizations),
       authz: setup.dependencies.permissions,
-      adoption: SsoArrivalAdoptionService.create(backfill),
+      adoption: SsoArrivalAdoptionService.create({
+        backfill,
+        latch: setup.repositories.latch,
+      }),
       signups: signupAnnouncements,
     });
     const ssoTestArrival = SsoTestArrivalService.create({
@@ -843,7 +846,6 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
           proposals: identityHistory,
           accounts: setup.dependencies.auth,
         }),
-        authorization: setup.dependencies.permissions,
         auditLog: setup.dependencies.auditLog,
         rateLimiter: setup.repositories.rateLimits,
         sessions: setup.dependencies.auth,
@@ -1278,5 +1280,13 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     operator: IdentityLookupOperator;
   }): Promise<LookupInvitationExpiry> {
     return this.#parts.lookup.extendLookupInvitation(input);
+  }
+
+  recordRefusedLookup(input: {
+    operator: IdentityLookupOperator;
+    action: string;
+    args: Readonly<Record<string, string | null>>;
+  }): Promise<void> {
+    return this.#parts.lookup.recordRefusedLookup(input);
   }
 }
