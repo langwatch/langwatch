@@ -77,9 +77,15 @@ function useConnectionBounce(
   useEffect(() => {
     if (!connectionId) return;
     let cancelled = false;
-    void signIn(connectionId, { callbackUrl: "/" }).then((result) => {
-      if (!cancelled && result?.error) setDialRefused(true);
-    });
+    // A dial that throws is as refused as one that answers with an error:
+    // either way nobody is on their way anywhere.
+    void signIn(connectionId, { callbackUrl: "/" })
+      .then((result) => {
+        if (!cancelled && result?.error) setDialRefused(true);
+      })
+      .catch(() => {
+        if (!cancelled) setDialRefused(true);
+      });
     return () => {
       cancelled = true;
     };

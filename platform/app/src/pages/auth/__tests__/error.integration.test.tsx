@@ -177,6 +177,30 @@ describe("Auth error page referrer redirect", () => {
         screen.queryByText(/Taking you to your organization's sign-in/i),
       ).toBeNull();
     });
+
+    /** @scenario "A dial the server refuses shows the refusal instead of waiting" */
+    it("shows the refusal when the dial itself throws", async () => {
+      vi.useRealTimers();
+      // The request never got an answer: the network dropped, or the client
+      // threw before asking. Nobody is on their way anywhere.
+      signIn.mockRejectedValueOnce(new Error("Failed to fetch"));
+      searchParamsRef.current = new URLSearchParams(
+        "error=SSO_REQUIRED_BY_ORGANIZATION&error_description=ssoc_gone",
+      );
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Error />
+        </ChakraProvider>,
+      );
+
+      expect(signIn).toHaveBeenCalledWith("ssoc_gone", { callbackUrl: "/" });
+      expect(
+        await screen.findByText(/Use your organization's sign-in/i),
+      ).toBeTruthy();
+      expect(
+        screen.queryByText(/Taking you to your organization's sign-in/i),
+      ).toBeNull();
+    });
   });
 
   describe("given a same-origin referrer", () => {
