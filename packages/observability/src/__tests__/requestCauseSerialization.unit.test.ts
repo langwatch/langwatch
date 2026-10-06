@@ -229,11 +229,69 @@ describe("emitted request-log records", () => {
 
           /** @scenario Error records carry no superjson metadata */
           it("emits no _superjson field", () => {
-            const [line] = JSON.stringify(emitted()).match(/_superjson/) ?? [];
-            expect(line).toBeUndefined();
+            expect(JSON.stringify(emitted())).not.toContain("_superjson");
           });
         });
       }
     }
+  });
+
+  describe("given a non-Error thrown at error level", () => {
+    function emittedFor(error: unknown) {
+      const [record] = captureRecords((logger) => {
+        logHttpRequest(logger as never, {
+          method: "POST",
+          url: "/fail",
+          statusCode: 500,
+          duration: 10,
+          userAgent: null,
+          error,
+        });
+      });
+      return record!.error;
+    }
+
+    describe("when it is a string", () => {
+      it("summarises it as type string with the text as message", () => {
+        expect(emittedFor("boom")).toEqual({ type: "string", message: "boom" });
+      });
+    });
+
+    describe("when it is an error-like object", () => {
+      const cause = () => emittedFor({
+        message: "database unavailable",
+        code: "P1001",
+      });
+
+      it("keeps its message and code", () => {
+        expect(cause()).toMatchObject({
+          message: "database unavailable",
+          code: "P1001",
+        });
+      });
+
+      it("emits only type, message, code and stack", () => {
+        expect(
+          Object.keys(cause()).every((k) =>
+            ["type", "message", "code", "stack"].includes(k),
+          ),
+        ).toBe(true);
+      });
+    });
+
+    describe("when it is a plain object without a message", () => {
+      it("renders the object as the message", () => {
+        expect(emittedFor({ reason: "x" }).message).toContain("reason");
+      });
+    });
+
+    describe("when it is an Error wrapping another Error as its cause", () => {
+      it("keeps the inner message in the message or stack", () => {
+        const cause = emittedFor(
+          new Error("outer", { cause: new Error("inner") }),
+        );
+        expect(`${cause.message}\n${cause.stack}`).toContain("inner");
+      });
+    });
   });
 });

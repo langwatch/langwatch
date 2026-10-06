@@ -32,8 +32,14 @@ export function registerLogContextProvider(provider: LogContextProvider): void {
  * whole (#8483). Type, message, code and stack are what a failure is triaged
  * by, and they stay a fixed four keys however wide the error is.
  *
- * Cause-chain messages and credential masking survive because the summary is
- * cut from the already-redacted pino serialization.
+ * Credential masking survives because an `Error` summary is cut from the
+ * already-redacted pino serialization. That serialization folds the messages
+ * of nested `cause`s into `message` and their stacks into `stack`, so inner
+ * causes stay readable. Other fields of a cause, and extras such as a
+ * HandledError's `reasons` or `meta`, are dropped by design.
+ *
+ * Non-Error throwables are summarised too: a string, an error-like object
+ * (string `message`), or any other value rendered as bounded JSON.
  */
 export function summarizeError(error: unknown): {
   type: string;
@@ -41,16 +47,33 @@ export function summarizeError(error: unknown): {
   code?: string | number;
   stack?: string;
 } {
+  if (typeof error === "string") return { type: "string", message: error };
+
   if (!(error instanceof Error)) {
+    if (isErrorLike(error)) {
+      const { name, message, code, stack } = error;
+      return {
+        type: typeof name === "string" && name ? name : "Object",
+        message,
+        ...(typeof code === "string" || typeof code === "number"
+          ? { code }
+          : {}),
+        ...(typeof stack === "string" ? { stack } : {}),
+      };
+    }
     return {
-      type: error === null ? "null" : typeof error,
-      message: String(error),
+      type: typeof error,
+      message: stringifyBounded(error),
     };
   }
 
-  const { type, message, stack } = redactCommandCredentials(
-    pino.stdSerializers.err(error),
-  );
+  const serialized = redactCommandCredentials(pino.stdSerializers.err(error));
+  const { message, stack } = serialized;
+  // A subclass that only sets `name` would otherwise group as "Error".
+  const type =
+    typeof error.name === "string" && error.name && error.name !== "Error"
+      ? error.name
+      : serialized.type;
   const code = (error as { code?: unknown }).code;
   return {
     type,
@@ -58,6 +81,31 @@ export function summarizeError(error: unknown): {
     ...(typeof code === "string" || typeof code === "number" ? { code } : {}),
     ...(stack === undefined ? {} : { stack }),
   };
+}
+
+const MAX_SUMMARY_MESSAGE_LENGTH = 1000;
+
+function isErrorLike(value: unknown): value is {
+  message: string;
+  name?: unknown;
+  code?: unknown;
+  stack?: unknown;
+} {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (value as { message?: unknown }).message === "string"
+  );
+}
+
+function stringifyBounded(value: unknown): string {
+  let text: string;
+  try {
+    text = JSON.stringify(value) ?? String(value);
+  } catch {
+    text = String(value);
+  }
+  return text.slice(0, MAX_SUMMARY_MESSAGE_LENGTH);
 }
 
 /**

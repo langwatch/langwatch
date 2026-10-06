@@ -286,7 +286,7 @@ describe("requestLogging", () => {
 
       it("still carries a bounded summary of the cause for diagnosis", () => {
         const cause = warnData()[REQUEST_CAUSE_FIELD];
-        expect(cause).toMatchObject({ type: "Error", message: "over quota" });
+        expect(cause).toMatchObject({ type: "PlanLimitExceededError", message: "over quota" });
         expect(cause).not.toBe(handledCustomer);
       });
 
