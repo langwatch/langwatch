@@ -17,7 +17,10 @@ import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
-import { ScimSyncLedgerWriterService } from "../eventing-scim-sync-ledger.service.ts";
+import {
+  ScimSyncLedgerWriterService,
+  type ScimSyncSenders,
+} from "../eventing-scim-sync-ledger.service.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import {
   ScimSyncLifecycleService,
@@ -113,6 +116,63 @@ function directoryOver({ ledger }: { ledger: ScimSyncLedgerWriterService }) {
     tokenPepper: "scim-test-pepper",
   });
 }
+
+/** Every verb's sender, each recording what it was handed under its own name. */
+function recordingSenders(): { senders: ScimSyncSenders; staged: [string, unknown][] } {
+  const staged: [string, unknown][] = [];
+  const sender = (name: string) => ({
+    send: async (data: unknown) => {
+      staged.push([name, data]);
+    },
+  });
+
+  return {
+    staged,
+    senders: {
+      issueScimToken: sender("issueScimToken"),
+      recordScimUserPush: sender("recordScimUserPush"),
+      recordScimGroupMapping: sender("recordScimGroupMapping"),
+      recordScimApplyFailure: sender("recordScimApplyFailure"),
+      redriveScimApply: sender("redriveScimApply"),
+      revokeScimSync: sender("revokeScimSync"),
+    },
+  };
+}
+
+describe("given a process that registered the directory-sync pipeline producer-only", () => {
+  describe("when an Enterprise directory pushes a person on a connection it holds a token for", () => {
+    /** @scenario A directory push's history lands on this process's own event stack */
+    it("stages the push on the sender the registration produced and reports no missing sender", async () => {
+      const { logger, lines } = createTestLogger();
+      const { senders, staged } = recordingSenders();
+      const ledger = ScimSyncLedgerWriterService.create({ logger });
+      ledger.connect(senders);
+      const service = directoryOver({ ledger });
+
+      const created = await service.createUser({
+        organizationId: ORGANIZATION,
+        connectionId: CONNECTION,
+        request: {
+          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+          userName: "ada@acme.test",
+          externalId: "okta-ada",
+        },
+      });
+
+      expect(created).toMatchObject({ userName: "ada@acme.test", active: true });
+      expect(staged).toHaveLength(1);
+      expect(staged[0]?.[0]).toBe("recordScimUserPush");
+      expect(staged[0]?.[1]).toMatchObject({
+        organizationId: ORGANIZATION,
+        connectionId: CONNECTION,
+        userId: "user_1",
+        externalId: "okta-ada",
+        op: "create",
+      });
+      expect(lines.findLine("error", "scim-sync")).toBeUndefined();
+    });
+  });
+});
 
 describe("given a deployment that configured no queue for the event stack", () => {
   describe("when an Enterprise directory pushes a person", () => {

@@ -39,6 +39,22 @@ describe("when the administrator presses the control", () => {
     expect(result.current.sending).toBe(false);
   });
 
+  /** @scenario The test sign-in names the connection rather than waiting for routing */
+  it("sends the one test sign-in to the connection it was given and changes nothing else", async () => {
+    const host = new FakeSsoHost();
+    const { result } = renderTestSignIn(host, "conn-registered");
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(host.testSignIns).toHaveLength(1);
+    expect(host.testSignIns[0]?.connectionId).toBe("conn-registered");
+    expect(result.current.failure).toBeNull();
+    expect(host.failures).toEqual([]);
+    expect(host.acknowledgements).toEqual([]);
+  });
+
   it("quotes a refusal that arrived before the browser ever left", async () => {
     const host = new FakeSsoHost({
       testSignIn: {

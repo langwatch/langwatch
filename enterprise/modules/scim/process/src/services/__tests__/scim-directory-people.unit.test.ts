@@ -384,6 +384,7 @@ describe("a directory deleting a person it no longer has in the organization", (
 
 describe("a directory push that arrives for a person", () => {
   describe("when nobody has an account for them here", () => {
+    /** @scenario A directory push provisions whatever the sign-in door would do */
     it("creates the account and lands the membership without asking anything else", async () => {
       const w = world();
 
