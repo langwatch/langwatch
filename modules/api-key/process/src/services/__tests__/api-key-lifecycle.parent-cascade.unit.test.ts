@@ -45,9 +45,11 @@ function keyRow(overrides: Partial<StoredApiKey> = {}): StoredApiKey {
 function makeService({
   children,
   grantsFail = false,
+  customRoleId = null,
 }: {
   children: { id: string }[];
   grantsFail?: boolean;
+  customRoleId?: string | null;
 }) {
   const rows = new Map<string, StoredApiKey>();
   rows.set(LOGIN_ID, keyRow());
@@ -77,9 +79,23 @@ function makeService({
     if (grantsFail) throw new Error("ledger unavailable");
   });
   const forget = vi.fn(async () => void 0);
+  const deleteRole = vi.fn(async () => void 0);
+  const listApiKeyBindings = async () =>
+    customRoleId
+      ? [
+          {
+            id: "rb_1",
+            apiKeyId: LOGIN_ID,
+            role: "CUSTOM",
+            customRoleId,
+            scopeType: "ORGANIZATION",
+            scopeId: ORG_ID,
+          },
+        ]
+      : [];
   const dependencies = {
-    authz: { listApiKeyBindings: async () => [] } as never,
-    grants: { revokeBindingsWhere, deleteRole: vi.fn() } as never,
+    authz: { listApiKeyBindings } as never,
+    grants: { revokeBindingsWhere, deleteRole } as never,
     organizations: {} as never,
     projects: {} as never,
     bindingIds: {} as never,
@@ -91,7 +107,7 @@ function makeService({
     forget,
   });
 
-  return { service, repository, revoke, findLiveChildren, revokeBindingsWhere, forget };
+  return { service, repository, revoke, findLiveChildren, revokeBindingsWhere, forget, deleteRole };
 }
 
 const caller = { callerUserId: USER_ID, callerIsAdmin: false, organizationId: ORG_ID };
@@ -241,5 +257,29 @@ describe("ApiKeyLifecycleService.revoke ordering", () => {
 
     expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ id: LOGIN_ID }));
     expect(forget).toHaveBeenCalledWith(expect.objectContaining({ revoked: true }));
+  });
+});
+
+describe("ApiKeyLifecycleService.revoke without the projection hold", () => {
+  /** @scenario "Rotating a key answers without waiting on the old key's cleanup" */
+  it("revokes the key at once and passes the skipped hold to its role's deletion", async () => {
+    const { service, revoke, forget, deleteRole } = makeService({
+      children: [],
+      customRoleId: "cr_1",
+    });
+
+    const revoked = await service.revoke({
+      id: LOGIN_ID,
+      ...caller,
+      cascadeToChildren: false,
+      awaitProjection: false,
+    });
+
+    expect(revoked.revokedAt).not.toBeNull();
+    expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ id: LOGIN_ID }));
+    expect(forget).toHaveBeenCalledWith(expect.objectContaining({ revoked: true }));
+    expect(deleteRole).toHaveBeenCalledWith(
+      expect.objectContaining({ roleId: "cr_1", awaitProjection: false }),
+    );
   });
 });
