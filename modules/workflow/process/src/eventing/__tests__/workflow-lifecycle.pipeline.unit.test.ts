@@ -7,11 +7,11 @@ import { createTenantId } from "@langwatch/eventing";
 import { WORKFLOW_CREATED_EVENT_TYPE } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import { RecordWorkflowCreatedCommand } from "../workflow-lifecycle.commands.ts";
 import {
+  RecordWorkflowCreatedCommand,
   WORKFLOW_CREATED_EVENT_VERSION,
   type WorkflowCreatedEvent,
-} from "../workflow-lifecycle.events.ts";
+} from "../workflow-lifecycle.commands.ts";
 
 const created = {
   workflowId: "workflow-1",

@@ -10,6 +10,8 @@ export interface PendingJoinRequest {
   /** ISO 8601: the wire carries these instants as text. */
   requestedAt: string;
   expiresAt: string | null;
+  /** The seat approval lands (ADR-171 v6): shown, never edited; approval carries no role. */
+  seat: "MEMBER" | "DEVELOPER";
 }
 
 /** One person who walked in on the domain setting: the domain admitted them, so no address. */

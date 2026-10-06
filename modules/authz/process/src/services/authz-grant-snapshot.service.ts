@@ -7,7 +7,6 @@ import {
 import { nowInstant } from "@langwatch/time";
 
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
-import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
 import type { AuthzCollectorService } from "./authz-collector.service.ts";
 
 const MAX_CACHE_ENTRIES = 10_000;
@@ -99,11 +98,9 @@ export class AuthzGrantSnapshotService {
   async findOwnerGrantsFor({
     principal,
     organizationId,
-    reader,
   }: {
     principal: AuthzPrincipalRef;
     organizationId: string;
-    reader?: AuthzReadRepository;
   }): Promise<CollectedGrants | null> {
     if (principal.type !== "apiKey") {
       return null;
@@ -118,14 +115,6 @@ export class AuthzGrantSnapshotService {
       type: "user",
       id: owner.userId,
     };
-
-    if (reader) {
-      return this.collector.collectGrants({
-        principal: ownerPrincipal,
-        organizationId,
-        reader,
-      });
-    }
 
     return this.collectCached({ principal: ownerPrincipal, organizationId });
   }

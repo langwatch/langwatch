@@ -25,7 +25,12 @@ app.post("/hooks", langwatchWebhook({ secret }), handler);
 
 // Express: the raw body first
 import { langwatchWebhook } from "@langwatch/webhook-verify/express";
-app.post("/hooks", express.raw({ type: "application/json" }), langwatchWebhook({ secret }), handler);
+app.post(
+  "/hooks",
+  express.raw({ type: "application/json" }),
+  langwatchWebhook({ secret }),
+  handler,
+);
 ```
 
 A delivery that does not verify is answered `401` with `{ "error": "<code>" }`.

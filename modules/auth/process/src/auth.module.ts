@@ -40,6 +40,8 @@ export const authProcessModule = defineProcessModule("auth")
       bindApiDoor(
         ApiDoorService.create({
           sessions: app,
+          twoStep: app,
+          identity: dependencies.identity,
           apiKeys: dependencies.apiKeys,
           cliProjects: app,
           authz: dependencies.authz,

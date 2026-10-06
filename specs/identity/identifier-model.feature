@@ -118,6 +118,14 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And the backfill, which links by the credential, converges on one row
 
   @unit
+  Scenario: A password sign-up states its credential identifier from the registration fact
+    Given "sam" registered with an address and a password through the sign-up form
+    And user's registered fact names the credential row, its creation time and the address
+    When identity reacts to that fact
+    Then the credential identifier is attached against that row, at the row's creation time
+    And a redelivered fact restates the same command, and a fact naming no row attaches nothing
+
+  @unit
   Scenario: Signing up makes the address routable before the fold lands
     Given "sam" is a newborn whose projection has never folded
     When a sign-up commits the attach of "sam"'s credential identifier

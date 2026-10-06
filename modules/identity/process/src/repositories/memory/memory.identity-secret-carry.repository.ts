@@ -18,6 +18,16 @@ export class MemoryIdentitySecretCarryRepository implements IdentitySecretCarryR
     return [...this.pairs.values()].filter((pair) => pair.userId === args.userId);
   }
 
+  async findDriftedUserIdsAfter(args: { cursor: string | null; limit: number }): Promise<string[]> {
+    const drifted = new Set<string>();
+    for (const pair of this.pairs.values()) {
+      const behind =
+        pair.credentialUpdatedAtMs === null || pair.accountUpdatedAtMs > pair.credentialUpdatedAtMs;
+      if (behind && (args.cursor === null || pair.userId > args.cursor)) drifted.add(pair.userId);
+    }
+    return [...drifted].toSorted().slice(0, args.limit);
+  }
+
   async insertCredentialIfMissing(args: {
     accountId: string;
     userId: string;

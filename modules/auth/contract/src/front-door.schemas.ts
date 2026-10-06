@@ -22,6 +22,12 @@ export type FrontDoorRouteInput = z.infer<typeof frontDoorRouteInputSchema>;
 export const frontDoorEmailInputSchema = z.object({ email: z.string().email() });
 export type FrontDoorEmailInput = z.infer<typeof frontDoorEmailInputSchema>;
 
+/** Sign-up's address, plus where the screen goes once through: the emailed link carries it. */
+export const signUpVerificationInputSchema = z.object({
+  ...frontDoorEmailInputSchema.shape,
+  callbackUrl: z.string().max(2048).optional(),
+});
+
 /**
  * The caller's own address comes from the session, never the request; the body
  * carries only the S256 challenge whose verifier the asking window keeps.

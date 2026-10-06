@@ -423,6 +423,10 @@ export abstract class OrganizationMembershipRepository {
     userId: string;
     pendingAdmissionId: string;
     via: DeveloperAdmissionVia;
+    /** The seat a caller decided (ADR-171 v6); absent reads the joiner seat. */
+    seat?: "MEMBER" | "DEVELOPER";
+    /** Where a join request was made, for the Developer admission audit row. */
+    origin?: "web" | "cli";
   }) => Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
 
   abstract deleteMember: (input: DeleteMemberInput) => Promise<void>;

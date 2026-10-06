@@ -4,7 +4,7 @@ import type React from "react";
 
 import type { SessionListRow } from "../session-list-row.ts";
 import { MissingValue } from "../ui/elements/cells/missing-value.tsx";
-import { ComparisonBar } from "./comparison-bar.tsx";
+import { ComparisonBar } from "./context-cell.tsx";
 
 /** What the session's tokens cost, against the dearest one on the page. */
 export const TokenCostCell: React.FC<{

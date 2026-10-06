@@ -59,6 +59,8 @@ const organizationTokens = new Map<string, OrganizationApiKeyResolution>([
 const refuseEverything = () => Promise.reject(new Error("an identified caller asks no permission"));
 const peers: ApiDoorPeers = {
   sessions: { verifyBrowserSession: refuseEverything, resolveBrowserSession: refuseEverything },
+  twoStep: { offersTwoStepVerification: () => false },
+  identity: { getOrganizationMfaStanding: refuseEverything },
   apiKeys: {
     getOrgProjects: () => Promise.resolve([]),
     findResolvedToken: ({ token }: ApiKeyTokenResolutionInput) =>
@@ -104,6 +106,7 @@ const peers: ApiDoorPeers = {
         updatedAt: new Date(0),
       }),
     getOrganizationIdByTeamId: refuseEverything,
+    findPersonalTeamOwners: refuseEverything,
   },
   entitlements: { getActivePlan: refuseEverything },
   auditLog: { record: refuseEverything },
@@ -722,5 +725,140 @@ describe("the door's organization of a scope", () => {
     await expect(authz.organizationOf?.({ tier: "project", id: "project-gone" })).resolves.toBe(
       null,
     );
+  });
+});
+
+describe("the organization's second-factor gate (Q184)", () => {
+  const getScope: AuthzApi["getScope"] = async (ids) => {
+    if (ids.projectId === "project-1") {
+      return { type: "project", id: "project-1", teamId: "team-1", organizationId: "org-1" };
+    }
+    if (ids.projectId === "project-own") {
+      return { type: "project", id: "project-own", teamId: "team-own", organizationId: "org-1" };
+    }
+    throw new AuthzScopeNotFoundError(ids);
+  };
+  function gate({ offered, satisfied }: { offered: boolean; satisfied: boolean }) {
+    const asked: { standings: unknown[]; personal: unknown[] } = { standings: [], personal: [] };
+    const { authz } = ApiDoorService.create({
+      ...peers,
+      twoStep: { offersTwoStepVerification: () => offered },
+      identity: {
+        getOrganizationMfaStanding: async (input) => {
+          asked.standings.push(input);
+          return {
+            organizationId: input.organizationId,
+            organizationName: "Acme",
+            required: true,
+            satisfaction: satisfied
+              ? { satisfied: true, by: "account_enrollment" }
+              : { satisfied: false, by: "none" },
+            holdsPasskey: false,
+          };
+        },
+      },
+      authz: { ...peers.authz, getScope },
+      organizations: {
+        ...peers.organizations,
+        findPersonalTeamOwners: async (input) => {
+          asked.personal.push(input);
+          return input.teamIds
+            .filter((teamId) => teamId === "team-own")
+            .map((teamId) => ({ teamId, ownerUserId: "sam" }));
+        },
+      },
+    }).door();
+    if (!authz.assertSecondFactor) throw new Error("the door asks the second-factor gate");
+    return { authz, asked };
+  }
+  const at = (tier: "organization" | "project" | "team", id: string) => ({
+    userId: "sam",
+    sessionId: "session-1",
+    organizationId: "org-1",
+    scope: { tier, id },
+  });
+
+  describe("given the deployment does not offer two-step verification", () => {
+    it("admits without reading anything", async () => {
+      const { authz, asked } = gate({ offered: false, satisfied: false });
+
+      await expect(authz.assertSecondFactor?.(at("project", "project-1"))).resolves.toBeUndefined();
+      expect(asked).toEqual({ standings: [], personal: [] });
+    });
+  });
+
+  describe("given a member who can prove a second factor on this session", () => {
+    it("admits after one standing read, asking no personal-workspace question", async () => {
+      const { authz, asked } = gate({ offered: true, satisfied: true });
+
+      await expect(authz.assertSecondFactor?.(at("project", "project-1"))).resolves.toBeUndefined();
+      expect(asked.standings).toEqual([
+        { userId: "sam", organizationId: "org-1", sessionId: "session-1" },
+      ]);
+      expect(asked.personal).toEqual([]);
+    });
+  });
+
+  describe("given a member the organization holds at the gate", () => {
+    it("refuses the organization's shared project with identity_mfa_enrollment_required", async () => {
+      const { authz } = gate({ offered: true, satisfied: false });
+
+      await expect(authz.assertSecondFactor?.(at("project", "project-1"))).rejects.toMatchObject({
+        code: "identity_mfa_enrollment_required",
+        httpStatus: 403,
+      });
+    });
+
+    it("refuses the organization itself", async () => {
+      const { authz, asked } = gate({ offered: true, satisfied: false });
+
+      await expect(authz.assertSecondFactor?.(at("organization", "org-1"))).rejects.toMatchObject({
+        code: "identity_mfa_enrollment_required",
+      });
+      expect(asked.personal).toEqual([]);
+    });
+
+    it("admits their own personal workspace's project", async () => {
+      const { authz, asked } = gate({ offered: true, satisfied: false });
+
+      await expect(
+        authz.assertSecondFactor?.(at("project", "project-own")),
+      ).resolves.toBeUndefined();
+      expect(asked.personal).toEqual([{ organizationId: "org-1", teamIds: ["team-own"] }]);
+    });
+
+    it("admits their own personal team", async () => {
+      const { authz } = gate({ offered: true, satisfied: false });
+
+      await expect(authz.assertSecondFactor?.(at("team", "team-own"))).resolves.toBeUndefined();
+    });
+  });
+
+  describe("given a batch over two projects of one organization", () => {
+    /** @scenario "A batch over several projects of one organization reads the standing once" */
+    it("reads the standing once and still applies the personal exemption per scope", async () => {
+      const { authz, asked } = gate({ offered: true, satisfied: false });
+
+      const [own, other] = await Promise.allSettled([
+        authz.assertSecondFactor?.(at("project", "project-own")),
+        authz.assertSecondFactor?.(at("project", "project-1")),
+      ]);
+
+      expect(asked.standings).toHaveLength(1);
+      expect(own?.status).toBe("fulfilled");
+      expect(other).toMatchObject({
+        status: "rejected",
+        reason: { code: "identity_mfa_enrollment_required" },
+      });
+    });
+
+    it("keeps nothing once the read settles, so a later request reads afresh", async () => {
+      const { authz, asked } = gate({ offered: true, satisfied: true });
+
+      await authz.assertSecondFactor?.(at("project", "project-1"));
+      await authz.assertSecondFactor?.(at("project", "project-1"));
+
+      expect(asked.standings).toHaveLength(2);
+    });
   });
 });

@@ -95,6 +95,18 @@ export type PendingInvitationForCaller = z.infer<
   typeof organizationPendingInvitationForCallerSchema
 >;
 
+/** The oldest pending invitation on each address the caller has proven (ADR-171 v6). */
+export const organizationPendingInvitationsForCallerSchema = z.array(
+  z.object({
+    inviteCode: z.string().min(1),
+    organizationName: z.string(),
+    role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]),
+  }),
+);
+export type PendingInvitationsForCaller = z.infer<
+  typeof organizationPendingInvitationsForCallerSchema
+>;
+
 /** The user row, flat. Mirrors `User` in `organization.rows.ts`. */
 export const organizationUserRowSchema = z
   .object({

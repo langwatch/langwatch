@@ -948,6 +948,9 @@ model JoinRequest {
   state             String
   /// How the domain was matched: `verified-identifier-domain` or `sso-connection-domain`.
   matchedVia        String
+  /// Where the request was made: `web` or `cli` (ADR-171 v6). A request from
+  /// the terminal lands a Developer seat whatever the joiner seat says.
+  origin            String    @default("web")
   /// While PENDING: when the day-14 wake lapses it. Null once resolved.
   expiresAt         DateTime?
   resolvedAt        DateTime?
@@ -5810,6 +5813,8 @@ model ProcessManagerOutbox {
   @@unique([processName, projectId, messageKey])
   @@index([processName, projectId, processKey, createdAt])
   @@index([status, nextAttemptAt, leasedUntil])
+  // The per-process-manager lease: status, then the manager, then due order.
+  @@index([status, processName, nextAttemptAt])
 }
 
 /// Why an outbox delivery failed, one row per FAILED attempt

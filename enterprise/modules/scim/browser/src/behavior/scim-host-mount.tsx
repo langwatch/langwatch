@@ -11,6 +11,7 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -27,6 +28,7 @@ class CapabilityScimHost extends ScimHostApi {
   private readonly feedback: UiFeedback;
   private readonly uiRoute: UiRoute;
   private readonly session: UiSession;
+  private readonly closeDrawer: () => void;
 
   constructor({
     orgId,
@@ -34,12 +36,14 @@ class CapabilityScimHost extends ScimHostApi {
     feedback,
     uiRoute,
     session,
+    closeDrawer,
   }: {
     orgId: string | undefined;
     appBaseUrl: string;
     feedback: UiFeedback;
     uiRoute: UiRoute;
     session: UiSession;
+    closeDrawer: () => void;
   }) {
     super();
     this.orgId = orgId;
@@ -47,6 +51,11 @@ class CapabilityScimHost extends ScimHostApi {
     this.feedback = feedback;
     this.uiRoute = uiRoute;
     this.session = session;
+    this.closeDrawer = closeDrawer;
+  }
+
+  closeOverlay(): void {
+    this.closeDrawer();
   }
 
   organizationId(): string | undefined {
@@ -92,6 +101,7 @@ export default function ScimHostMount({ children }: { children?: ReactNode }) {
   const { feedback, route, session } = useUiCapabilities();
   const { organizationId } = useUiScope().activeScope();
   const { appBaseUrl } = useUiDeployment();
+  const { closeDrawer } = useDrawer();
 
   const host = useMemo(
     () =>
@@ -101,8 +111,9 @@ export default function ScimHostMount({ children }: { children?: ReactNode }) {
         feedback,
         uiRoute: route,
         session,
+        closeDrawer,
       }),
-    [organizationId, appBaseUrl, feedback, route, session],
+    [organizationId, appBaseUrl, feedback, route, session, closeDrawer],
   );
 
   return <ScimHostProvider value={host}>{children}</ScimHostProvider>;

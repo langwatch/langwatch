@@ -25,7 +25,7 @@ import type { TraceProcessingCommandsService } from "../services/trace-processin
 import { TraceSpanNormalizationAdapterService } from "../services/trace-span-normalization-adapter.service.ts";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "./coding-agent-span-facts-dispatch.subscriber.ts";
 import { createCustomEvaluationSyncHandler } from "./custom-evaluation-sync.subscriber.ts";
-import { createDeferredOriginHandler } from "./deferred-origin.process.ts";
+import { createDeferredOriginHandler } from "./deferred-origin.subscriber.ts";
 import { createEvaluationTriggerSubscriber } from "./evaluation-trigger.subscriber.ts";
 import { createExperimentMetricsSyncHandler } from "./experiment-metrics-sync.subscriber.ts";
 import {

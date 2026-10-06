@@ -22,6 +22,7 @@ import { MemoryAuthzCutoverRepository } from "../memory/memory.authz-cutover.rep
 import { MemoryAuthzEpochRepository } from "../memory/memory.authz-epoch.repository.ts";
 import { MemoryAuthzGrantProjectionRepository } from "../memory/memory.authz-grant-projection.repository.ts";
 import { MemoryAuthzLedgerReadRepository } from "../memory/memory.authz-ledger-read.repository.ts";
+import { MemoryAuthzLineageEpochRepository } from "../memory/memory.authz-lineage-epoch.repository.ts";
 import { MemoryAuthzListingRepository } from "../memory/memory.authz-listing.repository.ts";
 import { MemoryAuthzManagedGrantRepository } from "../memory/memory.authz-managed-grant.repository.ts";
 import { MemoryAuthzMembershipStampRepository } from "../memory/memory.authz-membership-stamp.repository.ts";
@@ -54,6 +55,7 @@ const backends: readonly Backend[] = [
         admissions: MemoryAuthzAdmissionRepository.create({ memory }),
         userStandings: MemoryAuthzUserStandingRepository.create({ memory }),
         epoch: MemoryAuthzEpochRepository.create({ memory }),
+        lineageEpochs: MemoryAuthzLineageEpochRepository.create({ memory }),
         sessionVersions: MemoryAuthzSessionVersionRepository.create({ memory }),
         auditTrail: MemoryAuthzAuditTrailRepository.create({ memory }),
         platformGrants: MemoryAuthzPlatformGrantRepository.create({ memory }),
@@ -238,6 +240,16 @@ describe.each(backends)("given the $name authz backend", (backend) => {
       await epoch.bump({ organizationId: ORGANIZATION_ID });
       await epoch.bump({ organizationId: ORGANIZATION_ID });
       await expect(epoch.findEpoch({ organizationId: ORGANIZATION_ID })).resolves.toBe(2);
+    });
+  });
+
+  describe("when the lineage signal is moved", () => {
+    it("counts up from 0, so a never-moved organization still holds lineage", async () => {
+      const { lineageEpochs } = backend.create();
+
+      await expect(lineageEpochs.findEpoch({ organizationId: ORGANIZATION_ID })).resolves.toBe(0);
+      await lineageEpochs.bump({ organizationId: ORGANIZATION_ID });
+      await expect(lineageEpochs.findEpoch({ organizationId: ORGANIZATION_ID })).resolves.toBe(1);
     });
   });
 });

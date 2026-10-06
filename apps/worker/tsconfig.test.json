@@ -62,9 +62,6 @@
       "path": "../../packages/clickhouse-client/tsconfig.build.json"
     },
     {
-      "path": "../../packages/clickhouse-migrations/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/coding-agent/contract/tsconfig.build.json"
     },
     {
@@ -387,6 +384,9 @@
     },
     {
       "path": "../../modules/workflow/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/clickhouse-migrations/tsconfig.build.json"
     },
     {
       "path": "../../packages/test-harness/tsconfig.build.json"

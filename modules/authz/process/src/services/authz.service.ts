@@ -66,6 +66,7 @@ import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
+import type { AuthzLineageEpochRepository } from "../repositories/authz-lineage-epoch.repository.ts";
 import type { AuthzListingRepository } from "../repositories/authz-listing.repository.ts";
 import type { AuthzManagedGrantRepository } from "../repositories/authz-managed-grant.repository.ts";
 import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
@@ -98,6 +99,8 @@ export type AuthzServiceOptions = {
   bindings: AuthzManagedGrantRepository;
   /** Omitted = never cache. */
   epoch?: AuthzEpochRepository;
+  /** The organization's lineage signal; omitted = no scope lineage is held. */
+  lineageEpochs?: AuthzLineageEpochRepository;
   /**
    * Internal rollout knob; omitted = cache off. The composition root supplies the env read.
    */
@@ -125,7 +128,15 @@ const rolePermissionListSchema = z.array(z.string());
 
 export class AuthzService extends AuthzServiceContract {
   static create(options: AuthzServiceOptions): AuthzService {
-    const collector = AuthzCollectorService.create({ reader: options.repository });
+    const scopeLineage = AuthzScopeLineageService.create({
+      repository: options.repository,
+      cacheEnabled: options.cacheEnabled,
+      signal: options.lineageEpochs,
+    });
+    const collector = AuthzCollectorService.create({
+      reader: options.repository,
+      lineage: scopeLineage,
+    });
 
     return new AuthzService({
       collector,
@@ -134,7 +145,7 @@ export class AuthzService extends AuthzServiceContract {
         listing: options.listing,
       }),
       snapshots: AuthzGrantSnapshotService.create(collector, options),
-      scopeLineage: AuthzScopeLineageService.create({ repository: options.repository }),
+      scopeLineage,
       options,
     });
   }
@@ -321,6 +332,11 @@ export class AuthzService extends AuthzServiceContract {
 
   async checkScopeLineage(args: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult> {
     return this.scopeLineage.check(args);
+  }
+
+  /** Project's moved or archived fact for this organization; throws so the delivery retries. */
+  lineageChanged(input: { organizationId: string }): Promise<void> {
+    return this.scopeLineage.lineageChanged(input);
   }
 
   getDecision(args: AuthzGetDecisionInput): Promise<PermissionDecision> {

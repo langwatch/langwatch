@@ -482,6 +482,9 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
   findProjectSlugsInOrganization = unsupported<
     OrganizationInviteRepository["findProjectSlugsInOrganization"]
   >("findProjectSlugsInOrganization");
+  findOldestPendingInviteForAddress = unsupported<
+    OrganizationInviteRepository["findOldestPendingInviteForAddress"]
+  >("findOldestPendingInviteForAddress");
   async getPendingInviteForEmail({
     organizationId,
     email,

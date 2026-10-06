@@ -2475,7 +2475,7 @@ decides it. A mirrored read is restored when first asked for, never all at start
 page of a paged read is mirrored too, restored as stale and refetched at once. A tab shown again
 reads IndexedDB first, then refetches the stale reads it holds, so hints it missed while hidden
 are caught up (Alex, 2026-10-01). An answer whose `x-lw-schema` differs from the bundle's hash
-drops that row. Not built yet: the lazy restore (rows restore at start-up). ADR-170 (in part),
+drops that row. ADR-170 (in part),
 specs/ui/browser-query-caching.feature.
 `CachedView` ships.
 

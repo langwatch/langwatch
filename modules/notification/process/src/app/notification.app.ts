@@ -115,8 +115,14 @@ export class NotificationModule implements NotificationApiContract {
   }
 
   /** Web Push's pipeline over the kernel's process store, whose outbox holds the sends. */
-  webPushPipeline({ processStore }: { processStore: ProcessStore }): WebPushPipeline {
-    this.#webPushQueue = OutboxWebPushQueue.create(processStore);
+  webPushPipeline({
+    processStore,
+    notifyOutbox,
+  }: {
+    processStore: ProcessStore;
+    notifyOutbox?: (processName: string) => void;
+  }): WebPushPipeline {
+    this.#webPushQueue = OutboxWebPushQueue.create(processStore, notifyOutbox);
     return buildWebPushPipeline({ webPush: this.#webPush, processStore });
   }
 

@@ -11,6 +11,7 @@ import {
   SectionNavigationFrame,
   type SectionNavigationLink,
 } from "@langwatch/design-system/section-navigation-frame";
+import { ProvisioningSetupDrawerToken } from "@langwatch/enterprise-scim-contract";
 import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
 import { KeyRound, Plug, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -34,7 +35,11 @@ import { useSsoHost } from "../../model/sso-host.ts";
 import { ConnectionNameRow } from "../elements/connection-name-row.tsx";
 import { IssuerRow } from "../elements/issuer-row.tsx";
 import { LegacyRouteNotice } from "../elements/legacy-route-notice.tsx";
-import { AvailabilityRefusalNotice, LoadFailure } from "../elements/refusals.tsx";
+import {
+  AvailabilityRefusalNotice,
+  EnterprisePlanRequiredNotice,
+  LoadFailure,
+} from "../elements/refusals.tsx";
 import { SetupStep, SetupSteps, SetupStepsSkeleton } from "../elements/setup-step.tsx";
 import { ArrivalsSection } from "./arrivals.section.tsx";
 import { BreakGlassSection } from "./break-glass.section.tsx";
@@ -114,6 +119,8 @@ function SsoSetupPage({ organizationId }: { organizationId: string }) {
   if (!view.availability.available) {
     return <AvailabilityRefusalNotice refusal={view.availability.refusal} />;
   }
+
+  if (view.enterpriseRequired) return <EnterprisePlanRequiredNotice />;
 
   if (view.connection === null) {
     return view.legacyRoute ? (
@@ -582,6 +589,7 @@ function SetupJourneySteps({
           settling={activationAccepted}
           refusal={activate.error}
           onActivate={goLive}
+          onSetUpProvisioning={() => host.openOverlay(ProvisioningSetupDrawerToken)}
         />
       </SetupStep>
     </SetupSteps>

@@ -97,6 +97,8 @@ function noticeOver() {
         presence.push(payload);
       },
     },
+    recordProjectMoved: { send: async () => undefined },
+    recordProjectArchived: { send: async () => undefined },
   });
   return { notice, sent, presence };
 }

@@ -225,7 +225,7 @@ export interface AuthApi {
    * the installation has no email at all, it mails nothing and answers an unconfirmed proof.
    */
   requestNewAccountVerification(
-    input: Readonly<{ email: string }>,
+    input: Readonly<{ email: string; callbackUrl?: string }>,
   ): Promise<SignUpVerificationRequest>;
   /**
    * Starts identity's PKCE ceremony for the signed-in caller's own address, metered per caller;

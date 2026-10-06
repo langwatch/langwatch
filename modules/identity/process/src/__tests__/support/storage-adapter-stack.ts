@@ -9,12 +9,15 @@ import { z } from "zod";
 import type { IdentityUsersRepository } from "../../repositories/identity-users.repository.ts";
 import { newIdentityCommandId } from "../../rules/identity-command-id.rules.ts";
 import type { IdentityAccounts, IdentityResolver } from "../../rules/identity-storage.rules.ts";
+import { BetterAuthAccountBranchService } from "../../services/better-auth-account-branch.service.ts";
 import { BetterAuthCeremonyBridgeService } from "../../services/better-auth-ceremony-bridge.service.ts";
 import { IdentityCeremoniesService } from "../../services/better-auth-identity-ceremonies.service.ts";
+import { BetterAuthIdentityRoutingService } from "../../services/better-auth-identity-routing.service.ts";
 import {
   BetterAuthIdentityStorageService,
   type PasskeyRemoval,
 } from "../../services/better-auth-identity-storage.service.ts";
+import { BetterAuthUserBranchService } from "../../services/better-auth-user-branch.service.ts";
 import { CryptoIdentifierIdentityService } from "../../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
 import { IdentityService } from "../../services/identity.service.ts";
@@ -266,16 +269,33 @@ export function identityStack({
   const auth = authOver(
     BetterAuthIdentityStorageService.create({
       legacyEngine: schemaBoundLegacy ? schemaBoundLegacyEngine(db) : memoryAdapter(db),
-      accounts,
-      resolution,
-      ceremonies,
-      isUserOnIdentityWrites,
-      isAnyoneOnIdentityWrites,
-      // A stack that names no removal port is testing something else; the
-      // refusal keeps a passkey delete from quietly taking the legacy path.
-      passkeyRemoval: passkeyRemoval ?? {
-        deleteIfAnotherWayInRemains: async () => "not_found",
-      },
+      // The composition app/ owns (Q223 (a)): routing and both branches, once per bound engine.
+      routing: ({ legacy, naming }) =>
+        BetterAuthIdentityRoutingService.create({
+          legacy,
+          naming,
+          accounts,
+          isUserOnIdentityWrites,
+          // A stack that names no removal port is testing something else; the
+          // refusal keeps a passkey delete from quietly taking the legacy path.
+          passkeyRemoval: passkeyRemoval ?? {
+            deleteIfAnotherWayInRemains: async () => "not_found",
+          },
+          accountBranch: BetterAuthAccountBranchService.create({
+            legacy,
+            accounts,
+            resolution,
+            ceremonies,
+            isUserOnIdentityWrites,
+            isAnyoneOnIdentityWrites,
+          }),
+          userBranch: BetterAuthUserBranchService.create({
+            naming,
+            resolution,
+            ceremonies,
+            isUserOnIdentityWrites,
+          }),
+        }).adapter(),
     }).factory(),
     // The application's own wiring, verbatim: the account ceremonies bound to
     // better-auth's `databaseHooks` alongside the adapter that also runs them.

@@ -4,6 +4,7 @@ import {
   type AuthzEpochRedis,
   RedisAuthzEpochRepository,
 } from "../redis/redis.authz-epoch.repository.ts";
+import { RedisAuthzLineageEpochRepository } from "../redis/redis.authz-lineage-epoch.repository.ts";
 import {
   type AuthzSessionVersionRedis,
   RedisAuthzSessionVersionRepository,
@@ -27,6 +28,7 @@ export class LiveAuthzRepositories {
     return {
       ...PostgresAuthzRepositories.create({ prisma }),
       epoch: RedisAuthzEpochRepository.create({ redis }),
+      lineageEpochs: RedisAuthzLineageEpochRepository.create({ redis }),
       sessionVersions: RedisAuthzSessionVersionRepository.create({ redis }),
     };
   }

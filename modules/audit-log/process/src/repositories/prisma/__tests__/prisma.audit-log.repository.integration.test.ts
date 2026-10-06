@@ -95,4 +95,23 @@ describe.skipIf(!databaseUrl)("persisted audit entity history", () => {
     });
     expect(history[1]?.userId).toBeNull();
   });
+  /** @scenario "Concurrent deliveries of one keyed audit entry store one row" */
+  it("stores one row when two deliveries of one key race", async () => {
+    if (!connection) throw new Error("DATABASE_URL is required for audit integration tests");
+    const repository = PrismaAuditLogRepository.create({ prisma: connection.client });
+    const id = `${projectId}_keyed`;
+    const keyed = {
+      entry: { projectId, action: "emailSuppression.getAll", args: { triggerId: "trigger-1" } },
+      id,
+      occurredAt: 1_700_000_000_000,
+    };
+
+    const answers = await Promise.all([repository.createOnce(keyed), repository.createOnce(keyed)]);
+
+    expect(answers).toEqual([
+      { id, occurredAt: keyed.occurredAt },
+      { id, occurredAt: keyed.occurredAt },
+    ]);
+    expect(await connection.client.auditLog.count({ where: { id } })).toBe(1);
+  });
 });

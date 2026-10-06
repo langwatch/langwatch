@@ -86,4 +86,44 @@ describe("PrismaOrganizationRepository settings", () => {
       s3Bucket: "bucket",
     });
   });
+
+  /** @scenario "Organization settings are encrypted by the process's one cipher" */
+  it("reads back through the one cipher the write sealed under", async () => {
+    let row: Record<string, unknown> = {
+      id: "organization",
+      name: "Acme",
+      slug: "acme",
+      supportContact: null,
+      presenceEnabled: true,
+      traceSharingEnabled: true,
+      primaryIntent: null,
+      s3Bucket: null,
+      createdAt: new Date(1),
+      updatedAt: new Date(2),
+    };
+    const update = vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+      row = { ...row, ...data };
+    });
+    const findUnique = vi.fn(async () => row);
+    const repository = PrismaOrganizationRepository.create({
+      database: prismaDouble({ organization: { update, findUnique } }),
+      cipher,
+    });
+
+    await repository.updateSettings({
+      organizationId: "organization",
+      primaryIntent: null,
+      supportContact: null,
+      s3Endpoint: "https://storage.example.com",
+      s3AccessKeyId: "access-key",
+      s3SecretAccessKey: "",
+      s3Bucket: "",
+    });
+
+    expect(row.s3Endpoint).not.toBe("https://storage.example.com");
+    await expect(repository.findStoredSettings("organization")).resolves.toMatchObject({
+      s3Endpoint: "https://storage.example.com",
+      s3AccessKeyId: "access-key",
+    });
+  });
 });

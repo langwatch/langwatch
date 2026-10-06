@@ -8,6 +8,7 @@ import type { OrganizationUserDirectoryRepository } from "../repositories/organi
  */
 export interface OrganizationDirectory {
   findVerifiedEmail(input: Readonly<{ userId: string }>): Promise<string | null>;
+  findProvenAddresses(input: Readonly<{ userId: string }>): Promise<string[]>;
   listUserNames(
     input: Readonly<{ userIds: readonly string[] }>,
   ): Promise<readonly Readonly<{ id: string; name: string | null }>[]>;
@@ -34,9 +35,19 @@ export class OrganizationDirectoryService implements OrganizationDirectory {
   ) {}
 
   async findVerifiedEmail({ userId }: Readonly<{ userId: string }>): Promise<string | null> {
+    return (await this.findProvenAddresses({ userId }))[0] ?? null;
+  }
+
+  /**
+   * Every address this person has PROVEN: identifiers first, else the legacy
+   * column only where verified. The one rule the join door and the invitation
+   * lookup share, so neither can see an address the other cannot.
+   */
+  async findProvenAddresses({ userId }: Readonly<{ userId: string }>): Promise<string[]> {
     const verified = await this.options.identity.verifiedEmailsOf({ userId });
-    if (verified.kind === "resolved") return verified.emails[0]?.value ?? null;
-    return this.options.userDirectory.findLegacyVerifiedEmail(userId);
+    if (verified.kind === "resolved") return verified.emails.map(({ value }) => value);
+    const legacy = await this.options.userDirectory.findLegacyVerifiedEmail(userId);
+    return legacy === null ? [] : [legacy];
   }
 
   // Names only: the local part of a requester's address is not the

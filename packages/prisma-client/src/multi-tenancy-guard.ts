@@ -77,6 +77,9 @@ const GLOBAL_MODELS = [
   "Project",
   // Cluster-wide operator rows; one row per flag key and no tenant column.
   "FeatureFlag",
+  // The deployment's upgrade ledger: one run per upgrade, steps under it.
+  "LangwatchUpgradeRun",
+  "LangwatchUpgradeStep",
   // Issue reports sent by customers' coding agents (`langwatch report`). A
   // global support inbox read from the admin backoffice; `linkedProjectId` is
   // informational only, so there is no tenancy column to constrain on.

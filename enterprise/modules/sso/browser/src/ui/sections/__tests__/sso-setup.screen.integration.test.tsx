@@ -169,6 +169,7 @@ function setupView(overrides: Partial<SsoSetupPageView> = {}): SsoSetupPageView 
       activated: false,
     },
     legacyRoute: null,
+    enterpriseRequired: false,
     migration: null,
     availability: { available: true, proof: "dns-txt" },
     serviceProvider: SERVICE_PROVIDER,
@@ -317,6 +318,19 @@ describe("the single sign-on setup page", () => {
 
       expect(screen.getByTestId("sso-availability-refusal")).toHaveTextContent(/active license/);
       expect(screen.queryByTestId("sso-setup")).toBeNull();
+    });
+  });
+
+  describe("given an organization not on an Enterprise plan", () => {
+    /** @scenario "The setup screen still renders without an Enterprise plan" */
+    it("says single sign-on needs Enterprise and offers no control that would be refused", () => {
+      state.view = setupView({ enterpriseRequired: true, connection: null, goLive: null });
+
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      expect(screen.getByTestId("sso-enterprise-required")).toHaveTextContent(/Enterprise plan/);
+      expect(screen.queryByTestId("sso-setup")).toBeNull();
+      expect(screen.queryByRole("button")).toBeNull();
     });
   });
 

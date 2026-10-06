@@ -243,6 +243,7 @@ import { GovernancePeopleScreenService } from "../services/governance-people-scr
 import { GovernancePlanGateService } from "../services/governance-plan-gate.service.ts";
 import { PostgresGovernancePolicyService } from "../services/governance-policy.service.ts";
 import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service.ts";
+import { GovernanceTenantHistoryService } from "../services/governance-tenant-history.service.ts";
 import { GovernanceTraceFactsService } from "../services/governance-trace-facts.service.ts";
 import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
 import { IdentityMatchService } from "../services/identity-match.service.ts";
@@ -538,6 +539,11 @@ export class GovernanceModule implements GovernanceRestApi {
   }) {
     this.dependencies = dependencies;
     this.repositories = repositories;
+    const tenantHistory = GovernanceTenantHistoryService.create({
+      projects: dependencies.projects,
+      history: repositories.tenantHistory,
+    });
+    this.tenantHistory = tenantHistory;
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
     this.activityMonitor = ActivityMonitorService.create({
       repository: repositories.activityMonitor,
@@ -669,7 +675,7 @@ export class GovernanceModule implements GovernanceRestApi {
     this.workspaceViews = DefaultGovernanceAdminWorkspaceViewAuditService.create({
       auditLog: dependencies.auditLog,
       teams: dependencies.organizations,
-      projects: dependencies.projects,
+      projects: tenantHistory,
       events: repositories.ocsfEvents,
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
     });
@@ -678,7 +684,7 @@ export class GovernanceModule implements GovernanceRestApi {
       events: repositories.ocsfEvents,
     });
     this.quarantineFill = QuarantineFillEvaluatorService.create({
-      tenant: ProjectQuarantineTenantResolverService.create(dependencies.projects),
+      tenant: ProjectQuarantineTenantResolverService.create(tenantHistory),
       traces: dependencies.traces,
     });
     const anomalyDiagnostics = {
@@ -707,7 +713,7 @@ export class GovernanceModule implements GovernanceRestApi {
       tenant: {
         resolveTenantId: async (organizationId) =>
           (
-            await dependencies.projects.ensureInternal({
+            await tenantHistory.ensureInternal({
               organizationId,
               kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
             })
@@ -720,7 +726,11 @@ export class GovernanceModule implements GovernanceRestApi {
     });
     this.ingestionSources = IngestionSourceService.create({
       repository: repositories.ingestionSources,
-      projects: dependencies.projects,
+      projects: {
+        ensureInternal: (input) => tenantHistory.ensureInternal(input),
+        listActiveByScopes: (input) => dependencies.projects.listActiveByScopes(input),
+        findWithTeam: (id) => dependencies.projects.findWithTeam(id),
+      },
       entitlements: {
         hasEnterprisePlan: async (organizationId) =>
           isEnterpriseTier(
@@ -839,7 +849,7 @@ export class GovernanceModule implements GovernanceRestApi {
         sources: this.ingestionSources,
         costEvents: CanonicalCostExtractorService.create(),
         ottl,
-        projects: dependencies.projects,
+        projects: tenantHistory,
         directory: GovernanceIngestPrincipalService.create({
           organizations: dependencies.organizations,
         }),
@@ -855,6 +865,8 @@ export class GovernanceModule implements GovernanceRestApi {
   }
 
   private readonly dependencies: GovernanceAppDependencies;
+  /** Every ensure of the governance tenant goes through here, so its history stays complete (Q60). */
+  private readonly tenantHistory: GovernanceTenantHistoryService;
   private readonly anomalyRules: AnomalyRuleService;
   private readonly activityMonitor: ActivityMonitorService;
   private readonly planGate: GovernancePlanGateService;
@@ -1069,7 +1081,10 @@ export class GovernanceModule implements GovernanceRestApi {
     const worker = IngestionPullWorkerService.create({
       sources: repositories.ingestionSources,
       registry: pullers,
-      projects: dependencies.projects,
+      projects: {
+        ensureInternal: (input) => this.tenantHistory.ensureInternal(input),
+        findWithTeam: (id) => dependencies.projects.findWithTeam(id),
+      },
       sink: repositories.ocsfEvents,
       usageEntitlement: {
         isEnabled: (organizationId) =>

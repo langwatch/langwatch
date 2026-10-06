@@ -150,6 +150,31 @@ Feature: Shared project service
     Then no presence-setting-changed fact is recorded
 
   @unit
+  Scenario: A project moved to another team is recorded as project's fact
+    Given a project in team "alpha" of its organization
+    When it is moved to team "beta" of the same organization
+    Then project records a project-moved fact naming both teams and the project's organization
+
+  @unit
+  Scenario: Saving a project without changing its team records no moved fact
+    Given a project in team "alpha" of its organization
+    When its settings are saved naming team "alpha", or without naming a team
+    Then no project-moved fact is recorded
+
+  @unit
+  Scenario: An archived project is recorded as project's fact
+    Given a project in an organization
+    When it is archived
+    Then project records a project-archived fact with the project's organization
+
+  @unit
+  Scenario: A move or archive whose fact cannot be recorded still stands
+    Given project's lifecycle record fails
+    When a project is moved to another team, or archived
+    Then the move or archive is saved and answered as usual
+    And the failed record is logged with the project's id
+
+  @unit
   Scenario: Existing projects' presence settings are recorded by the backfill, idempotently
     Given an organization with two projects whose presence settings were stored before project recorded them
     When the backfill-project-presence-setting task runs twice

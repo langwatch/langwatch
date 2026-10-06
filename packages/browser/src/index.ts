@@ -23,6 +23,11 @@ export {
   type UnmountedHostOwner,
 } from "./ui-host-mounts.ts";
 export { BrowserLendRefusedError, checkLends, findLendRefusals } from "./ui-module-lends.ts";
+export {
+  BrowserPageClaimedTwiceError,
+  checkScreenAddresses,
+  findClaimedTwice,
+} from "./ui-screen-addresses.ts";
 export { UiFacilitiesSupply, UiShellSupply } from "./ui-supply.options.ts";
 export type {
   MissingUiSupplyFields,

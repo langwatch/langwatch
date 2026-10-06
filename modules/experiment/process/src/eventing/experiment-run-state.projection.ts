@@ -6,7 +6,6 @@ import {
 } from "@langwatch/eventing";
 
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../rules/experiment-run-event-types.rules.ts";
-import { normalizeDurationMs } from "./experiment-run-duration.process.ts";
 import type {
   EvaluatorResultEvent,
   ExperimentRunCompletedEvent,
@@ -21,6 +20,11 @@ import {
   targetResultEventSchema,
   traceMetricsComputedEventSchema,
 } from "./experiment-run-events.process.ts";
+
+/** Clamps a nullable duration to a non-negative value; clock skew can make one negative. */
+export function normalizeDurationMs(duration: number | null | undefined): number | null {
+  return duration != null ? Math.max(0, duration) : null;
+}
 
 /**
  * State data for an experiment run. Matches the experiment_runs ClickHouse

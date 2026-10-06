@@ -2,6 +2,7 @@ import {
   PULLED_USAGE_DEFAULT_CURRENCY_CODE,
   type PulledUsageObservedEventData,
   type PulledUsageObservedEvent,
+  type PulledUsagePricedEvent,
   type PulledUsageRetractedEvent,
   pulledUsageObservedEventSchema,
 } from "@langwatch/enterprise-governance-contract";
@@ -53,7 +54,13 @@ export type PulledUsageLedgerState = z.infer<typeof pulledUsageLedgerStateSchema
 
 const INITIAL_PULLED_USAGE_LEDGER_STATE: PulledUsageLedgerState = { filedCell: null };
 
-type PulledUsageEvent = (PulledUsageObservedEvent | PulledUsageRetractedEvent) & Event;
+/** The pipeline's whole event set; the manager handles only the two it names with `.on`. */
+type PulledUsageEvent = (
+  | PulledUsageObservedEvent
+  | PulledUsageRetractedEvent
+  | PulledUsagePricedEvent
+) &
+  Event;
 
 /**
  * The sole pricer of pulled cost for the usage ledger, one instance per restatement key:

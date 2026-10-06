@@ -45,11 +45,18 @@ describe("registering a credential account", () => {
 
       const created = await register(app);
 
-      expect(created.id).toEqual(expect.any(String));
+      expect(created).toEqual({ id: expect.any(String) });
       expect(lifecycle.recorded).toEqual([
         {
           type: "registered",
-          data: { tenantId: created.id, userId: created.id, occurredAt: expect.any(Number) },
+          data: {
+            tenantId: created.id,
+            userId: created.id,
+            occurredAt: expect.any(Number),
+            accountId: expect.any(String),
+            createdAtMs: expect.any(Number),
+            email: "a@x.com",
+          },
         },
       ]);
     });

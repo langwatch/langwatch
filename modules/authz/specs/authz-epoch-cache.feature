@@ -93,3 +93,86 @@ Feature: The grants cache and its epoch
     When an administrator removes alice from "acme"
     Then her membership is deleted before her grants are revoked
     And the epoch moves only after both, so no check in between is held
+
+  # ═══ Checks asked with ids share the same held answer ═════════════════
+
+  @unit
+  Scenario: A check asked with ids answers from the held grants
+    Given alice's grants were read once and nothing in "acme" has changed
+    When her permissions are checked again by project id, as "any of these" and as a batch
+    Then none of those checks resolves her grants afresh
+
+  @unit
+  Scenario: A revocation reaches a check asked with ids on the next request
+    Given alice's grants were read once through a check asked with a project id
+    When an administrator revokes her binding and the organization's epoch moves
+    Then her next check by id, "any of these" and batch check are all denied
+
+  @unit
+  Scenario: A role change reaches a check asked with ids on the next request
+    Given alice holds "admin" and her grants were read once through a check asked with ids
+    When an administrator changes her role to "viewer" and the organization's epoch moves
+    Then her next check by id answers as a viewer
+
+  @unit
+  Scenario: Demoting a key's owner reaches a check asked with ids on the next request
+    Given an API key owned by alice was checked once by project id
+    When alice is demoted and the organization's epoch moves
+    Then the key's next check by id is capped at her new role
+
+  # ═══ Where a scope sits ═══════════════════════════════════════════════
+
+  # A project's team and organization change only when it moves or is
+  # archived. Project records both as facts; authz moves the organization's
+  # lineage signal from its own side, and a held lineage is checked against
+  # it before it answers. The minute stays as a backstop.
+  @unit
+  Scenario: A scope's lineage is read at most once a minute
+    Given project "chatbot" has been resolved to its team and organization once
+    When the request door and the check both ask where "chatbot" sits, within a minute
+    Then the lineage is not read again
+    And after a minute it is read afresh
+
+  @unit
+  Scenario: An unknown or archived scope is never held
+    Given project "chatbot" could not be found
+    When it is asked about again
+    Then the lineage is read afresh
+
+  @unit
+  Scenario: A moved project's lineage is read afresh on the next request
+    Given project "chatbot" has been resolved to its team and organization once
+    When project records that "chatbot" moved to another team
+    And authz moves its organization's lineage signal
+    Then the next ask of where "chatbot" sits reads the lineage afresh, within the minute
+
+  @unit
+  Scenario: An archived project stops resolving on the next request
+    Given project "chatbot" has been resolved to its team and organization once
+    When project records that "chatbot" was archived
+    And authz moves its organization's lineage signal
+    Then the next ask of where "chatbot" sits finds no scope
+
+  @unit
+  Scenario: Project's moved and archived facts move the organization's lineage signal
+    Given authz subscribes to project's lifecycle facts
+    When project records a project-moved or a project-archived fact
+    Then the lineage signal of the fact's organization moves once per fact
+
+  @unit
+  Scenario: A lineage signal that cannot be read holds no lineage
+    Given the lineage signal cannot be read
+    When where "chatbot" sits is asked twice
+    Then the lineage is read both times
+
+  @unit
+  Scenario: A lineage signal that cannot be moved is retried
+    Given the lineage signal cannot be moved
+    When project records that "chatbot" was archived
+    Then authz's subscriber fails, so the delivery is retried
+
+  @unit
+  Scenario: Turning the grants cache off stops holding lineage too
+    Given an operator has turned the grants cache off
+    When where "chatbot" sits is asked twice
+    Then the lineage is read both times

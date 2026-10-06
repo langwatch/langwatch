@@ -6,6 +6,7 @@ import { MemoryAuthzCutoverRepository } from "./memory.authz-cutover.repository.
 import { MemoryAuthzEpochRepository } from "./memory.authz-epoch.repository.ts";
 import { MemoryAuthzGrantProjectionRepository } from "./memory.authz-grant-projection.repository.ts";
 import { MemoryAuthzLedgerReadRepository } from "./memory.authz-ledger-read.repository.ts";
+import { MemoryAuthzLineageEpochRepository } from "./memory.authz-lineage-epoch.repository.ts";
 import { MemoryAuthzListingRepository } from "./memory.authz-listing.repository.ts";
 import { MemoryAuthzManagedGrantRepository } from "./memory.authz-managed-grant.repository.ts";
 import { MemoryAuthzMembershipStampRepository } from "./memory.authz-membership-stamp.repository.ts";
@@ -28,6 +29,7 @@ export class MemoryAuthzRepositories {
       admissions: MemoryAuthzAdmissionRepository.create({ memory }),
       userStandings: MemoryAuthzUserStandingRepository.create({ memory }),
       epoch: MemoryAuthzEpochRepository.create({ memory }),
+      lineageEpochs: MemoryAuthzLineageEpochRepository.create({ memory }),
       sessionVersions: MemoryAuthzSessionVersionRepository.create({ memory }),
       auditTrail: MemoryAuthzAuditTrailRepository.create({ memory }),
       platformGrants: MemoryAuthzPlatformGrantRepository.create({ memory }),

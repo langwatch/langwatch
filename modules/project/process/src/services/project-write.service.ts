@@ -176,6 +176,14 @@ export class ProjectWriteService {
       organizationId: input.organizationId,
       data,
     });
+    if (owned && data.teamId && owned.teamId !== data.teamId) {
+      await this.created.moved({
+        projectId: input.id,
+        organizationId: input.organizationId,
+        fromTeamId: owned.teamId,
+        toTeamId: data.teamId,
+      });
+    }
 
     return project;
   }
@@ -197,6 +205,7 @@ export class ProjectWriteService {
     }
 
     const project = await this.repository.archive(input);
+    await this.created.archived({ projectId: input.id, organizationId: input.organizationId });
 
     return project;
   }

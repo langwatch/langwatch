@@ -3,10 +3,15 @@
  * The server half of the license registry (ADR-156): the platform door hides it from non-staff
  * and refuses a write to staff lacking ops:manage (Q42); the cloud-ops capability is the app's.
  */
-import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import { defineTrpcFact, defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { EnterpriseOpsApi, licenseRegistryTrpc } from "@langwatch/enterprise-ops-contract";
+import { opsOperatorSchema } from "@langwatch/ops-contract";
 
-import { operatorFact, STAFF } from "./enterprise-ops-operator.trpc.ts";
+/** The signed-in operator, bound by the process under the name ops reads it by. */
+export const operatorFact = defineTrpcFact("opsOperator", opsOperatorSchema.nullable());
+
+/** Cloud admin staff hold ops:view at the platform; anyone else is answered not-found (Q42). */
+export const STAFF = { at: "platform", hiddenWithout: "ops:view" } as const;
 
 export const licenseRegistryTrpcTransport: TrpcRouterDeclaration<
   EnterpriseOpsApi,

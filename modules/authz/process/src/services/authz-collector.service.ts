@@ -17,12 +17,15 @@ import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 import type {
   AuthzReadRepository,
   CustomRolePermissionsRow,
+  ScopeLineageRepository,
   ShareLinkRow,
 } from "../repositories/authz-read.repository.ts";
 import { liveBindings } from "../rules/grant-expiry.rules.ts";
 
 export type AuthzCollectorOptions = {
   reader: AuthzReadRepository;
+  /** Where scope refs read lineage from; omitted = the reader, read afresh every time. */
+  lineage?: Pick<ScopeLineageRepository, "findProjectLineage" | "findTeamOrganization">;
   /** Injected so binding and share-link liveness are testable at their exact boundary. */
   now?: () => Instant;
 };
@@ -34,9 +37,14 @@ export class AuthzCollectorService {
 
   private readonly now: () => Instant;
   private readonly reader: AuthzReadRepository;
+  private readonly lineage: Pick<
+    ScopeLineageRepository,
+    "findProjectLineage" | "findTeamOrganization"
+  >;
 
   private constructor(options: AuthzCollectorOptions) {
     this.reader = options.reader;
+    this.lineage = options.lineage ?? options.reader;
     this.now = options.now ?? nowInstant;
   }
 
@@ -55,7 +63,7 @@ export class AuthzCollectorService {
     organizationId?: string;
   }): Promise<AuthzScopeRef | null> {
     if (projectId) {
-      const lineage = await this.reader.findProjectLineage({ projectId });
+      const lineage = await this.lineage.findProjectLineage({ projectId });
       if (!lineage) {
         return null;
       }
@@ -69,7 +77,7 @@ export class AuthzCollectorService {
     }
 
     if (teamId) {
-      const team = await this.reader.findTeamOrganization({ teamId });
+      const team = await this.lineage.findTeamOrganization({ teamId });
       if (!team) {
         return null;
       }
@@ -100,7 +108,7 @@ export class AuthzCollectorService {
     parentThreadId?: string;
     shareTokens?: readonly string[];
   }): Promise<AuthzScopeRef | null> {
-    const lineage = await this.reader.findProjectLineage({ projectId });
+    const lineage = await this.lineage.findProjectLineage({ projectId });
     if (!lineage) {
       return null;
     }

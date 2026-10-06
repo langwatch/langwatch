@@ -43,6 +43,9 @@ export abstract class ScimHostApi {
 
   /** Replaces the whole query string; a key left out is a key removed. */
   abstract setQuery(next: Readonly<Record<string, string | undefined>>): void;
+
+  /** Closes the drawer the host opened by token. */
+  abstract closeOverlay(): void;
 }
 
 const ScimHostContext = createContext<ScimHostApi | undefined>(void 0);

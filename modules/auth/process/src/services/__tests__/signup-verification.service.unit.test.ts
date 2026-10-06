@@ -86,7 +86,10 @@ function makeService({
       budgets.push(key);
       return budgetAllowed ? { allowed: true } : { allowed: false, retryAfterSeconds: 60 };
     },
-    buildVerificationUrl: ({ token }) => `https://app.test/auth/signup?verify=${token}`,
+    buildVerificationUrl: ({ token, callbackUrl }) =>
+      `https://app.test/auth/signup?verify=${token}${
+        callbackUrl ? `&callbackUrl=${encodeURIComponent(callbackUrl)}` : ""
+      }`,
     isEmailUnconfigured: async () => unconfigured,
     now: () => clock,
     mintToken: () => `token-${++minted}`,
@@ -122,6 +125,22 @@ describe("given a sign-up address to confirm", () => {
       ]);
       expect(harness.memory.verificationTokens.get("token-1")?.expires).toEqual(
         NOW.add({ milliseconds: SIGN_UP_VERIFICATION_TTL_MS }),
+      );
+    });
+  });
+
+  describe("when the screen was started with a continuation", () => {
+    /** @scenario The emailed confirmation link brings the terminal's continuation along */
+    it("carries it on the link, so a fresh tab lands where the first one was going", async () => {
+      const harness = makeService();
+
+      await harness.service.requestVerification({
+        email: "sam@acme.com",
+        callbackUrl: "/cli/auth?user_code=ABCD-EFGH",
+      });
+
+      expect(harness.mail.sent[0]?.verificationUrl).toContain(
+        `callbackUrl=${encodeURIComponent("/cli/auth?user_code=ABCD-EFGH")}`,
       );
     });
   });

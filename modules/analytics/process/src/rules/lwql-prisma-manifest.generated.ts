@@ -283,6 +283,7 @@ export interface LwqlPrismaRows {
     readonly domain: "String";
     readonly state: "String";
     readonly matchedVia: "String";
+    readonly origin: "String";
     readonly expiresAt: "DateTime?";
     readonly resolvedAt: "DateTime?";
     readonly resolvedByType: "String?";

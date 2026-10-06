@@ -136,6 +136,7 @@ describe("given the memory identity repositories", () => {
         resolvedByType: null,
         resolvedById: null,
         withdrawalCause: null,
+        origin: "web" as const,
       };
       store.joinRequests.set("jr_1", {
         ...base,

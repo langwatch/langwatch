@@ -112,3 +112,30 @@ Feature: Process outbox lease hardening
     Given a dispatcher holding the lease on a message mid-delivery
     When a second dispatcher runs
     Then it does not dispatch that message
+
+  @unit @idle-backoff
+  Scenario: An idle outbox worker backs off its recovery poll until notified
+    Given an outbox worker whose drains lease nothing
+    When its recovery polls keep coming back empty
+    Then each empty poll doubles the interval to the next poll, up to 30 seconds
+    And a notification drains at once and returns the poll to its base interval
+    And a poll that leases a message returns the poll to its base interval
+
+  @unit @notify-on-insert
+  Scenario: A commit that inserted no intent does not nudge the outbox
+    Given a process manager mounted with consumers enabled
+    When an event commits a new state without inserting an intent
+    Then its outbox worker is not nudged
+    And when an event commits an intent, its outbox worker drains at once
+
+  @unit @notify-on-insert
+  Scenario: A wake nudges only the outbox of the process it woke
+    Given two process managers mounted on one runtime
+    When a wake commits an intent for one of them
+    Then only that process manager's outbox worker drains
+
+  @integration @wake-scan
+  Scenario: A wake row another scan holds is skipped rather than waited on
+    Given two due wakes and another connection holding a row lock on one of them
+    When the wake scan runs
+    Then it returns the unlocked wake without waiting for the lock

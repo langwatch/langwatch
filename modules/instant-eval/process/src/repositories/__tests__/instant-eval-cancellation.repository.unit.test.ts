@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { MemoryInstantEvalCancellationRepository } from "../memory/memory.instant-eval-cancellation.repository.ts";
+import { MemoryInstantEvalCancellationRepository } from "../memory/memory.instant-eval.repositories.ts";
 import {
   type InstantEvalCancellationRedis,
   RedisInstantEvalCancellationRepository,

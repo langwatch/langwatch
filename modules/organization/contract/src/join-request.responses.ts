@@ -73,6 +73,8 @@ export const joinRequestPendingSchema = waitingSinceSchema
     userId: z.string().min(1),
     name: z.string(),
     domain: z.string(),
+    /** The seat approval lands (ADR-171 v6): read only, approval carries no role. */
+    seat: joinerRoleSchema,
   })
   .array();
 export type JoinRequestPending = z.infer<typeof joinRequestPendingSchema>;
