@@ -45,7 +45,7 @@ const CONTEXT = { aggregateId: "grant", tenantId: createTenantId("org_contract")
 function memoryLedgerFixture(): LedgerFixture {
   const memory = AuthzMemoryStore.create();
   const organizationId = id("org");
-  memory.organizations.set(organizationId, { createdAt: at(T0) });
+  memory.organizations.set(organizationId, { name: "Ledger", createdAt: at(T0) });
 
   return {
     repositories: {
@@ -66,6 +66,7 @@ function memoryLedgerFixture(): LedgerFixture {
         role: "MEMBER",
         disabled: false,
         membershipStamp: `stamp_${userId}`,
+        pendingSsoGrantId: null,
         createdAt: at(T0),
       });
       return userId;

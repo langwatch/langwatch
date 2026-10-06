@@ -31,8 +31,15 @@ export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantReposito
     organizationId: string;
     userId: string;
   }): Promise<boolean> {
-    return this.memory.legacySharedTeamMemberships.some(
-      (row) => row.organizationId === input.organizationId && row.userId === input.userId,
+    return this.memory.teamMemberships.some(
+      (row) =>
+        row.userId === input.userId &&
+        this.memory.teams.some(
+          (team) =>
+            team.id === row.teamId &&
+            team.organizationId === input.organizationId &&
+            !team.isPersonal,
+        ),
     );
   }
 
@@ -40,13 +47,45 @@ export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantReposito
     organizationId: string;
     scopes: readonly { scopeType: GrantScopeTier; scopeId: string }[];
   }): Promise<AuthzBindingScopeRow[]> {
-    return this.memory.scopes
-      .filter(
-        (row) =>
-          row.organizationId === input.organizationId &&
-          input.scopes.some((scope) => scope.scopeType === row.type && scope.scopeId === row.id),
-      )
-      .map(({ organizationId: _organizationId, ...row }) => row);
+    const asked = (scopeType: GrantScopeTier, id: string) =>
+      input.scopes.some((scope) => scope.scopeType === scopeType && scope.scopeId === id);
+    const organization = this.memory.organizations.get(input.organizationId);
+    const teamsHere = this.memory.teams.filter(
+      (team) => team.organizationId === input.organizationId,
+    );
+    return [
+      ...(organization && asked("ORGANIZATION", input.organizationId)
+        ? [
+            {
+              type: "ORGANIZATION" as const,
+              id: input.organizationId,
+              name: organization.name,
+              personalWorkspaceName: null,
+            },
+          ]
+        : []),
+      ...teamsHere
+        .filter((team) => asked("TEAM", team.id))
+        .map((team): AuthzBindingScopeRow => ({
+          type: "TEAM",
+          id: team.id,
+          name: team.name,
+          personalWorkspaceName: team.isPersonal ? team.name : null,
+        })),
+      ...this.memory.projects.flatMap((project): AuthzBindingScopeRow[] => {
+        const team = teamsHere.find((candidate) => candidate.id === project.teamId);
+        if (!team || !asked("PROJECT", project.id)) return [];
+        const personal = project.isPersonal || team.isPersonal;
+        return [
+          {
+            type: "PROJECT",
+            id: project.id,
+            name: project.name,
+            personalWorkspaceName: personal ? team.name : null,
+          },
+        ];
+      }),
+    ];
   }
 
   async findGroupMembers(input: {

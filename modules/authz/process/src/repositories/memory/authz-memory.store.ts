@@ -9,7 +9,6 @@ import type { Instant } from "@langwatch/time";
 import type { AuthzAuditRow } from "../authz-audit-trail.repository.ts";
 import type {
   AuthzAssignableRoleRow,
-  AuthzBindingScopeRow,
   AuthzManagedBindingRow,
   AuthzUserGroupRow,
 } from "../authz-managed-grant.repository.ts";
@@ -18,15 +17,6 @@ import type {
   GrantRowShape,
   RoleRowShape,
 } from "../prisma/prisma.authz-grant.mapper.ts";
-
-/** One membership's unfinished admission marker. */
-export type AuthzMemoryAdmissionRow = {
-  organizationId: string;
-  userId: string;
-  grantId: string;
-  occurredAtMs: number;
-  disabled: boolean;
-};
 
 /** A user's standing as authz folded it from user's and identity's facts. */
 export type AuthzMemoryUserStandingRow = {
@@ -58,11 +48,15 @@ export type AuthzMemoryCustomRoleRow = AuthzAssignableRoleRow & {
   createdAt: Instant;
 };
 
-/** An OrganizationUser row: the role, the seat, and the generation the grant fence compares. */
+/**
+ * An OrganizationUser row: the role, the seat, the generation the grant fence
+ * compares, and the grant an unfinished single-sign-on admission waits for.
+ */
 export type AuthzMemoryMembershipRow = {
   role: OrganizationRole;
   disabled: boolean;
   membershipStamp: string;
+  pendingSsoGrantId: string | null;
   createdAt: Instant;
 };
 
@@ -103,6 +97,8 @@ export type AuthzMemoryTeamMembershipRow = {
 export type AuthzMemoryProjectRow = {
   id: string;
   teamId: string;
+  name: string;
+  isPersonal: boolean;
   apiKey: string;
   createdAt: Instant;
 };
@@ -131,15 +127,12 @@ export class AuthzMemoryStore {
   readonly sessionVersions = new Map<string, number>();
   readonly cutovers = new Map<string, AuthzMemoryCutoverRow>();
   readonly userStandings = new Map<string, AuthzMemoryUserStandingRow>();
-  readonly admissions: AuthzMemoryAdmissionRow[] = [];
   readonly bindings: AuthzMemoryBindingRow[] = [];
-  readonly scopes: (AuthzBindingScopeRow & { organizationId: string })[] = [];
   readonly users: Pick<AuthzAccessUser, "id" | "name" | "email" | "image">[] = [];
   /** Keyed `organizationId:userId`: the OrganizationUser row. */
   readonly memberships = new Map<string, AuthzMemoryMembershipRow>();
   readonly groups: AuthzMemoryGroupRow[] = [];
   readonly groupMemberships: { userId: string; groupId: string }[] = [];
-  readonly legacySharedTeamMemberships: { organizationId: string; userId: string }[] = [];
   readonly teams: AuthzMemoryTeamRow[] = [];
   readonly teamMemberships: AuthzMemoryTeamMembershipRow[] = [];
   readonly projects: AuthzMemoryProjectRow[] = [];
@@ -154,7 +147,7 @@ export class AuthzMemoryStore {
   /** The OrganizationInvite rows offboarding clears by email. */
   readonly organizationInvites: AuthzMemoryInviteRow[] = [];
   /** Organizations that exist, as the bootstrap fence and the import ask. */
-  readonly organizations = new Map<string, { createdAt: Instant }>();
+  readonly organizations = new Map<string, { name: string; createdAt: Instant }>();
   readonly auditLogs: AuthzAuditRow[] = [];
 
   static create(): AuthzMemoryStore {
@@ -196,13 +189,10 @@ export class AuthzMemoryStore {
     this.memberships.clear();
     this.organizations.clear();
     for (const rows of [
-      this.admissions,
       this.bindings,
-      this.scopes,
       this.users,
       this.groups,
       this.groupMemberships,
-      this.legacySharedTeamMemberships,
       this.teams,
       this.teamMemberships,
       this.projects,

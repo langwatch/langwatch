@@ -67,8 +67,8 @@ function memoryReadsFixture(): ReadsFixture {
   const memory = AuthzMemoryStore.create();
   const organizationId = id("org");
   const foreignOrganizationId = id("org");
-  memory.organizations.set(organizationId, { createdAt: at(T0) });
-  memory.organizations.set(foreignOrganizationId, { createdAt: at(T0) });
+  memory.organizations.set(organizationId, { name: "Reads", createdAt: at(T0) });
+  memory.organizations.set(foreignOrganizationId, { name: "Reads", createdAt: at(T0) });
 
   return {
     repositories: {
@@ -97,6 +97,7 @@ function memoryReadsFixture(): ReadsFixture {
           role,
           disabled: false,
           membershipStamp: `stamp_${userId}`,
+          pendingSsoGrantId: null,
           createdAt: at(T0 + 1_000),
         });
       }
@@ -119,7 +120,14 @@ function memoryReadsFixture(): ReadsFixture {
     },
     project: async ({ teamId, apiKey = id("key") }) => {
       const projectId = id("project");
-      memory.projects.push({ id: projectId, teamId, apiKey, createdAt: at(T0 + 2_000) });
+      memory.projects.push({
+        id: projectId,
+        teamId,
+        name: "Reads",
+        isPersonal: false,
+        apiKey,
+        createdAt: at(T0 + 2_000),
+      });
       return projectId;
     },
     teamMember: async ({ teamId, userId, role, assignedRoleId = null }) => {

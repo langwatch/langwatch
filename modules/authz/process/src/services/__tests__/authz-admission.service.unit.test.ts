@@ -27,11 +27,12 @@ function harness() {
 }
 
 function openAdmission(memory: AuthzMemoryStore): void {
-  memory.admissions.push({
-    ...SCOPE,
-    grantId: GRANT_ID,
-    occurredAtMs: 1_700_000_000_000,
+  memory.memberships.set(memory.membershipKey(ORGANIZATION_ID, USER_ID), {
+    role: "MEMBER",
     disabled: false,
+    membershipStamp: "stamp_admission",
+    pendingSsoGrantId: GRANT_ID,
+    createdAt: Temporal.Instant.fromEpochMilliseconds(1_700_000_000_000),
   });
 }
 

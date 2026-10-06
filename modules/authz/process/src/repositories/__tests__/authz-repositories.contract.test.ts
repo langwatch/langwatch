@@ -15,7 +15,7 @@ import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import type { AuthzManagedGrantRepository } from "../authz-managed-grant.repository.ts";
 import type { AuthzRepositories } from "../authz.repositories.ts";
-import { type AuthzMemoryGrantRow, AuthzMemoryStore } from "../memory/authz-memory.store.ts";
+import { AuthzMemoryStore } from "../memory/authz-memory.store.ts";
 import { MemoryAuthzAdmissionRepository } from "../memory/memory.authz-admission.repository.ts";
 import { MemoryAuthzAuditTrailRepository } from "../memory/memory.authz-audit-trail.repository.ts";
 import { MemoryAuthzCutoverRepository } from "../memory/memory.authz-cutover.repository.ts";
@@ -169,96 +169,6 @@ describe.each(backends)("given the $name authz backend", (backend) => {
     });
   });
 
-  describe("when a membership carries an unfinished admission", () => {
-    it("reads the marker back, and the grant only once the ledger holds one", async () => {
-      const repositories = backend.create();
-      const scope = { organizationId: ORGANIZATION_ID, userId: USER_ID };
-      repositories.store.admissions.push({
-        ...scope,
-        grantId: "rb_admission",
-        occurredAtMs: 1_700_000_000_000,
-        disabled: false,
-      });
-
-      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
-        found: true,
-        grantId: "rb_admission",
-        occurredAtMs: 1_700_000_000_000,
-      });
-      await expect(
-        repositories.admissions.readAdmissionGrant({ ...scope, grantId: "rb_admission" }),
-      ).resolves.toEqual({ found: false });
-    });
-
-    it("refuses to complete while no live grant answers the marker", async () => {
-      const repositories = backend.create();
-      const scope = { organizationId: ORGANIZATION_ID, userId: USER_ID };
-      repositories.store.admissions.push({
-        ...scope,
-        grantId: "rb_admission",
-        occurredAtMs: 1,
-        disabled: false,
-      });
-      repositories.store.grants.push(
-        admissionGrant({ ...scope, grantId: "rb_admission", revoked: true }),
-      );
-
-      await expect(
-        repositories.admissions.completeAdmission({ ...scope, grantId: "rb_admission" }),
-      ).resolves.toBe(false);
-      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
-        found: true,
-        grantId: "rb_admission",
-        occurredAtMs: 1,
-      });
-    });
-
-    it("clears the marker once a live grant answers it, and again on a revoked one", async () => {
-      const repositories = backend.create();
-      const scope = { organizationId: ORGANIZATION_ID, userId: USER_ID };
-      const marker = {
-        ...scope,
-        grantId: "rb_admission",
-        occurredAtMs: 1,
-        disabled: false,
-      };
-      repositories.store.admissions.push(marker);
-      repositories.store.grants.push(
-        admissionGrant({ ...scope, grantId: "rb_admission", revoked: false }),
-      );
-
-      await expect(
-        repositories.admissions.completeAdmission({ ...scope, grantId: "rb_admission" }),
-      ).resolves.toBe(true);
-      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
-        found: false,
-      });
-
-      repositories.store.admissions.push(marker);
-      await expect(
-        repositories.admissions.clearPendingAdmission({ ...scope, grantId: "rb_admission" }),
-      ).resolves.toBe(true);
-      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
-        found: false,
-      });
-    });
-
-    it("keeps a disabled membership's marker out of the read", async () => {
-      const repositories = backend.create();
-      const scope = { organizationId: ORGANIZATION_ID, userId: USER_ID };
-      repositories.store.admissions.push({
-        ...scope,
-        grantId: "rb_admission",
-        occurredAtMs: 1,
-        disabled: true,
-      });
-
-      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
-        found: false,
-      });
-    });
-  });
-
   describe("when user's and identity's facts reach the standing table", () => {
     const at = (ms: number) => Temporal.Instant.fromEpochMilliseconds(ms);
 
@@ -317,22 +227,6 @@ describe.each(backends)("given the $name authz backend", (backend) => {
         USER_ID,
       ]);
     });
-
-    it("keeps an inactive user's admission marker out of the read", async () => {
-      const repositories = backend.create();
-      const scope = { organizationId: ORGANIZATION_ID, userId: USER_ID };
-      repositories.store.admissions.push({
-        ...scope,
-        grantId: "rb_admission",
-        occurredAtMs: 1,
-        disabled: false,
-      });
-      await repositories.userStandings.recordDeactivated({ userId: USER_ID, at: at(10) });
-
-      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
-        found: false,
-      });
-    });
   });
 
   describe("when the epoch is bumped", () => {
@@ -380,6 +274,7 @@ function memoryHolderFixture(): HolderFixture {
         role: "MEMBER",
         disabled: false,
         membershipStamp: randomUUID(),
+        pendingSsoGrantId: null,
         createdAt: nowInstant(),
       });
       return userId;
@@ -605,41 +500,3 @@ describe.each(holderBackends)("given a role's holders on the $name backend", (ba
     },
   );
 });
-
-/** The organization-scope Grant row an SSO admission names, as the projection writes it. */
-function admissionGrant({
-  organizationId,
-  userId,
-  grantId,
-  revoked,
-}: {
-  organizationId: string;
-  userId: string;
-  grantId: string;
-  revoked: boolean;
-}): AuthzMemoryGrantRow {
-  const occurredAt = Temporal.Instant.fromEpochMilliseconds(1_700_000_000_000);
-  return {
-    id: grantId,
-    organizationId,
-    principalType: "USER",
-    principalId: userId,
-    roleKey: "member",
-    legacyRole: null,
-    source: "sso",
-    scopeType: "ORGANIZATION",
-    scopeId: organizationId,
-    token: null,
-    permission: null,
-    resourceKind: null,
-    projectId: null,
-    createdByUserId: null,
-    expiresAt: null,
-    maxViews: null,
-    occurredAt,
-    revokedAt: revoked ? occurredAt : null,
-    revokedReason: revoked ? "revocation" : null,
-    createdAt: occurredAt,
-    updatedAt: occurredAt,
-  };
-}

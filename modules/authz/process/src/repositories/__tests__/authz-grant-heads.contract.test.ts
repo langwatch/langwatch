@@ -63,7 +63,7 @@ const CONTEXT = { aggregateId: "grant", tenantId: createTenantId("org_contract")
 function memoryHeadsFixture(): HeadsFixture {
   const memory = AuthzMemoryStore.create();
   const organizationId = id("org");
-  memory.organizations.set(organizationId, { createdAt: at(T0) });
+  memory.organizations.set(organizationId, { name: "Heads", createdAt: at(T0) });
   const projectId = id("project");
 
   return {
@@ -83,6 +83,7 @@ function memoryHeadsFixture(): HeadsFixture {
         role: "MEMBER",
         disabled: false,
         membershipStamp,
+        pendingSsoGrantId: null,
         createdAt: at(T0),
       });
       return { userId, membershipStamp };

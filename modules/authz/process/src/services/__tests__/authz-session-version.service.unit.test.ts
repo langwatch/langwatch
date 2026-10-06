@@ -61,6 +61,7 @@ describe("AuthzSessionVersionService", () => {
         role: "MEMBER",
         disabled: false,
         membershipStamp: `stamp_${userId}`,
+        pendingSsoGrantId: null,
         createdAt: Temporal.Instant.fromEpochMilliseconds(0),
       });
     }
