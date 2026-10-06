@@ -1,6 +1,7 @@
 import {
   createUpgradeReader,
   type ListStepsFilter,
+  type UpgradeImage,
   type UpgradeReader,
   type UpgradeStatus,
   type UpgradeStepPage,
@@ -12,11 +13,13 @@ import type { UpgradeLedgerRepository } from "../upgrade-ledger.repository.ts";
 export class MemoryUpgradeLedgerRepository implements UpgradeLedgerRepository {
   private constructor(private readonly reader: UpgradeReader) {}
 
-  static create(): MemoryUpgradeLedgerRepository {
+  static create({
+    steps = [],
+  }: { steps?: UpgradeImage["steps"] } = {}): MemoryUpgradeLedgerRepository {
     return new MemoryUpgradeLedgerRepository(
       createUpgradeReader({
         postgres: { query: async () => ({ rows: [] }) },
-        image: { release: "unreleased", steps: [] },
+        image: { release: "unreleased", steps },
         floor: null,
       }),
     );

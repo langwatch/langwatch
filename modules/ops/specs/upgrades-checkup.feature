@@ -100,6 +100,13 @@ Feature: The checkup's migration rows and the doctor command read the upgrade le
     Then both steps are listed with their kind, mode and status
     And the upgrade status names the failed step
 
+  @unit
+  Scenario: A step the image ships that the ledger has not recorded keeps its migrations row refused, naming the step
+    Given the image ships a blocking migration step the upgrade ledger has not recorded
+    When the checkup reads its migrations rows
+    Then the migrations row is refused
+    And the detail names the step
+
   @integration
   Scenario: Doctor prints the upgrade status of an installation whose database is running
     Given the local Postgres accepts connections

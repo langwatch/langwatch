@@ -1,3 +1,4 @@
+export { imageSteps } from "./image-steps.ts";
 export { LEDGER_TABLES_DDL, createLedgerTables } from "./ledger-tables.ts";
 export { UpgradeLedgerRepository } from "./ledger.repository.ts";
 export { UpgradeLedgerSeedService } from "./ledger-seed.service.ts";

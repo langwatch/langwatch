@@ -1,8 +1,10 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { imageSteps } from "@langwatch/upgrade";
 import { loadReleases } from "@langwatch/upgrade/manifest";
 import {
   createUpgradeReader,
   type ListStepsFilter,
+  type UpgradeImage,
   type UpgradeReader,
   type UpgradeStatus,
   type UpgradeStepPage,
@@ -15,18 +17,21 @@ const LEDGER_TENANCY =
   "-- @tenancy: the upgrade ledger describes the installation, not a tenant.\n";
 
 /**
- * The ledger over this process's Postgres. The run registers every declared step into it, so the
- * image contributes only its release and floor (Q-U8, default taken).
+ * The ledger over this process's Postgres, read against the steps this image ships, so a step
+ * the ledger has not recorded reads as outstanding (Q-U8, default taken).
  */
 export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
   private constructor(private readonly reader: UpgradeReader) {}
 
   static create({
     prisma,
+    steps,
   }: {
     prisma: Pick<PrismaClient, "$queryRawUnsafe">;
+    steps?: UpgradeImage["steps"];
   }): PrismaUpgradeLedgerRepository {
     const { manifests, floor } = loadReleases();
+    const release = manifests.at(-1)?.release;
     return new PrismaUpgradeLedgerRepository(
       createUpgradeReader({
         postgres: {
@@ -34,7 +39,10 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
             rows: await prisma.$queryRawUnsafe<Row[]>(`${LEDGER_TENANCY}${text}`, ...values),
           }),
         },
-        image: { release: manifests.at(-1)?.release ?? "unreleased", steps: [] },
+        image: {
+          release: release ?? "unreleased",
+          steps: steps ?? imageSteps({ release: release ?? "0.0.0" }),
+        },
         floor,
       }),
     );

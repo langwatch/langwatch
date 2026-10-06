@@ -150,3 +150,7 @@ recommendation, and "default taken" if a lane proceeded on it.
 ## Answered (moved to `.claude/coordinator/rulings-2026-10-05.md` when ruled)
 
 - Q1-upcast: ruled 2026-10-06 night, option (a), a framework upcaster, accessible in ops and the migrations ledger.
+
+### ops-upgrade-image-steps
+
+- Q-U8: `imageSteps` lives in a new `packages/upgrade/src/image-steps.ts`, exported from the package root (not the gate or manifest subpath, which would cycle); ops and tasks both call it. Default taken, held for Alex.

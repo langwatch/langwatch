@@ -10,9 +10,8 @@ import {
   runMigrations,
 } from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
-import type { UpgradeClickHouse } from "@langwatch/upgrade";
-import { readImageTree } from "@langwatch/upgrade/gate";
-import { loadReleases, stampRelease } from "@langwatch/upgrade/manifest";
+import { imageSteps, type UpgradeClickHouse } from "@langwatch/upgrade";
+import { loadReleases } from "@langwatch/upgrade/manifest";
 import { formatStatus } from "@langwatch/upgrade/reader";
 import {
   createUpgradeRunner,
@@ -80,21 +79,6 @@ export function sqlReader({
       }
     },
   };
-}
-
-/** Every Prisma folder and goose file this image ships, as steps (ids per blitz plan 5.3). */
-function imageSteps({ release }: { release: string }) {
-  const current = readImageTree();
-  const cutAt = "1970-01-01T00:00:00Z";
-  const tree = stampRelease({
-    release,
-    previous: null,
-    cutAt,
-    current,
-    shipped: new Set(),
-    ownerOf: () => null,
-  });
-  return tree.steps;
 }
 
 function clickhouseTargets({ environment }: TaskInput) {
