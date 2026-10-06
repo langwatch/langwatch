@@ -17,6 +17,7 @@ function report(filename, code) {
 
 describe("given browser code", () => {
   describe("when it imports Redux in any spelling", () => {
+    /** @scenario "A Redux import in browser code is reported" */
     it("reports reduxImported naming the specifier", () => {
       const code = [
         'import { configureStore } from "@reduxjs/toolkit";',

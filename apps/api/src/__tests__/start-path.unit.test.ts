@@ -22,6 +22,7 @@ describe("the API start path", () => {
     });
 
     /** @scenario "The API listens only after preparation succeeded" */
+    /** @scenario "A failed migration stops the boot instead of serving" */
     it("chains the entry point behind preparation with &&, so a failed preparation never reaches it", () => {
       const start = scripts["start"] ?? "";
       expect(start.indexOf(" && ")).toBe(PREPARE.length);

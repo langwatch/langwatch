@@ -19,6 +19,7 @@ function report(body, filename = FILE) {
 
 describe("given an effect in browser code", () => {
   describe("when its only job is setting state from its dependencies", () => {
+    /** @scenario "An effect that only derives state is reported" */
     it("reports effectDerivesState naming the setter", () => {
       const found = report("useEffect(() => { setCount(items.length); }, [items]);");
 
@@ -39,6 +40,7 @@ describe("given an effect in browser code", () => {
   });
 
   describe("when the effect does anything else", () => {
+    /** @scenario "An effect that subscribes, times, touches the DOM or cleans up is left alone" */
     it("leaves subscriptions, timers, cleanups and the DOM alone", () => {
       const bodies = [
         "useEffect(() => { const t = setTimeout(() => setCount(items.length), 5); return () => clearTimeout(t); }, [items]);",

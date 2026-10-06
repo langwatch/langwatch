@@ -88,11 +88,24 @@ describe("given a migration sequence", () => {
   describe("when the first migration fails", () => {
     /** @scenario The tasks run in the order named and stop at the first failure */
     /** @scenario The lock is released even when a task fails */
+    /** @scenario A failed migration stops the boot instead of serving */
     it("stops the sequence and releases the lock", async () => {
       const failure = new Error("migration failed");
       calls.prisma.mockRejectedValueOnce(failure);
       await expect(runTasks(names, input())).rejects.toBe(failure);
       expect(calls.order).toEqual(["lock", "unlock"]);
+    });
+  });
+
+  describe("when an argument arrives alongside several task names", () => {
+    /** @scenario Arguments alongside several task names are refused */
+    it("refuses before running any task, because the argument has no single owner", async () => {
+      await expect(
+        runTasks(["prisma-migrate", "clickhouse-migrate", "--dry-run"], input()),
+      ).rejects.toThrow("Available tasks:");
+
+      expect(calls.order).toEqual([]);
+      expect(calls.lock).not.toHaveBeenCalled();
     });
   });
 

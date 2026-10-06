@@ -63,6 +63,30 @@ describe("given a module task run", () => {
     });
   });
 
+  describe("when one task is named with its own arguments", () => {
+    /** @scenario Arguments still reach a single named task */
+    it("hands the task exactly those arguments, untouched", async () => {
+      const received: (readonly string[])[] = [];
+      class ArgumentTask extends Task {
+        readonly name = "with-args";
+        readonly description = "records the arguments it was given";
+
+        async run({ args }: { args: readonly string[] }): Promise<void> {
+          received.push(args);
+        }
+      }
+      booted.app.tasks.mockReturnValue([new ArgumentTask()]);
+
+      await runModuleTask({
+        name: "with-args",
+        args: ["--dry-run", "--limit=5", "tenant a"],
+        signal: new AbortController().signal,
+      });
+
+      expect(received).toEqual([["--dry-run", "--limit=5", "tenant a"]]);
+    });
+  });
+
   describe("when no plugin module is named", () => {
     it("runs an installed module's task and imports nothing", async () => {
       const importModule = vi.fn(async () => ({}));

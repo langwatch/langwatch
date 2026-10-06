@@ -27,6 +27,7 @@ describe("given a zustand store in a browser package", () => {
   });
 
   describe("when it is created anywhere else", () => {
+    /** @scenario "A zustand store outside behavior is reported" */
     it("reports storeOutsideBehavior on the call, for create and createStore", () => {
       expect(report(`${BROWSER}/ui/sections/panel.tsx`, STORE)).toEqual([
         { line: 2, messageId: "storeOutsideBehavior" },
@@ -40,6 +41,7 @@ describe("given a zustand store in a browser package", () => {
   });
 
   describe("when the declaration file exports a store", () => {
+    /** @scenario "A package declaration file exporting a store is reported" */
     it("reports storeExported for re-exports and store-named bindings", () => {
       const code = [
         'export { useAgentStore } from "./behavior/agent.store";',

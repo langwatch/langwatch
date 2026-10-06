@@ -170,6 +170,75 @@ describe("Server", () => {
     });
   });
 
+  describe("given a door route and a served application", () => {
+    const route = (path: string, body: string): HealthRoute => ({
+      path,
+      handle: (_request, response) => {
+        response.writeHead(200).end(body);
+      },
+    });
+    const application = (answer: () => void) => ({
+      name: "api",
+      start: () => undefined,
+      stop: () => undefined,
+      handler: (_request: http.IncomingMessage, response: http.ServerResponse) => {
+        answer();
+        response.writeHead(200).end("application");
+      },
+    });
+
+    describe("when a request arrives for an address only the application answers", () => {
+      /** @scenario "A declining contribution falls through to the next" */
+      it("passes it by the route that does not claim it and the application answers", async () => {
+        const answered = vi.fn();
+        const server = await startServer();
+        server.with(route("/metrics", "metric 1\n"));
+        await server.serve(application(answered));
+
+        const response = await fetchFrom(server, "/api/things");
+
+        expect(response.status).toBe(200);
+        await expect(response.text()).resolves.toBe("application");
+        expect(answered).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when a request arrives for an address both would answer", () => {
+      /** @scenario "The lower order answers first" */
+      it("answers from the door route and never asks the application", async () => {
+        const answered = vi.fn();
+        const server = await startServer();
+        server.with(route("/metrics", "metric 1\n"));
+        await server.serve(application(answered));
+
+        const response = await fetchFrom(server, "/metrics");
+
+        await expect(response.text()).resolves.toBe("metric 1\n");
+        expect(answered).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a door route and no served application", () => {
+    describe("when a request arrives for an address the route does not claim", () => {
+      /** @scenario "Nothing on the door claims the request" */
+      it("answers 404", async () => {
+        const server = await startServer();
+        server.with({
+          path: "/metrics",
+          handle: (_request, response) => {
+            response.writeHead(200).end("metric 1\n");
+          },
+        });
+        await server.listen();
+
+        const response = await fetchFrom(server, "/elsewhere");
+
+        expect(response.status).toBe(404);
+      });
+    });
+  });
+
   describe("given an application that composed no handler", () => {
     describe("when the server is asked to serve it", () => {
       /** @scenario "A mounted transport is not a door handler" */

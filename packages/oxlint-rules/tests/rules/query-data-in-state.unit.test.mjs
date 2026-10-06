@@ -21,6 +21,7 @@ function report(body, filename = FILE) {
 
 describe("given a component reading a query", () => {
   describe("when the query data seeds useState", () => {
+    /** @scenario "Query data copied into state is reported" */
     it("reports queryCopiedToState for the result object and for destructured data", () => {
       expect(
         report("const q = client.thing.list.useQuery({});\nconst [rows] = useState(q.data ?? []);"),
