@@ -1,4 +1,4 @@
-import { QuoteExpiredError } from "@langwatch/enterprise-billing-contract";
+import { QuoteExpiredError, type SubscriptionInvite } from "@langwatch/enterprise-billing-contract";
 import { nowInstant } from "@langwatch/time";
 /**
  * The pure shape and arithmetic behind a seat-change quote: what a previewed invoice's two
@@ -9,7 +9,7 @@ import type Stripe from "stripe";
 
 export type InviteInput = {
   email: string;
-  role: "ADMIN" | "MEMBER" | "EXTERNAL";
+  role: SubscriptionInvite["role"];
   teamIds: string;
 };
 
