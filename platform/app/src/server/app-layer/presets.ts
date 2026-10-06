@@ -2326,7 +2326,13 @@ export function createTestApp(overrides?: TestAppOverrides): App {
   );
   const nullProjectRepository = new NullProjectRepository();
   const nullProjects = traced(
-    new ProjectService(nullProjectRepository, new NullLwqlKeyMapRepository()),
+    new ProjectService(
+      nullProjectRepository,
+      new NullLwqlKeyMapRepository(),
+      // Real rather than a double: it is Postgres-only, and the tRPC create
+      // checks an aggregate's rule through it.
+      new AggregateRuleService(new PrismaAggregateRuleRepository(testPrisma)),
+    ),
     "ProjectService",
   );
 

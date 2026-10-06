@@ -245,7 +245,7 @@ export interface CreateProjectParams {
  * cannot disagree on what an aggregate is stored as: a non-aggregate never
  * carries a rule, and an aggregate never lands without a validated one.
  */
-export async function aggregateProjectCreateFields({
+async function aggregateProjectCreateFields({
   kind,
   aggregateRule,
   organizationId,
@@ -282,6 +282,23 @@ export class ProjectService {
 
   async getById(id: string): Promise<Project | null> {
     return this.repo.getById(id);
+  }
+
+  /**
+   * The kind fields a new project is stored with, checked before anything is
+   * written: none for an ordinary project, the kind and its validated rule
+   * for an aggregate. The tRPC create writes its row itself and asks this,
+   * so both create paths check the rule through the one wired rule service.
+   */
+  async createKindFields(params: {
+    kind: CreateProjectParams["kind"];
+    aggregateRule: AggregateRule | undefined;
+    organizationId: string;
+  }): Promise<{ kind?: string; aggregateRule?: AggregateRule }> {
+    return aggregateProjectCreateFields({
+      ...params,
+      aggregateRules: this.aggregateRules,
+    });
   }
 
   /**

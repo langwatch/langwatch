@@ -13,9 +13,7 @@ import {
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { aggregateRuleSchema } from "~/server/app-layer/projects/aggregate-rule";
-import { AggregateRuleService } from "~/server/app-layer/projects/aggregate-rule.service";
 import {
-  aggregateProjectCreateFields,
   governanceProjectRouteViolation,
   personalWorkspaceArchiveViolation,
   personalWorkspaceCreateViolation,
@@ -28,7 +26,6 @@ import {
   isAggregateProjectKind,
 } from "~/server/app-layer/projects/project-kinds";
 import { mintProjectSlug } from "~/server/app-layer/projects/projectSlug";
-import { PrismaAggregateRuleRepository } from "~/server/app-layer/projects/repositories/aggregate-rule.prisma.repository";
 import type { Session } from "~/server/auth";
 import { TeamService } from "~/server/teams/team.service";
 import { encrypt } from "~/utils/encryption";
@@ -206,13 +203,10 @@ export const projectRouter = createTRPCRouter({
         });
       }
       // Validated before the team is created, so a refused rule writes nothing.
-      const kindFields = await aggregateProjectCreateFields({
+      const kindFields = await getApp().projects.createKindFields({
         kind: input.kind,
         aggregateRule: input.aggregateRule,
         organizationId: input.organizationId,
-        aggregateRules: new AggregateRuleService(
-          new PrismaAggregateRuleRepository(prisma),
-        ),
       });
 
       const projectNanoId = nanoid();
