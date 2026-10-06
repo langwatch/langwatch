@@ -391,6 +391,7 @@ describe("feature APIs", () => {
     await runtime.stop();
   });
 
+  /** @scenario "Local forwarding preserves application values and errors" */
   it("preserves argument, result, error identity, and method this binding", async () => {
     const runtime = await graph({ events: [] }).boot();
     const api = runtime.service(ProjectApi);
@@ -509,6 +510,7 @@ describe("feature APIs", () => {
     expect(events).toEqual([]);
   });
 
+  /** @scenario "Retained clients close after startup or cleanup failure" */
   it("invalidates retained APIs after a start failure", async () => {
     const startFailure = new Error("start failed");
     const runtime = await graph({ events: [] })
@@ -524,6 +526,7 @@ describe("feature APIs", () => {
     expect(() => api.name()).toThrow(FeatureApiUnavailableError);
   });
 
+  /** @scenario "Retained clients close after startup or cleanup failure" */
   it("invalidates retained APIs after cleanup failure", async () => {
     const cleanupFailure = new Error("cleanup failed");
     const runtime = await graph({ events: [] })

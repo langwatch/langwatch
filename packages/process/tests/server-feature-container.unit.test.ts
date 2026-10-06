@@ -420,7 +420,10 @@ describe("runtime failure ownership", () => {
     },
   );
 
-  /** @scenario "Failed setup or transport assembly awaits all acquired resources" */
+  /**
+   * @scenario "Failed setup or transport assembly awaits all acquired resources"
+   * @scenario "Retained clients close after startup or cleanup failure"
+   */
   it("reports boot and cleanup failures while still closing earlier resources", async () => {
     const failure = new Error("setup");
     const cleanup = new Error("cleanup");
@@ -511,7 +514,10 @@ describe("runtime failure ownership", () => {
     ]);
   });
 
-  /** @scenario "Failed start rolls back partial work and shutdown continues after failures" */
+  /**
+   * @scenario "Failed start rolls back partial work and shutdown continues after failures"
+   * @scenario "Retained clients close after startup or cleanup failure"
+   */
   it("continues shutdown after service failures and aggregates them with resource failures", async () => {
     const stopped: string[] = [];
     const feature = serverFeature<object>("owned")

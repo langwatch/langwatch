@@ -99,6 +99,7 @@ describe("given a process that named no store", () => {
 
 describe("given the members built over one Redis connection", () => {
   describe("when the cache, the idempotency store and the limiter are read", () => {
+    /** @scenario "A service receives its connection as a dependency" */
     it("builds all three over the single connection handed in", () => {
       const calls: string[] = [];
       const redis = redisDouble({
