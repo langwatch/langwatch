@@ -883,4 +883,4 @@ Feature: AI Gateway — Budgets
   Scenario: A ledger line with an unrecognised status is still listed
     Given a budget with a recent debit whose status the page does not know
     When a manager opens the budget's detail page
-    Then the debit is listed with its status shown as written
+    Then the debit is listed with its status shown as the wire sent it, not lower-cased

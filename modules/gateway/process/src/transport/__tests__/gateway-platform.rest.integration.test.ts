@@ -841,6 +841,31 @@ describe("the gateway budget routes behind the key door", () => {
       expect(body.data[0]?.scope_reach).toBe("unreachable");
     });
 
+    /** @scenario A budget read on its own carries its scope reach */
+    it("carries scope_reach on the by-id read", async () => {
+      const app = createApiFixture<GatewayApi>({
+        getKeyCaller: async () => ({
+          organizationId: ORGANIZATION_ID,
+          actor: null,
+          actorUserId: "user_1",
+        }),
+        getBudgetWithHealth: async () => ({
+          budget: budgetRow(),
+          spendAvailable: true,
+          readAt,
+          unreachableByAnyKey: true,
+        }),
+        groupMemberCounts: async () => new Map<string, number>(),
+      });
+      const hono = mountFamily({ app, idempotency: passthroughIdempotency });
+
+      const response = await hono.request("/api/gateway/v1/budgets/bgt_1");
+
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { budget: { scope_reach?: string } };
+      expect(body.budget.scope_reach).toBe("unreachable");
+    });
+
     /** @scenario The budget routes take an organization key and hand its caller to the application */
     it("creates a budget once the door admitted the key at the organization", async () => {
       const asked: KeyDoorQuestion[] = [];

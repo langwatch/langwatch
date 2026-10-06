@@ -326,6 +326,7 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the response status is 403
     And the body is the canonical error envelope with type "permission_denied"
     And error.code is "api_key_permission_denied"
+    And error.fault is "customer", saying who can act on the refusal
     # The ceiling refuses BENEATH the family's error handler, so it is the
     # layer that most easily drifts back to a flat body.
 

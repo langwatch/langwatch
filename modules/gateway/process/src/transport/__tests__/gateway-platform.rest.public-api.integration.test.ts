@@ -71,6 +71,7 @@ const virtualKeyDto: GatewayVirtualKeySnakeDto = {
 const wireBody = z.object({
   type: z.string().optional(),
   code: z.string().optional(),
+  fault: z.string().optional(),
   message: z.string().optional(),
   meta: z.record(z.string(), z.unknown()).optional(),
   spent_usd: z.string().optional(),
@@ -200,6 +201,7 @@ describe("the gateway platform family's public wire", () => {
       expect(answer.body).toMatchObject({
         type: "permission_denied",
         code: "api_key_permission_denied",
+        fault: "customer",
       });
     });
   });

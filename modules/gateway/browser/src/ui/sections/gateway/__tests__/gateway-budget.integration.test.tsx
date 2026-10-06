@@ -175,7 +175,8 @@ describe("budget detail page", () => {
       renderPage(MANAGE);
 
       expect(screen.getByText("ci key")).toBeInTheDocument();
-      expect(screen.getByText("queued")).toBeInTheDocument();
+      expect(screen.getByText("QUEUED")).toBeInTheDocument();
+      expect(screen.queryByText("queued")).not.toBeInTheDocument();
     });
   });
 });
