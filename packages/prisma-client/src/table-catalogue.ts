@@ -87,6 +87,7 @@ export const prismaTableCatalogue = {
   "TraceIngestSourceBilling": "TraceIngestSourceBilling",
   "RetentionPolicy": "RetentionPolicy",
   "DataPrivacyPolicy": "DataPrivacyPolicy",
+  "DataPrivacyProjectScope": "DataPrivacyProjectScope",
   "CustomLLMModelCost": "CustomLLMModelCost",
   "Workflow": "Workflow",
   "WorkflowVersion": "WorkflowVersion",
@@ -1587,6 +1588,17 @@ export const prismaModelFieldCatalogue = {
     "personalOnly",
     "config",
     "createdAt",
+    "updatedAt"
+  ],
+  "DataPrivacyProjectScope": [
+    "projectId",
+    "organizationId",
+    "teamId",
+    "isPersonal",
+    "departmentId",
+    "teamRecordedAt",
+    "departmentRecordedAt",
+    "archivedAt",
     "updatedAt"
   ],
   "CustomLLMModelCost": [
@@ -3129,6 +3141,7 @@ export const prismaRelationCatalogue = {
   "TraceIngestSourceBilling": {},
   "RetentionPolicy": {},
   "DataPrivacyPolicy": {},
+  "DataPrivacyProjectScope": {},
   "CustomLLMModelCost": {},
   "Workflow": {
     "project": "Project",

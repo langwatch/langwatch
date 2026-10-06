@@ -1,21 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  createDataPrivacyTestProjects,
+  createDataPrivacyTestScopes,
   dataPrivacyTestGraph,
 } from "../../app/__tests__/data-privacy.fixture.ts";
 import { MemoryDataPrivacyPolicyRepository } from "../../repositories/memory/memory.data-privacy.repository.ts";
+import { DataPrivacyProjectScopeService } from "../data-privacy-project-scope.service.ts";
 import { DataPrivacyResolutionService } from "../data-privacy-resolution.service.ts";
 
 /**
  * Spec: modules/data-privacy/specs/data-privacy-resolution-seam.feature.
- * Resolving a project's policy asks nothing of the write graph — its own
- * row already carries the organization, team and department the chain is built from.
+ * Resolving a project's policy asks no other module: data privacy's own project-scope fold
+ * carries the organization, team and department the chain is built from.
  */
 
 const ORGANIZATION_ID = dataPrivacyTestGraph.organizationId;
-
-const projects = createDataPrivacyTestProjects();
 
 async function resolution(options: { drops?: boolean } = {}) {
   const repository = MemoryDataPrivacyPolicyRepository.create();
@@ -32,14 +31,19 @@ async function resolution(options: { drops?: boolean } = {}) {
 
   return {
     findForProjectChain,
-    built: DataPrivacyResolutionService.create({ repository, projects }),
+    built: DataPrivacyResolutionService.create({
+      repository,
+      scopes: DataPrivacyProjectScopeService.create({
+        repository: await createDataPrivacyTestScopes(),
+      }),
+    }),
   };
 }
 
 describe("DataPrivacyResolutionService", () => {
-  describe("given a policy store and a project read with its team", () => {
+  describe("given a policy store and a folded scope for a project", () => {
     describe("when a project's policy is resolved", () => {
-      /** @scenario "The policy resolution composes from a database and one project read" */
+      /** @scenario "The policy resolution composes from a database and its own project-scope fold" */
       it("reads the chain from the project's own organization", async () => {
         const { built, findForProjectChain } = await resolution();
 

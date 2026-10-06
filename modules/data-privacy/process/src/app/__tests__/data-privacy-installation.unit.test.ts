@@ -6,11 +6,16 @@ import { memoryStores } from "@langwatch/process-stores";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { DataPrivacyModule } from "../../app/data-privacy.app.ts";
 import { dataPrivacyProcessModule } from "../../data-privacy.module.ts";
 import {
-  createDataPrivacyTestProjects,
+  dataPrivacyTestEventing,
+  projectFactOwner,
+} from "../../eventing/__tests__/data-privacy-project-scope.fixture.ts";
+import {
   dataPrivacyTestGraph,
   dataPrivacyTestSecrets,
+  foldDataPrivacyTestProject,
 } from "./data-privacy.fixture.ts";
 
 const PROJECT_ID = dataPrivacyTestGraph.projectId;
@@ -29,30 +34,50 @@ function process(role: "api" | "worker", googleCredentials?: string) {
       },
     })
     .provide({
-      project: createDataPrivacyTestProjects(),
       authz: createApiFixture<AuthzApi>(),
       "feature-flag": createApiFixture<FeatureFlagApi>(),
     });
 }
 
 describe("data privacy app installation", () => {
-  it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process(role).boot();
+  it("installs a working app in the api role, which refuses a project it has not folded", async () => {
+    const runtime = await process("api").boot();
 
     try {
       const app = runtime.service(DataPrivacyApi);
 
       expect(runtime.module(dataPrivacyProcessModule).provided).toBe(app);
-
-      await expect(app.getResolvedForProject({ projectId: PROJECT_ID })).resolves.toEqual(
-        PLATFORM_DEFAULT_DATA_PRIVACY,
-      );
-      await expect(app.dropsAnyContent({ projectId: PROJECT_ID })).resolves.toBe(false);
+      await expect(app.getResolvedForProject({ projectId: PROJECT_ID })).rejects.toMatchObject({
+        code: "project_not_found",
+      });
       await expect(app.listOrganizationRules({ organizationId: ORGANIZATION_ID })).resolves.toEqual(
         [],
       );
     } finally {
       await runtime.stop();
+    }
+  });
+
+  /** @scenario "Data privacy keeps no project peer" */
+  it("names no project peer and, in the worker role, resolves a project from its own fold", async () => {
+    const eventing = dataPrivacyTestEventing();
+    const append = projectFactOwner(eventing);
+    const runtime = await process("worker").withEventing(eventing).boot();
+    await runtime.start();
+
+    try {
+      const app = runtime.service(DataPrivacyApi);
+      expect(Object.keys(DataPrivacyModule.dependencies)).not.toContain("projects");
+
+      await foldDataPrivacyTestProject({ append, app });
+
+      await expect(app.getResolvedForProject({ projectId: PROJECT_ID })).resolves.toEqual(
+        PLATFORM_DEFAULT_DATA_PRIVACY,
+      );
+      await expect(app.dropsAnyContent({ projectId: PROJECT_ID })).resolves.toBe(false);
+    } finally {
+      await runtime.stop();
+      await eventing.close();
     }
   });
 

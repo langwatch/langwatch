@@ -9,9 +9,13 @@ import { describe, expect, it } from "vitest";
 
 import { dataPrivacyProcessModule } from "../../data-privacy.module.ts";
 import {
-  createDataPrivacyTestProjects,
+  dataPrivacyTestEventing,
+  projectFactOwner,
+} from "../../eventing/__tests__/data-privacy-project-scope.fixture.ts";
+import {
   dataPrivacyTestGraph,
   dataPrivacyTestSecrets,
+  foldDataPrivacyTestProject,
 } from "./data-privacy.fixture.ts";
 
 const PROJECT_ID = dataPrivacyTestGraph.projectId;
@@ -34,7 +38,10 @@ function spanWith(value: string): OtlpSpan {
   };
 }
 
+/** A worker hosting data privacy's project-scope fold, with the test project folded. */
 async function boot({ enforcement }: { enforcement?: string }) {
+  const eventing = dataPrivacyTestEventing();
+  const append = projectFactOwner(eventing);
   const runtime = await createApp({ role: "worker", secrets: dataPrivacyTestSecrets() })
     .withModules([dataPrivacyProcessModule])
     .withStores(memoryStores())
@@ -47,15 +54,24 @@ async function boot({ enforcement }: { enforcement?: string }) {
       },
     })
     .provide({
-      project: createDataPrivacyTestProjects(),
       authz: createApiFixture<AuthzApi>({
         checkScopeLineage: async () => ({ kind: "consistent" }),
       }),
       "feature-flag": createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
     })
+    .withEventing(eventing)
     .boot();
+  await runtime.start();
+  const app = runtime.service(DataPrivacyApi);
+  await foldDataPrivacyTestProject({ append, app });
 
-  return { app: runtime.service(DataPrivacyApi), stop: () => runtime.stop() };
+  return {
+    app,
+    stop: async () => {
+      await runtime.stop();
+      await eventing.close();
+    },
+  };
 }
 
 async function dropInputForProject(app: DataPrivacyApi): Promise<void> {

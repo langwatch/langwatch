@@ -6,7 +6,7 @@ The server half of [project](../README.md). Projects: finding them, their summar
 
 ## Installation
 
-`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).withTransportFacts(…).withEventing(projectLifecycleEventing).withTasks(…)`, `src/project.module.ts:12`.
+`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).withTransportFacts(…).withEventing(projectLifecycleEventing).withTasks(…)`, `src/project.module.ts:13`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -428,24 +428,26 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `project_lifecycle` (aggregate `project`)
 
-Declared at `src/eventing/project-lifecycle.pipeline.ts:34`. Events: `projectCreatedEventSchema`, `projectLegacyKeyRevokedEventSchema`, `projectPresenceSettingChangedEventSchema`, `projectMovedEventSchema`, `projectArchivedEventSchema`.
+Declared at `src/eventing/project-lifecycle.pipeline.ts:36`. Events: `projectCreatedEventSchema`, `projectLegacyKeyRevokedEventSchema`, `projectPresenceSettingChangedEventSchema`, `projectMovedEventSchema`, `projectArchivedEventSchema`, `projectDepartmentAssignedEventSchema`.
 
-| Kind    | Name                            | Handles | Declared at                                     |
-| ------- | ------------------------------- | ------- | ----------------------------------------------- |
-| command | `recordProjectCreated`          | –       | `src/eventing/project-lifecycle.pipeline.ts:45` |
-| command | `recordProjectLegacyKeyRevoked` | –       | `src/eventing/project-lifecycle.pipeline.ts:46` |
-| command | `recordPresenceSettingChanged`  | –       | `src/eventing/project-lifecycle.pipeline.ts:47` |
-| command | `recordProjectMoved`            | –       | `src/eventing/project-lifecycle.pipeline.ts:48` |
-| command | `recordProjectArchived`         | –       | `src/eventing/project-lifecycle.pipeline.ts:49` |
+| Kind    | Name                              | Handles | Declared at                                     |
+| ------- | --------------------------------- | ------- | ----------------------------------------------- |
+| command | `recordProjectCreated`            | –       | `src/eventing/project-lifecycle.pipeline.ts:48` |
+| command | `recordProjectLegacyKeyRevoked`   | –       | `src/eventing/project-lifecycle.pipeline.ts:49` |
+| command | `recordPresenceSettingChanged`    | –       | `src/eventing/project-lifecycle.pipeline.ts:50` |
+| command | `recordProjectMoved`              | –       | `src/eventing/project-lifecycle.pipeline.ts:51` |
+| command | `recordProjectArchived`           | –       | `src/eventing/project-lifecycle.pipeline.ts:52` |
+| command | `recordProjectDepartmentAssigned` | –       | `src/eventing/project-lifecycle.pipeline.ts:53` |
 
 ### Tasks
 
 Run by the tasks process, before serve.
 
-| Task                                | Class                                | Declared at                                              |
-| ----------------------------------- | ------------------------------------ | -------------------------------------------------------- |
-| `backfill-project-created`          | `ProjectCreatedBackfillTask`         | `src/tasks/project-created-backfill.task.ts:15`          |
-| `backfill-project-presence-setting` | `ProjectPresenceSettingBackfillTask` | `src/tasks/project-presence-setting-backfill.task.ts:16` |
+| Task                                   | Class                                   | Declared at                                                 |
+| -------------------------------------- | --------------------------------------- | ----------------------------------------------------------- |
+| `backfill-project-created`             | `ProjectCreatedBackfillTask`            | `src/tasks/project-created-backfill.task.ts:15`             |
+| `backfill-project-presence-setting`    | `ProjectPresenceSettingBackfillTask`    | `src/tasks/project-presence-setting-backfill.task.ts:16`    |
+| `backfill-project-department-assigned` | `ProjectDepartmentAssignedBackfillTask` | `src/tasks/project-department-assigned-backfill.task.ts:16` |
 
 ## Configuration
 

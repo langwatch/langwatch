@@ -166,6 +166,7 @@ describe("the tasks process installation", () => {
         "backfill-organization-presence-setting",
         "backfill-project-created",
         "backfill-project-presence-setting",
+        "backfill-project-department-assigned",
         "stalled-runs-backfill",
         "topic-clustering-run",
         "user-data-erase",

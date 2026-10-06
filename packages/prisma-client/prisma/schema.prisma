@@ -3496,6 +3496,22 @@ model DataPrivacyPolicy {
   @@index([scopeType, scopeId])
 }
 
+// Data privacy's fold of where each project sits, from project's lifecycle facts (record §5;
+// Alex, 2026-10-06). Each column group keeps its newest fact; no relation to Project.
+model DataPrivacyProjectScope {
+  projectId            String    @id
+  organizationId       String
+  teamId               String?
+  isPersonal           Boolean?
+  departmentId         String?
+  teamRecordedAt       DateTime?
+  departmentRecordedAt DateTime?
+  archivedAt           DateTime?
+  updatedAt            DateTime  @default(now()) @updatedAt
+
+  @@index([organizationId])
+}
+
 enum CustomLLMModelCostScopeType {
   ORGANIZATION
   TEAM
