@@ -162,6 +162,30 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # its empty face no longer says the thumbs come from users
 
   # ---------------------------------------------------------------------------
+  # The catalogue
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: AC15 Every widget answers a question from the question tree
+    Given the dashboards catalogue
+    Then every widget names the tree question it answers and the data it needs
+    And every template lists only widgets from the catalogue, none of them twice
+
+  @unit
+  Scenario: AC15b A project's preloaded boards never repeat a widget
+    Given an agent kind
+    When its preloaded templates are resolved for that kind
+    Then no widget appears on more than one of those boards
+
+  @unit
+  Scenario: AC15c The prototype's boards are the starter set, under the Agent Flight Deck name
+    Given the dashboards catalogue
+    Then the default template is named "Agent Flight Deck" and is preloaded for every application agent kind
+    And coding agents get the six personal boards preloaded instead
+    And the library's own templates are in the gallery only
+    # Decision: the prototype's Cockpit cards replace the Flight Deck's widgets; the Flight Deck name stays
+
+  # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
 
@@ -186,3 +210,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 12: "A picked question adds its widget and seeds Langy" (added by langwatch/tasks#911: the picker adds widgets and drafts Langy, no longer only asks) → Scenario: AC12 A picked question adds its widget and seeds Langy; Scenario: AC12b Without Langy a picked question still adds its widget; Scenario: AC12c A failed add keeps the picker open and does not seed Langy
   # AC 13: "An empty widget tells a quiet period from a missing source" (added by langwatch/tasks#911: no rows no longer means not connected) → Scenario: AC13 A quiet period does not ask the member to connect a source; Scenario: AC13b A source that was never set up shows its setup step; Scenario: AC13c Every template widget checks its own source
   # AC 14: "Reviewer thumbs are named as reviewer thumbs" (added by langwatch/tasks#911: the annotations table holds reviewer thumbs, not user feedback) → Scenario: AC14 Reviewer thumbs are named as reviewer thumbs
+  # AC 15: "One catalogue of widgets and templates, from the dashboards library" (added by langwatch/tasks#911: the library is the guide for what to build) → Scenario: AC15 Every widget answers a question from the question tree; Scenario: AC15b A project's preloaded boards never repeat a widget; Scenario: AC15c The prototype's boards are the starter set, under the Agent Flight Deck name
