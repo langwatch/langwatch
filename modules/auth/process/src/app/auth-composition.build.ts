@@ -493,6 +493,7 @@ export async function buildBetterAuth(
       },
       logger,
     }),
+    mintClaims: { claimsForMint: (args) => options.identityApi.claimsForMint(args) },
     ssoMigration: {
       decideAccountLink: (args) =>
         options.identityApi.ssoMigrationCallbacks().decideAccountLink(args),

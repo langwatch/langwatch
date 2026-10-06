@@ -28,6 +28,8 @@ import {
   type IdentityServerConfig,
   type MethodsLastUsed,
   type RoutingDecision,
+  type SessionClaims,
+  type SessionClaimsMintInput,
   SignInMethodPolicyService,
   type OrganizationMemberFactor,
   type OrganizationMfaRequirement,
@@ -136,6 +138,7 @@ import {
   IDENTITY_LATCH_CACHE_MAX_USERS,
   IDENTITY_LATCH_CACHE_TTL_MS,
 } from "../services/per-subject-cached-latch.service.ts";
+import { SessionClaimsService } from "../services/session-claims.service.ts";
 import { SignInAccountLookupService } from "../services/signin-account-lookup.service.ts";
 import { SignInRouterService } from "../services/signin-router.service.ts";
 import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
@@ -205,6 +208,7 @@ type IdentityAppParts = {
   identity: IdentityService;
   verification: VerificationCeremonyService;
   accountIdentifiers: AccountIdentifiersService;
+  sessionClaims: SessionClaimsService;
   microsoftAccountRekey: MicrosoftAccountRekeyService;
   newbornSweep: IdentityNewbornReconciliationService;
   backfill: IdentityBackfillService;
@@ -774,6 +778,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       reservations,
       identity,
       verification,
+      sessionClaims: SessionClaimsService.create({
+        heads: setup.repositories.heads,
+        identifiers: CryptoIdentifierIdentityService.create(),
+      }),
       accountIdentifiers: AccountIdentifiersService.create({
         heads: setup.repositories.heads,
         identity,
@@ -976,6 +984,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
   ): Promise<RoutingDecision> {
     return this.#parts.signInRouter.route(input);
+  }
+
+  claimsForMint(input: SessionClaimsMintInput): Promise<SessionClaims> {
+    return this.#parts.sessionClaims.claimsForMint(input);
   }
 
   getMethodsLastUsed(input: { userId: string }): Promise<MethodsLastUsed> {

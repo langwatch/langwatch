@@ -72,6 +72,7 @@ import type {
   RegenerateBackupCodesCommandData,
   MfaFactInput,
 } from "./mfa.ts";
+import type { SessionClaims, SessionClaimsMintInput } from "./session-claims.ts";
 import type { RoutingDecision } from "./signin-routing.ts";
 import type {
   SsoArrivingUser,
@@ -763,6 +764,11 @@ export interface IdentityApi {
   moveLegacyMicrosoftAccountKey(input: {
     profile: Readonly<Record<string, unknown>>;
   }): Promise<void>;
+  /**
+   * What a session records at mint (D06): the live identifier of the way in that minted it, or
+   * the id the callback's one native account derives before projection; never a guess.
+   */
+  claimsForMint(input: SessionClaimsMintInput): Promise<SessionClaims>;
   /** When each sign-in method last minted a session, read from the user's sessions. */
   getMethodsLastUsed(input: { userId: string }): Promise<MethodsLastUsed>;
   /** Where an address signs in; `breakGlass` asks for the rate-limited local door (ADR-117). */

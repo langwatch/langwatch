@@ -9,7 +9,9 @@ import {
 import { isNativeSocialProvider } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import { HandledError } from "@langwatch/handled-error";
 import {
-  deriveSessionAmr,
+  type IdentityApi,
+  NO_SESSION_CLAIMS,
+  type SessionClaims,
   signInProviderForPath,
   type SsoArrivalApi,
   type SsoAuthenticationActivityApi,
@@ -18,11 +20,16 @@ import {
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { fromDate } from "@langwatch/time";
 import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import type { BetterAuthAnnouncements, BetterAuthFederation } from "../better-auth.channel.ts";
+import type {
+  AcceptedCallbackAccount,
+  SessionCallbackEvidenceChannel,
+} from "./http.session-callback-evidence.channel.ts";
 
 /**
  * The collaborators every hook in this file reaches, handed in together.
@@ -690,9 +697,11 @@ async function refuseNativeProviderOnSignIn({
 export function createBeforeSessionCreateHook({
   repo,
   collaborators,
+  sessionClaims,
 }: {
   repo: BetterAuthHooksRepository;
   collaborators: BetterAuthHookCollaborators;
+  sessionClaims: SessionMintClaims;
 }): NonNullable<
   NonNullable<
     NonNullable<NonNullable<BetterAuthOptions["databaseHooks"]>["session"]>["create"]
@@ -732,22 +741,99 @@ export function createBeforeSessionCreateHook({
         message: authentication.code,
       });
     }
-    const amr = localSignInAmr({ path });
-    return amr.length > 0 ? { data: { ...session, amr: [...amr] } } : undefined;
+    const claims = await mintClaims({ userId: session.userId, path, context, sessionClaims });
+    if (claims.identifierId === null && claims.amr.length === 0) return undefined;
+    return {
+      data: {
+        ...session,
+        amr: [...claims.amr],
+        ...(claims.identifierId === null ? {} : { identifierId: claims.identifierId }),
+      },
+    };
   };
 }
 
+/** What a session records at mint, asked of identity with this request's callback evidence. */
+export type SessionMintClaims = Readonly<{
+  identity: Pick<IdentityApi, "claimsForMint">;
+  evidence: Pick<SessionCallbackEvidenceChannel, "findAcceptedAccounts">;
+}>;
+
+type SessionMintContext = Parameters<ReturnType<typeof createBeforeSessionCreateHook>>[1];
+
 /**
- * What a password, two-step or passkey sign-in proved, recorded on the session it mints
- * (D06). A federated callback records nothing here: its factors count only from a verified
- * token. specs/identity/mfa-and-session-shape.feature
+ * Which way in minted the session and what it proved (D06), from identity's answer. A
+ * failure records nothing, an ordinary session, never a refused one.
+ * specs/identity/saml-existing-user-linking.feature, specs/identity/mfa-and-session-shape.feature
  */
-function localSignInAmr({ path }: { path: string | undefined }): readonly string[] {
-  if (!path) return [];
+async function mintClaims({
+  userId,
+  path,
+  context,
+  sessionClaims,
+}: {
+  userId: string;
+  path: string | undefined;
+  context: SessionMintContext;
+  sessionClaims: SessionMintClaims;
+}): Promise<SessionClaims> {
+  if (!path) return NO_SESSION_CLAIMS;
   const reading = signInProviderForPath({ path });
-  if (!reading.recognized) return [];
-  if (reading.provider !== "credential" && reading.provider !== "passkey") return [];
-  return deriveSessionAmr({ path });
+  if (!reading.recognized) return NO_SESSION_CLAIMS;
+  try {
+    const [accepted, ...others] = sessionClaims.evidence.findAcceptedAccounts({
+      providerId: reading.provider,
+    });
+    const callback =
+      accepted && others.length === 0
+        ? {
+            providerAccountId: accepted.providerAccountId,
+            assertedFactors: accepted.assertedFactors,
+            verifiedTokenClaims: accepted.verifiedTokenClaims,
+            ...(await callbackAccountFor({ userId, accepted, context })),
+          }
+        : undefined;
+    return await sessionClaims.identity.claimsForMint({
+      userId,
+      path,
+      ...(callback ? { callback } : {}),
+    });
+  } catch (error) {
+    logger.warn({ error, userId }, "Session claims failed; the session records none");
+    return NO_SESSION_CLAIMS;
+  }
+}
+
+/**
+ * The one native account row for the accepted subject, read through Better Auth's own
+ * adapter so the callback's transaction sees the row it just wrote; several or none is
+ * uncertain evidence and derives nothing.
+ */
+async function callbackAccountFor({
+  userId,
+  accepted,
+  context,
+}: {
+  userId: string;
+  accepted: AcceptedCallbackAccount;
+  context: SessionMintContext;
+}): Promise<{ account?: { accountId: string; createdAtMs: number; email: string } }> {
+  const adapter = context?.context?.internalAdapter;
+  if (!adapter) return {};
+  const accounts = (await adapter.findAccounts(userId)).filter(
+    (row) => row.providerId === accepted.providerId && row.accountId === accepted.providerAccountId,
+  );
+  const [account, ...others] = accounts;
+  if (!account || others.length > 0) return {};
+  const user = await adapter.findUserById(userId);
+  if (!user?.email) return {};
+  return {
+    account: {
+      accountId: account.id,
+      createdAtMs: fromDate(account.createdAt).epochMilliseconds,
+      email: user.email,
+    },
+  };
 }
 
 /**

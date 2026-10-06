@@ -19,6 +19,7 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   type AssertedEmailVerification,
   assertedEmailVerification,
+  type IdentityApi,
   type SignInMethodPolicy,
   type SsoAssertionApi,
 } from "@langwatch/identity-contract";
@@ -55,6 +56,7 @@ import {
   createBeforeUserCreateHook,
   type BetterAuthHookCollaborators,
   type FindGoverningConnections,
+  type SessionMintClaims,
   type SignUpPolicy,
 } from "./http.better-auth-hooks.channel.ts";
 import type { CredentialSessionGuard } from "./http.credential-session-guard.channel.ts";
@@ -65,6 +67,7 @@ import {
 } from "./http.passkey-sign-up.channel.ts";
 import { PasswordResetSessionChannel } from "./http.password-reset-session.channel.ts";
 import { resilientGenericOAuth } from "./http.resilient-generic-oauth.channel.ts";
+import { SessionCallbackEvidenceChannel } from "./http.session-callback-evidence.channel.ts";
 import {
   runSignInRouterShadow,
   type SignInRouterShadow,
@@ -356,6 +359,7 @@ export const createAuthOptions = ({
   signUpPolicy,
   passwordResetSession,
   idTokenIssuerRefusals,
+  sessionClaims,
 }: {
   repo: BetterAuthHooksRepository;
   deployment: BetterAuthDeploymentConfiguration;
@@ -374,6 +378,8 @@ export const createAuthOptions = ({
   passwordResetSession?: PasswordResetSessionChannel;
   /** Keeps the issuer of an ID token the engine refused, so the redirect can name it. */
   idTokenIssuerRefusals?: IdTokenIssuerRefusalChannel;
+  /** What a session records at mint (D06): identity's answer over this callback's evidence. */
+  sessionClaims: SessionMintClaims;
 }): BetterAuthOptions & {
   // `emailAndPassword` is optional on `BetterAuthOptions` but this factory
   // always states it, and `enabled` inside it is REQUIRED. Saying so keeps the
@@ -449,6 +455,8 @@ export const createAuthOptions = ({
       impersonating: { type: "string", required: false, input: false },
       // What the minting sign-in proved (D06), written by the session create hook only.
       amr: { type: "string[]", required: false, input: false },
+      // Which of the person's identifiers minted it (D06), written by the same hook only.
+      identifierId: { type: "string", required: false, input: false },
     },
     // Preserve NextAuth's 30-day session TTL. BetterAuth defaults to 7 days,
     // which would force users to re-auth more often than before. Match the
@@ -646,7 +654,10 @@ export const createAuthOptions = ({
       create: {
         before: async (session, context) => {
           await credentialGuard.beforeSessionCreate({ userId: session.userId, context });
-          return createBeforeSessionCreateHook({ repo, collaborators: hooks })(session, context);
+          return createBeforeSessionCreateHook({ repo, collaborators: hooks, sessionClaims })(
+            session,
+            context,
+          );
         },
         after: async (session) => {
           await afterSessionCreate({
@@ -726,7 +737,13 @@ function genericOAuthPlugins(
  * own identity provider answers. Mounted always, because a connection is
  * refused per organization by the gate below and never by an absent route.
  */
-function ssoPlugin(assertions: SsoAssertionApi): ReturnType<typeof sso> {
+function ssoPlugin({
+  assertions,
+  evidence,
+}: {
+  assertions: SsoAssertionApi;
+  evidence: Pick<SessionCallbackEvidenceChannel, "recordAuthenticatedSsoAccount">;
+}): ReturnType<typeof sso> {
   return sso({
     /**
      * Provider rows are a projection of the managed connection log, so the
@@ -743,7 +760,17 @@ function ssoPlugin(assertions: SsoAssertionApi): ReturnType<typeof sso> {
     /** Somebody with no account who signs in through their employer's
      *  provider gets one; where they land is the arrival policy's business. */
     disableImplicitSignUp: false,
-    resolveUser: async (input, context) => resolveSsoUser({ assertions, input, context }),
+    resolveUser: async (input, context) => {
+      const resolution = await resolveSsoUser({ assertions, input, context });
+      // The exact account admitted here is the one the session it mints is attributed to.
+      if (resolution.action !== "reject") {
+        evidence.recordAuthenticatedSsoAccount({
+          providerId: input.providerId,
+          providerAccountId: input.accountKey.accountId,
+        });
+      }
+      return resolution;
+    },
   });
 }
 
@@ -870,6 +897,8 @@ type BetterAuthTransportOptions = Readonly<{
   findGoverningConnections: FindGoverningConnections;
   /** Who the installation lets create an account. */
   signUpPolicy: SignUpPolicy;
+  /** Identity's answer to what a session records at mint (D06). */
+  mintClaims: Pick<IdentityApi, "claimsForMint">;
 }>;
 
 /** The options the deployment's ONE Better Auth instance is built from. */
@@ -899,7 +928,9 @@ const transportOptions = ({
   storage,
   users,
   idTokenIssuerRefusals,
-}: BetterAuthTransportOptions) => {
+  mintClaims,
+  callbackEvidence,
+}: BetterAuthTransportOptions & { callbackEvidence: SessionCallbackEvidenceChannel }) => {
   const passwordResetSession = PasswordResetSessionChannel.create();
   const authOptions = createAuthOptions({
     repo: database,
@@ -915,6 +946,7 @@ const transportOptions = ({
     signUpPolicy,
     passwordResetSession,
     idTokenIssuerRefusals,
+    sessionClaims: { identity: mintClaims, evidence: callbackEvidence },
     hooks: {
       federation,
       invites,
@@ -943,7 +975,7 @@ const transportOptions = ({
             }),
           ]
         : []),
-      ssoPlugin(ssoAssertions),
+      ssoPlugin({ assertions: ssoAssertions, evidence: callbackEvidence }),
       signUpConfirmationPlugin({ verification: signUpVerification, users }),
     ],
     secondaryStorage,
@@ -966,7 +998,15 @@ const transportOptions = ({
 
 export type BetterAuthTransport = Auth<ReturnType<typeof transportOptions>>;
 
-/** Builds the deployment's ONE Better Auth instance. */
+/** Builds the deployment's ONE Better Auth instance; each request it handles opens its
+ *  own callback-evidence slot, so a session is attributed only to its own callback. */
 export const createBetterAuthTransport = (
   options: BetterAuthTransportOptions,
-): BetterAuthTransport => betterAuth(transportOptions(options));
+): BetterAuthTransport => {
+  const callbackEvidence = SessionCallbackEvidenceChannel.create();
+  const instance = betterAuth(transportOptions({ ...options, callbackEvidence }));
+  return {
+    ...instance,
+    handler: (request: Request) => callbackEvidence.runWithScope(() => instance.handler(request)),
+  };
+};

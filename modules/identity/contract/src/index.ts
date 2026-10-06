@@ -636,6 +636,12 @@ export {
 export {
   deriveSessionAmr,
   localFactorsForPath,
+  NO_SESSION_CLAIMS,
+  sessionCallbackEvidenceSchema,
+  sessionClaimsMintInputSchema,
+  type SessionCallbackEvidence,
+  type SessionClaims,
+  type SessionClaimsMintInput,
   signedInWithFor,
   signInMethodLabelFor,
   signInProviderForPath,

@@ -1,5 +1,6 @@
 import {
   IdentityVerificationExpiredError,
+  NO_SESSION_CLAIMS,
   type SsoArrivalApi,
   type SsoAssertionApi,
   type SsoAuthenticationActivityApi,
@@ -117,6 +118,7 @@ export function betterAuthTransportFor(
       claimAddressProof: async () => false,
     },
     users: {} as never,
+    mintClaims: { claimsForMint: async () => NO_SESSION_CLAIMS },
     ...ports,
   });
 }
