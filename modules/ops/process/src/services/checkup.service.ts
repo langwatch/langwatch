@@ -138,15 +138,16 @@ const SETTLED_STATUSES: ReadonlySet<string> = new Set(["done", "not-needed"]);
 /** How many step ids a row names before it counts the rest. */
 const NAMED_STEPS_LIMIT = 5;
 
-const PENDING_CODE = {
-  "postgres-schema": "checkup_postgres_migrations_pending",
-  "clickhouse-schema": "checkup_clickhouse_migrations_pending",
+/** Each code sits beside a literal `code:` so the registry's dead-code scan sees it raised. */
+const PENDING = {
+  "postgres-schema": { code: "checkup_postgres_migrations_pending" },
+  "clickhouse-schema": { code: "checkup_clickhouse_migrations_pending" },
 } as const;
 
 /** ClickHouse has no failed code of its own: a failed step is a migration not applied. */
-const FAILED_CODE = {
-  "postgres-schema": "checkup_postgres_migration_failed",
-  "clickhouse-schema": "checkup_clickhouse_migrations_pending",
+const FAILED = {
+  "postgres-schema": { code: "checkup_postgres_migration_failed" },
+  "clickhouse-schema": { code: "checkup_clickhouse_migrations_pending" },
 } as const;
 
 const UPGRADE_FIX =
@@ -351,7 +352,7 @@ export class CheckupService {
     if (failed.length > 0) {
       return {
         outcome: "refused",
-        code: FAILED_CODE[kind],
+        code: FAILED[kind].code,
         detail: `${failed.length} ${engine} migration(s) failed: ${nameSteps(failed)}.`,
         fix: `Read the error on /ops/upgrades or with \`pnpm task upgrade status\`, fix the cause, then run \`pnpm task upgrade\` again: it resumes where it stopped.`,
         docsPath: CHECKUP_DOCS.upgrade,
@@ -361,7 +362,7 @@ export class CheckupService {
     if (outstanding.length > 0) {
       return {
         outcome: "refused",
-        code: PENDING_CODE[kind],
+        code: PENDING[kind].code,
         detail: `${outstanding.length} ${engine} migration(s) not applied: ${nameSteps(outstanding)}.`,
         fix: UPGRADE_FIX,
         docsPath: CHECKUP_DOCS.upgrade,
