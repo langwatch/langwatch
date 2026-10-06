@@ -180,6 +180,7 @@ describe("socket permissions", () => {
   });
 
   describe("when the socket directory is created", () => {
+    /** @scenario "The socket is private to the user" */
     it("is 0700, so no other user can even enter it", () => {
       ensureSocketDir(dir);
 
@@ -279,6 +280,7 @@ describe("inspectSocketTrust", () => {
   });
 
   describe("given a symlink standing in for the socket", () => {
+    /** @scenario "A socket that is not demonstrably private is not used" */
     it("refuses it rather than following it somewhere we did not choose", async () => {
       const elsewhere = path.join(dir, "real.sock");
       listener = net.createServer();

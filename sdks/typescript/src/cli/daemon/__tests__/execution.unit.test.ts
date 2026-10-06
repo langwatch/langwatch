@@ -33,6 +33,7 @@ const collectingSink = (): {
 
 describe("ExecutionContext", () => {
   describe("when a command exits mid-flight", () => {
+    /** @scenario "A command that calls process.exit mid-flight" */
     it("keeps the output produced before the exit", () => {
       const { sink, stdout } = collectingSink();
       const context = new ExecutionContext("r1", sink);
