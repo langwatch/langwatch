@@ -55,6 +55,8 @@ class PrismaAuditLogTestSink implements AuditLogApi {
         ...command,
         args: command.args ?? undefined,
         metadata: command.metadata ?? undefined,
+        before: command.before ?? undefined,
+        after: command.after ?? undefined,
       },
     });
   }
