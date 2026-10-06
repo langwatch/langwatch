@@ -184,6 +184,39 @@ describe("config and secrets stay separate", () => {
     );
   });
 
+  /** @scenario "A module config schema may not declare a connection string" */
+  it("refuses a module binding a connection string another owner declares as a secret", () => {
+    const stores = {
+      name: "stores",
+      secrets: { databaseUrl: { id: "DATABASE_URL" } },
+    } as const;
+    const sneaky = {
+      name: "sneaky",
+      config: Config.define((c) => ({ url: c.env("DATABASE_URL", z.string().optional()) })),
+    } as const;
+
+    expect(() => parseProcessConfig({ owners: [stores, sneaky], environment: {} })).toThrow(
+      expect.objectContaining({ code: "config_claims_secret" }),
+    );
+  });
+
+  /** @scenario "The process root may declare a secret that is read through the secrets chain" */
+  it("accepts a process owner that declares a secret and carries no value for it", () => {
+    const processRoot = {
+      name: "process",
+      config: Config.define((c) => ({ port: c.env("PORT", z.string().default("5560")) })),
+      secrets: { signingKey: { id: "SIGNING_KEY" } },
+    } as const;
+
+    const config = parseProcessConfig({
+      owners: [processRoot],
+      environment: { SIGNING_KEY: "never-on-config" },
+    });
+
+    expect(config.process.port).toBe("5560");
+    expect(JSON.stringify(config)).not.toContain("never-on-config");
+  });
+
   /** @scenario "A config leaf under a declared family prefix refuses naming both owners" */
   it("refuses a config leaf read from a name under a declared secret family's prefix", () => {
     const stores = {

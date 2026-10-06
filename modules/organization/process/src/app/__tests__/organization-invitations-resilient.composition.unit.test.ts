@@ -75,6 +75,28 @@ async function application({ proven = {} }: { proven?: ProvenAddresses } = {}) {
 }
 
 describe("given an administrator of an organization with one team", () => {
+  describe("when a member is invited without naming a team", () => {
+    /** @scenario "Organization-only member invitations persist without a team assignment" */
+    it("keeps one pending organization invitation that carries no team", async () => {
+      const { app } = await application();
+
+      const created = await app.createInvitations(
+        {
+          organizationId: ORGANIZATION_ID,
+          validation: "strict",
+          invites: [{ email: "newbie@acme.test", role: "MEMBER" }],
+        },
+        ADMIN,
+      );
+      const listed = await app.listPendingInvitations({ organizationId: ORGANIZATION_ID });
+
+      expect(created).toHaveLength(1);
+      expect(listed).toHaveLength(1);
+      expect(listed[0]).toMatchObject({ email: "newbie@acme.test", role: "MEMBER" });
+      expect(listed[0]?.teamIds).toBe("");
+    });
+  });
+
   describe("when an external member is invited without naming a team", () => {
     /** @scenario "Teamless external invitations are refused" */
     it("creates no invitation", async () => {

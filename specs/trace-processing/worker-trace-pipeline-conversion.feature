@@ -1,15 +1,12 @@
 Feature: The worker mounts the trace processing pipeline
-  Every span LangWatch ingests is folded by the trace processing pipeline, and
-  the frozen job registry lists twenty-nine routing keys for it. A worker
-  process that registers fewer does not degrade: the queue keeps redelivering
-  the jobs nothing claimed, forever.
+  Every span LangWatch ingests is folded by the trace processing pipeline. A
+  worker process that registers fewer of its routing keys than the pipeline
+  declares does not degrade: the queue keeps redelivering the jobs nothing
+  claimed, forever.
 
-  Until now the standalone worker could BUILD that pipeline but not mount it —
-  the record-span command and fifteen subscriber handlers were parameters a
-  caller had to supply, and there was no caller. This feature is about the
-  parameters becoming composition: the worker builds its own record-span
-  command, its own alert-trigger subscriber, its own tracked-event span
-  builder, its own dataset normalization, and hands the pipeline to the queue.
+  The worker boots the trace module in the worker role and the module builds
+  its own record-span command, alert-trigger subscriber, tracked-event span
+  builder and dataset normalization from the peers it was installed with.
 
   What a customer notices is only ever the absence: a rating that never
   recorded, an alert that never fired, a project stuck on the onboarding card
@@ -17,16 +14,16 @@ Feature: The worker mounts the trace processing pipeline
 
   Background:
     Given a worker process holding one database, one queue and one object store
-    And the trace pipeline composed from packages alone
+    And the trace pipeline installed by the trace module
 
   Rule: Every routing key the registry lists is claimed
 
     @unit
     Scenario: The worker mounts every trace routing key
-      Given the byte-frozen job registry's twenty-nine trace processing keys
-      When the worker builds and mounts its trace pipeline
-      Then every key is claimed but the two the feature installer owns
-      And no key is registered that the registry does not list
+      Given the trace pipeline's declared commands and projections
+      When the worker boots and mounts its trace pipeline
+      Then every declared key is claimed
+      And no trace key is registered that the pipeline does not declare
       And the record-span command carries a real handler rather than a stand-in
 
   Rule: Alerts fire from the worker, and only on real ingestion

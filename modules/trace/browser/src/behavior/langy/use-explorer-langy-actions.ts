@@ -5,6 +5,7 @@ import {
   EXPLORER_ACTIONS,
   type ExplorerActionKind,
   type ExplorerGrouping,
+  queryWithoutInstantEvalChips,
 } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 import type { z } from "zod";
@@ -13,6 +14,8 @@ import { type LiveExplorerRead, readLiveExplorer } from "../../model/explorer/ex
 import { LENS_CAPABILITIES } from "../../model/lens-capabilities.ts";
 import { useExplorerStore } from "../explorer.store.ts";
 import { commitExplorerState, readExplorerState } from "../explorer/commit-explorer-state.ts";
+import { useOptionalTraceHost } from "../trace-host.ts";
+import { requestInstantEvalRoute } from "./instant-eval-route.bridge.ts";
 
 /**
  * The shape Langy's `useRegisterLangyActions` takes, stated structurally so
@@ -24,6 +27,20 @@ interface ExplorerLangyActionHandler {
 }
 
 export type ExplorerLangyActionHandlers = Record<string, ExplorerLangyActionHandler>;
+
+/** A refusal `executeUiAction` reports back by its `code`. */
+class ExplorerActionError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ExplorerActionError";
+  }
+}
+
+/** The lens whose rows are conversations, so its eval judges threads. */
+const CONVERSATIONS_LENS_ID = "conversations";
 
 /** How long a read waits for the list to answer the state it is reading. */
 const SETTLE_TIMEOUT_MS = 6_000;
@@ -100,12 +117,49 @@ function transformHandler(
   };
 }
 
+type RunInstantEvalPayload = z.output<
+  (typeof EXPLORER_ACTIONS)["explorer.runInstantEval"]["payloadSchema"]
+>;
+
+function runInstantEval({
+  projectId,
+  payload,
+}: {
+  projectId: string;
+  payload: RunInstantEvalPayload;
+}) {
+  const store = useExplorerStore.getState();
+  const target =
+    payload.target ?? (store.activeLensId === CONVERSATIONS_LENS_ID ? "threads" : "traces");
+  const otherQuery = queryWithoutInstantEvalChips(store.queryText);
+  const accepted = requestInstantEvalRoute({
+    projectId,
+    sentence: payload.instructions,
+    question: { instructions: payload.instructions, criteria: payload.criteria },
+    target,
+    otherQuery,
+    // A refusal leaves the search as it was: there is no typed phrase here.
+    fallbackQuery: otherQuery,
+    timeRange: { from: store.timeRange.from, to: store.timeRange.to },
+  });
+  if (!accepted) {
+    throw new ExplorerActionError(
+      "explorer_search_unavailable",
+      "The search bar is not on screen, so there is nowhere to show the run.",
+    );
+  }
+
+  return { status: "requested" as const, target };
+}
+
 /**
  * The handlers the Trace Explorer registers with Langy while it is open. A
  * transform kind commits through the store's own actions, so Langy and a click
  * are the same write. @see specs/langy/langy-trace-explorer-actions.feature
  */
 export function useExplorerLangyActions(): ExplorerLangyActionHandlers {
+  const projectId = useOptionalTraceHost()?.project()?.id;
+
   return useMemo(() => {
     const handlers: ExplorerLangyActionHandlers = {};
     for (const kind of EXPLORER_ACTION_KINDS) {
@@ -118,6 +172,19 @@ export function useExplorerLangyActions(): ExplorerLangyActionHandlers {
       payloadSchema: EXPLORER_ACTIONS["explorer.getState"].payloadSchema,
       run: () => readState(),
     };
+    handlers["explorer.runInstantEval"] = {
+      payloadSchema: EXPLORER_ACTIONS["explorer.runInstantEval"].payloadSchema,
+      run: (payload: never) => {
+        if (!projectId) {
+          throw new ExplorerActionError(
+            "explorer_project_unavailable",
+            "The page has not resolved its project yet.",
+          );
+        }
+
+        return runInstantEval({ projectId, payload });
+      },
+    };
     return handlers;
-  }, []);
+  }, [projectId]);
 }

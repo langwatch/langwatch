@@ -105,7 +105,10 @@ describe("given an operator's own allowlist", () => {
 });
 
 describe("given a worktree running the identity-provider simulator", () => {
-  /** @scenario "The worktree simulator is trusted outside production only" */
+  /**
+   * @scenario "The worktree simulator is trusted outside production only"
+   * @scenario "The simulator is dialled outside production and nowhere else"
+   */
   it("trusts it outside production", () => {
     expect(
       resolveTrustedOrigins({
@@ -117,7 +120,10 @@ describe("given a worktree running the identity-provider simulator", () => {
   });
 
   describe("when the deployment is production", () => {
-    /** @scenario "The worktree simulator is trusted outside production only" */
+    /**
+     * @scenario "The worktree simulator is trusted outside production only"
+     * @scenario "The simulator is dialled outside production and nowhere else"
+     */
     it("refuses it: it signs whatever it is asked to sign", () => {
       expect(
         resolveTrustedOrigins({

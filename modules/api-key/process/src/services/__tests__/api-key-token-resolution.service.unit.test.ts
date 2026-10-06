@@ -96,6 +96,7 @@ function serviceWith(fakes: Fakes = {}) {
 describe("ApiKeyTokenResolutionService", () => {
   describe("findVerifiedToken()", () => {
     describe("given a revoked key", () => {
+      /** @scenario A revoked key is refused at every door */
       it("refuses it", async () => {
         const { service } = serviceWith({ row: storedKey({ revokedAt: new Date() }) });
 

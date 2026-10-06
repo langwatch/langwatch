@@ -194,7 +194,7 @@ Feature: API Key Scope and Fine-Grained Permissions
     Given a personal API key has project access
     When its stored owner loses that access
     Then the key loses that access on its next permission check
-    And supplying a different or absent owner does not bypass the stored owner's ceiling
+    And the owner is read from storage by the key's id, never supplied by the caller
 
   @integration @unimplemented
   Scenario: Changing scope recalculates ceiling and resets out-of-bounds selections

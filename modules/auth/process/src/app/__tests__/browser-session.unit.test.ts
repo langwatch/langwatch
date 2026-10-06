@@ -395,6 +395,34 @@ describe("BrowserSessionService", () => {
     );
   });
 
+  describe("when a sign-out cannot revoke its session from one of the two stores", () => {
+    /** @scenario "Logout reports a revocation failure instead of confirming success" */
+    it("still clears the cached session and reports the database failure", async () => {
+      const cache = new Cache();
+      const sessions = new Sessions();
+      sessions.deletedById.mockRejectedValueOnce(new Error("database unavailable"));
+
+      await expect(
+        service({ sessions, cache }).service.revokeBrowserSession({ sessionId: "session-1" }),
+      ).rejects.toThrow("database unavailable");
+      expect(cache.deleted).toHaveBeenCalledWith("better-auth:token-1");
+    });
+
+    /** @scenario "Logout reports a revocation failure instead of confirming success" */
+    it("still deletes the session row and reports the cache failure", async () => {
+      const cache = new Cache();
+      cache.deleted.mockImplementation(() => {
+        throw new Error("session cache unavailable");
+      });
+      const sessions = new Sessions();
+
+      await expect(
+        service({ sessions, cache }).service.revokeBrowserSession({ sessionId: "session-1" }),
+      ).rejects.toThrow("session cache unavailable");
+      expect(sessions.deletedById).toHaveBeenCalledWith({ id: "session-1" });
+    });
+  });
+
   describe("when somebody reads the browsers they are signed in on", () => {
     const record = (overrides: Partial<BrowserSessionRecord> = {}): BrowserSessionRecord => ({
       id: "session-1",

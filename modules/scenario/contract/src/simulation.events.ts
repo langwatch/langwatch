@@ -137,7 +137,12 @@ export const simulationRunFinishedEventDataSchema = z.object({
   evaluators: runEvaluatorsSchema.optional(),
   /** The organization's admin and onboarding variant, read when a connected agent's run ends. */
   organizationAdmin: z
-    .object({ userId: z.string(), onboardingVariant: onboardingVariantSchema.nullish() })
+    .object({
+      userId: z.string(),
+      onboardingVariant: onboardingVariantSchema.nullish(),
+      /** When the organization was created, epoch ms; for days since signup. */
+      organizationCreatedAt: z.number().int().nonnegative().nullish(),
+    })
     .optional(),
   /** When the run finished, for peers that read only the data (§9); absent on older events. */
   occurredAt: z.number().int().nonnegative().optional(),

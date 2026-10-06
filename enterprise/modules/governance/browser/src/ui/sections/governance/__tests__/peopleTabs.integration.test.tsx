@@ -151,6 +151,18 @@ const pick = async ({ chipLabel, option }: { chipLabel: string; option: string }
   await userEvent.click(chip(chipLabel));
   await userEvent.click(await screen.findByRole("menuitem", { name: option }));
 };
+/** The resolved base rule of a Chakra control's emotion class: what it paints, as authored. */
+const rulesOf = (button: HTMLElement): string => {
+  const emotionClass = button.className.split(" ").pop() ?? "";
+  const rule = Array.from(document.querySelectorAll("style"))
+    .flatMap((sheet) => Array.from(sheet.sheet?.cssRules ?? []))
+    .flatMap((group) => (group instanceof CSSGroupingRule ? Array.from(group.cssRules) : [group]))
+    .find(
+      (candidate) =>
+        candidate.cssText.startsWith(`.${emotionClass} {`) && /display/.test(candidate.cssText),
+    );
+  return rule?.cssText ?? "";
+};
 const rowOf = (name: RegExp) => screen.getByRole("row", { name });
 const figure = (key: string) => screen.getByTestId(`people-summary-strip-${key}`);
 const toggle = () => screen.getByRole("button", { name: /sample data/i });
@@ -286,7 +298,7 @@ describe("given sam, a delegated viewer, opens the People page", () => {
 
       expect(screen.getAllByRole("row")).toHaveLength(3);
       const row = rowOf(/Nobody Metered/);
-      expect(within(row).getAllByLabelText("not measured")).toHaveLength(2);
+      expect(within(row).getAllByLabelText("not measured")).toHaveLength(3);
       expect(within(row).queryByText(/\$/)).toBeNull();
     });
   });
@@ -304,6 +316,52 @@ describe("given sam, a delegated viewer, opens the People page", () => {
       expect(rows).toHaveLength(1);
       expect(within(rows[0] ?? document.body).getByText("$12.50")).toBeInTheDocument();
       expect(within(rows[0] ?? document.body).getByText(/Copilot/)).toBeInTheDocument();
+    });
+  });
+
+  describe("when a provider named a linked person and a service account", () => {
+    /** @scenario "The list shows what a provider said and what the engine decided" */
+    it("shows identifier, provider, kind, first and last seen and the link proof in the row", () => {
+      harness.data["governancePeople.list"] = [
+        person({
+          displayText: "Linked Lin",
+          rawActorId: "lin@ext.test",
+          firstSeenAt: new Date(Date.now() - 9 * 86_400_000).toISOString(),
+          lastSeenAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+          link: {
+            userId: "u_1",
+            evidenceKind: "verified_email",
+            memberName: "Lin",
+            departmentName: null,
+          },
+        }),
+        person({
+          displayText: "Build bot",
+          rawActorId: "bot-7",
+          kind: "service_account",
+          lastSeenAt: "2026-08-02T00:00:00.000Z",
+        }),
+      ];
+      renderPage();
+
+      const headers = screen.getAllByRole("columnheader").map((header) => header.textContent);
+      expect(headers).toEqual(
+        expect.arrayContaining(["Provider", "Kind", "First seen", "Last seen", "Link proof"]),
+      );
+
+      const linked = rowOf(/Linked Lin/);
+      expect(within(linked).getByText("lin@ext.test")).toBeInTheDocument();
+      expect(within(linked).getByText(/Copilot/)).toBeInTheDocument();
+      expect(within(linked).getByText("Person")).toBeInTheDocument();
+      expect(within(linked).getByText("9 days ago")).toBeInTheDocument();
+      expect(within(linked).getAllByText("2 hours ago")).toHaveLength(2);
+      expect(within(linked).getByText("Matched")).toBeInTheDocument();
+      expect(within(linked).getByText("confirmed address")).toBeInTheDocument();
+
+      const bot = rowOf(/Build bot/);
+      expect(within(bot).getByText("Service account")).toBeInTheDocument();
+      expect(within(bot).getByText("Unmatched")).toBeInTheDocument();
+      expect(within(bot).queryByText("confirmed address")).toBeNull();
     });
   });
 
@@ -580,6 +638,31 @@ describe("given alice, an organization admin, on the People page", () => {
       expect(harness.calls).toEqual([
         { path: "governancePeople.runMatch", input: { organizationId: "org-1" } },
       ]);
+    });
+  });
+
+  describe("when alice opens the People page", () => {
+    /** @scenario "The page's actions sit top-right in the header" */
+    it("draws Add department outlined with a plus and Run match pass ghost, nothing solid", () => {
+      harness.data["activityMonitor.spendByUser"] = [spend({})];
+      renderPage({ permissions: ADMIN });
+
+      const header = within(screen.getByTestId("people-page-header"));
+      const add = header.getByRole("button", { name: /Add department/ });
+      const run = header.getByRole("button", { name: /Run match pass/ });
+      const sample = header.getByRole("button", { name: /sample data/i });
+
+      expect(add.querySelector("svg")).not.toBeNull();
+      expect(rulesOf(add)).toContain("border-color: var(--chakra-colors-border-emphasized)");
+      expect(rulesOf(add)).not.toMatch(/[ ;]background(-color)?:/);
+      for (const ghost of [run, sample]) {
+        expect(rulesOf(ghost)).toContain("border-color: var(--chakra-colors-transparent)");
+        expect(rulesOf(ghost)).toContain("background: var(--chakra-colors-transparent)");
+      }
+      for (const button of [add, run, sample]) {
+        expect(rulesOf(button)).not.toMatch(/orange|palette-solid|bg-inverted/);
+        expect(rulesOf(button)).toContain("height: var(--chakra-sizes-8)");
+      }
     });
   });
 

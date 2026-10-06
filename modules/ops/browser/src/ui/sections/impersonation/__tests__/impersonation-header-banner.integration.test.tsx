@@ -43,6 +43,7 @@ describe("the header's impersonation banner", () => {
   });
 
   /** @scenario An impersonation banner appears in the header */
+  /** @scenario "The banner and the way out keep working on the new claims" */
   it("names the person being impersonated and offers to stop", () => {
     renderBanner(IMPERSONATED);
     expect(screen.getByText("Impersonating Target User")).not.toBeNull();
@@ -56,6 +57,7 @@ describe("the header's impersonation banner", () => {
   });
 
   /** @scenario Clicking stop ends impersonation */
+  /** @scenario "The banner and the way out keep working on the new claims" */
   it("ends the impersonation on the server, then reloads onto the admin panel", async () => {
     renderBanner(IMPERSONATED);
     fireEvent.click(screen.getAllByRole("link", { name: "Stop" })[0]!);

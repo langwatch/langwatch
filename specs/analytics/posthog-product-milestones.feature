@@ -133,6 +133,7 @@ Feature: PostHog product milestones
     Given a project that has sent no signal today
     When its first signal of the day arrives
     Then project_active_day is tracked with the days since signup and the experiment property
+    And a trace-sourced or scenario-sourced day carries both, an unknown variant counting as none
 
   @unit
   Scenario: subsequent signals the same day do not re-track

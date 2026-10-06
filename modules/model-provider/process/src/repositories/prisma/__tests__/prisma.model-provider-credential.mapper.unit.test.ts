@@ -51,6 +51,7 @@ describe("readCustomKeys", () => {
 
   describe("given a column that holds an encrypted bag", () => {
     /** @scenario "Encrypted keys are decrypted on read" */
+    /** @scenario "The gateway decrypts a stored credential with the deployment's own cipher" */
     it("reads the keys back", () => {
       const stored = encrypt(JSON.stringify({ OPENAI_API_KEY: "sk-secret" }));
 

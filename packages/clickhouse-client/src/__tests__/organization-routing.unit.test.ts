@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ClickHouseQueryClient } from "../client.ts";
 import { ClickHouseConfigService } from "../config.ts";
-import { ClickHouseConnection } from "../connection.ts";
+import { ClickHouseConnection, ClickHouseNotConfiguredError } from "../connection.ts";
 import { routingDriver } from "../routingDriver.ts";
 import { createTenantRouter, parseRoutingTable } from "../tenancy.ts";
 import { TenantGuard } from "../tenantGuard.ts";
@@ -114,6 +114,46 @@ describe("organization routing", () => {
       ).rejects.toMatchObject({ violation: { kind: "missing-predicate" } });
       expect(shared.insert).not.toHaveBeenCalled();
       expect(isolated.insert).not.toHaveBeenCalled();
+      expect(isolated.query).not.toHaveBeenCalled();
+    } finally {
+      await connection.closeOnce();
+    }
+  });
+
+  /** @scenario "An install with no shared endpoint refuses the search by name" */
+  it("refuses a tenantless search by name rather than answering the empty set", async () => {
+    const isolated = {
+      query: vi.fn(async (_params: unknown) => ({ json: async () => [] })),
+      insert: vi.fn(async (_params: unknown) => void 0),
+      command: vi.fn(async (_params: unknown) => void 0),
+      close: vi.fn(async () => void 0),
+    };
+    const connection = ClickHouseConnection.create({
+      configuration: ClickHouseConfigService.create().resolve({
+        privateRoutes: [
+          { organizationId: "org-private", url: "http://private.invalid:8123", cluster: "test" },
+        ],
+      }),
+      router: createTenantRouter({
+        table: parseRoutingTable({}),
+        directory: { organizationForTenant: async () => "org-private" },
+      }),
+      clientFactory: { create: () => isolated },
+    });
+    const client = new ClickHouseQueryClient({
+      driver: routingDriver(connection),
+      tenantGuard: new TenantGuard(),
+    });
+
+    try {
+      await expect(
+        client.query({
+          tenantId: "",
+          sql: "SELECT AggregateId FROM event_log WHERE AggregateId LIKE {query:String}",
+          params: { query: "%abc%" },
+          unscoped: { reason: "Operator searches across tenants" },
+        }),
+      ).rejects.toBeInstanceOf(ClickHouseNotConfiguredError);
       expect(isolated.query).not.toHaveBeenCalled();
     } finally {
       await connection.closeOnce();

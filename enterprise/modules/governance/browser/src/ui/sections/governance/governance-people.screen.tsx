@@ -714,11 +714,11 @@ function PeoplePageHeader({
       {canManage && (
         <>
           {showRunMatch && (
-            <PageLayout.HeaderButton loading={isRunningMatch} onClick={onRunMatch}>
+            <PageLayout.HeaderButton variant="ghost" loading={isRunningMatch} onClick={onRunMatch}>
               Run match pass
             </PageLayout.HeaderButton>
           )}
-          <PageLayout.HeaderButton primary onClick={onAddDepartment}>
+          <PageLayout.HeaderButton onClick={onAddDepartment}>
             <Plus size={14} /> Add department
           </PageLayout.HeaderButton>
         </>

@@ -260,6 +260,28 @@ describe("createProjectMetadataHandler()", () => {
       });
     });
 
+    /** @scenario "the first signal of the day tracks the project's active day" */
+    it("passes the organization's creation time and onboarding variant to the first-trace record", async () => {
+      mockProjects.resolveOrgAdmin.mockResolvedValue({
+        userId: "admin-user-1",
+        organizationId: "org-1",
+        firstMessage: false,
+        onboardingVariant: "guided",
+        organizationCreatedAt: { epochMilliseconds: 1_700_000_000_000 },
+      });
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
+
+      expect(mockRecordSignal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recorded: "firstTrace",
+          organizationCreatedAt: 1_700_000_000_000,
+          onboardingVariant: "guided",
+        }),
+      );
+    });
+
     /** @scenario PostHog integration milestone reports unknown when SDK attributes are absent */
     it("falls back to unknown sdk properties when attributes are absent", async () => {
       const subscriber = createProjectMetadataHandler(deps);
@@ -407,6 +429,35 @@ describe("createProjectMetadataHandler()", () => {
         userId: "admin-user-1",
         projectId: tenantId,
       });
+    });
+  });
+
+  describe("when a later trace resolves an org admin with a signup time and variant", () => {
+    /** @scenario "the first signal of the day tracks the project's active day" */
+    it("passes both to the trace-received record", async () => {
+      mockProjects.findById.mockResolvedValue({
+        id: tenantId,
+        firstMessage: true,
+        integrated: true,
+      });
+      mockProjects.resolveOrgAdmin.mockResolvedValue({
+        userId: "admin-user-1",
+        organizationId: "org-1",
+        firstMessage: true,
+        onboardingVariant: "classic",
+        organizationCreatedAt: { epochMilliseconds: 1_700_000_000_000 },
+      });
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
+
+      expect(mockRecordSignal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recorded: "traceReceived",
+          organizationCreatedAt: 1_700_000_000_000,
+          onboardingVariant: "classic",
+        }),
+      );
     });
   });
 

@@ -72,6 +72,7 @@ describe("given the providers that wrap the router", () => {
       });
     });
 
+    /** @scenario "The browser application installs one session for every feature" */
     it("nests attribution, session, transport, design system and graphics quality in that order", () => {
       const nesting = container.querySelector(
         "[data-testid='attribution'] [data-testid='session'] [data-testid='transport'] [data-testid='graphics-quality'] [data-testid='routed-content']",

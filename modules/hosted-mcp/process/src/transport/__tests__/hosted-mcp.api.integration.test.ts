@@ -1067,6 +1067,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
     describe("when that person no longer holds the permission on the project", () => {
       /** @scenario "A bearer whose approver lost the permission is refused" */
+      /** @scenario A hosted MCP authorization yields a person-bound session, never a project key */
       it("refuses the call with the code mcp_grant_revoked", async () => {
         const accessToken = await mintBearer();
         sessionGrant.granted = false;
@@ -1153,6 +1154,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
   describe("when an authorization code is exchanged", () => {
     /** @scenario "MCP sign-in issues a person-bound, project-capped token with refresh, never a project key" */
+    /** @scenario A hosted MCP authorization yields a person-bound session, never a project key */
     it("answers an access token bound to the approver and project, with a refresh token", async () => {
       const body = await exchangeCode();
 

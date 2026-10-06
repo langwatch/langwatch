@@ -21,6 +21,17 @@ function leasedNothing(report: DispatchReport): boolean {
   return [dispatched, retried, dead, released, fenced].every((keys) => keys.length === 0);
 }
 
+/** A drain that leased a full batch likely left a backlog: drain again at once. */
+function leasedFullBatch(report: DispatchReport | undefined, batchSize: number): boolean {
+  if (!report) return false;
+  const { dispatched, retried, dead, released, fenced } = report;
+  const leased = [dispatched, retried, dead, released, fenced].reduce(
+    (total, keys) => total + keys.length,
+    0,
+  );
+  return leased >= batchSize;
+}
+
 function clampFraction(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.min(Math.max(value, 0), 1);
@@ -248,6 +259,7 @@ export class ProcessOutboxWorker {
     }
     this.inFlight = null;
     if (this.started) this.settleBackoff(report);
+    if (leasedFullBatch(report, this.batchSize)) this.drainRequested = true;
     if (this.drainRequested) {
       this.drainRequested = false;
       this.triggerDrain();

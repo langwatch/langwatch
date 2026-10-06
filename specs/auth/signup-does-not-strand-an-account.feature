@@ -54,11 +54,11 @@ Feature: Signing up never strands an account
   # cannot be undone is one that can be repeated.
   @unit
   Scenario: A sign-up that died mid-ceremony leaves the address usable
-    Given a passkey sign-up for my address wrote the account and then failed
+    Given a passkey sign-up for my address started and died before the ceremony finished
+    Then nothing was written for my address, because the account is created only when the ceremony succeeds
     When I sign up with a passkey for that address again
-    Then the ceremony starts rather than telling me the address is taken
-    And finishing it signs me in to the account the first attempt left behind
-    And I am counted as having signed up once, not twice
+    Then the ceremony starts with the same handle, so the retry replaces the credential
+    And finishing it creates the account and counts me as having signed up once
 
   @integration
   Scenario: Client session flags cannot bypass address confirmation

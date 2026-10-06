@@ -15,6 +15,7 @@ const read = (environment: Record<string, string | undefined>) =>
 describe("feature flag server configuration", () => {
   describe("given the force-enable list", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
+    /** @scenario "The worker reads the same flag overrides the application reads" */
     it("splits, trims and drops unregistered keys", () => {
       expect(
         read({ FEATURE_FLAG_FORCE_ENABLE: ` ${SYSTEM_FLAG} , not_a_flag ` }).forceEnable,

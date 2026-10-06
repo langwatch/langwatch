@@ -350,3 +350,16 @@ describe("given a reader who followed a retired address", () => {
     });
   });
 });
+
+describe("given the retired evaluation wizard address", () => {
+  describe("when it is opened with no experiment named", () => {
+    /** @scenario "The retired evaluation wizard address forwards to the experiments workbench" */
+    it("lands on the experiments workbench", async () => {
+      const router = open("/acme/evaluations/wizard");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/acme/experiments/workbench");
+      }, LAZY_CHROME);
+    });
+  });
+});

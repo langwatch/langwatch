@@ -264,6 +264,43 @@ describe("snapshot merging", () => {
     service.stop();
   });
 
+  describe("given a reader started over the snapshot store", () => {
+    /** @scenario "The operator dashboard reads the snapshot the writer publishes" */
+    it("reads both artifacts and never claims or renews the writer's lease", async () => {
+      const claims: string[] = [];
+      const reads: string[] = [];
+      class ReaderOnlyStub extends SnapshotRepositoryStub {
+        override async acquireOrRenewLease() {
+          claims.push("acquire");
+          return super.acquireOrRenewLease();
+        }
+
+        override async releaseLease(): Promise<void> {
+          claims.push("release");
+        }
+
+        override async readLive() {
+          reads.push("live");
+          return super.readLive();
+        }
+
+        override async readDetail() {
+          reads.push("detail");
+          return super.readDetail();
+        }
+      }
+      const service = DefaultOpsSnapshotService.create(new ReaderOnlyStub(live(), detail()));
+
+      await service.start();
+      const dashboard = service.findDashboardData();
+      service.stop();
+
+      expect(dashboard?.queues).toHaveLength(1);
+      expect(reads).toEqual(expect.arrayContaining(["live", "detail"]));
+      expect(claims).toEqual([]);
+    });
+  });
+
   describe("given a reader stopped while its first read is still in flight", () => {
     it("installs no poll, so a released reader stops touching its connection", async () => {
       vi.useFakeTimers();

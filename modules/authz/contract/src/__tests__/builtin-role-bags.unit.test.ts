@@ -85,6 +85,17 @@ describe("given the team roles", () => {
   });
 });
 
+describe("when the playground is requested", () => {
+  /** @scenario "The built-in administrators may open the playground" */
+  it.concurrent("admits the team and organization admins and nobody below them", () => {
+    expect(grants("admin", "playground:view")).toBe(true);
+    expect(grants("org-admin", "playground:view")).toBe(true);
+    for (const role of ["member", "viewer", "org-member"] as const) {
+      expect(grants(role, "playground:view")).toBe(false);
+    }
+  });
+});
+
 describe("given the organization roles", () => {
   describe("when the holder is an organization admin", () => {
     /** @scenario "An organization admin holds the organization and its governance surfaces" */

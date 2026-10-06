@@ -23,6 +23,7 @@ import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding
 import { setFilterChipLabels } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
 import { useFacetHoverStore } from "../../../../behavior/facet-hover.store.ts";
 import { useInstantEvalRunStore } from "../../../../behavior/instant-eval-run.store.ts";
+import { registerInstantEvalRoute } from "../../../../behavior/langy/instant-eval-route.bridge.ts";
 import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
 import { useSearchSubmitRequestStore } from "../../../../behavior/search-submit-request.store.ts";
 import { useFloatRect } from "../../../../behavior/use-float-rect.ts";
@@ -285,6 +286,9 @@ export const SearchBar: React.FC = () => {
     isInstantEvalAvailable,
     optInOffer: instantEvalAccess.optInOffer,
   });
+  // Langy's explorer.runInstantEval reaches the same route, and so the same cost rule.
+  const { onInstantEvalRoute } = instantEval;
+  useEffect(() => registerInstantEvalRoute(onInstantEvalRoute), [onInstantEvalRoute]);
   const { submitSearch, isRouting } = useSubmitSearch({
     isLangyAvailable: langyRoutesAsk,
     isInstantEvalAvailable,

@@ -20,6 +20,7 @@ describe("deriveRuleOutcome", () => {
   });
 
   describe("when an organization-scoped rule matches the context", () => {
+    /** @scenario "A rule that names the organization lights up the main menu" */
     it("returns the rule's enabled value without consulting later rules", () => {
       const rules: FeatureFlagRules = [
         { match: { organizationId: "org_a" }, enabled: true },

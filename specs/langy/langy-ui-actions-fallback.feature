@@ -65,13 +65,13 @@ Feature: Langy UI actions fall back to the backend and the page catches up
     When the backend serves the read
     Then the projection is marked source saved and carries the version
 
-  @unit
+  @integration
   Scenario: A run started with no browser covers what the workbench holds
     Given no page answered a workbench.run dispatch
     When the backend starts the run
     Then the run covers the same rows and columns the saved workbench shows
 
-  @unit
+  @integration
   Scenario: A run started with no browser fills the cells the workbench shows
     Given no page answered a workbench.run dispatch
     When the backend starts the run

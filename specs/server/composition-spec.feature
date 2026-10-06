@@ -494,9 +494,9 @@ Feature: Composing a process from feature installers
     @unit
     Scenario: The browser application installs one session for every feature
       Given the standing declaration apps/ui serves itself
-      When the installed features are read
-      Then one session is installed for the whole application
-      And each feature mounts its own transport provider over it
+      When the application installs the providers that wrap the router
+      Then one session provider is installed above the router for the whole application
+      And the one transport provider nests inside it, shared by every feature
 
     @unit
     Scenario: One declaration contributes to API and worker roles

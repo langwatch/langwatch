@@ -71,6 +71,8 @@ function request(cookie: string | null, method: string, path: string, body: stri
 describe("the admin REST declaration", () => {
   describe("given a caller the platform door refuses", () => {
     /** @scenario "Instance admin answers a refused caller the hidden 404 at its door" */
+    /** @scenario "A caller with no browser session still answers no one" */
+    /** @scenario "A signed-in person who is not staff cannot tell the door exists" */
     it.each([
       ["no session", null, "POST", "/api/admin/impersonate"],
       ["a customer", "customer", "POST", "/api/admin/impersonate"],
@@ -141,6 +143,20 @@ describe("the admin REST declaration", () => {
           total: 1,
         }),
       },
+    });
+
+    /** @scenario "The back office is reachable by instance staff" */
+    it("answers a signed-in staff member at the mounted door", async () => {
+      const { init } = request(
+        "viewer",
+        "POST",
+        "/api/admin/user",
+        JSON.stringify({ method: "getList", params: {} }),
+      );
+
+      const response = await mount(operatorApp).request("/api/admin/user", init);
+
+      expect(response.status).toBe(200);
     });
 
     /** @scenario "Every instance admin resource the console lists answers" */

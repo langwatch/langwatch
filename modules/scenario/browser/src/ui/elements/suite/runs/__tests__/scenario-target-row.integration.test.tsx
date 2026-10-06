@@ -47,6 +47,32 @@ describe("<ScenarioTargetRow/>", () => {
     });
   });
 
+  describe("given a passed run with a latency and a cost", () => {
+    /** @scenario "List row shows status label with latency and cost" */
+    it("shows Passed beside its latency and cost", () => {
+      const row = renderRow(
+        runOf({ status: ScenarioRunStatus.SUCCESS, durationInMs: 1200, totalCost: 0.003 }),
+      );
+      const listRow = row.parentElement!;
+
+      expect(within(listRow).getByText("Passed")).toBeInTheDocument();
+      expect(within(listRow).getByText("1.2s")).toBeInTheDocument();
+      expect(within(listRow).getByText("$0.003")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a failed run with a latency", () => {
+    /** @scenario "Failed list row shows red styling" */
+    it("draws a red circle and the Failed label beside its latency", () => {
+      const row = renderRow(runOf({ status: ScenarioRunStatus.FAILED, durationInMs: 5400 }));
+      const listRow = row.parentElement!;
+
+      expect(row.firstElementChild).toHaveStyle({ background: "var(--chakra-colors-red-500)" });
+      expect(within(listRow).getByText("Failed")).toBeInTheDocument();
+      expect(within(listRow).getByText("5.4s")).toBeInTheDocument();
+    });
+  });
+
   describe("given a scenario run with null cost and no latency", () => {
     /** @scenario "List row without metrics shows only status label" */
     it("shows the status label and the duration, and no cost", () => {

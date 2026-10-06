@@ -88,6 +88,10 @@ export class InviteTeamAssignmentService {
       });
     }
 
+    // An organization member may hold no team; only an external guest needs one to reach anything.
+    if (invite.role !== "EXTERNAL")
+      return { kind: "teams", teamAssignments: [], teamIdsString: "" };
+
     return { kind: "dropped" };
   }
 

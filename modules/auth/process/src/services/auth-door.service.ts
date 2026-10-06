@@ -81,21 +81,17 @@ export class AuthDoorService {
     });
   }
 
-  /** Ends the session the cookies name; a failed lookup still leaves the cookies to clear. */
+  /**
+   * Ends the session the cookies name. A failed lookup or revocation is thrown, never
+   * swallowed: the sign-out must not confirm a session that still answers.
+   */
   async revokeSessionFromCookies(input: { cookie: string | undefined }): Promise<void> {
     const headers = cookieHeaders(input);
     if (presentedSessionCookie(headers).kind === "absent") return;
 
-    try {
-      const verification = await this.deps.verifyBrowserSession({ headers });
-      if (verification.kind === "verified") {
-        await this.deps.revokeBrowserSession({ sessionId: verification.verified.session.id });
-      }
-    } catch (error) {
-      logger.warn(
-        { error },
-        "sign-out could not revoke the session; its cookies are still cleared",
-      );
+    const verification = await this.deps.verifyBrowserSession({ headers });
+    if (verification.kind === "verified") {
+      await this.deps.revokeBrowserSession({ sessionId: verification.verified.session.id });
     }
   }
 

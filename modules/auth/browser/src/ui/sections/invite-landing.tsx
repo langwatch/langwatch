@@ -5,12 +5,14 @@ import { useEffect, useRef, useState } from "react";
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { signIn, signOut, useSession } from "../../behavior/auth-client.tsx";
 import { hardRedirect } from "../../behavior/hard-redirect.ts";
+import { usePasskeyCeremony } from "../../behavior/passkey-ceremony.store.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
 import { acceptInviteResultSchema } from "../../model/accept-invite-result.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 import { SecondaryActionLink } from "../elements/secondary-action-link.tsx";
+import { PasskeyCeremonyPanel, passkeyCeremonyTitle } from "./passkey-ceremony-panel.tsx";
 import { SignInMethodPicker } from "./sign-in-method-picker.tsx";
 
 /** Invitation landing: handles signed-out, signed-in, and expired cases. */
@@ -129,6 +131,8 @@ function SignedOutInvite({
   const asked = useRef(false);
   // A refused passkey ceremony, reported by the rail and drawn once at the top.
   const [passkeyError, setPasskeyError] = useState<unknown>(null);
+  // One somebody deliberately started, which takes the card below.
+  const ceremony = usePasskeyCeremony();
   const callbackUrl = inviteCallbackUrl(inviteCode);
 
   // Asked with no address: the invitation names the organization, never the
@@ -139,6 +143,15 @@ function SignedOutInvite({
     asked.current = true;
     void decide({ identifier: null });
   }, [decide]);
+
+  // This landing draws its rail throughout, so a ceremony takes the card here too.
+  if (ceremony) {
+    return (
+      <AuthCard title={passkeyCeremonyTitle({ ceremony })}>
+        <PasskeyCeremonyPanel ceremony={ceremony} />
+      </AuthCard>
+    );
+  }
 
   return (
     <AuthCard title={`Join ${organizationName}`}>

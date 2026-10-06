@@ -1,3 +1,4 @@
+import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type {
   LangyApi,
@@ -17,17 +18,28 @@ const ACCEPTED = { conversationId: "conv-1", turnId: "turn-1" };
 
 function buildApi(options: {
   dark?: boolean;
+  /** The key lacks `langy:create`, so the door refuses before the app is asked anything. */
+  lacksPermission?: boolean;
   settle?: (input: LangyTurnSettlementWaitInput) => Promise<LangyTurnSettlementWait>;
 }) {
   const started: LangyStartConversationTurnInput[] = [];
-  const authenticate = (input: { request: Request; permission: string }) => ({
-    actor: { type: "user" as const, id: USER_ID },
-    scope: { tier: "project" as const, id: PROJECT_ID },
-    permission: input.permission,
-  });
+  const authenticate = (input: { request: Request; permission: string }) => {
+    if (options.lacksPermission) throw new ApiKeyPermissionDeniedError(input.permission);
+
+    return {
+      actor: { type: "user" as const, id: USER_ID },
+      scope: { tier: "project" as const, id: PROJECT_ID },
+      permission: input.permission,
+    };
+  };
+  let callerAsked = 0;
   const app = createApiFixture<LangyApi>({
-    getRestCaller: async () =>
-      options.dark ? { dark: true } : { dark: false, projectId: PROJECT_ID, userId: USER_ID },
+    getRestCaller: async () => {
+      callerAsked += 1;
+      return options.dark
+        ? { dark: true }
+        : { dark: false, projectId: PROJECT_ID, userId: USER_ID };
+    },
     getRestActor: async ({ userId }) => ({ user: { id: userId } }),
     startConversationTurn: async (input) => {
       started.push(input);
@@ -53,7 +65,7 @@ function buildApi(options: {
   const postUnmounted = () =>
     hono.request("http://api.test/api/langy/not-a-real-route", { method: "POST" });
 
-  return { post, postRaw, postUnmounted, started };
+  return { post, postRaw, postUnmounted, started, callerAsked: () => callerAsked };
 }
 
 const TURN = {
@@ -198,6 +210,22 @@ describe("given the key-authed surface is switched off for the project", () => {
       const body = await dark.text();
       expect(body).toBe(await unrouted.text());
       expect(body).not.toContain("trace_id");
+      expect(api.started).toEqual([]);
+    });
+  });
+});
+
+describe("given the key-authed surface is switched off and the key lacks langy:create", () => {
+  describe("when the key starts a turn", () => {
+    /** @scenario "The key's permission is checked before the rollback switch" */
+    it("answers the permission denial and never asks whether the surface is dark", async () => {
+      const api = buildApi({ dark: true, lacksPermission: true });
+
+      const refused = await api.post(TURN);
+
+      expect(refused.status).toBe(403);
+      expect(await refused.json()).toMatchObject({ code: "api_key_permission_denied" });
+      expect(api.callerAsked()).toBe(0);
       expect(api.started).toEqual([]);
     });
   });

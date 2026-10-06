@@ -60,6 +60,7 @@ describe("PrismaOrganizationRepository settings", () => {
     expect(mainDecrypt(data.s3AccessKeyId)).toBe("access-key");
   });
 
+  /** @scenario "An organization's stored settings are read with this process's cipher" */
   it("opens a row main sealed", async () => {
     const findUnique = vi.fn().mockResolvedValue({
       id: "organization",

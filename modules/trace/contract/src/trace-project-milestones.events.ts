@@ -13,6 +13,10 @@ export const firstTraceRecordedEventDataSchema = z.object({
   sdkLanguage: z.string(),
   sdkFramework: z.string(),
   occurredAt: z.number().int().nonnegative(),
+  /** When the organization was created, epoch ms; for days since signup. */
+  organizationCreatedAt: z.number().int().nonnegative().nullish(),
+  /** Which onboarding the organization went through; a string, so no new dependency. */
+  onboardingVariant: z.string().nullish(),
 });
 export type FirstTraceRecordedEventData = z.infer<typeof firstTraceRecordedEventDataSchema>;
 
@@ -23,5 +27,9 @@ export const traceReceivedEventDataSchema = z.object({
   /** The organization's admin when recorded. */
   userId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
+  /** When the organization was created, epoch ms; for days since signup. */
+  organizationCreatedAt: z.number().int().nonnegative().nullish(),
+  /** Which onboarding the organization went through; a string, so no new dependency. */
+  onboardingVariant: z.string().nullish(),
 });
 export type TraceReceivedEventData = z.infer<typeof traceReceivedEventDataSchema>;

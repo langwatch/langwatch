@@ -174,7 +174,8 @@ Feature: Custom role permission editing
     Then the raw error travels, never a sentence the screen composed
 
   @integration
-  Scenario: A role whose details cannot be read reports the failure
-    Given a custom role whose details cannot be read
-    When the administrator opens its editor
-    Then the failure is reported and no empty editor is opened
+  Scenario: Custom roles that cannot be read report the failure
+    Given the organization's custom roles cannot be read
+    When the administrator opens the roles page
+    Then the failure is reported and no empty custom role list is shown
+    And the built-in roles are still listed

@@ -55,7 +55,7 @@ Feature: Credential arbitration
 
   @unit
   Scenario: A key route reached with no resolved credential is refused before its handler
-    Given a permission gate mounted without the unified auth middleware
-    When a request reaches it with no resolved credential
-    Then the request is refused, not passed through
-    And the failure is reported as the platform's own misconfiguration
+    Given a route whose door resolved no credential
+    When its handler asks for the request's credential principal
+    Then the ask raises, never answering from a blank principal
+    And the failure is a plain error naming the missing authentication middleware, so it logs loudly

@@ -121,6 +121,14 @@ describe("given a deployment that named no browser-session identity", () => {
     await expect(app.betterAuth()).rejects.toThrowError(/NEXTAUTH_SECRET and NEXTAUTH_URL/);
   });
 
+  /** @scenario A process with no Better Auth instance still declares the auth family */
+  it("refuses a sign-in attempt with the code service_unavailable", async () => {
+    const app = await appFor();
+
+    await expect(app.betterAuth()).rejects.toMatchObject({ code: "service_unavailable" });
+  });
+
+  /** @scenario A process with no Better Auth instance still declares the auth family */
   it("verifies every caller as anonymous rather than failing", async () => {
     const app = await appFor();
 

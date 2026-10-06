@@ -267,14 +267,13 @@ Feature: Shared ops snapshot with a single elected writer
 
   @unit
   Scenario: The operator dashboard reads the snapshot the writer publishes
-    Given the API process composed a connection to the snapshot store
-    When its operator back office is composed
+    Given the API process composed a reader over the snapshot store
+    When the reader starts
     Then it reads the live and detail artifacts the writer publishes
     And it never claims the writer's lease
 
   @unit
-  Scenario: A process with no snapshot store says so rather than reporting an all-clear
-    Given the API process composed no connection to the snapshot store
+  Scenario: A process with no snapshot collector says so rather than reporting an all-clear
+    Given the API process runs no snapshot collector
     When the operator badge is read
     Then the counts carry no computed time
-    And the process names the absence at composition

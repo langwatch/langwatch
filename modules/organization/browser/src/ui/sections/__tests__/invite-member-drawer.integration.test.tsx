@@ -8,12 +8,12 @@ import "@testing-library/jest-dom/vitest";
 import { organizationApiCreateInvitesInputSchema } from "@langwatch/organization-contract";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing.tsx";
 import { InviteMemberDrawer } from "../invite-member-drawer.tsx";
 
-const calls = vi.hoisted(() => ({ createInvites: vi.fn() }));
+const calls = vi.hoisted(() => ({ createInvites: vi.fn(), invalidated: [] as string[] }));
 
 vi.mock("../../../behavior/organization-api.ts", () => {
   const answers: Record<string, unknown> = {
@@ -35,7 +35,9 @@ vi.mock("../../../behavior/organization-api.ts", () => {
       mutateAsync: vi.fn(),
       isPending: false,
     }),
-    invalidate: vi.fn(),
+    invalidate: () => {
+      calls.invalidated.push(path);
+    },
     fetch: vi.fn(),
   });
 
@@ -59,14 +61,16 @@ vi.mock("../../../behavior/use-public-env.ts", () => ({
 
 afterEach(() => {
   vi.clearAllMocks();
+  calls.invalidated.length = 0;
   cleanup();
 });
 
 describe("the invite drawer", () => {
   describe("given it is open for an organization", () => {
-    /** @scenario Inviting through the drawer preserves organization and team scope */
-    it("creates the invite against that organization and closes", async () => {
-      const host = new FakeOrganizationHost({ grants: new Set(["organization:manage"]) });
+    let host: FakeOrganizationHost;
+
+    beforeEach(async () => {
+      host = new FakeOrganizationHost({ grants: new Set(["organization:manage"]) });
       renderWithOrganizationHost(<InviteMemberDrawer open={true} />, host);
 
       await userEvent.type(
@@ -74,7 +78,10 @@ describe("the invite drawer", () => {
         "new@acme.com",
       );
       await userEvent.click(screen.getByRole("button", { name: /send invites/i }));
+    });
 
+    /** @scenario Inviting through the drawer preserves organization and team scope */
+    it("creates the invite against that organization and closes", async () => {
       await waitFor(() => expect(calls.createInvites).toHaveBeenCalled());
       expect(calls.createInvites.mock.calls[0]?.[0]).toMatchObject({
         organizationId: "org-1",
@@ -85,6 +92,11 @@ describe("the invite drawer", () => {
         organizationApiCreateInvitesInputSchema.parse(calls.createInvites.mock.calls[0]?.[0]),
       ).not.toThrow();
       await waitFor(() => expect(host.overlays).toContainEqual({ name: null }));
+    });
+
+    /** @scenario Invitation changes refresh the visible seat usage */
+    it("drops the cached seat limits once an invitation is created", async () => {
+      await waitFor(() => expect(calls.invalidated).toContain("licenseEnforcement.checkLimit"));
     });
   });
 });

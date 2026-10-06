@@ -79,6 +79,7 @@ describe("cron routes", () => {
   });
 
   /** @scenario "No tracked source declares a cron route" */
+  /** @scenario A destructive scheduled job answers no caller */
   it("finds no cron route in any tracked source", () => {
     const offenders = trackedSources().flatMap((fileName) => {
       let text: string;

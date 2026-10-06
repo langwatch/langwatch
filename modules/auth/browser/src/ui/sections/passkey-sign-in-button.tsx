@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { authClient, navigate, safeRedirectTarget } from "../../behavior/auth-client.tsx";
+import { endPasskeyCeremony, startPasskeyCeremony } from "../../behavior/passkey-ceremony.store.ts";
 import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
 import { signInMethodActionLabel } from "../../model/method-labels.ts";
 import { passkeyFailure } from "../../model/passkey-failure.ts";
@@ -48,17 +49,36 @@ export function PasskeySignInButton({
   onDeclined?: () => void;
 }) {
   const [isBusy, setIsBusy] = useState(false);
+  // Cancelling cannot stop the browser's prompt, so it makes the screen stop acting on it.
+  const attempt = useRef<{ abandoned: boolean } | null>(null);
 
   const setBusy = (next: boolean) => {
     setIsBusy(next);
     onBusyChange?.(next);
   };
 
-  const dial = async () => {
+  const dial = () => {
     onError(null);
     setBusy(true);
+    if (attempt.current) attempt.current.abandoned = true;
+    const current = { abandoned: false };
+    attempt.current = current;
+    startPasskeyCeremony({
+      purpose: "sign-in",
+      cancel: () => {
+        current.abandoned = true;
+        setBusy(false);
+        onDeclined?.();
+      },
+      retry: dial,
+    });
+    void run(current);
+  };
+
+  const run = async (current: { abandoned: boolean }) => {
     try {
       const result = await authClient.signIn.passkey();
+      if (current.abandoned) return;
       // A cancelled prompt is not a failure worth shouting about: the person
       // closed it, and the other methods are still on the screen behind this.
       if (result?.error) {
@@ -71,13 +91,16 @@ export function PasskeySignInButton({
       rememberLastUsedMethod({ id: "passkey" });
       navigate(safeRedirectTarget(callbackUrl));
     } catch {
-      // A throw from the WebAuthn client — unsupported, an insecure origin, a
-      // ceremony that never got started. It never reached the server, so there
-      // is no status to read and nothing to tell apart.
+      // A throw from the WebAuthn client never reached the server: no status to read.
+      if (current.abandoned) return;
       onError(passkeyFailure(void 0));
       onDeclined?.();
     } finally {
-      setBusy(false);
+      // A ceremony somebody walked away from releases nothing it no longer owns.
+      if (!current.abandoned) {
+        setBusy(false);
+        endPasskeyCeremony();
+      }
     }
   };
 
@@ -86,7 +109,7 @@ export function PasskeySignInButton({
     if (!autoStart || autoStarted.current) return;
     autoStarted.current = true;
     onAutoStarted?.();
-    void dial();
+    dial();
     // `dial` is redefined every render; the ref is what keeps this to once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart]);
@@ -97,7 +120,7 @@ export function PasskeySignInButton({
       label={signInMethodActionLabel(PASSKEY)}
       badge={badge}
       isBusy={isBusy}
-      onClick={() => void dial()}
+      onClick={dial}
       testId="passkey-sign-in"
     />
   );
