@@ -217,6 +217,9 @@
       "path": "enterprise/modules/demo-data/process/tsconfig.json"
     },
     {
+      "path": "enterprise/modules/digest/process/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/enterprise-gateway/contract/tsconfig.json"
     },
     {
