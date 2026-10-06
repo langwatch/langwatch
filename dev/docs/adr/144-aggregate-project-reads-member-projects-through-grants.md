@@ -424,3 +424,18 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   table's occurrence column; a subquery on a side table (evaluations,
   annotations) takes the tenant set without the window, because that
   table's timestamp is not the trace's.
+- v4.2 (2026-10-06, implementation note after block C, no decision
+  changed). Three limits the store client brings, recorded so block F and
+  later readers do not rediscover them. A fold that reads a trace back
+  under a project deleted since the event was written now fails with
+  `AccessNotGrantedError` and takes the pipeline's retry path, where the
+  base wrote an orphan row; the failure is the intended outcome, and the
+  lineage lookup behind it is cached for sixty seconds per project. On an
+  aggregate, which member wins a trace id held by two members is
+  deterministic per read path, not per trace: the hint-less summary read
+  takes the earliest occurrence and a hinted read takes the one nearest
+  its hint; block F threads the tenant from the summary read through the
+  reads that follow it so the detail page stays on one member. Log records
+  and the analytics rollup table keep their hand-written tenant until a
+  fifth time column (`TimeUnixMs`) is admitted to the client's list, which
+  is a decision for block F.
