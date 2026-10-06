@@ -1,0 +1,71 @@
+# Slate, 2026-10-06: A bucket and round 1
+
+Source: the 46 group-A entries of `question-triage-2026-10-06.md` §2.1, plus the 37 round 1 rows Alex ruled in `rulings-2026-10-06-rounds.md` (restore as main; build the Langy cards to the spec), which the coordinator moved to A. Each entry was checked against the code at `a8a2efe4bc`, with a parity run (`check:feature-parity --json`, 93 unbound).
+
+Every manifest is in `.claude/manifests/<slug>.md`, and its handoff goes to `.claude/handoffs/<slug>.md`. Every manifest carries the same rules: spec first, no new FK or `@relation`, additive migrations only, never read `.env`, no git writes, never `git stash`, and held questions under the lane's own heading in `held-questions.md`.
+
+**Landing-held paths.** The six night lanes have handed back, so the landing lane holds:
+
+- every file named in their handoffs' §10;
+- `packages/eventing/src/upcast/`, `packages/handled-error`, `dev/docs/ARCHITECTURE.md` and `.github/workflows/langwatch-app-ci.yml`;
+- every file still carrying their uncommitted diffs: `packages/api/src/rest/{host,declaration,runtime}.ts`, three `packages/process/src` files, process-stores, observability, the browser-host drawer, the enforcer, the catalogue, `billing.module.ts` and `index.ts`, entitlement, the chart, the lockfile and the test-harness `package.json`.
+
+Every manifest forbids all of these.
+
+## Slate
+
+| slug | model | owned paths | A ids covered | why unblocked |
+| --- | --- | --- | --- | --- |
+| `a-legacy-key-stale-rows` | lane-opus (medium) | project create services + `legacy-project-key.rules.ts` + `project.rest.ts` doc strings; `modules/api-key/browser/src/**`; `api-keys-v2.feature`; user-avatar test; `missing-installed-module.unit.test.ts` (`@scenario` lines); feature files: user-avatar-upload, api-process-trpc-record, declarative-process-composition :31, externalize-event-byte-content :713 | api-keys-v2 :122 :129 :135; Q48; user-avatar-upload :90 :139; api-process-trpc-record :22 :60; declarative-process-composition :31; externalize-event-byte-content :713 | The record (ARCHITECTURE "never minted or returned") and rulings :91 :212 :227 :196 :157 cover these. Verified open: `project-write.service.ts:131` and `project.service.ts:208` still mint, `project-token-input.ts:35` mints 90 days with no picker, and the boot refusal they bind to already exists (`MissingProviderError`). |
+| `a-run-page-http-mappings` | lane-opus (medium) | `modules/scenario/browser/src/**`; `modules/agent/browser/src/**`; `suite-bugfixes-1956.feature` | suite-bugfixes-1956 :44; Q171 (A and B); scenario-input-mapping :197 | Covered by rulings:97 and round 1 product rows. Verified: no run page exists, and the three-segment address redirects to `?openRun=` (`use-suite-routing.ts:60-62`). |
+| `a-signin-access-screens` | lane-opus (high) | `modules/auth/browser/src/**`; `modules/authz/browser/src/**`; `modules/organization/browser/src/features/authentication-settings/**`; `enterprise/modules/sso/browser/src/**` except the one sso-setup screen test | signin-signup-screens :205 :579 :957 :965 :972 :979; passkeys :432 (copy half); org-access-cluster :35 :47 :54 :70; organization-authentication-settings :36 :129 | Round 1 rules restore as main, the Access tab included. Main's tests are named per row in the manifest, and all of these rows are unbound. |
+| `a-auth-process-rows` | lane-opus (high) | `modules/auth/process/src/**`; `identity-storage-adapter.feature` (the :584 rewording) | Q150 (Auth 32); signin-signup-screens :347; passkeys :432 (server half); mfa-and-session-shape :555; identity-storage-adapter :584 :660; scim-sso-signin :28; langy-session-key :90 | Covered by rulings :81 :205 :342 and round 1. For :660, harness-live-oidc's held line recommends option (a), test in auth, so the lane proceeds on it. The OIDC provider is in the tree (not yet committed). The ceilings are asked in auth's `api-door.service.ts`. |
+| `a-identity-sso-process` | lane-opus (high) | `modules/identity/process/src/**`; `enterprise/modules/{sso,scim}/process/src/**`; `packages/api/src/access/**` + `trpc/policy.ts`; one sso screen test (`@scenario` line); `sso-onboarding-tiers.feature` | identifier-model :129; mfa-and-session-shape :524 :610; sso-activation :622; sso-onboarding-tiers :433; sso-credential-enforcement :111 | Covered by rulings :230 :205/:212(4) :123 :118 and round 1. Impersonation claims landed in 7d08df0ea5; what remains is the decision half. |
+| `a-langy-cards` | lane-sonnet | `modules/langy/browser/src/**`; `modules/langy/process/src/**` (quiet mark and state rows only) | langy-choice-questions :57 :174 :187; langy-composer-feedback-and-cards :109; langy-guided-onboarding :405 :412 :428 :1341 | Round 1: build to the spec. Main's tests are named per row. |
+| `a-product-restore` | lane-opus (medium) | analytics `langwatch-ql*` eval path; `modules/instant-eval/process`; `packages/api/src/trpc/runtime.ts` + new `audit-refusal-budget.*` tests; `modules/audit-log/process`; `modules/experiment/process`; `modules/model-provider/process`; licensing process + `license-minting.ts` | instant-eval-billing :210; audit-log :371; evaluation-execution :230; credential-validation :482; license-registry :64 | Round 1: restore as main. These are five independent slices. |
+| `a-billing-governance` | lane-opus (high) | `enterprise/modules/billing/process/src/**`; billing contract (not `billing-report.commands.ts`); `enterprise/modules/governance/**`; new `apps/api/src/__tests__/project-filter.invariant.integration.test.ts`; `plan-allowance-on-ingest-doors.feature`; `admin-catalog-editor.feature` | Q69; Q43 (billing half); plan-allowance-on-ingest-doors :37; ui-contract :125 :314; pulled-rows-home-and-leak-gate :43 :56; governance-cost-screen :529; admin-catalog-editor :56 :101 | Covered by rulings :121 :189 :323 :157 and round 1. Billing is free now that ent-merge has handed back. **Precondition:** `git status --short enterprise/modules/billing` must be empty (the landing lane commits ent-merge's `billing.module.ts` and `index.ts` first). The governance slices run first. |
+
+**Disjointness, checked by eye.**
+
+- **`modules/auth`.** Browser goes to signin-access, process to auth-process.
+- **sso.** Browser goes to signin-access, except one screen test, which identity-sso owns for a `@scenario` line. Process goes to identity-sso.
+- **`packages/api`.** `access/**` and `trpc/policy.ts` go to identity-sso; `trpc/runtime.ts` goes to product-restore. Each lane writes new tests under its own file prefix. `rest/**` stays landing-held.
+- **project.** legacy-key owns the create-path files; billing-governance only adds a test in `apps/api`.
+- **Feature files.** Each owned feature file has one lane, and none is in a landing §10. Every other feature edit goes into §10.
+
+Spawn order: whatever fits the ceiling. a-billing-governance waits on the landing commit for billing only.
+
+## A entries needing no work (done)
+
+| entry | sha |
+| --- | --- |
+| LE-2 keep the mask | eca3d819d3 (undeclared 5xx `presumed_platform`, masked; declared customer 5xx keeps its body). The overload exception is CH-1 (D, round 7). |
+| Q-U2 "Upgrades" under Ops, "release upgrade" copy | 8723ee4dde |
+| 5-8 governance fixes | 69600c1fef (anomaly secret redacted), e3c866d5c0 (seat count), ba453f08f8 (Lambda), f890f35491 (HTTP drain) |
+| 16 CRON_API_KEY retired | ff65b6a83f |
+| 18 getSetup `enterpriseRequired` | 3f17b76a72 |
+| 20 transport skipped, not refused | 4a47d24a4a |
+| 36 ceiling notice offers the next tier | 0ec1d37035 |
+| 37 digest parked | 32e850698f. The scenarios are `@unimplemented` under Alex's gap comment. The file cannot go on `LEGACY_INERT` because its template-pick rows are bound. |
+| 70, 126 Instant Eval meter once Stripe holds it | f782649f83 |
+| 76 Lambda config fingerprint | ba453f08f8 |
+| 78 credential-arbitration rows | 23043e4a72, 7f68975be8 |
+| 86 malformed agent answer kept, no 500 | e361040a34 |
+| 117 gateway tour | 39d738fdd6 |
+| 122 no legacy key row | 7f68975be8 (backfill row `@unimplemented`, column model) |
+| 124 CLI login session, audit names | fbb008f70f, 7f68975be8 |
+| 160 12-hour sandbox key, held 8 hours | 15c0c6786e |
+| Q150 Trace 9 and tracked-event-validation :78 | e72339e92b. The scenario rewording is in t1-d2's §10 (landing-held). |
+| 103, api-process-metrics :65, api-process-executable :102 | Done in process-doors-ready-metrics (handoff status "review", not committed). The landing lane commits it and applies its §10. |
+
+## A entries that cannot start yet
+
+None among the 46 or the round 1 rows. Two partial holds:
+
+- **Q69, Q43 billing half, plan-allowance :37** (in `a-billing-governance`). These start only once the landing lane has committed ent-merge's billing diff (the manifest's precondition).
+- **The rewordings that land in other lanes' §10.** Examples: tracked-event-validation :76-80 and api-process-executable :92-106. They wait on the landing lane.
+
+## Not covered, for the record
+
+- **ingest-api-key-lifecycle :233.** It was in round 1's product question but is absent from the ruled list. It stays held (`bind-rest-night.md:27`).
+- **Peer cut T1 slice 1.** t1-d2 left it partial: the decoder needs two more dependencies (`t1-d2-span-facts.md` §11, T1-D2-deps-extra). It is not an A entry.
