@@ -367,4 +367,26 @@ describe("Feature: the reconciler keeps members current", () => {
       });
     });
   });
+
+  /** @scenario "Reconciling twice changes nothing" */
+  describe("given an aggregate project whose members are current", () => {
+    describe("when the reconciler runs again", () => {
+      it("leaves the same grant rows with the same ids and no duplicate", async () => {
+        const aggregate = await createAggregate({ kind: "all-personal" });
+        const before = await sharedReadRowsOf(aggregate.id);
+        expect(before.length).toBeGreaterThan(0);
+
+        const again = await reconciler.reconcile({
+          aggregateProjectId: aggregate.id,
+        });
+
+        expect(again.attached).toEqual([]);
+        expect(again.revoked).toEqual([]);
+        const after = await sharedReadRowsOf(aggregate.id);
+        expect(after).toEqual(before);
+        const live = after.filter((row) => row.revokedAt === null);
+        expect(new Set(live.map((row) => row.scopeId)).size).toBe(live.length);
+      });
+    });
+  });
 });
