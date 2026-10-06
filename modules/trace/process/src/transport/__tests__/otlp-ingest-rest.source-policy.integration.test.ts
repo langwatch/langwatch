@@ -1,4 +1,4 @@
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { createRestRuntime } from "@langwatch/api/rest";
 /**
  * @vitest-environment node
  * The OTLP trace receiver with an ingestion-source credential: what the door
@@ -10,6 +10,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { LocalFeatureApis } from "@langwatch/process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TraceApi, type OtlpIngestCredential } from "@langwatch/trace-contract";
+import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
@@ -17,7 +18,7 @@ import { otlpIngestRest } from "../otlp-ingest.rest.ts";
 
 const PROJECT = { id: "project-123", teamId: "team-1", organizationId: "organization-1" };
 
-const renderRefusal: RestErrorHandler = (error, c) => {
+const renderRefusal: ErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {
     const serialized = error.serialize();
     return c.json(
