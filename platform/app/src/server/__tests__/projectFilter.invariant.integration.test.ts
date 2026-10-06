@@ -536,19 +536,17 @@ beforeAll(async () => {
   // never receives cost of its own; its row is here only so the role-aware
   // case below can tell the filter from an empty answer.
   await prisma.cost.createMany({
-    data: [
-      applicationProjectId,
-      governanceProjectId,
-      aggregateProjectId,
-    ].map((projectId) => ({
-      projectId,
-      costType: CostType.TRACE_CHECK,
-      referenceType: CostReferenceType.CHECK,
-      referenceId: `check-${projectId}`,
-      costName: "leak gate",
-      amount: 1.5,
-      currency: "USD",
-    })),
+    data: [applicationProjectId, governanceProjectId, aggregateProjectId].map(
+      (projectId) => ({
+        projectId,
+        costType: CostType.TRACE_CHECK,
+        referenceType: CostReferenceType.CHECK,
+        referenceId: `check-${projectId}`,
+        costName: "leak gate",
+        amount: 1.5,
+        currency: "USD",
+      }),
+    ),
   });
 
   // The agents inventory lists only `connected` agents that are still

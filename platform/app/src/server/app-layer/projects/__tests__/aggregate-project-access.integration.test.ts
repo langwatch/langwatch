@@ -19,11 +19,11 @@ import {
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resolveApiKeyPermissionProjectBatch } from "~/server/app-layer/authz/credential-permissions";
 import {
   batchProjectPermissions,
   batchScopePermissions,
 } from "~/server/app-layer/authz/permission-adapters";
-import { resolveApiKeyPermissionProjectBatch } from "~/server/app-layer/authz/credential-permissions";
 import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import { createTestApp } from "~/server/app-layer/presets";
 import { getDataPrivacySnapshot } from "~/server/data-privacy/dataPrivacyPolicy.read";
@@ -121,7 +121,10 @@ describe("Feature: only organisation admins open an aggregate project", () => {
   });
 
   describe("given a batched permission check that covers the aggregate", () => {
-    const scopeBatch = async (userId: string, permission: "project:view" | "project:update") => {
+    const scopeBatch = async (
+      userId: string,
+      permission: "project:view" | "project:update",
+    ) => {
       const { projects } = await batchScopePermissions(sessionOf(userId), {
         organizationId: fixture.organizationId,
         teamIds: [],

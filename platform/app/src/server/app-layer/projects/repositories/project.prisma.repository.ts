@@ -10,7 +10,6 @@ import {
 } from "~/server/app-layer/authz/ledger";
 import { parseOnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 import { projectKindsHiddenFrom } from "../project-kinds";
-import { PrismaProjectKindRepository } from "./project-kind.prisma.repository";
 import type {
   CreateProjectInput,
   CreateTeamWithBindingInput,
@@ -25,6 +24,7 @@ import type {
   UpdateProjectInput,
   UpdateProjectMetadataInput,
 } from "./project.repository";
+import { PrismaProjectKindRepository } from "./project-kind.prisma.repository";
 
 export class PrismaProjectRepository implements ProjectRepository {
   private readonly kinds: PrismaProjectKindRepository;

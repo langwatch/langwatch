@@ -175,7 +175,9 @@ describe("Feature: the aggregate project receives no traces", () => {
           oneTeam.projects,
           withBindings.flatMap((team) => team.projects),
         ]) {
-          const listed = projects.find((project) => project.id === aggregate.id);
+          const listed = projects.find(
+            (project) => project.id === aggregate.id,
+          );
           expect(listed).toBeDefined();
           expect(listed?.apiKey).toBe("");
           expect(listed?.lwqlKey).toBe("");

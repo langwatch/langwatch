@@ -111,9 +111,9 @@ describe("Feature: the projects REST API writes an aggregate only for an organis
   describe("given a key whose owner holds an organisation custom role but is not an admin", () => {
     describe("when it renames the aggregate", () => {
       it("is answered not found, though it renames an ordinary project", async () => {
-        expect((await send("PATCH", editorToken, fixture.shared.id)).status).toBe(
-          200,
-        );
+        expect(
+          (await send("PATCH", editorToken, fixture.shared.id)).status,
+        ).toBe(200);
         expect((await send("PATCH", editorToken, aggregate.id)).status).toBe(
           404,
         );
