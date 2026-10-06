@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`InstantEvalApi`)
 
-Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:91`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:96`; nothing else in this package is public.
 
 #### `isEnabled`
 
@@ -122,6 +122,14 @@ One classification of a peer's own text rather than a run's rows, which is how t
 
 ```typescript
 classify(input: { projectId: string; text: string; questions: readonly InstantEvalQuestion[]; /** Aborts the judgement when the caller has gone, as a hosted call's request does. */ signal?: AbortSignal; }): Promise<InstantEvalJudgement>;
+```
+
+#### `judgeQuery`
+
+One synchronous query's judged columns, their texts in place (Alex, 2026-10-06, "Judge cycle"): holds the query token budget's price, judges, records the spend once, then drops the hold. Refuses an exhausted budget or an oversized query before anything is judged.
+
+```typescript
+judgeQuery(input: InstantEvalQueryJudgingInput): Promise<InstantEvalQueryJudging>;
 ```
 
 #### `priceOf`
@@ -281,7 +289,7 @@ Declared at `src/eventing/instant-eval-processing.pipeline.ts:60`. Events: `inst
 
 | Kind   | Leaf                    | Environment variable                    | Declared at                                 |
 | ------ | ----------------------- | --------------------------------------- | ------------------------------------------- |
-| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval.app.ts:139`           |
+| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval.app.ts:143`           |
 | config | `classifier`            | `INSTANT_EVAL_CLASSIFIER`               | `../contract/src/instant-eval.config.ts:12` |
 | config | `classifierBaseUrl`     | `JEV_BASE_URL`                          | `../contract/src/instant-eval.config.ts:17` |
 | config | `classifierModel`       | `JEV_MODEL`                             | `../contract/src/instant-eval.config.ts:25` |

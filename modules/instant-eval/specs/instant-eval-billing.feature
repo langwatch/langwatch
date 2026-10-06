@@ -206,8 +206,8 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       When the queue refuses it
       Then the hold taken for it is released
 
-    # Synchronous judging is restored (Alex, 2026-10-06); held on the peer cycle, lwql-sync-eval.
-    @unit @unimplemented
+    # Synchronous judging is restored (Alex, 2026-10-06, "Inline eval" and "Judge cycle").
+    @unit
     Scenario: A judged query holds its ceiling while it judges
       Given a free organization under its budget
       When a statement calling an eval function is run

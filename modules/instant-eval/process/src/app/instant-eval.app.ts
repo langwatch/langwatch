@@ -13,6 +13,8 @@ import {
   type InstantEvalEstimateWire,
   type InstantEvalJudgement,
   type InstantEvalOptInAccess,
+  type InstantEvalQueryJudging,
+  type InstantEvalQueryJudgingInput,
   type InstantEvalQuestion,
   type InstantEvalResultsWire,
   type InstantEvalSampleWire,
@@ -64,8 +66,10 @@ import {
 import { InstantEvalFinishService } from "../services/instant-eval-finish.service.ts";
 import { InstantEvalFreeBudgetService } from "../services/instant-eval-free-budget.service.ts";
 import { InstantEvalJudgePageService } from "../services/instant-eval-judge-page.service.ts";
+import { InstantEvalJudgeRowsService } from "../services/instant-eval-judge-rows.service.ts";
 import { InstantEvalOptInService } from "../services/instant-eval-opt-in.service.ts";
 import { InstantEvalPlanService } from "../services/instant-eval-plan.service.ts";
+import { InstantEvalQueryJudgingService } from "../services/instant-eval-query-judging.service.ts";
 import { InstantEvalRateLimiterService } from "../services/instant-eval-rate-limiter.service.ts";
 import { InstantEvalReadsService } from "../services/instant-eval-reads.service.ts";
 import { InstantEvalRowSourceService } from "../services/instant-eval-row-source.service.ts";
@@ -147,6 +151,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
   private readonly dispatcher: InstantEvalCommandDispatcherService;
   private readonly pipeline: InstantEvalProcessingPipelineDefinition;
   private readonly hostedSpend: InstantEvalSpendService;
+  private readonly queries: InstantEvalQueryJudgingService;
 
   private constructor(options: {
     access: InstantEvalAccessService;
@@ -157,6 +162,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
     dispatcher: InstantEvalCommandDispatcherService;
     pipeline: InstantEvalProcessingPipelineDefinition;
     hostedSpend: InstantEvalSpendService;
+    queries: InstantEvalQueryJudgingService;
   }) {
     this.access = options.access;
     this.optIns = options.optIns;
@@ -166,6 +172,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
     this.dispatcher = options.dispatcher;
     this.pipeline = options.pipeline;
     this.hostedSpend = options.hostedSpend;
+    this.queries = options.queries;
   }
 
   static async create(setup: InstantEvalSetup): Promise<InstantEvalModule> {
@@ -247,8 +254,25 @@ export class InstantEvalModule implements InstantEvalApiContract {
       },
     });
 
+    // A query's spend lands on the same spine a run's finish records to.
+    const queries = InstantEvalQueryJudgingService.create({
+      rows: InstantEvalJudgeRowsService.create({ judge }),
+      budget,
+      spend: InstantEvalSpendService.create({
+        peers: {
+          findSpendAttribution: spendAttributionOf(projects),
+          recordPricedSpend: async (input) => {
+            await gateway.recordPricedSpend(input);
+          },
+        },
+      }),
+      pricing: judge.pricing,
+      queryTokenBudget: setup.config.queryTokenBudget,
+    });
+
     return new InstantEvalModule({
       hostedSpend,
+      queries,
       access,
       optIns,
       classifications: InstantEvalClassifyService.create({ judge }),
@@ -587,6 +611,10 @@ export class InstantEvalModule implements InstantEvalApiContract {
     signal?: AbortSignal;
   }): Promise<InstantEvalJudgement> {
     return this.classifications.classify(input);
+  }
+
+  judgeQuery(input: InstantEvalQueryJudgingInput): Promise<InstantEvalQueryJudging> {
+    return this.queries.judgeQuery(input);
   }
 
   priceOf(input: { inputTokens: number }): { costUsd: number; priceUsd: number } {
