@@ -20,10 +20,10 @@ import type { ExperimentAttachmentLinkChannel } from "../experiment-attachment-l
 const logger = createLogger("langwatch:experiment:attachment-link");
 
 /** How long the run waits for an address on the public internet. */
-export const ATTACHMENT_LINK_TIMEOUT_MS = 30_000;
+const ATTACHMENT_LINK_TIMEOUT_MS = 30_000;
 
 /** The address policy a deployment fences a run's attachment reads with. */
-export type ExperimentAttachmentEgressPolicy = Readonly<{
+type ExperimentAttachmentEgressPolicy = Readonly<{
   blockLocal: boolean;
   allowedHosts: readonly string[];
   verifyTls: boolean;
@@ -42,7 +42,7 @@ interface AttachmentLinkBodyReader {
 }
 
 /** The fenced fetch seam, injected so a test never opens a socket. */
-export type FencedAttachmentFetch = (
+type FencedAttachmentFetch = (
   validated: SsrfValidationResult,
   init: FencedFetchOptions,
   tls: EgressTlsPolicy,

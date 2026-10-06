@@ -48,11 +48,11 @@ export type ExperimentDspyClickHouseClient = {
   }): Promise<ExperimentDspyClickHouseResult>;
 };
 
-export type ExperimentDspyClickHouseResolver = (
+type ExperimentDspyClickHouseResolver = (
   tenantId: string,
 ) => Promise<ExperimentDspyClickHouseClient | null>;
 
-export type ExperimentDspyTelemetry = {
+type ExperimentDspyTelemetry = {
   warn(input: { projectId: string; error: unknown }, message: string): void;
 };
 

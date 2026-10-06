@@ -44,7 +44,7 @@ import { ExperimentRunPlanService } from "./experiment-run-plan.service.ts";
 import type { ExperimentRunErrorReporting } from "./experiment-run-results-writer.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
-export type WorkflowEvaluationParameters = Record<string, string | number | boolean>;
+type WorkflowEvaluationParameters = Record<string, string | number | boolean>;
 
 const logger = createLogger("langwatch:experiment:workflow-evaluation");
 
@@ -55,7 +55,7 @@ const WORKFLOW_TARGET_ID = "workflow-target";
  * Runs a studio workflow as an evaluations-v3 evaluation. The single
  * backend execution path, shared with the evaluations-v3 run API.
  */
-export type WorkflowEvaluationDependencies = {
+type WorkflowEvaluationDependencies = {
   experiments: Pick<ExperimentService, "findOrCreateForWorkflow">;
   /** The workflow rows and versions this run reads, which it does not own. */
   workflowSource: ExperimentWorkflowDsl;

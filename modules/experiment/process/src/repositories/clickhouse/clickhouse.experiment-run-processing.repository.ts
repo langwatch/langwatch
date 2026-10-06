@@ -2,7 +2,6 @@ import type { AppendStore } from "@langwatch/eventing";
 
 import { ExperimentRunItemStore } from "../../eventing/experiment-run-item.store.ts";
 import type { ClickHouseExperimentRunResultRecord } from "../../eventing/experiment-run-result-storage.projection.ts";
-import type { ExperimentRunStateData } from "../../eventing/experiment-run-state.projection.ts";
 import type {
   ExperimentClickHouseRepository,
   ExperimentEventingClickHouseResolver,
@@ -14,11 +13,6 @@ import { MemoryExperimentRunStateRepository } from "../memory/memory.experiment-
 import { ClickhouseExperimentClickHouseRepository } from "./clickhouse.experiment-clickhouse.repository.ts";
 import { ClickHouseExperimentIdLookupRepository } from "./clickhouse.experiment-id-lookup.repository.ts";
 import { ClickHouseExperimentRunStateRepository } from "./clickhouse.experiment-run-state.repository.ts";
-
-export type ExperimentRunEventingStateRepository = ExperimentRunStateRepository;
-export type ExperimentRunEventingIdLookup = ExperimentIdLookupRepository;
-export type ExperimentRunEventingResultRecord = ClickHouseExperimentRunResultRecord;
-export type ExperimentRunEventingState = ExperimentRunStateData;
 
 /**
  * The Eventing side of experiment run processing: the storage this feature's

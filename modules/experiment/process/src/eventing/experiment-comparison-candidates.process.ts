@@ -84,7 +84,7 @@ export const evaluatorScoresBlock = ({
  * echoes back as the verdict label; fall back to the internal target id.
  * Never promptId — the aggregator's normalizer doesn't match it.
  */
-export const variantIdentifierFor = ({
+const variantIdentifierFor = ({
   target,
   loadedPrompts,
 }: {
@@ -121,7 +121,7 @@ export const buildVariantIdentifiers = ({
  * identifier from buildVariantIdentifiers, which can leak raw target
  * ids into user-facing copy. Mirrors the frontend's pickTargetName.
  */
-export const variantDisplayNameFor = ({
+const variantDisplayNameFor = ({
   target,
   loadedPrompts,
   loadedEvaluators,

@@ -6,7 +6,7 @@ import {
 import type { WorkbenchCredential } from "@langwatch/experiment-contract";
 import { defineProcessModule } from "@langwatch/process";
 
-import { ExperimentModule, type ExperimentAppDependencies } from "#app/experiment.app";
+import { ExperimentModule } from "#app/experiment.app";
 
 import { experimentLifecycleEventing } from "./eventing/experiment-lifecycle.pipeline.ts";
 import { experimentRunProcessingEventing } from "./eventing/experiment-run-processing.pipeline.ts";
@@ -21,8 +21,6 @@ import { experimentV3Rest, experimentWorkbenchCredential } from "./transport/exp
 import { experimentWorkbenchRunRest } from "./transport/experiment-workbench-run.rest.ts";
 import { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
 import { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
-
-export type { ExperimentAppDependencies };
 
 export const experimentProcessModule = defineProcessModule("experiment")
   .withRepositories(experimentRepositories)

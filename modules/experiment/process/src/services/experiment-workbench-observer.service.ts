@@ -5,7 +5,7 @@ import { nowInstant } from "@langwatch/time";
 import type { ExperimentLifecyclePipeline } from "../eventing/experiment-lifecycle.pipeline.ts";
 
 /** One run that ended, as the workbench reports it. */
-export type ExperimentRan = Readonly<{
+type ExperimentRan = Readonly<{
   userId: string;
   projectId: string;
   experimentId: string | undefined;
@@ -25,7 +25,7 @@ export type ExperimentWorkbenchObserver = Readonly<{
 }>;
 
 /** Announces one run that ended to the lifecycle pipeline; a failure is the caller's to log. */
-export type ExperimentRanAnnouncer = (input: ExperimentRan) => Promise<void>;
+type ExperimentRanAnnouncer = (input: ExperimentRan) => Promise<void>;
 
 /** Where an ended run is announced and an unnamed workbench failure reported. Both best-effort. */
 export class ExperimentWorkbenchObserverService implements ExperimentWorkbenchObserver {

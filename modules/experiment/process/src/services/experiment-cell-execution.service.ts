@@ -39,7 +39,7 @@ const sandboxKey = ExperimentRunSandboxKeyService.create();
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 
 /** The per-cell loaded data `executeCell` needs beyond the cell itself. */
-export type LoadedCellData = {
+type LoadedCellData = {
   prompt?: VersionedPrompt;
   agent?: TypedAgent;
   evaluators?: LoadedEvaluators;

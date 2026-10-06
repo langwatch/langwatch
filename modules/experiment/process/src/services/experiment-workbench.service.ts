@@ -67,11 +67,11 @@ export class NoopExperimentWorkbenchUpdates extends ExperimentWorkbenchUpdates {
  * The one thing this needs from the experiment service that owns it: an
  * unused "Draft N" name for a workbench saved without one.
  */
-export type ExperimentDraftNames = {
+type ExperimentDraftNames = {
   findNextDraftName(input: { projectId: string }): Promise<string>;
 };
 
-export type ExperimentWorkbenchServiceOptions = {
+type ExperimentWorkbenchServiceOptions = {
   repository: ExperimentRepository;
   newId: () => string;
   updates: ExperimentWorkbenchUpdates;

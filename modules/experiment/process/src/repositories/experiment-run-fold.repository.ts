@@ -28,14 +28,14 @@ export const experimentRunPlanFoldStateSchema = z.object({
 });
 
 /** A target's output on one row, as a comparison reads it. */
-export const experimentRunTargetOutputSchema = z.object({
+const experimentRunTargetOutputSchema = z.object({
   output: z.unknown(),
   cost: z.number().optional(),
   duration: z.number().optional(),
 });
 
 /** One evaluator's verdict on a target's row, folded into a comparison's candidates. */
-export const experimentRunEvaluatorScoreSchema = z.object({
+const experimentRunEvaluatorScoreSchema = z.object({
   name: z.string(),
   score: z.number().optional(),
   label: z.string().optional(),
@@ -43,7 +43,7 @@ export const experimentRunEvaluatorScoreSchema = z.object({
 });
 
 /** What the fold needs to know of an evaluator when its verdict arrives. */
-export const experimentRunFoldEvaluatorSchema = z.object({
+const experimentRunFoldEvaluatorSchema = z.object({
   /** The name a verdict carries only when the evaluator has a database record. */
   recordNamed: z.boolean(),
   fallbackName: z.string(),
@@ -51,12 +51,12 @@ export const experimentRunFoldEvaluatorSchema = z.object({
 });
 
 /** One frame main's SSE sent, as a recorded event produced it. */
-export const experimentRunFrameSchema = z.custom<EvaluationV3Event>(
+const experimentRunFrameSchema = z.custom<EvaluationV3Event>(
   (value) => typeof value === "object" && value !== null && "type" in value,
 );
 
 /** A frame the run streamed, numbered in the run's order, with the event that produced it. */
-export const experimentRunRecentEventSchema = z.object({
+const experimentRunRecentEventSchema = z.object({
   seq: z.number().int().nonnegative(),
   eventId: z.string(),
   frame: experimentRunFrameSchema,

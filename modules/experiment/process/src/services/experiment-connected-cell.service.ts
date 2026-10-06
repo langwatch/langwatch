@@ -51,7 +51,7 @@ export type ConnectedDispatch = (params: {
 }) => Promise<CallOutcome>;
 
 /** Execution input for a connected agent cell with run world injected. */
-export type ConnectedCellExecutionInput = {
+type ConnectedCellExecutionInput = {
   cell: ExecutionCell;
   projectId: string;
   agent: TypedAgent;

@@ -8,7 +8,7 @@ import {
 } from "../experiment-run-event-stream.repository.ts";
 
 /** The connection a subscription holds; a `Redis`, a `Cluster` and a double all satisfy it. */
-export type ExperimentRunStreamSubscriberClient = {
+type ExperimentRunStreamSubscriberClient = {
   subscribe(channel: string): Promise<unknown>;
   unsubscribe(channel: string): Promise<unknown>;
   on(event: "message", handler: (channel: string, message: string) => void): unknown;
@@ -17,7 +17,7 @@ export type ExperimentRunStreamSubscriberClient = {
 };
 
 /** The Redis operations the stream needs: publish, and a second connection to listen on. */
-export type ExperimentRunStreamRedis = Readonly<{
+type ExperimentRunStreamRedis = Readonly<{
   publish(channel: string, message: string): Promise<number>;
   duplicate(): ExperimentRunStreamSubscriberClient;
 }>;
