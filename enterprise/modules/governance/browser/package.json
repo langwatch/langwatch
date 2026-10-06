@@ -35,6 +35,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@paper-design/shaders-react": "catalog:",
     "lucide-react": "catalog:",
