@@ -184,8 +184,8 @@ describe("Feature: the reconciler keeps members current", () => {
     }
   });
 
-  /** @scenario "The hidden governance project is never a member" */
   describe("when ana creates an aggregate project with the rule all personal projects", () => {
+    /** @scenario "The hidden governance project is never a member" */
     it("attaches every personal project and never the hidden governance project", async () => {
       // A governance project that even looks personal: only its kind keeps
       // it out, so this fails if the kind filter goes.
@@ -223,9 +223,9 @@ describe("Feature: the reconciler keeps members current", () => {
     });
   });
 
-  /** @scenario "A new personal project joins an all-personal aggregate on creation" */
   describe("given an aggregate project with the rule all personal projects", () => {
     describe("when a new member accepts an invite and their personal project is created", () => {
+      /** @scenario "A new personal project joins an all-personal aggregate on creation" */
       it("makes the new personal project a member of the aggregate", async () => {
         const aggregate = await createAggregate({ kind: "all-personal" });
         const email = `newcomer-${fixture.ns}@example.com`;
@@ -261,9 +261,9 @@ describe("Feature: the reconciler keeps members current", () => {
     });
   });
 
-  /** @scenario "A department move updates a by-department aggregate" */
   describe("given an aggregate project with the rule personal projects in department Engineering", () => {
     describe("when a member in Engineering is moved to department Sales", () => {
+      /** @scenario "A department move updates a by-department aggregate" */
       it("revokes their personal project's read, and a move back restores it", async () => {
         const departments = new DepartmentService(prisma);
         await departments.assignUser({
@@ -308,9 +308,9 @@ describe("Feature: the reconciler keeps members current", () => {
     });
   });
 
-  /** @scenario "Removing a project from an explicit rule revokes its read" */
   describe("given an aggregate project with an explicit list of two projects", () => {
     describe("when ana edits the rule to drop one project", () => {
+      /** @scenario "Removing a project from an explicit rule revokes its read" */
       it("drops that project from the proof and keeps its grant row, marked revoked", async () => {
         const kept = fixture.shared.id;
         const dropped = fixture.personal.seller.id;
@@ -370,9 +370,9 @@ describe("Feature: the reconciler keeps members current", () => {
     });
   });
 
-  /** @scenario "Reconciling twice changes nothing" */
   describe("given an aggregate project whose members are current", () => {
     describe("when the reconciler runs again", () => {
+      /** @scenario "Reconciling twice changes nothing" */
       it("leaves the same grant rows with the same ids and no duplicate", async () => {
         const aggregate = await createAggregate({ kind: "all-personal" });
         const before = await sharedReadRowsOf(aggregate.id);
@@ -392,10 +392,10 @@ describe("Feature: the reconciler keeps members current", () => {
     });
   });
 
-  /** @scenario "A nightly sweep catches a missed trigger" */
   describe("given an aggregate project with the rule all personal projects", () => {
     describe("and a personal project created while the reconciler was unavailable", () => {
       describe("when the nightly sweep runs for the organisation", () => {
+        /** @scenario "A nightly sweep catches a missed trigger" */
         it("makes that personal project a member", async () => {
           const aggregate = await createAggregate({ kind: "all-personal" });
           const job = await prisma.scheduledJob.findFirstOrThrow({
