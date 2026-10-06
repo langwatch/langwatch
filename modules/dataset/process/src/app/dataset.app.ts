@@ -82,7 +82,7 @@ type DatasetSetup = FeatureSetup<
  * naming an experiment instead of a name, and possibly missing name and
  * columns when only patching what already exists.
  */
-export interface DatasetUpsertInput {
+interface DatasetUpsertInput {
   projectId: string;
   /** The dataset being replaced, by id. */
   datasetId?: string;

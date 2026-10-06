@@ -12,7 +12,7 @@ import type { DatasetModule, DatasetNormalize } from "../app/dataset.app.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
 import { DatasetNormalizeCommandHandler } from "./dataset-normalize.commands.ts";
 
-export const DATASET_NORMALIZATION_PIPELINE_NAME = "dataset_normalization";
+const DATASET_NORMALIZATION_PIPELINE_NAME = "dataset_normalization";
 
 export type DatasetNormalizationDefinition = StaticPipelineDefinition<
   never,

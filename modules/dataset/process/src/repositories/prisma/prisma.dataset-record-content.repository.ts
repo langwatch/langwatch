@@ -1,14 +1,8 @@
 import { datasetRecordSchema, type DatasetRecord } from "@langwatch/dataset-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma } from "@langwatch/prisma-client/generated";
 
 import type { DatasetRecordContentRepository } from "../dataset-record-content.repository.ts";
-
-/**
- * Only what this repository touches, so composition names the slice it needs
- * rather than the whole generated client.
- */
-export type DatasetRecordContentDatabase = Pick<PrismaClient, "datasetRecord">;
 
 export class PrismaDatasetRecordContentRepository
   extends PrismaRepository.for("DatasetRecord")

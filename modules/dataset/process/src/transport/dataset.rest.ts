@@ -96,7 +96,7 @@ const UPLOAD_THEN_IMPORT =
   "upload the file as a stored object with the purpose dataset_import, then create the dataset from it";
 
 /** The inert declaration the process mounts on its own project-key door. */
-export type DatasetRestDeclaration = Readonly<{
+type DatasetRestDeclaration = Readonly<{
   protocol: "rest";
   namespace: string;
   router: () => RestTransportDeclaration<DatasetApi>;

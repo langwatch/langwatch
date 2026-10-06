@@ -3,18 +3,12 @@ import type { Instant, TimeInput } from "@langwatch/time";
 import type { DatasetRow } from "./dataset.repository.ts";
 
 /** A Json column's value, mirroring the generated client's own shape. */
-export type DatasetJsonObject = { [Key in string]?: DatasetJsonValue };
-export type DatasetJsonArray = DatasetJsonValue[];
-export type DatasetJsonValue =
-  | string
-  | number
-  | boolean
-  | DatasetJsonObject
-  | DatasetJsonArray
-  | null;
+type DatasetJsonObject = { [Key in string]?: DatasetJsonValue };
+type DatasetJsonArray = DatasetJsonValue[];
+type DatasetJsonValue = string | number | boolean | DatasetJsonObject | DatasetJsonArray | null;
 
 /** The columns a dataset row is written with, minus its relations. */
-export type DatasetWriteFields = {
+type DatasetWriteFields = {
   id?: string;
   name?: string;
   slug?: string;

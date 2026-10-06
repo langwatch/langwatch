@@ -145,24 +145,3 @@ export const parseJsonl = (jsonl: string): unknown[] =>
     .split("\n")
     .filter((line) => line.trim().length > 0)
     .map((line) => JSON.parse(line));
-
-/**
- * Narrow an `unknown` caught value to one carrying a given property with a given string value.
- * Shared by every storage impl so the "is this a NoSuchKey / ENOENT?" check lives in exactly
- * one place.
- */
-export const errorHasProp = (error: unknown, prop: "code" | "name", value: string): boolean =>
-  typeof error === "object" &&
-  error !== null &&
-  prop in error &&
-  (error as Record<string, unknown>)[prop] === value;
-
-/**
- * True when a caught error is a "missing object" from any storage backend — the 4-way
- * `name`/`code` × `NoSuchKey`/`NotFound` check.
- */
-export const isMissingObjectError = (error: unknown): boolean =>
-  errorHasProp(error, "name", "NoSuchKey") ||
-  errorHasProp(error, "name", "NotFound") ||
-  errorHasProp(error, "code", "NoSuchKey") ||
-  errorHasProp(error, "code", "NotFound");

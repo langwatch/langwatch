@@ -30,26 +30,26 @@ import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
  * file (no streaming JSON-array parser is wired in v1), so it's hard-capped well
  * below heap. JSONL is the streaming-friendly format for large datasets.
  */
-export const LARGE_JSON_MAX_BYTES = 100 * 1024 * 1024;
+const LARGE_JSON_MAX_BYTES = 100 * 1024 * 1024;
 
 /**
  * Max bytes for a single JSONL line (I-MEM). `readline` emits one line at a time, so a normal
  * file never buffers more than a line; but a pathological file with no newlines (or one giant
  * line) would make `readline` buffer the whole thing in memory.
  */
-export const MAX_JSONL_LINE_BYTES = 8 * 1024 * 1024;
+const MAX_JSONL_LINE_BYTES = 8 * 1024 * 1024;
 
 /**
  * Max bytes for a single CSV row (I-MEM), the CSV counterpart to `MAX_JSONL_LINE_BYTES`.
  */
-export const MAX_CSV_ROW_BYTES = 8 * 1024 * 1024;
+const MAX_CSV_ROW_BYTES = 8 * 1024 * 1024;
 
 /**
  * papaparse read-buffer size — how many bytes it pulls from the source stream before emitting
  * rows, so it reads in fixed-size I/O chunks rather than draining the stream as fast as the
  * chunk writer allows (backpressure).
  */
-export const CSV_IO_CHUNK_BYTES = 8 * 1024 * 1024;
+const CSV_IO_CHUNK_BYTES = 8 * 1024 * 1024;
 
 export type DatasetNormalizeDeps = {
   repository: DatasetRepository;
@@ -81,7 +81,7 @@ async function deleteFlushedChunks({
  * Thrown when a staged `.json` array is too large to buffer; surfaced to the
  * user as the dataset's `statusError`. Convert to JSONL to stream it instead.
  */
-export class LargeJsonUnsupportedError extends UploadValidationError {
+class LargeJsonUnsupportedError extends UploadValidationError {
   constructor(message = "Large .json files are not supported — convert to JSONL") {
     super(message, "file_too_large");
     this.name = "LargeJsonUnsupportedError";

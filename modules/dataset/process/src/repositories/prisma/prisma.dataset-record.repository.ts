@@ -13,7 +13,7 @@ import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type DatasetRecordDatabase = Pick<PrismaClient, "datasetRecord">;
+type DatasetRecordDatabase = Pick<PrismaClient, "datasetRecord">;
 
 export class PrismaDatasetRecordRepository
   extends PrismaRepository.for("DatasetRecord")

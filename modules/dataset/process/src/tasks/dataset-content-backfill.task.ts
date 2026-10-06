@@ -38,7 +38,7 @@ export class DatasetContentBackfillSweep {
 }
 
 /** What the sweep needs of the migration repository, and nothing more. */
-export type DatasetContentMigration = Pick<DatasetMigrationService, "run">;
+type DatasetContentMigration = Pick<DatasetMigrationService, "run">;
 
 /**
  * The task-launcher entry — `pnpm --filter @langwatch/tasks task dataset-content-backfill`.
