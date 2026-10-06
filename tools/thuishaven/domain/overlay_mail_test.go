@@ -41,11 +41,22 @@ func TestHasEmailProviderConfiguredIsFalseWithNoneOfTheKeysSet(t *testing.T) {
 }
 
 // @scenario "A stack with the mail lane sends its email into the sink"
+// @scenario "A provider key with no provider named does not keep mail off the sink"
 func TestMailSMTPEnvInjectsOverABareProviderKey(t *testing.T) {
 	for _, key := range []string{"SENDGRID_API_KEY", "RESEND_API_KEY"} {
-		env := MailSMTPEnv(map[string]string{key: "copied-from-a-template"}, 45510)
+		resolved := map[string]string{key: "copied-from-a-template"}
+		if HasEmailProviderConfigured(resolved) {
+			t.Fatalf("with only %s set, no provider is named, yet one reads as configured", key)
+		}
+		env := MailSMTPEnv(resolved, 45510)
 		if got := valueOf(env, "EMAIL_PROVIDER"); got != "smtp" {
 			t.Fatalf("with only %s set, EMAIL_PROVIDER = %q, want smtp", key, got)
+		}
+		if got := valueOf(env, "SMTP_HOST"); got != "127.0.0.1" {
+			t.Fatalf("with only %s set, SMTP_HOST = %q, want the sink on loopback", key, got)
+		}
+		if got := valueOf(env, "SMTP_PORT"); got != "45510" {
+			t.Fatalf("with only %s set, SMTP_PORT = %q, want the sink's port", key, got)
 		}
 	}
 }
