@@ -1,0 +1,12 @@
+# Packages
+
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
+
+| Kind    | Package                    | What it is (package.json `description`) | Depended on by |
+| ------- | -------------------------- | --------------------------------------- | -------------- |
+| library | [@lw/core](core/README.md) | The core vocabulary.                    | 2              |
+
+Kind is the architecture enforcer's classification; "Depended on by" counts workspace
+packages that list the package in their `package.json`.
+
+<!-- readme:generated:end -->

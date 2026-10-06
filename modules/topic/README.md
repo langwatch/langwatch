@@ -1,27 +1,42 @@
-# Topic
+# topic
 
-The Topic feature owns the projected topic model, the topic-clustering
-eventing pipeline, and the read surface for clustering status and history.
-The process-owned application graph exposes one `app.topics` service; there
-is no second read service.
+A project's conversation topics, and what the last topic-clustering run did.
 
-`contract` contains portable Zod 4 schemas, the abstract service capability,
-and the clustering event/command taxonomy (type strings, versions, enums,
-event data schemas) — no eventing or server dependencies. `server` contains
-the private Prisma repository, the service implementation, and the
-topic-clustering-processing pipeline: event envelopes, commands, fold
-projections, the `topicClustering` process manager, and its run intent
-executor (`adapters/eventing.topic-clustering.adapter.ts`). Pipeline
-registration, the clustering execution, boot seeds, and the Prisma projection
-stores enter process composition as named ports. Every manual trigger dispatches
-the Topic Eventing command; no task calls the page runner directly.
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-The active application registry remains a deliberate residual. The new worker
-composition is producer-only until it can mount the complete shared Eventing
-registry, including Trace's `assignTopic` consumer; a Topic-only consumer
-would retry unrelated jobs from `event-sourcing/jobs`. Malformed history JSON
-is treated as an empty rebuildable history, and topic lists preserve database
-order. No caller imports the repository or Prisma rows.
+## At a glance
 
-Specs live in `specs/` (event-sourced scheduling, run history, topics source
-of truth, trace assignment, read surface).
+|                |                                                                                              |
+| -------------- | -------------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                              |
+| Subjects       | topic, topic-clustering                                                                      |
+| Halves         | [contract](contract) · [process](process) · [browser](browser)                               |
+| Api token      | `TopicApi` = `moduleApi<TopicApi>()("topic")`, `contract/src/topic.api.ts:24` (6 operations) |
+| Installed by   | api, worker, tasks (process); ui (browser)                                                   |
+
+## What topic owns
+
+| Kind                           | Name                                                                | Declared at                                                                |
+| ------------------------------ | ------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Postgres table                 | `Topic`                                                             | `process/src/repositories/prisma/prisma.topic.repository.ts:27`            |
+| Postgres table                 | `TopicClusteringRunProjection`                                      | `process/src/repositories/prisma/prisma.topic.repository.ts:27`            |
+| Postgres table                 | `TopicClusteringRunHistoryProjection`                               | `process/src/repositories/prisma/prisma.topic.repository.ts:27`            |
+| Postgres, accessed not claimed | `Cost`, `ProcessManagerInstance`, `Project`, `TopicModelProjection` | `process/src/repositories/prisma/prisma.topic-clustering.repository.ts:17` |
+| Stores required                | prisma, redis                                                       | `process/src/repositories/live/live.topic.repositories.ts:12`              |
+| Stores required                | prisma                                                              | `process/src/repositories/prisma/prisma.topic.repositories.ts:29`          |
+
+Anything else topic needs belongs to another module and is reached through its `*Api`.
+
+## Peers (static dependencies)
+
+| Name             | Token              | Module                                        |
+| ---------------- | ------------------ | --------------------------------------------- |
+| `evaluations`    | `EvaluationApi`    | [evaluation](../evaluation/README.md)         |
+| `modelProviders` | `ModelProviderApi` | [model-provider](../model-provider/README.md) |
+| `traces`         | `TraceApi`         | [trace](../trace/README.md)                   |
+
+## Who depends on topic
+
+[project](../project/README.md), [trace](../trace/README.md) (as a peer).
+
+<!-- readme:generated:end -->

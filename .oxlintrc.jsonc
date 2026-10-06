@@ -22,5 +22,6 @@
     "plugins/langwatch/scripts/session-context.mjs",
     "plugins/langwatch/scripts/session-guidance.mjs",
     "tools/apidiff/inventory/**",
+    "tools/readmegen/extract/**",
   ],
 }

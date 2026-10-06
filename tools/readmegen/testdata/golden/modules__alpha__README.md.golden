@@ -1,0 +1,44 @@
+# alpha
+
+Alpha keeps the items every gamma reads.
+
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
+
+## At a glance
+
+|                |                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                             |
+| Subjects       | alpha, alpha-item                                                                           |
+| Halves         | [contract](contract) · [process](process) · [browser](browser)                              |
+| Api token      | `AlphaApi` = `moduleApi<AlphaApi>()("alpha")`, `contract/src/alpha.api.ts:12` (1 operation) |
+| Other token    | `AlphaReplayApi`, `contract/src/alpha-replay.api.ts:4`                                      |
+| Installed by   | api (process); ui (browser)                                                                 |
+
+## What alpha owns
+
+| Kind                           | Name                                                    | Declared at                                                                   |
+| ------------------------------ | ------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Postgres table                 | `AlphaItem` (`alpha_item`)                              | `process/src/repositories/prisma/prisma.alpha-item.repository.ts:20`          |
+| Postgres, accessed not claimed | `GammaThing`                                            | `process/src/repositories/prisma/prisma.alpha-item.repository.ts:9`           |
+| ClickHouse table (writes)      | `alpha_events`                                          | `process/src/repositories/clickhouse/clickhouse.alpha-event.repository.ts:31` |
+| Stores required                | prisma, clickhouse                                      | `process/src/repositories/prisma/prisma.alpha.repositories.ts:7`              |
+| Secrets                        | `signingKey` (ALPHA_SIGNING_KEY)                        | `process/src/app/alpha.app.ts:14`                                             |
+| Config                         | `region` (ALPHA_REGION), `limits` (≈ `computeLimits()`) | `contract/src/alpha.config.ts:3`                                              |
+
+Anything else alpha needs belongs to another module and is reached through its `*Api`.
+
+## Peers (static dependencies)
+
+| Name            | Token      | Module                      |
+| --------------- | ---------- | --------------------------- |
+| `...extraPeers` | –          | ≈ unresolved                |
+| `gammas`        | `GammaApi` | [gamma](../gamma/README.md) |
+
+## Who depends on alpha
+
+[beta](../../enterprise/modules/beta/README.md) (as a peer).
+
+<!-- readme:generated:end -->
+
+A footnote the generator keeps.

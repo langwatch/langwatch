@@ -1,62 +1,66 @@
 # ops
 
-`ops` owns platform administration and operator capabilities available to every
-deployment, not Enterprise-only code.
+Platform administration for every deployment: admin operations, impersonation, blob storage inspection and the operator views over queues and the scheduler.
 
-- `contract/`: portable Zod DTOs, errors, operator result types, and `OpsService`.
-- `server/`: process-owned services and private Prisma/Redis adapters.
-- `web/`: browser-safe clients, formatters, JSON inspection, reusable operator
-  controls, the controlled DejaView workspace, and the Foundry trace editor/emitter.
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-The app still owns transport registration, auth/session lookup, and process
-composition. Ops snapshots are read, written, and streamed through the single
-`OpsSnapshotService`. Scheduler and queue controls are methods on the
-canonical `OpsService`; queue Redis state and DLQ audit writes stay private to
-the server package, while payload decoding is a named app storage adapter.
-The Ops process half owns Ops instance admin resource queries (ARCHITECTURE.md §3.5) behind private repositories;
-generated Prisma does not cross the contract or transport boundary.
+## At a glance
 
-## Operator journey
+|                |                                                                                         |
+| -------------- | --------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                         |
+| Subjects       | admin, impersonation, ops                                                               |
+| Halves         | [contract](contract) · [process](process) · [browser](browser)                          |
+| Api token      | `OpsApi` = `moduleApi<OpsApi>()("ops")`, `contract/src/ops.api.ts:659` (126 operations) |
+| Installed by   | api, worker, tasks (process); ui (browser)                                              |
 
-An authenticated platform admin opens Backoffice, searches a user, supplies an
-audited reason before impersonating, and can stop that session from the shared
-Ops presentation. Operators can also inspect or clean blob storage through the
-existing app transport; authorization and irreversible-action safeguards stay
-at that transport edge.
+## What ops owns
 
-The Foundry page and drawer compose their selected project and prompt-loading
-transport hook in the app. The Ops web package owns the editor, presets, trace
-generation, browser-side OTel emission, and presentation state.
-The DejaView page follows the same boundary: the app supplies tRPC results and
-handled-error rendering, while the web package owns URL-fragment state,
-keyboard navigation, and the complete search/replay presentation.
+| Kind           | Name                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Declared at                                                          |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Postgres table | `BugReport`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `process/src/repositories/prisma/prisma.bug-report.repository.ts:38` |
+| Secrets        | `licensePrivateKey` (LANGWATCH_LICENSE_PRIVATE_KEY), `clickhouseUrl` (≈ `storesOwner.secrets.clickhouse`), `slackBugReportsBotToken` (SLACK_BUG_REPORTS_BOT_TOKEN)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | `process/src/app/ops.app.ts:731`                                     |
+| Config         | `apiKey` (LANGWATCH_OPS_API_KEY), `metricsApiKey` (METRICS_API_KEY), `clickhouseOpsUrl` (CLICKHOUSE_OPS_URL), `usageStats.disabled` (DISABLE_USAGE_STATS), `usageStats.installMethod` (INSTALL_METHOD), `usageStats.chartVersion` (LANGWATCH_CHART_VERSION), `collectClickHouseBackupMetrics` (CLICKHOUSE_BACKUP_METRICS_ENABLED), `productAnalytics.key` (POSTHOG_KEY), `productAnalytics.host` (POSTHOG_HOST), `bugReportSlackChannel` (SLACK_BUG_REPORTS_CHANNEL), `cloudOps` (LANGWATCH_CLOUD_OPS), `adminEmails` (ADMIN_EMAILS), `nodeEnvironment` (NODE_ENV), `isSaas` (IS_SAAS), `publicBaseUrl` (BASE_HOST), `serviceVersion` (SERVICE_VERSION), `otelResourceAttributes` (OTEL_RESOURCE_ATTRIBUTES) | `contract/src/ops.config.ts:26`                                      |
 
-## Behavioural contracts
+Anything else ops needs belongs to another module and is reached through its `*Api`.
 
-Package-owned worker, queue, and presentation contracts live beside the
-implementation:
+## Peers (static dependencies)
 
-- [Admin](./specs/admin.feature)
-- [Latency windows](./specs/dashboard-latency-windows.feature)
-- [Tenant rate anomalies](./specs/event-queue-anomaly-detection.feature)
-- [Tenant-scoped queue drain](./specs/event-queue-resilience.feature)
-- [Pending-counter reconciliation](./specs/pending-counter-reconcile.feature)
-- [Queue discovery](./specs/queue-discovery.feature)
-- [Queue-group state](./specs/queue-group-state.feature)
+| Name             | Token              | Module                                                    |
+| ---------------- | ------------------ | --------------------------------------------------------- |
+| `analytics`      | `AnalyticsApi`     | [analytics](../analytics/README.md)                       |
+| `annotations`    | `AnnotationApi`    | [annotation](../annotation/README.md)                     |
+| `apiKeys`        | `ApiKeyApi`        | [api-key](../api-key/README.md)                           |
+| `auditLog`       | `AuditLogApi`      | [audit-log](../audit-log/README.md)                       |
+| `auth`           | `AuthApi`          | [auth](../auth/README.md)                                 |
+| `authz`          | `AuthzApi`         | [authz](../authz/README.md)                               |
+| `automations`    | `AutomationApi`    | [automation](../automation/README.md)                     |
+| `codingAgents`   | `CodingAgentApi`   | [coding-agent](../coding-agent/README.md)                 |
+| `dashboards`     | `DashboardApi`     | [dashboard](../dashboard/README.md)                       |
+| `datasets`       | `DatasetApi`       | [dataset](../dataset/README.md)                           |
+| `experiments`    | `ExperimentApi`    | [experiment](../experiment/README.md)                     |
+| `featureFlags`   | `FeatureFlagApi`   | [feature-flag](../feature-flag/README.md)                 |
+| `gateway`        | `GatewayApi`       | [gateway](../gateway/README.md)                           |
+| `github`         | `GithubApi`        | [github](../github/README.md)                             |
+| `identity`       | `IdentityApi`      | [identity](../identity/README.md)                         |
+| `instantEvals`   | `InstantEvalApi`   | [instant-eval](../instant-eval/README.md)                 |
+| `langy`          | `LangyApi`         | [langy](../langy/README.md)                               |
+| `licensing`      | `LicensingApi`     | [licensing](../../enterprise/modules/licensing/README.md) |
+| `modelProviders` | `ModelProviderApi` | [model-provider](../model-provider/README.md)             |
+| `monitors`       | `MonitorApi`       | [monitor](../monitor/README.md)                           |
+| `notifications`  | `NotificationApi`  | [notification](../notification/README.md)                 |
+| `organizations`  | `OrganizationApi`  | [organization](../organization/README.md)                 |
+| `projects`       | `ProjectApi`       | [project](../project/README.md)                           |
+| `prompts`        | `PromptApi`        | [prompt](../prompt/README.md)                             |
+| `retention`      | `DataRetentionApi` | [data-retention](../data-retention/README.md)             |
+| `scenarios`      | `ScenarioApi`      | [scenario](../scenario/README.md)                         |
+| `storedObjects`  | `StoredObjectApi`  | [stored-object](../stored-object/README.md)               |
+| `traces`         | `TraceApi`         | [trace](../trace/README.md)                               |
+| `users`          | `UserApi`          | [user](../user/README.md)                                 |
+| `workflows`      | `WorkflowApi`      | [workflow](../workflow/README.md)                         |
 
-Some contracts remain at the repository boundary because they describe a
-composed app or shared infrastructure rather than one package surface:
-[dead-letter recovery](../../../specs/ops/dead-letter-recovery.feature),
-[scheduler control](../../../specs/ops/scheduler-operator-control.feature),
-[the shared snapshot](../../../specs/ops/shared-ops-snapshot.feature),
-[process visibility](../../../specs/ops/process-manager-visibility.feature),
-and [Ops dashboard density](../../../specs/ops/ops-dashboard-density.feature).
-The app owns their transport/composition assertions; the package tests still
-bind the package portions to named scenarios.
+## Who depends on ops
 
-The shared architectural decisions [ADR-090](../../../dev/docs/adr/090-shared-ops-snapshot-single-writer.md)
-and [ADR-091](../../../dev/docs/adr/091-operator-control-over-the-scheduler.md)
-remain in the repository ADR catalogue because they govern process and app
-composition, not only this package. The remaining root `specs/ops` contracts
-cover ClickHouse, email, feature flags, local observability, and production
-bundle infrastructure, so they are intentionally not duplicated here.
+[enterprise-ops](../../enterprise/modules/enterprise-ops/README.md), [saas](../../enterprise/modules/saas/README.md) (as a peer).
+
+<!-- readme:generated:end -->

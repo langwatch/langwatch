@@ -1,37 +1,32 @@
 # LangWatch Enterprise
 
-Everything under `enterprise/` is the Enterprise Edition of LangWatch.
-It is **not** covered by the repository's Apache 2.0 license — it is governed by
-the [LangWatch Enterprise License](./LICENSE.md).
+Everything under `enterprise/` is the Enterprise Edition of LangWatch. It is not covered by the repository's Apache 2.0 licence ([LICENSE.md](../LICENSE.md)); it is governed by the [LangWatch Enterprise License](./LICENSE.md). These modules ship in every distribution and stay dormant without a licence, which they verify at runtime; what needs a commercial licence is using those capabilities in production, or running a distribution whose licence checks were removed or bypassed. Enterprise routes are always mounted and refuse per organisation on entitlement ([ARCHITECTURE.md §11](../dev/docs/ARCHITECTURE.md)). For a licence, see https://langwatch.ai/pricing or write to sales@langwatch.ai.
 
-This directory is the legal ownership root. It holds no packages of its own —
-only modules, each mirroring the same shape a core module uses:
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-- `modules/<feature>/{contract,server,web}` — billing, licensing,
-  managed-provider, saas, scim, sso, and governance. Each module's contract is
-  shared, its server half is installed by `createApp` like any other module,
-  and its browser half (where one exists) is installed by `createUi`.
-  `modules/catalogue.json` maps every one of these subjects to its owning
-  module and its `enterprise` classification; the generated module lists
-  install both classifications into the same processes.
+## Modules
 
-There is no separate Enterprise composition root and no conditional mounting:
-Enterprise routes are always mounted and refuse per-organization on
-entitlement. Entitlement resolves licenses through the installed `LicensingApi`
-peer, which verifies each organization's stored license. See [dev/docs/ARCHITECTURE.md §11](../dev/docs/ARCHITECTURE.md)
-for the shape ruling.
+| Module                                                     | Subjects                                                                                                                                                                                                                                                                                                                                                        | Halves                       |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| [billing](modules/billing/README.md)                       | billing                                                                                                                                                                                                                                                                                                                                                         | contract · process · browser |
+| [demo-data](modules/demo-data/README.md)                   | demo-data                                                                                                                                                                                                                                                                                                                                                       | contract · process           |
+| [digest](modules/digest/README.md)                         | digest                                                                                                                                                                                                                                                                                                                                                          | process                      |
+| [enterprise-gateway](modules/enterprise-gateway/README.md) | enterprise-gateway, personal-virtual-key, routing-policy                                                                                                                                                                                                                                                                                                        | contract · process           |
+| [enterprise-ops](modules/enterprise-ops/README.md)         | enterprise-ops                                                                                                                                                                                                                                                                                                                                                  | contract · process           |
+| [governance](modules/governance/README.md)                 | ai-tool-catalog, anomaly-alert, anomaly-rule, canonical-cost, cost-attribution-policy, department, governance, ingestion-credentials, ingestion-pull, ingestion-source, ingestion-template, ocsf-export, ottl, persona-home, personal-usage, platform-tool-policy, pull-destination, pulled-usage, puller, quarantine-fill, session-policy, spend-spike-anomaly | contract · process · browser |
+| [licensing](modules/licensing/README.md)                   | license, licensing                                                                                                                                                                                                                                                                                                                                              | contract · process · browser |
+| [managed-provider](modules/managed-provider/README.md)     | managed-model-provider, managed-provider                                                                                                                                                                                                                                                                                                                        | contract · process · browser |
+| [nurturing](modules/nurturing/README.md)                   | nurturing, product-milestone                                                                                                                                                                                                                                                                                                                                    | contract · process           |
+| [saas](modules/saas/README.md)                             | saas                                                                                                                                                                                                                                                                                                                                                            | contract · process · browser |
+| [scim](modules/scim/README.md)                             | scim, scim-sync                                                                                                                                                                                                                                                                                                                                                 | contract · process · browser |
+| [sso](modules/sso/README.md)                               | sso                                                                                                                                                                                                                                                                                                                                                             | contract · process · browser |
 
-Billing's Stripe subscription lifecycle, usage-limit notifications, and
-license-purchase workflow live in `enterprise/modules/billing/process`; the
-application only installs it from the generated module list (ARCHITECTURE.md §4).
+Every module is listed in `modules/catalogue.json` with `classification: enterprise`; the generated module lists install it beside the core modules. Gating is per route, never per mount.
 
-These modules ship in every LangWatch distribution and you may run them in
-production without a license: the enterprise capabilities verify a license at
-runtime and stay dormant without one, and everything else in LangWatch is
-unrestricted. What requires a commercial Enterprise License is using those
-capabilities in production, or running a distribution whose license checks
-were removed or bypassed. See [LICENSE.md](./LICENSE.md) for the exact terms,
-and https://langwatch.ai/pricing or sales@langwatch.ai for a license.
+## Packages
 
-Apache-licensed source is governed separately by the repository root
-[`LICENSE.md`](../../LICENSE.md).
+| Package                                 | Description                                                                                             |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `@langwatch/enterprise-license-signing` | Signs and verifies LangWatch Enterprise licences: the licensing module and the local-dev seed share it. |
+
+<!-- readme:generated:end -->

@@ -43,7 +43,7 @@ const NAMES_TABLE_BY_BINDING = new RegExp(
 );
 const READING_VERBS = new Set(["from", "join"]);
 
-type Access = { module: string; table: string; file: string; line: number; write: boolean };
+export type Access = { module: string; table: string; file: string; line: number; write: boolean };
 type ScanRoot = { module: string; directory: string };
 
 const ALLOWED =
@@ -389,7 +389,7 @@ function readFile({
 }
 
 /** Every module access to a live ClickHouse table, in a stable file order. */
-function collectAccess(
+export function collectAccess(
   root: string,
   catalogue: readonly FeatureCatalogueEntry[],
   tables: ReadonlyMap<string, string>,

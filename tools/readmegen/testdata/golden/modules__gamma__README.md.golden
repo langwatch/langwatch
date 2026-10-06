@@ -1,0 +1,29 @@
+# gamma
+
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
+
+## At a glance
+
+|                |                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                             |
+| Subjects       | gamma                                                                                       |
+| Halves         | [process](process)                                                                          |
+| Api token      | `GammaApi` = `moduleApi<GammaApi>()("gamma")`, `contract/src/gamma.api.ts:2` (0 operations) |
+| Installed by   | api (process)                                                                               |
+
+## What gamma owns
+
+No table, store, secret or config: gamma declares none.
+
+Anything else gamma needs belongs to another module and is reached through its `*Api`.
+
+## Peers (static dependencies)
+
+None: gamma declares no peers.
+
+## Who depends on gamma
+
+[alpha](../alpha/README.md) (as a peer).
+
+<!-- readme:generated:end -->
