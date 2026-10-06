@@ -13,7 +13,6 @@ import type { SignInProviderMounts, SsoApi } from "@langwatch/enterprise-sso-con
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
-import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -95,22 +94,13 @@ async function appFor(
     },
     members: {
       encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-      logger: createLogger("langwatch:auth:test"),
       // Better Auth's storage and hook repositories take the client and query
       // nothing until a request reaches them; no test below reaches one.
       prisma: {} as never,
       redis: null as never,
-      rateLimiter: { check: async () => ({ allowed: true }) } as never,
-      secrets: {
-        find: () => undefined,
-        read: (key: string) => {
-          throw new Error(`test double does not stub secrets.read("${key}")`);
-        },
-      },
       publicBaseUrl: undefined,
       identityEmails: undefined as never,
       invites: null,
-      isSaas: false,
       nodeEnvironment: undefined,
       processName: "langwatch-api",
     },

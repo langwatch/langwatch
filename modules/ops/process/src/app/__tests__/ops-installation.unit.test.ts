@@ -107,7 +107,6 @@ function process(
       isSaas: false,
       serviceVersion: "test",
       publicBaseUrl: undefined,
-      processName: "langwatch-test",
     })
     .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
     .withAnalytical(memberWithoutStore<ClickHouseQueryClient>())

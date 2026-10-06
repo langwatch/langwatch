@@ -8,11 +8,9 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
-import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
-import type { RateLimiter, SecretResolver } from "@langwatch/process-stores/members";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
@@ -26,13 +24,6 @@ const ACCESS_TOKEN = "lw_at_active";
 const AUTHORIZATION = `Bearer ${ACCESS_TOKEN}`;
 
 async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<AuthModule> {
-  const secrets: SecretResolver = {
-    find: () => void 0,
-    read: (key) => {
-      throw new Error(`test double does not stub secrets.read("${key}")`);
-    },
-  };
-
   return AuthModule.create({
     config: {
       sessionUrl: undefined,
@@ -65,15 +56,11 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
     },
     members: {
       encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-      logger: createLogger("langwatch:auth:test"),
       prisma: createApiFixture<PrismaClient>(),
       redis: createApiFixture(),
-      rateLimiter: createApiFixture<RateLimiter>(),
-      secrets,
       publicBaseUrl: void 0,
       identityEmails: void 0,
       invites: null,
-      isSaas: false,
       nodeEnvironment: undefined,
       processName: "langwatch-api",
     },

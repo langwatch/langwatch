@@ -1,3 +1,4 @@
+import type { AuthRateLimitRepository } from "./auth-rate-limit.repository.ts";
 import type { AuthSessionRepository } from "./auth-session.repository.ts";
 import type { CliDeviceSessionRepository } from "./cli-device-session.repository.ts";
 import type { SignInAttemptLockRepository } from "./sign-in-attempt-lock.repository.ts";
@@ -17,4 +18,6 @@ export interface AuthRepositories {
   readonly signInLocks: SignInAttemptLockRepository;
   /** The rules organizations set over their members' sign-ins (GAC-09, GAC-10). */
   readonly signInSecurity: SignInSecuritySettingsRepository;
+  /** The sign-in door's and the token check's fixed-window counters. */
+  readonly rateLimits: AuthRateLimitRepository;
 }

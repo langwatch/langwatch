@@ -46,6 +46,7 @@ import { LangyApi } from "@langwatch/langy-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   AdminSessionExpiredError,
   AdminSurfaceHiddenError,
@@ -735,12 +736,10 @@ export class OpsModule implements OpsApi {
     "redis",
     "clickhouse",
     "eventing",
-    "logger",
     "nodeEnvironment",
     "isSaas",
     "serviceVersion",
     "publicBaseUrl",
-    "processName",
   ] as const;
 
   /**
@@ -761,8 +760,10 @@ export class OpsModule implements OpsApi {
       redis: setup.members.redis,
       featureFlags: setup.dependencies.featureFlags,
     });
+    const logger = createLogger("langwatch:ops");
     const infrastructure = buildOpsInfrastructure({
       members: setup.members,
+      logger,
       config: setup.config,
       resources: setup.resources,
       processStore: setup.repositories.processStore,
@@ -774,7 +775,14 @@ export class OpsModule implements OpsApi {
     const { dependencies } = setup;
     const { members } = setup;
     const checkup = OpsCheckupService.create({
-      members,
+      // The role names this process (§3.3).
+      members: {
+        isSaas: members.isSaas,
+        serviceVersion: members.serviceVersion,
+        publicBaseUrl: members.publicBaseUrl,
+        nodeEnvironment: members.nodeEnvironment,
+        processName: setup.role ?? "unknown",
+      },
       config: setup.config,
       peers: {
         ...dependencies,
@@ -823,12 +831,12 @@ export class OpsModule implements OpsApi {
       resolveInstances: async () => [sharedStorageStatsInstance(members.clickhouse)],
       readings: storageReadings,
       collectBackups: setup.config.collectClickHouseBackupMetrics,
-      logger: members.logger,
+      logger,
     });
 
     const { adminEmails } = setup.config;
     for (const warning of PlatformOperatorsService.bootWarnings({ adminEmails })) {
-      members.logger.warn(warning);
+      logger.warn(warning);
     }
 
     const app = OpsModule.fromInfrastructure({

@@ -58,6 +58,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
+import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
@@ -81,6 +82,7 @@ import {
   type AuthLifecycleDefinition,
   buildAuthLifecyclePipeline,
 } from "../eventing/auth-lifecycle.pipeline.ts";
+import type { AuthRateLimitRepository } from "../repositories/auth-rate-limit.repository.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
@@ -157,19 +159,14 @@ export interface AuthInviteDirectory {
   requestFresh(input: Readonly<{ inviteCode: string }>): Promise<void>;
 }
 
+const logger = createLogger("langwatch:auth");
+
 /**
  * The closed members this module reads as a literal, restated as a
  * named tuple so `publicBaseUrl` (a process fact, not one of the fourteen)
  * can be appended to the runtime list below without losing this typing.
  */
-const AUTH_CLOSED_READS = [
-  "encryption",
-  "logger",
-  "prisma",
-  "redis",
-  "rateLimiter",
-  "secrets",
-] as const;
+const AUTH_CLOSED_READS = ["encryption", "prisma", "redis"] as const;
 
 /**
  * Process-supplied infrastructure. Declared members required at boot;
@@ -188,9 +185,6 @@ export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
     identityEmails: IdentityEmailService | undefined;
     /** The invitation reads, or nothing where this process composed none. */
     invites: AuthInviteDirectory | null;
-    /** Whether this is the hosted product: the process's own fact, supplied
-     * as a member. The flag itself has a ruling of its own pending. */
-    isSaas: boolean;
     /** The deployment's environment name — the process's own fact (`NODE_ENV`
      * has one owner). Read for what is trusted outside production only. */
     nodeEnvironment: string | undefined;
@@ -244,12 +238,7 @@ export class AuthModule implements AuthApiContract {
   static readonly publicConfig = authBrowserConfig.project;
   /** `secrets` resolves NEXTAUTH_SECRET (ADR-132); `publicBaseUrl` is the
    * process's own fact. A process that cannot supply one refuses at boot. */
-  static readonly reads = [
-    ...AUTH_CLOSED_READS,
-    "publicBaseUrl",
-    "isSaas",
-    "nodeEnvironment",
-  ] as const;
+  static readonly reads = [...AUTH_CLOSED_READS, "publicBaseUrl", "nodeEnvironment"] as const;
   /** The browser-session key. Only the identity built from it ever escapes (ADR-132). */
   static readonly secrets = {
     session: sessionSecret,
@@ -269,6 +258,8 @@ export class AuthModule implements AuthApiContract {
   readonly #cliDeviceFlow: CliDeviceFlowService;
   readonly #signUp: SignUpVerificationService | null;
   readonly #members: AuthInfrastructure;
+  /** The counters the token check and the sign-in door meter through. */
+  readonly #rateLimits: AuthRateLimitRepository;
   readonly #dependencies: AuthAppPeers;
   /** The `Account` rows a retiring connection is judged over — auth's own,
    *  swept for a peer that owns none of them (ADR-129). */
@@ -345,6 +336,7 @@ export class AuthModule implements AuthApiContract {
     cliDeviceFlow,
     signUp,
     members,
+    rateLimits,
     dependencies,
     legacySsoAccess,
     federatedAccounts,
@@ -360,6 +352,7 @@ export class AuthModule implements AuthApiContract {
     cliDeviceFlow: Omit<CliDeviceFlowCollaborators, "session">;
     signUp: SignUpVerificationService | null;
     members: AuthInfrastructure;
+    rateLimits: AuthRateLimitRepository;
     dependencies: AuthAppPeers;
     legacySsoAccess: LegacySsoAccessService;
     federatedAccounts: FederatedAccountReadsService;
@@ -377,6 +370,7 @@ export class AuthModule implements AuthApiContract {
     });
     this.#signUp = signUp;
     this.#members = members;
+    this.#rateLimits = rateLimits;
     this.#dependencies = dependencies;
     this.#legacySsoAccess = legacySsoAccess;
     this.#federatedAccounts = federatedAccounts;
@@ -387,7 +381,7 @@ export class AuthModule implements AuthApiContract {
     this.#twoStep = twoStep;
     this.#lifecycle = AuthLifecycleNoticeService.create({
       reportError: (error) =>
-        members.logger.error({ error }, "a sign-in milestone was not recorded for nurturing"),
+        logger.error({ error }, "a sign-in milestone was not recorded for nurturing"),
     });
     this.#providerAccountLinks = ProviderAccountLinkService.create({
       issuers: connectionIssuers,
@@ -395,7 +389,7 @@ export class AuthModule implements AuthApiContract {
     });
     this.#projectTokens = ProjectAuthTokenService.create({
       apiKeys: dependencies.apiKeys,
-      rateLimiter: members.rateLimiter,
+      rateLimiter: rateLimits,
     });
     this.#door = AuthDoorService.create({
       betterAuth: () => this.betterAuth(),
@@ -471,6 +465,7 @@ export class AuthModule implements AuthApiContract {
         },
       }),
       members,
+      rateLimits: repositories.rateLimits,
       dependencies: {
         apiKeys: dependencies.apiKeys,
         featureFlags: dependencies.featureFlags,
@@ -507,7 +502,7 @@ export class AuthModule implements AuthApiContract {
             federationLicensed: () => dependencies.licensing.isPlatformSsoLicensed(),
             offersPasskeys: () => config.passkeysEnabled,
             issuesOwnPasswords: () => config.localPasswords,
-            selfHosted: () => !members.isSaas,
+            selfHosted: () => !config.isSaas,
           }).resolvePolicy();
           return policy.defaultMethods;
         },
@@ -572,7 +567,7 @@ export class AuthModule implements AuthApiContract {
         SignupAnnouncementService.create({
           channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
           publicBaseUrl: members.publicBaseUrl,
-          logger: members.logger,
+          logger,
         }),
     );
 
@@ -630,15 +625,15 @@ export class AuthModule implements AuthApiContract {
             signInProviders,
             licensing: dependencies.licensing,
             sso: dependencies.sso,
-            isSaas: members.isSaas,
+            isSaas: config.isSaas,
             localPasswords: config.localPasswords,
             trustedIdpOrigins: config.trustedIdpOrigins,
             idpSimulatorUrl: config.idpSimulatorUrl,
             isProduction: members.nodeEnvironment === "production",
-            logger: members.logger,
+            logger,
           });
       } else {
-        members.logger.info(
+        logger.info(
           { module: "auth" },
           "This process named no browser-session identity (NEXTAUTH_SECRET and NEXTAUTH_URL), so it composes no Better Auth instance: every browser caller reads as signed out and the sign-in door refuses",
         );
@@ -940,7 +935,7 @@ export class AuthModule implements AuthApiContract {
   async isWithinBudget(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
   ): Promise<Readonly<{ allowed: boolean; retryAfterSeconds?: number | undefined }>> {
-    const decision = await this.#members.rateLimiter.check(input.key, {
+    const decision = await this.#rateLimits.check(input.key, {
       requests: input.max,
       seconds: input.windowSeconds,
     });

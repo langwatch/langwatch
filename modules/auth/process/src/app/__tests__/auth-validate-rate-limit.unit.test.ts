@@ -12,13 +12,13 @@ import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
-import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import type { AuthRepositories } from "../../repositories/auth.repositories.ts";
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
 import { AuthModule } from "../auth.app.ts";
 import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
@@ -26,7 +26,7 @@ import { TestUserApi } from "./support/test-user-api.ts";
 
 const CEILING = resolveRequestBound("authValidatePerIpPerMinute", "ENTERPRISE");
 
-/** The limiter member, over a memory counter, remembering the window each check named. */
+/** The limiter repository, over a memory counter, remembering the window each check named. */
 function countingLimiter() {
   const counts = new Map<string, number>();
   const windows: ({ requests: number; seconds: number } | undefined)[] = [];
@@ -43,6 +43,15 @@ function countingLimiter() {
   };
 
   return { rateLimiter, windows };
+}
+
+/** The memory repositories, metering through the counting limiter instead of their own. */
+function withRateLimits(
+  memory: MemoryAuthRepositories,
+  rateLimits: AuthRepositories["rateLimits"],
+): AuthRepositories {
+  const { sessions, cliSessions, signUpTokens, signInLocks, signInSecurity } = memory;
+  return { sessions, cliSessions, signUpTokens, signInLocks, signInSecurity, rateLimits };
 }
 
 async function appFor(
@@ -62,7 +71,7 @@ async function appFor(
       signInProviders: NO_SIGN_IN_PROVIDERS,
       signUpMode: "open",
     },
-    repositories: MemoryAuthRepositories.create(),
+    repositories: withRateLimits(MemoryAuthRepositories.create(), limiter),
     dependencies: {
       users: new TestUserApi({}) as never,
       apiKeys: {
@@ -82,20 +91,11 @@ async function appFor(
     },
     members: {
       encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-      logger: createLogger("langwatch:auth:test"),
       prisma: {} as never,
       redis: null as never,
-      rateLimiter: limiter,
-      secrets: {
-        find: () => undefined,
-        read: (key: string) => {
-          throw new Error(`test double does not stub secrets.read("${key}")`);
-        },
-      },
       publicBaseUrl: undefined,
       identityEmails: undefined as never,
       invites: null,
-      isSaas: false,
       nodeEnvironment: undefined,
       processName: "langwatch-api",
     },

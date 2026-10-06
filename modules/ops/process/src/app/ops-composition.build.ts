@@ -100,14 +100,12 @@ export type OpsProcessMembers = Readonly<{
   clickhouse: ClickHouseQueryClient;
   /** Cross-pipeline inspection and replay read the registered definitions, nothing more. */
   eventing: Pick<EventSourcing, "definitions">;
-  logger: Logger;
   /** The process's own fact (§6), for the EXPLAIN fail-closed rule. */
   nodeEnvironment: string | undefined;
   /** The process's own facts the checkup and the usage report name. */
   isSaas: boolean;
   serviceVersion: string;
   publicBaseUrl: string | undefined;
-  processName: string;
 }>;
 
 /**
@@ -194,6 +192,7 @@ export function sharedStorageStatsInstance(
 /** Builds the {@link OpsAppInfrastructure} `OpsModule.create` composes over. */
 export function buildOpsInfrastructure(input: {
   members: OpsProcessMembers;
+  logger: Logger;
   config: OpsServerConfig;
   resources: ResourceOwnership;
   processStore: ProcessStore;
@@ -201,7 +200,7 @@ export function buildOpsInfrastructure(input: {
   rateTracker: AnomalyRateTrackerRepository;
   cloudOps: boolean;
 }): OpsAppInfrastructure {
-  const { members, config, resources } = input;
+  const { members, logger, config, resources } = input;
   const introspection = EventingIntrospectionService.create(() => members.eventing.definitions);
 
   const snapshots = DefaultOpsSnapshotService.create(
@@ -210,7 +209,7 @@ export function buildOpsInfrastructure(input: {
   // Polling starts here rather than on first read: the dashboard, the badge and
   // the live stream all read the last artifact this process pulled.
   snapshots.start().catch((error: unknown) => {
-    members.logger.error({ error }, "failed to start the ops snapshot reader");
+    logger.error({ error }, "failed to start the ops snapshot reader");
   });
   resources.own("api ops snapshot reader", () => snapshots.stop());
 
@@ -228,7 +227,7 @@ export function buildOpsInfrastructure(input: {
     name: "ops queue-metrics writer",
     start: () => {
       queueMetricsWriter.start().catch((error: unknown) => {
-        members.logger.error({ error }, "failed to start the ops queue-metrics writer");
+        logger.error({ error }, "failed to start the ops queue-metrics writer");
       });
     },
     stop: () => queueMetricsWriter.stop(),

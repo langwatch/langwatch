@@ -44,9 +44,7 @@ async function bootAuth({
     .withModules([withMemoryRepositories(authProcessModule)])
     .withMembers({
       publicBaseUrl: "https://app.acme.test",
-      isSaas: false,
       nodeEnvironment: "test",
-      rateLimiter: { check: async () => ({ allowed: true }) },
       logging: createLogger("langwatch:auth:sign-up-installation"),
     })
     .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
