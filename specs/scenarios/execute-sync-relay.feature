@@ -209,8 +209,8 @@ Feature: A scenario turn runs on the project's own engine without the credential
     Scenario: The agent-test turn takes the same route as every other turn
       Given the deployment is configured with per-project engines
       When an agent test sends its one turn to a code or workflow agent
-      Then the turn's job is routed through the control plane
-      And the child posts the turn to the relay with the project's own key
+      Then the turn's job is routed through the control plane's relay
+      And the job hands the scenario child that route and the project's own key
 
     @unit
     Scenario: A self-hosted agent-test turn posts to the engine directly

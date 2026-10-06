@@ -268,6 +268,7 @@ describe("AgentTestService.sendTurn", () => {
       expect(result).toEqual({ output: "pong", durationMs: 12, instance: null });
     });
 
+    /** @scenario "The agent-test turn takes the same route as every other turn" */
     it("runs the turn in a child along the prefetched route, with the project's telemetry and only usable deadlines", async () => {
       runTurn.mockResolvedValue({ success: true, output: "pong", durationMs: 12 });
       const { service } = serviceFor({});

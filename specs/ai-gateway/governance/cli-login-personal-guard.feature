@@ -74,13 +74,15 @@ Feature: CLI login never lands a user on a personal project
       Given a pending device code with credential_type "project_api_key"
       And the user has a personal project and explicitly picked it in the browser
       When the user approves with their own personal project's id
-      Then the response is 200 and returns that personal project's API key
+      Then the response is 200 and names that personal project
+      And the exchange returns a project session on that project, never its API key
 
     @integration @project-picker
-    Scenario: project-login approval returns the shared project's key
+    Scenario: project-login approval opens a project session on the shared project
       Given a pending device code with credential_type "project_api_key"
       When the user approves with the shared team project's id
-      Then the response is 200 and returns that project's API key
+      Then the response is 200 and names that project
+      And the exchange returns a project session on that project, never its API key
 
     @integration @project-picker @rbac
     Scenario: project-login approval allows an org admin who is not a direct team member
@@ -148,7 +150,7 @@ Feature: CLI login never lands a user on a personal project
   Rule: a Developer seat logs in to its own personal project only (ADR-171)
 
     A Developer holds their personal project and nothing shared, so the only
-    project the CLI may hand a key for is that one. Bound to
+    project the CLI may open a session on is that one. Bound to
     `auth-cli-personal-guard.integration.test.ts`; the seat itself is in
     specs/members/developer-seat.feature.
 

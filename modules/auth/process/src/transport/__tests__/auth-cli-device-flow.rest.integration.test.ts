@@ -849,7 +849,7 @@ describe("given a CLI starting a device login", () => {
     });
 
     /** @scenario project-login approval honours the caller's own explicitly picked personal project */
-    it("honours the caller's own personal project, whose key the exchange then returns", async () => {
+    it("honours the caller's own personal project, opening a project session on it", async () => {
       const world = deviceFlowWorld();
       world.project = liveProject({
         id: "project-mine",
@@ -864,15 +864,19 @@ describe("given a CLI starting a device login", () => {
       const exchanged = await api.post("/api/auth/cli/exchange", {
         device_code: grant.device_code,
       });
+      const exchangedBody = await exchanged.text();
 
       expect(approved.status).toBe(200);
-      await expect(exchanged.json()).resolves.toMatchObject({
+      await expect(approved.json()).resolves.toMatchObject({ project: { id: "project-mine" } });
+      expect(JSON.parse(exchangedBody)).toMatchObject({
+        kind: "project_session",
         project: { id: "project-mine" },
       });
+      expect(exchangedBody).not.toContain("sk-lw-mine");
     });
 
-    /** @scenario project-login approval returns the shared project's key */
-    it("approves a shared project, whose key the exchange then returns", async () => {
+    /** @scenario project-login approval opens a project session on the shared project */
+    it("approves a shared project, opening a project session on it", async () => {
       const world = deviceFlowWorld();
       world.project = liveProject();
       const api = mount(world);
@@ -882,13 +886,18 @@ describe("given a CLI starting a device login", () => {
       const exchanged = await api.post("/api/auth/cli/exchange", {
         device_code: grant.device_code,
       });
+      const exchangedBody = await exchanged.text();
 
       expect(approved.status).toBe(200);
       await expect(approved.json()).resolves.toMatchObject({
         kind: "api_key",
         project: { id: "project-shared" },
       });
-      await expect(exchanged.json()).resolves.toMatchObject({ project: { id: "project-shared" } });
+      expect(JSON.parse(exchangedBody)).toMatchObject({
+        kind: "project_session",
+        project: { id: "project-shared" },
+      });
+      expect(exchangedBody).not.toContain("sk-lw-shared");
     });
 
     describe("when the caller holds a Developer seat (ADR-171)", () => {

@@ -366,7 +366,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
   Scenario: A voice target carries the caller OpenAI key to the child
     Given a voice agent and a project with an enabled OpenAI provider
     When the run data is prefetched for that voice target
-    Then the prepared voice data carries the project's OpenAI key as caller env
+    Then the prepared voice adapter data carries the project's OpenAI key in its callerEnv
 
   # AC19, AC20
   @unit
