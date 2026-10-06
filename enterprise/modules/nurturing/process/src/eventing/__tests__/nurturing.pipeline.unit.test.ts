@@ -391,10 +391,19 @@ describe("nurturing's guidedOnboardingTurnFailed peer subscriber", () => {
 });
 
 const MORNING = 1_791_280_800_000;
+const SIGNUP_AGE_MS = 3.5 * 24 * 60 * 60 * 1000;
 const NEXT_DAY = 1_791_334_800_000;
 
 /** Trace's own fact for a project's trace, as its project_milestones pipeline records it. */
-function traceFact({ type, occurredAt }: { type: string; occurredAt: number }): Event {
+function traceFact({
+  type,
+  occurredAt,
+  onboardingVariant = "guided",
+}: {
+  type: string;
+  occurredAt: number;
+  onboardingVariant?: string;
+}): Event {
   return {
     id: `evt-${type}-${occurredAt}`,
     aggregateId: "project-1",
@@ -411,6 +420,8 @@ function traceFact({ type, occurredAt }: { type: string; occurredAt: number }): 
       sdkLanguage: "python",
       sdkFramework: "openai",
       occurredAt,
+      organizationCreatedAt: occurredAt - SIGNUP_AGE_MS,
+      onboardingVariant,
     },
     idempotencyKey: `project-1:${type}:${occurredAt}`,
   } as Event;
@@ -433,7 +444,11 @@ function runFinishedFact({ runId, occurredAt }: { runId: string; occurredAt: num
       target: { type: "connected", referenceId: "agent-1" },
       results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
       status: "SUCCESS",
-      organizationAdmin: { userId: "admin-1", onboardingVariant: "guided" },
+      organizationAdmin: {
+        userId: "admin-1",
+        onboardingVariant: "guided",
+        organizationCreatedAt: occurredAt - SIGNUP_AGE_MS,
+      },
       occurredAt,
     },
     idempotencyKey: `${runId}:finished`,
@@ -463,7 +478,12 @@ describe("nurturing's project active day, derived from trace and scenario facts"
         {
           userId: "admin-1",
           event: "project_active_day",
-          properties: { source: "trace", projectId: "project-1" },
+          properties: {
+            source: "trace",
+            projectId: "project-1",
+            days_since_signup: 3,
+            "$feature/experiment_onboarding_langy_guided": "guided",
+          },
         },
       ]);
     });
@@ -497,8 +517,33 @@ describe("nurturing's project active day, derived from trace and scenario facts"
           event: "project_active_day",
           properties: expect.objectContaining({
             source: "scenario_run",
+            days_since_signup: 3,
             "$feature/experiment_onboarding_langy_guided": "guided",
           }),
+        },
+      ]);
+    });
+  });
+
+  describe("when a trace fact carries an onboarding variant nurturing does not know", () => {
+    /** @scenario "the first signal of the day tracks the project's active day" */
+    it("tracks project_active_day without the experiment property", async () => {
+      const { posthog, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(
+        traceFact({
+          type: TRACE_RECEIVED_EVENT_TYPE,
+          occurredAt: MORNING,
+          onboardingVariant: "retired-variant",
+        }),
+      );
+      await settle();
+
+      expect(activeDays(posthog)).toEqual([
+        {
+          userId: "admin-1",
+          event: "project_active_day",
+          properties: { source: "trace", projectId: "project-1", days_since_signup: 3 },
         },
       ]);
     });

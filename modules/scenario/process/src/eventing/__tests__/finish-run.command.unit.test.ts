@@ -139,6 +139,7 @@ describe("FinishRunCommand", () => {
       const loadOrganizationAdmin = vi.fn(async () => ({
         userId: "admin-1",
         onboardingVariant: "guided" as const,
+        organizationCreatedAt: { epochMilliseconds: 1_700_000_000_000 },
       }));
       const handler = new FinishRunCommand(
         makeDeps({ loadPriorEvents: vi.fn().mockResolvedValue([queued]), loadOrganizationAdmin }),
@@ -148,7 +149,11 @@ describe("FinishRunCommand", () => {
 
       expect(loadOrganizationAdmin).toHaveBeenCalledWith("tenant-1");
       expect(events[0]!.data).toMatchObject({
-        organizationAdmin: { userId: "admin-1", onboardingVariant: "guided" },
+        organizationAdmin: {
+          userId: "admin-1",
+          onboardingVariant: "guided",
+          organizationCreatedAt: 1_700_000_000_000,
+        },
       });
     });
 

@@ -42,6 +42,7 @@ import {
 import {
   GUIDED_ONBOARDING_RECORDED_EVENT_TYPE,
   guidedOnboardingRecordedEventDataSchema,
+  onboardingVariantSchema,
 } from "@langwatch/onboarding-contract";
 import {
   INTEGRATION_METHOD_CHOSEN_EVENT_TYPE,
@@ -140,8 +141,17 @@ export function buildNurturingPipeline(deps: {
   }) => Promise<NurturingSignal[]>;
 }): NurturingPipeline {
   /** The project's first application signal of the UTC day; delivery's claim drops the rest. */
-  const deliverActiveDay = (input: Parameters<typeof projectActiveDaySignal>[0]) => {
-    const signal = projectActiveDaySignal(input);
+  const deliverActiveDay = ({
+    onboardingVariant,
+    ...input
+  }: Omit<Parameters<typeof projectActiveDaySignal>[0], "onboardingVariant"> & {
+    onboardingVariant?: string | null;
+  }) => {
+    const parsed = onboardingVariantSchema.safeParse(onboardingVariant);
+    const signal = projectActiveDaySignal({
+      ...input,
+      onboardingVariant: parsed.success ? parsed.data : null,
+    });
     return deps.deliver({ key: nurturingSignalKey(signal), signal });
   };
   return definePipeline({

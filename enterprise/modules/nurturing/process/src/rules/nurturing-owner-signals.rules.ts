@@ -366,6 +366,7 @@ export function scenarioRunActiveDaySignal({
       projectId: tenantId,
       userId: admin.userId,
       occurredAt,
+      organizationCreatedAt: admin.organizationCreatedAt,
       onboardingVariant: admin.onboardingVariant,
     }),
   ];

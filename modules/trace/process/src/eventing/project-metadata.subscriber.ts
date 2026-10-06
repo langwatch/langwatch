@@ -69,7 +69,8 @@ async function trackFirstTraceIntegrated({
   tenantId: string;
   attrs: Record<string, string>;
 }): Promise<void> {
-  const { userId } = await deps.projects.resolveOrgAdmin(tenantId);
+  const { userId, organizationCreatedAt, onboardingVariant } =
+    await deps.projects.resolveOrgAdmin(tenantId);
   if (!userId) return;
 
   try {
@@ -80,6 +81,8 @@ async function trackFirstTraceIntegrated({
       sdkLanguage: attrs["sdk.language"] ?? "unknown",
       sdkFramework: attrs["langwatch.sdk.framework"] ?? "unknown",
       occurredAt: source.occurredAt,
+      organizationCreatedAt: organizationCreatedAt?.epochMilliseconds,
+      onboardingVariant,
     });
   } catch (error) {
     logger.error({ tenantId, error }, "Failed to record the first trace (non-fatal)");
@@ -100,7 +103,8 @@ async function trackTraceReceived({
   tenantId: string;
 }): Promise<void> {
   try {
-    const { userId } = await deps.projects.resolveOrgAdmin(tenantId);
+    const { userId, organizationCreatedAt, onboardingVariant } =
+      await deps.projects.resolveOrgAdmin(tenantId);
     if (!userId) return;
 
     await deps.milestones.recordTraceReceived({
@@ -108,6 +112,8 @@ async function trackTraceReceived({
       projectId: tenantId,
       userId,
       occurredAt: source.occurredAt,
+      organizationCreatedAt: organizationCreatedAt?.epochMilliseconds,
+      onboardingVariant,
     });
   } catch (error) {
     logger.error({ tenantId, error }, "Failed to record a later trace (non-fatal)");
