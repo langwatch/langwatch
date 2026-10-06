@@ -127,3 +127,12 @@ Feature: Seed presets — a database that is ready to look at
     And LANGWATCH_LICENSE_PRIVATE_KEY is not set
     When the storage seed runs
     Then the organization holds the test-suite enterprise licence
+
+  # The seed writes the project straight to the database, so no project lifecycle
+  # fact reaches data privacy's fold of where a project sits. Bound by
+  # apps/tasks/src/storage-seed/__tests__/seed-data-privacy.unit.test.ts.
+  @unit
+  Scenario: The seeded project resolves its data privacy without a lifecycle fact
+    When the storage seed runs
+    Then data privacy's scope row for the seeded project names its organization, team, department and personal flag
+    And no fact time is recorded, so a later project lifecycle fact still folds over it

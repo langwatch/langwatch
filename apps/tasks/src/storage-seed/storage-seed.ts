@@ -34,6 +34,7 @@ import {
   seedGrantBinding,
   seedRoleProjection,
 } from "./seed-authz.ts";
+import { seedDataPrivacyProjectScope } from "./seed-data-privacy.ts";
 import { seedDemoPlatform } from "./seed-demo-platform.ts";
 import {
   buildAdminUserUpsertArgs,
@@ -219,6 +220,10 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
             integrated: isPastOnboarding,
           }
         : { apiKey },
+  });
+  await seedDataPrivacyProjectScope({
+    prisma,
+    project: { ...project, organizationId: organization.id },
   });
 
   // Admin user + BetterAuth credential (email/password) login. Upserted by
