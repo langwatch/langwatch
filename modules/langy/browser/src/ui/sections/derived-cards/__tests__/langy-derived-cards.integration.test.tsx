@@ -71,6 +71,39 @@ describe("Langy derived card presentation", () => {
     expect(screen.getByText("support-reply-v1 · version 3")).toBeDefined();
   });
 
+  /** @scenario Picking a quiet option answers the question */
+  it("answers with a quiet option's id and locks the card with that option marked", () => {
+    const onSelect = vi.fn();
+    const card: LangyDerivedChoicesCard = {
+      kind: "choices",
+      blockId: "choice-quiet",
+      question: "How should I set this up?",
+      options: [
+        { id: "folder", label: "Share a local folder" },
+        { id: "describe", label: "I'd rather describe it", quiet: true },
+      ],
+    };
+    const view = (lockState: Parameters<typeof LangyChoicesCard>[0]["lockState"]) => (
+      <DesignSystemProvider forcedTheme="light">
+        <LangyChoicesCard card={card} lockState={lockState} onSelect={onSelect} />
+      </DesignSystemProvider>
+    );
+    const { container, rerender } = render(view({ status: "open" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "I'd rather describe it" }));
+
+    expect(onSelect).toHaveBeenCalledWith({
+      selection: { blockId: "choice-quiet", optionIds: ["describe"] },
+      card,
+    });
+
+    rerender(view({ status: "answered", optionIds: ["describe"] }));
+
+    const ticks = container.querySelectorAll("svg.lucide-check");
+    expect(ticks).toHaveLength(1);
+    expect(ticks[0]?.closest("button")?.textContent).toContain("I'd rather describe it");
+  });
+
   it("answers an open single-select question through the named action", () => {
     const onSelect = vi.fn();
     const card: LangyDerivedChoicesCard = {

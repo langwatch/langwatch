@@ -150,6 +150,28 @@ describe("explainLangyError", () => {
         });
       });
 
+      /** @scenario A rate limit filed under the provider's own code reads the same way */
+      it("reads the provider's own rate limit code as the provider rate limiting, with no status reason", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: { http_status: 429, provider: "azure", body_kind: "json" },
+                reasons: [{ kind: "rate_limit_exceeded" }],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.description).toBe(
+          "The model provider is rate-limiting this model right now. Wait a minute and send your message again, or pick a model with more room.",
+        );
+        expect(presentation.action).toEqual({ label: "Try again", kind: "retry" });
+      });
+
       /** @scenario A model the provider refuses to this key reads as a credential to check */
       it("reads a Bedrock access_denied as the provider refusing the key, and offers the settings", () => {
         // The chain a guided-onboarding turn on Bedrock recorded: the key had

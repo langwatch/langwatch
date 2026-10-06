@@ -1093,6 +1093,7 @@ describe("given a folder the developer stops sharing", () => {
   });
 
   /** @scenario "The chat says the folder is gone" */
+  /** @scenario "A disconnected folder is asked for again" */
   it("writes the disconnect into the transcript, and starts no turn for it", async () => {
     const key = await approvedSessionKey(podA);
     const { cli } = await shareFolder(podA, key);
