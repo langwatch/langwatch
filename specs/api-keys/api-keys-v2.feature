@@ -168,13 +168,24 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then the 401 says the key was revoked
       And when it is presented with a wrong secret the 401 is the plain invalid-key answer
 
-  Rule: nobody mints a key beyond what they hold, and a key expires unless told otherwise
+  Rule: nobody mints a key beyond what they hold, and the minter chooses when it expires
 
     @integration
-    Scenario: A new key expires in 90 days unless "never" is chosen
-      When "ada" mints a key without changing the expiry
-      Then the key expires 90 days from now
-      And when she chooses "never" the key has no expiry
+    Scenario: Create stays unavailable until an expiry is chosen
+      Given "ada" has named a new key and has not chosen an expiry
+      Then the expiry field asks her to choose one
+      And Create is unavailable
+      And when she chooses an expiry Create becomes available
+
+    @integration
+    Scenario: Choosing no expiration mints a key with no expiry
+      When "ada" names a new key and chooses "No expiration"
+      Then the key is minted with no expiry
+
+    @integration
+    Scenario: Choosing a preset mints a key that expires that many days from now
+      When "ada" names a new key and chooses "30 days"
+      Then the key expires 30 days from now
 
     @integration
     Scenario: A key row offers Revoke and nothing else

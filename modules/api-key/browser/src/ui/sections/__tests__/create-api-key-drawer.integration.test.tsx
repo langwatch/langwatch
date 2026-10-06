@@ -84,6 +84,17 @@ function renderDrawer({
 
 const createButton = () => screen.getByRole("button", { name: "Create secret key" });
 
+async function chooseExpiration({
+  user,
+  label,
+}: {
+  user: ReturnType<typeof userEvent.setup>;
+  label: string;
+}) {
+  await user.click(screen.getByText("Choose when this key expires"));
+  await user.click(await screen.findByRole("option", { name: label }));
+}
+
 beforeEach(() => {
   state.members = [];
 });
@@ -103,6 +114,7 @@ describe("given a member who is not an admin", () => {
       fireEvent.change(nameInput, { target: { value: "CI" } });
       const descriptionInput = screen.getByPlaceholderText("What is this key used for?");
       fireEvent.change(descriptionInput, { target: { value: "pipeline" } });
+      await chooseExpiration({ user, label: "No expiration" });
       expect(createButton()).toBeEnabled();
       await user.click(createButton());
       expect(onCreate.mock.calls).toEqual([
@@ -129,6 +141,7 @@ describe("given a member who is not an admin", () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
       await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "Scoped");
+      await chooseExpiration({ user, label: "No expiration" });
       fireEvent.click(screen.getByText("Restricted"));
       expect(await screen.findByTestId("counter")).toHaveTextContent("0");
       expect(createButton()).toBeDisabled();
@@ -150,6 +163,59 @@ describe("given a member who is not an admin", () => {
       fireEvent.click(screen.getByText("Toggle drawer"));
       fireEvent.click(screen.getByText("Toggle drawer"));
       expect(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev")).toHaveValue("");
+    });
+  });
+});
+
+describe("given a named key with no expiry chosen", () => {
+  describe("when the creator has not chosen yet", () => {
+    /** @scenario "Create stays unavailable until an expiry is chosen" */
+    it("asks for a choice and keeps Create disabled until one is made", async () => {
+      const user = userEvent.setup();
+      renderDrawer();
+      fireEvent.change(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), {
+        target: { value: "CI" },
+      });
+      expect(screen.getByTestId("api-key-expiration-hint")).toHaveTextContent(
+        "Choose when this key expires",
+      );
+      expect(createButton()).toBeDisabled();
+      await chooseExpiration({ user, label: "No expiration" });
+      expect(screen.queryByTestId("api-key-expiration-hint")).toBeNull();
+      expect(createButton()).toBeEnabled();
+    });
+  });
+
+  describe("when No expiration is chosen", () => {
+    /** @scenario "Choosing no expiration mints a key with no expiry" */
+    it("sends no expiry", async () => {
+      const user = userEvent.setup();
+      const { onCreate } = renderDrawer();
+      fireEvent.change(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), {
+        target: { value: "CI" },
+      });
+      await chooseExpiration({ user, label: "No expiration" });
+      await user.click(createButton());
+      expect(onCreate.mock.calls[0]?.[0]?.expiresAt).toBeUndefined();
+    });
+  });
+
+  describe("when 30 days is chosen", () => {
+    /** @scenario "Choosing a preset mints a key that expires that many days from now" */
+    it("sends an expiry 30 days from now", async () => {
+      const user = userEvent.setup();
+      const { onCreate } = renderDrawer();
+      fireEvent.change(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), {
+        target: { value: "CI" },
+      });
+      const before = Date.now();
+      await chooseExpiration({ user, label: "30 days" });
+      await user.click(createButton());
+      const after = Date.now();
+      const sent = onCreate.mock.calls[0]?.[0]?.expiresAt;
+      const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+      expect(sent?.epochMilliseconds).toBeGreaterThanOrEqual(before + thirtyDays);
+      expect(sent?.epochMilliseconds).toBeLessThanOrEqual(after + thirtyDays);
     });
   });
 });
@@ -178,6 +244,7 @@ describe("given an admin", () => {
       fireEvent.click(screen.getByText("Service"));
       expect(await screen.findByText(/Not tied to any user/)).toBeInTheDocument();
       await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "Bot");
+      await chooseExpiration({ user, label: "No expiration" });
       await user.click(createButton());
       const sent = onCreate.mock.calls[0]?.[0];
       expect(sent?.keyType).toBe("service");
@@ -192,6 +259,7 @@ describe("given an admin", () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
       await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "Mine");
+      await chooseExpiration({ user, label: "No expiration" });
       await user.click(createButton());
       expect(onCreate.mock.calls[0]?.[0]?.assignedToUserId).toBeUndefined();
       expect(onCreate.mock.calls[0]?.[0]?.keyType).toBe("personal");

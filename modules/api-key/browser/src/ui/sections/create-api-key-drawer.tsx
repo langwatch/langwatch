@@ -27,6 +27,8 @@ import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import {
   earliestCustomExpiration,
   EXPIRATION_OPTIONS,
+  EXPIRATION_UNCHOSEN,
+  isExpirationChosen,
   resolveExpiresAt,
 } from "../../model/api-key-form.ts";
 import { useApiKeyHost } from "../../model/api-key-host.ts";
@@ -165,7 +167,7 @@ export function CreateApiKeyDrawer({
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [expirationPreset, setExpirationPreset] = useState("");
+  const [expirationPreset, setExpirationPreset] = useState(EXPIRATION_UNCHOSEN);
   const [customDate, setCustomDate] = useState("");
   const [selectedScopes, setSelectedScopes] = useState<ScopeTriadEntry[]>([]);
   const [permissionMode, setPermissionMode] = useState<"all" | "restricted">("all");
@@ -223,7 +225,7 @@ export function CreateApiKeyDrawer({
   const resetForm = () => {
     setName("");
     setDescription("");
-    setExpirationPreset("");
+    setExpirationPreset(EXPIRATION_UNCHOSEN);
     setCustomDate("");
     setSelectedScopes(
       currentProjectId ? [{ scopeType: "PROJECT", scopeId: currentProjectId }] : [],
@@ -258,8 +260,11 @@ export function CreateApiKeyDrawer({
   const hasAnySelection =
     permissionMode === "all" || Object.values(categorySelections).some((v) => v !== "none");
 
+  const expirationChosen = isExpirationChosen({ preset: expirationPreset, customDate });
+
   const canCreate =
     name.trim() &&
+    expirationChosen &&
     !isCreating &&
     !myBindings.isLoading &&
     !myBindings.isError &&
@@ -460,13 +465,13 @@ export function CreateApiKeyDrawer({
                 collection={expirationCollection}
                 value={[expirationPreset]}
                 onValueChange={(details) => {
-                  const val = details.value[0] ?? "";
+                  const val = details.value[0] ?? EXPIRATION_UNCHOSEN;
                   setExpirationPreset(val);
                   if (val !== "custom") setCustomDate("");
                 }}
               >
                 <Select.Trigger width="full" background="bg">
-                  <Select.ValueText placeholder="No expiration" />
+                  <Select.ValueText placeholder="Choose when this key expires" />
                 </Select.Trigger>
                 <Select.Content width="300px" paddingY={2}>
                   {EXPIRATION_OPTIONS.map((option) => (
@@ -483,6 +488,11 @@ export function CreateApiKeyDrawer({
                   min={minCustomDate}
                   onChange={(e) => setCustomDate(e.target.value)}
                 />
+              )}
+              {!expirationChosen && (
+                <Text fontSize="xs" color="fg.muted" data-testid="api-key-expiration-hint">
+                  Choose when this key expires, or select No expiration.
+                </Text>
               )}
             </VStack>
           </VStack>
