@@ -64,7 +64,7 @@ export class ClickHouseGovernanceCostChargeRepository extends GovernanceCostChar
     const result = await client.query<Record<string, unknown>>({
       query: `
         SELECT
-          TenantId, toString(Day) AS Day, CostSource, IngestionSourceId, Provider, Model,
+          TenantId, Day, CostSource, IngestionSourceId, Provider, Model,
           AgentId, CurrencyCode, RawActorId, EventId, RestatementKey, IsRetraction,
           ObservedAtMs, AmountNanoMinor, EventOccurredAt
         FROM ${GOVERNANCE_COST_CHARGE_TABLE} FINAL

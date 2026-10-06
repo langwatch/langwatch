@@ -384,4 +384,21 @@ describe.skipIf(
       });
     });
   });
+
+  describe("given a day's pulled charges", () => {
+    describe("when the drift check reads them back", () => {
+      it("answers that day's charges from the real server, the day as filed", async () => {
+        const world = await worldWithSpend();
+
+        const read = await charges.findChargesForDay({
+          tenantId: world.tenantId,
+          day: FIRST_DAY,
+          costSource: "pulled",
+        });
+
+        expect(read.length).toBeGreaterThan(0);
+        expect(new Set(read.map((charge) => charge.Day))).toEqual(new Set([FIRST_DAY]));
+      });
+    });
+  });
 });
