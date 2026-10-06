@@ -3,7 +3,7 @@ import type { Instant } from "@langwatch/time";
 
 import type { CreateIngestionKeyInput } from "./api-key-rest.schemas.ts";
 import type { ApiKeyListEntry, NamedApiKeyBinding } from "./api-key.list.ts";
-import type { MintRunKeyInput } from "./api-key.run-key.ts";
+import type { MintAgentSandboxKeyInput, MintRunKeyInput } from "./api-key.run-key.ts";
 import type {
   ApiKeyTokenResolutionInput,
   OrganizationApiKeyResolution,
@@ -95,6 +95,11 @@ export interface ApiKeyApi {
    * `ApiKeyPermissionDeniedError` on the first permission they lack, cached key or not.
    */
   mintRunKey(input: MintRunKeyInput): Promise<string>;
+  /**
+   * The key every code agent run of a project puts in its sandbox: the agent cache alone, for
+   * twelve hours, shared for eight. Nobody's in a shared project, the owner's in a personal one.
+   */
+  mintAgentSandboxKey(input: MintAgentSandboxKeyInput): Promise<string>;
   /** Resolves organization-only credentials while keeping refusal classes apart. */
   resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,

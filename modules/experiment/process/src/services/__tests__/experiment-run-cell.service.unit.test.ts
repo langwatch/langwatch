@@ -641,12 +641,12 @@ const codePlan = (): ExperimentRunPlan => ({
 });
 
 /** A cell of a code target, lent whatever key the project's credential answers with. */
-async function codeCell(credential: { mint: ApiKeyApi["mintRunKey"] }) {
+async function codeCell(credential: { mint: ApiKeyApi["mintAgentSandboxKey"] }) {
   const { folds, cells } = compose({
     agents: [codeAgent],
     collaborating: {
       sandboxCredentials: ExperimentRunSandboxCredentialService.create({
-        apiKeys: createApiFixture<ApiKeyApi>({ mintRunKey: credential.mint }),
+        apiKeys: createApiFixture<ApiKeyApi>({ mintAgentSandboxKey: credential.mint }),
       }),
     },
   });
@@ -657,21 +657,18 @@ async function codeCell(credential: { mint: ApiKeyApi["mintRunKey"] }) {
 }
 
 describe("given a cell whose target executes code", () => {
-  /** @scenario "A run lends its code a per-run key holding only the agent cache" */
-  it("lends a per-run key holding only the agent cache to the dispatched workflow", async () => {
-    const asked: string[][] = [];
-    const floors: (number | undefined)[] = [];
+  /** @scenario "A run lends its code the project's shared sandbox key" */
+  it("lends the project's shared agent sandbox key to the dispatched workflow", async () => {
+    const asked: unknown[] = [];
     const executed = await codeCell({
-      mint: async ({ permissions, minRemainingMs }) => {
-        asked.push(permissions);
-        floors.push(minRemainingMs);
+      mint: async (input) => {
+        asked.push(input);
         return "sandbox-key";
       },
     });
 
-    expect(asked).toEqual([["agentCache:manage"]]);
-    // It must outlive a Lambda dispatch (900 s and a minute back), like the engine's own key.
-    expect(floors).toEqual([960_000]);
+    // The project's shared sandbox key: api-key decides its grain, owner and lifetime.
+    expect(asked).toEqual([{ projectId: "project_alpha" }]);
 
     expect(executed.outcome).toBe("succeeded");
     expect(engine.sandboxKeys).toEqual(["sandbox-key"]);

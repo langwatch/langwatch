@@ -13,6 +13,7 @@ import {
   type ApiKeyUser,
   type CreateApiKeyInput,
   type CreateIngestionKeyInput,
+  type MintAgentSandboxKeyInput,
   type MintRunKeyInput,
   type NamedApiKeyBinding,
   type UpdateApiKeyInput,
@@ -45,6 +46,7 @@ import { credentialsSecret, Secret, sessionSecret, type ScopedSecrets } from "@l
 import type { Instant } from "@langwatch/time";
 
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
+import { AgentSandboxKeyService } from "../services/agent-sandbox-key.service.ts";
 import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
 import { IngestionKeyMintService } from "../services/ingestion-key-mint.service.ts";
@@ -169,27 +171,36 @@ export class ApiKeyModule implements ApiKeyApi {
       tokens: ApiKeyTokenService.create(pepper),
     });
     const runKeys = RunKeyMintService.create({ apiKeys: service, authz: authorization });
+    const sandboxKeys = AgentSandboxKeyService.create({
+      apiKeys: service,
+      authz: authorization,
+      projects: setup.dependencies.projects,
+      held: setup.repositories.sandboxKeys,
+    });
 
     const ingestionKeys = IngestionKeyMintService.create({ apiKeys: service });
 
-    return new ApiKeyModule({ service, authorization, runKeys, ingestionKeys });
+    return new ApiKeyModule({ service, authorization, runKeys, sandboxKeys, ingestionKeys });
   }
 
   private constructor(deps: {
     service: ApiKeyService;
     authorization: AuthzApi;
     runKeys: RunKeyMintService;
+    sandboxKeys: AgentSandboxKeyService;
     ingestionKeys: IngestionKeyMintService;
   }) {
     this.#service = deps.service;
     this.#authorization = deps.authorization;
     this.#runKeys = deps.runKeys;
+    this.#sandboxKeys = deps.sandboxKeys;
     this.#ingestionKeys = deps.ingestionKeys;
   }
 
   readonly #service: ApiKeyService;
   readonly #authorization: AuthzApi;
   readonly #runKeys: RunKeyMintService;
+  readonly #sandboxKeys: AgentSandboxKeyService;
   readonly #ingestionKeys: IngestionKeyMintService;
 
   /**
@@ -219,6 +230,9 @@ export class ApiKeyModule implements ApiKeyApi {
   }
   mintRunKey(input: MintRunKeyInput): Promise<string> {
     return this.#runKeys.mintRunKey(input);
+  }
+  mintAgentSandboxKey(input: MintAgentSandboxKeyInput): Promise<string> {
+    return this.#sandboxKeys.mintAgentSandboxKey(input);
   }
   async resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,

@@ -11,6 +11,7 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryAgentSandboxKeyRepository } from "../../repositories/memory/memory.agent-sandbox-key.repository.ts";
 import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
@@ -46,7 +47,11 @@ async function appOver() {
     duplicates: [],
   }));
   const app = await ApiKeyModule.create({
-    repositories: { apiKeys, answers: MemoryApiKeyAnswerCacheRepository.create() },
+    repositories: {
+      apiKeys,
+      answers: MemoryApiKeyAnswerCacheRepository.create(),
+      sandboxKeys: MemoryAgentSandboxKeyRepository.create(),
+    },
     dependencies: {
       authorization: createApiFixture<AuthzApi>({
         hasPermission: vi.fn(async () => true),

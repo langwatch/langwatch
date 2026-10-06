@@ -56,7 +56,7 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   secrets: SecretApi;
   traces: TraceApi;
   /** Mints the run's keys: the child's, and a code agent's sandbox key. */
-  apiKeys: Pick<ApiKeyApi, "mintRunKey">;
+  apiKeys: Pick<ApiKeyApi, "mintRunKey" | "mintAgentSandboxKey">;
   voiceTargets: VoiceTargetReader | null;
 };
 
