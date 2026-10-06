@@ -67,18 +67,3 @@ export type TopicClusteringProcessingEvent =
   | TopicClusteringRunCompletedEvent
   | TopicClusteringRunFailedEvent
   | TopicClusteringTopicsRecordedEvent;
-
-/** The durable event schemas of the `topic_clustering` aggregate, in one place. */
-export class EventingTopicEventsService {
-  private constructor() {}
-
-  static create(): EventingTopicEventsService {
-    return new EventingTopicEventsService();
-  }
-
-  static readonly requested = TopicClusteringRequestedEventSchema;
-  static readonly runStarted = TopicClusteringRunStartedEventSchema;
-  static readonly runCompleted = TopicClusteringRunCompletedEventSchema;
-  static readonly runFailed = TopicClusteringRunFailedEventSchema;
-  static readonly topicsRecorded = TopicClusteringTopicsRecordedEventSchema;
-}

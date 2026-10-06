@@ -15,12 +15,12 @@ import type {
   TopicClusteringRunCompletedEvent,
   TopicClusteringRunFailedEvent,
   TopicClusteringRunStartedEvent,
-} from "../services/topic-events.service.ts";
+} from "../rules/topic-clustering-events.rules.ts";
 import {
   TopicClusteringRunCompletedEventSchema,
   TopicClusteringRunFailedEventSchema,
   TopicClusteringRunStartedEventSchema,
-} from "../services/topic-events.service.ts";
+} from "../rules/topic-clustering-events.rules.ts";
 
 /**
  * One run in the project's history, accumulated across the run's pages. The raw error text is
