@@ -109,11 +109,6 @@ export function statementLaneCaps({
   return { reserve, laneCap: maxConcurrent - reserve };
 }
 
-/** A mutable count of the statements a lane is actually running on the driver. */
-interface Running {
-  count: number;
-}
-
 /**
  * One kind of work's lane: the cap limiter it must enter before the total
  * limiter, and a count of what it is running right now.
@@ -122,13 +117,17 @@ interface Running {
  * what keeps the other kind's reserve free. It is `null` only for the single
  * shared "all" lane of a budget too small to split, where there is nothing to
  * reserve against and the total limiter is the whole bound.
+ *
+ * `running` counts the statements this lane holds on the driver right now. A
+ * Lane is shared by reference, so `run` mutates this field in place as it
+ * admits and releases - no box needed.
  */
 interface Lane {
   lane: LimiterLane;
   cap: ConcurrencyLimiter | null;
   capMax: number;
   maxQueued: number;
-  running: Running;
+  running: number;
 }
 
 /**
@@ -145,14 +144,14 @@ function signalOf(params: unknown): AbortSignal | undefined {
   return (params as StatementParams).abort_signal;
 }
 
-function buildLane(lane: LimiterLane, capMax: number, withCap: boolean): Lane {
+function buildLane(lane: LimiterLane, capMax: number, hasCap: boolean): Lane {
   const maxQueued = Math.max(MIN_QUEUE_DEPTH, capMax * QUEUE_DEPTH_PER_SLOT);
   return {
     lane,
     capMax,
     maxQueued,
-    running: { count: 0 },
-    cap: withCap
+    running: 0,
+    cap: hasCap
       ? new ConcurrencyLimiter({ maxConcurrent: capMax, maxQueued })
       : null,
   };
@@ -222,15 +221,15 @@ function laneStats(
   if (!lane.cap) {
     return {
       lane: lane.lane,
-      inFlight: lane.running.count,
+      inFlight: lane.running,
       queued: total.stats().queued,
     };
   }
   const { inFlight, queued } = lane.cap.stats();
   return {
     lane: lane.lane,
-    inFlight: lane.running.count,
-    queued: queued + inFlight - lane.running.count,
+    inFlight: lane.running,
+    queued: queued + inFlight - lane.running,
   };
 }
 
@@ -344,30 +343,21 @@ export function withStatementLimit<T extends ClickHouseClient>({
   return limited;
 }
 
-/** An armed wait: what the limiter blocks on, and how it ended. */
-interface ArmedWait {
-  signal: AbortSignal | undefined;
-  /** True only if OUR timer fired — never merely that the signal aborted. */
-  hasTimedOut: () => boolean;
-  dispose: () => void;
-}
-
-const NOT_ARMED = (signal: AbortSignal | undefined): ArmedWait => ({
-  signal,
-  hasTimedOut: () => false,
-  dispose: () => {
-    // Nothing was armed, so there is nothing to clear.
-  },
-});
-
 /**
- * Arm the wait bound, but only when a slot is ALREADY unavailable.
+ * One statement's wait bound, armed lazily at the limiter that first makes it
+ * wait rather than up front.
  *
- * `saturated` folds both limiters a statement must pass: its lane cap and the
- * shared total. On the ordinary path a slot is free on both and `acquire`
- * resolves without waiting, so arming anything would cost a timer and an
- * `AbortSignal.any` per statement — millions a day — to bound a wait that never
- * happens.
+ * The saturation of a limiter can only be read truthfully at the instant the
+ * statement enters it: `ConcurrencyLimiter.run` admits a free slot on a
+ * microtask, so a batch of statements issued in one tick all see a total still
+ * reading zero in-flight and none of them would arm — then they queue on the
+ * total with no bound at all. So this object carries the timer, and `acquire`
+ * calls {@link StatementWait.armIfSaturated} right before each `run`, when that
+ * limiter's count is current.
+ *
+ * Arming is idempotent: one timer bounds the whole statement, lane cap wait and
+ * total wait alike, so the first saturated limiter starts it and a later one
+ * reuses it. The timer, once armed, is disposed at admission.
  *
  * A plain timer rather than `AbortSignal.timeout` for two reasons: it can be
  * CLEARED the moment the statement is admitted, where a timeout signal holds
@@ -375,44 +365,60 @@ const NOT_ARMED = (signal: AbortSignal | undefined): ArmedWait => ({
  * accumulate one per queued statement; and it is fakeable, so the test for this
  * does not have to spend twenty real seconds proving it.
  */
-function armWait({
-  saturated,
+interface StatementWait {
+  /** Arm the one timer (idempotently) when the limiter being entered is full. */
+  armIfSaturated: (isFull: boolean) => void;
+  /**
+   * The signal to hand the limiter. The caller's signal until armed, so the
+   * ordinary unsaturated path allocates neither a timer nor an `AbortSignal.any`
+   * — millions of statements a day that never wait. Composed with our abort
+   * controller once armed, and read fresh at each `run` so a timer armed only
+   * at the total still bounds the total wait.
+   */
+  readonly signal: AbortSignal | undefined;
+  /** True only if OUR timer fired — never merely that the signal aborted. */
+  hasTimedOut: () => boolean;
+  dispose: () => void;
+}
+
+function createStatementWait({
   signal,
   waitTimeoutMs,
 }: {
-  saturated: boolean;
   signal: AbortSignal | undefined;
   waitTimeoutMs: number;
-}): ArmedWait {
-  if (!saturated) return NOT_ARMED(signal);
-
-  const controller = new AbortController();
+}): StatementWait {
+  let composed: AbortSignal | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   let hasFired = false;
-  const timer = setTimeout(() => {
-    hasFired = true;
-    controller.abort();
-  }, waitTimeoutMs);
-  // Never a reason to hold the process open: if nothing else is running there
-  // is no statement ahead of this one to wait for.
-  timer.unref?.();
+
+  const arm = () => {
+    if (timer) return;
+    const controller = new AbortController();
+    composed = signal
+      ? AbortSignal.any([signal, controller.signal])
+      : controller.signal;
+    timer = setTimeout(() => {
+      hasFired = true;
+      controller.abort();
+    }, waitTimeoutMs);
+    // Never a reason to hold the process open: if nothing else is running there
+    // is no statement ahead of this one to wait for.
+    timer.unref?.();
+  };
 
   return {
-    signal: signal
-      ? AbortSignal.any([signal, controller.signal])
-      : controller.signal,
+    armIfSaturated: (isFull) => {
+      if (isFull) arm();
+    },
+    get signal() {
+      return composed ?? signal;
+    },
     hasTimedOut: () => hasFired,
-    dispose: () => clearTimeout(timer),
+    dispose: () => {
+      if (timer) clearTimeout(timer);
+    },
   };
-}
-
-/** Is a slot unavailable on either the lane cap or the shared total? */
-function isSaturated(
-  lane: Lane,
-  total: ConcurrencyLimiter,
-  totalMax: number,
-): boolean {
-  if (total.stats().inFlight >= totalMax) return true;
-  return lane.cap ? lane.cap.stats().inFlight >= lane.capMax : false;
 }
 
 /**
@@ -420,21 +426,31 @@ function isSaturated(
  * many of this kind can hold or wait on a total slot, which is what keeps the
  * other kind's reserve reachable. The "all" lane has no cap and enters the
  * total directly.
+ *
+ * The wait is armed per limiter, at the moment it is entered: a slot free when
+ * the statement was issued can be taken by the time its lane cap grants, so the
+ * only truthful saturation check is the one taken right before each `run`.
  */
 function acquire({
   lane,
   total,
+  totalMax,
   onDriver,
-  signal,
+  wait,
 }: {
   lane: Lane;
   total: ConcurrencyLimiter;
+  totalMax: number;
   onDriver: () => Promise<unknown>;
-  signal: AbortSignal | undefined;
+  wait: StatementWait;
 }): Promise<unknown> {
-  const runInTotal = () => total.run({ task: onDriver, signal });
+  const runInTotal = () => {
+    wait.armIfSaturated(total.stats().inFlight >= totalMax);
+    return total.run({ task: onDriver, signal: wait.signal });
+  };
   if (!lane.cap) return runInTotal();
-  return lane.cap.run({ task: runInTotal, signal });
+  wait.armIfSaturated(lane.cap.stats().inFlight >= lane.capMax);
+  return lane.cap.run({ task: runInTotal, signal: wait.signal });
 }
 
 /**
@@ -445,7 +461,7 @@ function acquire({
  */
 function refusalFor({
   error,
-  admitted,
+  isAdmitted,
   instance,
   operation,
   queuedAt,
@@ -453,14 +469,14 @@ function refusalFor({
   hasTimedOut,
 }: {
   error: unknown;
-  admitted: boolean;
+  isAdmitted: boolean;
   instance: string;
   operation: LimitedOperation;
   queuedAt: number;
   waitTimeoutMs: number;
   hasTimedOut: () => boolean;
 }): ClickHouseOverloadedError | undefined {
-  if (admitted) return undefined;
+  if (isAdmitted) return undefined;
 
   // A full queue on EITHER limiter is the same verdict: no capacity for this
   // statement.
@@ -514,22 +530,18 @@ async function run({
   task: () => Promise<unknown>;
 }): Promise<unknown> {
   const queuedAt = performance.now();
-  let admitted = false;
+  let isAdmitted = false;
 
-  // One armed wait covers both limiters: the composed signal is passed to the
-  // lane cap and the total alike, so whichever makes the statement wait, the
-  // same timeout bounds it.
-  const wait = armWait({
-    saturated: isSaturated(lane, total, totalMax),
-    signal,
-    waitTimeoutMs,
-  });
+  // One wait covers both limiters, armed lazily by `acquire` at whichever one
+  // first makes the statement wait - never up front, where a same-tick batch
+  // would all read the total as free and none would arm.
+  const wait = createStatementWait({ signal, waitTimeoutMs });
 
   const onDriver = async () => {
     // Admission is the innermost point - both the lane cap and the total have
-    // granted a slot - so the wait is over and `admitted` is set only here.
-    admitted = true;
-    lane.running.count += 1;
+    // granted a slot - so the wait is over and `isAdmitted` is set only here.
+    isAdmitted = true;
+    lane.running += 1;
     wait.dispose();
     observeClickHouseStatementWait(
       instance,
@@ -539,16 +551,16 @@ async function run({
     try {
       return await task();
     } finally {
-      lane.running.count -= 1;
+      lane.running -= 1;
     }
   };
 
   try {
-    return await acquire({ lane, total, onDriver, signal: wait.signal });
+    return await acquire({ lane, total, totalMax, onDriver, wait });
   } catch (error) {
     const refusal = refusalFor({
       error,
-      admitted,
+      isAdmitted,
       instance,
       operation,
       queuedAt,

@@ -597,6 +597,129 @@ describe("withStatementLimit", () => {
     });
   });
 
+  /**
+   * The slot-availability check can only be read truthfully at the instant a
+   * limiter is entered: `ConcurrencyLimiter.run` admits a free slot on a
+   * microtask, so a batch issued in one tick all see the total still reading
+   * zero in-flight. A statement with lane room but no total slot would then arm
+   * no wait and queue on the total forever. The bound must be armed lazily, at
+   * the total, when the total is the thing that is full.
+   */
+  describe("given the whole budget is taken within one tick", () => {
+    describe("when a statement with lane room but no total slot follows in the same tick", () => {
+      /** @scenario a same-tick statement blocked only on the total is still bounded */
+      it("refuses it as overload rather than queueing on the total unbounded", async () => {
+        const driver = deferrableClient();
+        // 4 with a reserve of 1 caps each lane at 3. Three reads plus one insert
+        // fill the total of 4, yet the insert lane still has two slots free.
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 4,
+          instance,
+          waitTimeoutMs: 20,
+        });
+
+        // No await between these: every statement is issued in one tick, before
+        // any admission microtask has run, so the total reads zero in-flight the
+        // whole time they are issued.
+        const fillers = [
+          limited.query({ query: "SELECT 1" }),
+          limited.query({ query: "SELECT 2" }),
+          limited.query({ query: "SELECT 3" }),
+          limited.insert({ table: "spans", values: [] }),
+        ];
+        const blocked = limited.insert({ table: "spans", values: [] });
+
+        await expect(blocked).rejects.toBeInstanceOf(ClickHouseOverloadedError);
+
+        // Only the first insert reached the driver; the blocked one timed out on
+        // the total and was shed before admission.
+        expect(driver.client.insert).toHaveBeenCalledTimes(1);
+        expect(driver.started).toBe(4);
+
+        driver.releaseAll();
+        for (let round = 0; round <= 1; round += 1) {
+          await settleMicrotasks();
+          driver.releaseAll();
+        }
+        await Promise.all(fillers);
+      });
+
+      it("never reaches the driver with the refused statement", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 4,
+          instance,
+          waitTimeoutMs: 20,
+        });
+
+        const fillers = [
+          limited.query({ query: "SELECT 1" }),
+          limited.query({ query: "SELECT 2" }),
+          limited.query({ query: "SELECT 3" }),
+          limited.insert({ table: "spans", values: [] }),
+        ];
+        const startedBeforeShed = driver.started;
+        const blocked = limited.insert({ table: "spans", values: [] });
+
+        await expect(blocked).rejects.toBeInstanceOf(ClickHouseOverloadedError);
+
+        // The four fillers started, the fifth never did.
+        expect(driver.started).toBe(startedBeforeShed + 4);
+
+        driver.releaseAll();
+        for (let round = 0; round <= 1; round += 1) {
+          await settleMicrotasks();
+          driver.releaseAll();
+        }
+        await Promise.all(fillers);
+      });
+    });
+
+    describe("when the total was already full in an earlier tick", () => {
+      /**
+       * The complement of the same-tick case: lazy arming must still bound the
+       * ordinary path where the total is genuinely full by the time the surplus
+       * arrives. Here the lane cap grants at once and the total is what blocks.
+       */
+      it("refuses the lane-roomy statement as overload", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 4,
+          instance,
+          waitTimeoutMs: 20,
+        });
+
+        const fillers = [
+          limited.query({ query: "SELECT 1" }),
+          limited.query({ query: "SELECT 2" }),
+          limited.query({ query: "SELECT 3" }),
+          limited.insert({ table: "spans", values: [] }),
+        ];
+        // Let every filler be admitted so the total truly reads full before the
+        // surplus insert is issued.
+        await settleMicrotasks();
+        expect(driver.started).toBe(4);
+
+        const blocked = limited.insert({ table: "spans", values: [] });
+
+        await expect(blocked).rejects.toBeInstanceOf(ClickHouseOverloadedError);
+
+        expect(driver.client.insert).toHaveBeenCalledTimes(1);
+        expect(driver.started).toBe(4);
+
+        driver.releaseAll();
+        for (let round = 0; round <= 1; round += 1) {
+          await settleMicrotasks();
+          driver.releaseAll();
+        }
+        await Promise.all(fillers);
+      });
+    });
+  });
+
   describe("given a configured reserve share", () => {
     describe("when inserts flood a budget of 8 with a quarter reserved", () => {
       it("holds inserts to the budget less the reserve", async () => {
