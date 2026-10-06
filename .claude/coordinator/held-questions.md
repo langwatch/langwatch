@@ -209,3 +209,13 @@ recommendation, and "default taken" if a lane proceeded on it.
 
 - Project create (both `ProjectWriteService.createProject` and the internal governance project) now stores `lw-revoked-<ksuid>` in the required, unique `Project.apiKey` column via `ProjectCredentialsService.generateApiKey()`, so a new project has no legacy key and `getLegacyKeyStatus` answers `{ present: false }`; existing projects untouched, no migration. Default taken, held for Alex.
 - `ProjectCredentials.generateApiKey` keeps its name (three unowned integration tests implement the abstract class by object literal); a rename to `generateUnusableLegacyKey` is proposed in the lane handoff §11. Default taken, held for Alex.
+
+### a-identity-sso-process
+
+- mfa-and-session-shape :524: the door records every scoped decision (permission, any, all, by-input) as main's `permissionDecisionRecord` to the `langwatch:authz:decision` log (info under impersonation, debug otherwise) in `packages/api/src/access/decision-record.ts`; platform-tier decisions keep their existing refusal warn (`impersonated: true`, operator asked) and write no record, as main's tRPC middleware did. Default taken (as main, scoped decisions only), held for Alex.
+- identifier-model :129: the provisional write sits in `IdentityLedgerStore.commit` (main's ledger.ts:219 shape) with `writeProvisionalHeads` on the Prisma projection repository and a memory twin that keeps the rows apart; ADR-135 decision 2 still reads "deleted" and needs amending to Q63. Default taken (restore as main), held for Alex.
+
+### a-run-page-http-mappings
+
+- suite-bugfixes-1956 :41 (Q171 A): the standalone run page lives at today's redirect address `/[project]/simulations/<set>/<batch>/<run>`, rendered by the simulations catch-all screen (a separate `[set]/[batch]/[run]` route would swallow `/simulations/run-plans/<suite>/<batch>`); a project on the Agent Testing flag still goes to the run drawer there. Default taken, held for Alex.
+- suites-page-metrics-display (Q171 B): the list row shows the run's average Agent-role latency (`roleLatencies.Agent`), falling back to run duration when none is recorded, as the metrics pill reads it. Default taken, held for Alex.

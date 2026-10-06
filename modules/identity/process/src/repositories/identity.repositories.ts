@@ -1,5 +1,6 @@
 import type { StateProjectionStore } from "@langwatch/eventing";
 
+import type { ProvisionalHeadsWriter } from "../eventing/identity-ledger.store.ts";
 import type { IdentityFoldState } from "../eventing/identity-state.projection.ts";
 import type { JoinRequestFoldState } from "../eventing/join-request-state.projection.ts";
 import type { MfaFoldState } from "../eventing/mfa-enrollment-state.projection.ts";
@@ -81,7 +82,7 @@ export interface IdentityRepositories {
   readonly ssoRegistrants: SsoRegistrantReadRepository;
   readonly ssoMigrationEvidence: SsoMigrationEvidenceRepository;
   /** The folded heads each identity pipeline writes, under the queue's per-aggregate lock. */
-  readonly identityProjection: StateProjectionStore<IdentityFoldState>;
+  readonly identityProjection: StateProjectionStore<IdentityFoldState> & ProvisionalHeadsWriter;
   readonly mfaProjection: StateProjectionStore<MfaFoldState>;
   readonly joinRequestProjection: StateProjectionStore<JoinRequestFoldState>;
   readonly ssoConnectionHeads: StateProjectionStore<SsoConnectionFoldState>;

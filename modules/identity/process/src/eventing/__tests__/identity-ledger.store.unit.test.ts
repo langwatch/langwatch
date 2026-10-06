@@ -7,6 +7,7 @@ import type {
 import {
   ATTACH_IDENTIFIER_COMMAND_TYPE,
   emptyIdentityHeads,
+  type IdentifierFact,
   IdentityIdentifierNotFoundError,
   reduceIdentity,
 } from "@langwatch/identity-contract";
@@ -47,20 +48,32 @@ class InMemoryStateStore implements StateProjectionStore<IdentityFoldState> {
     this.storeContexts.push(context);
     this.stored.set(context.aggregateId, projection);
   }
+
+  /** Rows the ledger wrote for a newborn before staging, apart because they carry no cursor. */
+  readonly provisional = new Map<string, IdentifierFact>();
+  onProvisional: () => void = () => {};
+
+  async writeProvisionalHeads({ facts }: { facts: IdentifierFact[] }) {
+    this.onProvisional();
+    for (const fact of facts) this.provisional.set(fact.identifierId, fact);
+  }
 }
 
 /** The heads as the Prisma repository reads them: off the projection the
  *  QUEUE's fold wrote. Nothing else ever writes it. */
 class ProjectionHeads implements IdentityHeadsRepository {
-  constructor(private readonly store: InMemoryStateStore) {}
+  constructor(
+    private readonly store: InMemoryStateStore,
+    private readonly newborn = false,
+  ) {}
 
   async getUserHashKey() {
     return { userHashKey: "key_material" };
   }
 
-  /** Folded: these doubles hold no provisional newborn rows. */
-  async hasFolded() {
-    return true;
+  /** Folded, unless the harness plays a newborn: then a cursor exists once the fold stored one. */
+  async hasFolded({ userId }: { userId: string }) {
+    return this.newborn ? this.store.stored.has(userId) : true;
   }
 
   async getActiveIdentifierByValue(): Promise<{ userId: string; identifierId: string }> {
@@ -69,9 +82,10 @@ class ProjectionHeads implements IdentityHeadsRepository {
 
   async findHeads({ userId }: { userId: string }) {
     const stored = this.store.stored.get(userId);
-    return stored
-      ? { userId, identifiers: stored.state.identifiers }
-      : emptyIdentityHeads({ userId });
+    if (stored) return { userId, identifiers: stored.state.identifiers };
+    const heads = emptyIdentityHeads({ userId });
+    for (const fact of this.store.provisional.values()) heads.identifiers[fact.identifierId] = fact;
+    return heads;
   }
 
   async getIdentifier({ userId, identifierId }: { userId: string; identifierId: string }) {
@@ -130,13 +144,17 @@ function harness(overrides?: {
   /** The queue never drains: the read-your-writes wait must expire. */
   foldNeverLands?: boolean;
   noSender?: boolean;
+  /** The user's projection has never folded, so the ledger writes provisional heads. */
+  newborn?: boolean;
 }) {
   const store = new InMemoryStateStore();
   const appended: IdentityEvent[][] = [];
   const staged: unknown[] = [];
   const order: string[] = [];
+  store.onProvisional = () => order.push("provisional");
+  const heads = new ProjectionHeads(store, overrides?.newborn ?? false);
   const guards = IdentityGuardsService.create({
-    heads: new ProjectionHeads(store),
+    heads,
     users: inMemoryIdentityUsers(),
     reservations: inMemoryIdentityReservations(),
     identifiers: CryptoIdentifierIdentityService.create(),
@@ -169,6 +187,7 @@ function harness(overrides?: {
 
   const ledger = new IdentityLedgerStore({
     projectionStore: store,
+    heads,
     // The sender is handed in directly, so the eventing port is never asked:
     // a shape that refuses proves it stays unasked.
     eventing: {
@@ -181,7 +200,7 @@ function harness(overrides?: {
   });
   const identity = IdentityService.create(guards, ledger);
 
-  return { identity, store, appended, staged, order, sender };
+  return { identity, store, appended, staged, order, sender, heads };
 }
 
 function attachData(overrides?: Record<string, unknown>) {
@@ -316,6 +335,56 @@ describe("the identity ledger writer", () => {
         }),
       ).rejects.toMatchObject({ code: "identity_identifier_not_found" });
       expect(order).toEqual([]);
+    });
+  });
+
+  describe("when the user is a newborn whose projection has never folded", () => {
+    /** @scenario "Signing up makes the address routable before the fold lands" */
+    it("writes the identifier row before staging, with no cursor, and the fold overwrites it whole", async () => {
+      const lagging = harness({ newborn: true, foldNeverLands: true });
+
+      const facts = await lagging.identity.attachIdentifier(attachData());
+
+      const provisional = [...lagging.store.provisional.values()];
+      expect(provisional).toHaveLength(1);
+      expect(provisional[0]!.value).toBe("sam.j@acme.com");
+      expect(lagging.order).toEqual(["provisional", "stage"]);
+      expect(lagging.store.stored.get(USER)).toBeUndefined();
+      expect(await lagging.heads.hasFolded({ userId: USER })).toBe(false);
+
+      // The queue drains: the fold writes the same row whole and sets the cursor.
+      const events = identityEventsFor({
+        command: { type: ATTACH_IDENTIFIER_COMMAND_TYPE, data: attachData() as never },
+        facts,
+      });
+      foldInto(lagging.store, events);
+      const folded = lagging.store.stored.get(USER)!;
+      const identifierId = provisional[0]!.identifierId;
+      expect(folded.state.identifiers[identifierId]).toEqual(
+        lagging.store.provisional.get(identifierId),
+      );
+      expect(folded.cursor.eventId).toBe(events[0]!.id);
+    });
+
+    /** @scenario "A newborn's provisional head does not silence its own attach" */
+    it("the queued re-run still appends and folds: the provisional row silences nothing", async () => {
+      const { identity, store, appended, order } = harness({ newborn: true });
+
+      const events = await identity.attachIdentifier(attachData());
+
+      expect(order).toEqual(["provisional", "stage", "append", "fold"]);
+      expect(appended).toHaveLength(1);
+      expect(events).toHaveLength(1);
+      expect(store.stored.get(USER)!.cursor.eventId).toBe(appended[0]![0]!.id);
+    });
+
+    it("writes nothing provisional for a user who has folded", async () => {
+      const { identity, store, order } = harness();
+
+      await identity.attachIdentifier(attachData());
+
+      expect(store.provisional.size).toBe(0);
+      expect(order).toEqual(["stage", "append", "fold"]);
     });
   });
 

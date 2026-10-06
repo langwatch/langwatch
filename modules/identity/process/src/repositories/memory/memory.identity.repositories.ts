@@ -1,4 +1,3 @@
-import type { IdentityFoldState } from "../../eventing/identity-state.projection.ts";
 import type { JoinRequestFoldState } from "../../eventing/join-request-state.projection.ts";
 import type { MfaFoldState } from "../../eventing/mfa-enrollment-state.projection.ts";
 import type { SsoConnectionFoldState } from "../../eventing/sso-connection-state.projection.ts";
@@ -6,6 +5,7 @@ import type { IdentityRepositories } from "../identity.repositories.ts";
 import { MemoryIdentityAccountRekeyRepository } from "./memory.identity-account-rekey.repository.ts";
 import { MemoryIdentityLatchRepository } from "./memory.identity-latch.repository.ts";
 import { MemoryIdentityLookupRepository } from "./memory.identity-lookup.repository.ts";
+import { MemoryIdentityProjectionRepository } from "./memory.identity-projection.repository.ts";
 import { MemoryIdentityRateLimitRepository } from "./memory.identity-rate-limit.repository.ts";
 import { MemoryIdentitySecretCarryRepository } from "./memory.identity-secret-carry.repository.ts";
 import { MemoryIdentitySignInAccountsRepository } from "./memory.identity-signin-accounts.repository.ts";
@@ -82,7 +82,7 @@ export function identityRepositoriesOverMemory(store: MemoryIdentityStore): Iden
     ssoEngineProviders: MemorySsoEngineProviderRepository.create(store),
     ssoRegistrants: MemorySsoRegistrantReadRepository.create(store),
     ssoMigrationEvidence: MemorySsoMigrationEvidenceRepository.create(store),
-    identityProjection: MemoryStateProjectionRepository.create<IdentityFoldState>(),
+    identityProjection: MemoryIdentityProjectionRepository.create(),
     mfaProjection: MemoryStateProjectionRepository.create<MfaFoldState>(),
     joinRequestProjection: MemoryStateProjectionRepository.create<JoinRequestFoldState>(),
     ssoConnectionHeads: MemoryStateProjectionRepository.create<SsoConnectionFoldState>(),
