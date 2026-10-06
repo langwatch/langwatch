@@ -6,8 +6,8 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 /**
  * The prompt library's application: what its doors call.
  */
+import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
   PromptApi,
@@ -92,10 +92,14 @@ type PromptDependencies = Readonly<{
  * itself knows. Absent where the deployment named no `BASE_HOST`, which the
  * platform-link read below already refuses on.
  */
-type PromptMembers = MembersRead<readonly ["logger", "rateLimiter"]> &
-  Readonly<{ publicBaseUrl: string | undefined }>;
+type PromptMembers = Readonly<{ publicBaseUrl: string | undefined }>;
 
-type PromptSetup = FeatureSetup<PromptDependencies, PromptMembers, undefined>;
+type PromptSetup = FeatureSetup<
+  PromptDependencies,
+  PromptMembers,
+  undefined,
+  Pick<PromptRepositories, "rateLimits">
+>;
 type PromptRepositorySetup = FeatureSetup<
   PromptDependencies,
   PromptMembers,
@@ -134,10 +138,7 @@ export class PromptModule implements PromptApi {
     workflow: WorkflowApi,
     modelProviders: ModelProviderApi,
   };
-  /**
-   * `rateLimiter` is the playground door's run counter.
-   */
-  static readonly reads = ["logger", "rateLimiter", "publicBaseUrl"] as const;
+  static readonly reads = ["publicBaseUrl"] as const;
 
   static create(setup: PromptRepositorySetup): PromptModule {
     const prompts = PromptService.create({
@@ -159,6 +160,7 @@ export class PromptModule implements PromptApi {
    */
   static createWithPrompts(setup: PromptSetup, prompts: PromptService): PromptModule {
     const { dependencies, members } = setup;
+    const logger = createLogger("langwatch:prompt");
     const lifecycle = buildPromptLifecyclePipeline();
     // Tied the knot: the callback below fires only once a request calls
     // `announceCreated`, by which point `app` is always assigned.
@@ -167,10 +169,7 @@ export class PromptModule implements PromptApi {
       const app = appRef.current;
       if (!app) return;
       void app.#recordPromptCreated(input).catch((error: unknown) =>
-        members.logger.error(
-          { error, projectId: input.projectId },
-          "prompt_created was not recorded",
-        ),
+        logger.error({ error, projectId: input.projectId }, "prompt_created was not recorded"),
       );
     };
     const app = new PromptModule({
@@ -183,7 +182,7 @@ export class PromptModule implements PromptApi {
         bounds: PromptExecuteBoundsService.create({
           entitlement: dependencies.plans,
           projects: dependencies.projects,
-          rateLimiter: members.rateLimiter,
+          rateLimits: setup.repositories.rateLimits,
         }),
       }),
       members: { prompts, afterPromptCreated },

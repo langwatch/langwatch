@@ -7,7 +7,6 @@ import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
-import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
@@ -19,11 +18,7 @@ function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([promptProcessModule])
     .withStores(memoryStores())
-    .withMembers({
-      logging: createTestLogger().logger,
-      rateLimiter: { check: async () => ({ allowed: true }) },
-      publicBaseUrl: void 0,
-    })
+    .withMembers({ publicBaseUrl: void 0 })
     .provide({
       project: createApiFixture<ProjectApi>({}),
       authz: createApiFixture<AuthzApi>({}),

@@ -44,10 +44,10 @@ describe("the /api/prompts refusals", () => {
       const refusal = new SystemPromptRequiredError();
 
       const response = await updateRefusedWith(refusal);
-      const body = (await response.json()) as { error: string; message: string };
+      const body = (await response.json()) as { code: string; message: string };
 
       expect(response.status).toBe(400);
-      expect(body.error).toBe("prompt_system_prompt_required");
+      expect(body.code).toBe("prompt_system_prompt_required");
       expect(body.message).toBe(refusal.message);
       expect(body.message).not.toMatch(/SystemPrompt(Required|Conflict)Error/);
     });
@@ -56,10 +56,10 @@ describe("the /api/prompts refusals", () => {
   describe("when an update sets both a prompt and a system message", () => {
     it("answers 409 with the conflict's own code", async () => {
       const response = await updateRefusedWith(new SystemPromptConflictError());
-      const body = (await response.json()) as { error: string };
+      const body = (await response.json()) as { code: string };
 
       expect(response.status).toBe(409);
-      expect(body.error).toBe("prompt_system_prompt_conflict");
+      expect(body.code).toBe("prompt_system_prompt_conflict");
     });
   });
 
@@ -74,20 +74,20 @@ describe("the /api/prompts refusals", () => {
       );
 
       const response = await getPrompt("/api/prompts/checkout-agent:nightly", app);
-      const body = (await response.json()) as { error: string };
+      const body = (await response.json()) as { code: string };
 
       expect(response.status).toBe(422);
-      expect(body.error).toBe("prompt_tag_invalid");
+      expect(body.code).toBe("prompt_tag_invalid");
     });
   });
 
   describe("when a shorthand address also names a tag by query", () => {
     it("answers 422 as a validation error", async () => {
       const response = await getPrompt("/api/prompts/checkout-agent:production?tag=staging");
-      const body = (await response.json()) as { error: string };
+      const body = (await response.json()) as { code: string };
 
       expect(response.status).toBe(422);
-      expect(body.error).toBe("validation_error");
+      expect(body.code).toBe("validation_error");
     });
   });
 });

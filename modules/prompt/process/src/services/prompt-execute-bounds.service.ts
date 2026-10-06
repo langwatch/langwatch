@@ -1,10 +1,11 @@
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   PromptExecuteRateLimitedError,
   PromptMessagesTooManyError,
 } from "@langwatch/prompt-contract";
+
+import type { PromptRateLimitRepository } from "../repositories/prompt-rate-limit.repository.ts";
 
 /**
  * The tier-effective ceilings the playground's execution door runs under: the
@@ -15,23 +16,23 @@ export class PromptExecuteBoundsService {
   static create(deps: {
     entitlement: EntitlementApi;
     projects: ProjectApi;
-    rateLimiter: RateLimiter;
+    rateLimits: PromptRateLimitRepository;
   }): PromptExecuteBoundsService {
     return new PromptExecuteBoundsService(deps);
   }
 
   readonly #entitlement: EntitlementApi;
   readonly #projects: ProjectApi;
-  readonly #rateLimiter: RateLimiter;
+  readonly #rateLimits: PromptRateLimitRepository;
 
   private constructor(deps: {
     entitlement: EntitlementApi;
     projects: ProjectApi;
-    rateLimiter: RateLimiter;
+    rateLimits: PromptRateLimitRepository;
   }) {
     this.#entitlement = deps.entitlement;
     this.#projects = deps.projects;
-    this.#rateLimiter = deps.rateLimiter;
+    this.#rateLimits = deps.rateLimits;
   }
 
   /**
@@ -48,7 +49,7 @@ export class PromptExecuteBoundsService {
       key: "promptExecutePerMinute",
       organizationId,
     });
-    const decision = await this.#rateLimiter.check(`prompt-execute:${input.projectId}`, {
+    const decision = await this.#rateLimits.check(`prompt-execute:${input.projectId}`, {
       requests,
       seconds: 60,
     });

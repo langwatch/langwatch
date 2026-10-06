@@ -7,13 +7,13 @@ import type { ProjectApi } from "@langwatch/project-contract";
  */
 import type { UpdatePromptCommand, VersionedPrompt } from "@langwatch/prompt-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
 import type { PromptLifecyclePipeline } from "../../eventing/prompt-lifecycle.pipeline.ts";
+import { MemoryPromptRateLimitRepository } from "../../repositories/memory/memory.prompt-rate-limit.repository.ts";
 import { MemoryPromptRepositories } from "../../repositories/memory/memory.prompt.repositories.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
 import { PromptModule } from "../prompt.app.ts";
@@ -72,11 +72,8 @@ function harness() {
         workflow: createApiFixture<WorkflowApi>(),
         modelProviders: defaultModelFixture(),
       },
-      members: {
-        logger: createTestLogger().logger,
-        rateLimiter: { check: async () => ({ allowed: true }) },
-        publicBaseUrl: "https://app.langwatch.test",
-      },
+      members: { publicBaseUrl: "https://app.langwatch.test" },
+      repositories: { rateLimits: MemoryPromptRateLimitRepository.create() },
       config: undefined,
       resources: { own: () => {}, ownService: () => {} },
       secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
@@ -310,8 +307,6 @@ describe("PromptModule.commitMessageFor", () => {
 describe("PromptModule.create", () => {
   describe("given its declared repository bundle", () => {
     it("builds a working engine over memory repositories", async () => {
-      const { logger: fakeLogger } = createTestLogger();
-
       const app = PromptModule.create({
         dependencies: {
           projects: createApiFixture<ProjectApi>({
@@ -323,11 +318,7 @@ describe("PromptModule.create", () => {
           workflow: createApiFixture<WorkflowApi>(),
           modelProviders: defaultModelFixture(),
         },
-        members: {
-          logger: fakeLogger,
-          rateLimiter: { check: async () => ({ allowed: true }) },
-          publicBaseUrl: "https://app.langwatch.test",
-        },
+        members: { publicBaseUrl: "https://app.langwatch.test" },
         config: undefined,
         resources: { own: () => {}, ownService: () => {} },
         secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
@@ -380,11 +371,7 @@ describe("PromptModule.create", () => {
           workflow: createApiFixture<WorkflowApi>(),
           modelProviders: defaultModelFixture(),
         },
-        members: {
-          logger: createTestLogger().logger,
-          rateLimiter: { check: async () => ({ allowed: true }) },
-          publicBaseUrl: "https://app.langwatch.test",
-        },
+        members: { publicBaseUrl: "https://app.langwatch.test" },
         config: undefined,
         resources: { own: () => {}, ownService: () => {} },
         secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

@@ -1,8 +1,6 @@
-import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { canonicalErrorResponse, bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { HandledError } from "@langwatch/handled-error";
-import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -12,33 +10,16 @@ import { ScopedSecrets } from "@langwatch/secrets";
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { HTTPException } from "hono/http-exception";
 
 import { PromptModule } from "#app/prompt.app";
 
 import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
+import { MemoryPromptRateLimitRepository } from "../../repositories/memory/memory.prompt-rate-limit.repository.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
 import { promptRest, promptRestFacts } from "../prompt.rest.ts";
 
 export const PROMPT_TEST_PROJECT = "project_authorized";
 export const PROMPT_TEST_ORGANIZATION = "org_1";
-
-/**
- * The process's own boundary renderer, reduced to what these tests read back.
- * Hono's own refusal wins; a handled error keeps its status and code; anything
- * else degrades to the generic unknown.
- */
-const renderRefusal: RestErrorHandler = (error, c) => {
-  if (error instanceof HTTPException) return error.getResponse();
-
-  if (HandledError.isHandled(error)) {
-    const serialized = error.serialize();
-
-    return c.json({ error: serialized.code, message: error.message }, serialized.httpStatus as 400);
-  }
-
-  return c.json({ error: "Internal Server Error" }, 500);
-};
 
 /** The real application over a scripted engine, so the family's own operations run. */
 export function buildPromptApp(prompts: PromptService): PromptModule {
@@ -51,11 +32,8 @@ export function buildPromptApp(prompts: PromptService): PromptModule {
         workflow: createApiFixture<WorkflowApi>(),
         modelProviders: defaultModelFixture(),
       },
-      members: {
-        logger: createLogger("prompt-rest-test"),
-        rateLimiter: { check: async () => ({ allowed: true }) },
-        publicBaseUrl: "https://app.langwatch.test",
-      },
+      members: { publicBaseUrl: "https://app.langwatch.test" },
+      repositories: { rateLimits: MemoryPromptRateLimitRepository.create() },
       config: undefined,
       resources: { own: () => {}, ownService: () => {} },
       secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
@@ -85,7 +63,7 @@ export function mountPromptRest(options: {
   const hono = runtime.mount(promptRest.router(), {
     app: () => options.app,
     credential: "project",
-    onError: renderRefusal,
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(promptRestFacts, () => ({
         organizationId,

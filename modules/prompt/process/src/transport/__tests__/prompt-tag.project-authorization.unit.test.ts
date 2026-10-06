@@ -5,7 +5,6 @@
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -15,6 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 import { PromptModule } from "#app/prompt.app";
 
 import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
+import { MemoryPromptRateLimitRepository } from "../../repositories/memory/memory.prompt-rate-limit.repository.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
 import { promptTagTrpcTransport } from "../prompt-tag.trpc.ts";
 import { promptTrpcCaller } from "./prompt-trpc.fixture.ts";
@@ -40,11 +40,8 @@ function buildCaller(options: { manageable: readonly string[] }) {
         workflow: createApiFixture<WorkflowApi>(),
         modelProviders: defaultModelFixture(),
       },
-      members: {
-        logger: createLogger("prompt-tag-authorization-test"),
-        rateLimiter: { check: async () => ({ allowed: true }) },
-        publicBaseUrl: "https://app.langwatch.test",
-      },
+      members: { publicBaseUrl: "https://app.langwatch.test" },
+      repositories: { rateLimits: MemoryPromptRateLimitRepository.create() },
       config: undefined,
       resources: { own: () => {}, ownService: () => {} },
       secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
