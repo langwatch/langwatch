@@ -3683,6 +3683,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../../packages/secrets
+      '@langwatch/task':
+        specifier: workspace:*
+        version: link:../../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
@@ -14649,6 +14652,9 @@ importers:
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
+      '@langwatch/enterprise-governance-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/governance/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract

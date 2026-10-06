@@ -3415,6 +3415,16 @@ model TraceEditOverlay {
   @@index([projectId])
 }
 
+model TraceIngestSourceBilling {
+  organizationId String
+  sourceType     String
+  billed         Boolean
+  recordedAt     DateTime
+  updatedAt      DateTime @updatedAt
+
+  @@id([organizationId, sourceType])
+}
+
 enum RetentionPolicyScopeType {
   ORGANIZATION
   TEAM

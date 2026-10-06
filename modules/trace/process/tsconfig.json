@@ -50,6 +50,9 @@
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/governance/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {
