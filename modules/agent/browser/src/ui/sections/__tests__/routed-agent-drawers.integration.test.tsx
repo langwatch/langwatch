@@ -225,6 +225,16 @@ describe("the agent editors opened by address", () => {
     expect(screen.getByTestId("agent-name-input")).toBeInTheDocument();
   });
 
+  /** @scenario "HTTP agent editor renders Scenario Mappings section" */
+  it("draws the Scenario Mappings section with a row per scenario field", () => {
+    render(<RoutedAgentHttpEditorDrawer />, { wrapper });
+
+    expect(screen.getByText("Scenario Mappings")).toBeInTheDocument();
+    for (const field of ["input", "messages", "threadId", "session"]) {
+      expect(screen.getAllByText(field).length).toBeGreaterThan(0);
+    }
+  });
+
   /** @scenario "Clicking Code Agent in the type selector opens the code editor drawer" */
   it("mounts the code editor with its form", () => {
     render(<RoutedAgentCodeEditorDrawer />, { wrapper });

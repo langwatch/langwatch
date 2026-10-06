@@ -24,6 +24,7 @@ import { useRoutedHttpAgent } from "../../behavior/use-routed-http-agent.ts";
 import { useRoutedWorkflowAgent } from "../../behavior/use-routed-workflow-agent.ts";
 import { useWorkflowTargetMapping } from "../../behavior/use-workflow-target-mapping.ts";
 import { getRandomWorkflowIcon } from "../../model/workflow/random-workflow-icon.ts";
+import { ScenarioMappingSection } from "../blocks/scenario-mapping-section.tsx";
 import {
   WorkflowCodeEditorModal,
   type WorkflowCodeEditorModalHost,
@@ -102,7 +103,7 @@ export function RoutedAgentHttpEditorDrawer({ agentId, onSave }: AgentEditorDraw
     <AgentHttpEditorDrawer
       {...http.options}
       {...(goBack ? { onGoBack: goBack } : {})}
-      renderScenarioMappings={() => null}
+      renderScenarioMappings={(section) => <ScenarioMappingSection {...section} />}
       renderVariables={() => null}
       renderTestPanel={(panel) => <AgentTestPanel {...panel} />}
       explainTestError={http.explainTestError}
