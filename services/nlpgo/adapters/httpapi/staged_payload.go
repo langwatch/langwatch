@@ -24,6 +24,7 @@ package httpapi
 // signature rides in the query string, which we intentionally do not restrict.
 
 import (
+	"bytes"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -35,6 +36,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/services/nlpgo/app"
 )
 
 // StagedPayloadHeader carries a presigned S3 GET URL for the real request
@@ -52,9 +55,10 @@ const StagedPayloadKeyHeader = "X-Payload-Key"
 var stagedPayloadClient = &http.Client{Timeout: 60 * time.Second}
 
 // maxStagedPayloadBytes bounds the fetched body so a tampered or unexpectedly
-// huge object can't exhaust memory. 256 MiB mirrors the langevals staged
-// middleware ceiling (langevals/staged_payload.py).
-const maxStagedPayloadBytes = 256 * 1024 * 1024
+// huge object can't exhaust memory. It is the engine's own request body cap:
+// a staged body is the same request taking another route in, so a dataset row
+// the engine accepts over direct HTTP is accepted staged as well.
+const maxStagedPayloadBytes = app.DefaultMaxRequestBodyBytes
 
 // validateStagedPayloadURL enforces the SSRF guard: https only, and the host
 // must be an AWS S3 host (path-style `s3[.-]<region>.amazonaws.com` or
@@ -151,7 +155,10 @@ func fetchStagedPayload(ctx context.Context, client *http.Client, raw string, ma
 	// Read one byte past the limit so we can distinguish "exactly at limit"
 	// from "over limit" — io.LimitReader silently truncates rather than
 	// erroring, which would otherwise hand back a corrupt (clipped) body.
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
+	if resp.ContentLength > maxBytes {
+		return nil, fmt.Errorf("staged payload exceeds %d byte limit", maxBytes)
+	}
+	body, err := readAllSized(io.LimitReader(resp.Body, maxBytes+1), resp.ContentLength)
 	if err != nil {
 		return nil, fmt.Errorf("read staged payload body: %w", err)
 	}
@@ -178,7 +185,21 @@ func readStudioRequestBody(r *http.Request, client *http.Client) ([]byte, error)
 		}
 		return body, nil
 	}
-	return io.ReadAll(r.Body)
+	return readAllSized(r.Body, min(r.ContentLength, app.DefaultMaxRequestBodyBytes))
+}
+
+// readAllSized reads r to the end. When the sender declared the body length
+// the buffer is allocated once at that size: io.ReadAll grows by reallocating,
+// which for a body of a few hundred megabytes leaves about as much again in
+// discarded buffers. The caller bounds `declared`, because it comes off a
+// header the sender controls.
+func readAllSized(r io.Reader, declared int64) ([]byte, error) {
+	if declared <= 0 {
+		return io.ReadAll(r)
+	}
+	buf := bytes.NewBuffer(make([]byte, 0, declared+bytes.MinRead))
+	_, err := buf.ReadFrom(r)
+	return buf.Bytes(), err
 }
 
 // openStagedPayload decrypts a sealed staged body: nonce (12 bytes), then the

@@ -12,7 +12,13 @@ import {
 } from "@langwatch/api/rest";
 import { mapZodIssuesToLogContext } from "@langwatch/config";
 import {
+  DATASET_CEILING_LIMITS,
+  DATASET_DEFAULT_LIMITS,
+  formatDatasetByteLimit,
+} from "@langwatch/dataset-contract";
+import {
   EvaluationApi,
+  EvaluationLogResultsTooLargeError,
   EvaluationRestExperimentNotFoundError,
   EvaluatorMissingFieldError,
   acknowledgementSchema,
@@ -88,7 +94,12 @@ const BATCH_EVALUATION_KSUID_PREFIX = "batchevaluation";
 const DEFAULT_MODEL = "openai/gpt-5";
 const DEFAULT_EMBEDDINGS_MODEL = "openai/text-embedding-3-small";
 
-const BATCH_LOG_MAX_BYTES = 20 * 1024 * 1024;
+/**
+ * The largest batch any organization can be raised to. The route has no
+ * project in reach when the body is read, so it declares this ceiling and the
+ * handler then holds the body to the organization's own limit.
+ */
+const BATCH_LOG_MAX_BYTES = DATASET_CEILING_LIMITS.rowBytes;
 const EVALUATE_MAX_BYTES = 30 * 1024 * 1024;
 
 /**
@@ -102,6 +113,10 @@ const PRODUCES_JSON = "application/json";
  * A `POST /api/dataset/evaluate` named an experiment slug this project holds no
  * experiment for.
  */
+/** The refusal a batch log past the ceiling earns, by the code the handler's own check uses. */
+const batchLogTooLarge = (): Error =>
+  new EvaluationLogResultsTooLargeError({ maxBytes: BATCH_LOG_MAX_BYTES });
+
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>
   new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
@@ -216,7 +231,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .post("/api/evaluations/batch/log_results", "postApiEvaluationsBatchLogResults")
   .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
-  .withBodyLimit({ maxBytes: BATCH_LOG_MAX_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BATCH_LOG_MAX_BYTES, onExceeded: batchLogTooLarge })
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
     because: LEGACY_PROTOCOL_REASON,
@@ -226,7 +241,9 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     summary: "Report batch evaluation results",
     requestBody: { schema: eSBatchEvaluationRESTParamsSchema },
     description:
-      "Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.",
+      "Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. " +
+      `Bodies up to ${formatDatasetByteLimit(DATASET_DEFAULT_LIMITS.rowBytes)} are accepted, sized for one dataset row with ten 20 MB images inline. ` +
+      "A larger body is refused with `evaluation_log_results_too_large`.",
     tags: ["Evaluations"],
     responses: {
       200: {
@@ -245,6 +262,10 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
       403: {
         description: "The API key lacks evaluations:manage",
         content: { [PRODUCES_JSON]: { schema: resolver(evaluateErrorSchema) } },
+      },
+      413: {
+        description:
+          "The body is larger than the organization accepts in one request; `error.code` is `evaluation_log_results_too_large` and `error.meta.maxBytes` is the limit",
       },
     },
   })
@@ -408,6 +429,7 @@ async function logBatchResults({
   // Size comes from the wire bytes, not a re-serialisation of the parsed body —
   // these payloads carry full dataset entries and LLM outputs.
   const payloadSize = Buffer.byteLength(raw, "utf8");
+  await app.assertBatchLogWithinLimit({ projectId, payloadBytes: payloadSize });
   const body = parseJson(raw);
 
   if (!body) return answer({ message: "Invalid body, expecting json" }, 400);

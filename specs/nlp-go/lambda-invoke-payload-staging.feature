@@ -98,6 +98,13 @@ Feature: Auto S3 staging for large nlpgo Lambda invoke payloads
     # loopback origin only through a test-only variable it ignores outright on
     # a deployed environment.
 
+  @unit
+  Scenario: A staged body is accepted up to the same size as a direct request body
+    Given a dataset row carrying ten inline images at the default per-file limit
+    When the control plane stages the invoke body to S3
+    Then the engine accepts a staged body as large as the largest body it reads directly
+    And a staged body past that size is refused
+
   @e2e
   Scenario: The engine refuses a staged-payload header pointing off S3
     Given a staged-payload header whose host is not an AWS S3 host

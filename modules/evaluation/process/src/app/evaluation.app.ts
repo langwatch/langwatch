@@ -370,6 +370,7 @@ export class EvaluationModule implements EvaluationApiContract {
       experiments: members.experiments,
       runs: members.experimentRuns,
       report: members.report,
+      limits: dependencies.datasets,
     });
   }
 
@@ -620,6 +621,8 @@ export class EvaluationModule implements EvaluationApiContract {
   getMonitorPerformance: EvaluationApiContract["getMonitorPerformance"] = (input) =>
     this.#service.getMonitorPerformance(input);
 
+  assertBatchLogWithinLimit: EvaluationApiContract["assertBatchLogWithinLimit"] = (input) =>
+    this.#batchLog.assertWithinLimit(input);
   logBatchEvaluation: EvaluationApiContract["logBatchEvaluation"] = (input) =>
     this.#batchLog.log(input);
   runEvaluator: EvaluationApiContract["runEvaluator"] = (input) =>

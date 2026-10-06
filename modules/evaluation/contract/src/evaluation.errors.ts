@@ -27,3 +27,18 @@ export class EvaluationTraceNotEvaluatableError extends Error {
     this.name = "EvaluationTraceNotEvaluatableError";
   }
 }
+
+/** One SDK batch of results is larger than the organization accepts in one request. */
+export class EvaluationLogResultsTooLargeError extends HandledError {
+  declare readonly code: "evaluation_log_results_too_large";
+
+  constructor({ maxBytes }: { maxBytes: number }) {
+    super(
+      "evaluation_log_results_too_large",
+      `The batch of results is larger than the ${Math.floor(maxBytes / (1024 * 1024))} MB one request carries. ` +
+        "Send fewer results per request, and send images as links or dataset attachments instead of inline data.",
+      { httpStatus: 413, fault: "customer", meta: { maxBytes } },
+    );
+    this.name = "EvaluationLogResultsTooLargeError";
+  }
+}
