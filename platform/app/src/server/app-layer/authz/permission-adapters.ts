@@ -18,6 +18,10 @@ import {
 } from "~/generated/prisma/client";
 import { authzChecksFor } from "~/server/app-layer/authz/checks";
 import {
+  applyAggregateAdminGate,
+  projectKindReaderFor,
+} from "~/server/app-layer/permissions/aggregate-admin-gate";
+import {
   DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   MembershipDisabledError,
@@ -185,11 +189,15 @@ export async function resolveProjectPermission(
     permission,
     projectId,
   });
-  return {
-    permitted: decision.allowed,
-    organizationRole: decision.organizationRole,
-    denialReason: decision.denialReason,
-  };
+  return applyAggregateAdminGate({
+    decision: {
+      permitted: decision.allowed,
+      organizationRole: decision.organizationRole,
+      denialReason: decision.denialReason,
+    },
+    projectId,
+    kinds: projectKindReaderFor(ctx.prisma),
+  });
 }
 
 export async function resolveProjectPermissionAny(
@@ -207,11 +215,15 @@ export async function resolveProjectPermissionAny(
     permissions,
     projectId,
   });
-  return {
-    permitted: decision.allowed,
-    organizationRole: decision.organizationRole,
-    denialReason: decision.denialReason,
-  };
+  return applyAggregateAdminGate({
+    decision: {
+      permitted: decision.allowed,
+      organizationRole: decision.organizationRole,
+      denialReason: decision.denialReason,
+    },
+    projectId,
+    kinds: projectKindReaderFor(ctx.prisma),
+  });
 }
 
 export async function hasProjectPermission(

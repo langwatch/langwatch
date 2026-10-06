@@ -16,10 +16,11 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { AGGREGATE_DEFAULT_RULE, aggregateRuleSchema } from "../aggregate-rule";
 import { AggregateRuleService } from "../aggregate-rule.service";
-import { AGGREGATE_PROJECT_KIND } from "../project.service";
+import { AGGREGATE_PROJECT_KIND } from "../project-kinds";
 import { PrismaAggregateRuleRepository } from "../repositories/aggregate-rule.prisma.repository";
 import {
   type AggregateFixture,
+  realOrganizationService,
   seedAggregateOrganization,
 } from "./aggregateProjectFixture";
 
@@ -54,10 +55,7 @@ describe("Feature: an admin creates an aggregate project", () => {
     });
   };
 
-  const membersOf = async (project: {
-    id: string;
-    aggregateRule: unknown;
-  }) =>
+  const membersOf = async (project: { id: string; aggregateRule: unknown }) =>
     rules.membersOf({
       rule: aggregateRuleSchema.parse(project.aggregateRule),
       organizationId: fixture.organizationId,
@@ -65,7 +63,9 @@ describe("Feature: an admin creates an aggregate project", () => {
     });
 
   beforeAll(async () => {
-    globalForApp.__langwatch_app = createTestApp();
+    globalForApp.__langwatch_app = createTestApp({
+      organizations: realOrganizationService(prisma),
+    });
     fixture = await seedAggregateOrganization(prisma, { label: "agg-create" });
   });
 

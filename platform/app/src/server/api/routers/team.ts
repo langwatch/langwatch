@@ -4,6 +4,7 @@ import { TeamUserRole } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { PERSONAL_TEAM_ARCHIVE_REFUSAL } from "~/server/app-layer/teams/team.service";
+import { getApp } from "~/server/app-layer/app";
 import { TeamService } from "~/server/teams/team.service";
 import {
   assertEnterprisePlan,
@@ -83,6 +84,10 @@ export const teamRouter = createTRPCRouter({
         organizationId: input.organizationId,
         callerId,
         callerHasManage,
+        callerOrganizationRole: await getApp().organizations.getUserOrgRole({
+          userId: callerId,
+          organizationId: input.organizationId,
+        }),
       });
 
       // Email-privacy redaction is request-scoped (depends on the caller), so it
@@ -141,6 +146,10 @@ export const teamRouter = createTRPCRouter({
       const team = await service.getTeamWithMembers({
         slug: input.slug,
         organizationId: input.organizationId,
+        callerOrganizationRole: await getApp().organizations.getUserOrgRole({
+          userId: callerId,
+          organizationId: input.organizationId,
+        }),
       });
 
       if (!team) {

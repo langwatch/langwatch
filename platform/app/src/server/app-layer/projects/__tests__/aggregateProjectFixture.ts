@@ -11,9 +11,24 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
+import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
+import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
+
+/**
+ * The test app's organisation service is a null one; these suites read
+ * organisation roles and the project switcher for real.
+ */
+export function realOrganizationService(prisma: PrismaClient) {
+  return new OrganizationService(new PrismaOrganizationRepository(prisma), {
+    seedForOrg: async () => {
+      /* not exercised */
+    },
+  } as unknown as PromptTagRepository);
+}
 
 export type AggregateFixture = Awaited<
   ReturnType<typeof seedAggregateOrganization>
@@ -66,17 +81,21 @@ export async function seedAggregateOrganization(
         departmentId,
       },
     });
-    await seedRoleBinding(prisma, {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId,
-      userId: user.id,
-      role:
-        organizationRole === OrganizationUserRole.ADMIN
-          ? TeamUserRole.ADMIN
-          : TeamUserRole.VIEWER,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organizationId,
-    });
+    // A Developer seat holds no organisation-wide binding: its reach is its
+    // own personal team plus whatever team it is put on.
+    if (organizationRole !== OrganizationUserRole.DEVELOPER) {
+      await seedRoleBinding(prisma, {
+        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        organizationId,
+        userId: user.id,
+        role:
+          organizationRole === OrganizationUserRole.ADMIN
+            ? TeamUserRole.ADMIN
+            : TeamUserRole.VIEWER,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
+      });
+    }
     if (teamRole) {
       await prisma.teamUser.create({
         data: { userId: user.id, teamId: team.id, role: teamRole },
@@ -146,6 +165,11 @@ export async function seedAggregateOrganization(
     organizationRole: OrganizationUserRole.MEMBER,
     teamRole: TeamUserRole.ADMIN,
   });
+  const developer = await makeUser({
+    handle: "developer",
+    organizationRole: OrganizationUserRole.DEVELOPER,
+    teamRole: TeamUserRole.ADMIN,
+  });
   const engineer = await makeUser({
     handle: "engineer",
     organizationRole: OrganizationUserRole.MEMBER,
@@ -168,6 +192,20 @@ export async function seedAggregateOrganization(
     }),
   };
   const shared = await makeTeamProject("shared");
+  /** An aggregate on the shared team, as the create mutation stores one. */
+  const makeAggregate = (handle: string) =>
+    prisma.project.create({
+      data: {
+        name: `${handle} ${ns}`,
+        slug: `--test-aggregate-${handle}-${ns}`,
+        apiKey: `test-key-aggregate-${handle}-${ns}`,
+        teamId: team.id,
+        language: "other",
+        framework: "other",
+        kind: "aggregate",
+        aggregateRule: { kind: "all-personal" },
+      },
+    });
   const governance = await prisma.project.create({
     data: {
       name: `Governance ${ns}`,
@@ -187,6 +225,7 @@ export async function seedAggregateOrganization(
     departments,
     admin,
     member,
+    developer,
     engineer,
     seller,
     personal,
@@ -194,6 +233,7 @@ export async function seedAggregateOrganization(
     governance,
     makeUser,
     makeTeamProject,
+    makeAggregate,
     cleanup: () =>
       cleanupTestRows(prisma, [
         ["grant", { organizationId }],

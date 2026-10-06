@@ -14,7 +14,8 @@ import {
   aggregateRuleSchema,
 } from "../aggregate-rule";
 import { AggregateRuleService } from "../aggregate-rule.service";
-import { AGGREGATE_PROJECT_KIND, ProjectService } from "../project.service";
+import { ProjectService } from "../project.service";
+import { AGGREGATE_PROJECT_KIND } from "../project-kinds";
 import type { AggregateRuleRepository } from "../repositories/aggregate-rule.repository";
 import type { ProjectRepository } from "../repositories/project.repository";
 
@@ -27,8 +28,18 @@ type StoredProject = {
 };
 
 const PROJECTS: StoredProject[] = [
-  { id: "p_eng", organizationId: "org_a", isPersonal: true, ownerDepartmentId: "dep_eng" },
-  { id: "p_sales", organizationId: "org_a", isPersonal: true, ownerDepartmentId: "dep_sales" },
+  {
+    id: "p_eng",
+    organizationId: "org_a",
+    isPersonal: true,
+    ownerDepartmentId: "dep_eng",
+  },
+  {
+    id: "p_sales",
+    organizationId: "org_a",
+    isPersonal: true,
+    ownerDepartmentId: "dep_sales",
+  },
   { id: "p_team", organizationId: "org_a", isPersonal: false },
   { id: "p_gov", organizationId: "org_a", isPersonal: false, readable: false },
   { id: "p_foreign", organizationId: "org_b", isPersonal: true },

@@ -21,6 +21,7 @@ import {
   type AccessListingRepository,
 } from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { liveRoles } from "~/server/app-layer/authz/repositories/live-rows";
+import { projectKindsHiddenFrom } from "~/server/app-layer/projects/project-kinds";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import type {
   RoleBindingRepository,
@@ -305,9 +306,12 @@ export class TeamService {
   async getTeamWithMembers({
     slug,
     organizationId,
+    callerOrganizationRole,
   }: {
     slug: string;
     organizationId: string;
+    /** Decides whether the team's aggregate projects are listed (ADR-144). */
+    callerOrganizationRole: string | null;
   }) {
     const team = await this.prisma.team.findFirst({
       where: { slug, organizationId },
@@ -315,7 +319,7 @@ export class TeamService {
         projects: {
           where: {
             archivedAt: null,
-            kind: { not: "internal_governance" },
+            kind: { notIn: projectKindsHiddenFrom(callerOrganizationRole) },
           },
         },
       },
@@ -345,10 +349,13 @@ export class TeamService {
     organizationId,
     callerId,
     callerHasManage,
+    callerOrganizationRole,
   }: {
     organizationId: string;
     callerId: string;
     callerHasManage: boolean;
+    /** Decides whether aggregate projects are listed (ADR-144). */
+    callerOrganizationRole: string | null;
   }) {
     const teams = await this.prisma.team.findMany({
       where: {
@@ -367,7 +374,7 @@ export class TeamService {
         projects: {
           where: {
             archivedAt: null,
-            kind: { not: "internal_governance" },
+            kind: { notIn: projectKindsHiddenFrom(callerOrganizationRole) },
           },
         },
       },

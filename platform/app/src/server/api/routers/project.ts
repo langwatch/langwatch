@@ -15,17 +15,19 @@ import { probeProjectPermission } from "~/server/app-layer/permissions/imperativ
 import { aggregateRuleSchema } from "~/server/app-layer/projects/aggregate-rule";
 import { AggregateRuleService } from "~/server/app-layer/projects/aggregate-rule.service";
 import {
-  AGGREGATE_PROJECT_KIND,
   aggregateProjectCreateFields,
-  aggregateProjectRouteViolation,
   governanceProjectRouteViolation,
-  isAggregateProjectKind,
   personalWorkspaceArchiveViolation,
   personalWorkspaceCreateViolation,
   personalWorkspaceMoveViolation,
 } from "~/server/app-layer/projects/project.service";
-import { PrismaAggregateRuleRepository } from "~/server/app-layer/projects/repositories/aggregate-rule.prisma.repository";
+import {
+  AGGREGATE_PROJECT_KIND,
+  aggregateProjectRouteViolation,
+  isAggregateProjectKind,
+} from "~/server/app-layer/projects/project-kinds";
 import { mintProjectSlug } from "~/server/app-layer/projects/projectSlug";
+import { PrismaAggregateRuleRepository } from "~/server/app-layer/projects/repositories/aggregate-rule.prisma.repository";
 import type { Session } from "~/server/auth";
 import { TeamService } from "~/server/teams/team.service";
 import { encrypt } from "~/utils/encryption";
@@ -85,17 +87,19 @@ function assertMoveStaysOutOfPersonalWorkspaces({
  * organisation role alone (ADR-144 decision 5), so creation asks the same
  * question rather than leaving a creator locked out of what they made.
  */
-async function assertCanOpenAggregates(
-  prisma: PrismaClient,
-  { userId, organizationId }: { userId: string; organizationId: string },
-): Promise<void> {
-  const membership = await prisma.organizationUser.findUnique({
-    where: { userId_organizationId: { userId, organizationId } },
-    select: { role: true },
-  });
+async function assertCanOpenAggregates({
+  userId,
+  organizationId,
+}: {
+  userId: string;
+  organizationId: string;
+}): Promise<void> {
   const violation = aggregateProjectRouteViolation({
     kind: AGGREGATE_PROJECT_KIND,
-    organizationRole: membership?.role,
+    organizationRole: await getApp().organizations.getUserOrgRole({
+      userId,
+      organizationId,
+    }),
   });
   if (violation) {
     throw new TRPCError({ code: "FORBIDDEN", message: violation });
@@ -181,7 +185,7 @@ export const projectRouter = createTRPCRouter({
 
       const isAggregate = isAggregateProjectKind(input.kind);
       if (isAggregate) {
-        await assertCanOpenAggregates(prisma, {
+        await assertCanOpenAggregates({
           userId,
           organizationId: input.organizationId,
         });

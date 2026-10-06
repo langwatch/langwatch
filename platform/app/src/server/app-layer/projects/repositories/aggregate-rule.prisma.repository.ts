@@ -1,5 +1,5 @@
 import type { PrismaClient } from "~/generated/prisma/client";
-import { NON_DESTINATION_PROJECT_KINDS } from "../project.service";
+import { NON_DESTINATION_PROJECT_KINDS } from "../project-kinds";
 import type { AggregateRuleRepository } from "./aggregate-rule.repository";
 
 /**

@@ -35,6 +35,7 @@ import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSe
 import { isCustomRole } from "../../../api/enterprise";
 import { CustomRoleNotAssignableError } from "../../../role-bindings/errors";
 import { sessionRevocation } from "../../identity/runtime";
+import { projectKindsHiddenFrom } from "../../projects/project-kinds";
 import {
   CannotRemoveSelfAsLastAdminError,
   DeveloperSeatNoSharedAccessError,
@@ -870,7 +871,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }): Promise<FullyLoadedOrganization[]> {
     const { userId, isDemo, demoProjectId } = params;
 
-    return this.prisma.organization.findMany({
+    const organizations = (await this.prisma.organization.findMany({
       where: {
         OR: [
           ...(isDemo
@@ -925,7 +926,22 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           },
         },
       },
-    }) as Promise<FullyLoadedOrganization[]>;
+    })) as FullyLoadedOrganization[];
+
+    // ADR-144 decision 5: an aggregate reads other people's personal
+    // projects, so it is in the switcher of an organisation admin and nobody
+    // else, whichever team it sits on. The role differs per organisation, and
+    // `members` above is already narrowed to this user, so the filter is
+    // applied here rather than in the one cross-organisation query.
+    for (const organization of organizations) {
+      const hidden = projectKindsHiddenFrom(organization.members[0]?.role);
+      for (const team of organization.teams) {
+        team.projects = team.projects.filter(
+          (project) => !hidden.includes(project.kind),
+        );
+      }
+    }
+    return organizations;
   }
 
   async getOrganizationWithMembers(params: {

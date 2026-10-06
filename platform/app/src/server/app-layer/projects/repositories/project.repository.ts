@@ -154,6 +154,11 @@ export interface ProjectRepository {
      * `project:view` receives. An empty array lists nothing.
      */
     projectIds?: string[];
+    /**
+     * Leaves out the governance project always, and aggregate projects unless
+     * the caller is an organization admin (ADR-144 decision 5).
+     */
+    callerOrganizationRole: string | null;
   }): Promise<PaginatedResult<Project>>;
   /**
    * Every project id of the organization, ordered by id ascending: archived
@@ -252,6 +257,7 @@ export class NullProjectRepository implements ProjectRepository {
     page: number;
     limit: number;
     projectIds?: string[];
+    callerOrganizationRole: string | null;
   }): Promise<PaginatedResult<Project>> {
     return { data: [], pagination: { page: 1, limit: 50, total: 0 } };
   }

@@ -8,6 +8,7 @@ import {
 } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import type { ApiKeyService } from "~/server/api-key/api-key.service";
+import { credentialOwnerRole } from "~/server/api-key/credential-owner-role";
 import { resolveVisibleProjects } from "~/server/api-key/project-visibility";
 import type { OrgResolvedToken } from "~/server/api-key/token-resolver";
 import {
@@ -21,6 +22,7 @@ import {
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
 } from "~/server/app-layer/projects/project.service";
+import { aggregateProjectRouteViolation } from "~/server/app-layer/projects/project-kinds";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
@@ -160,6 +162,10 @@ secured
         organizationId: organization.id,
         page,
         limit,
+        callerOrganizationRole: await credentialOwnerRole({
+          resolved,
+          organizationId: organization.id,
+        }),
         ...(visible.kind === "some" ? { projectIds: visible.ids } : {}),
       });
 
@@ -237,28 +243,36 @@ secured
 
 /**
  * One project of this organization, addressed by id — and never the hidden
- * governance project.
+ * governance project, nor an aggregate unless the credential's owner is an
+ * organization admin.
  *
  * The governance project is excluded from every listing surface, so answering a
  * read about it is the one thing left that would confirm it exists. It reads as
  * not found, which is what it is as far as this API is concerned: the id
  * belongs to an internal tenancy record, not to a workspace anybody can open
- * (ADR-128 §11).
+ * (ADR-128 §11). An aggregate is listed only to organization admins (ADR-144
+ * decision 5), so for anyone else it reads as not found for the same reason.
  */
 async function readableProject({
   id,
   organizationId,
+  callerOrganizationRole,
   service,
 }: {
   id: string;
   organizationId: string;
+  callerOrganizationRole: string | null;
   service: ProjectService;
 }) {
   const project = await service.getWithTeam(id);
   if (
     !project ||
     project.team.organizationId !== organizationId ||
-    governanceProjectRouteViolation(project.kind)
+    governanceProjectRouteViolation(project.kind) ||
+    aggregateProjectRouteViolation({
+      kind: project.kind,
+      organizationRole: callerOrganizationRole,
+    })
   ) {
     throw new NotFoundError("Project not found");
   }
@@ -279,6 +293,10 @@ secured
       const project = await readableProject({
         id,
         organizationId: organization.id,
+        callerOrganizationRole: await credentialOwnerRole({
+          resolved: c.get("orgResolvedToken") as OrgResolvedToken,
+          organizationId: organization.id,
+        }),
         service,
       });
 

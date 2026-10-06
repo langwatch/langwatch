@@ -4,6 +4,8 @@ import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import { type Organization, TeamUserRole } from "~/generated/prisma/client";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
+import { credentialOwnerRole } from "~/server/api-key/credential-owner-role";
+import type { OrgResolvedToken } from "~/server/api-key/token-resolver";
 import {
   TeamNotFoundError,
   type TeamRestService,
@@ -276,7 +278,13 @@ secured
       });
       if (!team) throw new TeamNotFoundError(id);
 
-      const projects = await service.listProjects({ teamId: id });
+      const projects = await service.listProjects({
+        teamId: id,
+        callerOrganizationRole: await credentialOwnerRole({
+          resolved: c.get("orgResolvedToken") as OrgResolvedToken,
+          organizationId: organization.id,
+        }),
+      });
 
       return c.json({ data: projects });
     },

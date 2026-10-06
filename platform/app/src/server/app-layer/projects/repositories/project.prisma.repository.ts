@@ -9,6 +9,7 @@ import {
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
 import { parseOnboardingVariant } from "~/server/schemas/sign-up-data.schema";
+import { projectKindsHiddenFrom } from "../project-kinds";
 import type {
   CreateProjectInput,
   CreateTeamWithBindingInput,
@@ -234,16 +235,18 @@ export class PrismaProjectRepository implements ProjectRepository {
     page,
     limit,
     projectIds,
+    callerOrganizationRole,
   }: {
     organizationId: string;
     page: number;
     limit: number;
     projectIds?: string[];
+    callerOrganizationRole: string | null;
   }): Promise<PaginatedResult<Project>> {
     const where = {
       archivedAt: null,
       team: { organizationId },
-      kind: { not: "internal_governance" },
+      kind: { notIn: projectKindsHiddenFrom(callerOrganizationRole) },
       ...(projectIds ? { id: { in: projectIds } } : {}),
     };
     const [data, total] = await Promise.all([
