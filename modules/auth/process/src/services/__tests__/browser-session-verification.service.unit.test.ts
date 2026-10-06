@@ -24,14 +24,20 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 const COOKIE_NAME = "better-auth.session_token";
 const COOKIE_VALUE = "secret-token-value.sig";
 
-function serviceOver({ verifyBrowserSession }: Pick<AuthApi, "verifyBrowserSession">) {
+function serviceOver({
+  verifyBrowserSession,
+  resolveBrowserSession = async () => ({ kind: "anonymous" }),
+}: Pick<AuthApi, "verifyBrowserSession"> & Partial<Pick<AuthApi, "resolveBrowserSession">>) {
   return BrowserSessionVerificationService.create({
-    sessions: createApiFixture<AuthApi>({
-      verifyBrowserSession,
-      resolveBrowserSession: async () => ({ kind: "anonymous" }),
-    }),
+    sessions: createApiFixture<AuthApi>({ verifyBrowserSession, resolveBrowserSession }),
   });
 }
+
+const verifiedSession = async () =>
+  ({
+    kind: "verified",
+    verified: { session: { id: "session-sam" }, user: { id: "user-sam" } },
+  }) as Awaited<ReturnType<AuthApi["verifyBrowserSession"]>>;
 
 function requestCarrying(cookie?: string): Request {
   return new Request("https://app.test/api/anything", {
@@ -75,6 +81,41 @@ describe("given a request carrying a Better Auth session token", () => {
 
       expect(loggerSpies.error).toHaveBeenCalledTimes(1);
       expect(loggerSpies.warn).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a session token Better Auth verifies", () => {
+  describe("when the Auth service finds no live session behind it", () => {
+    /** @scenario A verified session the Auth service cannot resolve is logged */
+    it("is anonymous, and the unresolved session is logged with its identifiers", async () => {
+      const service = serviceOver({ verifyBrowserSession: verifiedSession });
+
+      await expect(
+        service.verify(requestCarrying(`${COOKIE_NAME}=${COOKIE_VALUE}`)),
+      ).resolves.toEqual({ kind: "anonymous" });
+
+      expect(loggerSpies.warn).toHaveBeenCalledTimes(1);
+      const [fields] = loggerSpies.warn.mock.calls[0] as [Record<string, unknown>, string];
+      expect(fields).toEqual({ sessionId: "session-sam", userId: "user-sam" });
+    });
+  });
+
+  describe("when the Auth service throws resolving it", () => {
+    /** @scenario An Auth service that throws still leaves the caller anonymous */
+    it("is anonymous, and the failure is logged as an error", async () => {
+      const service = serviceOver({
+        verifyBrowserSession: verifiedSession,
+        resolveBrowserSession: async () => {
+          throw new Error("read fork down");
+        },
+      });
+
+      await expect(
+        service.verify(requestCarrying(`${COOKIE_NAME}=${COOKIE_VALUE}`)),
+      ).resolves.toEqual({ kind: "anonymous" });
+
+      expect(loggerSpies.error).toHaveBeenCalledTimes(1);
     });
   });
 });

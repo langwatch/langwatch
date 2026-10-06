@@ -150,6 +150,29 @@ describe("the key door", () => {
     );
   });
 
+  describe("given an Authorization: Basic header beside an X-Auth-Token", () => {
+    /** @scenario Authorization header from a proxy does not poison X-Auth-Token fallback */
+    it("uses the X-Auth-Token, which wins over Basic", async () => {
+      const credential = await door.identifyKey({
+        request: request({
+          authorization: `Basic ${btoa("proxy-user:proxy-password")}`,
+          "x-auth-token": "legacy-key",
+        }),
+      });
+
+      expect(credential.principal).toEqual({ kind: "project", projectId: "project-1" });
+    });
+
+    /** @scenario Authorization Basic is read when no X-Auth-Token is sent */
+    it("reads the Basic credential when no X-Auth-Token is sent", async () => {
+      const credential = await door.identifyKey({
+        request: request({ authorization: `Basic ${btoa("project-1:legacy-key")}` }),
+      });
+
+      expect(credential.principal).toEqual({ kind: "project", projectId: "project-1" });
+    });
+  });
+
   describe("given an API key that resolves a project", () => {
     it("still reaches its organization, naming the project it resolved", async () => {
       const credential = await door.identifyKey({

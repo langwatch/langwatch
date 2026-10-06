@@ -110,7 +110,7 @@ describe("a session idle past its organization's window", () => {
     };
     const refusals = {
       application: { document: null },
-      api: { kind: "caller", caller: { authSessionId: "session-sam" } },
+      api: { kind: "anonymous" },
       background: { kind: "anonymous" },
     };
 

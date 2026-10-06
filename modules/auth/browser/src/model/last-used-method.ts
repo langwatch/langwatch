@@ -20,13 +20,14 @@ export function readLastUsedMethodId(): string | null {
 }
 
 /**
- * Remembers a method that actually got somebody in — a password sign-in that
+ * Remembers a method that actually got somebody in: a password sign-in that
  * came back without a failure, or a federated one promoted from the pending
- * slot once a session exists.
+ * slot. It retires any parked method, so an abandoned dial cannot overwrite it.
  */
 export function rememberLastUsedMethod(method: Pick<SignInMethod, "id">): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, method.id);
+    window.localStorage.removeItem(PENDING_KEY);
   } catch {
     // A browser that will not store it simply does not get the badge.
     return;

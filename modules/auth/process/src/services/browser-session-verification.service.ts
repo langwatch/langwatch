@@ -34,7 +34,7 @@ export class BrowserSessionVerificationService {
     if (verification.kind !== "verified") return { kind: "anonymous" };
     const { verified } = verification;
 
-    const resolution = await this.sessions.resolveBrowserSession({ verified });
+    const resolution = await this.#resolution(verified);
     if (resolution.kind === "anonymous") {
       // Better Auth verified the cookie and the Auth service still found no live session: the row
       // is gone, revoked, or was never this process's to see. Distinct from an anonymous caller.
@@ -43,7 +43,7 @@ export class BrowserSessionVerificationService {
         "Better Auth verified a browser session the Auth service could not resolve; the caller is treated as anonymous",
       );
 
-      return { kind: "caller", caller: { authSessionId: verified.session.id } };
+      return { kind: "anonymous" };
     }
     const { session } = resolution;
 
@@ -59,6 +59,20 @@ export class BrowserSessionVerificationService {
         ...(session.user.impersonator ? { impersonator: session.user.impersonator } : {}),
       },
     };
+  }
+
+  async #resolution(
+    verified: Extract<BrowserSessionVerification, { kind: "verified" }>["verified"],
+  ): Promise<Awaited<ReturnType<BrowserSessionOperations["resolveBrowserSession"]>>> {
+    try {
+      return await this.sessions.resolveBrowserSession({ verified });
+    } catch (error) {
+      logger.error(
+        { error, sessionId: verified.session.id, userId: verified.user.id },
+        "The Auth service failed resolving a verified browser session; treating request as anonymous",
+      );
+      return { kind: "anonymous" };
+    }
   }
 
   async #verification(request: Request): Promise<BrowserSessionVerification> {

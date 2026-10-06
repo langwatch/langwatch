@@ -533,7 +533,7 @@ function extractApiKeyRequestCredentials(request: Request): ApiKeyRequestCredent
   const xAuthToken = request.headers.get("x-auth-token");
   const xProjectId = request.headers.get("x-project-id");
 
-  if (authorization?.toLowerCase().startsWith("basic ")) {
+  if (!xAuthToken && authorization?.toLowerCase().startsWith("basic ")) {
     const parsed = parseBasicCredentials(authorization.slice(6));
     if (parsed) {
       return parsed;

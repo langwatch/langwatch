@@ -52,9 +52,16 @@ Feature: Diagnostic logging on auth failure
     Given a corporate proxy injects "Authorization: Basic <its-own-base64>" into the request
     And the customer's request also carries "X-Auth-Token: <valid-key>"
     When the middleware runs extractCredentials
-    Then the credential extraction must fall back to X-Auth-Token
+    Then the credential extraction uses X-Auth-Token, which wins over Authorization: Basic
     And the customer's legitimate token is used for project resolution
     And the request is not 401'd by the proxy header
+
+  @unit
+  Scenario: Authorization Basic is read when no X-Auth-Token is sent
+    Given a request carries "Authorization: Basic" holding a project id and a key
+    And the request carries no X-Auth-Token
+    When the middleware runs extractCredentials
+    Then the key is taken from the Basic credential, with its project id
 
   @unit
   Scenario: Empty or whitespace-only Bearer token does not poison X-Auth-Token fallback
