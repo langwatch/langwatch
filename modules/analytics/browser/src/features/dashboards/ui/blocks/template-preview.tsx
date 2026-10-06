@@ -1,7 +1,8 @@
 /**
  * A template card's preview: the template's real board as a captured image in an inset frame,
  * or, until one is captured, faint blocks where its widgets sit. Either way it is decoration,
- * runs no query and cannot be focused; the sketch is laid out wide and scaled to the card.
+ * runs no query and cannot be focused. Both fit the card's width and run off the bottom
+ * under the fade, so no widget is cut at the sides.
  */
 
 import { Box, Grid, HStack, Image } from "@langwatch/design-system/primitives";
@@ -113,14 +114,7 @@ export function TemplatePreview({ preview, isMuted }: { preview: Preview; isMute
     >
       <Box height="full" opacity={isMuted ? 0.55 : 1}>
         {preview.kind === "image" ? (
-          <Image
-            src={preview.src}
-            alt=""
-            width="full"
-            height="full"
-            objectFit="cover"
-            objectPosition="top"
-          />
+          <Image src={preview.src} alt="" width="full" height="auto" />
         ) : (
           <Box width={`${BOARD_WIDTH}px`} transform={`scale(${scale})`} transformOrigin="top left">
             <LayoutSketch widgets={preview.widgets} />

@@ -3,6 +3,8 @@
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
+import { existsSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { CHART_GRID_COLUMNS } from "../../../model/chart-grid.ts";
@@ -169,6 +171,15 @@ describe("the templates library", () => {
       for (const { board, preview } of TEMPLATE_LIBRARY) {
         if (!TEMPLATE_PREVIEW_IDS.has(board.id)) continue;
         expect(preview, board.id).toEqual({ kind: "image", src: templatePreviewSrc(board.id) });
+      }
+    });
+
+    /** @scenario "AC107d Templates library: a card previews the template's real board" */
+    it("ships an image file for every template it calls captured", () => {
+      const publicDir = "../../../../../../../apps/ui/public";
+      for (const id of TEMPLATE_PREVIEW_IDS) {
+        const file = new URL(`${publicDir}${templatePreviewSrc(id)}`, import.meta.url);
+        expect(existsSync(file), id).toBe(true);
       }
     });
 

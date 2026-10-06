@@ -33,11 +33,29 @@ import {
 } from "./catalogue-filter.ts";
 
 /** Templates with a board image captured from the demo seed, served at `templatePreviewSrc`. */
-export const TEMPLATE_PREVIEW_IDS: ReadonlySet<string> = new Set(["cockpit"]);
+export const TEMPLATE_PREVIEW_IDS: ReadonlySet<string> = new Set([
+  "cockpit",
+  "costs",
+  "models",
+  "asks",
+  "answers",
+  "unanswered",
+  "breaks",
+  "speed",
+  "tools",
+  "release",
+  "change",
+  "evals",
+  "signoff",
+  "customers",
+  "calls",
+  "fields",
+  "outputs",
+]);
 
 /** Where a captured template image is served from. */
 export function templatePreviewSrc(templateId: string): string {
-  return `/images/dashboards/templates/${templateId}.png`;
+  return `/images/dashboards/templates/${templateId}.webp`;
 }
 
 /** The faint stand-in a sketched widget shows in place of its chart. */
