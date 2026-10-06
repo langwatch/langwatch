@@ -106,7 +106,9 @@ export class ScimSyncLedgerWriterService implements ScimSyncLifecycleLedger {
           pipeline: SCIM_SYNC_PIPELINE_NAME,
           senderName,
         },
-        `directory sync history not recorded: this process registered no "${SCIM_SYNC_PIPELINE_NAME}" pipeline, so there is no "${senderName}" sender to stage through. The push itself is unaffected; every directory-sync fact is lost until the pipeline is registered on this process's eventing.`,
+        `directory sync history not recorded: this process registered no "${SCIM_SYNC_PIPELINE_NAME}" pipeline, ` +
+          `so there is no "${senderName}" sender to stage through. The push itself is unaffected; ` +
+          `every directory-sync fact is lost until the pipeline is registered on this process's eventing.`,
       );
       return;
     }

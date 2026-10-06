@@ -4,7 +4,6 @@
  * ADR-092 §6 step RECORD — denials emit one structured log line here. That
  */
 import {
-  ALL_PERMISSIONS,
   PermissionDeniedError,
   type AuthzDeclaredScopeId,
   type AuthzGetDecisionInput,
@@ -63,7 +62,6 @@ import {
   AuthzScopeNotFoundError,
   type AuthzFindPermissionsBeyondCallerInput,
 } from "@langwatch/authz-contract";
-import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -73,14 +71,13 @@ import type { AuthzManagedGrantRepository } from "../repositories/authz-managed-
 import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
 import { findPermissionsBeyondHeld } from "../rules/grant-escalation.rules.ts";
 import { AuthzCollectorService } from "./authz-collector.service.ts";
+import { AuthzDecisionService } from "./authz-decision.service.ts";
 import { AuthzGrantReaderService } from "./authz-grant-reader.service.ts";
 import { AuthzGrantSnapshotService } from "./authz-grant-snapshot.service.ts";
 import { AuthzIdDecisionsService } from "./authz-id-decisions.service.ts";
 import { AuthzPermissionGateService } from "./authz-permission-gate.service.ts";
 import type { AuthzPlatformOperatorsService } from "./authz-platform-operators.service.ts";
 import { AuthzScopeLineageService } from "./authz-scope-lineage.service.ts";
-
-const decisions = createLogger("langwatch:authz:decisions");
 
 /** The loose ids a caller holds before a scope ref has been resolved. */
 type ScopeIds = {
@@ -146,11 +143,12 @@ export class AuthzService extends AuthzServiceContract {
 
   private readonly idDecisions: AuthzIdDecisionsService;
 
+  private readonly decisionCore: AuthzDecisionService;
+
   private readonly gate: AuthzPermissionGateService;
 
   private readonly collector: AuthzCollectorService;
   private readonly bindingReader: AuthzGrantReaderService;
-  private readonly snapshots: AuthzGrantSnapshotService;
   private readonly scopeLineage: AuthzScopeLineageService;
   private readonly options: AuthzServiceOptions;
 
@@ -170,15 +168,15 @@ export class AuthzService extends AuthzServiceContract {
     super();
     this.collector = collector;
     this.bindingReader = bindingReader;
-    this.snapshots = snapshots;
     this.scopeLineage = scopeLineage;
     this.options = options;
+    this.decisionCore = AuthzDecisionService.create({ engine: this.engine, snapshots });
     this.idDecisions = AuthzIdDecisionsService.create({
       engine: this.engine,
       collector,
       snapshots,
       getScope: (ids) => this.getScope(ids),
-      recordDenial: (decision) => this.recordDenial(decision),
+      recordDenial: (decision) => this.decisionCore.recordDenial(decision),
     });
     this.gate = AuthzPermissionGateService.create({
       authorize: (input) => this.authorize(input),
@@ -196,32 +194,9 @@ export class AuthzService extends AuthzServiceContract {
     return decision;
   }
 
-  /**
-   * check() plus the collected snapshot - for adapters that must also surface legacy context
-   * fields (the tRPC middleware sets ctx.organizationRole from it). For an api-key principal
-   * the snapshot returned is the KEY's, not the owner's: the owner only ever caps.
-   */
-  async checkDetailed({ principal, permission, scope }: CheckArgs): Promise<{
-    decision: AuthzDecision;
-    grants: CollectedGrants;
-  }> {
-    const organizationId = scopeOrganizationId(scope);
-    const [grants, resourceGrants, ownerGrants] = await Promise.all([
-      this.snapshots.collectCached({ principal, organizationId }),
-      this.snapshots.findResourceGrantsFor(scope),
-      this.snapshots.findOwnerGrantsFor({ principal, organizationId }),
-    ]);
-    const decision = this.engine.decideWithCeiling({
-      keyGrants: grants,
-      ownerGrants,
-      permission,
-      scope,
-      demoProjectId: this.snapshots.findDemoProjectId(),
-      resourceGrants,
-    });
-    this.recordDenial(decision);
-
-    return { decision, grants };
+  /** check() plus the collected snapshot; see AuthzDecisionService. */
+  checkDetailed(args: CheckArgs): Promise<{ decision: AuthzDecision; grants: CollectedGrants }> {
+    return this.decisionCore.checkDetailed(args);
   }
 
   async can(args: AuthzCanInput): Promise<boolean> {
@@ -273,37 +248,12 @@ export class AuthzService extends AuthzServiceContract {
     });
   }
 
-  /**
-   * The caller's full effective permission set at a scope — the frontend's single source of
-   * truth (useCan). Computed by testing the whole registry against one collected snapshot:
-   * pure decides over ~126 permissions.
-   */
-  async effectivePermissions({
-    principal,
-    scope,
-  }: {
+  /** The caller's full effective permission set at a scope; see AuthzDecisionService. */
+  effectivePermissions(args: {
     principal: AuthzPrincipalRef;
     scope: AuthzScopeRef;
   }): Promise<AuthzPermission[]> {
-    const organizationId = scopeOrganizationId(scope);
-    const [grants, resourceGrants, ownerGrants] = await Promise.all([
-      this.snapshots.collectCached({ principal, organizationId }),
-      this.snapshots.findResourceGrantsFor(scope),
-      this.snapshots.findOwnerGrantsFor({ principal, organizationId }),
-    ]);
-    const demo = this.snapshots.findDemoProjectId();
-
-    return ALL_PERMISSIONS.filter(
-      (permission) =>
-        this.engine.decideWithCeiling({
-          keyGrants: grants,
-          ownerGrants,
-          permission,
-          scope,
-          demoProjectId: demo,
-          resourceGrants,
-        }).allowed,
-    );
+    return this.decisionCore.effectivePermissions(args);
   }
 
   /**
@@ -483,40 +433,9 @@ export class AuthzService extends AuthzServiceContract {
     return this.bindingReader.getAccessBreakdown(args);
   }
 
-  /**
-   * ADR-092 §6 — render the walk for a decision against the CURRENT grant
-   * snapshot, not the one the decision was made against: a grant write between the decision
-   * and this call changes the rendered walk.
-   */
-  async explainDecision({ decision }: { decision: AuthzDecision }): Promise<string[]> {
-    const grants = await this.snapshots.collectCached({
-      principal: decision.principal,
-      organizationId: scopeOrganizationId(decision.scope),
-    });
-
-    return this.engine.explain({ decision, grants });
-  }
-
-  /**
-   * ADR-092 §6 step RECORD, as far as it goes today: one structured line per
-   * DENY, carrying the five facts a mismatch investigation starts from.
-   */
-  private recordDenial(decision: AuthzDecision): void {
-    if (decision.allowed) {
-      return;
-    }
-
-    decisions.info(
-      {
-        principalType: decision.principal.type,
-        principalId: decision.principal.type === "anonymous" ? undefined : decision.principal.id,
-        permission: decision.permission,
-        scopeType: decision.scope.type,
-        scopeId: decision.scope.id,
-        denialReason: decision.denialReason,
-      },
-      "authz decision denied",
-    );
+  /** ADR-092 §6: the walk for a decision, against the current snapshot. */
+  explainDecision(args: { decision: AuthzDecision }): Promise<string[]> {
+    return this.decisionCore.explainDecision(args);
   }
 
   /** Fail closed if an untyped caller bypasses the exclusive scope argument. */

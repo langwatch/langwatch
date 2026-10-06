@@ -3,7 +3,7 @@
  * grants. Every mutation validates against the registry/tenancy and bumps the org's authz
  * epoch so caches and passports die on the caller's next request.
  */
-import { toLedgerActor, type Actor, type LedgerActor } from "@langwatch/authorization";
+import type { Actor } from "@langwatch/authorization";
 import {
   AuthzGrantsService as AuthzGrantsServiceContract,
   DuplicateGrantError,
@@ -38,8 +38,6 @@ import {
   type AuthzUpdateGrantInput,
   type AuthzUpdateBindingInput,
   type GrantPrincipal,
-  type GrantRole,
-  type GrantableAuthzScopeRef,
   scopeOrganizationId,
   type AuthzChangeGrantRoleInput,
   type AuthzCreateGrantInput,
@@ -57,9 +55,16 @@ import type { AuthzEpochRepository } from "../repositories/authz-epoch.repositor
 import type {
   AuthzGrantRepository,
   BindingPrincipalWhere,
-  GrantWrite,
 } from "../repositories/authz-grant.repository.ts";
 import type { AuthzManagedGrantRepository } from "../repositories/authz-managed-grant.repository.ts";
+import {
+  RESOURCE_SCOPE_REJECTION,
+  SCOPE_TYPE_FOR_REF,
+  grantLedgerActor,
+  grantWriteRow,
+  knownWriteFailure,
+} from "../rules/grant-write.rules.ts";
+import { AuthzDirectoryGrantsService } from "./authz-directory-grants.service.ts";
 import { AuthzGrantGuardsService } from "./authz-grant-guards.service.ts";
 import { AuthzGrantManagementService } from "./authz-grant-management.service.ts";
 import {
@@ -99,17 +104,6 @@ type AuthzOffboardRequest = Omit<AuthzOffboardInput, "actor"> & {
   actor: { userId: string } | Actor;
 };
 
-type GrantableScope = GrantableAuthzScopeRef;
-
-const SCOPE_TYPE_FOR_REF = {
-  project: "PROJECT",
-  team: "TEAM",
-  organization: "ORGANIZATION",
-} as const;
-
-const RESOURCE_SCOPE_REJECTION =
-  "Resource-tier access is granted by sharing the resource, not by a role binding";
-
 export class AuthzGrantsService extends AuthzGrantsServiceContract {
   static create(options: AuthzGrantsServiceOptions): AuthzGrantsService {
     const bindingWriter = AuthzGrantWriterService.create({
@@ -136,6 +130,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
   private readonly grantManagement: AuthzGrantManagementService;
   private readonly offboarding: AuthzOffboardingService;
   private readonly guards: AuthzGrantGuardsService;
+  private readonly directoryGrants: AuthzDirectoryGrantsService;
 
   private constructor({
     options,
@@ -156,6 +151,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     this.grantManagement = grantManagement;
     this.offboarding = offboarding;
     this.guards = guards;
+    this.directoryGrants = AuthzDirectoryGrantsService.create(options);
   }
 
   /** INSERT (who, role, where) — visible on the next check. */
@@ -184,11 +180,18 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     await this.guards.assertScopeBelongsToOrganization({ where, organizationId });
     await this.guards.assertRoleUsable({ role, organizationId });
 
-    const row = this.bindingRow({ who, role, where, organizationId, expiresAtMs });
+    const row = grantWriteRow({
+      bindingId: this.options.newBindingId(),
+      principal: this.principalWhere(who),
+      role,
+      where,
+      organizationId,
+      expiresAtMs,
+    });
     try {
       await repository.createBinding({
         row,
-        actor: this.writeActor(actor),
+        actor: grantLedgerActor(actor),
         source,
       });
     } catch (error) {
@@ -214,7 +217,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         organizationId,
         role: "customRoleId" in role ? "CUSTOM" : role.builtin,
         customRoleId: "customRoleId" in role ? role.customRoleId : null,
-        actor: this.writeActor(actor),
+        actor: grantLedgerActor(actor),
       });
     } catch (error) {
       // A role change can collide with a sibling binding the principal
@@ -233,7 +236,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
       await repository.deleteBinding({
         bindingId,
         organizationId,
-        actor: this.writeActor(actor),
+        actor: grantLedgerActor(actor),
       });
     } catch (error) {
       this.rethrowKnownWriteFailure(error, { bindingId });
@@ -274,7 +277,14 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     const { repository } = this.options;
     await this.guards.assertScopeBelongsToOrganization({ where: to, organizationId });
     await this.guards.assertRoleUsable({ role, organizationId });
-    const row = this.bindingRow({ who, role, where: to, organizationId, expiresAtMs });
+    const row = grantWriteRow({
+      bindingId: this.options.newBindingId(),
+      principal: this.principalWhere(who),
+      role,
+      where: to,
+      organizationId,
+      expiresAtMs,
+    });
     try {
       await repository.replaceBinding({
         deleteWhere: {
@@ -284,7 +294,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
           principal: this.principalWhere(who),
         },
         create: row,
-        actor: this.writeActor(actor),
+        actor: grantLedgerActor(actor),
       });
     } catch (error) {
       this.rethrowKnownWriteFailure(error, {
@@ -309,7 +319,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     organizationId,
   }: AuthzOffboardRequest): Promise<AuthzOffboardOutput> {
     const result = await this.offboarding.offboard({
-      actor: this.writeActor(actor),
+      actor: grantLedgerActor(actor),
       userId,
       organizationId,
     });
@@ -371,41 +381,17 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     return this.options.ledger.revokeBindingsWhere(args);
   }
 
-  /**
-   * The directory's own organization-scoped grants for these people, taken
-   * back in one revocation: group membership supplies their access now. An
-   * administrator's own grant at the same scope carries another source.
-   */
-  async retireDirectoryGrants({
-    organizationId,
-    userIds,
-    actor,
-    reason,
-  }: AuthzRetireDirectoryGrantsInput): Promise<AuthzRetireDirectoryGrantsOutput> {
-    if (userIds.length === 0) return 0;
-
-    const bindingIds = await this.options.repository.findDirectoryOrganizationGrantIds({
-      organizationId,
-      userIds,
-    });
-    if (bindingIds.length === 0) return 0;
-
-    await this.options.ledger.revokeBindings({
-      organizationId,
-      bindingIds,
-      actor,
-      ...(reason ? { reason } : {}),
-    });
-    return bindingIds.length;
+  /** The directory's own organization grants, retired; see AuthzDirectoryGrantsService. */
+  retireDirectoryGrants(
+    args: AuthzRetireDirectoryGrantsInput,
+  ): Promise<AuthzRetireDirectoryGrantsOutput> {
+    return this.directoryGrants.retireDirectoryGrants(args);
   }
 
-  /** Newest first, capped by the caller: a reconciliation panel reads a page,
-   *  never the whole history of a directory that has run for years. */
-  async findDirectoryCausedChanges({
-    organizationId,
-    limit,
-  }: AuthzDirectoryCausedChangesInput): Promise<AuthzDirectoryCausedChangesOutput> {
-    return this.options.repository.findDirectoryCausedChanges({ organizationId, limit });
+  findDirectoryCausedChanges(
+    args: AuthzDirectoryCausedChangesInput,
+  ): Promise<AuthzDirectoryCausedChangesOutput> {
+    return this.directoryGrants.findDirectoryCausedChanges(args);
   }
 
   async offboardMember(args: AuthzOffboardMemberInput): Promise<void> {
@@ -456,68 +442,25 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     return this.grantManagement.revoke(args);
   }
 
-  private bindingRow({
-    who,
-    role,
-    where,
-    organizationId,
-    expiresAtMs,
-  }: {
-    who: GrantPrincipal;
-    role: GrantRole;
-    where: GrantableScope;
-    organizationId: string;
-    expiresAtMs: number | undefined;
-  }): GrantWrite {
-    return {
-      bindingId: this.options.newBindingId(),
-      organizationId,
-      scopeType: SCOPE_TYPE_FOR_REF[where.type],
-      scopeId: where.id,
-      role: "customRoleId" in role ? "CUSTOM" : role.builtin,
-      customRoleId: "customRoleId" in role ? role.customRoleId : null,
-      principal: this.principalWhere(who),
-      // Omitted, never `undefined`: a grant with no end date keeps the shape it always had.
-      ...(expiresAtMs !== undefined ? { expiresAtMs } : {}),
-    };
-  }
-
   private nowMs(): number {
     return nowInstant().epochMilliseconds;
-  }
-
-  private writeActor(actor: { userId: string } | Actor): LedgerActor {
-    return toLedgerActor("userId" in actor ? { type: "user", id: actor.userId } : actor);
-  }
-
-  private tryPortErrorCode(error: unknown): string | undefined {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      typeof (error as { code: unknown }).code === "string"
-    ) {
-      return (error as { code: string }).code;
-    }
-
-    return undefined;
   }
 
   private rethrowKnownWriteFailure(
     error: unknown,
     { bindingId, ...meta }: { bindingId?: string } & Record<string, unknown>,
   ): never {
-    const code = this.tryPortErrorCode(error);
+    const failure = knownWriteFailure(error);
     const errorMeta = { ...meta };
     if (bindingId) {
       errorMeta.bindingId = bindingId;
     }
 
-    if (code === "role_binding_already_exists") {
+    if (failure === "duplicate") {
       throw new DuplicateGrantError(errorMeta);
     }
 
-    if (code === "role_binding_not_found") {
+    if (failure === "not_found") {
       throw AuthzGrantGuardsService.bindingNotFound(errorMeta);
     }
 

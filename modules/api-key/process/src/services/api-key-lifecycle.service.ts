@@ -19,8 +19,13 @@ import {
 import type { AuthzGrantCaller, AuthzPrincipalRef } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import { fromDate } from "@langwatch/time";
+import type { z } from "zod";
 
-import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
+import type {
+  ApiKeyCreateRecord,
+  ApiKeyRepository,
+  StoredApiKey,
+} from "../repositories/api-key.repository.ts";
 import type { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
 import type { ApiKeyTokenResolutionService } from "./api-key-token-resolution.service.ts";
@@ -143,24 +148,14 @@ export class ApiKeyLifecycleService {
     const generated = this.options.tokens.generate({
       prefix: parsed.ingestSourceType ? INGEST_KEY_PREFIX : API_KEY_PREFIX,
     });
-    const row = await this.repository.create({
-      name: parsed.name,
-      description: parsed.description ?? null,
-      lookupId: generated.lookupId,
-      hashedSecret: generated.hashedSecret,
-      permissionMode: parsed.permissionMode ?? "default",
-      userId: parsed.userId ?? null,
-      createdByUserId: parsed.createdByUserId ?? null,
-      createdByDeviceLabel: parsed.createdByDeviceLabel ?? null,
-      parentApiKeyId: parsed.parentApiKeyId ?? null,
-      organizationId: parsed.organizationId,
-      expiresAt: parsed.expiresAt ? fromDate(parsed.expiresAt) : null,
-      ingestSourceType: parsed.ingestSourceType ?? null,
-      ingestionTemplateId: parsed.ingestionTemplateId ?? null,
-      isSystemManaged: parsed.isSystemManaged ?? false,
-      startsDisabled: true,
-      grants: effectiveBindings,
-    });
+    const row = await this.repository.create(
+      createRecord({
+        parsed,
+        lookupId: generated.lookupId,
+        hashedSecret: generated.hashedSecret,
+        grants: effectiveBindings,
+      }),
+    );
     await this.grants.writeBindings({
       apiKeyId: row.id,
       organizationId: parsed.organizationId,
@@ -213,29 +208,12 @@ export class ApiKeyLifecycleService {
         })
       : void 0;
     if (input.bindings) {
-      for (const binding of input.bindings) {
-        await this.grants.validateScope(binding, input.organizationId);
-      }
-
-      await this.grants.assertPersonalScopesOwnedBy({
-        scopes: input.bindings,
-        organizationId: input.organizationId,
+      await this.validateUpdateBindings({
+        input,
+        bindings: input.bindings,
         ownerUserId: existing.userId,
-        isSystemManaged: false,
+        permissions,
       });
-      const principals = ceilingPrincipals({
-        ownerUserId: existing.userId,
-        userId: input.callerUserId,
-        apiKeyId: input.callerApiKeyId,
-      });
-      for (const principal of principals) {
-        await this.grants.assertCeiling({
-          principal,
-          organizationId: input.organizationId,
-          bindings: input.bindings,
-          permissions: permissions ?? [],
-        });
-      }
     }
 
     const effectiveBindings =
@@ -261,6 +239,43 @@ export class ApiKeyLifecycleService {
     await this.answers.forget({ lookupId: existing.lookupId, revoked: false });
 
     return publicApiKey(await this.bindings.attachOne(updated));
+  }
+
+  /** The new bindings' scopes, personal-scope ownership and every caller's ceiling, in order. */
+  private async validateUpdateBindings({
+    input,
+    bindings,
+    ownerUserId,
+    permissions,
+  }: {
+    input: UpdateApiKeyInput;
+    bindings: ApiKeyScope[];
+    ownerUserId: string | null;
+    permissions: string[] | undefined;
+  }): Promise<void> {
+    for (const binding of bindings) {
+      await this.grants.validateScope(binding, input.organizationId);
+    }
+
+    await this.grants.assertPersonalScopesOwnedBy({
+      scopes: bindings,
+      organizationId: input.organizationId,
+      ownerUserId,
+      isSystemManaged: false,
+    });
+    const principals = ceilingPrincipals({
+      ownerUserId,
+      userId: input.callerUserId,
+      apiKeyId: input.callerApiKeyId,
+    });
+    for (const principal of principals) {
+      await this.grants.assertCeiling({
+        principal,
+        organizationId: input.organizationId,
+        bindings,
+        permissions: permissions ?? [],
+      });
+    }
   }
 
   /** Sets revokedAt, then a refusal as the key's shared answer: dead on every pod at once. */
@@ -448,4 +463,36 @@ export class ApiKeyLifecycleService {
       });
     }
   }
+}
+
+/** The stored row a create writes: disabled until its grants land, then activated. */
+function createRecord({
+  parsed,
+  lookupId,
+  hashedSecret,
+  grants,
+}: {
+  parsed: z.output<typeof createApiKeyInputSchema>;
+  lookupId: string;
+  hashedSecret: string;
+  grants: ApiKeyScope[];
+}): ApiKeyCreateRecord {
+  return {
+    name: parsed.name,
+    description: parsed.description ?? null,
+    lookupId,
+    hashedSecret,
+    permissionMode: parsed.permissionMode ?? "default",
+    userId: parsed.userId ?? null,
+    createdByUserId: parsed.createdByUserId ?? null,
+    createdByDeviceLabel: parsed.createdByDeviceLabel ?? null,
+    parentApiKeyId: parsed.parentApiKeyId ?? null,
+    organizationId: parsed.organizationId,
+    expiresAt: parsed.expiresAt ? fromDate(parsed.expiresAt) : null,
+    ingestSourceType: parsed.ingestSourceType ?? null,
+    ingestionTemplateId: parsed.ingestionTemplateId ?? null,
+    isSystemManaged: parsed.isSystemManaged ?? false,
+    startsDisabled: true,
+    grants,
+  };
 }
