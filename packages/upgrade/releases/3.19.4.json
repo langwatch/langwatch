@@ -1,0 +1,14 @@
+{
+  "release": "3.19.4",
+  "previous": "3.19.3",
+  "cutAt": "2026-10-01T23:31:12+02:00",
+  "steps": [
+    {
+      "id": "prisma:20261001120000_sso_provider_entra_issuer_trailing_slash",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: sso provider entra issuer trailing slash"
+    }
+  ]
+}
