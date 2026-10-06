@@ -1,3 +1,4 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   DepartmentScopeOwnershipUnavailableError,
   dataPrivacyConfigSchema,
@@ -9,7 +10,6 @@ import {
   type DataPrivacyScope,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { overBroadSecretPatternProbe } from "@langwatch/redaction";
 import safe from "safe-regex2";
@@ -22,37 +22,40 @@ import {
 import { DataPrivacyPolicyCacheService } from "./data-privacy-cache.service.ts";
 import { DataPrivacyResolutionService } from "./data-privacy-resolution.service.ts";
 
+/** The door's own lineage check (`packages/api` access), asked of a nested scope (Q151 Q1). */
+type ScopeLineage = Pick<AuthzApi, "checkScopeLineage">;
+
 export class DataPrivacyService {
   private readonly repository: DataPrivacyPolicyRepository;
   private readonly cache: DataPrivacyPolicyCacheService;
   private readonly resolution: DataPrivacyResolutionService;
   private readonly projects: ProjectApi;
-  private readonly organizations: OrganizationApi;
+  private readonly lineage: ScopeLineage;
 
   private constructor({
     repository,
     cache,
     resolution,
     projects,
-    organizations,
+    lineage,
   }: {
     repository: DataPrivacyPolicyRepository;
     cache: DataPrivacyPolicyCacheService;
     resolution: DataPrivacyResolutionService;
     projects: ProjectApi;
-    organizations: OrganizationApi;
+    lineage: ScopeLineage;
   }) {
     this.repository = repository;
     this.cache = cache;
     this.resolution = resolution;
     this.projects = projects;
-    this.organizations = organizations;
+    this.lineage = lineage;
   }
 
   static create(options: {
     repository: DataPrivacyPolicyRepository;
     projects: ProjectApi;
-    organizations: OrganizationApi;
+    lineage: ScopeLineage;
     ttlMs?: number;
     now?: () => number;
   }): DataPrivacyService {
@@ -71,7 +74,7 @@ export class DataPrivacyService {
         cache,
       }),
       projects: options.projects,
-      organizations: options.organizations,
+      lineage: options.lineage,
     });
   }
 
@@ -145,22 +148,18 @@ export class DataPrivacyService {
       return input.organizationId;
     }
 
-    if (input.scope.scopeType === "TEAM") {
-      const team = await this.organizations.getTeamById({ teamId: input.scope.scopeId });
-      if (team.organizationId !== input.organizationId) {
+    if (input.scope.scopeType === "TEAM" || input.scope.scopeType === "PROJECT") {
+      const { organizationId, scope } = input;
+      const lineage = await this.lineage.checkScopeLineage(
+        scope.scopeType === "TEAM"
+          ? { organizationId, teamId: scope.scopeId }
+          : { organizationId, projectId: scope.scopeId },
+      );
+      if (lineage.kind !== "consistent") {
         throw new ScopeTargetNotFoundError();
       }
 
-      return team.organizationId;
-    }
-
-    if (input.scope.scopeType === "PROJECT") {
-      const project = await this.projects.getWithTeam(input.scope.scopeId);
-      if (project.team.organizationId !== input.organizationId) {
-        throw new ScopeTargetNotFoundError();
-      }
-
-      return project.team.organizationId;
+      return input.organizationId;
     }
 
     throw new DepartmentScopeOwnershipUnavailableError();
