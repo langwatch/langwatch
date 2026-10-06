@@ -45,6 +45,8 @@ describe("Governance receiver policy", () => {
     },
   );
 
+  /** @scenario "Receiver identity wins over sender and configured policy" */
+  /** @scenario "Metrics retain the existing billing distinction" */
   it.each(["traces", "logs", "metrics"] as const)(
     "overwrites forged %s provenance and retains authenticated key identity",
     (signal) => {
@@ -92,6 +94,7 @@ describe("Governance receiver policy", () => {
     },
   );
 
+  /** @scenario "Metrics retain the existing billing distinction" */
   it.each([true, false])(
     "prices traces and logs with bundled=%s while metrics remain unpriced",
     (nonBillable) => {
@@ -118,6 +121,7 @@ describe("Governance receiver policy", () => {
   );
 
   /** @scenario Foreign OTLP traffic on a copilot_vscode key is dropped at the receiver */
+  /** @scenario "VS Code policy excludes inherited telemetry" */
   it.each(["traces", "metrics"] as const)(
     "filters foreign VS Code %s scopes and removes empty groups",
     (signal) => {
@@ -154,6 +158,7 @@ describe("Governance receiver policy", () => {
     },
   );
 
+  /** @scenario "VS Code policy excludes inherited telemetry" */
   it("keeps unrelated source scopes and does not apply the VS Code restriction to logs", () => {
     const other = buildIngestKeyReceiverPolicies(identity, true);
     const vscode = buildIngestKeyReceiverPolicies(

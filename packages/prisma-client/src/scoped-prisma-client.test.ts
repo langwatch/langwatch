@@ -45,6 +45,7 @@ function clientFixture() {
 }
 
 describe("scoped Prisma repository capability", () => {
+  /** @scenario "A scoped repository cannot escape its owner" */
   it("only exposes delegates for claimed models", () => {
     const { client } = clientFixture();
     const scoped = scopedPrismaClient(client, ["AuditLog"]);
@@ -58,6 +59,7 @@ describe("scoped Prisma repository capability", () => {
     );
   });
 
+  /** @scenario "A scoped repository cannot escape its owner" */
   it("rejects foreign nested relation reads before the delegate executes", () => {
     const { client, userFindMany } = clientFixture();
     const scoped = scopedPrismaClient(client, ["User"]);
@@ -71,6 +73,7 @@ describe("scoped Prisma repository capability", () => {
     expect(userFindMany).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A scoped repository cannot escape its owner" */
   it("rejects foreign relation filters and nested writes before the delegate executes", () => {
     const { client, userFindMany, userUpdate } = clientFixture();
     const scoped = scopedPrismaClient(client, ["User"]);
@@ -88,6 +91,7 @@ describe("scoped Prisma repository capability", () => {
     expect(userUpdate).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A scoped repository cannot escape its owner" */
   it("keeps an interactive transaction inside the same capability", async () => {
     const { auditLogCreate, client, transaction } = clientFixture();
     const scoped = scopedPrismaClient(client, ["AuditLog"]);
@@ -168,6 +172,7 @@ describe("scoped Prisma repository capability", () => {
     ).toThrow(/reason, and removal condition/);
   });
 
+  /** @scenario "A migration exception is narrower than ownership" */
   it("allows only an exact reviewed relation exception", () => {
     const { client, userFindMany, userUpdate } = clientFixture();
     const scoped = scopedPrismaClient(client, ["User"], {
@@ -192,5 +197,6 @@ describe("scoped Prisma repository capability", () => {
     ).toThrow(/foreign relation User.orgMemberships/);
     expect(userFindMany).toHaveBeenCalledTimes(2);
     expect(userUpdate).not.toHaveBeenCalled();
+    expect(() => Reflect.get(scoped, "organizationUser")).toThrow(/denied access/);
   });
 });

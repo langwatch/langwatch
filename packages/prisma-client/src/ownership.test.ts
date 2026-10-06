@@ -20,6 +20,7 @@ describe("Prisma table claims", () => {
     });
     expect(Object.isFrozen(claim.tables)).toBe(true);
   });
+  /** @scenario "Invalid claims fail locally" */
   it.each([[], ["MissingModel"], ["__proto__"], ["constructor"]])(
     "rejects invalid untyped input %j",
     (models) => {

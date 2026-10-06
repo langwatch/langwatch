@@ -49,6 +49,7 @@ describe("EntitlementModule.assertWithinUsageLimit", () => {
 
   describe("given an organization within its monthly allowance", () => {
     /** @scenario "An organization within its monthly allowance is let through" */
+    /** @scenario "Work within the monthly allowance is let through" */
     it("resolves without refusing", async () => {
       const app = createEntitlementTestApp({
         infrastructure: { baseline: free, counter: TestUsageCounter.create(10) },

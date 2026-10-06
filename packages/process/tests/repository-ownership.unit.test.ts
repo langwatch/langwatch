@@ -41,6 +41,7 @@ class AnnotationModule {
 }
 
 describe("repository ownership", () => {
+  /** @scenario "Conflicting owners fail before factories run" */
   it.each(["api", "worker", "tasks"] as const)(
     "rejects conflicting ownership before any %s factory runs",
     async (role) => {
@@ -49,11 +50,16 @@ describe("repository ownership", () => {
         defineProcessModule("user").withApi(UserModule).build(),
         defineProcessModule("annotation").withApi(AnnotationModule).build(),
       ]);
-      await expect(runtime.boot()).rejects.toThrow(RepositoryOwnershipConflictError);
+      const refusal = await runtime.boot().catch((error: unknown) => error);
+      expect(refusal).toBeInstanceOf(RepositoryOwnershipConflictError);
+      expect((refusal as Error).message).toContain(
+        "Table postgres/User is claimed by both user and annotation",
+      );
       expect(created).not.toHaveBeenCalled();
     },
   );
 
+  /** @scenario "Multiple repositories implement one coherent owner" */
   it("allows two repositories belonging to the same owner", () => {
     expect(() =>
       assertRepositoryOwnership([
@@ -80,6 +86,7 @@ describe("repository ownership", () => {
     ).not.toThrow();
   });
 
+  /** @scenario "Mutation cannot rewrite a declared claim" */
   it("freezes a declaration independently of later metadata mutation", () => {
     const tables = ["AuditLog"];
     const app = {

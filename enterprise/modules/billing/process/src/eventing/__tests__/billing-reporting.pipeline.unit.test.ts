@@ -154,6 +154,7 @@ describe("the monthly billing roll-up's eventing declaration", () => {
 
   describe("given usage records a month's counted total", () => {
     /** @scenario "Billing reports to Stripe from the month's counted total" */
+    /** @scenario "Billing reports the month's total to Stripe from usage's month_counted event" */
     it("subscribes to month_counted and dispatches the month's report with that total", async () => {
       const pipeline = rollUp();
       const { definition, subscribers } = peerSubscribers(pipeline);

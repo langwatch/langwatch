@@ -39,6 +39,8 @@ function report(code, path = filename) {
 }
 
 describe("efficient Zod object composition", () => {
+  /** @scenario "A derived object spreads its fields" */
+  /** @scenario "Schema aliases and imports retain their identity" */
   it.each([
     [
       "named import",
@@ -74,9 +76,11 @@ describe("efficient Zod object composition", () => {
     expect(findings[0].messageId).toBe("spreadShape");
     expect(findings[0].message).toContain("z.object({ ...base.shape, ...fields })");
     expect(findings[0].message).toContain(".safeExtend({ ...fields })");
+    expect(findings[0].message).toMatch(/strict.*catchall/s);
     expect(zodObjectCompositionRule.meta.fixable).toBeUndefined();
   });
 
+  /** @scenario "Refinements survive object composition" */
   it.each([
     'import { z } from "zod"; z.object({}).refine(() => true).extend({});',
     'import { base } from "./refined.ts"; base.extend({});',
@@ -87,6 +91,8 @@ describe("efficient Zod object composition", () => {
     expect(findings[0].message).toContain("Write `.safeExtend({ ...fields })` here");
   });
 
+  /** @scenario "Unrelated APIs are not mistaken for schemas" */
+  /** @scenario "Schema aliases and imports retain their identity" */
   it.each([
     [
       "spread",
@@ -112,6 +118,7 @@ describe("efficient Zod object composition", () => {
     expect(report(code)).toEqual([]);
   });
 
+  /** @scenario "Schema aliases and imports retain their identity" */
   it("does not let an unrelated shadow hide an outer schema", () => {
     const findings = report(
       'import { z } from "zod"; const base = z.object({}); function run(base) { base.extend({}); } base.extend({});',
@@ -129,6 +136,7 @@ describe("efficient Zod object composition", () => {
     expect(report(code).map((finding) => finding.messageId)).toEqual(["spreadShape"]);
   });
 
+  /** @scenario "Generated artifacts and test fixtures are excluded" */
   it.each(["example.generated.ts", "__tests__/example.unit.test.ts"])("ignores %s", (name) => {
     expect(
       report(

@@ -6,6 +6,7 @@ Feature: Efficient Zod object composition
   Background:
     Given Zod schemas remain the source of truth for parsed input and output
 
+  @unit
   Scenario: A derived object spreads its fields
     Given a production schema is a statically resolved Zod object
     When it is composed with extend or merge
@@ -13,24 +14,28 @@ Feature: Efficient Zod object composition
     And the diagnostic recommends composing its shape with an object constructor
     And the diagnostic requires preserving strictness and catchall behavior
 
+  @unit
   Scenario: Schema aliases and imports retain their identity
     Given a Zod object is aliased locally or imported from workspace source
     When its extend or merge method is called
     Then lint follows named imports and re-exports to the object definition
     And an unrelated shadowing binding is not treated as that schema
 
+  @unit
   Scenario: Refinements survive object composition
     Given a Zod object has refinements
     When its shape needs additional fields
     Then safeExtend is allowed
     And lint does not automatically replace the schema with a shape spread
 
+  @unit
   Scenario: Unrelated APIs are not mistaken for schemas
     Given a receiver cannot be statically resolved to a Zod object
     When it calls a method named extend or merge
     Then this rule reports nothing
     And opaque factories do not trigger a separate typechecking pass
 
+  @unit
   Scenario: Generated artifacts and test fixtures are excluded
     Given a source file is generated, a declaration, or a test
     When lint evaluates object composition

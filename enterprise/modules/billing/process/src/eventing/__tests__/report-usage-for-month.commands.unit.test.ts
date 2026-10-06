@@ -494,6 +494,7 @@ describe("ReportUsageForMonthCommand", () => {
 
   describe("given org with billable events and active subscription", () => {
     /** @scenario "Report metered usage through an injected provider" */
+    /** @scenario "Billing reports the month's total to Stripe from usage's month_counted event" */
     it("reports delta, updates checkpoint, and self-dispatches", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue({

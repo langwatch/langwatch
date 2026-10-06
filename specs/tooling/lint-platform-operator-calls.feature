@@ -8,41 +8,48 @@ Feature: The platform-operator-calls policy
 
   Rule: `platform-operator-calls` refuses grant and revoke outside ops and identity
 
+    @unit
     Scenario: A module other than ops or identity calls an operation
       Given a file in the billing module imports the authz contract
       And it calls grantPlatformOperator
       When the platform-operator-calls policy reads the workspace
       Then it reports the file, the line and the operation
 
+    @unit
     Scenario: The ops module calls an operation
       Given a file in the ops module imports the authz contract
       And it calls grantPlatformOperator
       When the platform-operator-calls policy reads the workspace
       Then it reports nothing
 
+    @unit
     Scenario: The identity module calls an operation
       Given a file in the identity module imports the authz contract
       And it calls revokePlatformOperator
       When the platform-operator-calls policy reads the workspace
       Then it reports nothing
 
+    @unit
     Scenario: The authz module declares and serves the operations
       Given a file in the authz module calls grantPlatformOperator
       When the platform-operator-calls policy reads the workspace
       Then it reports nothing
 
+    @unit
     Scenario: Another module lists the platform operators
       Given a file in the billing module imports the authz contract
       And it calls listPlatformOperators
       When the platform-operator-calls policy reads the workspace
       Then it reports nothing
 
+    @unit
     Scenario: A file outside any module calls an operation
       Given an application file imports the authz contract
       And it calls revokePlatformOperator
       When the platform-operator-calls policy reads the workspace
       Then it reports the file, the line and the operation
 
+    @unit
     Scenario: A same-named method on something that is not AuthzApi is not a call
       Given a file calls grantPlatformOperator but never imports the authz contract
       When the platform-operator-calls policy reads the workspace

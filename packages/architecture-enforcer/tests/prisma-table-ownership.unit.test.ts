@@ -61,6 +61,7 @@ afterEach(() => {
 });
 
 describe("Prisma table ownership lint", () => {
+  /** @scenario "Mapped table names identify the same storage" */
   it("finds conflicting physical tables across separately installed features", () => {
     const world = fixture();
     world.repository("user", 'prismaTables("User")');
@@ -73,6 +74,7 @@ describe("Prisma table ownership lint", () => {
     ]);
   });
 
+  /** @scenario "Multiple repositories implement one coherent owner" */
   it("allows a coherent group and multiple private repositories under one owner", () => {
     const world = fixture();
     world.repository("user", 'prismaTables("User", "Profile")');
@@ -148,6 +150,7 @@ describe("Prisma table ownership lint", () => {
     ]);
   });
 
+  /** @scenario "Invalid claims fail locally" */
   it.each(["prismaTables()", "prismaTables(...models)", "prismaTables(model)"])(
     "rejects hidden claim %s",
     (expression) => {
@@ -159,6 +162,7 @@ describe("Prisma table ownership lint", () => {
     },
   );
 
+  /** @scenario "An App cannot own a second copy of the table list" */
   it("rejects claims placed on an app", () => {
     const world = fixture();
     world.repository("user", 'prismaTables("User")', { path: "app/user.app.ts" });
@@ -167,6 +171,7 @@ describe("Prisma table ownership lint", () => {
     ]);
   });
 
+  /** @scenario "Invalid claims fail locally" */
   it("rejects forwarding the claim factory", () => {
     const world = fixture();
     world.repository("user", 'claim("User")', {

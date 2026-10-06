@@ -523,6 +523,7 @@ describe("the scenario-events usage gate", () => {
 
   describe("when the organization spent its monthly allowance", () => {
     /** @scenario "A scenario event past the monthly usage limit is refused" */
+    /** @scenario "A scenario event past the monthly allowance is refused with the plan limit" */
     it("refuses the event with the plan limit and dispatches nothing", async () => {
       const messageSnapshot = vi.fn();
       const family = await buildEventFamily({

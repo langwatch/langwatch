@@ -3,6 +3,7 @@ Feature: Private Prisma table ownership
   One feature owns a table and peers use its API.
   Repository declarations are checked before constructing feature applications.
 
+  @unit
   Scenario Outline: Conflicting owners fail before factories run
     Given User and Annotation both declare the User table
     When the process boots for the <role> role
@@ -14,21 +15,25 @@ Feature: Private Prisma table ownership
       | worker |
       | task   |
 
+  @unit
   Scenario: Multiple repositories implement one coherent owner
     Given two User repositories declare the User table
     When the ownership declarations are checked
     Then both repositories belong to the single User owner
 
+  @unit
   Scenario: Mapped table names identify the same storage
     Given two features declare models mapped to the same physical table
     When the catalogue ownership lint runs
     Then it reports conflicting owners even if they never share a process
 
+  @unit
   Scenario: Mutation cannot rewrite a declared claim
     Given a feature declaration snapshots its repository claims
     When external code mutates the original declaration data
     Then the feature retains its original frozen table claims
 
+  @unit
   Scenario Outline: Invalid claims fail locally
     Given a repository declares <claim>
     When the claim is validated
@@ -41,12 +46,13 @@ Feature: Private Prisma table ownership
       | a computed model list    |
       | a forwarded claim factory |
 
+  @unit
   Scenario: An App cannot own a second copy of the table list
     Given an App calls prismaTables directly
     When the architecture lint runs
     Then it directs the claim to the private Prisma repository
 
-  @pending-isolation
+  @unit
   Scenario Outline: A scoped repository cannot escape its owner
     Given a repository receives a capability for its declared tables
     When it attempts <access> to a foreign table
@@ -61,7 +67,7 @@ Feature: Private Prisma table ownership
       | a transaction client escape     |
       | a client extension escape       |
 
-  @pending-isolation
+  @unit
   Scenario: A migration exception is narrower than ownership
     Given one repository has an approved exception for a specific foreign relation read
     When it attempts a write or a different foreign relation
