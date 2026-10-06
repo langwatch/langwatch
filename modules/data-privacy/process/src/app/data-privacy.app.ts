@@ -19,7 +19,6 @@ import {
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
@@ -96,7 +95,6 @@ export class DataPrivacyModule implements DataPrivacyApi {
   static readonly contract = DataPrivacyApi;
   static readonly dependencies = {
     projects: ProjectApi,
-    organizations: OrganizationApi,
     featureFlags: FeatureFlagApi,
     permissions: AuthzApi,
     evaluation: EvaluationApi,
@@ -165,7 +163,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     const privacy = DataPrivacyService.create({
       repository: repositories.policies,
       projects: dependencies.projects,
-      organizations: dependencies.organizations,
+      lineage: dependencies.permissions,
     });
     const permissions = DataPrivacyPermissionsService.create({ authz: dependencies.permissions });
 

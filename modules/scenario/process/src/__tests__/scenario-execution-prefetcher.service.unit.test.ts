@@ -4,7 +4,6 @@
 
 import { ApiKeyPermissionDeniedError, type ApiKeyApi } from "@langwatch/api-key-contract";
 import { ModelNotConfiguredError, findAliasTarget } from "@langwatch/model-provider-contract";
-import { CHILD_PROCESS } from "@langwatch/scenario-contract";
 import type {
   ScenarioChildEnvironment,
   ScenarioExecutionPrefetchInput,
@@ -542,13 +541,11 @@ describe("prefetchWithFixture, given a code target in a project with an organiza
     archivedAt: null,
   };
 
-  function codeDeps(mintSandbox: ApiKeyApi["mintRunKey"]) {
+  function codeDeps(mintSandbox: ApiKeyApi["mintAgentSandboxKey"]) {
     const sandboxMints = vi.fn(mintSandbox);
-    const mintRunKey: ApiKeyApi["mintRunKey"] = async (input) =>
-      input.permissions.includes("agentCache:manage") ? sandboxMints(input) : "run-key";
     const deps = createMockDeps({
       agentFetcher: { findById: vi.fn().mockResolvedValue(codeAgent) },
-      apiKeys: { mintRunKey },
+      apiKeys: { mintRunKey: async () => "run-key", mintAgentSandboxKey: sandboxMints },
     });
     return { deps, sandboxMints };
   }
@@ -559,8 +556,8 @@ describe("prefetchWithFixture, given a code target in a project with an organiza
   }
 
   describe("when the run data is prefetched", () => {
-    /** @scenario "A code agent's sandbox holds a per-run key reaching only the agent cache" */
-    it("carries a per-run key for the starter holding only the agent cache", async () => {
+    /** @scenario "A code agent's sandbox holds the project's shared key reaching only the agent cache" */
+    it("carries the project's shared sandbox key", async () => {
       const { deps, sandboxMints } = codeDeps(async () => "sandbox-key-1");
 
       const result = await prefetchWithFixture({
@@ -571,12 +568,7 @@ describe("prefetchWithFixture, given a code target in a project with an organiza
       });
 
       expect(sandboxKeyOf(result)).toBe("sandbox-key-1");
-      expect(sandboxMints).toHaveBeenCalledWith({
-        userId: "user_1",
-        projectId: "proj_123",
-        permissions: ["agentCache:manage"],
-        minRemainingMs: CHILD_PROCESS.TIMEOUT_MS,
-      });
+      expect(sandboxMints).toHaveBeenCalledWith({ projectId: "proj_123" });
     });
   });
 

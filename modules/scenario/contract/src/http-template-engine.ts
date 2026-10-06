@@ -3,12 +3,12 @@
 import { createSandboxedLiquid } from "@langwatch/automation-contract";
 
 import type { FieldMapping } from "./field-mapping.ts";
+import type { ScenarioInput } from "./resolve-field-mappings.ts";
 import {
   resolveFieldMappings,
   sessionAsText,
   extractSourceField,
 } from "./resolve-field-mappings.ts";
-import type { ScenarioInput } from "./resolve-field-mappings.ts";
 import type { RunParameterValues } from "./scenario.parameters.ts";
 
 /** Marks pre-serialised JSON that body templates must interpolate verbatim. */

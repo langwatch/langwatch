@@ -5,11 +5,11 @@ import { isUsageReportDue } from "../rules/usage-report-schedule.rules.ts";
 import { runUsageReport, type UsageReportRunDeps } from "./ops-usage-report.intent.ts";
 
 /** Hourly, so the report goes on the first wake after 12:00 UTC and a restart never skips a day. */
-export const USAGE_REPORT_WAKE_INTERVAL_MS = 60 * 60 * 1000;
+const USAGE_REPORT_WAKE_INTERVAL_MS = 60 * 60 * 1000;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export const usageReportScheduleStateSchema = z.object({
+const usageReportScheduleStateSchema = z.object({
   /** Epoch ms of the last report this process asked for, or of its first wake. */
   lastReportAt: z.number().nullable(),
 });

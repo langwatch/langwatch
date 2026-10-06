@@ -1,7 +1,8 @@
 Feature: The canonical REST envelope carries the remediation channel
 
-  The canonical envelope nests the refusal under `error` and spells its keys
-  the way the Go data plane does, so one consumer reads either plane. That
+  The canonical envelope carries the refusal's fields (`type`, `code`,
+  `message`, ...) at the root, never nested under an `error` key, and spells
+  its keys the way the Go data plane does, so one consumer reads either plane. That
   contract always included the remediation channel — `tips`, `docs_url` and
   `fault` — but only the Go side ever emitted it: the TypeScript boundary
   built the envelope from the code, sentence, meta and trace ids alone, so a

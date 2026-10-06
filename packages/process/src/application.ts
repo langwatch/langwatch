@@ -59,6 +59,7 @@ import {
 } from "./repository-registry.ts";
 import { type ResourceOwnership, ResourceScope } from "./resource-scope.ts";
 import { RuntimeLifecycle, cleanupAfterFailure, type RuntimeService } from "./runtime-lifecycle.ts";
+import type { TestPeer } from "./testing.ts";
 import type { Tier } from "./tiers.ts";
 import {
   declaredForRole,
@@ -306,6 +307,8 @@ export interface ApplicationOptions<
   readonly secrets?: ModuleSecretsScope;
   /** Scopes the stores' operator reads to one module's declared handles (§7). */
   readonly operatorReads?: ModuleOperatorReadsScope;
+  /** Test-only stand-ins for peers the process does not install (`@langwatch/process/testing`). */
+  readonly peers?: readonly TestPeer[];
 }
 
 /** An application with its members named, collecting declarations. */
@@ -331,6 +334,9 @@ export class ApplicationBuilder<
     this.operatorReads = options.operatorReads;
     this.name = options.role;
     this.state = state ?? { features: [], services: [], provisions: [], hosts: {} };
+    for (const peer of options.peers ?? []) {
+      peer.bind((token, instance) => this.addProvision(token, instance));
+    }
   }
 
   /**
@@ -391,11 +397,15 @@ export class ApplicationBuilder<
 
   /** Provide a peer by token; install module providing same token to refuse. */
   withProvided<Instance>(token: DependencyToken<Instance>, instance: Instance): this {
+    this.addProvision(token, instance);
+    return this;
+  }
+
+  private addProvision<Instance>(token: DependencyToken<Instance>, instance: Instance): void {
     if (this.state.provisions.some((provision) => provision.token === token)) {
       throw new DuplicateProviderError(tokenName(token), ["the process", "the process"]);
     }
     this.state.provisions.push({ token, instance });
-    return this;
   }
 
   /** Exactly this module's own handles: a peer's are not reachable by name. */
@@ -753,6 +763,9 @@ function installModuleEventing({
       app: state.provided,
       processStore: eventing.processStore,
       resources,
+      ...(eventing.notifyOutbox
+        ? { notifyOutbox: (processName: string) => eventing.notifyOutbox?.(processName) }
+        : {}),
     },
     log: () => eventing.eventStore,
   });

@@ -52,12 +52,19 @@ async function bodyOf(response: Response): Promise<{ code?: string; meta?: unkno
 }
 
 describe("a platform route", () => {
-  /** Sessions by cookie value; `holders` hold the platform grant. */
-  function browserDoor({ holders }: { holders: readonly string[] }) {
+  /** Sessions by cookie value; `holders` hold the platform grant, `staff` only `ops:view`. */
+  function browserDoor({
+    holders,
+    staff = [],
+  }: {
+    holders: readonly string[];
+    staff?: readonly string[];
+  }) {
     const asked: { userId: string; permission: PlatformTierPermission }[] = [];
     const sessions: Record<string, SessionCaller> = {
       operator: { userId: "operator-1" },
       member: { userId: "member-1" },
+      staff: { userId: "staff-1" },
       impersonated: { userId: "member-1", impersonator: { id: "operator-1" } },
     };
     const door = BrowserSessionIdentity.create({
@@ -69,7 +76,9 @@ describe("a platform route", () => {
         getPlatformDecision: async (input) => {
           asked.push(input);
 
-          return { permitted: holders.includes(input.userId) };
+          const viewer = input.permission === "ops:view" && staff.includes(input.userId);
+
+          return { permitted: holders.includes(input.userId) || viewer };
         },
       },
       publicBaseUrl: void 0,
@@ -177,6 +186,87 @@ describe("a platform route", () => {
       expect((await bodyOf(anonymous)).code).toBe("not_found");
       expect(holder.status).toBe(413);
       expect(ran).toEqual([]);
+    });
+  });
+
+  describe("when the route hides from non-staff (Q42)", () => {
+    function staffRoute(ran: string[]) {
+      return defineRestRouter(DoorsApi)
+        .withNamespace("e4-staff")
+        .withVersion(VERSION)
+        .withCredential("browser")
+        .post("/impersonate", "run")
+        .withPermission("ops:manage", { at: "platform", hiddenWithout: "ops:view" })
+        .withInput(z.object({ userId: z.string() }))
+        .withBodyLimit({ maxBytes: 64 })
+        .withOutput(z.object({ actor: z.string() }))
+        .handle(({ actor }) => {
+          ran.push(actor.id);
+
+          return { actor: actor.id };
+        })
+        .build()
+        .router();
+    }
+
+    /** @scenario "A staff platform route hides from non-staff and refuses staff by name" */
+    it("answers 401 anonymous, 404 non-staff and 403 staff lacking the write, before the body", async () => {
+      const ran: string[] = [];
+      const { asked, door } = browserDoor({ holders: ["operator-1"], staff: ["staff-1"] });
+      const app = mount(staffRoute(ran), door);
+
+      const anonymous = await call(app, "staff", null, "{not json");
+      const member = await call(app, "staff", "member", "{not json");
+      const staff = await call(app, "staff", "staff", "{not json");
+
+      expect([anonymous.status, member.status, staff.status]).toEqual([401, 404, 403]);
+      expect((await bodyOf(member)).code).toBe("not_found");
+      expect(await bodyOf(staff)).toMatchObject({
+        code: "permission_denied",
+        meta: { permission: "ops:manage" },
+      });
+      expect(asked).toEqual([
+        { userId: "member-1", permission: "ops:view" },
+        { userId: "staff-1", permission: "ops:view" },
+        { userId: "staff-1", permission: "ops:manage" },
+      ]);
+      expect(ran).toEqual([]);
+    });
+
+    /** @scenario "A staff platform route hides from non-staff and refuses staff by name" */
+    it("runs the handler for a caller holding both", async () => {
+      const ran: string[] = [];
+      const { door } = browserDoor({ holders: ["operator-1"], staff: ["staff-1"] });
+      const app = mount(staffRoute(ran), door);
+
+      const response = await call(app, "staff", "operator", JSON.stringify({ userId: "u" }));
+
+      expect(response.status).toBe(200);
+      expect(ran).toEqual(["operator-1"]);
+    });
+
+    /** @scenario "A staff platform route hides from non-staff and refuses staff by name" */
+    it("refuses a staff permission that is not platform-tier, or a staff route naming a refusal", () => {
+      const route = () =>
+        defineRestRouter(DoorsApi)
+          .withNamespace("e4-staff-declared")
+          .withVersion(VERSION)
+          .withCredential("browser")
+          .post("/run", "run");
+
+      expect(() =>
+        route().withPermission("ops:manage", {
+          at: "platform",
+          hiddenWithout: "traces:view" as never,
+        }),
+      ).toThrow(/only a platform-tier permission marks staff/);
+      expect(() =>
+        route().withPermission("ops:manage", {
+          at: "platform",
+          hiddenWithout: "ops:view",
+          refusal: "hidden",
+        } as never),
+      ).toThrow(/names no refusal of its own/);
     });
   });
 

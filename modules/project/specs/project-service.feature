@@ -29,11 +29,13 @@ Feature: Shared project service
     Then it receives the process-owned project service
     And it does not construct a project repository or service
 
+  @unit
   Scenario: A feature resolves a project's organization
     When Managed Provider needs a project's organization
     Then it asks the process-owned project service
     And it does not query Project persistence directly
 
+  @unit
   Scenario: A compatibility transport resolves a project's organization
     When the Gateway spend-event transport needs to scope virtual-key names
     Then it asks the process-owned project service for the organization
@@ -77,6 +79,8 @@ Feature: Shared project service
     Then the service throws a personal-workspace boundary error
     And it does not write the forbidden change
 
+  # Gap: no test yet proves the tRPC door and the provided ProjectApi share one service over one store.
+  @unimplemented
   Scenario: Project compatibility transports share one runtime service
     When tRPC or the project REST API handles a project operation
     Then it reads ProjectService from the process application context

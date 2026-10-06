@@ -6,9 +6,10 @@ export class MemoryUsageRepositories {
   static readonly requires = [] as const;
 
   static create(): UsageRepositories {
+    const billableEvents = MemoryBillableEventsMeterRepository.create();
     return {
-      billableEvents: MemoryBillableEventsMeterRepository.create(),
-      traces: MemoryTraceMeterRepository.create(),
+      billableEvents,
+      traces: MemoryTraceMeterRepository.create({ billableEvents: billableEvents.rows }),
     };
   }
 }

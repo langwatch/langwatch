@@ -1,3 +1,4 @@
+import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
 export const AUDIT_LOG_FEATURE_ID = "audit-log" as const;
@@ -53,3 +54,27 @@ export type ListAuditLogEntityHistoryInput = {
   argumentNames: string[];
   limit: number;
 };
+
+/** Portable audit write capability. */
+export interface AuditLogApi {
+  record(command: RecordAuditLogCommand): Promise<RecordedAuditLogEntry>;
+  listEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]>;
+  /** Whether this actor already recorded this action on this target since `sinceMs`. */
+  hasRecordedSince(input: RecordedSinceInput): Promise<boolean>;
+}
+
+export const AuditLogApi = moduleApi<AuditLogApi>()("audit-log");
+
+/**
+ * `idempotencyKey` is the row's id, an `audit` KSUID the producer mints once when it records the
+ * intent in its own commit; a repeat delivery writes nothing and answers the first row (Alex, Q72).
+ */
+export const recordAuditLogCommandSchema = z.object({
+  ...auditLogEntrySchema.shape,
+  idempotencyKey: z.string().min(1).optional(),
+});
+export type RecordAuditLogCommand = z.infer<typeof recordAuditLogCommandSchema>;
+
+/** The payload of a producer's audit intent: an entry its outbox records after commit. */
+export const auditLogIntentSchema = recordAuditLogCommandSchema.required({ idempotencyKey: true });
+export type AuditLogIntent = z.infer<typeof auditLogIntentSchema>;

@@ -13,7 +13,7 @@ import {
   simulationEventMessageSchema,
   simulationEventResultsSchema,
 } from "./simulation-event.values.ts";
-import { simulationTargetSchema } from "./simulation-target.ts";
+import { simulationTargetSchema } from "./simulation.ts";
 
 const runSecretCiphertextSchema = z.record(z.string(), z.string());
 

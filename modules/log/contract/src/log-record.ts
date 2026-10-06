@@ -72,3 +72,22 @@ export const canonicalTraceLogRecordSchema = z.object({
   scopeVersion: z.string().nullable(),
 });
 export type CanonicalTraceLogRecord = z.infer<typeof canonicalTraceLogRecordSchema>;
+
+export type LogPiiRedactionLevel = "STRICT" | "ESSENTIAL" | "DISABLED";
+
+export type PreparedCanonicalLogRecord = {
+  record: CanonicalLogRecord;
+  normalized: {
+    body: string;
+    attributes: Record<string, string>;
+    resourceAttributes: Record<string, string>;
+    scopeName: string;
+    scopeVersion: string | null;
+  };
+};
+
+export type LogPreparation = {
+  accepted: PreparedCanonicalLogRecord[];
+  rejectedLogRecords: number;
+  errors: string[];
+};

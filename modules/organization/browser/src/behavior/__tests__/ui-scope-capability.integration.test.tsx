@@ -9,7 +9,8 @@ import type { UiSessionReading, UiSessionSnapshot } from "@langwatch/browser-hos
 import type { UiScopeTeam } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, waitFor } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -314,6 +315,69 @@ describe("given a signed-in viewer with an active project opens a share link", (
 
     await waitFor(() => expect(view.getByTestId("status").textContent).toBe("unavailable"));
     expect(view.getByTestId("project").textContent).toBe("none");
+  });
+});
+
+const JOHN = "user-john";
+
+/** The scope probe with the signed-in user under the test's control. */
+function SwitchingProbe({
+  transport,
+  control,
+}: {
+  transport: UiFeatureApiTransport;
+  control: { signInAs?: (userId: string) => void };
+}) {
+  const [userId, setUserId] = useState(JANE);
+  control.signInAs = setUserId;
+  const session: UiSessionReading = {
+    status: "authenticated",
+    user: { id: userId, name: userId, email: null, image: null },
+  };
+  return <ScopeProbe transport={transport} session={session} />;
+}
+
+describe("given the first user has resolved an organization and project", () => {
+  /** @scenario "Switching users does not reuse the previous user's graph or grants" */
+  it("publishes neither of them in the first render for a user whose graph has not answered", async () => {
+    const control: { signInAs?: (userId: string) => void } = {};
+    let graphReads = 0;
+    const transport = createApiFixture<UiFeatureApiTransport>({
+      query: (path: string) => {
+        if (path !== UI_ORGANIZATIONS_PROCEDURE) return Promise.reject(new Error(path));
+        graphReads += 1;
+        return graphReads === 1
+          ? Promise.resolve(organizationWith({ teams: [PERSONAL_TEAM, SHARED_TEAM] }))
+          : new Promise(() => {});
+      },
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/:project/traces",
+          element: (
+            <QueryClientProvider client={queryClient}>
+              <SwitchingProbe transport={transport} control={control} />
+            </QueryClientProvider>
+          ),
+        },
+      ],
+      { initialEntries: ["/acme-app/traces"] },
+    );
+    const view = render(<RouterProvider router={router} />);
+    dispose = () => {
+      view.unmount();
+      router.dispose();
+    };
+    await waitFor(() => expect(view.getByTestId("project").textContent).toBe("proj-app"));
+    expect(view.getByTestId("organization").textContent).toBe("org-acme");
+
+    act(() => control.signInAs?.(JOHN));
+
+    expect(view.getByTestId("organization").textContent).toBe("none");
+    expect(view.getByTestId("project").textContent).toBe("none");
+    expect(view.getByTestId("host").textContent).toBe("none");
   });
 });
 

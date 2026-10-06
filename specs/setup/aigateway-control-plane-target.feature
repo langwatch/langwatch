@@ -88,14 +88,16 @@ Feature: AI Gateway control-plane target cannot silently default to the wrong wo
     Then it reports that exact URL
     And the endpoint requires no credential, matching the k8s probes and the metrics endpoint
 
-  @unit
+  # Gap: pnpm dev asks no reused gateway for /debug/control-plane; dev-stack.sh does no check, and main had none.
+  @unit @unimplemented
   Scenario: a reused gateway pointed at the right control plane raises no warning
     Given pnpm dev finds a gateway already listening on the port it would have started its own on
     And that gateway's debug endpoint reports the same control-plane URL this worktree expects
     When pnpm dev evaluates whether to trust the reused gateway
     Then it raises no warning
 
-  @unit
+  # Gap: pnpm dev asks no reused gateway for /debug/control-plane; dev-stack.sh does no check, and main had none.
+  @unit @unimplemented
   Scenario: a reused gateway pointed at a different control plane raises a loud, actionable warning
     Given pnpm dev finds a gateway already listening on the port it would have started its own on
     And that gateway's debug endpoint reports a control-plane URL different from what this worktree expects
@@ -103,7 +105,8 @@ Feature: AI Gateway control-plane target cannot silently default to the wrong wo
     Then it raises a multi-line warning naming both the expected and the actual control-plane URL
     And the warning states how to fix it
 
-  @unit
+  # Gap: pnpm dev asks no reused gateway for /debug/control-plane; dev-stack.sh does no check, and main had none.
+  @unit @unimplemented
   Scenario: a reused gateway whose control-plane target cannot be verified is treated as suspect, not silently trusted
     Given pnpm dev finds a gateway already listening on the port it would have started its own on
     And that gateway's debug endpoint cannot be reached, for instance because it predates this check

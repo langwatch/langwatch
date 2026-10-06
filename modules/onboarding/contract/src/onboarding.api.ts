@@ -1,5 +1,7 @@
+import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/module";
 
+import { GUIDED_PATHS } from "./onboarding-guided-paths.ts";
 import type { OnboardingVariant, GuidedOnboardingState } from "./onboarding-schemas.ts";
 import type { OrganizationInitialized } from "./onboarding.responses.ts";
 import type {
@@ -28,16 +30,6 @@ export type GuidedOnboardingForProject = Readonly<{
   organizationId: string;
   variant: OnboardingVariant | null;
   state: GuidedOnboardingState;
-}>;
-
-/** One product-analytics event about guided onboarding, tracked against a person. */
-export type GuidedOnboardingTrackedEvent = Readonly<{
-  userId: string;
-  event: string;
-  projectId?: string;
-  properties: Readonly<Record<string, unknown>>;
-  /** The same for every delivery of one source event, so the sink keeps one. */
-  uuid?: string;
 }>;
 
 /** The onboarding capability. Operations arrive with the port of the process half. */
@@ -79,8 +71,25 @@ export interface OnboardingApi {
   getGuidedStateByProject(
     input: Readonly<{ projectId: string }>,
   ): Promise<GuidedOnboardingForProject>;
-  /** Fire and forget: the reaction that tracks it must not fail on it. */
-  trackGuidedOnboardingEvent(input: GuidedOnboardingTrackedEvent): void;
 }
 
 export const OnboardingApi = moduleApi<OnboardingApi>()("onboarding");
+
+/**
+ * Handled errors of the guided onboarding (ADR-045): the failures a caller
+ * can act on. A path name outside the four the product knows is the one the
+ * CLI can produce, since it takes the path as free text.
+ */
+
+export class GuidedOnboardingPathUnknownError extends HandledError {
+  declare readonly code: "guided_onboarding_path_unknown";
+
+  constructor(path: string) {
+    super("guided_onboarding_path_unknown", `Unknown onboarding path: ${path}`, {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { path, knownPaths: [...GUIDED_PATHS] },
+    });
+    this.name = "GuidedOnboardingPathUnknownError";
+  }
+}

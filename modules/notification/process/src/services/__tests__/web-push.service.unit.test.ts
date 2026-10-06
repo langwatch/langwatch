@@ -16,8 +16,8 @@ import { describe, expect, it } from "vitest";
 import { MemoryWebPushGatewayChannel } from "../../channels/memory/memory.web-push-gateway.channel.ts";
 import { OutboxWebPushQueue } from "../../eventing/web-push.pipeline.ts";
 import { WEB_PUSH_PROCESS_NAME } from "../../eventing/web-push.process.ts";
+import { MemoryWebPushVapidKeyRepository } from "../../repositories/memory/memory.notification.repositories.ts";
 import { MemoryWebPushSubscriptionRepository } from "../../repositories/memory/memory.web-push-subscription.repository.ts";
-import { MemoryWebPushVapidKeyRepository } from "../../repositories/memory/memory.web-push-vapid-key.repository.ts";
 import {
   vapidSubject,
   webPushTopicHeader,

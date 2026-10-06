@@ -249,7 +249,7 @@ describe("a mounted contract procedure", () => {
 
       const args = seen[0]!;
       expect(Object.keys(args).toSorted()).toEqual(["actor", "app", "input", "scope", "signal"]);
-      expect(args.scope).toEqual({ tier: "project", id: "project-1" });
+      expect(args.scope).toEqual({ tier: "project", id: "project-1", organizationId: null });
       expect(args.actor).toEqual({ type: "user", id: "reviewer-1" });
       expect(args.input).toEqual({ projectId: "project-1", id: "annotation-1" });
       expect(Object.keys(args.input as object)).not.toContain("scope");

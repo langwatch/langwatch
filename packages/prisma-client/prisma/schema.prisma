@@ -3422,6 +3422,16 @@ model TraceEditOverlay {
   @@index([projectId])
 }
 
+model TraceIngestSourceBilling {
+  organizationId String
+  sourceType     String
+  billed         Boolean
+  recordedAt     DateTime
+  updatedAt      DateTime @updatedAt
+
+  @@id([organizationId, sourceType])
+}
+
 enum RetentionPolicyScopeType {
   ORGANIZATION
   TEAM
@@ -5803,6 +5813,8 @@ model ProcessManagerOutbox {
   @@unique([processName, projectId, messageKey])
   @@index([processName, projectId, processKey, createdAt])
   @@index([status, nextAttemptAt, leasedUntil])
+  // The per-process-manager lease: status, then the manager, then due order.
+  @@index([status, processName, nextAttemptAt])
 }
 
 /// Why an outbox delivery failed, one row per FAILED attempt
@@ -6779,4 +6791,41 @@ model WebPushVapidKey {
   /// The private key, base64url, encrypted with the process encryption key.
   privateKeyEncrypted String
   createdAt           DateTime @default(now())
+}
+
+/// The upgrade ledger (packages/upgrade): runner-owned infrastructure beside _prisma_migrations,
+/// created by the runner with CREATE TABLE IF NOT EXISTS before any step. @@ignore keeps it out
+/// of the client, so no module can claim it; the model exists so `prisma migrate dev` sees no drift.
+model LangwatchUpgradeRun {
+  id         String    @id
+  kind       String
+  release    String?
+  startedAt  DateTime  @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  outcome    String?
+  plan       Json?
+  report     Json?
+
+  @@map("_langwatch_upgrade_run")
+  @@ignore
+}
+
+/// One row per step of every kind the upgrade ledger knows; see LangwatchUpgradeRun.
+model LangwatchUpgradeStep {
+  id         String    @id
+  kind       String
+  release    String?
+  mode       String
+  status     String
+  inferred   Boolean   @default(false)
+  attempt    Int       @default(0)
+  lastError  String?   @map("last_error")
+  report     Json?
+  runId      String?   @map("run_id")
+  startedAt  DateTime? @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  updatedAt  DateTime  @map("updated_at")
+
+  @@map("_langwatch_upgrade_step")
+  @@ignore
 }

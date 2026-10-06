@@ -120,7 +120,8 @@ export class UnrevokedSsoConnectionDirectory extends SsoConnectionDirectoryRevoc
   }): Promise<{ revoked: number }> {
     logger.warn(
       { ...input, reason: "no-directory-capability" },
-      "tore down a connection without deleting its directory tokens: this process composes no SCIM capability, and every token issued for the connection now fails verification against its torn-down state",
+      "tore down a connection without deleting its directory tokens: this process composes no SCIM capability, " +
+        "and every token issued for the connection now fails verification against its torn-down state",
     );
     return { revoked: 0 };
   }

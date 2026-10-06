@@ -19,9 +19,10 @@ import type {
   OrganizationSignedUpEventData,
 } from "@langwatch/organization-contract";
 import type { PromptCreatedEventData } from "@langwatch/prompt-contract";
-import type {
-  ScenarioCreatedEventData,
-  SimulationRunFinishedEventData,
+import {
+  type ScenarioCreatedEventData,
+  type SimulationRunFinishedEventData,
+  UNGRADED_RUN_STATUSES,
 } from "@langwatch/scenario-contract";
 import type {
   FirstTraceRecordedEventData,
@@ -29,8 +30,6 @@ import type {
 } from "@langwatch/trace-contract";
 import type { UserLifecycleEventData } from "@langwatch/user-contract";
 import type { WorkflowCreatedEventData } from "@langwatch/workflow-contract";
-
-import { isConnectedAgentRunSucceeded } from "./nurturing-scenario-run.rules.ts";
 
 /** The signal a peer's event raises, keyed by the aggregate and instant the event carries. */
 type OwnerEvent<Data> = Readonly<{ data: Data; aggregateId: string }>;
@@ -409,4 +408,18 @@ export function traceReceivedSignal({
   const { tenantId, occurredAt, userId, projectId } = data;
   const sourceEventId = `${aggregateId}:${occurredAt}`;
   return { kind: "trace_received", sourceEventId, tenantId, occurredAt, userId, projectId };
+}
+
+/**
+ * A run that worked against a connected agent: it finished with a verdict,
+ * whichever way the judge decided. An ungraded status (error, unreachable
+ * target, timeout) is not one.
+ */
+export function isConnectedAgentRunSucceeded(data: SimulationRunFinishedEventData): boolean {
+  const { target, status, results } = data;
+  if (target?.type !== "connected") return false;
+  const explicit = status?.toUpperCase();
+  if (explicit && UNGRADED_RUN_STATUSES.has(explicit)) return false;
+  if (explicit === "SUCCESS" || explicit === "FAILED" || explicit === "FAILURE") return true;
+  return results?.verdict === "success" || results?.verdict === "failure";
 }

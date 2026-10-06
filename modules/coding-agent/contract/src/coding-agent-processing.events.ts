@@ -88,3 +88,14 @@ export function parseSpanFactsLiftedPayload(value: unknown): SpanFactsLiftedPayl
   }
   return spanFactsLiftedPayloadSchema.parse(value);
 }
+
+export const contributeSpanFactsCommandDataSchema = spanFactsContributionSchema;
+export type ContributeSpanFactsCommandData = z.infer<typeof contributeSpanFactsCommandDataSchema>;
+
+export const contributeLogFactsCommandDataSchema = logFactsContributionSchema;
+export type ContributeLogFactsCommandData = z.infer<typeof contributeLogFactsCommandDataSchema>;
+
+export const contributeMetricFactsCommandDataSchema = metricFactsContributionSchema;
+export type ContributeMetricFactsCommandData = z.infer<
+  typeof contributeMetricFactsCommandDataSchema
+>;

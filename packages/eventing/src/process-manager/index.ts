@@ -18,6 +18,7 @@ export type {
   ProcessSignalEnvelope,
 } from "./processManager.types.ts";
 export {
+  captureTraceCarrier,
   DEFAULT_SIGNAL_REVISION_RETRIES,
   type HandleResult,
   ProcessManagerService,
@@ -43,7 +44,6 @@ export type {
   ProcessTransaction,
   TransactResult,
 } from "./stores/processStore.types.ts";
-export { captureTraceCarrier } from "./traceCarrier.ts";
 export {
   ProcessWakeWorker,
   type ProcessWakeWorkerOptions,

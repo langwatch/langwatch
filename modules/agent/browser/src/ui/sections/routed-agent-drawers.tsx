@@ -4,9 +4,15 @@
  */
 import type { AgentWithFields } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Link } from "@langwatch/browser-host/link";
 import { CopyButton } from "@langwatch/design-system/copy-button";
 import { Button, VStack } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { VariablesSection } from "@langwatch/design-system/variable-mapping";
+import { WorkflowCardDisplay } from "@langwatch/design-system/workflow-card";
+import { toEpochMs } from "@langwatch/time";
+import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 
 import { SetupWithAgentButton } from "../../behavior/lent-setup-with-agent-button.tsx";
@@ -16,6 +22,7 @@ import { useRoutedCodeAgent } from "../../behavior/use-routed-code-agent.ts";
 import { useRoutedDrawer } from "../../behavior/use-routed-drawer.ts";
 import { useRoutedHttpAgent } from "../../behavior/use-routed-http-agent.ts";
 import { useRoutedWorkflowAgent } from "../../behavior/use-routed-workflow-agent.ts";
+import { useWorkflowTargetMapping } from "../../behavior/use-workflow-target-mapping.ts";
 import { getRandomWorkflowIcon } from "../../model/workflow/random-workflow-icon.ts";
 import {
   WorkflowCodeEditorModal,
@@ -159,8 +166,8 @@ export function RoutedAgentCodeEditorDrawer({ agentId, onSave }: AgentEditorDraw
   );
 }
 
-// ponytail: mapping sections and the workflow card live in other modules' browsers; until one is
-// lent as a capability these drawers draw no mapping editor (saved mappings keep their defaults).
+// ponytail: the workflow editor drawer still draws no mapping editor (saved mappings keep their
+// defaults); the target drawer below renders the design-system mapping section.
 export function RoutedAgentWorkflowEditorDrawer({ agentId, onSave }: AgentEditorDrawerProps) {
   const { close, goBack } = useRoutedDrawer();
   const workflow = useRoutedWorkflowAgent({ agentId, close, ...(onSave ? { onSave } : {}) });
@@ -176,12 +183,46 @@ export function RoutedAgentWorkflowEditorDrawer({ agentId, onSave }: AgentEditor
 export function RoutedAgentWorkflowTargetEditorDrawer({ agentId }: { agentId?: string }) {
   const { close, goBack } = useRoutedDrawer();
   const workflow = useRoutedWorkflowAgent({ agentId, close });
+  const mapping = useWorkflowTargetMapping();
+  const linked = workflow.workflow;
+  const card = linked && (
+    <WorkflowCardDisplay
+      name={linked.name}
+      icon={linked.icon}
+      updatedAtLabel={formatTimeAgo(toEpochMs(linked.updatedAt))}
+      width="300px"
+      {...(workflow.editorHref ? { action: <ExternalLink size={16} /> } : {})}
+    />
+  );
   return (
     <AgentWorkflowTargetEditorDrawer
       open
       isLoading={workflow.options.isLoading}
       hasLookupFailed={workflow.hasLookupFailed}
-      mappings={null}
+      workflowCard={
+        workflow.editorHref ? (
+          <Link href={workflow.editorHref} isExternal data-testid="open-workflow-link">
+            {card}
+          </Link>
+        ) : (
+          card
+        )
+      }
+      mappings={
+        <VariablesSection
+          title="Input Variables"
+          variables={workflow.targetInputs}
+          onChange={() => undefined}
+          showMappings
+          availableSources={mapping.availableSources}
+          mappings={mapping.inputMappings}
+          {...(mapping.onInputMappingsChange
+            ? { onMappingChange: mapping.onInputMappingsChange }
+            : {})}
+          canAddRemove={false}
+          readOnly={false}
+        />
+      }
       onClose={close}
       {...(goBack ? { onGoBack: goBack } : {})}
     />

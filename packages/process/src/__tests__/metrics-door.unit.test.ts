@@ -6,7 +6,7 @@ import { processMetrics, processTelemetry } from "@langwatch/observability/node"
 import { afterEach, describe, expect, it } from "vitest";
 
 import { processConfig } from "../config.ts";
-import { Server } from "../server-factory.ts";
+import { Server } from "../preamble.ts";
 
 const servers: { close(): Promise<void> }[] = [];
 
@@ -92,6 +92,7 @@ describe("a process scraped through its health door", () => {
   });
 
   describe("given no metrics key and a production environment", () => {
+    /** @scenario "In production an unset key leaves the process with no metrics endpoint" */
     it("mounts no metrics endpoint rather than an open one", async () => {
       const request = await serve({ ...prometheus, NODE_ENV: "production" });
 

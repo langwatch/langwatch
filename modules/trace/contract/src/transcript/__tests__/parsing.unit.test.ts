@@ -4,10 +4,10 @@ import {
   applyChatTextLeaves,
   coerceToChatMessages,
   collectChatTextLeaves,
-  extractSystemText,
-  parseContentBlocks,
-  withBlockKeys,
-} from "../parsing.ts";
+} from "../chat-message-coercion.ts";
+import { withBlockKeys } from "../content-block-keying.ts";
+import { parseContentBlocks } from "../content-parser.ts";
+import { extractSystemText } from "../transcript-text-extraction.ts";
 
 describe("coerceToChatMessages", () => {
   describe("given an explicit chat_messages typed-value envelope", () => {

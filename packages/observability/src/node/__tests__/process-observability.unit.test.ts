@@ -12,10 +12,9 @@ vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({}),
 }));
 
-import { createProcessObservability } from "../process-observability.ts";
+import { createProcessObservability, UnexportedSpanProcessor } from "../process-observability.ts";
 import { processTelemetry } from "../process-telemetry.ts";
 import type { TelemetrySecret, TelemetrySettings } from "../telemetry-settings.ts";
-import { UnexportedSpanProcessor } from "../unexported-spans.ts";
 
 /** What the SDK was actually handed, for the one call this test made. */
 function sdkOptions(): {

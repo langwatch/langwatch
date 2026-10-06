@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiFixture } from "../api-fixture.ts";
+import { createApiFixture } from "../index.ts";
 
 interface ExampleApi {
   get(id: string): Promise<string>;

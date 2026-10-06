@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { withClickHouseDefaultQuerySettings } from "../managed-client.ts";
-import { DEFAULT_CLICKHOUSE_SETTINGS } from "../queryDefaults.ts";
+import {
+  DEFAULT_CLICKHOUSE_SETTINGS,
+  withClickHouseDefaultQuerySettings,
+} from "../managed-client.ts";
 
 function mockClient() {
   const query = vi.fn().mockResolvedValue({ json: () => [] });

@@ -6,9 +6,13 @@ import {
   PULLED_USAGE_PIPELINE_NAME,
   pulledUsageObservationKey,
   pulledUsageObservedEventDataSchema,
+  pulledUsagePricedEventDataSchema,
+  pulledUsagePricedEventSchema,
+  pulledUsagePricedKey,
   pulledUsageRetractedEventDataSchema,
   pulledUsageRetractionKey,
   type PulledUsageObservedEvent,
+  type PulledUsagePricedEvent,
   type PulledUsageRetractedEvent,
   pulledUsageObservedEventSchema,
   pulledUsageRetractedEventSchema,
@@ -39,7 +43,10 @@ import { PULLED_USAGE_LEDGER_PROCESS_NAME } from "./pulled-usage-ledger.process.
  * in `PULLED_USAGE_PROCESSING_EVENT_TYPES`, so a process manager that handles
  * it is type-checked against the same set the pipeline registers.
  */
-type PulledUsageEvent = (PulledUsageObservedEvent & Event) | (PulledUsageRetractedEvent & Event);
+type PulledUsageEvent =
+  | (PulledUsageObservedEvent & Event)
+  | (PulledUsageRetractedEvent & Event)
+  | (PulledUsagePricedEvent & Event);
 
 export type PulledUsageDefinition = StaticPipelineDefinition<
   PulledUsageEvent,
@@ -90,6 +97,22 @@ const RetractPulledUsageCommand = defineCommand({
   makeJobId: (data) => pulledUsageRetractionKey(data),
 });
 
+/** The ledger process's priced fact, which gateway's budget ledger peer-subscribes to (Q208C). */
+const RecordPulledUsagePricedCommand = defineCommand({
+  commandType: PULLED_USAGE_COMMAND_TYPES.PRICE,
+  eventType: PULLED_USAGE_EVENT_TYPES.PRICED,
+  eventVersion: PULLED_USAGE_EVENT_VERSIONS.PRICED,
+  aggregateType: PULLED_USAGE_AGGREGATE_TYPE,
+  schema: pulledUsagePricedEventDataSchema,
+  aggregateId: (data) => data.restatementKey,
+  idempotencyKey: (data) => pulledUsagePricedKey(data),
+  spanAttributes: (data) => ({
+    "payload.scope_id": data.scopeId,
+    "payload.amount_nano_usd": data.amountNanoUsd,
+  }),
+  makeJobId: (data) => pulledUsagePricedKey(data),
+});
+
 type AdapterOptions = {
   ledger?: PulledUsageLedgerProcess;
   /** Absent in a deployment with no cost summary to check. */
@@ -120,10 +143,12 @@ export class PulledUsageEventingAdapter {
   static commandHandlers(): {
     recordPulledUsage: typeof RecordPulledUsageCommand;
     retractPulledUsage: typeof RetractPulledUsageCommand;
+    recordPulledUsagePriced: typeof RecordPulledUsagePricedCommand;
   } {
     return {
       recordPulledUsage: RecordPulledUsageCommand,
       retractPulledUsage: RetractPulledUsageCommand,
+      recordPulledUsagePriced: RecordPulledUsagePricedCommand,
     } as const;
   }
 
@@ -134,9 +159,14 @@ export class PulledUsageEventingAdapter {
         type: PULLED_USAGE_AGGREGATE_TYPE,
       }),
     })
-      .withEvents([pulledUsageObservedEventSchema, pulledUsageRetractedEventSchema])
+      .withEvents([
+        pulledUsageObservedEventSchema,
+        pulledUsageRetractedEventSchema,
+        pulledUsagePricedEventSchema,
+      ])
       .withCommand("recordPulledUsage", RecordPulledUsageCommand)
-      .withCommand("retractPulledUsage", RetractPulledUsageCommand);
+      .withCommand("retractPulledUsage", RetractPulledUsageCommand)
+      .withCommand("recordPulledUsagePriced", RecordPulledUsagePricedCommand);
     if (this.costRollup) {
       pipeline.withClickHouseFoldProjection(this.costRollup);
     }

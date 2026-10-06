@@ -13,14 +13,12 @@ import {
   type GuidedOnboardingState,
   type GuidedOnboardingStateWithInstance,
   type GuidedOnboardingStateWithVariant,
-  type GuidedOnboardingTrackedEvent,
   type IntegrationsCheckStatus,
   type OnboardingCallerInput,
   type OnboardingInitializeOrganizationInput,
   type OnboardingSignUpCaller,
   type OrganizationInitialized,
 } from "@langwatch/onboarding-contract";
-import { OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -29,7 +27,6 @@ import { ScenarioApi } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
-import { HttpPostHogEventsChannel } from "../channels/http/http.posthog-events.channel.ts";
 import {
   buildGuidedOnboardingLifecyclePipeline,
   type GuidedOnboardingLifecyclePipeline,
@@ -46,7 +43,6 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
   static readonly dependencies = {
     organizations: OrganizationApi,
     permissions: AuthzApi,
-    ops: OpsApi,
     /** Where an app on this instance points; the gateway owns the address. */
     gateway: GatewayApi,
     /** The project-to-organization hop a project-scoped read resolves through. */
@@ -94,16 +90,10 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
   }
 
   static create(setup: OnboardingSetup): OnboardingModule {
-    const ops = setup.dependencies.ops;
-    const events = HttpPostHogEventsChannel.create({
-      targets: () => ops.findProductAnalyticsTargets(),
-    });
-    setup.resources.own("Onboarding PostHog client", () => events.close());
     const lifecycle = buildGuidedOnboardingLifecyclePipeline();
     const senders: { commands?: EventingCommands<GuidedOnboardingLifecyclePipeline> } = {};
     const guided = GuidedOnboardingService.create({
       organizations: setup.dependencies.organizations,
-      events,
       announce: async (input) => {
         if (!senders.commands) {
           throw new Error("guided_onboarding_lifecycle pipeline senders are not connected yet");
@@ -266,16 +256,6 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
 
   getCheckStatus(input: { projectId: string }): Promise<IntegrationsCheckStatus> {
     return this.#checks.getCheckStatus(input);
-  }
-
-  trackGuidedOnboardingEvent(input: GuidedOnboardingTrackedEvent): void {
-    this.#guided.trackEvent({
-      userId: input.userId,
-      event: input.event,
-      projectId: input.projectId,
-      properties: input.properties,
-      uuid: input.uuid,
-    });
   }
 
   private actorOf(input: OnboardingCallerInput): { organizationId: string; userId: string } {

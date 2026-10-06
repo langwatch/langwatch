@@ -21,7 +21,13 @@ export type AuthzDeclaration =
   | { kind: "permission"; permission: AuthzPermission; via?: ScopeTierField }
   | { kind: "permission-any"; permissions: readonly AuthzPermission[] }
   | { kind: "permission-all"; permissions: readonly AuthzPermission[]; via?: ScopeTierField }
-  | { kind: "no-permission"; reason: string; allow?: Record<string, string> }
+  | {
+      kind: "no-permission";
+      reason: string;
+      allow?: Record<string, string>;
+      /** The read a person held at the second-factor gate needs to recover; asks no gate. */
+      mfaRecovery?: Readonly<{ reason: string }>;
+    }
   | {
       kind: "service-authorized";
       reason: string;

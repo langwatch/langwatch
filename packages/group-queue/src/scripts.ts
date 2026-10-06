@@ -11,7 +11,6 @@ import {
 } from "./blobConstants.ts";
 import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua.ts";
 import { CachedLuaScript } from "./cachedLuaScript.ts";
-import { resolveDispatchAllowListRedisKey } from "./dispatch-scope.ts";
 import { gqJobsDispatchedOverrideTotal } from "./metrics.ts";
 
 // Lua scripts inlined as string constants.
@@ -2520,4 +2519,15 @@ export function pendingGroupsKey(keyPrefix: string): string {
  */
 export function pendingDriftKey(keyPrefix: string): string {
   return `${keyPrefix}stats:pending-drift`;
+}
+
+/** Resolves the fifth dispatch-script key without ever leaving the queue's slot. */
+export function resolveDispatchAllowListRedisKey({
+  keyPrefix,
+  allowedGroupsKey,
+}: {
+  keyPrefix: string;
+  allowedGroupsKey?: string;
+}): string {
+  return allowedGroupsKey ?? `${keyPrefix}dispatch-all`;
 }

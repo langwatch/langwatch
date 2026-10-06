@@ -7,7 +7,7 @@ import {
   storedObjectOperationIdSchema,
   storedObjectProjectIdSchema,
 } from "./ids.ts";
-import { hasControlCharacters } from "./validation.ts";
+import { hasControlCharacters } from "./safe-media-types.ts";
 
 export const STORED_OBJECT_FILENAME_MAX_BYTES = 255;
 export const STORED_OBJECT_MEDIA_TYPE_MAX_CHARACTERS = 127;

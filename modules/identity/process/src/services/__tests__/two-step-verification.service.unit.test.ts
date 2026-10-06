@@ -202,6 +202,75 @@ describe("two-step verification", () => {
     });
   });
 
+  describe("given the organization requires nothing", () => {
+    /** @scenario "An organization that requires nothing is satisfied after one read" */
+    it("answers satisfied after the organization read alone", async () => {
+      const { service } = organizationService(accounts);
+      const reads = {
+        setting: vi.spyOn(accounts, "getOrganizationSetting"),
+        membership: vi.spyOn(accounts, "isActiveMember"),
+        factors: vi.spyOn(accounts, "getAccountFactors"),
+      };
+
+      await expect(
+        service.getStanding({ userId: "user_ana", organizationId: "org_open", sessionId: "s_1" }),
+      ).resolves.toMatchObject({
+        organizationId: "org_open",
+        required: false,
+        satisfaction: { satisfied: true, by: "not_required" },
+      });
+      expect(reads.setting).toHaveBeenCalledTimes(1);
+      expect(reads.membership).not.toHaveBeenCalled();
+      expect(reads.factors).not.toHaveBeenCalled();
+    });
+
+    it("reads no session sign-in method", async () => {
+      const findSessionAmr = vi.fn(async () => [] as string[]);
+      const service = OrganizationMfaService.create({
+        accounts,
+        auth: createApiFixture<AuthApi>({ offersTwoStepVerification: () => true, findSessionAmr }),
+        notifier: OrganizationMfaNotifierService.create({
+          accounts,
+          mail: MemoryOrganizationMfaRequirementMailChannel.create(),
+          emails: { resolveEmail: async () => KEEP_LEGACY },
+        }),
+        entitled: async () => true,
+      });
+
+      await service.getStanding({
+        userId: "user_ana",
+        organizationId: "org_open",
+        sessionId: "s_1",
+      });
+
+      expect(findSessionAmr).not.toHaveBeenCalled();
+    });
+
+    it("reads nothing at all where two-step verification is not offered", async () => {
+      const { service } = organizationService(accounts, { offered: false });
+      const setting = vi.spyOn(accounts, "getOrganizationSetting");
+
+      await expect(
+        service.getStanding({ userId: "user_bo", organizationId: "org_acme", sessionId: "s_1" }),
+      ).resolves.toMatchObject({ required: false, satisfaction: { satisfied: true } });
+      expect(setting).not.toHaveBeenCalled();
+    });
+
+    it("tells nothing apart between an organization that does not exist and one that requires nothing", async () => {
+      const { service } = organizationService(accounts);
+
+      await expect(
+        service.getStanding({ userId: "user_ana", organizationId: "org_missing", sessionId: null }),
+      ).resolves.toEqual({
+        organizationId: "org_missing",
+        organizationName: null,
+        required: false,
+        satisfaction: { satisfied: true, by: "not_required" },
+        holdsPasskey: false,
+      });
+    });
+  });
+
   describe("given an administrator reads the requirement", () => {
     it("says there is no connection when the only one was torn down", async () => {
       store.putConnection({

@@ -1,5 +1,5 @@
 # Extends specs/ui/browser-query-caching.feature and packages/api/specs/read-hints.feature.
-# Rows restore at start-up today; the lazy restore and the call-site lint are the tracked gaps.
+# The call-site lint is the tracked gap.
 
 Feature: The framework caches every read in the browser, so no module or screen configures caching
   A read is cached in memory and mirrored to the sealed IndexedDB store, keyed by procedure path,
@@ -25,7 +25,7 @@ Feature: The framework caches every read in the browser, so no module or screen 
     Then the row is not painted
     And the row is removed from the store
 
-  @unimplemented
+  @integration
   Scenario: A read is restored from disk only when it is first asked for
     Given the store holds rows for two reads
     When the document reloads and a screen asks for one of them

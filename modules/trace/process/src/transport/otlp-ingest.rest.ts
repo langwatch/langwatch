@@ -39,6 +39,8 @@ import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { getLangWatchTracer } from "langwatch";
 
+import { ingestPlanLimitRefusal } from "./collector.rest.ts";
+
 const loggerTraces = createLogger("langwatch:otel:v1:traces");
 
 const AUTH_REASON = "OTLP ingestion API key resolved in-handler";
@@ -322,7 +324,11 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
-  .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
+  .withResponse("protocol", {
+    produces: PRODUCES_JSON,
+    because: OTLP_PROTOCOL_REASON,
+    refusal: ingestPlanLimitRefusal,
+  })
   .withDocs({ hide: true })
   .handle(async ({ app, raw, request, response }) =>
     response.write(
@@ -341,7 +347,11 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
-  .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
+  .withResponse("protocol", {
+    produces: PRODUCES_JSON,
+    because: OTLP_PROTOCOL_REASON,
+    refusal: ingestPlanLimitRefusal,
+  })
   .withDocs({ hide: true })
   .handle(async ({ app, raw, request, response }) =>
     response.write(await handleOtlpPathAlias({ app, raw, request })),
@@ -352,7 +362,11 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
-  .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
+  .withResponse("protocol", {
+    produces: PRODUCES_JSON,
+    because: OTLP_PROTOCOL_REASON,
+    refusal: ingestPlanLimitRefusal,
+  })
   .withDocs({ hide: true })
   .handle(async ({ app, raw, request, response }) =>
     response.write(await handleOtlpPathAlias({ app, raw, request })),
@@ -362,7 +376,11 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
-  .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
+  .withResponse("protocol", {
+    produces: PRODUCES_JSON,
+    because: OTLP_PROTOCOL_REASON,
+    refusal: ingestPlanLimitRefusal,
+  })
   .withDocs({ hide: true })
   .handle(async ({ app, raw, request, response }) =>
     response.write(await handleOtlpPathAlias({ app, raw, request })),
@@ -372,7 +390,11 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
-  .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
+  .withResponse("protocol", {
+    produces: PRODUCES_JSON,
+    because: OTLP_PROTOCOL_REASON,
+    refusal: ingestPlanLimitRefusal,
+  })
   .withDocs({ hide: true })
   .handle(async ({ app, raw, request, response }) =>
     response.write(await handleOtlpPathAlias({ app, raw, request })),

@@ -1,7 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 
 /** One refusal as a public ops door writes it: the status and the JSON body. */
-export type OpsDoorRefusal = { status: number; body: Record<string, unknown> };
+type OpsDoorRefusal = { status: number; body: Record<string, unknown> };
 
 /** Main's unhandled body; its trace block needs the refusal to carry the trace id. */
 const UNHANDLED = { error: "Internal server error", message: "An unknown error occurred" };

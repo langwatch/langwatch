@@ -116,7 +116,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     And user "ian@acme.test" has `virtualKeys:update` at PROJECT "demo"
     When "ian@acme.test" calls `api.virtualKeys.update` with id="vk_demo" and new name="renamed"
     Then the call succeeds
-    And the audit log records actor="ian@acme.test", action="virtualKey.update", target="vk_demo"
+    And the audit log records actor="ian@acme.test", action="gateway.virtual_key.updated", target="vk_demo"
 
   @integration
   Scenario: Rotating a VK requires virtualKeys:rotate

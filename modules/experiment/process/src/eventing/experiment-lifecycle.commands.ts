@@ -1,17 +1,26 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
-import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
+import { createTenantId, defineCommandSchema, EventSchema, EventUtils } from "@langwatch/eventing";
 import {
   EXPERIMENT_LIFECYCLE_AGGREGATE_TYPE,
   EXPERIMENT_RAN_EVENT_TYPE,
   EXPERIMENT_RAN_EVENT_VERSION,
+  experimentRanEventDataSchema,
 } from "@langwatch/experiment-contract";
+import { z } from "zod";
 
-import {
-  RECORD_EXPERIMENT_RAN_COMMAND_TYPE,
-  type ExperimentRanEvent,
-  type RecordExperimentRanCommandData,
-  recordExperimentRanCommandDataSchema,
-} from "./experiment-lifecycle.events.ts";
+export const RECORD_EXPERIMENT_RAN_COMMAND_TYPE = "lw.experiment.record_ran" as const;
+
+export const recordExperimentRanCommandDataSchema = experimentRanEventDataSchema;
+export type RecordExperimentRanCommandData = z.infer<typeof recordExperimentRanCommandDataSchema>;
+
+export const experimentRanEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(EXPERIMENT_RAN_EVENT_TYPE),
+  version: z.literal(EXPERIMENT_RAN_EVENT_VERSION),
+  data: experimentRanEventDataSchema,
+});
+export type ExperimentRanEvent = z.infer<typeof experimentRanEventSchema>;
+export type ExperimentLifecycleEvent = ExperimentRanEvent;
 
 /** Records that a workbench run ended; the same send twice is one event. */
 export class RecordExperimentRanCommand implements CommandHandler<

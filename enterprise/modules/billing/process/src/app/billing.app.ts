@@ -68,7 +68,11 @@ import {
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
 import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
 import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
-import { resourceLimitCooldown } from "../services/billing-alert-cooldown.service.ts";
+import {
+  planLimitCooldown,
+  planLimitInFlight,
+  resourceLimitCooldown,
+} from "../services/billing-alert-cooldown.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
 import { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
 import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
@@ -95,6 +99,7 @@ import { LicensePurchaseDeliveryService } from "../services/license-purchase-del
 import { LicensePurchaseService } from "../services/license-purchase.service.ts";
 import { LicensingLicenseGeneratorService } from "../services/licensing-license-generator.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
+import { PlanLimitAlertService } from "../services/plan-limit-alert.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
@@ -247,6 +252,7 @@ export class BillingModule
           subscriptions: setup.repositories.webhookSubscriptions,
           organizations: setup.dependencies.organizations,
           resourceLimitAlerts,
+          planLimitAlerts: BillingModule.#composePlanLimitAlerts(setup, notices),
         }),
         webhook: {
           signing,
@@ -324,6 +330,22 @@ export class BillingModule
         subscriptions: setup.repositories.subscriptions,
         isSaas,
       }),
+      notices,
+      errors: BillingErrorReporterService.create(),
+    });
+  }
+
+  /** Main's plan-limit alert, guarded in flight, by the 30-day damper and the organization's stamp. */
+  static #composePlanLimitAlerts(
+    setup: BillingSetup,
+    notices: BillingUsageNoticeService,
+  ): PlanLimitAlertService {
+    const { organizations, projects } = setup.dependencies;
+    return PlanLimitAlertService.create({
+      isSaas: setup.config.isSaas,
+      inFlight: planLimitInFlight,
+      cooldown: planLimitCooldown,
+      organizations: UsageLimitOrganizationService.create({ organizations, projects }),
       notices,
       errors: BillingErrorReporterService.create(),
     });

@@ -79,6 +79,7 @@ import type { AutomationGraphNotifier } from "../channels/automation-graph-alert
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
+import { OutboxAutomationAuditSink } from "../eventing/automation-audit.intent.ts";
 import {
   createAutomationsPipeline,
   type AutomationsPipeline,
@@ -103,6 +104,7 @@ import { AutomationEvaluationTriggerFilterService } from "../services/automation
 import type { AutomationDispatchError } from "../services/automation-graph-activity.service.ts";
 import { AutomationGraphAlertNotifierService } from "../services/automation-graph-alert-notifier.service.ts";
 import { AutomationMatchRecordMetricsService } from "../services/automation-match-record-metrics.service.ts";
+import { AutomationNextStepService } from "../services/automation-next-step.service.ts";
 import { AutomationNotificationDeliveryUnavailableService } from "../services/automation-notification-delivery-unavailable.service.ts";
 import { AutomationNotificationDeliveryService } from "../services/automation-notification-delivery.service.ts";
 import { AutomationProviderRegistryService } from "../services/automation-provider-registry.service.ts";
@@ -236,7 +238,7 @@ export interface AutomationAuditSink {
   record(
     entry: Readonly<{
       userId: string;
-      projectId?: string;
+      projectId: string;
       action: string;
       args?: unknown;
     }>,
@@ -353,6 +355,8 @@ interface AutomationAppCollaborators {
   publicApi: AutomationPublicApiService;
   latestEvaluations: TriggerLatestEvaluationService;
   audit: AutomationAuditSink;
+  /** What the audit outbox's worker writes to (Alex, Q72). */
+  auditLog: AuditLogApi;
   limits: AutomationCallCounter;
   publicBaseUrl: string | undefined;
   evaluations: AutomationEvaluationSubscriberService;
@@ -558,6 +562,13 @@ export class AutomationModule implements AutomationApi {
         mailer: { send: (content) => dependencies.notifications.sendEmail(content) },
         traces: dependencies.traces,
         metrics: AutomationRunawayMetricsOtelService.create(),
+        nextStep: AutomationNextStepService.create({
+          projects: dependencies.projects,
+          plans: dependencies.entitlement,
+          nextStep: dependencies.entitlement,
+          baseHost,
+          logger,
+        }),
         baseHost,
         logger,
       }),
@@ -723,6 +734,7 @@ export class AutomationModule implements AutomationApi {
       latestEvaluations,
       monitors: dependencies.monitors,
       audit: infrastructure.audit,
+      auditLog: dependencies.auditLog,
       limits: infrastructure.limits,
       publicBaseUrl: infrastructure.publicBaseUrl,
       evaluations: AutomationEvaluationSubscriberService.create({
@@ -751,6 +763,7 @@ export class AutomationModule implements AutomationApi {
   readonly #latestEvaluations: TriggerLatestEvaluationService;
   #monitors: MonitorApiContract;
   #audit: AutomationAuditSink;
+  readonly #auditLog: AuditLogApi;
   #limits: AutomationCallCounter;
   readonly #publicBaseUrl: string | undefined;
   readonly #evaluations: AutomationEvaluationSubscriberService;
@@ -768,6 +781,7 @@ export class AutomationModule implements AutomationApi {
     this.#latestEvaluations = collaborators.latestEvaluations;
     this.#monitors = collaborators.monitors;
     this.#audit = collaborators.audit;
+    this.#auditLog = collaborators.auditLog;
     this.#limits = collaborators.limits;
     this.#publicBaseUrl = collaborators.publicBaseUrl;
     this.#evaluations = collaborators.evaluations;
@@ -782,8 +796,11 @@ export class AutomationModule implements AutomationApi {
       throw new Error("Automation was asked for its pipeline, but no settlement was composed");
     }
     this.#reportInstances = processStore;
+    // A built pipeline means an outbox: audit writes ride it from here on (Alex, Q72).
+    this.#audit = OutboxAutomationAuditSink.create(processStore);
     return createAutomationsPipeline({
       ...this.#settlement,
+      auditLog: this.#auditLog,
       retention: processStore,
       reports: this.#reportDispatcher,
       reportRuns: this.#reportSchedules,
@@ -1238,7 +1255,7 @@ export class AutomationModule implements AutomationApi {
   }): Promise<EmailSuppressionRow[]> {
     const rows = await this.#automation.getAllEnriched({ projectId: input.projectId });
 
-    void this.#audit.record({
+    await this.#audit.record({
       userId: input.actorId,
       projectId: input.projectId,
       action: "emailSuppression.getAll",

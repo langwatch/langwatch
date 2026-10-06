@@ -28,7 +28,7 @@ export const platformOperatorSeedGrantIntentSchema = platformOperatorSeedRecorde
 /** One key: the outbox holds one grant for the one recorded decision. */
 export const PLATFORM_OPERATOR_SEED_GRANT_KEY = "grant:recorded" as const;
 
-export type PlatformOperatorSeedIntents = {
+type PlatformOperatorSeedIntents = {
   seed: IntentSpec<typeof platformOperatorSeedIntentSchema>;
   grant: IntentSpec<typeof platformOperatorSeedGrantIntentSchema>;
 };

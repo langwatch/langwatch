@@ -27,3 +27,21 @@ export function scimRefusalDocument(failure: Error): ScimError {
     detail: "The request could not be completed",
   };
 }
+
+/** The RFC 7644 error document a SCIM operation refuses with: status, detail and, when given, type. */
+export function scimErrorDocument({
+  status,
+  detail,
+  scimType,
+}: {
+  status: string;
+  detail: string;
+  scimType?: string;
+}): ScimError {
+  return {
+    schemas: [SCIM_ERROR_SCHEMA],
+    status,
+    detail,
+    ...(scimType === undefined ? {} : { scimType }),
+  };
+}

@@ -189,7 +189,7 @@ describe("GET /api/me/usage", () => {
       );
     });
 
-    // The scenario says 400; main and this door answer 422 (open question).
+    /** @scenario "A half-specified window is rejected" */
     it("refuses a window with only one bound, before anything is read", async () => {
       const { response, body, personalUsage } = await get({
         path: `${USAGE_PATH}?windowStartMs=1000`,
@@ -200,6 +200,7 @@ describe("GET /api/me/usage", () => {
       expect(personalUsage).not.toHaveBeenCalled();
     });
 
+    /** @scenario "An inverted window is rejected" */
     it("refuses a window whose start is not before its end", async () => {
       const { response, body, personalUsage } = await get({
         path: `${USAGE_PATH}?windowStartMs=2000&windowEndMs=2000`,

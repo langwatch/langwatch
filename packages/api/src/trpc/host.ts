@@ -353,6 +353,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
                   ...(impersonatorId ? { impersonatorId } : {}),
                 }
               : null,
+            ...(ctx.session ? { browserSession: { id: ctx.session.sessionId ?? null } } : {}),
           };
         },
       },
@@ -428,6 +429,10 @@ function decidingOnce(authz: Authorize): Authorize {
   const lineages = new Map<string, Promise<AuthzScopeLineageResult>>();
   const platform = new Map<string, Promise<PlatformDecision>>();
   const askPlatform = authz.getPlatformDecision?.bind(authz);
+  const organizations = new Map<string, Promise<string | null>>();
+  const askOrganization = authz.organizationOf?.bind(authz);
+  const secondFactors = new Map<string, Promise<void>>();
+  const askSecondFactor = authz.assertSecondFactor?.bind(authz);
 
   return {
     getDecision: (input) =>
@@ -444,6 +449,23 @@ function decidingOnce(authz: Authorize): Authorize {
       : {
           getPlatformDecision: (input) =>
             askOnce(platform, JSON.stringify(input), () => askPlatform(input)),
+        }),
+    ...(askOrganization === void 0
+      ? {}
+      : {
+          organizationOf: (scope) =>
+            askOnce(organizations, `${scope.tier}:${scope.id}`, () => askOrganization(scope)),
+        }),
+    // A batch over one scope asks the organization's requirement once, refusal included.
+    ...(askSecondFactor === void 0
+      ? {}
+      : {
+          assertSecondFactor: (input) =>
+            askOnce(
+              secondFactors,
+              JSON.stringify([input.userId, input.sessionId, input.scope.tier, input.scope.id]),
+              () => askSecondFactor(input),
+            ),
         }),
   };
 }

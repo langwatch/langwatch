@@ -1,5 +1,5 @@
 import type { AggregateType } from "./aggregateType.ts";
-import type { EventType } from "./eventType.ts";
+import type { EventType } from "./types.ts";
 
 export interface EventDefinition<Type extends EventType = EventType> {
   readonly type: Type;

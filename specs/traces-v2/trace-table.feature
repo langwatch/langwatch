@@ -42,7 +42,7 @@ Rule: Trace table page layout
   @unimplemented
   Scenario: Three-panel layout renders on Observe page
     When the Observe page loads
-    Then the filter sidebar is on the left
+    Then the filter sidebar is on the left, collapsed on a fresh load
     And the trace table fills the center column
     And the trace drawer area is on the right (hidden until a trace is selected)
 
@@ -104,13 +104,13 @@ Rule: Origin filter in sidebar
   Scenario: Selecting an origin filters traces and syncs with search bar
     When the user checks "Application" in the Origin facet
     Then only Application traces are shown in the table
-    And the search bar shows "@origin:application"
+    And the search bar shows "origin:application"
 
   @unimplemented
   Scenario: Multi-select origins
     When the user checks "Application" and "Simulation"
     Then traces from both origins are shown
-    And the search bar shows "@origin:application @origin:simulation"
+    And the search bar shows "(origin:application OR origin:simulation)"
 
   # The following three scenarios describe origin-conditional facet sections
   # (Scenario / Verdict / Eval Type / Score Range) that are not implemented
@@ -451,9 +451,9 @@ Rule: Default columns and status indicator
     Then token counts show compact format like "1.2K" or "450"
 
   @unimplemented
-  Scenario: Model column shows abbreviated provider/model
+  Scenario: Model column shows the raw model string
     Given a trace used "gpt-4o"
-    Then the Model column shows "oai/4o"
+    Then the Model column shows "gpt-4o"
 
   @integration
   Scenario: Model column shows badge for multiple models
@@ -552,8 +552,7 @@ Rule: Interactive value chips
   @unimplemented
   Scenario: Estimated cost shows tilde prefix
     Given a trace with TokensEstimated = true
-    Then the cost shows "~$0.003" with a tilde prefix
-    And hovering shows a tooltip "Estimated"
+    Then the cost shows "~$0.0030" with a tilde prefix
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -837,8 +836,8 @@ Rule: Pagination
     Then page 1 loads
 
   @unimplemented
-  Scenario: Pagination controls are bottom-right
-    Then the pagination controls (previous/next arrows and page indicator) are in the bottom-right of the table
+  Scenario: Pagination controls are centred below the table
+    Then the pagination controls (previous/next arrows and page indicator) are centred below the table, with the summary on the left
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -906,7 +905,7 @@ Rule: Table loading states
   Scenario: Initial load shows skeleton rows
     Given no cached data exists
     When the Observe page loads
-    Then approximately 10 shimmer skeleton rows are displayed
+    Then 50 shimmer skeleton rows are displayed
 
   @integration
   Scenario: Preset switch reduces opacity while loading

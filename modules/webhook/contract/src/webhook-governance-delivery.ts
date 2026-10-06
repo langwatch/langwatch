@@ -6,7 +6,7 @@
 import { gatewayGovernanceEventSchema } from "@langwatch/gateway-contract";
 import { z } from "zod";
 
-import { webhookSpendDeliveryRequestSchema } from "./webhook-spend-delivery.ts";
+import { webhookSpendDeliveryRequestSchema } from "./webhook-spend-envelope.ts";
 
 export const WEBHOOK_GOVERNANCE_DELIVERY_REQUESTED_EVENT_TYPE =
   "lw.webhook.governance_delivery.requested" as const;

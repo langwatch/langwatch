@@ -4,7 +4,6 @@ import process from "node:process";
 import type { Duplex } from "node:stream";
 
 import { GracefulShutdown } from "./graceful-shutdown.ts";
-import { hostedRuntime } from "./hosted-runtime.ts";
 import { drainHttpServer } from "./http-drain.ts";
 import {
   HEARTBEAT_INTERVAL_MS,
@@ -98,7 +97,8 @@ export class Server {
     });
     // Hosted first, so it stops LAST: the health door outlives every drain
     // phase, and a probe during shutdown still sees the process as alive.
-    server.with(server.createHealthComponent(options.healthPort));
+    server.health = server.createHealthComponent(options.healthPort);
+    server.with(server.health);
     if (options.ownsProcess !== false) {
       server.disposeFatal = installFatalHandlers({
         service: options.name,
@@ -123,6 +123,8 @@ export class Server {
   /** Set by `run`: a process with no HTTP surface answers liveness off its main loop. */
   private livenessOffLoop = false;
   private livenessThread: LivenessThread | undefined;
+  private health: ServerComponent | undefined;
+  private healthOpening: Promise<void> | undefined;
   private heartbeat: Heartbeat | undefined;
   private upgrades: UpgradeDoor | undefined;
   private draining = false;
@@ -182,6 +184,21 @@ export class Server {
   get healthAddress(): AddressInfo | string | null {
     if (this.healthListener === undefined) return null;
     return this.livenessThread?.address ?? this.healthListener.address();
+  }
+
+  /**
+   * Opens the health door ahead of `listen`, off the main loop, so liveness answers while a
+   * slow boot stage (the voice tunnel mint) is still running. `listen` finds it open.
+   * Spec: specs/server/worker-liveness-probe.feature.
+   */
+  openLiveness(): Promise<void> {
+    this.livenessOffLoop = true;
+    return this.openHealth();
+  }
+
+  private openHealth(): Promise<void> {
+    this.healthOpening ??= Promise.resolve(this.health?.start?.());
+    return this.healthOpening;
   }
 
   private createHealthComponent(port: number | undefined): ServerComponent {
@@ -363,7 +380,7 @@ export class Server {
     const started: ServerComponent[] = [];
     try {
       for (const component of this.components) {
-        await component.start?.();
+        await (component === this.health ? this.openHealth() : component.start?.());
         started.push(component);
       }
     } catch (error) {
@@ -393,6 +410,14 @@ export class Server {
     this.graceful.phase({ name: `${this.name} resources`, run: () => this.resources.close() });
   }
 
+  /** A door opened by `openLiveness` whose `listen` never came has no phase to close it. */
+  private async closeUnlistened(): Promise<void> {
+    if (this.listening === undefined && this.healthOpening !== undefined) {
+      await this.healthOpening.catch(() => void 0);
+      await this.health?.stop();
+    }
+  }
+
   private async stopStarted(started: readonly ServerComponent[]): Promise<void> {
     for (const component of [...started].reverse()) {
       try {
@@ -408,7 +433,7 @@ export class Server {
     this.draining = true;
     this.closing ??= Promise.resolve()
       .then(() => this.graceful.run())
-      .then(() => void 0)
+      .then(() => this.closeUnlistened())
       .finally(() => {
         this.disposeSignals?.();
         this.disposeFatal?.();
@@ -524,4 +549,23 @@ export async function bindHttpServer(
       await new Promise((resume) => setTimeout(resume, BIND_RETRY_MS));
     }
   }
+}
+
+type Runtime = Readonly<{ start(): Promise<void> | void; stop(): Promise<void> | void }>;
+
+/**
+ * The booted application, spoken as a component: the chain stays fluent and
+ * no call site hand-rolls a `{ name, start, stop }` object.
+ */
+export function hostedRuntime({
+  name,
+  runtime,
+  drain,
+}: Readonly<{ name: string; runtime: Runtime; drain?: boolean }>): ServerComponent {
+  return {
+    name,
+    start: () => runtime.start(),
+    stop: () => runtime.stop(),
+    ...(drain === true ? { drain: true } : {}),
+  };
 }

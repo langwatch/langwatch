@@ -13,6 +13,7 @@ Feature: Gateway budget decision service
     When the Gateway checks a request for another provider
     Then that budget is absent from the scopes response
 
+  @unit
   Scenario: The process owns one budget decision service
     Given the API, CLI, and Gateway routes use the application instance
     When multiple requests perform budget checks

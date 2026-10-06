@@ -1,4 +1,7 @@
+import type { SessionImpersonation } from "@langwatch/auth-contract";
 import type { Instant } from "@langwatch/time";
+
+import type { StoredImpersonationClaims } from "../rules/impersonation-claims.rules.ts";
 
 /**
  * The browser sessions this module owns, as rows. Every operation is keyed by
@@ -9,7 +12,8 @@ export type StoredBrowserSession = {
   id: string;
   userId: string;
   sessionToken: string;
-  impersonating: unknown;
+  /** The {actor, subject} claims (D06); null when the row carries none. */
+  impersonation: StoredImpersonationClaims | null;
   /** When the sign-in that minted this session happened (GAC-10). */
   createdAt: Instant;
   /** Our own activity stamp, null on any session never under a window. */
@@ -46,6 +50,10 @@ export interface AuthSessionRepository {
   deleteAllForUser(input: { userId: string }): Promise<number>;
   deleteById(input: { id: string }): Promise<number>;
   deleteOthersForUser(input: { userId: string; keepSessionId: string }): Promise<number>;
+  /** Writes the {actor, subject} claims onto the session (D06); a gone session writes nothing. */
+  writeImpersonation(input: { sessionId: string; claims: SessionImpersonation }): Promise<void>;
+  /** Clears the claims; idempotent, and the session itself stays. */
+  clearImpersonation(input: { sessionId: string }): Promise<void>;
   /** Records that a session was used, for the idle window (GAC-10). */
   touch(input: { sessionId: string; at: Instant }): Promise<void>;
   /** Distinct people holding an unexpired session at `at` (epoch ms), install-wide. */

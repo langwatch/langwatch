@@ -28,6 +28,8 @@ import {
   type IdentityServerConfig,
   type MethodsLastUsed,
   type RoutingDecision,
+  type SessionClaims,
+  type SessionClaimsMintInput,
   SignInMethodPolicyService,
   type OrganizationMemberFactor,
   type OrganizationMfaRequirement,
@@ -136,6 +138,8 @@ import {
   IDENTITY_LATCH_CACHE_MAX_USERS,
   IDENTITY_LATCH_CACHE_TTL_MS,
 } from "../services/per-subject-cached-latch.service.ts";
+import { SessionClaimsService } from "../services/session-claims.service.ts";
+import { SignUpIdentifierService } from "../services/sign-up-identifier.service.ts";
 import { SignInAccountLookupService } from "../services/signin-account-lookup.service.ts";
 import { SignInRouterService } from "../services/signin-router.service.ts";
 import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
@@ -160,6 +164,7 @@ import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.servic
 import { SsoDomainOwnershipBackfillService } from "../services/sso-domain-ownership-backfill.service.ts";
 import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
 import { SsoEngineProviderService } from "../services/sso-engine-provider.service.ts";
+import { SsoIdpCredentialsService } from "../services/sso-idp-credentials.service.ts";
 import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
 import { SsoIssuerDirectoryService } from "../services/sso-issuer-directory.service.ts";
 import { SsoIssuerEndpointOriginsService } from "../services/sso-issuer-endpoint-origins.service.ts";
@@ -204,8 +209,10 @@ type IdentityAppParts = {
   identity: IdentityService;
   verification: VerificationCeremonyService;
   accountIdentifiers: AccountIdentifiersService;
+  sessionClaims: SessionClaimsService;
   microsoftAccountRekey: MicrosoftAccountRekeyService;
   newbornSweep: IdentityNewbornReconciliationService;
+  signUpIdentifiers: SignUpIdentifierService;
   backfill: IdentityBackfillService;
   secrets: IdentitySecretCarryService;
   ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService;
@@ -496,6 +503,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       clock: { now: () => nowInstant().epochMilliseconds, newCommandId: newIdentityCommandId },
     });
     const newbornSweep = IdentityNewbornReconciliationService.create({ reservations });
+    const signUpIdentifiers = SignUpIdentifierService.create({ identity });
     const secrets = IdentitySecretCarryService.create(setup.repositories.secretCarry);
     const backfill = IdentityBackfillService.create({
       reads: setup.repositories.backfill,
@@ -513,6 +521,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       offersPasskeys: () => setup.dependencies.auth.offersPasskeys(),
       issuesOwnPasswords: () => setup.dependencies.auth.issuesOwnPasswords(),
       selfHosted: () => !setup.config.isSaas,
+      mountedSocialMethodIds: () => setup.dependencies.auth.findMountedSocialMethodIds(),
     });
     const passwordDoor = passwordDoorMounted(signInMethodPolicy);
     const holderCanWalkIn = breakGlassEligibility(
@@ -648,7 +657,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       connections: setup.repositories.ssoConnections,
       memberships: arrivalMemberships(setup.dependencies.organizations),
       authz: setup.dependencies.permissions,
-      adoption: SsoArrivalAdoptionService.create(backfill),
+      adoption: SsoArrivalAdoptionService.create({
+        backfill,
+        latch: setup.repositories.latch,
+      }),
       signups: signupAnnouncements,
     });
     const ssoTestArrival = SsoTestArrivalService.create({
@@ -686,10 +698,12 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
           connections: () => ssoConnections,
           reads: setup.repositories.ssoConnections,
           activity: setup.repositories.ssoMigrationEvidence,
-          credentials: setup.repositories.ssoCredentials,
+          idpCredentials: SsoIdpCredentialsService.create({
+            credentials: setup.repositories.ssoCredentials,
+            registrations: SsoIdpRegistrationService.create({ discovery: issuerDiscovery }),
+          }),
           breakGlass,
           passwordDoor,
-          registrations: SsoIdpRegistrationService.create({ discovery: issuerDiscovery }),
           finalization: SsoMigrationFinalizationService.create({
             connections: () => ssoConnections,
             evidence: ssoMigrationProgress,
@@ -715,6 +729,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       breakGlass: setup.repositories.ssoBreakGlass,
       activity: setup.repositories.ssoMigrationEvidence,
       migrations: ssoMigrationProgress,
+      entitled: async ({ organizationId }) =>
+        isEnterpriseTier(
+          (await setup.dependencies.entitlements.getActivePlan({ organizationId })).type,
+        ),
     });
     const auth = setup.dependencies.auth;
     const resolveAuthProvider = () => auth.resolveAuthProvider();
@@ -771,6 +789,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       reservations,
       identity,
       verification,
+      sessionClaims: SessionClaimsService.create({
+        heads: setup.repositories.heads,
+        identifiers: CryptoIdentifierIdentityService.create(),
+      }),
       accountIdentifiers: AccountIdentifiersService.create({
         heads: setup.repositories.heads,
         identity,
@@ -792,6 +814,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
         accounts: setup.repositories.accountRekey,
       }),
       newbornSweep,
+      signUpIdentifiers,
       backfill,
       secrets,
       ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService.create(
@@ -830,7 +853,6 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
           proposals: identityHistory,
           accounts: setup.dependencies.auth,
         }),
-        authorization: setup.dependencies.permissions,
         auditLog: setup.dependencies.auditLog,
         rateLimiter: setup.repositories.rateLimits,
         sessions: setup.dependencies.auth,
@@ -975,6 +997,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     return this.#parts.signInRouter.route(input);
   }
 
+  claimsForMint(input: SessionClaimsMintInput): Promise<SessionClaims> {
+    return this.#parts.sessionClaims.claimsForMint(input);
+  }
+
   getMethodsLastUsed(input: { userId: string }): Promise<MethodsLastUsed> {
     return this.#parts.accountIdentifiers.getMethodsLastUsed(input);
   }
@@ -1062,6 +1088,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
 
   newbornSweep(): IdentityNewbornReconciliationService {
     return this.#parts.newbornSweep;
+  }
+
+  signUpIdentifiers(): SignUpIdentifierService {
+    return this.#parts.signUpIdentifiers;
   }
 
   userMigrations(): readonly SystemMigration[] {
@@ -1261,5 +1291,13 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     operator: IdentityLookupOperator;
   }): Promise<LookupInvitationExpiry> {
     return this.#parts.lookup.extendLookupInvitation(input);
+  }
+
+  recordRefusedLookup(input: {
+    operator: IdentityLookupOperator;
+    action: string;
+    args: Readonly<Record<string, string | null>>;
+  }): Promise<void> {
+    return this.#parts.lookup.recordRefusedLookup(input);
   }
 }

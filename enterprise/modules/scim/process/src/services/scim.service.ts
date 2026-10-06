@@ -1,5 +1,3 @@
-import crypto from "node:crypto";
-
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
   type ScimCreateUserRequest,
@@ -14,25 +12,14 @@ import {
   type ScimRequestRecord,
   type ScimUser,
   ScimService as ScimServiceContract,
-  ScimConnectionNotFoundError,
-  ScimConnectionRequiredError,
-  ScimTokenNotFoundError,
-  ScimTokenTooShortError,
-  ScimTokenUnavailableError,
   type ScimTokenEntitlement,
   type ScimTokenSummary,
 } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { createLogger } from "@langwatch/observability";
-import { nowInstant, type Instant } from "@langwatch/time";
+import type { Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 
 import type { ScimRepository } from "../repositories/scim.repository.ts";
-import {
-  digestScimToken,
-  MINIMUM_SCIM_TOKEN_LENGTH,
-  scimTokenDigests,
-} from "../rules/scim-token-digest.rules.ts";
 import type { ScimDepartmentAssignment } from "./scim-cost-center.service.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
 import {
@@ -44,8 +31,7 @@ import { type ScimGrantAuthority, ScimGrantsService } from "./scim-grants.servic
 import { ScimProvisioningService, type ScimUserProvisioning } from "./scim-provisioning.service.ts";
 import { ScimRequestLogService } from "./scim-request-log.service.ts";
 import type { ScimSyncLifecycle, ScimUserPushOperation } from "./scim-sync-lifecycle.service.ts";
-
-const logger = createLogger("langwatch:scim:tokens");
+import { ScimTokenService } from "./scim-token.service.ts";
 
 /**
  * Maps between SCIM 2.0 User resources and LangWatch User/OrganizationUser models.
@@ -65,11 +51,10 @@ export class ScimService extends ScimServiceContract {
   private readonly repository: ScimRepository;
   private readonly userOperations: ScimProvisioningService;
   private readonly groups: ScimDirectoryService;
-  private readonly entitlements: Pick<EntitlementApi, "getActivePlan">;
   private readonly identities: ScimDirectoryIdentityService;
   private readonly lifecycle: ScimSyncLifecycle;
   private readonly requests: ScimRequestLogService;
-  private readonly tokenPepper: string | undefined;
+  private readonly tokens: ScimTokenService;
 
   private constructor({
     prisma,
@@ -96,7 +81,6 @@ export class ScimService extends ScimServiceContract {
   }) {
     super();
     this.repository = prisma;
-    this.tokenPepper = tokenPepper;
     this.requests = ScimRequestLogService.create(prisma);
     this.identities = ScimDirectoryIdentityService.create({ repository: prisma, connections });
     this.lifecycle = lifecycle;
@@ -112,7 +96,12 @@ export class ScimService extends ScimServiceContract {
       provenOffboarding,
       authority: this.identities,
     });
-    this.entitlements = entitlements;
+    this.tokens = ScimTokenService.create({
+      repository: prisma,
+      entitlements,
+      lifecycle,
+      tokenPepper,
+    });
     this.groups = ScimDirectoryService.create({
       prisma,
       grants,
@@ -158,147 +147,33 @@ export class ScimService extends ScimServiceContract {
     return this.identities.findOwnership(input);
   }
 
-  async generateToken(input: {
-    organizationId: string;
-    connectionId?: string | null;
-    description?: string;
-    secret?: string;
-  }): Promise<{ token: string; tokenId: string; connectionId: string }> {
-    if (!input.connectionId) {
-      throw new ScimConnectionRequiredError();
-    }
-
-    const exists = await this.repository.scimConnectionExists({
-      organizationId: input.organizationId,
-      connectionId: input.connectionId,
-    });
-    if (!exists) {
-      throw new ScimConnectionNotFoundError(input.connectionId);
-    }
-
-    if (input.secret !== undefined && input.secret.trim().length < MINIMUM_SCIM_TOKEN_LENGTH) {
-      throw new ScimTokenTooShortError(MINIMUM_SCIM_TOKEN_LENGTH);
-    }
-
-    const token = input.secret?.trim() ?? crypto.randomBytes(32).toString("hex");
-    const pepper = this.tokenHashKey();
-    // Both digests: a legacy sha256 row and a new HMAC row must never name one value.
-    const taken = await this.repository.findTokensByHashes(scimTokenDigests({ token, pepper }));
-    if (taken.length > 0) {
-      throw new ScimTokenUnavailableError();
-    }
-
-    const stored = await this.repository.createToken({
-      organizationId: input.organizationId,
-      connectionId: input.connectionId,
-      hashedToken: digestScimToken({ token, scheme: "hmac-sha256", pepper }),
-      hashScheme: "hmac-sha256",
-      description: input.description ?? null,
-    });
-    await this.lifecycle.tokenIssued({
-      organizationId: input.organizationId,
-      connectionId: input.connectionId,
-      tokenId: stored.id,
-    });
-
-    return { token, tokenId: stored.id, connectionId: input.connectionId };
+  generateToken(
+    input: Parameters<ScimTokenService["generateToken"]>[0],
+  ): Promise<{ token: string; tokenId: string; connectionId: string }> {
+    return this.tokens.generateToken(input);
   }
 
-  async listTokens(input: { organizationId: string }): Promise<ScimTokenSummary[]> {
-    const tokens = await this.repository.findTokens(input.organizationId);
-    return tokens.map((token) => ({
-      id: token.id,
-      connectionId: token.connectionId,
-      description: token.description,
-      createdAt: token.createdAt,
-      lastUsedAt: token.lastUsedAt,
-    }));
+  listTokens(input: { organizationId: string }): Promise<ScimTokenSummary[]> {
+    return this.tokens.listTokens(input);
   }
 
-  async revokeToken(input: {
-    organizationId: string;
-    tokenId: string;
-  }): Promise<{ success: true }> {
-    const token = await this.repository.findToken(input);
-    if (!(await this.repository.revokeToken(input))) {
-      throw new ScimTokenNotFoundError(input.tokenId);
-    }
-
-    // Rotation keeps the sync live: it ends only with the connection's last token.
-    const liveTokenIds = token?.connectionId
-      ? await this.repository.findTokenIdsForConnection({
-          organizationId: input.organizationId,
-          connectionId: token.connectionId,
-        })
-      : [];
-    if (token?.connectionId && liveTokenIds.length === 0) {
-      await this.lifecycle.revoked({
-        organizationId: input.organizationId,
-        connectionId: token.connectionId,
-        tokenId: input.tokenId,
-        cause: "revoke",
-      });
-    }
-
-    return { success: true };
+  revokeToken(input: { organizationId: string; tokenId: string }): Promise<{ success: true }> {
+    return this.tokens.revokeToken(input);
   }
 
-  async revokeTokensForConnection(input: {
+  revokeTokensForConnection(input: {
     organizationId: string;
     connectionId: string;
   }): Promise<{ revoked: number }> {
-    const revoked = await this.repository.revokeTokensForConnection(input);
-    // A retired connection lets its people go, so a successor may provision them.
-    await this.repository.releaseDirectoryPeople(input);
-    await this.lifecycle.revoked({
-      ...input,
-      tokenId: null,
-      cause: "teardown",
-    });
-
-    return { revoked };
+    return this.tokens.revokeTokensForConnection(input);
   }
 
-  async verifyToken(input: { token: string }): Promise<ScimTokenEntitlement> {
-    const matches = await this.repository.findTokensByHashes(
-      scimTokenDigests({ token: input.token, pepper: this.tokenHashKey() }),
-    );
-    if (matches.length > 1) {
-      logger.error({ rows: matches.length }, "a presented SCIM token names more than one row");
-    }
-    const stored = matches.length === 1 ? matches[0] : undefined;
-    if (!stored) {
-      return { status: "invalid_token" };
-    }
-
-    const plan = await this.entitlements.getActivePlan({
-      organizationId: stored.organizationId,
-    });
-    if (plan.type !== "ENTERPRISE") {
-      return {
-        status: "plan_not_entitled",
-        organizationId: stored.organizationId,
-        connectionId: stored.connectionId,
-      };
-    }
-
-    return {
-      status: "ok",
-      id: stored.id,
-      organizationId: stored.organizationId,
-      connectionId: stored.connectionId,
-    };
+  verifyToken(input: { token: string }): Promise<ScimTokenEntitlement> {
+    return this.tokens.verifyToken(input);
   }
 
-  async recordTokenUse(input: { tokenId: string }): Promise<void> {
-    await this.repository.recordTokenUse({ tokenId: input.tokenId, usedAt: nowInstant() });
-  }
-
-  private tokenHashKey(): string {
-    if (!this.tokenPepper) {
-      throw new Error("CREDENTIALS_SECRET (or NEXTAUTH_SECRET) must be set to hash SCIM tokens");
-    }
-    return this.tokenPepper;
+  recordTokenUse(input: { tokenId: string }): Promise<void> {
+    return this.tokens.recordTokenUse(input);
   }
 
   /**

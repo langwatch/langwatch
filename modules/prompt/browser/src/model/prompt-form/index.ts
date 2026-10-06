@@ -1,7 +1,6 @@
 export { buildDefaultFormValues, DEFAULT_FORM_VALUES } from "./default-form-values.ts";
-export { areFormValuesEqual } from "./are-form-values-equal.ts";
 export { getSaveBlockerMessage } from "./save-blocker-message.ts";
-export { isNodeDataEqual } from "./node-data-comparison.ts";
+export { areFormValuesEqual, isNodeDataEqual } from "./node-data-comparison.ts";
 export {
   changeHandleFormSchema,
   createChangeHandleFormSchema,

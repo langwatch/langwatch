@@ -4,7 +4,7 @@
  *
  * @see modules/scenario/specs/scenario-execution.feature
  */
-import type { MintRunKeyInput } from "@langwatch/api-key-contract";
+import type { MintAgentSandboxKeyInput, MintRunKeyInput } from "@langwatch/api-key-contract";
 import { CHILD_PROCESS, TargetAdapterDataSchema } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
@@ -14,16 +14,21 @@ const projectId = "project-1";
 
 function createService() {
   const calls: MintRunKeyInput[] = [];
+  const sandboxCalls: MintAgentSandboxKeyInput[] = [];
   const service = ScenarioRunKeyService.create({
     apiKeys: {
       mintRunKey: async (input) => {
         calls.push(input);
         return `token-${calls.length}`;
       },
+      mintAgentSandboxKey: async (input) => {
+        sandboxCalls.push(input);
+        return "sandbox-token";
+      },
     },
   });
 
-  return { service, calls };
+  return { service, calls, sandboxCalls };
 }
 
 const codeAdapter = TargetAdapterDataSchema.parse({
@@ -102,12 +107,15 @@ describe("ScenarioRunKeyService", () => {
     expect(calls[0]?.minRemainingMs).toBe(CHILD_PROCESS.TIMEOUT_MS);
   });
 
-  /** @scenario "A code agent's sandbox holds a per-run key reaching only the agent cache" */
-  it("gives a code agent's sandbox a key holding the agent cache alone", async () => {
-    const { service, calls } = createService();
+  /** @scenario "A code agent's sandbox holds the project's shared key reaching only the agent cache" */
+  it("gives a code agent's sandbox the project's shared agent sandbox key", async () => {
+    const { service, calls, sandboxCalls } = createService();
 
-    await service.sandboxTokenFor({ projectId, startedByUserId: "user-1" });
+    const token = await service.sandboxTokenFor({ projectId, startedByUserId: "user-1" });
 
-    expect(calls[0]).toMatchObject({ userId: "user-1", permissions: ["agentCache:manage"] });
+    // Api-key's shared key decides grain, owner and lifetime; the starter plays no part.
+    expect(sandboxCalls).toEqual([{ projectId }]);
+    expect(calls).toHaveLength(0);
+    expect(token).toBe("sandbox-token");
   });
 });

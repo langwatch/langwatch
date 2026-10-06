@@ -374,6 +374,44 @@ describe("the project tRPC namespace over the application the composition builds
     });
   });
 
+  describe("given the hidden governance project", () => {
+    const GOVERNANCE_ID = "project_governance";
+    const governance = (database: ReturnType<typeof application>["database"]) =>
+      database.putProject(
+        project({
+          id: GOVERNANCE_ID,
+          name: "Governance (internal)",
+          slug: "governance-organization-1",
+          apiKey: "sk-lw-base-key-of-the-governance",
+          kind: "internal_governance",
+        }),
+      );
+
+    /** @scenario The governance area cannot be archived through the projects API */
+    it("refuses an archive from the browser door and leaves it live", async () => {
+      const { caller, database } = mount();
+      governance(database);
+
+      await expect(
+        caller.archiveById({ projectId: "project_1", projectToArchiveId: GOVERNANCE_ID }),
+      ).rejects.toMatchObject({ cause: { code: "forbidden", httpStatus: 403 } });
+
+      expect(database.findProject(GOVERNANCE_ID)?.archivedAt).toBeNull();
+    });
+
+    /** @scenario The governance area cannot be renamed or moved through the projects API */
+    it("refuses a settings update from the browser door and writes nothing", async () => {
+      const { caller, database } = mount();
+      governance(database);
+
+      await expect(
+        caller.update({ projectId: GOVERNANCE_ID, name: "Renamed", traceSharingEnabled: false }),
+      ).rejects.toMatchObject({ cause: { code: "forbidden", httpStatus: 403 } });
+
+      expect(database.findProject(GOVERNANCE_ID)?.name).toBe("Governance (internal)");
+    });
+  });
+
   describe("when a clustering request does not land", () => {
     /** @scenario "a clustering request that fails is reported, not raised" */
     it("reports it through the process's logger and answers with an unknown failure", async () => {

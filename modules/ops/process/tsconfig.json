@@ -151,6 +151,9 @@
       "path": "../../scenario/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
       "path": "../../stored-object/contract/tsconfig.build.json"
     },
     {
@@ -173,9 +176,6 @@
     },
     {
       "path": "../../feature-flag/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

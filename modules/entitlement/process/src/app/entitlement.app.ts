@@ -137,6 +137,7 @@ export class EntitlementModule implements EntitlementApiContract {
   #warnings: UsageWarning;
   #spend: EntitlementRepositories["spend"];
   #users: UserApi;
+  #organizations: OrganizationApi;
   #requestBoundOverrides: RequestBoundsOverrides;
 
   private constructor({
@@ -164,6 +165,7 @@ export class EntitlementModule implements EntitlementApiContract {
     this.#warnings = infrastructure.warnings;
     this.#spend = repositories.spend;
     this.#users = dependencies.users;
+    this.#organizations = dependencies.organizations;
     this.#requestBoundOverrides = config.requestBounds ?? {};
   }
 
@@ -242,10 +244,14 @@ export class EntitlementModule implements EntitlementApiContract {
     return resolveRequestBound(input.key, plan.type, this.#requestBoundOverrides);
   }
 
-  resolvePlanNextStep(
-    input: Readonly<{ plan: Plan; pricingModel: PricingModel | null; currency?: "USD" | "EUR" }>,
+  async resolvePlanNextStep(
+    input: Readonly<{ plan: Plan; organizationId: string }>,
   ): Promise<PlanNextStep> {
-    return this.#nextStep.resolve(input);
+    const { pricingModel, currency } = await this.#organizations.getPricing({
+      organizationId: input.organizationId,
+    });
+
+    return this.#nextStep.resolve({ plan: input.plan, pricingModel, currency });
   }
 
   async getUsage(input: GetUsageInput): Promise<UsageStats> {

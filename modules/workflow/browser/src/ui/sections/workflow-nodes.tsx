@@ -9,7 +9,14 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { Component, ComponentType, Field, LLMConfig } from "@langwatch/workflow-contract";
+import type {
+  Component,
+  ComponentType,
+  End,
+  Evaluator,
+  Field,
+  LLMConfig,
+} from "@langwatch/workflow-contract";
 import {
   Handle,
   type Node,
@@ -28,6 +35,20 @@ import { GATE_FIELD, showsTemporaryGate } from "../../model/control-flow.ts";
 import { hasUnsavedChanges } from "../../model/unsaved-changes.ts";
 import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
 import { ComponentExecutionButton } from "./workflow-node-execution.tsx";
+
+export const EvaluatorNode = forwardRef(function EvaluatorNode(
+  props: NodeProps<Node<Evaluator>>,
+  ref: Ref<HTMLDivElement>,
+) {
+  return <ComponentNode ref={ref} {...props} />;
+});
+
+export const EndNode = forwardRef(function EndNode(
+  props: NodeProps<Node<End>>,
+  ref: Ref<HTMLDivElement>,
+) {
+  return <ComponentNode ref={ref} {...props} inputsTitle="Results" />;
+});
 
 export function getNodeDisplayName(node: {
   id: string;

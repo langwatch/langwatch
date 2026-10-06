@@ -10,10 +10,6 @@ import { ManagerExplorerService } from "../manager-explorer.service.ts";
 const metadataMock = vi.fn<() => OpsProcessManagerMetadata[]>(() => []);
 
 class FakeIntrospection implements OpsEventingIntrospection {
-  killSwitches(): never[] {
-    return [];
-  }
-
   projections(): never[] {
     return [];
   }

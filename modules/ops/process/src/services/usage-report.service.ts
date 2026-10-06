@@ -39,7 +39,7 @@ export type UsageReportSwitchChange = Readonly<{
   hostnameOptOut?: boolean;
 }>;
 
-export type UsageReportSendOutcome =
+type UsageReportSendOutcome =
   | "sent"
   | "refused"
   | "unreachable"
@@ -47,7 +47,7 @@ export type UsageReportSendOutcome =
   | "connect_disabled"
   | "no_organization";
 
-export interface UsageReportServiceDependencies {
+interface UsageReportServiceDependencies {
   readonly collection: UsageReportCollectionService;
   readonly organizations: Pick<OrganizationApi, "findAllIds">;
   readonly channel: UsageReportChannel;

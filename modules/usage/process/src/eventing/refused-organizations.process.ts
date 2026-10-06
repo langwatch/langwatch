@@ -2,7 +2,7 @@ import type { EventHandler, IntentSpec, WakeHandler } from "@langwatch/eventing"
 import type { MonthCountedEventData } from "@langwatch/usage-contract";
 import { z } from "zod";
 
-import { decideLimit, type LimitState } from "../rules/usage-limit.rules.ts";
+import { countInUnit, decideLimit, type LimitState } from "../rules/usage-limit.rules.ts";
 import { UsageCountingService } from "../services/usage-counting.service.ts";
 import type {
   countMonthCommandDataSchema,
@@ -31,12 +31,13 @@ export const monthCounted: EventHandler<LimitState, MonthCountedEventData, Inten
   // A refusal arms the recount; anything else clears it.
   const wakeAt = next.reached ? Math.max(ctx.at, ctx.now) + REFUSED_ORGANIZATIONS_WAKE_MS : null;
   if (decision === "none") return { state: next, nextWakeAt: wakeAt };
+  const inUnit = countInUnit(data);
   const payload = {
     tenantId: data.organizationId,
     organizationId: data.organizationId,
     month: data.month,
     occurredAt: data.occurredAt,
-    count: data.billableEvents,
+    count: inUnit.read ? inUnit.count : 0,
     ...data.limit,
     decision,
   };

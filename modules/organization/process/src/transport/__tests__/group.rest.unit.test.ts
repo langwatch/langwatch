@@ -189,6 +189,7 @@ describe("given the /api/groups family", () => {
     };
 
     /** @scenario POST /api/groups creates a group */
+    /** @scenario "A request manages an organization group" */
     it("answers 201 with the group and its generated slug", async () => {
       const send = mount({ createGroup: async () => created });
 
@@ -243,6 +244,7 @@ describe("given the /api/groups family", () => {
 
   describe("when one group is read", () => {
     /** @scenario GET /api/groups/:id returns group with members and bindings */
+    /** @scenario "A request manages an organization group" */
     it("answers its members with userId, name and email, and its bindings", async () => {
       const send = mount({
         getGroup: async () => ({ ...summary("Engineering", 1), members: [alice] }),
@@ -275,6 +277,7 @@ describe("given the /api/groups family", () => {
 
   describe("when a group is renamed", () => {
     /** @scenario PATCH /api/groups/:id renames a group */
+    /** @scenario "A request manages an organization group" */
     it("answers the new name and the updated slug", async () => {
       const renameGroup = vi.fn(async () => ({
         ...summary("New Name", 0),
@@ -304,6 +307,7 @@ describe("given the /api/groups family", () => {
 
   describe("when a group is deleted", () => {
     /** @scenario DELETE /api/groups/:id deletes a group */
+    /** @scenario "A request manages an organization group" */
     it("answers 200 and asks the application to delete it", async () => {
       const deleteGroup = vi.fn(async () => {});
       const send = mount({ deleteGroup });

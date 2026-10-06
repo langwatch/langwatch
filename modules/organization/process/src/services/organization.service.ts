@@ -59,6 +59,7 @@ import {
   type UpdateOrganizationSettingsResult,
   type OrganizationUsageCount,
   OrganizationNotFoundForTeamError,
+  type PricingModel,
 } from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
@@ -248,6 +249,12 @@ export class OrganizationService extends OrganizationServiceContract {
     maxSessionDurationDays: number;
   }): Promise<void> {
     return this.repository.saveSessionPolicy(input);
+  }
+
+  getPricing(input: {
+    organizationId: string;
+  }): Promise<{ pricingModel: PricingModel | null; currency: "USD" | "EUR" }> {
+    return this.repository.getPricing(input);
   }
 
   isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean> {

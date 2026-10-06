@@ -90,7 +90,6 @@ export function buildEventing(options: {
     ...(options.participation === undefined ? {} : { participation: options.participation }),
     ...(queueFactory === undefined ? {} : { queueFactory }),
     processStore,
-    ...(config.killSwitch === undefined ? {} : { killSwitch: config.killSwitch }),
     ...(options.redis === undefined
       ? {}
       : {

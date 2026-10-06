@@ -3,9 +3,11 @@ import type {
   JoinRequestJoining,
   Organization,
   OrganizationJsonValue,
+  OrganizationCurrency,
   OrganizationIntent,
   OrganizationUserRole,
   PersonalFeatures,
+  PricingModel,
   TeamUserRole,
 } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
@@ -24,6 +26,9 @@ export interface MemoryOrganizationRow {
   s3SecretAccessKey: string | null;
   s3Bucket: string | null;
   stripeCustomerId: string | null;
+  /** Absent reads as the twin's own projection: SEAT_EVENT in USD. */
+  pricingModel?: PricingModel;
+  currency?: OrganizationCurrency;
   sentPlanLimitAlert?: Instant | null;
   /** Every sign-up answer the organization carries, guided onboarding among
    *  them. Shapeless here for the reason it is shapeless in Postgres. */

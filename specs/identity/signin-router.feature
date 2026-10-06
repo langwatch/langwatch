@@ -192,7 +192,8 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then the next question is refused and says how long to wait
     And the router is never asked to decide it
 
-  @unit
+  # Gap: auth meters only the caller (auth.route:<caller>, 200/h); no per-address budget exists, and main had none.
+  @unit @unimplemented
   Scenario: One address probed from many places is eventually refused
     Given the same address is asked about from a new client each time
     When that address's budget for the hour is spent

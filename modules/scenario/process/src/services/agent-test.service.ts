@@ -62,7 +62,7 @@ export type AgentTestServiceOptions = {
   agents: AgentApi;
   projects: ProjectApi;
   /** Mints the run key the test's child calls LangWatch with. */
-  apiKeys: Pick<ApiKeyApi, "mintRunKey">;
+  apiKeys: Pick<ApiKeyApi, "mintRunKey" | "mintAgentSandboxKey">;
   workflows: WorkflowApi;
   prompts: PromptApi;
   secrets: SecretApi;

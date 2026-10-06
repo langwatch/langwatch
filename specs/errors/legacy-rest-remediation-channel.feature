@@ -1,7 +1,8 @@
 Feature: The legacy REST families keep the remediation channel
 
-  The families that publish the flat `{ error, message }` body used to ship
-  the remediation channel alongside it: the tips an agent follows when it has
+  The legacy families publish the same flat root body as every other family
+  (`type`, `code`, `message` at the root, nothing nested under `error`) and
+  ship the remediation channel alongside it: the tips an agent follows when it has
   no presentation registry, the documentation link, the fault that says who
   can act, and the reasons chain.
 
@@ -32,27 +33,16 @@ Feature: The legacy REST families keep the remediation channel
     When a caller reaches that route
     Then the body carries a reason for each rejected field
 
-  # The boundary's `onError` is not the only place a handled error becomes a
-  # legacy body: the credential and API-key-ceiling refusals are answered by
-  # the security middleware itself, which had its own copy of the shape. So a
-  # denial arrived with a code and a sentence while every refusal rendered by
-  # the boundary also carried its fault, remediation and reasons — and the
-  # API-key ceiling is precisely the refusal that has tips and a docs link.
+  # An API-key ceiling denial is the refusal with tips and a docs link: the
+  # door renders it through the same envelope as every other handled refusal.
 
   @unit
-  Scenario: A denial answered by the security middleware carries the same channel
+  Scenario: An API-key ceiling denial carries the same channel
     Given an API key that does not grant the permission a route requires
     When a caller reaches that route
     Then the denial carries the tips for re-scoping the key
     And it carries the documentation link for creating one
     And it says who can act on it
-
-  @unit
-  Scenario: One refusal renders one body whichever half answers it
-    Given a refusal the security middleware answers itself
-    And the same refusal raised into the boundary's error handler
-    When both are rendered
-    Then the two bodies are identical
 
   @unit
   Scenario: An API-key ceiling denial carries no identifier fields

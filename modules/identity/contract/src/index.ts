@@ -636,6 +636,12 @@ export {
 export {
   deriveSessionAmr,
   localFactorsForPath,
+  NO_SESSION_CLAIMS,
+  sessionCallbackEvidenceSchema,
+  sessionClaimsMintInputSchema,
+  type SessionCallbackEvidence,
+  type SessionClaims,
+  type SessionClaimsMintInput,
   signedInWithFor,
   signInMethodLabelFor,
   signInProviderForPath,
@@ -649,6 +655,13 @@ export {
   describePasswordProblem,
 } from "./password-policy.ts";
 export { pickPrimaryEmail } from "./primary-email.ts";
+export {
+  AUTH0_BRIDGE_METHODS,
+  AUTH0_SOCIAL_STRATEGIES,
+  auth0BridgeRailIds,
+  type Auth0BridgeMethod,
+  type Auth0SocialStrategy,
+} from "./auth0-bridge.ts";
 export {
   LOCAL_METHOD_SET,
   PASSKEY_METHOD,

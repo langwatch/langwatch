@@ -37,7 +37,8 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
       if (readCode(error) !== ANNOTATOR_REFERENCE_INVALID) throw error;
       throw new DispatchError({
         message:
-          "This automation names an annotator that parses as neither a queue nor a member, so a queue item cannot be written for it. Re-save the automation with a queue or a member that still exists.",
+          "This automation names an annotator that parses as neither a queue nor a member, so a queue item " +
+          "cannot be written for it. Re-save the automation with a queue or a member that still exists.",
         retryable: false,
       });
     }

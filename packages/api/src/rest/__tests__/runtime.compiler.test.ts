@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { expect, it } from "vitest";
 
 /** @scenario "A REST endpoint is one complete declaration in the server" */
+/** @scenario "Answering requires an output schema" */
 it("accepts the fluent annotation REST router and rejects a body from an implicit no-content route", () => {
   const directory = mkdtempSync(join(process.cwd(), ".tmp-rest-transport-"));
   const accepted = join(directory, "accepted.ts");

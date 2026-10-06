@@ -11,16 +11,33 @@ const textField = (identifier: string): Field => ({ identifier, type: "str" });
 
 const PLACEHOLDER_INPUTS = [textField("input")];
 
-/** The workflow's entry inputs and end outputs, read as text the way main's drawer read them. */
-function workflowFields(dsl: unknown): { inputs: Field[]; outputs: Field[] } {
+/**
+ * The workflow's entry inputs and end outputs, read as text the way main's editor drawer read
+ * them, plus the inputs with their declared types the way main's target drawer showed them.
+ */
+function workflowFields(dsl: unknown): { inputs: Field[]; outputs: Field[]; typedInputs: Field[] } {
   const parsed = studioWorkflowSchema.safeParse(dsl);
-  if (!parsed.success) return { inputs: [], outputs: [] };
+  if (!parsed.success) return { inputs: [], outputs: [], typedInputs: [] };
   const { edges, nodes } = parsed.data;
   const end = nodes.find((node) => node.type === "end" || node.id === "end");
+  const surface = getMappingSurfaceInputs(edges, nodes);
   return {
-    inputs: getMappingSurfaceInputs(edges, nodes).map(({ identifier }) => textField(identifier)),
+    inputs: surface.map(({ identifier }) => textField(identifier)),
     outputs: (end?.data.inputs ?? []).map(({ identifier }) => textField(identifier)),
+    typedInputs: surface.map(({ identifier, type }) => ({ identifier, type })),
   };
+}
+
+/** The workflow's inputs as a target maps them: one text "input" when it declares none. */
+function targetInputsOf({
+  hasLookupFailed,
+  typedInputs,
+}: {
+  hasLookupFailed: boolean;
+  typedInputs: Field[];
+}): Field[] {
+  if (hasLookupFailed) return [];
+  return typedInputs.length > 0 ? typedInputs : PLACEHOLDER_INPUTS;
 }
 
 /** What a workflow agent's drawers read when the address opened them: agent and workflow. */
@@ -46,7 +63,7 @@ export function useRoutedWorkflowAgent({
     { enabled: Boolean(workflowId && projectId) },
   );
   const update = agentApi.agents.update.useMutation();
-  const { inputs, outputs } = workflowFields(workflowQuery.data?.currentVersion?.dsl);
+  const { inputs, outputs, typedInputs } = workflowFields(workflowQuery.data?.currentVersion?.dsl);
 
   const options: WorkflowAgentEditorOptions = {
     open: true,
@@ -73,5 +90,12 @@ export function useRoutedWorkflowAgent({
   };
   const hasLookupFailed =
     agentQuery.isError || workflowQuery.isError || (Boolean(agentQuery.data) && !workflowId);
-  return { options, hasLookupFailed };
+  const project = host.project();
+  return {
+    options,
+    hasLookupFailed,
+    ...(workflowQuery.data ? { workflow: workflowQuery.data } : {}),
+    targetInputs: targetInputsOf({ hasLookupFailed, typedInputs }),
+    ...(project?.slug && workflowId ? { editorHref: `/${project.slug}/studio/${workflowId}` } : {}),
+  };
 }

@@ -111,6 +111,8 @@ import {
   producerFor,
   refusalProducer,
   type RestEvent,
+  type RestProtocolRefusal,
+  type RestResponseKind,
 } from "./response-kind.ts";
 import {
   DECLARED_ANSWER,
@@ -319,15 +321,20 @@ function protocolRefusalScope(route: RestTransportRoute<unknown>): MiddlewareHan
 function protocolRefusals(onError: ErrorHandler): ErrorHandler {
   return (error, context) => {
     const route = refusingRoutes.get(context);
-    const refusal = route?.response?.refusal;
+    const refusal = route ? routeRefusal(route) : undefined;
 
     if (!route || !refusal) return onError(error, context);
 
     const result = refusal({ failure: error, response: refusalProducer() });
     if (isDeclined(result)) return onError(error, context);
 
-    return respondProduced({ context, route, result });
+    return respondProduced({ context, route, result, kind: "protocol" });
   };
+}
+
+/** The refusal a protocol route declared, or the one a `responds()` route keeps its wire with. */
+function routeRefusal(route: RestTransportRoute<unknown>): RestProtocolRefusal | undefined {
+  return route.response?.refusal ?? route.refusal;
 }
 
 /**
@@ -427,6 +434,11 @@ function assertDoorQuestions({
   }
 }
 
+/** Whether the route asks its plan before its permission (Q31), at the credential's scope. */
+function planFirst(route: RestTransportRoute<unknown>): boolean {
+  return route.entitlement?.before === "permission";
+}
+
 /** Whether the door only identifies the caller, leaving the permission to be asked later. */
 function identifiedFirst({
   route,
@@ -437,7 +449,7 @@ function identifiedFirst({
 }): boolean {
   if (route.access?.kind === "authenticated" || route.access?.kind === "deferred") return true;
 
-  if (route.permissionPlatform) return true;
+  if (route.permissionPlatform || planFirst(route)) return true;
 
   return (
     Boolean(route.permissionBy) || (credential === "browser" && Boolean(route.permissionTarget))
@@ -459,10 +471,17 @@ function assertAfterBodyPorts({
   door: RestIdentity;
   credential: RestDoorCredential;
 }): void {
-  if ((route.permissionTarget || route.permissionBy) && !door.authorize) {
+  if ((route.permissionTarget || route.permissionBy || planFirst(route)) && !door.authorize) {
     throw new Error(
       `REST ${address} checks "${routePermissions(route).join(", ")}" after its door, at a ` +
         "scope its input names, and this runtime supplied no identity.authorize",
+    );
+  }
+
+  if (planFirst(route) && credential === "browser") {
+    throw new Error(
+      `REST ${address} asks its plan before its permission at the credential's own scope, and ` +
+        "the browser door resolves none",
     );
   }
 
@@ -643,7 +662,7 @@ function routeStack<Api>({
       : [];
 
   return [
-    ...(route.response?.refusal ? [protocolRefusalScope(route)] : []),
+    ...(routeRefusal(route) ? [protocolRefusalScope(route)] : []),
     versionContext({ route, family, version, status }),
     ...(documents
       ? [
@@ -1180,6 +1199,11 @@ function handlerMiddleware<Api>({
       });
     }
 
+    // Plan first (Q31): the door only identified, so the plan is asked at its scope.
+    if (planFirst(route)) {
+      await checkEntitlement({ route, ports, scope: decision.scope, input, family });
+    }
+
     const target = await checkRouteScope({ route, caller, door, ports, input, context });
     const capabilities = { route, ports, context, family, version, caller, input } as const;
 
@@ -1188,7 +1212,7 @@ function handlerMiddleware<Api>({
     // idempotency tenancy are asked about exactly this scope.
     const resolved = target ?? decision.scope;
 
-    await checkEntitlement({ route, ports, scope: resolved, input, family });
+    if (!planFirst(route)) await checkEntitlement({ route, ports, scope: resolved, input, family });
 
     await countCall(capabilities);
 
@@ -1768,7 +1792,7 @@ function askedAfterBody({
     return { permissions, target, named: true };
   }
 
-  if (!chosen) return null;
+  if (!chosen && !planFirst(route)) return null;
 
   if (!caller.scope) throw new Error(`REST ${route.operation} chose a permission with no scope`);
 
@@ -1808,7 +1832,7 @@ async function callerOf({
 
   if (kind === "optional") return requireIdentifyOptional(door)({ request });
 
-  if (kind === "authenticated" || kind === "deferred")
+  if (kind === "authenticated" || kind === "deferred" || planFirst(route))
     return requireIdentify(door)({ request, ...(rawBody === void 0 ? {} : { rawBody }) });
 
   return door.authenticate({
@@ -2125,23 +2149,26 @@ function respondProduced({
   context,
   route,
   result,
+  kind: declared = route.response?.kind,
 }: {
   context: Context;
   route: RestTransportRoute<unknown>;
   result: unknown;
+  /** The kind the answer must be: the route's own, or a refusal's protocol. */
+  kind?: RestResponseKind | undefined;
 }): Response {
   if (!isProducedAnswer(result)) {
     throw new Error(
-      `REST ${route.operation} declares a ${route.response?.kind} answer and returned something ` +
+      `REST ${route.operation} declares a ${declared} answer and returned something ` +
         "no response producer made",
     );
   }
 
   const kind = producedKind(result);
 
-  if (kind !== route.response?.kind) {
+  if (kind !== declared) {
     throw new Error(
-      `REST ${route.operation} declares a ${route.response?.kind} answer and produced a ${kind} one`,
+      `REST ${route.operation} declares a ${declared} answer and produced a ${kind} one`,
     );
   }
 

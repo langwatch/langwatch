@@ -27,7 +27,7 @@ import {
   projectionReplayStateSchema,
 } from "./ops-projection-replay.process.ts";
 
-export type ProjectionReplayDefinition = StaticPipelineDefinition<
+type ProjectionReplayDefinition = StaticPipelineDefinition<
   ProjectionReplayRequestedEvent,
   Record<string, Projection>,
   { name: "requestProjectionReplay"; payload: ProjectionReplayRun & CommandEnvelope }

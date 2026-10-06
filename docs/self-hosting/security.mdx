@@ -95,7 +95,6 @@ kubectl create secret generic langwatch-secrets \
   --namespace langwatch \
   --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
   --from-literal=nextAuthSecret=$(openssl rand -hex 32) \
-  --from-literal=cronApiKey=$(openssl rand -hex 32) \
   --from-literal=virtualKeyPepper=$(openssl rand -hex 32) \
   --from-literal=LW_GATEWAY_INTERNAL_SECRET=$(openssl rand -hex 32) \
   --from-literal=LW_GATEWAY_JWT_SECRET=$(openssl rand -hex 32) \

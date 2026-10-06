@@ -2,9 +2,8 @@ import { z } from "zod";
 
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { CommandType } from "../domain/commandType.ts";
-import type { EventType } from "../domain/eventType.ts";
 import { createTenantId } from "../domain/tenantId.ts";
-import type { Event } from "../domain/types.ts";
+import type { Event, EventType } from "../domain/types.ts";
 import { EventUtils } from "../utils/event.utils.ts";
 import type { Command, CommandHandler, CommandHandlerResult } from "./command.ts";
 import type { CommandEnvelope } from "./commandEnvelope.ts";

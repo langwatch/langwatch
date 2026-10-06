@@ -1,3 +1,4 @@
+import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import type {
   CliBootstrapResult,
   GovernanceBudgetOverviewForUser,
@@ -11,7 +12,6 @@ import type {
   PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
 
-import type { UserCodeAccessPreference } from "./user-code-access.ts";
 import type {
   MeProject,
   MePersonalCredential,
@@ -27,6 +27,7 @@ import type {
   UserPersonalContext,
 } from "./user.responses.ts";
 import type {
+  UserCodeAccessPreference,
   UserApiBudgetOverviewInput,
   UserApiPersonalUsageInput,
   UserApiRequestBudgetIncreaseInput,
@@ -216,3 +217,11 @@ export interface UserApi {
 }
 
 export const UserApi = moduleApi<UserApi>()("user");
+
+/** The deployment facts user reads: the shared origin a budget-increase mail links back to. */
+export const userConfig = Config.define(() => ({
+  /** The shared deployment origin; absent, a budget-increase request is refused by name. */
+  publicBaseUrl,
+}));
+
+export type UserServerConfig = ConfigOf<typeof userConfig>;

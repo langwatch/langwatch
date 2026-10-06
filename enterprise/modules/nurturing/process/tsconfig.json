@@ -34,6 +34,9 @@
       "path": "../../../../modules/experiment/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/langy/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/module/tsconfig.build.json"
     },
     {

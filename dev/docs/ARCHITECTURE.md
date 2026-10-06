@@ -337,6 +337,9 @@ already have the container". A module class receives `repositories`, `channels`,
 `dependencies`, `config`, `secrets`, `role` and `resources`, never a bag of clients or facts.
 There are no supply tokens and no `.provide`; a test stubs a peer through the module's own test
 seams (§13).
+An installation test hands `bootInstalledProcess({ peers: [testPeer({ token, instance })] })`
+(`@langwatch/process/testing`) a stand-in for each peer it does not install; `package-boundaries`
+refuses that import outside test files.
 
 **Members are removed now** (Alex, 2026-10-05): before other module work, lanes remove `withMember`,
 `app/<f>.members.ts` and `app/<f>-composition.build.ts` (deleted, §15), each member becoming a config leaf, a secret
@@ -1357,8 +1360,11 @@ bucket, account or root. Its settings belong to the stores owner:
 `AZURE_BLOB_*`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`,
 `AZURE_FEDERATED_TOKEN_FILE` and `LANGWATCH_LOCAL_STORAGE_PATH`, with
 `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_SESSION_TOKEN` and
-`AZURE_BLOB_ACCOUNT_KEY` as secrets. The memory tier answers it with a memory
-twin.
+`AZURE_BLOB_ACCOUNT_KEY` as secrets. Main's per-organisation
+`DATAPLANE_S3__<label>__<orgId>=<json>` family is one `Secret.family("DATAPLANE_S3__")`
+handle on the stores, parsed once at boot into private accounts as the ClickHouse routes
+are; an organisation listed there is placed on its own S3 account whatever the shared
+backend is. The memory tier answers it with a memory twin.
 
 Bodies travel as streams, and every digest is computed over a stream, once.
 Nothing holds a whole object in memory to hash it. Modules build repositories
@@ -2469,7 +2475,7 @@ decides it. A mirrored read is restored when first asked for, never all at start
 page of a paged read is mirrored too, restored as stale and refetched at once. A tab shown again
 reads IndexedDB first, then refetches the stale reads it holds, so hints it missed while hidden
 are caught up (Alex, 2026-10-01). An answer whose `x-lw-schema` differs from the bundle's hash
-drops that row. Not built yet: the lazy restore (rows restore at start-up). ADR-170 (in part),
+drops that row. ADR-170 (in part),
 specs/ui/browser-query-caching.feature.
 `CachedView` ships.
 

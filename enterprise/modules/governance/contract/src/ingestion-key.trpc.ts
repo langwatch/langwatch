@@ -3,7 +3,7 @@
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
-import type { GovernanceCallSurface } from "./governance-audit.ts";
+import type { GovernanceCallSurface } from "./admin-workspace-view-audit.ts";
 import { issuedIngestionKeySchema } from "./ingestion-source-key.commands.ts";
 
 /** One of the caller's live personal ingestion keys, without its secret. */

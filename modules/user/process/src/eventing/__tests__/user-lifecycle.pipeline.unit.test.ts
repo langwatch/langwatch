@@ -56,14 +56,21 @@ describe("user's lifecycle pipeline", () => {
   });
 
   /** @scenario "A self-service registration is recorded as user's fact" */
-  it("records a registration on the user, keyed once per user", async () => {
-    const [event] = await new RecordUserRegisteredCommand().handle(
-      command(RecordUserRegisteredCommand.schema.type),
-    );
+  it("records a registration on the user, naming its credential row, keyed once per user", async () => {
+    const registration = {
+      ...FACT,
+      accountId: "acc_1",
+      createdAtMs: FACT.occurredAt,
+      email: "sam@acme.com",
+    };
+    const [event] = await new RecordUserRegisteredCommand().handle({
+      ...command(RecordUserRegisteredCommand.schema.type),
+      data: registration,
+    });
 
     expect(event?.type).toBe(USER_REGISTERED_EVENT_TYPE);
     expect(event?.aggregateId).toBe("user_1");
-    expect(event?.data).toEqual(FACT);
+    expect(event?.data).toEqual(registration);
     expect(event?.idempotencyKey).toBe("user_1:registered");
   });
 

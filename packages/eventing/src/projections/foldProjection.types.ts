@@ -1,7 +1,6 @@
 import type { ExhaustedOutcome } from "@langwatch/group-queue";
 
 import type { Event } from "../domain/types.ts";
-import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 
 // Stateful projection folding events into accumulated state via pure functions:
@@ -80,9 +79,6 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
  * Options for configuring fold projection processing behavior.
  */
 export interface FoldProjectionOptions {
-  // Operator stop resolved per tenant; absent means generated key.
-  // Custom key must match descriptors or switch cannot be set.
-  killSwitch?: KillSwitchOptions;
   /** Disable this projection in the assembled runtime. */
   disabled?: boolean;
   // `occurredAt` (default) follows business time; `acceptedAt` follows

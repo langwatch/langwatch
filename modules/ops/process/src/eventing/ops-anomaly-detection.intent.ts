@@ -12,7 +12,7 @@ export interface AnomalyDetectionTickResult {
   cleared: number;
 }
 
-export interface AnomalyDetectionDeps {
+interface AnomalyDetectionDeps {
   /** One detector tick; converges on the same anomalies however often it runs. */
   detect: () => Promise<AnomalyDetectionTickResult>;
   deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;

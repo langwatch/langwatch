@@ -29,7 +29,7 @@ describe("requiredPermissionForPurpose", () => {
 
   describe("given a purpose the table does not name", () => {
     it("requires scenarios:view, as every in-process writer's media did before", () => {
-      expect(requiredPermissionForPurpose("evaluation_inputs")).toBe("scenarios:view");
+      expect(requiredPermissionForPurpose("unlisted_purpose")).toBe("scenarios:view");
       expect(requiredPermissionForPurpose("toString")).toBe("scenarios:view");
     });
   });

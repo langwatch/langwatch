@@ -24,7 +24,7 @@ import { DurationCell } from "../duration-cell.tsx";
 import { EvaluationsCell } from "../evaluations-cell.tsx";
 import { LabelsCell } from "../labels-cell.tsx";
 import { ModelCell } from "../model-cell.tsx";
-import { ServiceCell } from "../service-cell.tsx";
+import { ServiceCell } from "../simple-cells.tsx";
 import { SinceCell } from "../since-cell.tsx";
 import { TimeCell } from "../time-cell.tsx";
 import { TimestampCell } from "../timestamp-cell.tsx";

@@ -1,11 +1,10 @@
 import type { Logger } from "@langwatch/observability";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
-import { TaskCatalogue } from "../task-catalogue.ts";
+import { Task, TaskCatalogue } from "../task-catalogue.ts";
 import { TaskHost } from "../task-host.ts";
 import { runTask } from "../task-launcher.ts";
 import { TaskInfrastructureUnavailableError } from "../task.errors.ts";
-import { Task } from "../task.ts";
 
 /** A minimal fake — the launcher only ever calls `.info` and `.error`. */
 function silentLogger() {

@@ -80,6 +80,12 @@ Feature: Invitation acceptance and role recomputation
     Then it is refused as organization not found and no invite is written
 
   @unit
+  Scenario: The plan check for a batch of invitations is resolved for the inviting administrator
+    Given an administrator inviting a batch to an organization
+    When the batch is created
+    Then the organization's plan is resolved for that administrator, so their plan overrides apply to the seat check
+
+  @unit
   Scenario: An invitation with no recorded sender attributes its grants to the service, not the invitee
     Given an invitation that carries no requesting admin
     When it is accepted

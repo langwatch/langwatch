@@ -203,6 +203,7 @@ describe("given the teams REST family over the application the composition build
 
   describe("when a team is created", () => {
     /** @scenario Creates a team */
+    /** @scenario "A request manages a shared team" */
     it("answers 201 with the team's id, name, slug, organization and timestamps", async () => {
       const { app, repositories } = await application();
       const { send } = mountTeamsRestApplication(app);
@@ -336,6 +337,7 @@ describe("given the teams REST family over the application the composition build
 
   describe("when one team is read", () => {
     /** @scenario Returns a team by id */
+    /** @scenario "A request manages a shared team" */
     it("answers 200 with the team", async () => {
       const { send } = mountTeamsRestApplication((await application()).app);
 
@@ -399,6 +401,7 @@ describe("given the teams REST family over the application the composition build
      * `updateTeam`, not `updateTeamWithMembers`: a PATCH carrying a name has no
      * membership array to give, and demanding one would have changed the wire.
      */
+    /** @scenario "A request manages a shared team" */
     it("answers 200 with the new name and writes it", async () => {
       const { app, repositories } = await application();
       const { send } = mountTeamsRestApplication(app);
@@ -443,6 +446,7 @@ describe("given the teams REST family over the application the composition build
 
   describe("when a team is archived", () => {
     /** @scenario Archives a team */
+    /** @scenario "A request manages a shared team" */
     it("answers 200 with the archive stamp, and archives the row", async () => {
       const { app, repositories } = await application();
       const { send } = mountTeamsRestApplication(app);
@@ -501,6 +505,7 @@ describe("given the teams REST family over the application the composition build
   });
 
   describe("when a team's members are listed", () => {
+    /** @scenario "A request lists a team's related resources" */
     it("answers 200 with each member's id, name, email and role", async () => {
       const { send } = mountTeamsRestApplication((await application()).app);
 
@@ -711,6 +716,7 @@ describe("given the teams REST family over the application the composition build
   });
 
   describe("when a team's projects are listed", () => {
+    /** @scenario "A request lists a team's related resources" */
     it("answers 200 with the projects that live in the team", async () => {
       const { send } = mountTeamsRestApplication((await application()).app);
 

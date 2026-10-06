@@ -28,3 +28,11 @@ Feature: A folder is one concept and a file is one readable part
     And only its own folder reads it
     When architecture lint checks the workspace
     Then it reports nothing, because the grammar asked for those files and the runtime set their size
+
+  @unit @architecture
+  Scenario: An application's config.ts is never a fragment of its main.ts
+    Given an application's src/config.ts is shorter than the fragment floor
+    And only its main.ts reads it
+    When architecture lint checks the workspace
+    Then it reports nothing, because the record says an application is a main.ts and a config.ts
+    And any other small file beside main.ts is still reported

@@ -20,6 +20,8 @@ type BillingLifecycleAnnouncerDeps = Readonly<{
   };
   /** The ops alert a peer's seat-limit event ends in, subscribed on the lifecycle pipeline. */
   resourceLimitAlerts: BuildBillingLifecyclePipelineInput["alerts"];
+  /** The ops alert usage's limit-reached fact ends in, subscribed on the same pipeline. */
+  planLimitAlerts: BuildBillingLifecyclePipelineInput["planLimitAlerts"];
 }>;
 
 /**
@@ -36,7 +38,10 @@ export class BillingLifecycleAnnouncerService {
   }
 
   private constructor(private readonly deps: BillingLifecycleAnnouncerDeps) {
-    this.pipeline = buildBillingLifecyclePipeline({ alerts: deps.resourceLimitAlerts });
+    this.pipeline = buildBillingLifecyclePipeline({
+      alerts: deps.resourceLimitAlerts,
+      planLimitAlerts: deps.planLimitAlerts,
+    });
   }
 
   /** Binds the lifecycle pipeline's own senders. */

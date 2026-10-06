@@ -1,16 +1,56 @@
 import { z } from "zod";
 
+import { customMetadataSchema, langWatchSpanSchema } from "./trace-format.schemas.ts";
 import { logTraceContributionSchema } from "./trace-log-contribution.ts";
-import { metricCorrelationFields } from "./trace-metric-correlation.ts";
 import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "./trace.constants.ts";
+import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./trace.otlp.ts";
 import { normalizedSpanSchema } from "./trace.spans.ts";
 
-export {
-  DEFAULT_PII_REDACTION_LEVEL,
-  piiRedactionLevelSchema,
-  recordSpanCommandDataSchema,
-} from "./trace-ingress.commands.ts";
-export type { PIIRedactionLevel, RecordSpanCommandData } from "./trace-ingress.commands.ts";
+export const piiRedactionLevelSchema = z.enum(["STRICT", "ESSENTIAL", "DISABLED"]);
+export type PIIRedactionLevel = z.infer<typeof piiRedactionLevelSchema>;
+
+export const DEFAULT_PII_REDACTION_LEVEL: PIIRedactionLevel = "ESSENTIAL";
+
+/** Raw OTLP span input before durable ingress processing. */
+export const recordSpanCommandDataSchema = z.object({
+  tenantId: z.string(),
+  span: spanSchema,
+  resource: resourceSchema.nullable(),
+  instrumentationScope: instrumentationScopeSchema.nullable(),
+  piiRedactionLevel: piiRedactionLevelSchema.optional(),
+  occurredAt: z.number(),
+  spoolRef: z.string().optional(),
+});
+
+export type RecordSpanCommandData = z.infer<typeof recordSpanCommandDataSchema>;
+
+const metricKindSchema = z.enum(["gauge", "sum", "histogram", "exponential_histogram", "summary"]);
+
+/**
+ * Metric exemplar correlation fields shared by ingress validation and storage
+ * replay. Both enforce to prevent malformed rows; metricKind imported to prevent drift.
+ */
+export const metricCorrelationFields = {
+  traceId: z.string().regex(/^[a-f0-9]{32}$/i),
+  spanId: z.string().regex(/^[a-f0-9]{16}$/i),
+  pointId: z.string().regex(/^[a-f0-9]{64}$/),
+  seriesId: z.string().regex(/^[a-f0-9]{64}$/),
+  metricName: z.string(),
+  metricUnit: z.string(),
+  metricKind: metricKindSchema,
+  exemplarValue: z.number().nullable(),
+  exemplarTimeUnixMs: z.number().int().nonnegative(),
+} as const;
+
+export const recordCapturedSpanInputSchema = z.object({
+  projectId: z.string().min(1),
+  span: langWatchSpanSchema,
+  customMetadata: customMetadataSchema,
+  userId: z.string().min(1),
+  occurredAt: z.number(),
+});
+
+export type RecordCapturedSpanInput = z.infer<typeof recordCapturedSpanInputSchema>;
 
 export const recordTraceSpanEventDataSchema = z.object({
   ingressEventId: z.string(),
@@ -66,3 +106,12 @@ export type ResolveOriginCommandData = z.infer<typeof resolveOriginCommandDataSc
 export const changeTraceNameInputSchema = z.object({
   newName: z.string().min(TRACE_NAME_MIN_LENGTH).max(TRACE_NAME_MAX_LENGTH),
 });
+
+/**
+ * Trace owns the durable assignment command that materialises a clustered
+ * topic on its trace projections. Other features use this portable command
+ * port rather than reaching into Trace's Eventing pipeline.
+ */
+export abstract class TraceTopicAssignment {
+  abstract assignTopic(input: AssignTopicCommandData): Promise<void>;
+}

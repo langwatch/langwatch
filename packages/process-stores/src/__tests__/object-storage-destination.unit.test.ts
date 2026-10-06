@@ -6,6 +6,7 @@ import { Temporal } from "@langwatch/time";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { ObjectStorageAzureConfig } from "../config.ts";
+import { AzureBackendMisconfiguredError } from "../object-storage-azure-credentials.ts";
 import { UnreachableStorageLocationError } from "../object-storage-backend.ts";
 import { buildObjectStorage } from "../object-storage-member.ts";
 import {
@@ -180,4 +181,78 @@ describe("given writes moved to S3 while the Azure settings stay for legacy read
     );
     await storage.close?.();
   });
+});
+
+describe("given each combination of Azure backend and auth-mode configuration", () => {
+  const recordedOnAzure = {
+    ...at,
+    location: { kind: "azure", accountName: "lwacct", container: "lw-container" },
+  } as const;
+  const workloadIdentity = {
+    tenantId: "tenant-1",
+    clientId: "client-1",
+    federatedTokenFile: "/nonexistent/azure-identity-token",
+  };
+  const s3Shared = { bucket: "shared", endpoint: undefined, region: "eu-west-1" };
+
+  const combinations: {
+    name: string;
+    settings: Partial<ObjectStorageSettings>;
+    accountKey?: string;
+    usable: boolean;
+  }[] = [
+    {
+      name: "shared key, complete",
+      settings: { backend: "azure", azure: completeAzure },
+      accountKey,
+      usable: true,
+    },
+    {
+      name: "workload identity, complete, no account key",
+      settings: {
+        backend: "azure",
+        azure: { ...completeAzure, authMode: "workloadIdentity", identity: workloadIdentity },
+      },
+      usable: true,
+    },
+    {
+      name: "shared key without a container",
+      settings: { backend: "azure", azure: { ...completeAzure, container: undefined } },
+      accountKey,
+      usable: false,
+    },
+    {
+      name: "shared key without an account key",
+      settings: { backend: "azure", azure: completeAzure },
+      usable: false,
+    },
+    {
+      name: "S3 selected for writes, no Azure retained",
+      settings: { backend: "s3", s3: s3Shared },
+      usable: false,
+    },
+  ];
+
+  /** @scenario "A resolvable Azure destination always comes with a usable Azure driver" */
+  it.each(combinations)(
+    "$name: writes resolve to Azure exactly when the Azure driver serves its location",
+    async ({ settings, accountKey: key, usable }) => {
+      const opened = await openObjectStorage({ settings, accountKey: key });
+      closers.push(opened.close);
+
+      const destination = await opened.storage.destination("project-1").catch(() => undefined);
+      const resolvesToAzure = destination?.kind === "azure";
+      const reachRefusal = await opened.storage
+        .signDownload(recordedOnAzure, { expiresAt })
+        .then(() => undefined)
+        .catch((error: unknown) => error);
+      const driverUsable = !(
+        reachRefusal instanceof UnreachableStorageLocationError ||
+        reachRefusal instanceof AzureBackendMisconfiguredError
+      );
+
+      expect(resolvesToAzure).toBe(usable);
+      expect(driverUsable).toBe(usable);
+    },
+  );
 });

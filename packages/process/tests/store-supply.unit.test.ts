@@ -9,8 +9,8 @@ import { describe, expect, it } from "vitest";
 import { bootInstalledProcess } from "../src/boot-installed-process.ts";
 import { processConfig } from "../src/config.ts";
 import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
+import { Server } from "../src/preamble.ts";
 import { defineRepositories } from "../src/repository-registry.ts";
-import { Server } from "../src/server-factory.ts";
 
 interface LedgerApi {
   total(): number;

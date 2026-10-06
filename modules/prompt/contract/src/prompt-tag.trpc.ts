@@ -41,3 +41,6 @@ export const promptTagTrpc = defineTrpcContract("promptTags")
   .withInput(promptTagNameTrpcInputSchema)
   .withOutput(promptDeleteResultSchema)
   .build();
+
+export const SEEDED_TAGS = ["production", "staging"] as const;
+export type SeededTag = (typeof SEEDED_TAGS)[number];

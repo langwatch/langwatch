@@ -1,3 +1,4 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type {
   GraphTriggerEvaluationReason,
   GraphTriggerEvaluationResult,
@@ -63,14 +64,17 @@ export function automationProcessDefinition({
   retention = new InertIntentRetention(),
   reports = { dispatch: async () => {} },
   reportRuns = { settleRun: async () => {} },
+  auditLog = createApiFixture<AuditLogApi>(),
 }: {
-  name: "triggerSettlement" | "graphAlertSweep" | "reportSchedule";
+  name: "triggerSettlement" | "graphAlertSweep" | "reportSchedule" | "automationAudit";
+  auditLog?: AuditLogApi;
   scheduledIntents?: AutomationScheduledIntent;
   retention?: AutomationIntentRetentionRepository;
   reports?: ReportDispatcher;
   reportRuns?: ReportRunSettlement;
 }): ProcessManagerDefinition {
   const dependencies: AutomationsPipelineDeps = {
+    auditLog,
     settlement: new InertSettlementExecutor(),
     scheduledIntents,
     retention,
@@ -89,6 +93,7 @@ export function automationPeerSubscribers(
   peerReactions: AutomationsPipelineDeps["peerReactions"],
 ): Map<string, EventSubscriberDefinition> {
   const pipeline = createAutomationsPipeline({
+    auditLog: createApiFixture<AuditLogApi>(),
     settlement: new InertSettlementExecutor(),
     scheduledIntents: new InertScheduledIntents(),
     retention: new InertIntentRetention(),

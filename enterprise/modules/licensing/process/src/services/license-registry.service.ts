@@ -14,11 +14,7 @@ import {
   type IssueLicenseInput as ContractIssueLicenseInput,
   IssuedLicenseNotActiveError,
   IssuedLicenseNotFoundError,
-  LicenseAlreadyRegisteredError,
-  LicenseAlreadyReissuedError,
   LicenseKeyInvalidError,
-  LicenseOverageMaxRequiresOverageError,
-  LicenseSigningNotConfiguredError,
   OrganizationNotFoundError,
   type IssuedLicenseCustomerRecord,
   type IssuedLicensePage,
@@ -31,22 +27,17 @@ import {
   type SignedIssuedLicense,
   type ConnectService,
 } from "@langwatch/enterprise-licensing-contract";
-import { registryHashForToken } from "@langwatch/gateway-contract";
 import { licenseSeats } from "@langwatch/plans";
 import { Temporal, toDate, type Instant } from "@langwatch/time";
 
 import type {
-  IssuedLicenseDraft,
   IssuedLicenseRecord,
   IssuedLicenseRepository,
 } from "../repositories/issued-license.repository.ts";
-import {
-  isUniqueViolation,
-  issuedLicenseView,
-  statusOfIssuedLicense,
-  violationNames,
-} from "../rules/issued-license.rules.ts";
+import { resolveLicenseTerms } from "../rules/issued-license-row.rules.ts";
+import { issuedLicenseView, statusOfIssuedLicense } from "../rules/issued-license.rules.ts";
 import type { ContractBudgets } from "./contract-budget.service.ts";
+import { IssuedLicenseWriterService } from "./issued-license-writer.service.ts";
 
 interface LicenseRegistryOptions {
   repository: IssuedLicenseRepository;
@@ -65,25 +56,21 @@ type IssueLicenseTerms = Omit<ContractIssueLicenseInput, "expiresAt"> & {
   expiresAt: Instant;
 };
 
-type RowDraft = {
-  licenseKey: string;
-  organizationId: string | null;
-  source: IssuedLicenseSource;
-  issuedById: string | null;
-  overrides?: Partial<IssuedLicenseRecord>;
-};
-
 export class LicenseRegistryService {
   static create(options: LicenseRegistryOptions): LicenseRegistryService {
     return new LicenseRegistryService(options);
   }
 
-  private constructor(private readonly options: LicenseRegistryOptions) {}
+  private readonly writer: IssuedLicenseWriterService;
+
+  private constructor(private readonly options: LicenseRegistryOptions) {
+    this.writer = IssuedLicenseWriterService.create(options);
+  }
 
   /** Signs a new license for a customer and records it. */
   async issue(input: IssueLicenseTerms): Promise<SignedIssuedLicense> {
-    const privateKey = this.requireSigningKey();
-    const terms = this.resolveTerms({ current: null, input: input.terms });
+    const privateKey = this.writer.getSigningKey();
+    const terms = resolveLicenseTerms({ current: null, input: input.terms });
     const organization = await this.resolveCustomer(input.customer);
 
     const { licenseKey } = this.options.generation.generate({
@@ -105,7 +92,7 @@ export class LicenseRegistryService {
     // must be the last write that can fail: the other order loses the signed
     // license to a failure here and leaves a row no caller ever saw.
     await this.options.organizations.markSelfHostedCustomer(organization.id);
-    const row = await this.createRow({
+    const row = await this.writer.createRow({
       licenseKey,
       organizationId: organization.id,
       source: "BACKOFFICE",
@@ -126,7 +113,7 @@ export class LicenseRegistryService {
     source: Extract<IssuedLicenseSource, "PURCHASE" | "SCRIPT">;
     organizationId?: string;
   }): Promise<IssuedLicenseView> {
-    const row = await this.createRow({
+    const row = await this.writer.createRow({
       licenseKey: input.licenseKey,
       organizationId: input.organizationId ?? null,
       source: input.source,
@@ -155,7 +142,7 @@ export class LicenseRegistryService {
     // here would otherwise find its own tokenHash taken and be refused as
     // already registered, with the organization never marked.
     await this.options.organizations.markSelfHostedCustomer(organization.id);
-    const row = await this.createRow({
+    const row = await this.writer.createRow({
       licenseKey: input.licenseKey,
       organizationId: organization.id,
       source: "LEGACY_IMPORT",
@@ -204,7 +191,7 @@ export class LicenseRegistryService {
     const current = await this.getRow(input.id);
     // Expired is allowed: renewing after a lapse is the common renewal.
     this.refuseIfSettled(current);
-    const signed = await this.signReplacement({ current, ...input });
+    const signed = await this.writer.signReplacement({ current, ...input });
     return { licenseKey: signed.licenseKey, license: this.toView(signed.row) };
   }
 
@@ -222,7 +209,7 @@ export class LicenseRegistryService {
     this.refuseUnlessActive(current);
     const raised = current.organizationId !== null && input.maxMembers > current.maxMembers;
 
-    const { licenseKey, row } = await this.signReplacement({
+    const { licenseKey, row } = await this.writer.signReplacement({
       current,
       maxMembers: input.maxMembers,
       expiresAt: current.expiresAt,
@@ -316,7 +303,7 @@ export class LicenseRegistryService {
     const row = await this.getRow(id);
     const updated = await this.options.repository.update(
       row.id,
-      this.resolveTerms({ current: row, input: terms }),
+      resolveLicenseTerms({ current: row, input: terms }),
     );
     await this.syncBudget(updated, operatorId);
     await this.publishConnectServices(updated);
@@ -396,28 +383,6 @@ export class LicenseRegistryService {
     return { licenses: rows.map((row) => this.toView(row)), total };
   }
 
-  /**
-   * An overage maximum is only valid while overage is enabled, and switching
-   * overage off clears it. Judged as the terms will stand, not as they arrived.
-   */
-  private resolveTerms({
-    current,
-    input,
-  }: {
-    current: IssuedLicenseRecord | null;
-    input: LicenseTermsInput | undefined;
-  }): LicenseTermsInput {
-    if (!input) return {};
-    const overageEnabled = input.overageEnabled ?? current?.overageEnabled ?? false;
-    if (!overageEnabled && input.overageMaxUsdCents != null) {
-      throw new LicenseOverageMaxRequiresOverageError();
-    }
-    if (!overageEnabled && input.overageEnabled === false) {
-      return { ...input, overageMaxUsdCents: null };
-    }
-    return input;
-  }
-
   private async resolveCustomer(customer: LicenseCustomer): Promise<IssuedLicenseCustomerRecord> {
     if ("newOrganizationName" in customer) {
       return this.options.organizations.createSelfHostedCustomer({
@@ -427,96 +392,6 @@ export class LicenseRegistryService {
     const organization = await this.options.organizations.findById(customer.organizationId);
     if (!organization) throw new OrganizationNotFoundError();
     return organization;
-  }
-
-  /** Signs a replacement for `current` and records it as waiting for delivery. */
-  private async signReplacement(input: {
-    current: IssuedLicenseRecord;
-    maxMembers?: number;
-    maxMembersLite?: number;
-    maxMessagesPerMonth?: number;
-    expiresAt: Instant;
-    operatorId: string;
-    /** Set by a seat change that raised a linked license; see `changeSeats`. */
-    seatsRaisedFrom?: number;
-  }): Promise<{ licenseKey: string; row: IssuedLicenseRecord }> {
-    const { current } = input;
-    const { licenseKey } = this.options.generation.generate({
-      organizationName: current.organizationName,
-      email: current.email,
-      planType: current.planType,
-      ...licenseSeats({
-        members: input.maxMembers ?? current.maxMembers,
-        membersLite: input.maxMembersLite ?? current.maxMembersLite,
-      }),
-      maxMessagesPerMonth: input.maxMessagesPerMonth,
-      expiresAt: toDate(input.expiresAt),
-      connectServices: current.services,
-      privateKey: this.requireSigningKey(),
-      now: toDate(this.options.now()),
-    });
-
-    try {
-      const row = await this.createRow({
-        licenseKey,
-        organizationId: current.organizationId,
-        source: "BACKOFFICE",
-        issuedById: input.operatorId,
-        overrides: {
-          ...replacementColumns({ current, held: licenseKey }),
-          seatsRaisedFrom: input.seatsRaisedFrom ?? null,
-        },
-      });
-      return { licenseKey, row };
-    } catch (error) {
-      // A tokenHash or licenseId clash is already named by the row writer. Only
-      // a replacesId clash reaches here, and it means the license this one
-      // replaces was reissued by somebody else first.
-      if (error instanceof LicenseAlreadyRegisteredError) throw error;
-      if (isUniqueViolation(error)) throw new LicenseAlreadyReissuedError();
-      throw error;
-    }
-  }
-
-  private async createRow(draft: RowDraft): Promise<IssuedLicenseRecord> {
-    const signed = this.options.cryptography.parseLicenseKey(draft.licenseKey.trim());
-    if (!signed) throw new LicenseKeyInvalidError();
-    const token = this.options.cryptography.getLicenseToken(draft.licenseKey);
-
-    const tokenHash = await registryHashForToken(token);
-    // The read is what gives the operator the named refusal; the catch below
-    // is what covers the write that raced it, because the table decides.
-    if (await this.options.repository.findByTokenHash(tokenHash)) {
-      throw new LicenseAlreadyRegisteredError();
-    }
-    try {
-      return await this.options.repository.create({
-        ...blankRow(),
-        licenseId: signed.data.licenseId,
-        organizationName: signed.data.organizationName,
-        email: signed.data.email,
-        planType: signed.data.plan.type,
-        ...licenseSeats({
-          members: signed.data.plan.maxMembers,
-          membersLite: signed.data.plan.maxMembersLite,
-        }),
-        maxMembersLite: signed.data.plan.maxMembersLite ?? 0,
-        issuedAt: Temporal.Instant.from(signed.data.issuedAt),
-        expiresAt: Temporal.Instant.from(signed.data.expiresAt),
-        tokenHash,
-        organizationId: draft.organizationId,
-        source: draft.source,
-        issuedById: draft.issuedById,
-        ...draft.overrides,
-      });
-    } catch (error) {
-      // Two writes of the same key both pass the read above, and the unique
-      // index refuses the second. A `replacesId` clash is `reissue`'s own
-      // refusal; every other clash means the license is already registered.
-      if (violationNames({ error, column: "replacesId" })) throw error;
-      if (isUniqueViolation(error)) throw new LicenseAlreadyRegisteredError();
-      throw error;
-    }
   }
 
   private toView(row: IssuedLicenseRecord): IssuedLicenseView {
@@ -556,79 +431,11 @@ export class LicenseRegistryService {
     });
   }
 
-  private requireSigningKey(): string {
-    const privateKey = this.options.signingKey();
-    if (!privateKey || privateKey.trim() === "") throw new LicenseSigningNotConfiguredError();
-    return privateKey;
-  }
-
   private async getRow(id: string): Promise<IssuedLicenseRecord> {
     const row = await this.options.repository.findById(id);
     if (!row) throw new IssuedLicenseNotFoundError();
     return row;
   }
-}
-
-/** What the replacement inherits from the license it replaces. */
-function replacementColumns({
-  current,
-  held,
-}: {
-  current: IssuedLicenseRecord;
-  held: string;
-}): Partial<IssuedLicenseRecord> {
-  return {
-    replacesId: current.id,
-    pendingDeliveryLicense: held,
-    services: current.services,
-    seatRateCents: current.seatRateCents,
-    seatCurrency: current.seatCurrency,
-    commitUsdCents: current.commitUsdCents,
-    overageEnabled: current.overageEnabled,
-    overageMaxUsdCents: current.overageMaxUsdCents,
-    instanceId: current.instanceId,
-    instanceBoundAt: current.instanceBoundAt,
-  };
-}
-
-/** Every column a new row starts at, before the license and the caller speak. */
-function blankRow(): Omit<
-  IssuedLicenseDraft,
-  | "licenseId"
-  | "tokenHash"
-  | "organizationId"
-  | "organizationName"
-  | "email"
-  | "planType"
-  | "maxMembers"
-  | "maxMembersLite"
-  | "issuedAt"
-  | "expiresAt"
-  | "source"
-  | "issuedById"
-> {
-  return {
-    revokedAt: null,
-    revokedById: null,
-    revokedReason: null,
-    supersededAt: null,
-    replacesId: null,
-    pendingDeliveryLicense: null,
-    services: [],
-    seatRateCents: null,
-    seatCurrency: null,
-    commitUsdCents: 0,
-    overageEnabled: false,
-    overageMaxUsdCents: null,
-    instanceId: null,
-    instanceBoundAt: null,
-    lastSyncAt: null,
-    lastSyncVersion: null,
-    reportedMembers: null,
-    reportedMembersLite: null,
-    virtualKeyId: null,
-    seatsRaisedFrom: null,
-  };
 }
 
 /**

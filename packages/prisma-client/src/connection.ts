@@ -211,3 +211,52 @@ function guardedClient({
     },
   }) as unknown as PrismaClient;
 }
+
+export interface PrismaReadinessOptions {
+  connection: PrismaConnection;
+}
+
+/** A guarded readiness probe; callers decide whether a failure stops boot. */
+export class PrismaReadinessService {
+  private constructor() {}
+
+  static create(): PrismaReadinessService {
+    return new PrismaReadinessService();
+  }
+
+  async check(options: PrismaReadinessOptions): Promise<void> {
+    await options.connection.client.$queryRawUnsafe(
+      "-- @tenancy: prisma readiness probe\nSELECT 1 AS ready",
+    );
+  }
+}
+
+/** Product-owned seed behavior; this package owns only its execution mechanics. */
+export abstract class PrismaSeed {
+  abstract run(client: PrismaClient): Promise<void>;
+}
+
+export class PrismaSeedService {
+  private constructor() {}
+
+  static create(): PrismaSeedService {
+    return new PrismaSeedService();
+  }
+
+  run(input: { connection: PrismaConnection; seed: PrismaSeed }): Promise<void> {
+    return input.seed.run(input.connection.client);
+  }
+}
+
+/** Idempotent shutdown of the Prisma client followed by its explicit pg pool. */
+export class PrismaShutdownService {
+  private constructor() {}
+
+  static create(): PrismaShutdownService {
+    return new PrismaShutdownService();
+  }
+
+  shutdown(connection: PrismaConnection): Promise<void> {
+    return connection.closeOnce();
+  }
+}

@@ -10,6 +10,7 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { MemoryAgentSandboxKeyRepository } from "../../repositories/memory/memory.agent-sandbox-key.repository.ts";
 import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
@@ -48,7 +49,11 @@ async function appOver({
   const resolver = SecretsResolver.over(SecretsChain.start({ environment }).withEnv());
 
   return ApiKeyModule.create({
-    repositories: { apiKeys, answers: MemoryApiKeyAnswerCacheRepository.create() },
+    repositories: {
+      apiKeys,
+      answers: MemoryApiKeyAnswerCacheRepository.create(),
+      sandboxKeys: MemoryAgentSandboxKeyRepository.create(),
+    },
     dependencies: {
       authorization: createApiFixture<AuthzApi>({
         listApiKeyBindings: async () => [],
@@ -113,6 +118,7 @@ describe("given a key main hashed under the deployment's credentials secret", ()
   });
 
   describe("when none of the chain is set", () => {
+    /** @scenario A process configured with no API-key pepper refuses to boot, naming the setting */
     it("refuses to build, naming the secrets it looked for", async () => {
       const refused = appOver({ environment: { API_KEY_PEPPER: "" }, hashedUnder: "" });
 

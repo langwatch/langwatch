@@ -8,7 +8,14 @@ import type {
 import { NON_BILLABLE_ATTR } from "@langwatch/trace-contract";
 
 import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";
-import { canReadCapturedContent } from "./trace-viewer-protections.rules.ts";
+
+/**
+ * Whether this viewer may read text the model wrote from the conversation, rather than a fact
+ * about it. Both sides are required: summaries, titles and evaluator prose paraphrase prompt
+ * and reply together, so one-sided access would leak the other. Every surface asks here.
+ */
+export const canReadCapturedContent = (protections: Protections): boolean =>
+  protections.canSeeCapturedInput === true && protections.canSeeCapturedOutput === true;
 
 /**
  * Gates for v2 trace read DTOs: enforces same Protections on both transports

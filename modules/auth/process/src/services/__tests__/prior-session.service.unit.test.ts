@@ -23,7 +23,7 @@ function priorSessions({
       id: "session-1",
       userId: "user-1",
       sessionToken: "tok",
-      impersonating: null,
+      impersonation: null,
       expires,
     });
   }

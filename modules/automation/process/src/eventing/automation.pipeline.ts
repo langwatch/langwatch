@@ -1,3 +1,4 @@
+import { auditLogIntentSchema, type AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
   graphTriggerActivityGroupKey,
@@ -40,6 +41,18 @@ import {
   settleWindowBucket,
 } from "../rules/trigger-settlement.rules.ts";
 import type { AutomationEvaluationSubscriberService } from "../services/automation-evaluation-subscriber.service.ts";
+import { pruneAuditIntents, recordAuditIntent } from "./automation-audit.intent.ts";
+import {
+  AUTOMATION_AUDIT_INITIAL_STATE,
+  AUTOMATION_AUDIT_MAX_ATTEMPTS,
+  AUTOMATION_AUDIT_PROCESS_NAME,
+  AUTOMATION_AUDIT_PRUNE_INTENT,
+  AUTOMATION_AUDIT_PRUNE_INTERVAL_MS,
+  AUTOMATION_AUDIT_RECORD_INTENT,
+  automationAuditPruneSchema,
+  automationAuditPruneWake,
+  automationAuditStateSchema,
+} from "./automation-audit.process.ts";
 import type { AutomationScheduledIntent } from "./graph-alert-sweep.intent.ts";
 import { runGraphAlertSweep } from "./graph-alert-sweep.intent.ts";
 import {
@@ -121,6 +134,8 @@ export type AutomationEvent = TriggerMatchRecordedEvent | ReportScheduleEvent;
  *  topology itself (states, intents, evolve/wake handlers, outbox tuning)
  *  is defined inline below, ADR-052 "Approved builder API". */
 export interface AutomationsPipelineDeps {
+  /** Where the audit outbox writes, after the request that recorded the intent committed. */
+  auditLog: AuditLogApi;
   scheduledIntents: AutomationScheduledIntent;
   settlement: AutomationSettlementExecutor;
   retention: AutomationIntentRetentionRepository;
@@ -295,6 +310,23 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
         .on(reportRunSettledEventSchema, reportRunSettled)
         .onWake(reportScheduleWake)
         .outbox({ maxAttempts: REPORT_DISPATCH_MAX_ATTEMPTS, leaseDurationMs: 300_000 }),
+    )
+    .withProcessManager(AUTOMATION_AUDIT_PROCESS_NAME, (pm) =>
+      pm
+        .state(automationAuditStateSchema, AUTOMATION_AUDIT_INITIAL_STATE)
+        .intent(
+          AUTOMATION_AUDIT_RECORD_INTENT,
+          auditLogIntentSchema,
+          recordAuditIntent(deps.auditLog),
+        )
+        .intent(
+          AUTOMATION_AUDIT_PRUNE_INTENT,
+          automationAuditPruneSchema,
+          pruneAuditIntents(deps.retention),
+        )
+        .schedule({ everyMs: AUTOMATION_AUDIT_PRUNE_INTERVAL_MS })
+        .onWake(automationAuditPruneWake)
+        .outbox({ maxAttempts: AUTOMATION_AUDIT_MAX_ATTEMPTS }),
     )
     .withProcessManager("graphAlertSweep", (pm) =>
       pm

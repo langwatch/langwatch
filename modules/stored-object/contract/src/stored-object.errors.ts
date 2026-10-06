@@ -291,19 +291,6 @@ export class StoredObjectCapabilityUnavailableError extends HandledError {
   }
 }
 
-export class PayloadStagingUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor() {
-    super(
-      "service_unavailable",
-      "This request carries more data than can be sent inline, and this deployment has no object storage configured to stage it through.",
-      { httpStatus: 503, fault: "platform" },
-    );
-    this.name = "PayloadStagingUnavailableError";
-  }
-}
-
 /** One caller read more files in the window than the byte door allows; retry after the wait. */
 export class StoredObjectFilesRateLimitedError extends HandledError {
   declare readonly code: "stored_object_files_rate_limited";

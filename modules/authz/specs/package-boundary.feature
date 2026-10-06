@@ -19,7 +19,7 @@ Feature: AuthZ package boundary
     And packages/authz and packages/authz-server do not exist
     And no compatibility package or forwarding export preserves the old package name
 
-  @architecture @contract @typecheck
+  @unit @architecture @contract @typecheck
   Scenario: The contract is portable and uses Zod 4
     Given a browser or another feature imports @langwatch/authz-contract
     Then principals, scopes, permissions, decisions, commands and event payloads come from Zod 4 schemas

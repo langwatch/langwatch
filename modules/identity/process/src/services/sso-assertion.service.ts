@@ -127,8 +127,6 @@ export class SsoAssertionService {
     accountId?: string;
     email: string | null | undefined;
   }): Promise<SsoAssertionDecision> {
-    const carryOn = { action: "continue" } as const;
-
     // Not a connection at all: the deployment's own brokered provider and the
     // generic OAuth path do not come through this seam.
     if (!looksLikeSsoConnectionId(providerId)) {
@@ -180,6 +178,22 @@ export class SsoAssertionService {
       });
     }
 
+    return this.decideForUnclaimedSetup({ connection, providerId, domain, email });
+  }
+
+  /** A connection still in setup admits only its registrant, at the registered address. */
+  private async decideForUnclaimedSetup({
+    connection,
+    providerId,
+    domain,
+    email,
+  }: {
+    connection: SsoConnectionState;
+    providerId: string;
+    domain: string;
+    email: string | null | undefined;
+  }): Promise<SsoAssertionDecision> {
+    const carryOn = { action: "continue" } as const;
     // Suspension and teardown remove the dialable provider, but this gate
     // still has to refuse an in-flight or stale direct callback after that.
     if (!isSsoConnectionInSetup(connection.state)) {

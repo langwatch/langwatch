@@ -1,4 +1,3 @@
-export { filterFieldsEnum, type FilterField } from "./analytics.filter-field.ts";
 export {
   analyticsComparisonWindow,
   type AnalyticsComparisonWindow,
@@ -13,7 +12,7 @@ export {
 export * from "./analytics.service.ts";
 export * from "./analytics.api.ts";
 export * from "./analytics.trpc.ts";
-export * from "./analytics-rest.schemas.ts";
+export * from "./analytics.input-schemas.ts";
 export * from "./analytics-lwql.trpc.ts";
 export * from "./analytics-lwql.schemas.ts";
 export * from "./analytics.lwql.ts";
@@ -23,15 +22,8 @@ export * from "./series-points.ts";
 export * from "./analytics.timeseries.ts";
 export * from "./analytics.chart-series.ts";
 export * from "./analytics.evaluation.ts";
-export {
-  BUILDER_CHART_KIND,
-  DASHBOARD_SRCDOC_CHART_KIND,
-  WORKBENCH_SQL_CHART_KIND,
-} from "./analytics.chart-kind.ts";
-export * from "./analytics.query-shapes.ts";
 export * from "./analytics-query.errors.ts";
 export * from "./langwatch-ql.errors.ts";
-export * from "./analytics.input-schemas.ts";
 export * from "./analytics.metric-aggregations.ts";
 export * from "./dashboard-widget.errors.ts";
 export * from "./langwatch-ql-app-functions.ts";
@@ -39,4 +31,4 @@ export * from "./langwatch-ql-app-function.errors.ts";
 export * from "./langwatch-ql-violation.ts";
 export * from "./langwatch-ql-validation.errors.ts";
 export * from "./analytics.config.ts";
-export * from "./filter-sidebar.ts";
+export * from "./analytics.filter-field.ts";

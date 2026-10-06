@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { searchSubmitProgress } from "../search-submit-progress.ts";
+import { searchSubmitProgress } from "../search-bar.tsx";
 
 describe("searchSubmitProgress", () => {
   describe("given a sentence routed to an Instant Eval", () => {

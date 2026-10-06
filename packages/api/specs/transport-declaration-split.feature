@@ -243,6 +243,14 @@ Feature: Transport declaration split
     And a door that resolved a tenant scope for it fails rather than answering
 
   @unit
+  Scenario: The deployment-secret door reads its bearer as RFC 6750 spells it
+    Given a family behind a deployment secret (Alex, 2026-10-06, Q52)
+    When a caller presents the secret after the "Bearer" scheme in any letter case, with whitespace around the header or between scheme and secret
+    Then the door admits the caller
+    And a secret presented with no scheme, or under another scheme, is refused as unverified
+    And a configured secret with whitespace around it is compared trimmed
+
+  @unit
   Scenario: A family behind a deployment secret publishes the secret's own scheme
     Given the deployment-secret and SCIM-token credentials
     When the document asks what each of them publishes
@@ -374,6 +382,14 @@ Feature: Transport declaration split
     Given a platform route declares its refusal hidden (Alex, 2026-10-05, E4)
     When a caller with no session, or a signed-in caller lacking the permission, calls it with a body over the route's cap
     Then each is answered 404 not_found, the same answer, before the body is read
+
+  @integration
+  Scenario: A staff platform route hides from non-staff and refuses staff by name
+    Given a platform route asks a write permission and hides from callers lacking a staff permission (Alex, 2026-10-06, Q42)
+    When a caller with no session, a signed-in caller lacking the staff permission, and a staff caller lacking the write permission call it
+    Then they are answered 401, 404 not_found and 403 permission_denied naming the write permission, each before the body is read
+    And a caller holding both reaches the handler
+    And a staff permission that is not platform-tier, or a staff route that also names a refusal, is refused where it is written
 
   @integration
   Scenario: A route hands its handler the key the door resolved

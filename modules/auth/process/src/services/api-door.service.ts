@@ -20,6 +20,11 @@ import {
   isEnterpriseTier,
   type EntitlementApi,
 } from "@langwatch/entitlement-contract";
+import {
+  IdentityMfaEnrollmentRequiredError,
+  type IdentityApi,
+  type OrganizationMfaStanding,
+} from "@langwatch/identity-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import {
@@ -37,12 +42,19 @@ const WEBHOOK_ENDPOINTS_REFUSAL =
 
 export type ApiDoorPeers = Readonly<{
   sessions: Pick<AuthApi, "verifyBrowserSession" | "resolveBrowserSession">;
+  /** Whether this deployment offers two-step verification; off, the gate asks nothing. */
+  twoStep: Pick<AuthApi, "offersTwoStepVerification">;
+  /** Where one person stands with one organization's second-factor requirement (Q184). */
+  identity: Pick<IdentityApi, "getOrganizationMfaStanding">;
   apiKeys: ApiRestCredentialPeers["apiKeys"];
   /** Where a project-bound CLI access token is read back to its person and project. */
   cliProjects: ApiRestCredentialPeers["cliProjects"];
   /** The decisions both transports authorize through, and the key ceilings the key doors ask. */
   authz: ApiDoor["authz"] & ApiRestCredentialPeers["authz"] & Pick<AuthzApi, "getScope" | "can">;
-  organizations: Pick<OrganizationApi, "getSettings" | "getOrganizationIdByTeamId">;
+  organizations: Pick<
+    OrganizationApi,
+    "getSettings" | "getOrganizationIdByTeamId" | "findPersonalTeamOwners"
+  >;
   entitlements: Pick<EntitlementApi, "getActivePlan">;
   auditLog: Pick<AuditLogApi, "record">;
 }>;
@@ -58,6 +70,7 @@ export class ApiDoorService {
   readonly #sessions: BrowserSessionVerificationService;
   readonly #callerCredentials = new WeakMap<RestCaller, ApiOrganizationCredential["resolved"]>();
   readonly #projectCredentials = new WeakMap<RestCaller, ApiProjectCredential>();
+  readonly #standings = new Map<string, Promise<OrganizationMfaStanding>>();
 
   private constructor(peers: ApiDoorPeers) {
     this.#peers = peers;
@@ -103,7 +116,93 @@ export class ApiDoorService {
           scope: { type: "platform" },
         }),
       }),
+      organizationOf: async (scope) => {
+        const ids = scope.tier === "project" ? { projectId: scope.id } : { teamId: scope.id };
+        const resolved = await authz.getScope(ids).catch((error: unknown) => {
+          if (AuthzScopeNotFoundError.is(error)) return null;
+          throw error;
+        });
+        return resolved?.type === scope.tier ? resolved.organizationId : null;
+      },
+      assertSecondFactor: (input) => this.#assertSecondFactor(input),
     };
+  }
+
+  /**
+   * Main's mfa-gate: the flag before any read, the standing next, and only a refusal pays for
+   * the personal-workspace read, since nobody's own workspace is held by an employer's rule.
+   */
+  async #assertSecondFactor({
+    userId,
+    sessionId,
+    organizationId,
+    scope,
+  }: Parameters<NonNullable<ApiDoor["authz"]["assertSecondFactor"]>>[0]): Promise<void> {
+    if (!this.#peers.twoStep.offersTwoStepVerification()) return;
+
+    const standing = await this.#standing({ userId, sessionId, organizationId });
+    if (standing.satisfaction.satisfied) return;
+    if (await this.#isPersonal({ organizationId, scope })) return;
+
+    throw new IdentityMfaEnrollmentRequiredError(
+      `organization ${organizationId} requires a second factor and ${userId} cannot yet prove one`,
+    );
+  }
+
+  /**
+   * A batch over several scopes of one organization reads the standing once: concurrent askers
+   * share one read, and nothing is kept after it settles, so a later request reads afresh. Only
+   * the standing is shared; the scope-dependent exemption stays with each asker.
+   */
+  #standing({
+    userId,
+    sessionId,
+    organizationId,
+  }: {
+    userId: string;
+    sessionId: string | null;
+    organizationId: string;
+  }): Promise<OrganizationMfaStanding> {
+    const key = JSON.stringify([userId, sessionId, organizationId]);
+    const known = this.#standings.get(key);
+    if (known) return known;
+
+    const read = this.#peers.identity
+      .getOrganizationMfaStanding({ userId, organizationId, sessionId })
+      .finally(() => this.#standings.delete(key));
+    this.#standings.set(key, read);
+
+    return read;
+  }
+
+  /** A personal project always hangs from its owner's personal team, so the team answers. */
+  async #isPersonal({
+    organizationId,
+    scope,
+  }: {
+    organizationId: string;
+    scope: Readonly<{ tier: "organization" | "project" | "team"; id: string }>;
+  }): Promise<boolean> {
+    if (scope.tier === "organization") return false;
+
+    const teamId =
+      scope.tier === "team"
+        ? scope.id
+        : await this.#peers.authz.getScope({ projectId: scope.id }).then(
+            (resolved) => (resolved.type === "project" ? resolved.teamId : null),
+            (error: unknown) => {
+              if (AuthzScopeNotFoundError.is(error)) return null;
+              throw error;
+            },
+          );
+    if (teamId === null) return false;
+
+    const personal = await this.#peers.organizations.findPersonalTeamOwners({
+      organizationId,
+      teamIds: [teamId],
+    });
+
+    return personal.length > 0;
   }
 
   #projectDoor(): RestIdentity {

@@ -2,7 +2,7 @@ import { moduleApi } from "@langwatch/module";
 import type { SpanDetail } from "@langwatch/trace-contract";
 
 import type { LogContentKey } from "./coding-agent-log-content.ts";
-import type { ContributeSpanFactsCommandData } from "./coding-agent-processing.commands.ts";
+import type { ContributeSpanFactsCommandData } from "./coding-agent-processing.events.ts";
 import type { CodingAgentReceivedSpan } from "./coding-agent-span-admission.ts";
 import type {
   CodingAgentTracePullRequestInput,

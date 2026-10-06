@@ -1,10 +1,11 @@
-/** @vitest-environment jsdom */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+/** @vitest-environment jsdom */
+import { WorkflowCardDisplay } from "@langwatch/design-system/workflow-card";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { WorkflowCardActions, WorkflowCardDisplay } from "../ui/elements/workflow-card.tsx";
+import { WorkflowCardActions } from "../ui/elements/workflow-card.tsx";
 
 class ResizeObserverStub {
   observe() {}

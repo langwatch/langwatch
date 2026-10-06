@@ -1,3 +1,4 @@
+import type { SessionImpersonation } from "@langwatch/auth-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
@@ -12,11 +13,47 @@ const sessionSelect = {
   id: true,
   userId: true,
   sessionToken: true,
-  impersonating: true,
+  actorUserId: true,
+  subjectUserId: true,
+  impersonationReason: true,
+  impersonationExpiresAt: true,
   createdAt: true,
   lastSeenAt: true,
   updatedAt: true,
 } as const;
+
+type SessionRow = {
+  id: string;
+  userId: string;
+  sessionToken: string;
+  actorUserId: string | null;
+  subjectUserId: string | null;
+  impersonationReason: string | null;
+  impersonationExpiresAt: Date | null;
+  createdAt: Date;
+  lastSeenAt: Date | null;
+  updatedAt: Date;
+};
+
+function storedSession(row: SessionRow): StoredBrowserSession {
+  return {
+    id: row.id,
+    userId: row.userId,
+    sessionToken: row.sessionToken,
+    impersonation:
+      row.actorUserId || row.subjectUserId || row.impersonationExpiresAt
+        ? {
+            actorUserId: row.actorUserId,
+            subjectUserId: row.subjectUserId,
+            reason: row.impersonationReason,
+            expiresAt: row.impersonationExpiresAt ? fromDate(row.impersonationExpiresAt) : null,
+          }
+        : null,
+    createdAt: fromDate(row.createdAt),
+    lastSeenAt: row.lastSeenAt ? fromDate(row.lastSeenAt) : null,
+    updatedAt: fromDate(row.updatedAt),
+  };
+}
 
 /**
  * The `Session` table, which auth owns outright. Deletes go through
@@ -56,14 +93,8 @@ export class PrismaAuthSessionRepository
 
   async findById({ id }: { id: string }): Promise<StoredBrowserSession | null> {
     const row = await this.prisma.session.findUnique({ where: { id }, select: sessionSelect });
-    if (!row) return null;
 
-    return {
-      ...row,
-      createdAt: fromDate(row.createdAt),
-      lastSeenAt: row.lastSeenAt ? fromDate(row.lastSeenAt) : null,
-      updatedAt: fromDate(row.updatedAt),
-    };
+    return row ? storedSession(row) : null;
   }
 
   async findStoredForUser({
@@ -73,12 +104,7 @@ export class PrismaAuthSessionRepository
   }): Promise<readonly StoredBrowserSession[]> {
     const rows = await this.prisma.session.findMany({ where: { userId }, select: sessionSelect });
 
-    return rows.map((row) => ({
-      ...row,
-      createdAt: fromDate(row.createdAt),
-      lastSeenAt: row.lastSeenAt ? fromDate(row.lastSeenAt) : null,
-      updatedAt: fromDate(row.updatedAt),
-    }));
+    return rows.map(storedSession);
   }
 
   async findForUser({ userId }: { userId: string }): Promise<readonly BrowserSessionRecord[]> {
@@ -128,6 +154,36 @@ export class PrismaAuthSessionRepository
     const deleted = await this.prisma.session.deleteMany({ where: { id } });
 
     return deleted.count;
+  }
+
+  async writeImpersonation({
+    sessionId,
+    claims,
+  }: {
+    sessionId: string;
+    claims: SessionImpersonation;
+  }): Promise<void> {
+    await this.prisma.session.updateMany({
+      where: { id: sessionId },
+      data: {
+        actorUserId: claims.actorUserId,
+        subjectUserId: claims.subjectUserId,
+        impersonationReason: claims.reason,
+        impersonationExpiresAt: toDate(claims.expiresAt),
+      },
+    });
+  }
+
+  async clearImpersonation({ sessionId }: { sessionId: string }): Promise<void> {
+    await this.prisma.session.updateMany({
+      where: { id: sessionId },
+      data: {
+        actorUserId: null,
+        subjectUserId: null,
+        impersonationReason: null,
+        impersonationExpiresAt: null,
+      },
+    });
   }
 
   async touch({ sessionId, at }: { sessionId: string; at: Instant }): Promise<void> {

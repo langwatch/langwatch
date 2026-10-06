@@ -3,7 +3,7 @@
 import { passkeyClient } from "@better-auth/passkey/client";
 import { clearPersistedUiQueries } from "@langwatch/browser-host/query-persistence";
 import { clearReaderUiStorage, clearSessionUiStorage } from "@langwatch/browser-host/storage";
-import { looksLikeSsoConnectionId } from "@langwatch/identity-contract";
+import { AUTH0_BRIDGE_METHODS, looksLikeSsoConnectionId } from "@langwatch/identity-contract";
 import { nowInstant } from "@langwatch/time";
 import { createAuthClient } from "better-auth/react";
 import { type ReactElement, type ReactNode, useCallback, useEffect, useState } from "react";
@@ -314,12 +314,15 @@ export const signIn = async (
   // `ee/sso/providers.ts`) alike: the social plugin and the generic-oauth plugin both honor the
   // same providerId. BetterAuth handles the redirect to the provider URL itself when
   // `disableRedirect` is unset.
-  const mappedProvider = provider === "azure-ad" ? "microsoft" : provider;
+  const bridge = AUTH0_BRIDGE_METHODS.find(({ methodId }) => methodId === provider);
+  const nativeProvider = provider === "azure-ad" ? "microsoft" : provider;
+  const mappedProvider = bridge === undefined ? nativeProvider : "auth0";
   const result = await client.signIn.social({
     provider: mappedProvider as "google",
     callbackURL,
     disableRedirect: !shouldRedirect,
     ...(options?.loginHint ? { loginHint: options.loginHint } : {}),
+    ...(bridge === undefined ? {} : { additionalParams: { connection: bridge.connection } }),
   });
   if (result.error) {
     return {

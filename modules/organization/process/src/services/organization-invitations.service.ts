@@ -1,3 +1,4 @@
+import type { PlanProviderUser } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type {
@@ -42,6 +43,8 @@ type OrganizationInvitationsCreateInput = Readonly<{
   }>[];
   /** The user recorded as the sender of every invitation in the batch. */
   requestedBy?: string;
+  /** The person the plan is resolved for: their plan overrides apply to the seat check. */
+  user?: PlanProviderUser;
   /**
    * Chosen by the transport that asked, never by the composition: a batch naming a team
    * outside the organization is refused under `strict` and filtered under `lenient`.
@@ -180,6 +183,7 @@ export class OrganizationInvitationsService implements OrganizationInvitations {
         ...(invite.teams === undefined ? {} : { teams: invite.teams.map((team) => ({ ...team })) }),
       })),
       ...(input.requestedBy === undefined ? {} : { requestedBy: input.requestedBy }),
+      ...(input.user === undefined ? {} : { user: input.user }),
       // Whichever mode the transport asked for. The composition deliberately
       // picks none: hard-coding one here is what made the management API
       // accept a batch naming a team outside the organization and answer 201

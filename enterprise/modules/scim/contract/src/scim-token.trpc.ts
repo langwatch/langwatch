@@ -3,6 +3,7 @@
  * Every `scimToken.*` procedure, declared once. The names are the settings
  * page's cache keys, so they are the wire names it has always called.
  */
+import { CONNECTION_ACTIVATED_EVENT_TYPE } from "@langwatch/identity-contract";
 import { defineTrpcContract } from "@langwatch/module";
 
 import {
@@ -22,7 +23,7 @@ export const scimTokenTrpc = defineTrpcContract("scimToken")
   .withOutput(scimTokenSummarySchema.array())
 
   /** The connections a token can be minted against, so the page names one. */
-  .query("connections")
+  .query("connections", { invalidatedBy: [CONNECTION_ACTIVATED_EVENT_TYPE] })
   .withInput(scimTokenScopeSchema)
   .withOutput(scimDirectoryConnectionSchema.array())
 

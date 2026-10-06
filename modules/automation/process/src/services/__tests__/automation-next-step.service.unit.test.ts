@@ -3,10 +3,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import {
-  AutomationNextStepService,
-  AutomationOrganizationPricing,
-} from "../automation-next-step.service.ts";
+import { AutomationNextStepService } from "../automation-next-step.service.ts";
 
 const pro: Plan = {
   planSource: "subscription",
@@ -32,16 +29,6 @@ const launch: PlanNextStep = {
   automationDailyDispatchCeiling: 150,
 };
 
-class TieredEuroPricing extends AutomationOrganizationPricing {
-  pricingFor() {
-    return Promise.resolve({
-      kind: "priced" as const,
-      pricingModel: "TIERED" as const,
-      currency: "EUR" as const,
-    });
-  }
-}
-
 describe("AutomationNextStepService", () => {
   /** @scenario "A ceiling notice quotes the rung entitlement names next" */
   it("links the checkout of the rung the entitlement capability names", async () => {
@@ -58,14 +45,13 @@ describe("AutomationNextStepService", () => {
         getOrganizationId: () => Promise.resolve("organization-1"),
       }),
       plans: entitlement,
-      organizations: new TieredEuroPricing(),
       nextStep: entitlement,
       baseHost: "https://app.example.com",
     });
 
     const step = await adapter.resolve("project-1");
 
-    expect(asked).toEqual([{ plan: pro, pricingModel: "TIERED", currency: "EUR" }]);
+    expect(asked).toEqual([{ plan: pro, organizationId: "organization-1" }]);
     expect(step).toEqual({
       kind: "named",
       nextStep: {

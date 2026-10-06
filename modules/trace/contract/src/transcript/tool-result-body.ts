@@ -22,4 +22,4 @@ export function toolResultBodyToString(content: unknown): string {
     return "[unserializable value]";
   }
 }
-import { isRecord } from "./record.ts";
+import { isRecord } from "./content-format.ts";

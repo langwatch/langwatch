@@ -11,7 +11,6 @@ import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { experimentAttachmentLinkChannels } from "../channels/experiment-attachment-link-channels.registry.ts";
@@ -40,6 +39,7 @@ import {
   runRefusalsOf,
   type ExperimentRunRefusals,
 } from "../rules/experiment-run-availability.rules.ts";
+import { ExperimentAgentOwnershipService } from "./experiment-agent-ownership.service.ts";
 import { ExperimentAttachmentInputService } from "./experiment-attachment-input.service.ts";
 import type { ExecutionDataServices } from "./experiment-execution-data.service.ts";
 import { ExperimentRunBoardWriteBackService } from "./experiment-run-board-write-back.service.ts";
@@ -67,7 +67,7 @@ export type ExperimentRunProcessing = Readonly<{
   /** The peers a run's execution data is loaded through before it is planned. */
   services: ExecutionDataServices;
   /** Refuses a run against someone else's personal development agent before it starts. */
-  ownership: Pick<SuiteApi, "assertConnectedAgentsRunnable">;
+  ownership: Pick<ExperimentAgentOwnershipService, "assertConnectedAgentsRunnable">;
   /** Cells in flight at once when a run names no limit of its own. */
   concurrency: number;
   /** What this process refuses of a run, for want of Redis or a public address. */
@@ -86,7 +86,6 @@ type ExperimentRunPeers = Readonly<{
   modelProviders: ModelProviderApi;
   evaluation: EvaluationApi;
   apiKeys: ApiKeyApi;
-  suite: SuiteApi;
   storedObjects: StoredObjectApi;
 }>;
 
@@ -163,7 +162,7 @@ export class ExperimentRunService {
         abort,
         publicBaseUrl,
         services,
-        ownership: peers.suite,
+        ownership: ExperimentAgentOwnershipService.create(peers.agents),
         concurrency: config.runConcurrency,
         refusals,
       },

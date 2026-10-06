@@ -4,7 +4,7 @@ import type { ProcessMemberSource } from "@langwatch/process-stores";
 import type { ScopedSecrets } from "@langwatch/secrets";
 
 import type { ExposedSurface } from "../process-supply.ts";
-import { apiSurface, bearerDoor, instanceAdminDoor } from "./api-surface.ts";
+import { apiSurface, instanceAdminDoor } from "./api-surface.ts";
 import { resolveUiBundle } from "./bundle-config.ts";
 import { apiOwner, type ApiHostConfig } from "./config-owner.ts";
 
@@ -38,9 +38,6 @@ export async function processSurface({
     assetBase: config.assetBase,
     publicConfig,
   });
-  const cron = await secrets.into(apiOwner.secrets.cron, (token) =>
-    bearerDoor({ name: "cron", token }),
-  );
   const instanceAdmin = await secrets.into(apiOwner.secrets.instanceAdmin, (token) =>
     instanceAdminDoor({ token, isSaas }),
   );
@@ -50,7 +47,6 @@ export async function processSurface({
     stores: { database: true, redis: true },
     bundle,
     storage: {},
-    internalBearers: { cron },
     instanceAdmin,
     trustedProxies: config.trustedProxies,
     executionProxyBaseUrl,

@@ -2,7 +2,6 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   type EventSourcing,
-  type ProcessStore,
   ReplayService as EventingReplayService,
   replayLeanOf,
   replayProjectionsOf,
@@ -27,32 +26,17 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { Instant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
-import type { Cluster, Redis as IORedis } from "ioredis";
 
 import type { AnomalyRateTrackerRepository } from "../repositories/anomaly.repository.ts";
-import { NullBlobStoreRepository } from "../repositories/blob-store.repository.ts";
-import { EventExplorerClickHouseRepository } from "../repositories/clickhouse/clickhouse.event-explorer.repository.ts";
 import { OpsClickHouseRuntime } from "../repositories/clickhouse/clickhouse.ops-explain.repository.ts";
-import { ClickHouseStorageFootprintRepository } from "../repositories/clickhouse/clickhouse.storage-footprint.repository.ts";
 import { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
-import { PrismaAdminBackofficeRepository } from "../repositories/prisma/prisma.admin-backoffice.repository.ts";
-import {
-  type AdminDatabase,
-  PrismaImpersonationRepository,
-} from "../repositories/prisma/prisma.admin.repository.ts";
+import type { OpsRepositories } from "../repositories/ops.repositories.ts";
 import { PrismaProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
-import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository.ts";
 import {
   PrismaSchedulerAuditRepository,
   type SchedulerAuditDatabase,
 } from "../repositories/prisma/prisma.scheduler-audit.repository.ts";
-import { NullQueueRepository } from "../repositories/queue.repository.ts";
-import { QueueRedisRepository } from "../repositories/redis/queue.repository.ts";
-import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
-import { BlobStoreRedisRepository } from "../repositories/redis/redis.blob-store.repository.ts";
-import { RedisOpsMetricsRepository } from "../repositories/redis/redis.ops-metrics.repository.ts";
-import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository.ts";
-import { ReplayRedisRepository } from "../repositories/redis/redis.replay.repository.ts";
+import type { StorageFootprintRepository } from "../repositories/storage-footprint.repository.ts";
 import {
   type AdminAccess,
   AdminAccessService,
@@ -66,7 +50,11 @@ import {
 import { BlobStoreService } from "../services/blob-store.service.ts";
 import { EventExplorerService } from "../services/event-explorer.service.ts";
 import { EventingIntrospectionService } from "../services/eventing-introspection.service.ts";
-import { type AdminAuditSink, ImpersonationService } from "../services/impersonation.service.ts";
+import {
+  type AdminAuditSink,
+  ImpersonationService,
+  type ImpersonationSessions,
+} from "../services/impersonation.service.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
 import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service.ts";
 import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service.ts";
@@ -77,13 +65,10 @@ import { ReplayRetentionService } from "../services/replay-retention.service.ts"
 import { ReplayService } from "../services/replay.service.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import type { StorageStatsInstance } from "../services/storage-stats-collection.service.ts";
-import {
-  SystemMigrationPassService,
-  type SystemMigrationPassRepositories,
-} from "../services/system-migration-pass.service.ts";
+import { SystemMigrationPassService } from "../services/system-migration-pass.service.ts";
 import type {
+  BugReportNotifier,
   OpsExplorers,
-  QueuePayloadDecoder,
   OpsAppDependencies,
   OpsAppInfrastructure,
   OpsCapability,
@@ -178,28 +163,26 @@ class QueueOpsMetricsSource extends OpsQueueMetricsSourceRepository {
 
 /** The one endpoint storage stats measure: the shared ClickHouse, as main's worker did. */
 export function sharedStorageStatsInstance(
-  clickhouse: ClickHouseQueryClient,
+  storage: StorageFootprintRepository,
 ): StorageStatsInstance {
-  return { target: "shared", storage: ClickHouseStorageFootprintRepository.create({ clickhouse }) };
+  return { target: "shared", storage };
 }
 
 /** Builds the {@link OpsAppInfrastructure} `OpsModule.create` composes over. */
 export function buildOpsInfrastructure(input: {
+  bugReportNotifier: BugReportNotifier;
   members: OpsProcessMembers;
   logger: Logger;
   config: OpsServerConfig;
   resources: ResourceOwnership;
-  processStore: ProcessStore;
-  repositories: SystemMigrationPassRepositories;
+  repositories: OpsRepositories;
   rateTracker: AnomalyRateTrackerRepository;
   cloudOps: boolean;
 }): OpsAppInfrastructure {
-  const { members, logger, config, resources } = input;
+  const { members, logger, config, resources, repositories } = input;
   const introspection = EventingIntrospectionService.create(() => members.eventing.definitions);
 
-  const snapshots = DefaultOpsSnapshotService.create(
-    RedisOpsSnapshotRepository.create(members.redis),
-  );
+  const snapshots = DefaultOpsSnapshotService.create(repositories.snapshots);
   // Polling starts here rather than on first read: the dashboard, the badge and
   // the live stream all read the last artifact this process pulled.
   snapshots.start().catch((error: unknown) => {
@@ -210,12 +193,10 @@ export function buildOpsInfrastructure(input: {
   // Every serving role, lease-elected across the fleet (ADR-090); stopped before the
   // stores close, so the lease is handed back rather than left to lapse.
   const queueMetricsWriter = OpsMetricsCollectorService.create({
-    metrics: RedisOpsMetricsRepository.create({ redis: members.redis }),
-    ops: new QueueOpsMetricsSource(
-      QueueService.create({ repo: QueueRedisRepository.create({ redis: members.redis }) }),
-    ),
+    metrics: repositories.metrics,
+    ops: new QueueOpsMetricsSource(QueueService.create({ repo: repositories.queues })),
     rateTracker: input.rateTracker,
-    snapshots: DefaultOpsSnapshotService.create(RedisOpsSnapshotRepository.create(members.redis)),
+    snapshots: DefaultOpsSnapshotService.create(repositories.snapshots),
   });
   resources.ownService({
     name: "ops queue-metrics writer",
@@ -237,8 +218,7 @@ export function buildOpsInfrastructure(input: {
     createCapability: (dependencies: OpsAppDependencies): OpsCapability => {
       return OpsOperations.create({
         authz: dependencies.authz,
-        // Without it every queue read answers the empty NullQueueRepository shape.
-        redis: members.redis,
+        repositories,
         // Where an organization's connection decides its sign-in, editing
         // the legacy `ssoDomain`/`ssoProvider` strings changes nothing a
         // person experiences, so the backoffice refuses rather than accepting
@@ -246,6 +226,7 @@ export function buildOpsInfrastructure(input: {
         ssoRouting: organizationSsoRouting(dependencies.identity),
         database: members.prisma,
         audit: AdminAuditService.create({ auditLog: dependencies.auditLog }),
+        sessions: dependencies.auth,
         auditLog: dependencies.auditLog,
         users: dependencies.users,
         scheduler: {
@@ -254,12 +235,12 @@ export function buildOpsInfrastructure(input: {
         },
         explorers: {
           eventExplorer: EventExplorerService.create({
-            repo: EventExplorerClickHouseRepository.create({ clickhouse: members.clickhouse }),
+            repo: repositories.events,
             introspection,
           }) satisfies OpsEventExplorer,
           managerExplorer: ManagerExplorerService.create({
-            store: input.processStore,
-            fleet: ProcessOpsPrismaRepository.create({ prisma: members.prisma }),
+            store: repositories.processStore,
+            fleet: repositories.processFleet,
             audit: PrismaProcessAuditRepository.create({
               prisma: members.prisma,
               auditLog: dependencies.auditLog,
@@ -269,7 +250,7 @@ export function buildOpsInfrastructure(input: {
           // Every role reads, cancels and starts; only the worker hosting
           // `ops_projection_replay` builds a runtime and executes.
           replay: ReplayService.create({
-            repo: ReplayRedisRepository.create({ redis: members.redis }),
+            repo: repositories.replay,
             runtimeFactory: new OpsReplayRuntimes({
               members,
               retention: dependencies.retention,
@@ -292,18 +273,16 @@ export function buildOpsInfrastructure(input: {
     grafana: { findLinkConfig: () => null },
     createSystemMigrations: ({ dependencies, passRequests }) =>
       SystemMigrationPassService.runner({
-        repositories: input.repositories,
+        repositories,
         isSaaS: () => config.isSaas,
         routes: () => members.clickhouse.privateRoutes(),
         dependencies,
         passRequests,
       }),
-    // The bug-report intake's own flood bound and best-effort alert. This
-    // process has neither a dedicated limiter nor a notifier of its own for
-    // this endpoint yet, so it allows and answers silently rather than
-    // refusing to accept a report that already reached it.
+    // The intake's flood bound: this process has no dedicated limiter for this
+    // endpoint yet, so it allows rather than refuse a report that reached it.
     bugReportRateLimiter: { consume: () => Promise.resolve({ allowed: true }) },
-    bugReportNotifier: { notify: () => Promise.resolve() },
+    bugReportNotifier: input.bugReportNotifier,
     explainClients: explainRuntime,
     findOpsApiKey: () => config.apiKey ?? null,
     findProductAnalyticsTargets: () => {
@@ -329,14 +308,20 @@ function organizationSsoRouting(identity: OpsAppDependencies["identity"]): Organ
 
 export interface OpsOperationsOptions {
   authz: AdminAccessServiceOptions["authz"];
-  database: AdminDatabase & SchedulerAuditDatabase;
+  /** The stores the operations read and edit, as the registry built them. */
+  repositories: Pick<
+    OpsRepositories,
+    "instanceAdmin" | "impersonation" | "queues" | "blobStore" | "anomalyState"
+  >;
+  /** What the scheduler's audit trail reads; the trail itself also takes the audit log. */
+  database: SchedulerAuditDatabase;
   audit: AdminAuditSink;
+  /** Auth's session claims, which an impersonation starts, reads and stops. */
+  sessions: ImpersonationSessions;
   /** The shared audit log every operator act is recorded on. */
   auditLog: AuditLogApi;
   access?: AdminAccess | undefined;
   now?: (() => Instant) | undefined;
-  redis?: IORedis | Cluster | undefined;
-  queuePayloads?: QueuePayloadDecoder | undefined;
   users: UserApi;
   /** Whether one organization's own connection decides its sign-in. */
   ssoRouting?: OrganizationSsoRouting | undefined;
@@ -364,31 +349,24 @@ export class OpsOperations {
     const access =
       this.options.access ??
       AdminAccessService.create({ authz: this.options.authz, users: this.options.users });
-    const queues = this.options.redis
-      ? QueueService.create({
-          repo: QueueRedisRepository.create({
-            redis: this.options.redis,
-            ...(this.options.queuePayloads ? { payloads: this.options.queuePayloads } : {}),
-          }),
-          audit: QueueAuditService.create({ auditLog: this.options.auditLog }),
-        })
-      : QueueService.create({ repo: NullQueueRepository.create() });
+    const { repositories } = this.options;
+    const queues = QueueService.create({
+      repo: repositories.queues,
+      audit: QueueAuditService.create({ auditLog: this.options.auditLog }),
+    });
 
     return OpsService.create({
       access,
       adminBackoffice: AdminBackofficeService.create({
-        repository: PrismaAdminBackofficeRepository.create(this.options.database),
+        repository: repositories.instanceAdmin,
         users: this.options.users,
         audit: this.options.audit,
         ssoRouting: this.options.ssoRouting,
       }),
-      blobStore: BlobStoreService.create(
-        this.options.redis
-          ? BlobStoreRedisRepository.create(this.options.redis)
-          : NullBlobStoreRepository.create(),
-      ),
+      blobStore: BlobStoreService.create(repositories.blobStore),
       impersonation: ImpersonationService.create({
-        repository: PrismaImpersonationRepository.create(this.options.database),
+        repository: repositories.impersonation,
+        sessions: this.options.sessions,
         access,
         audit: this.options.audit,
         now: this.options.now,
@@ -400,9 +378,7 @@ export class OpsOperations {
           auditLog: this.options.auditLog,
         }),
       }),
-      anomalyState: this.options.redis
-        ? RedisAnomalyStateRepository.create(this.options.redis)
-        : null,
+      anomalyState: repositories.anomalyState,
       queues,
       explorers: this.options.explorers,
     });

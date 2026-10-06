@@ -21,6 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@clickhouse/client": "catalog:",
     "@langwatch/agent-process": "workspace:*",
     "@langwatch/analytics-process": "workspace:*",
     "@langwatch/annotation-process": "workspace:*",
@@ -101,6 +102,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/topic-process": "workspace:*",
     "@langwatch/trace-process": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@langwatch/usage-process": "workspace:*",
     "@langwatch/user-process": "workspace:*",
     "@langwatch/webhook-process": "workspace:*",

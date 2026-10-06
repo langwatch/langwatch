@@ -1,4 +1,4 @@
-import { parseContentBlocks } from "./parsing.ts";
+import { parseContentBlocks } from "./content-parser.ts";
 import type { ChatMessage } from "./types.ts";
 
 /** Which side of a captured LLM call a chat payload is being read as. */

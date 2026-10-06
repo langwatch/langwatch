@@ -2,7 +2,6 @@ import type { ExhaustedOutcome } from "@langwatch/group-queue";
 
 import type { TenantId } from "../domain/tenantId.ts";
 import type { Event } from "../domain/types.ts";
-import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 import type { RetentionPolicy } from "../runtime.types.ts";
 import type { EnqueueDispatchOptions } from "../subscribers/eventSubscriber.types.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
@@ -59,12 +58,6 @@ export type MapEnqueueDispatchOptions<E extends Event = Event> = Pick<
  * projection's own event type for typed filters.
  */
 export interface MapProjectionOptions<E extends Event = Event> {
-  /**
-   * Operator stop for this component, resolved per tenant at dispatch time.
-   * Absent means the generated key; a `customKey` must also be what the
-   * descriptors advertise or the switch cannot be set.
-   */
-  killSwitch?: KillSwitchOptions;
   /** Concurrency limit for processing jobs. */
   concurrency?: number;
 

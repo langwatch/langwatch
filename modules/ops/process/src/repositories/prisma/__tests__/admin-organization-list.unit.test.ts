@@ -6,7 +6,7 @@
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaAdminBackofficeRepository as InstanceAdminRepository } from "../prisma.admin-backoffice.repository.ts";
+import { PrismaAdminBackofficeRepository as InstanceAdminRepository } from "../prisma.instance-admin.repository.ts";
 
 const LICENSE_KEY = "signed-license-key-material";
 

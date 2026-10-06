@@ -28,4 +28,13 @@ export class MemoryCostAttributionPolicyRepository extends CostAttributionPolicy
   async enabledCodingAssistantConfigs(organizationId: string): Promise<unknown[]> {
     return this.configs.get(organizationId) ?? [];
   }
+
+  async organizationsWithEnabledCodingAssistants(): Promise<string[]> {
+    return [...this.configs].filter(([, configs]) => configs.length > 0).map(([id]) => id);
+  }
+
+  /** Replaces an organization's enabled configs, as an admin edit would. */
+  replace({ organizationId, configs }: { organizationId: string; configs: unknown[] }): void {
+    this.configs.set(organizationId, configs);
+  }
 }

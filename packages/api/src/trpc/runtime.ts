@@ -9,6 +9,7 @@ import {
   type Actor,
   declaredScopeIdSchema,
   type AuthzDeclaredScopeId,
+  type AuthzHandlerScope,
   type AuthzPermission,
   type PlatformTierPermission,
   type ScopeTierField,
@@ -49,6 +50,7 @@ import { z } from "zod";
 import {
   AuthenticationRequiredError,
   decide,
+  scopeWithOrganization,
   decideEntitlement,
   declareAccessMiddleware,
   SCOPE_INPUT_FIELDS,
@@ -272,12 +274,15 @@ export const callerAddressFact = defineTrpcFact("callerAddress", z.string().null
 /** A feature API token is the runtime identity a router binds to. */
 export type TrpcFeatureApiWitness<Api> = ModuleApiToken<Api>;
 
-/** What a governed handler is handed. There is no `ctx`, request or response. */
+/**
+ * What a governed handler is handed. There is no `ctx`, request or response. Its scope carries
+ * the organization holding it (Alex, 2026-10-06, lineage D1).
+ */
 export type TrpcContractHandlerArguments<Input, App> = Omit<
   ApiHandlerArguments<Input, App>,
-  "actor"
+  "actor" | "scope"
 > &
-  Readonly<{ actor: TrpcHandlerActor }>;
+  Readonly<{ actor: TrpcHandlerActor; scope: AuthzHandlerScope | null }>;
 
 /**
  * What a procedure that runs with no caller is handed. Both halves are null
@@ -365,6 +370,8 @@ export type TrpcProcedureRequest<TContext extends object> = Readonly<{
   mintsCredential?: AuthzPermission;
   /** Present exactly when the procedure's audit row names a target its input does not. */
   audit?: TrpcAuditTarget;
+  /** Present exactly when the module hears of a caller its door refused (Q51). */
+  onRefused?: TrpcRefusalHook<unknown, unknown>;
   /** What the procedure asks the process for; the mount binds each one. */
   facts: readonly TrpcFact[];
   handle(args: never, ...facts: never[]): unknown;
@@ -377,6 +384,11 @@ export type TrpcProcedureRequest<TContext extends object> = Readonly<{
  * (Alex, 2026-10-05, E10). The host resolves it; the handler writes nothing.
  */
 export type TrpcAuditTarget = Readonly<{ target: "organization"; via: "projectId" | "teamId" }>;
+
+/** What a module is handed when its procedure's door refuses a caller (Alex, 2026-10-06, Q51). */
+export type TrpcRefusalHook<Api, Input> = (
+  args: Readonly<{ app: Api; input: Input; actor: Caller["actor"] }>,
+) => void | Promise<void>;
 
 /** The tier each audited input field names, as the host is asked about it. */
 const AUDITED_TIER = { projectId: "project", teamId: "team" } as const;
@@ -459,11 +471,11 @@ export interface TrpcRouterAccess<
   /**
    * What the tenant must hold beside the permission, asked after access at the scope it
    * resolved (refused access never reaches the plan). `feature` is named on the refusal;
-   * `when` asks only for an input it holds for.
+   * `when` asks only for an input it holds for. The plan-first order is REST's alone (Q31).
    */
   withEntitlement(
     entitlement: ApiEntitlement,
-    options?: EntitlementOptions,
+    options?: Omit<EntitlementOptions, "before">,
   ): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
   /**
    * The procedure mints a credential (a key, token or secret). The runtime refuses it with
@@ -479,6 +491,13 @@ export interface TrpcRouterAccess<
    * does not carry, and on a procedure that runs with no caller.
    */
   withAudit(target: TrpcAuditTarget): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
+  /**
+   * What the module does when the door refuses a caller: handed the parsed input and the caller,
+   * awaited before the refusal is answered unchanged; a hook that throws fails the call.
+   */
+  onRefused(
+    hook: TrpcRefusalHook<Api, z.output<Contract["members"][Name]["input"]>>,
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
   /**
    * The permission the parsed input chooses (`permissionBy`): its map names every value the
    * field holds. A bare entry is asked at `via`'s scope, an entry with a tier at its own field.
@@ -524,6 +543,8 @@ export interface TrpcRouterAccess<
   noPermission(declaration: {
     reason: string;
     allow?: Record<string, string>;
+    /** Exempt from the second-factor gate: the read a held member recovers through. */
+    mfaRecovery?: Readonly<{ reason: string }>;
   }): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
   /** The handler proves standing itself; `enforces` records which fields it covers. */
   serviceAuthorized(declaration: {
@@ -555,6 +576,7 @@ type Implementation = Readonly<{
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
   audit?: TrpcAuditTarget;
+  onRefused?: TrpcRefusalHook<unknown, unknown>;
   facts: readonly TrpcFact[];
   handle(args: never, ...facts: never[]): unknown;
 }>;
@@ -578,17 +600,11 @@ function mountRouter<Api, Contract extends TrpcContract>(
         );
       }
 
+      // An implementation carries only the marks its procedure declared, so it spreads as is.
       record[name] = runtime.procedure({
         procedure: `${contract.namespace}.${name}`,
         member,
-        access: implementation.access,
-        ...(implementation.entitlement ? { entitlement: implementation.entitlement } : {}),
-        ...(implementation.mintsCredential
-          ? { mintsCredential: implementation.mintsCredential }
-          : {}),
-        ...(implementation.audit ? { audit: implementation.audit } : {}),
-        facts: implementation.facts,
-        handle: implementation.handle,
+        ...implementation,
         app,
       });
     }
@@ -611,6 +627,7 @@ type ProcedureMarks = Readonly<{
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
   audit?: TrpcAuditTarget;
+  onRefused?: TrpcRefusalHook<unknown, unknown>;
 }>;
 
 type EntitlementQuestion = {
@@ -637,6 +654,13 @@ function assertNoTenantQuestion({ contract, name, entitlement }: EntitlementQues
   );
 }
 
+/** The declared second-factor recovery exemption, copied so the declaration cannot change it. */
+function copiedRecovery(mfaRecovery: Readonly<{ reason: string }> | undefined): {
+  mfaRecovery?: Readonly<{ reason: string }>;
+} {
+  return mfaRecovery ? { mfaRecovery: { reason: mfaRecovery.reason } } : {};
+}
+
 function copiedAllowance(
   allow: Record<string, string> | undefined,
 ): Record<string, string> | undefined {
@@ -657,14 +681,18 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
   /** One selected procedure, with the facts it has named so far. */
   const selected = (name: string, facts: readonly TrpcFact[], marks: ProcedureMarks = {}) => {
     const { entitlement } = marks;
-    const implement = (access: TrpcAccess) => ({
-      handle: (handle: (args: never, ...values: never[]) => unknown) =>
-        routerBuilder(
-          api,
-          contract,
-          new Map(implementations).set(name, { access, facts, handle, ...marks }),
-        ),
-    });
+    const implement = (access: TrpcAccess) => {
+      assertRefusable({ contract, name, access, onRefused: marks.onRefused });
+
+      return {
+        handle: (handle: (args: never, ...values: never[]) => unknown) =>
+          routerBuilder(
+            api,
+            contract,
+            new Map(implementations).set(name, { access, facts, handle, ...marks }),
+          ),
+      };
+    };
 
     return {
       withFacts: (...added: readonly TrpcFact[]) => {
@@ -675,10 +703,19 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
       withEntitlement: (named: ApiEntitlement, options: EntitlementOptions = {}) => {
         assertSingleEntitlement({ contract, name, entitlement });
 
+        assertNoPlanFirst({ address: `tRPC ${contract.namespace}.${name}`, options });
+
         return selected(name, facts, { ...marks, entitlement: { entitlement: named, ...options } });
       },
       mintsCredential: (permission: AuthzPermission) =>
         selected(name, facts, { ...marks, mintsCredential: permission }),
+      onRefused: (hook: TrpcRefusalHook<unknown, unknown>) => {
+        if (marks.onRefused) {
+          throw new Error(`tRPC ${contract.namespace}.${name} declares onRefused twice`);
+        }
+
+        return selected(name, facts, { ...marks, onRefused: hook });
+      },
       withAudit: (target: TrpcAuditTarget) => {
         assertAuditTarget({ contract, name, target, declared: marks.audit });
 
@@ -716,11 +753,16 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
 
         return implement(access);
       },
-      noPermission: (declaration: { reason: string; allow?: Record<string, string> }) =>
+      noPermission: (declaration: {
+        reason: string;
+        allow?: Record<string, string>;
+        mfaRecovery?: Readonly<{ reason: string }>;
+      }) =>
         implement({
           kind: "no-permission",
           reason: declaration.reason,
           allow: copiedAllowance(declaration.allow),
+          ...copiedRecovery(declaration.mfaRecovery),
         }),
       serviceAuthorized: (declaration: {
         reason: string;
@@ -751,6 +793,27 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
       router: mountRouter<Api, Contract>(contract, implementations),
     }),
   } as TrpcRouterBuilder<Api, Contract, Implemented>;
+}
+
+/** A hook needs a door that refuses: a public, unchecked or self-checked procedure has none. */
+function assertRefusable({
+  contract,
+  name,
+  access,
+  onRefused,
+}: {
+  contract: TrpcContract;
+  name: string;
+  access: TrpcAccess;
+  onRefused: TrpcRefusalHook<unknown, unknown> | undefined;
+}): void {
+  const refuses = !["public", "no-permission", "service-authorized"].includes(access.kind);
+
+  if (!onRefused || refuses) return;
+
+  throw new Error(
+    `tRPC ${contract.namespace}.${name} declares onRefused, and its door refuses nobody`,
+  );
 }
 
 function isPermissionList(access: PermissionArgument): access is readonly AuthzPermission[] {
@@ -1119,6 +1182,7 @@ export function createTrpcRuntime<
           facts,
           ...(request.entitlement ? { entitlement: request.entitlement } : {}),
           ...(request.mintsCredential ? { mintsCredential: request.mintsCredential } : {}),
+          ...(request.onRefused ? { onRefused: request.onRefused } : {}),
         }),
       );
 
@@ -1289,6 +1353,7 @@ function access<TContext extends object>({
   procedure,
   entitlement,
   mintsCredential,
+  onRefused,
   app,
   facts,
 }: {
@@ -1297,6 +1362,7 @@ function access<TContext extends object>({
   procedure: string;
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
+  onRefused?: TrpcRefusalHook<unknown, unknown>;
   app: (ctx: TContext) => unknown;
   facts: readonly BoundFact<TContext>[];
 }) {
@@ -1317,6 +1383,7 @@ function access<TContext extends object>({
       facts,
       ...(entitlement ? { entitlement } : {}),
       ...(mintsCredential ? { mintsCredential } : {}),
+      ...(onRefused ? { onRefused } : {}),
     }),
   );
 }
@@ -1329,6 +1396,7 @@ function check<TContext extends object>({
   procedure,
   entitlement,
   mintsCredential,
+  onRefused,
   app,
   facts,
 }: {
@@ -1337,6 +1405,7 @@ function check<TContext extends object>({
   procedure: string;
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
+  onRefused?: TrpcRefusalHook<unknown, unknown>;
   app: (ctx: TContext) => unknown;
   facts: readonly BoundFact<TContext>[];
 }) {
@@ -1365,7 +1434,15 @@ function check<TContext extends object>({
       return next({ ctx: { handlerArguments: anonymous } });
     }
 
-    const decision = await authorized({ members, declaration, ctx, input });
+    const decision = await authorized({ members, declaration, ctx, input }).catch(
+      async (failure: unknown) => {
+        if (onRefused && isRefusal(failure)) {
+          await onRefused({ app: app(ctx), input, actor: members.identity.caller(ctx).actor });
+        }
+
+        throw failure;
+      },
+    );
 
     if (!decision.actor) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication is required" });
@@ -1395,7 +1472,10 @@ function check<TContext extends object>({
     const handlerArguments: ResolvedAccess = {
       app: app(ctx),
       actor: decision.actor,
-      scope: decision.scope,
+      scope: await scopeWithOrganization({
+        scope: decision.scope,
+        authorize: members.authorization.forRequest(ctx),
+      }),
       facts: await resolveFacts({ facts, ctx }),
     };
 
@@ -1422,6 +1502,13 @@ async function resolveFacts<TContext extends object>({
   }
 
   return resolved;
+}
+
+/** A caller the door turned away, as opposed to a door that could not answer. */
+function isRefusal(failure: unknown): boolean {
+  if (failure instanceof TRPCError) return failure.code === "UNAUTHORIZED";
+
+  return failure instanceof HandledError && (failure.httpStatus ?? 500) < 500;
 }
 
 /**
@@ -2007,4 +2094,15 @@ export function createTrpcErrorFormatter(
       },
     };
   };
+}
+
+/** The plan-first order (Q31) is a REST door's; a procedure asks its plan after access. */
+function assertNoPlanFirst({
+  address,
+  options,
+}: {
+  address: string;
+  options: EntitlementOptions;
+}): void {
+  if (options.before) throw new Error(`${address} asks its plan first, which REST alone does`);
 }

@@ -5,7 +5,6 @@
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
-import { derivedTraceEventSchema } from "./trace-derived-event.ts";
 import { traceEditOverlayPatchSchema } from "./trace-edit-overlay.contract.ts";
 import { evaluationRunDataSchema } from "./trace-evaluation.schemas.ts";
 import {
@@ -175,6 +174,20 @@ export const tracesSpanLangwatchSignalsSchema = z.array(spanLangwatchSignalsSche
 
 /** `spansFull`: every span of a trace, mapped and redacted. */
 export const tracesSpanDetailsSchema = z.array(spanDetailSchema);
+
+/**
+ * Trace-level event shape, derived from a span's OTel events. Read from
+ * stored_spans on demand (`getTraceEventsByTraceId`), not hoisted onto the
+ * fold — that made folding O(n^2).
+ */
+export const derivedTraceEventSchema = z.object({
+  spanId: z.string(),
+  timestamp: z.number(),
+  name: z.string(),
+  attributes: z.record(z.string(), z.string()),
+});
+
+export type DerivedTraceEvent = z.infer<typeof derivedTraceEventSchema>;
 
 /** `traceEvents`: the drawer's timeline, protections applied. */
 export const tracesTraceEventsSchema = z.array(derivedTraceEventSchema);

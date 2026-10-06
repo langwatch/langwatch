@@ -171,6 +171,27 @@ describe("given a module that declares its event sourcing with withEventing", ()
       expect(declaration.built[0]!.participation).toBe("consume");
     });
 
+    /** @scenario "An enqueue that stores a send wakes the outbox once" */
+    it("hands the module the runtime's outbox wake, bound to the runtime", async () => {
+      const eventing = eventingHost("consume");
+      const notifyOutbox = vi.fn();
+      const declaration = keyEventing();
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing(declaration);
+
+      await new ApplicationBuilder({
+        role: "worker",
+        members: liveMemberSourceOf({ eventing: { ...eventing.host, notifyOutbox } }),
+      })
+        .withModules([module])
+        .boot();
+
+      declaration.built[0]!.notifyOutbox?.("notification_web_push");
+      expect(notifyOutbox).toHaveBeenCalledWith("notification_web_push");
+    });
+
     /** @scenario "A module declares its event sourcing beside its transports" */
     it("hands the module the senders registration answered with", async () => {
       const eventing = eventingHost("produce");

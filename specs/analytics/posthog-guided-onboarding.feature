@@ -218,20 +218,20 @@ Feature: PostHog guided onboarding events
   Scenario: a failed Langy turn of the guided conversation is tracked with its code and path
     Given a guided onboarding conversation on the gateway path
     When one of its turns fails with the code langy_github_not_connected
-    Then a "guided_onboarding_turn_failed" event is tracked against the user of the conversation
+    Then langy records the turn-failed fact and nurturing tracks a "guided_onboarding_turn_failed" event against the user of the conversation
     And it carries code langy_github_not_connected, path gateway and the experiment property
 
   @unit
   Scenario: a turn that ended in failure with a partial answer is tracked as failed
     Given a guided onboarding conversation
     When one of its turns ends with the outcome failed
-    Then a "guided_onboarding_turn_failed" event is tracked
+    Then langy records the turn-failed fact and nurturing tracks a "guided_onboarding_turn_failed" event
 
   @unit
   Scenario: a failed turn of an ordinary conversation tracks nothing
     Given a conversation that is not the organization's guided conversation
     When one of its turns fails
-    Then no "guided_onboarding_turn_failed" event is tracked
+    Then langy records no turn-failed fact and no "guided_onboarding_turn_failed" event is tracked
 
   # ============================================================================
   # Client registration

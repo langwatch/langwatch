@@ -3,7 +3,7 @@
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
-import { enterpriseGatewayWriteAcknowledgedSchema } from "./enterprise-gateway.responses.ts";
+import { enterpriseGatewayWriteAcknowledgedSchema } from "./enterprise-gateway.api.ts";
 import {
   issuedPersonalVirtualKeyAnswerSchema,
   personalVirtualKeySchema,

@@ -9,6 +9,10 @@ import {
   definePipeline,
   type EventingSetup,
 } from "@langwatch/eventing";
+import {
+  USER_REGISTERED_EVENT_TYPE,
+  userRegisteredEventDataSchema,
+} from "@langwatch/user-contract";
 
 import type { IdentityModule } from "../app/identity.app.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
@@ -41,6 +45,13 @@ export const identityEventing = defineEventingModule({
       aggregate: defineAggregate({ type: "global" }),
     })
       .withEvents([])
+      // A password sign-up's identifier, stated from user's fact (Q189): the user module
+      // does not peer identity, so identity reacts from its own side.
+      .withPeerSubscriber("userRegistered", {
+        eventType: USER_REGISTERED_EVENT_TYPE,
+        data: userRegisteredEventDataSchema,
+        handle: (registration) => app.signUpIdentifiers().attachRegistered({ registration }),
+      })
       .withProcessManager(BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME, (pm) =>
         pm
           .state(breakGlassExpiryWarnStateSchema, BREAK_GLASS_EXPIRY_WARN_INITIAL_STATE)

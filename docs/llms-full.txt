@@ -10480,7 +10480,6 @@ kubectl create namespace langwatch
 
 kubectl -n langwatch create secret generic langwatch-app-secrets \
   --from-literal=credentialsEncryptionKey="$(openssl rand -hex 32)" \
-  --from-literal=cronApiKey="$(openssl rand -hex 32)" \
   --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
   --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
   --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
@@ -61970,7 +61969,6 @@ LangWatch is configured through environment variables. How you set them depends 
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
 | `NEXTAUTH_SECRET`                     | Signs sessions, keys the sign-in lock-out records and unsubscribe links, and encrypts two-step verification backup codes. Changing it signs every user out                                                                                                                                                                                                                                                            | Yes                |
 | `CREDENTIALS_SECRET`                  | AES-256-GCM key for stored credentials (model provider keys, webhook signing secrets, SSO credentials) and the pepper for API key hashes. Must be exactly 64 hex characters (`openssl rand -hex 32`). Falls back to `NEXTAUTH_SECRET` when unset. Changing it makes stored credentials unreadable and invalidates every API key except legacy project keys. See [Security](/self-hosting/security#credentials-secret) | Yes                |
-| `CRON_API_KEY`                        | Bearer secret the scheduled jobs send to the app's internal cron routes. Unset, those routes refuse every call. The Helm chart generates it                                                                                                                                                                                                                                                                           | For scheduled jobs |
 | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | Key for the stand-in that replaces an erased identifier. At least 32 characters. Needed once anyone is erased, with the same value on the app and the workers (Helm: `app.extraEnvs` and `workers.extraEnvs`). Never change it after the first erasure                                                                                                                                                                | For erasure        |
 | `LANGWATCH_INSTANCE_ADMIN_API_KEY`    | Bearer credential for the organization provisioning API (`/api/organizations`). At least 32 characters. Unset, that API answers 404                                                                                                                                                                                                                                                                                   | No                 |
 | `API_TOKEN_JWT_SECRET`                | Not used by any feature. No code reads it; it can be left unset                                                                                                                                                                                                                                                                                                                                                       | No                 |
@@ -62310,7 +62308,6 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.signUp.allowedDomains` | `SIGN_UP_ALLOWED_DOMAINS` (joined with commas) |
 | `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
-| `app.cronApiKey.value` | `CRON_API_KEY` |
 | `app.email.provider` | `EMAIL_PROVIDER` |
 | `app.email.providers.sendgrid.apiKey.value` | `SENDGRID_API_KEY` |
 | `app.email.providers.ses.region` | `AWS_REGION` (with `USE_AWS_SES=true`) |
@@ -64064,7 +64061,6 @@ With `autogen.enabled: false` the chart creates no Secrets; it reads them from S
 | Key | Needed when |
 |-----|-------------|
 | `credentialsEncryptionKey` | Always |
-| `cronApiKey` | Always |
 | `nextAuthSecret` | Always |
 | `virtualKeyPepper` | Always |
 | `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWAY_JWT_SECRET` | `gateway.chartManaged: true` (default) |
@@ -64447,7 +64443,7 @@ The defaults are a HorizontalPodAutoscaler running 2 to 10 replicas, a ClusterIP
 
 Three things to know when running it:
 
-1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret` and `virtualKeyPepper`.
+1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `nextAuthSecret` and `virtualKeyPepper`.
 
    The [Production Deployment](#production-deployment) section above lists the keys the Secret needs. With `autogen.enabled=false` and a required key missing, the pods that read it stay in `CreateContainerConfigError` naming the key (under plain `helm`, a missing `LANGY_INTERNAL_SECRET` in an existing Secret stops the render instead); under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
 2. **A public route needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate route. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
@@ -67327,7 +67323,6 @@ kubectl create secret generic langwatch-secrets \
   --namespace langwatch \
   --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
   --from-literal=nextAuthSecret=$(openssl rand -hex 32) \
-  --from-literal=cronApiKey=$(openssl rand -hex 32) \
   --from-literal=virtualKeyPepper=$(openssl rand -hex 32) \
   --from-literal=LW_GATEWAY_INTERNAL_SECRET=$(openssl rand -hex 32) \
   --from-literal=LW_GATEWAY_JWT_SECRET=$(openssl rand -hex 32) \

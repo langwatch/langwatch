@@ -60,4 +60,14 @@ export interface StoredObjectRecordRepository {
   }): Promise<{ activeObjectCount: number; activeByteLength: number }>;
 
   findPage(input: StoredObjectRecordPageQuery): Promise<StoredObjectRecord[]>;
+
+  /** Rows of one purpose across every tenant, ordered by tenant then id, after the cursor. */
+  findPageByPurpose(input: {
+    purpose: string;
+    after?: Readonly<{ tenantId: StoredObjectProjectId; id: StoredObjectId }>;
+    limit: number;
+  }): Promise<StoredObjectRecord[]>;
+
+  /** Removes the row; a row that is not there is not an error. */
+  delete(input: { tenantId: StoredObjectProjectId; id: StoredObjectId }): Promise<void>;
 }

@@ -5,11 +5,11 @@
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
-import { RecordExperimentRanCommand } from "../experiment-lifecycle.commands.ts";
 import {
+  RecordExperimentRanCommand,
   RECORD_EXPERIMENT_RAN_COMMAND_TYPE,
   type RecordExperimentRanCommandData,
-} from "../experiment-lifecycle.events.ts";
+} from "../experiment-lifecycle.commands.ts";
 
 const ran: RecordExperimentRanCommandData = {
   tenantId: "project-1",

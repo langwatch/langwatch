@@ -54,7 +54,6 @@ import {
   statusBorderColor,
 } from "./search-bar-indicators.tsx";
 import { SearchFallbackNotice } from "./search-fallback-notice.tsx";
-import { searchSubmitProgress } from "./search-submit-progress.ts";
 import { SearchedAsNotice } from "./searched-as-notice.tsx";
 import { SyntaxHelpDrawerHost } from "./syntax-help-drawer.tsx";
 import { TokenValuePicker, type TokenValuePickerAnchor } from "./token-value-picker.tsx";
@@ -62,6 +61,25 @@ import { useAskLangyFromSearch } from "./use-ask-langy-from-search.ts";
 import type { ValueResolver } from "./use-filter-editor.ts";
 import { useInstantEvalRoute } from "./use-instant-eval-route.ts";
 import { useSubmitSearch } from "./use-submit-search.ts";
+
+/**
+ * What the bar says between Enter and the result: routing, then an Instant
+ * Eval's estimate and start, so Enter is never followed by a still page.
+ */
+export function searchSubmitProgress({
+  isRouting,
+  isEstimating,
+  isStarting,
+}: {
+  isRouting: boolean;
+  isEstimating: boolean;
+  isStarting: boolean;
+}): string | null {
+  if (isRouting) return "Searching";
+  if (isEstimating) return "Estimating the Instant Eval";
+  if (isStarting) return "Starting the Instant Eval";
+  return null;
+}
 
 const MAX_DYNAMIC_ITEMS = 10;
 

@@ -2,6 +2,8 @@
  * whole if any parameter invalid, not partially.
  */
 
+import { z } from "zod";
+
 import { renderScenarioContent } from "./scenario-content-template.ts";
 import {
   ScenarioParameterMissingError,
@@ -286,3 +288,12 @@ export async function resolveRunParameters({
 
   return resolved;
 }
+
+/**
+ * Ciphertext keyed by secret-parameter name. Deliberately not
+ * `runParameterValuesSchema`: ciphertext can exceed the source secret's
+ * length and is never a regular run parameter.
+ */
+export const runSecretCiphertextSchema = z.record(z.string(), z.string());
+
+export type RunSecretCiphertext = z.infer<typeof runSecretCiphertextSchema>;

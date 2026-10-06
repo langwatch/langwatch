@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { studioClientEventSchema } from "../studio-events.ts";
-import { studioOptimizerParamsSchema } from "../studio-optimization.ts";
+import { studioOptimizerParamsSchema } from "../studio-workflow.ts";
 
 const workflow = {
   workflow_id: "wf-1",

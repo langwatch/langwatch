@@ -101,11 +101,10 @@ Feature: Isolated Scenario execution
     Then the key has at least that bound of life left
 
   @unit
-  Scenario: A code agent's sandbox holds a per-run key reaching only the agent cache
+  Scenario: A code agent's sandbox holds the project's shared key reaching only the agent cache
     Given a scenario run against a code agent
     When the run is prepared
-    Then the sandbox gets a key for the run's starter, or the system, holding only agentCache:manage
-    And no key is shared across the project's runs or kept in Redis
+    Then the sandbox gets the project's shared sandbox key, holding only agentCache:manage
     And a run whose sandbox key cannot be minted still runs without the agent cache
 
   @unit

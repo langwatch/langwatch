@@ -92,3 +92,9 @@ Feature: Where an organization can go next
     Given an organization on the Pro plan of the tiered ladder
     When another module asks the entitlement capability where it goes next
     Then the answer names the rung the self-serve catalogue sells above it
+
+  @unit
+  Scenario: A peer asks for the next step without knowing the organization's pricing
+    Given an organization on the Pro plan whose own pricing is tiered and quoted in euro
+    When another module asks the entitlement capability where it goes next, naming only the organization
+    Then the capability reads that pricing itself and quotes the rung in euro

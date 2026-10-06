@@ -1,7 +1,11 @@
 import { z } from "zod";
 
-import { clauseField, isClause } from "./clause-field.ts";
-import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
+import {
+  clauseField,
+  isClause,
+  type GuardMiddleware,
+  type GuardParams,
+} from "./guard-middleware.ts";
 import { ORG_BEARING_MODEL_NAMES } from "./organization-guard.ts";
 
 // Looks for `projectId`, `organizationId`, or `tenantId` anywhere in
@@ -73,6 +77,9 @@ const GLOBAL_MODELS = [
   "Project",
   // Cluster-wide operator rows; one row per flag key and no tenant column.
   "FeatureFlag",
+  // The deployment's upgrade ledger: one run per upgrade, steps under it.
+  "LangwatchUpgradeRun",
+  "LangwatchUpgradeStep",
   // Issue reports sent by customers' coding agents (`langwatch report`). A
   // global support inbox read from the admin backoffice; `linkedProjectId` is
   // informational only, so there is no tenancy column to constrain on.

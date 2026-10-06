@@ -21,6 +21,7 @@ import {
 import { TraceUsageCountClickHouseRepository } from "../clickhouse/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../trace.repositories.ts";
 import { PrismaTraceEditOverlayRepository } from "./prisma.trace-edit-overlay.repository.ts";
+import { PrismaTraceIngestSourceBillingRepository } from "./prisma.trace-ingest-source-billing.repository.ts";
 
 /**
  * Live tier for Postgres repositories. Writes carry their retention; the
@@ -48,6 +49,9 @@ export class PostgresTraceRepositories {
 
     return {
       editOverlay: PrismaTraceEditOverlayRepository.create(members.prisma),
+      ingestSourceBilling: PrismaTraceIngestSourceBillingRepository.create({
+        prisma: members.prisma,
+      }),
       summaryProjection: TraceSummaryProjectionClickHouseRepository.create(storage),
       analyticsProjection: TraceAnalyticsClickHouseRepository.create(storage),
       analyticsRollup: TraceAnalyticsRollupClickHouseRepository.create(storage),

@@ -84,6 +84,7 @@ export const prismaTableCatalogue = {
   "ShareLink": "ShareLink",
   "PinnedTrace": "PinnedTrace",
   "TraceEditOverlay": "TraceEditOverlay",
+  "TraceIngestSourceBilling": "TraceIngestSourceBilling",
   "RetentionPolicy": "RetentionPolicy",
   "DataPrivacyPolicy": "DataPrivacyPolicy",
   "CustomLLMModelCost": "CustomLLMModelCost",
@@ -1557,6 +1558,13 @@ export const prismaModelFieldCatalogue = {
     "updatedById",
     "updatedBy",
     "createdAt",
+    "updatedAt"
+  ],
+  "TraceIngestSourceBilling": [
+    "organizationId",
+    "sourceType",
+    "billed",
+    "recordedAt",
     "updatedAt"
   ],
   "RetentionPolicy": [
@@ -3115,6 +3123,7 @@ export const prismaRelationCatalogue = {
     "createdBy": "User",
     "updatedBy": "User"
   },
+  "TraceIngestSourceBilling": {},
   "RetentionPolicy": {},
   "DataPrivacyPolicy": {},
   "CustomLLMModelCost": {},

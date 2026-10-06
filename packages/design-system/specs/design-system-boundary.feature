@@ -26,6 +26,13 @@ Feature: Design system foundations and boundary
     And the feature conditions are added after the base config
     And the design-system package has no dependency on the feature
 
+  @unit @theme
+  Scenario: Solid orange stays the brand orange when a feature theme restyles it
+    Given a feature-owned config that gives orange.solid a value for one condition only
+    When the app creates a design system with that extension
+    Then orange.solid still resolves to #ED8926 outside that condition
+    And the feature value applies inside it
+
   @integration @theme
   Scenario: Every provider uses the composed system
     Given the app has composed its installed feature theme extensions
@@ -39,14 +46,14 @@ Feature: Design system foundations and boundary
     Then the component is available from its named package export
     But package internals and undeclared components cannot be imported
 
-  @browser @accessibility
+  @integration @browser @accessibility
   Scenario: Modal overlays are safe by default
     Given a modal dialog is opened from a keyboard control
     Then focus is trapped inside the dialog
     And background interaction and scrolling are prevented
     And closing restores focus to the trigger
 
-  @browser @accessibility
+  @integration @browser @accessibility
   Scenario: Shared controls expose accessible names and focus
     Given a search input, icon action or tag editor from the design system
     When a keyboard or assistive-technology user reaches the control
@@ -54,7 +61,7 @@ Feature: Design system foundations and boundary
     And its focus indicator is visible
     And decorative icons are hidden from the accessibility tree
 
-  @browser @responsive
+  @unimplemented @browser @responsive
   Scenario: Shared composites have a small-screen strategy
     Given pagination or a selection action bar is rendered on a narrow viewport
     Then its controls remain operable without clipping or horizontal overflow

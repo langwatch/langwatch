@@ -65,6 +65,7 @@ function checkupService(): OpsCheckupService {
       usageStats: { disabled: false, installMethod: undefined, chartVersion: undefined },
       collectClickHouseBackupMetrics: true,
       productAnalytics: { key: undefined, host: undefined },
+      bugReportSlackChannel: undefined,
       cloudOps: false,
       adminEmails: [],
       nodeEnvironment: "production",

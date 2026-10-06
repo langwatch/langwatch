@@ -8,7 +8,6 @@ import {
   organizationApiKeyResolutionSchema,
   resolvedApiKeyTokenSchema,
   type ApiKey,
-  type ApiKeyBinding,
   type OrganizationApiKeyResolution,
   type ResolvedApiKeyCredential,
   API_KEY_PREFIX,
@@ -27,6 +26,7 @@ import {
   type ApiKeyAnswerCacheRepository,
 } from "../repositories/api-key-answer-cache.repository.ts";
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
+import { bindingsReachProject, findGrantedProjectIds } from "../rules/api-key-grant-reach.rules.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
@@ -54,32 +54,6 @@ function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;
 
   return key;
-}
-
-/**
- * Whether the key's own grants reach the project a caller named. An organization binding
- * reaches every project in it, a team binding every project on that team, a project binding
- * only its own.
- */
-function bindingsReachProject(
-  // The two fields the answer turns on, rather than the whole binding: the
-  // verified key carries the schema's own rows, whose optional `customRoleId`
-  // is not the narrowed one `ApiKeyBinding` states, and neither field below is
-  // that one.
-  bindings: readonly Pick<ApiKeyBinding, "scopeType" | "scopeId">[],
-  project: ProjectIdentity,
-): boolean {
-  return bindings.some((binding) => {
-    if (binding.scopeType === "ORGANIZATION") {
-      return binding.scopeId === project.organizationId;
-    }
-
-    if (binding.scopeType === "TEAM") {
-      return binding.scopeId === project.teamId;
-    }
-
-    return binding.scopeId === project.id;
-  });
 }
 
 export class ApiKeyTokenResolutionService {
@@ -451,19 +425,6 @@ export class ApiKeyTokenResolutionService {
   private nowMs(): number {
     return this.now().epochMilliseconds;
   }
-}
-
-/** The distinct projects a key's own grants name; a key bound to exactly one answers it alone. */
-function findGrantedProjectIds(
-  bindings: readonly Pick<ApiKeyBinding, "scopeType" | "scopeId">[],
-): string[] {
-  const projectIds = new Set(
-    bindings.flatMap((binding) =>
-      binding.scopeType === "PROJECT" && binding.scopeId ? [binding.scopeId] : [],
-    ),
-  );
-
-  return [...projectIds];
 }
 
 /** Concurrent reads of one token in this process share one promise, dropped once it settles. */

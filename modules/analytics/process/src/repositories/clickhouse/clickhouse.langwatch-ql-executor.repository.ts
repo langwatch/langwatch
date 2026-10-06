@@ -34,8 +34,8 @@ import {
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
   extractUnknownIdentifier,
+  toError,
 } from "./clickhouse.query-error-translation.mapper.ts";
-import { toError } from "./clickhouse.to-error.mapper.ts";
 
 /**
  * How long the driver waits on a LangWatchQL query, in milliseconds.

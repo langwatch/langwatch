@@ -12,14 +12,14 @@ import {
 
 import type { TopicModule } from "../app/topic.app.ts";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";
-import { TOPIC_CLUSTERING_PROCESS_NAME } from "../rules/topic-clustering-process.rules.ts";
 import {
   TopicClusteringRequestedEventSchema,
   TopicClusteringRunStartedEventSchema,
   TopicClusteringRunCompletedEventSchema,
   TopicClusteringRunFailedEventSchema,
   TopicClusteringTopicsRecordedEventSchema,
-} from "../services/topic-events.service.ts";
+} from "../rules/topic-clustering-events.rules.ts";
+import { TOPIC_CLUSTERING_PROCESS_NAME } from "../rules/topic-clustering-process.rules.ts";
 import {
   type TopicClusteringRunHistoryData,
   TopicClusteringRunHistoryFoldProjection,

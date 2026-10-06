@@ -59,6 +59,7 @@ const viewWith = (live: Connection | null): SsoSetupPageView => ({
   record: null,
   goLive: null,
   legacyRoute: null,
+  enterpriseRequired: false,
   migration: null,
   availability: { available: true, proof: "dns-txt" },
   serviceProvider: {

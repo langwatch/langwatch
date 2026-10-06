@@ -46,7 +46,7 @@ type ReadsFixture = Readonly<{
   }) => Promise<string>;
   disableMembership: (userId: string) => Promise<void>;
   team: (organizationId?: string) => Promise<string>;
-  project: (input: { teamId: string; apiKey?: string }) => Promise<string>;
+  project: (input: { teamId: string; apiKey?: string; archived?: boolean }) => Promise<string>;
   teamMember: (input: {
     teamId: string;
     userId: string;
@@ -118,7 +118,7 @@ function memoryReadsFixture(): ReadsFixture {
       });
       return teamId;
     },
-    project: async ({ teamId, apiKey = id("key") }) => {
+    project: async ({ teamId, apiKey = id("key"), archived = false }) => {
       const projectId = id("project");
       memory.projects.push({
         id: projectId,
@@ -127,6 +127,7 @@ function memoryReadsFixture(): ReadsFixture {
         isPersonal: false,
         apiKey,
         createdAt: at(T0 + 2_000),
+        archivedAt: archived ? at(T0 + 3_000) : null,
       });
       return projectId;
     },
@@ -222,7 +223,7 @@ async function postgresReadsFixture(): Promise<ReadsFixture> {
       teamIds.push(teamId);
       return teamId;
     },
-    project: async ({ teamId, apiKey = id("key") }) => {
+    project: async ({ teamId, apiKey = id("key"), archived = false }) => {
       const projectId = id("project");
       await database.project.create({
         data: {
@@ -234,6 +235,7 @@ async function postgresReadsFixture(): Promise<ReadsFixture> {
           language: "python",
           framework: "openai",
           createdAt: toDate(at(T0 + 2_000)),
+          archivedAt: archived ? toDate(at(T0 + 3_000)) : null,
         },
       });
       return projectId;
@@ -625,6 +627,26 @@ describe.each(backends)("given the decision reads on the $name backend", (backen
       await expect(
         fixture.repositories.read.findTeamOrganization({ teamId: id("team") }),
       ).resolves.toBeNull();
+    });
+  });
+
+  describe.skipIf(backend.skip)("when an archived project's lineage is read", () => {
+    /** @scenario "An archived project resolves to no scope, as an unknown one does" */
+    it("resolves nothing for it, while its live sibling still resolves", async () => {
+      const fixture = await open();
+      const teamId = await fixture.team();
+      const archived = await fixture.project({ teamId, archived: true });
+      const live = await fixture.project({ teamId });
+
+      await expect(
+        fixture.repositories.read.findProjectLineage({ projectId: archived }),
+      ).resolves.toBeNull();
+      await expect(
+        fixture.repositories.read.findProjectLineage({ projectId: live }),
+      ).resolves.toEqual({
+        teamId,
+        organizationId: fixture.organizationId,
+      });
     });
   });
 });

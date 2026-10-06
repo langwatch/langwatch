@@ -4,8 +4,12 @@ import {
   RESERVED_SYSTEM_KEY_NAMES,
 } from "@langwatch/api-key-contract";
 
-import { clauseField, isClause } from "./clause-field.ts";
-import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
+import {
+  clauseField,
+  isClause,
+  type GuardMiddleware,
+  type GuardParams,
+} from "./guard-middleware.ts";
 
 /**
  * Organization-tenancy guard: enforces single-organization scoping with organizationId predicates.
@@ -236,6 +240,9 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   ScimSyncState: {
     extraBound: ({ clause }) => typeof clauseField(clause, "connectionId") === "string",
   },
+  // Trace's fold of governance's coding-assistant billing fact, one row per
+  // (organizationId, sourceType); every read and write names its organization.
+  TraceIngestSourceBilling: {},
   RoleBinding: {
     // Reachable by its parent api key / group (each owned by one org) or by
     // its inline (scopeType, scopeId) target (a team / project id unique

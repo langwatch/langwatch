@@ -11,6 +11,10 @@ import {
   PrismaConnection,
   PrismaConnectionService,
   PrismaQueryGuard,
+  PrismaReadinessService,
+  PrismaSeed,
+  PrismaSeedService,
+  PrismaShutdownService,
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "./connection.ts";
@@ -21,9 +25,6 @@ import {
   type PrismaMigrationRequest,
   PrismaMigrationService,
 } from "./migration.ts";
-import { PrismaReadinessService } from "./readiness.ts";
-import { PrismaSeed, PrismaSeedService } from "./seed.ts";
-import { PrismaShutdownService } from "./shutdown.ts";
 
 class RecordingGuard extends PrismaQueryGuard {
   readonly contexts: PrismaQueryContext[] = [];

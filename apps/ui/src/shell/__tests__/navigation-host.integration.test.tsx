@@ -218,7 +218,54 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
+class CountingRpc extends GraphRpc {
+  calls = 0;
+  override query(path: string): Promise<unknown> {
+    this.calls += 1;
+    return super.query(path);
+  }
+}
+
+class UserSession extends SignedInSession {
+  constructor(private readonly id: string) {
+    super();
+  }
+  override currentUser(): UiActor {
+    return { id: this.id, name: "Ada", email: "ada@example.com", image: null };
+  }
+}
+
 describe("the application chrome", () => {
+  /** @scenario A user switch never shows another user's cache */
+  it("reads the organization graph again, under its own key, when the user changes", async () => {
+    const rpc = new CountingRpc();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = (session: UiSession) => (
+      <MemoryRouter initialEntries={["/my-project/traces"]}>
+        <QueryClientProvider client={client}>
+          <UiCapabilityContextProvider value={{ ...CAPABILITIES, rpc, session }}>
+            <UiDesignSystemShell>
+              <Routes>
+                <Route element={<UiAppChrome capabilities={ROOT} />}>
+                  <Route path="/:project/traces" element={<HostProbe />} />
+                </Route>
+              </Routes>
+            </UiDesignSystemShell>
+          </UiCapabilityContextProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+    const view = render(tree(new UserSession("user_1")));
+    await waitFor(() =>
+      expect(screen.getByTestId("probe").getAttribute("data-organizations")).toBe("1"),
+    );
+    const before = rpc.calls;
+
+    view.rerender(tree(new UserSession("user_2")));
+
+    await waitFor(() => expect(rpc.calls).toBeGreaterThan(before));
+  });
+
   it("draws NavigationShell over a mounted navigation host", async () => {
     renderChrome();
 

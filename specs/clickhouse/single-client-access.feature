@@ -155,6 +155,19 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
       Then the client lets it through
       And the reason does not travel to the server as part of the request
 
+    @unit
+    Scenario: An OR that can disjoin a tenant predicate away is refused
+      Given a read with an OR beside a tenant predicate, or around the bracket that holds one
+      When the guard checks it
+      Then it is refused as a weakening disjunction
+
+    @unit
+    Scenario: An OR bracketed beneath a tenant predicate does not refuse a scoped statement
+      Given a read whose every OR sits in a bracket beneath a predicate binding the claimed tenant
+      And no OR shares a bracket with a tenant predicate or encloses one
+      When the guard checks it
+      Then it is accepted
+
   # A replay reads a batch's whole history in one statement; main streamed it so a batch's memory
   # stays bounded by its accumulators, not its event count (Alex, 2026-09-28). A streamed read is
   # guarded and routed like any other, but holds no slot and is never retried: its reader sets how

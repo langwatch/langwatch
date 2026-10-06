@@ -76,6 +76,7 @@ Feature: Canonical user lifecycle
     Given the auth provider is email
     When a registration succeeds through the register route
     Then exactly one "lw.user.registered" fact is recorded for the created user id
+    And the fact names the credential row it opened, its creation time and the address
     And the fact is keyed by the user alone, so a redelivery records nothing new
 
   @unit

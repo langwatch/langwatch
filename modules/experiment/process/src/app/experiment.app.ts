@@ -90,7 +90,6 @@ import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
-import { SuiteApi } from "@langwatch/suite-contract";
 import {
   WorkflowApi,
   type StudioWorkflow,
@@ -215,8 +214,6 @@ export class ExperimentModule implements ExperimentApi {
     evaluation: EvaluationApi,
     /** Mints the sandbox key a run lends the code it executes. */
     apiKeys: ApiKeyApi,
-    /** Owns the rule refusing a run against someone else's personal agent. */
-    suite: SuiteApi,
     /** Reads a row's stored attachment for the target it is dispatched to. */
     storedObjects: StoredObjectApi,
   };

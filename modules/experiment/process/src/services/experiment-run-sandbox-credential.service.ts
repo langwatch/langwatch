@@ -1,4 +1,4 @@
-import { AGENT_SANDBOX_PERMISSIONS, type ApiKeyApi } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 
 import { ExperimentSandboxCredential } from "./experiment-run-sandbox-key.service.ts";
@@ -6,43 +6,31 @@ import { ExperimentSandboxCredential } from "./experiment-run-sandbox-key.servic
 const logger = createLogger("langwatch:experiment:run-sandbox-credential");
 
 /**
- * The engine key's dispatch floor (workflow-run-key.rules.ts): a Lambda invocation's 900 s plus
- * a minute back. It is the longer of the two floors, so a self-hosted engine's 15 minutes is
- * covered too; this module cannot see which engine runs the cell.
- */
-const SANDBOX_KEY_FLOOR_MS = 900 * 1000 + 60 * 1000;
-
-/**
- * The key a run lends the code it executes: a per-run key for its starter (or the system)
- * holding only the agent cache. A run that cannot get one still runs, without the agent cache.
+ * The key a run lends the code it executes: the one its project's code agent runs share, holding
+ * only the agent cache (specs/agent-cache/agent-cache.feature). A run that cannot get one still
+ * runs, without the agent cache.
  */
 export class ExperimentRunSandboxCredentialService extends ExperimentSandboxCredential {
   static create({
     apiKeys,
   }: {
-    apiKeys: Pick<ApiKeyApi, "mintRunKey">;
+    apiKeys: Pick<ApiKeyApi, "mintAgentSandboxKey">;
   }): ExperimentRunSandboxCredentialService {
     return new ExperimentRunSandboxCredentialService(apiKeys);
   }
 
-  private constructor(private readonly apiKeys: Pick<ApiKeyApi, "mintRunKey">) {
+  private constructor(private readonly apiKeys: Pick<ApiKeyApi, "mintAgentSandboxKey">) {
     super();
   }
 
   async findRunKey({
     projectId,
-    userId,
   }: {
     projectId: string;
     userId: string | null;
   }): Promise<string | undefined> {
     try {
-      return await this.apiKeys.mintRunKey({
-        userId,
-        projectId,
-        permissions: [...AGENT_SANDBOX_PERMISSIONS],
-        minRemainingMs: SANDBOX_KEY_FLOOR_MS,
-      });
+      return await this.apiKeys.mintAgentSandboxKey({ projectId });
     } catch (error) {
       logger.warn(
         { projectId, error },

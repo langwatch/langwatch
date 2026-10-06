@@ -8,6 +8,7 @@ import {
 import { defineProcessModule } from "@langwatch/process";
 
 import { GovernanceModule } from "./app/governance.app.ts";
+import { codingAssistantBillingEventing } from "./eventing/coding-assistant-billing.pipeline.ts";
 import { governanceActivityMonitorEventing } from "./eventing/governance-activity-monitor.pipeline.ts";
 import { ingestionPullReconcileEventing } from "./eventing/ingestion-pull-reconcile.pipeline.ts";
 import { ingestionPullEventing } from "./eventing/ingestion-pull.pipeline.ts";
@@ -76,4 +77,5 @@ export const governanceProcessModule = defineProcessModule("governance")
   .withEventing(pulledUsageEventing)
   .withEventing(ingestionPullEventing)
   .withEventing(ingestionPullReconcileEventing)
-  .withEventing(governanceActivityMonitorEventing);
+  .withEventing(governanceActivityMonitorEventing)
+  .withEventing(codingAssistantBillingEventing);

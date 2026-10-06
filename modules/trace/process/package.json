@@ -44,6 +44,7 @@
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",

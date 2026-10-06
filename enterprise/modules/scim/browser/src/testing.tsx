@@ -64,6 +64,13 @@ export class FakeScimHost extends ScimHostApi {
   setQuery(next: Readonly<Record<string, string | undefined>>): void {
     this.queries.push(next);
   }
+
+  /** How many times a drawer asked to close. */
+  closedOverlays = 0;
+
+  closeOverlay(): void {
+    this.closedOverlays += 1;
+  }
 }
 
 /** Renders the screen inside the Design System's provider and a host. */

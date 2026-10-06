@@ -105,8 +105,15 @@ Feature: Enterprise billing compatibility
     And it is never asked as the impersonated customer
 
   @unit
+  Scenario: Someone who is not staff is answered not-found by the connected-billing door
+    Given a caller who holds no platform operator permission
+    When they read or write a customer's connected billing
+    Then the platform door answers not-found before billing is asked
+    And an anonymous caller is answered 401
+
+  @unit
   Scenario: A view-only operator reads the billing overview but is refused on every billing write
     Given a platform operator holding ops:view and not ops:manage
     When they read a customer's connected-billing overview
     Then the overview answers
-    And onboard, add commit, renew, complete renewal and mark paid out of band are each refused with the shared not-found
+    And onboard, add commit, renew, complete renewal and mark paid out of band are each refused with permission_denied

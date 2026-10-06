@@ -38,6 +38,7 @@ function input() {
     connections: {
       database: {
         client: undefined as never,
+        sql: undefined as never,
         hold: (run: () => Promise<void>) => calls.lock(void 0, run),
         close: async () => void 0,
       },

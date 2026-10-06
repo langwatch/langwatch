@@ -1,5 +1,11 @@
+import { Config, isSaas, outboundProxy, type ConfigOf } from "@langwatch/config";
 import { moduleApi } from "@langwatch/module";
+import { z } from "zod";
 
+import type {
+  WebhookDeliveryRequest,
+  WebhookDeliveryRequestResult,
+} from "./webhook-delivery-request.ts";
 import type { WebhookGatewayEventDeliveryRequest } from "./webhook-governance-delivery.ts";
 import type {
   WebhookRequestDelivery,
@@ -11,8 +17,9 @@ import type {
   ApplyWebhookEndpointChangesCommand,
   CreateWebhookEndpointCommand,
   UpdateWebhookEndpointCommand,
+  ListWebhookEventsQuery,
+  ListWebhookEventsResult,
 } from "./webhook.commands.ts";
-import type { ListWebhookEventsQuery, ListWebhookEventsResult } from "./webhook.queries.ts";
 import type {
   WebhookDeliveryLog,
   WebhookDeliveryPosition,
@@ -66,6 +73,11 @@ export interface WebhookApi {
   }): Promise<void>;
   /** Queues one committed gateway event (spend or governance) for delivery; a repeat is dropped. */
   requestGatewayEventDelivery(input: WebhookGatewayEventDeliveryRequest): Promise<void>;
+  /**
+   * Queues one message for one endpoint and answers its delivery id at once (ADR-167). Call it
+   * from an outbox intent only; an unknown or archived endpoint throws, an inactive one skips.
+   */
+  requestDelivery(input: WebhookDeliveryRequest): Promise<WebhookDeliveryRequestResult>;
   /** Sends one attempt and logs it; throws a classified `DispatchError` for the outbox. */
   sendRequest(input: WebhookSendRequest): Promise<WebhookSendRequestResult>;
   /** One source's recorded {@link sendRequest} attempts, newest first. */
@@ -77,3 +89,22 @@ export interface WebhookApi {
 }
 
 export const WebhookApi = moduleApi<WebhookApi>()("webhook");
+
+/**
+ * Webhook destination fences; opt in with literal '1', refuse other values.
+ */
+const unsafeSwitch = z
+  .union([z.boolean(), z.literal("1"), z.literal("0"), z.literal("")])
+  .optional()
+  .transform((value) => value === true || value === "1");
+
+export const webhookConfig = Config.define((c) => ({
+  allowInsecureLocalUrls: c.env("WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS", unsafeSwitch),
+  allowAmbientAwsCredentials: c.env("WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS", unsafeSwitch),
+  /** The hosted product (the shared leaf): its HTTP egress verifies the receiver's certificate. */
+  isSaas,
+  /** The proxy spellings (the shared leaf); SQS deliveries follow them. */
+  outboundProxy,
+}));
+
+export type WebhookServerConfig = ConfigOf<typeof webhookConfig>;

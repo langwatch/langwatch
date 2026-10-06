@@ -7,7 +7,6 @@ import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contrac
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -24,6 +23,7 @@ const USER_ID = "user-1";
 /** A caller who may write at every tier, so only the target is under test. */
 const permittedAuthz = createApiFixture<AuthzApi>({
   hasPermission: async () => true,
+  checkScopeLineage: async () => ({ kind: "consistent" }),
   canBatchByIds: async (input: AuthzCanBatchByIdsInput) => ({
     teams: new Map(input.teams.map((team) => [team.teamId, true])),
     projects: new Map(input.projects.map((project) => [project.projectId, true])),
@@ -47,7 +47,6 @@ async function bootWith(scopeOrganizationId: string | null): Promise<DataPrivacy
     directory,
     dependencies: {
       projects: createDataPrivacyTestProjects(),
-      organizations: createApiFixture<OrganizationApi>(),
       permissions: permittedAuthz,
       featureFlags: createApiFixture<FeatureFlagApi>(),
       evaluation: createApiFixture<EvaluationApi>(),

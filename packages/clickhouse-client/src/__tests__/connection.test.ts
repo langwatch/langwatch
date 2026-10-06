@@ -8,8 +8,8 @@ import {
   ClickHouseNotConfiguredError,
   type ClickHouseClientCreationInput,
   type ClickHouseCloseableClient,
+  ClickHouseShutdownService,
 } from "../connection.ts";
-import { ClickHouseShutdownService } from "../shutdown.ts";
 
 interface TestClient extends ClickHouseCloseableClient {
   input: ClickHouseClientCreationInput;

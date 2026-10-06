@@ -24,12 +24,14 @@ Feature: The standalone API process dispatches commands and consumes none
   Rule: The runtime exists only where the queue does
 
     @unit
-    Scenario: A process with no queue composes no dispatch
-      Given the deployment configured no Redis
-      When the process composes its Eventing runtime
-      Then it composes none, and names the consequence at boot
-      # The queue infrastructure has already named the cause. A reader of the
-      # boot log should not have to derive "no dispatch" from "no Redis".
+    Scenario: A process with no queue refuses to boot, naming the setting
+      Given an installed module that keeps its state in Redis
+      And the deployment configured no Redis
+      When the process boots
+      Then the boot refuses, naming REDIS_URL
+      # The queue is the process's one Redis, so there is no half composition
+      # that serves without dispatch (typed-process-supply.feature, "A queue a
+      # module needs and the deployment did not configure").
 
   Rule: A producer owns neither an event log nor a process store
 
@@ -75,12 +77,6 @@ Feature: The standalone API process dispatches commands and consumes none
       Then the join command is staged on the sender the registration produced, before the call returns
       And this process appends nothing itself, because its event log refuses by name
       And the join lifecycle process manager is declined by name
-
-    @integration
-    Scenario: A process with no queue registers no identity pipeline
-      Given the deployment configured no Redis
-      When the API process composes its identity pipelines
-      Then it registers none, and every ledger refuses by name rather than dropping the write
 
     # The directory-sync ledger is the one that does NOT throw on an absent
     # sender: a push is an identity provider's HTTP request, and refusing it

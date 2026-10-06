@@ -118,6 +118,7 @@ import {
   type ScopeGraphOrganization,
   organizationServerConfig,
   type OrganizationServerConfig,
+  type PricingModel,
   type PendingInvitationForCaller,
   type SignUpVerdict,
 } from "@langwatch/organization-contract";
@@ -687,6 +688,12 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     maxSessionDurationDays: number;
   }): Promise<void> {
     return this.#dependencies.organizations.saveSessionPolicy(input);
+  }
+
+  getPricing(input: {
+    organizationId: string;
+  }): Promise<{ pricingModel: PricingModel | null; currency: "USD" | "EUR" }> {
+    return this.#dependencies.organizations.getPricing(input);
   }
 
   isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean> {

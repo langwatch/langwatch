@@ -3,7 +3,7 @@ import { processMetrics, processTelemetry } from "@langwatch/observability/node"
 import { describe, expect, it } from "vitest";
 
 import { processConfig } from "../config.ts";
-import { Server } from "../server-factory.ts";
+import { Server } from "../preamble.ts";
 
 const start = (environment: Readonly<Record<string, string>> = {}) =>
   Server.create("telemetry-preamble-test")

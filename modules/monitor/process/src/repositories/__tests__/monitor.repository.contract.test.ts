@@ -127,6 +127,7 @@ function contractCases(backend: Backend): void {
   });
 
   describe("when a project holds monitors in several execution modes", () => {
+    /** @scenario "The evaluation trigger reads a project's on-message monitors" */
     it("lists only the enabled on-message monitors of that project", async () => {
       const onMessage = await backend.repository().create(creation({ name: "On message" }));
       await backend.repository().create(creation({ name: "Manual", executionMode: "MANUALLY" }));

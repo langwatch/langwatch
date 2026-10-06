@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The server half of the self-hosted instance registry (ADR-156, section
- * 10), gated inside the application the same not-found way as every other
- * Backoffice resource.
+ * The server half of the self-hosted instance registry (ADR-156, section 10): the platform
+ * door hides it from non-staff (Q42); the cloud-ops capability is the application's.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { EnterpriseOpsApi, selfHostedInstancesTrpc } from "@langwatch/enterprise-ops-contract";
 
-import { operatorFact, STAFF_LIST } from "./enterprise-ops-operator.trpc.ts";
+import { operatorFact, STAFF } from "./license-registry.trpc.ts";
 
 export const selfHostedInstancesTrpcTransport: TrpcRouterDeclaration<
   EnterpriseOpsApi,
@@ -15,11 +14,11 @@ export const selfHostedInstancesTrpcTransport: TrpcRouterDeclaration<
 > = defineTrpcRouter(EnterpriseOpsApi, selfHostedInstancesTrpc)
   .procedure("getAll")
   .withFacts(operatorFact)
-  .noPermission(STAFF_LIST)
+  .withPermission("ops:view", STAFF)
   .handle(({ app, input }, operator) => app.listSelfHostedInstances({ ...input, operator }))
 
   .procedure("getById")
   .withFacts(operatorFact)
-  .noPermission(STAFF_LIST)
+  .withPermission("ops:view", STAFF)
   .handle(({ app, input }, operator) => app.getSelfHostedInstance({ ...input, operator }))
   .build();

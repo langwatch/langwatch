@@ -27,6 +27,8 @@ import {
   type ReleaseHeldAccountResult,
   type SaveSignInSecurityInput,
   type SaveSignInSecurityResult,
+  type SessionImpersonation,
+  type SessionImpersonationState,
   type SignInSecuritySettings,
   type VerifiedBrowserSession,
   type AuthUsageCount,
@@ -52,6 +54,7 @@ import {
   type EmailIdentifierAdded,
   IdentityApi,
   type IdentityEmailService,
+  organizationConnectionsOf,
   type RoutingDecision,
   type SignedInWith,
   SignInMethodPolicyService,
@@ -75,6 +78,7 @@ import { auth0PasswordChannels } from "../channels/auth0-password-channels.regis
 import { cliDeviceSettlementChannels } from "../channels/cli-device-settlement-channels.registry.ts";
 import type { BetterAuthTransport } from "../channels/http/http.better-auth.channel.ts";
 import { IdTokenIssuerRefusalChannel } from "../channels/http/http.id-token-issuer-refusal.channel.ts";
+import { OAuthProfileEmailChannel } from "../channels/http/http.oauth-profile-email.channel.ts";
 import { passwordResetMailChannels } from "../channels/password-reset-mail-channels.registry.ts";
 import { signUpVerificationMailChannels } from "../channels/sign-up-verification-mail-channels.registry.ts";
 import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
@@ -88,6 +92,7 @@ import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.aut
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
+import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
 import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins.rules.ts";
@@ -279,6 +284,8 @@ export class AuthModule implements AuthApiContract {
   #composeBetterAuth: (() => Promise<BetterAuthTransport>) | null = null;
   /** Shared by the Better Auth logger and the door, per request. */
   #idTokenIssuerRefusals = IdTokenIssuerRefusalChannel.create();
+  /** Shared by the providers' profile mapping and the door, per request. */
+  #oauthProfileEmails = OAuthProfileEmailChannel.create();
   #betterAuth: Promise<BetterAuthTransport> | null = null;
   /** The identity {@link AuthModule.create} resolved, held for {@link baseUrl}. */
   #browserSession: BetterAuthDeploymentIdentity | undefined;
@@ -310,11 +317,32 @@ export class AuthModule implements AuthApiContract {
     return this.#issuesOwnPasswords;
   }
 
+  /** The social providers this deployment mounted, by the id the rail dials; set at boot. */
+  #mountedSocialMethodIds: readonly string[] = [];
+
   /** This deployment's answer to {@link AuthModule.findDialableIdentityProviderOrigins}. */
   #dialableIdentityProviderOrigins: string[] = [];
 
   findDialableIdentityProviderOrigins(): string[] {
     return [...this.#dialableIdentityProviderOrigins];
+  }
+
+  findMountedSocialMethodIds(): string[] {
+    return [...this.#mountedSocialMethodIds];
+  }
+
+  getImpersonation(input: { sessionId: string }): Promise<SessionImpersonationState> {
+    return this.#sessions.getImpersonation(input);
+  }
+
+  startImpersonation(
+    input: SessionImpersonation & { sessionId: string; reason: string },
+  ): Promise<void> {
+    return this.#sessions.startImpersonation(input);
+  }
+
+  stopImpersonation(input: { sessionId: string }): Promise<void> {
+    return this.#sessions.stopImpersonation(input);
   }
 
   private constructor({
@@ -386,6 +414,13 @@ export class AuthModule implements AuthApiContract {
       revokeBrowserSession: (input) => this.revokeBrowserSession(input),
       idTokenIssuerRefusals: this.#idTokenIssuerRefusals,
       connectionIssuers,
+      oauthProfileEmails: this.#oauthProfileEmails,
+      governingConnections: {
+        findGoverningConnections: async ({ email }) =>
+          organizationConnectionsOf(
+            await dependencies.identity.routeSignIn({ identifier: email, breakGlass: false }),
+          ),
+      },
       deriveQueryCacheKey: (input) => this.#deriveQueryCacheKey(input),
       now: members.now ?? nowInstant,
     });
@@ -490,6 +525,7 @@ export class AuthModule implements AuthApiContract {
             offersPasskeys: () => config.passkeysEnabled,
             issuesOwnPasswords: () => config.localPasswords,
             selfHosted: () => !config.isSaas,
+            mountedSocialMethodIds: () => app.#mountedSocialMethodIds,
           }).resolvePolicy();
           return policy.defaultMethods;
         },
@@ -530,6 +566,7 @@ export class AuthModule implements AuthApiContract {
       into: setup.secrets.into,
       baseUrl: config.sessionUrl ?? "",
     });
+    app.#mountedSocialMethodIds = mountedSocialMethodIds({ configuration: signInProviders });
     const auth0ManagementSecret = await setup.secrets.into(
       AuthModule.secrets.auth0ManagementSecret,
       (value) => value,
@@ -580,6 +617,7 @@ export class AuthModule implements AuthApiContract {
           buildBetterAuth({
             identity,
             idTokenIssuerRefusals: app.#idTokenIssuerRefusals,
+            oauthProfileEmails: app.#oauthProfileEmails,
             signupAnnouncements,
             lifecycle: app.#lifecycle,
             signInLockout: SignInLockoutService.create({

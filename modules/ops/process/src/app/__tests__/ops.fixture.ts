@@ -59,9 +59,6 @@ class EmptyOpsIntrospection implements OpsEventingIntrospection {
   projections() {
     return [];
   }
-  killSwitches() {
-    return [];
-  }
   processManagers() {
     return [];
   }

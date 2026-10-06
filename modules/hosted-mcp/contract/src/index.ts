@@ -2,7 +2,7 @@ export {
   HostedMcpApi,
   type HostedMcpApiContract,
   type HostedMcpHandler,
-} from "./hosted-mcp.api.ts";
+} from "./mcp-authorize.schemas.ts";
 
 export {
   approved,
@@ -14,6 +14,6 @@ export {
 export {
   mcpAuthorizationCodeRecordSchema,
   type McpAuthorizationCodeRecord,
-} from "./mcp-oauth-token.schemas.ts";
+} from "./mcp-authorize.schemas.ts";
 
-export { hostedMcpConfig, type HostedMcpServerConfig } from "./hosted-mcp.config.ts";
+export { hostedMcpConfig, type HostedMcpServerConfig } from "./mcp-authorize.schemas.ts";

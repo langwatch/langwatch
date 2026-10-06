@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { generateOtelSpanId, generateOtelTraceId } from "../trace-otel-ids.ts";
+import { generateOtelSpanId, generateOtelTraceId } from "../trace.ts";
 
 describe("OpenTelemetry id generation", () => {
   describe("given a generated trace id", () => {

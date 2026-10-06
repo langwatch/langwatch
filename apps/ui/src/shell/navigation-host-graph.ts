@@ -24,14 +24,14 @@ export type NavigationGraphRead = readonly {
   primaryIntent?: string | null;
   /** The organization-wide presence kill switch; absent means never read. */
   presenceEnabled?: boolean;
-  members?: { role: string }[];
-  teams: {
+  members?: readonly { role: string }[];
+  teams: readonly {
     id: string;
     name: string;
     isPersonal?: boolean | null;
     ownerUserId?: string | null;
-    members?: { userId: string }[];
-    projects: {
+    members?: readonly { userId: string }[];
+    projects: readonly {
       id: string;
       name: string;
       slug: string;
@@ -59,7 +59,7 @@ export function toNavigationOrganizations(read: NavigationGraphRead): Navigation
       name: team.name,
       isPersonal: team.isPersonal,
       ownerUserId: team.ownerUserId,
-      members: team.members,
+      members: team.members ? [...team.members] : undefined,
       projects: team.projects.map((project) => ({
         id: project.id,
         name: project.name,

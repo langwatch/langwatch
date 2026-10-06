@@ -1,53 +1,22 @@
-Feature: The standalone API process composes its own agent service
+Feature: The agent module installs with the modules it needs
   As an operator running a LangWatch API deployment
-  I want the API process to build the agent service its RPC surface serves
-  So that the agents door does not require a second process to hand it one
+  I want a process that installs the agent module without a module it needs to refuse to boot
+  So that an agents door never answers over a peer nobody installed
 
-  # WHY THIS EXISTS
-  #
-  # `API_UNAVAILABLE_PRODUCT_ADAPTERS` named "AgentsWorkflowPort and
-  # AgentsAuditLogPort: agent workflow copies and agent audit history" as the
-  # reason the agent service had to arrive from a host. The ports were always
-  # the Agents package's; what was missing was any implementation of them
-  # outside the legacy application.
-  #
-  # `@langwatch/agent-process` has them now — `PostgresAgentAdapter` builds the
-  # repository, the linked-workflow reads and the audit-history read from ONE
-  # guarded Prisma client, which is the client this process already composes.
-  #
-  # Copying a WORKFLOW agent copies the Studio graph it points at, which is the
-  # workflow module's `copy` — a dataset copier, a DSL rewriter and the version
-  # rules behind them. The agent service asks the workflow module for that copy
-  # through its installed `WorkflowApi` peer, so a copied agent points at a
-  # graph in its own project, never at another project's.
+  # The agent module declares the workflow and audit-log modules it needs
+  # (its static dependencies). A process installing it without either refuses
+  # to boot, naming the module and the peer (record sections 3 and 6). There is
+  # no host that injects an agent service, and no process composes one by hand.
 
-  Rule: A process with a database composes the agent service itself
+  Rule: A process missing a module the agent module needs refuses to boot
 
     @unit
-    Scenario: The API process composes its own agent service
-      Given the deployment configured a database
-      And no host supplied an agent service
-      When the process composes
-      Then it builds the agent service over its own guarded client
-      And the agents RPC surface is served from it
-
-    @unit
-    Scenario: An injected agent service is the one the process serves
-      Given a host supplies the API process with its own agent service
-      When the process composes
-      Then the agents surface is served by the host's service
-      And the process composes none of its own
-      # A second agent service in one process would read the same rows through
-      # two graphs, and only one of them would be the one a host can observe.
-
-    @unit
-    Scenario: A process with no database composes no agent service
-      Given the deployment configured no database
-      And no host supplied an agent service
-      When the process composes
-      Then it composes no agent service, and names the missing half at boot
-      And the agents RPC surface mounts backed by the null object
-      And every agents call refuses by name instead of leaving no route at all
+    Scenario: A process installing agent without the modules it needs refuses to boot
+      Given the agent module declares the workflow and audit-log modules as peers
+      When a process installs it with neither installed
+      Then the boot refuses, naming the agent module and the first peer missing
+      And the agent module's service is never constructed
+      And the process never becomes ready
 
   Rule: Copying a workflow agent copies its graph through the workflow module
 

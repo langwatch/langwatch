@@ -2,7 +2,7 @@
  * Where a project's organization can upgrade its automation ceiling. This adapter
  * provides the hop from project to organization and the deployment's checkout address.
  */
-import type { EntitlementApi, PlanProvider, PricingModel } from "@langwatch/entitlement-contract";
+import type { EntitlementApi, PlanProvider } from "@langwatch/entitlement-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
@@ -11,27 +11,10 @@ import type { AutomationNextStepResolution } from "./automation-runaway.service.
 /** Where the sales conversation happens for an organization the ladder cannot price. */
 const ACCOUNT_TEAM_CONTACT_URL = "https://langwatch.ai/contact";
 
-/** `unpriced` is an organization with no billing record to price an upgrade from. */
-type AutomationOrganizationPricingAnswer =
-  | { kind: "priced"; pricingModel: PricingModel | null; currency: "USD" | "EUR" }
-  | { kind: "unpriced" };
-
-/**
- * The two organization columns a quote depends on, read where they live. A
- * port rather than the repository: reading the whole aggregate for two
- * columns would couple automation's mail to every future change in it.
- */
-export abstract class AutomationOrganizationPricing {
-  abstract pricingFor(input: {
-    organizationId: string;
-  }): Promise<AutomationOrganizationPricingAnswer>;
-}
-
 export class AutomationNextStepService {
   static create(options: {
     projects: Pick<ProjectApi, "getOrganizationId">;
     plans: Pick<PlanProvider, "getActivePlan">;
-    organizations: AutomationOrganizationPricing;
     nextStep: Pick<EntitlementApi, "resolvePlanNextStep">;
     baseHost: string;
     logger?: Logger;
@@ -46,7 +29,6 @@ export class AutomationNextStepService {
     private readonly options: {
       projects: Pick<ProjectApi, "getOrganizationId">;
       plans: Pick<PlanProvider, "getActivePlan">;
-      organizations: AutomationOrganizationPricing;
       nextStep: Pick<EntitlementApi, "resolvePlanNextStep">;
       baseHost: string;
     },
@@ -61,15 +43,9 @@ export class AutomationNextStepService {
   async resolve(projectId: string): Promise<AutomationNextStepResolution> {
     try {
       const organizationId = await this.options.projects.getOrganizationId(projectId);
-      const pricing = await this.options.organizations.pricingFor({ organizationId });
-      if (pricing.kind === "unpriced") return { kind: "unnamed" };
 
       const plan = await this.options.plans.getActivePlan({ organizationId });
-      const resolved = await this.options.nextStep.resolvePlanNextStep({
-        plan,
-        pricingModel: pricing.pricingModel,
-        currency: pricing.currency,
-      });
+      const resolved = await this.options.nextStep.resolvePlanNextStep({ plan, organizationId });
 
       if (resolved.kind === "none") return { kind: "unnamed" };
       if (resolved.kind === "account_team") {

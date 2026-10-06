@@ -42,4 +42,17 @@ describe("HttpPostHogChannel", () => {
       expect(reads.count).toBe(1);
     });
   });
+
+  describe("when the product-analytics targets cannot be read", () => {
+    /** @scenario "a failing analytics call never fails the write" */
+    it("returns normally", () => {
+      const channel = HttpPostHogChannel.create({
+        targets: () => {
+          throw new Error("ops unavailable");
+        },
+      });
+
+      expect(() => channel.track({ ...MILESTONE, uuid: "uuid-1" })).not.toThrow();
+    });
+  });
 });

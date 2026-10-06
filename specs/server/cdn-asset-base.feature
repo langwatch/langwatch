@@ -55,7 +55,7 @@ Feature: Production HTTP server — runtime-configurable CDN asset base
       And dist/client/index.html references /assets/index-deadbeef.js
       When a client requests /
       Then the response body references https://cdn.langwatch.ai/abc123/assets/index-deadbeef.js
-      And the resolver returns "https://cdn.langwatch.ai/abc123/assets/x.js" for the path "assets/x.js"
+      And the preload and stylesheet links under /assets/ are rewritten the same way
 
     @unit
     Scenario: Same-origin rewriting is a no-op for the entry references

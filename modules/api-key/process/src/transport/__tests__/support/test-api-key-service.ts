@@ -25,6 +25,7 @@ export class TestApiKeyService implements ApiKeyApi {
   findVerifiedToken = unsupported<ApiKeyApi["findVerifiedToken"]>();
   getByIdForCaller = unsupported<ApiKeyApi["getByIdForCaller"]>();
   mintRunKey = unsupported<ApiKeyApi["mintRunKey"]>();
+  mintAgentSandboxKey = unsupported<ApiKeyApi["mintAgentSandboxKey"]>();
   getOrgMembers = unsupported<ApiKeyApi["getOrgMembers"]>();
   getOrgProjects = unsupported<ApiKeyApi["getOrgProjects"]>();
   getOrgTeams = unsupported<ApiKeyApi["getOrgTeams"]>();

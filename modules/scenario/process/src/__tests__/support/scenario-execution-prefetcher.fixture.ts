@@ -141,7 +141,7 @@ export interface ScenarioPrefetchFixture {
   /** The project's organization; absent, it is "organization_1". */
   organizationId?: string;
   /** The run-key mint; unconfigured, every key is "run-key". */
-  apiKeys?: Partial<Pick<ApiKeyApi, "mintRunKey">>;
+  apiKeys?: Partial<Pick<ApiKeyApi, "mintRunKey" | "mintAgentSandboxKey">>;
   /** Whether workflow reports per-project engines; absent, it does not. */
   perProjectEngines?: boolean;
 }

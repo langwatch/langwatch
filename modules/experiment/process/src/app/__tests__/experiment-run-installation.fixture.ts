@@ -43,7 +43,6 @@ import type { StoresMemberSource } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
@@ -276,7 +275,6 @@ export function fails(nodeId: string, error: string): StudioServerEvent[] {
 
 export type PeerOverrides = Partial<{
   agent: AgentApi;
-  suite: SuiteApi;
   entitlement: EntitlementApi;
   "model-provider": ModelProviderApi;
   "api-key": ApiKeyApi;
@@ -301,10 +299,9 @@ function peersOf(overrides: PeerOverrides) {
     entitlement: createApiFixture<EntitlementApi>({ requestBound: async () => 1_000 }),
     evaluation: createApiFixture<EvaluationApi>({ reportEvaluation: async () => {} }),
     "api-key": createApiFixture<ApiKeyApi>({
-      mintRunKey: async ({ permissions }) =>
-        permissions.includes("agentCache:manage") ? "sandbox-key" : "run-key",
+      mintRunKey: async () => "run-key",
+      mintAgentSandboxKey: async () => "sandbox-key",
     }),
-    suite: createApiFixture<SuiteApi>({ assertConnectedAgentsRunnable: async () => {} }),
     "stored-object": createApiFixture<StoredObjectApi>({}),
     "model-provider": createApiFixture<ModelProviderApi>({
       listCosts: async () => [],

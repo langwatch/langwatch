@@ -267,31 +267,45 @@ Feature: The fence a customer-supplied webhook leaves through
       And the webhook module's refusal reaches automation's outbox unchanged, so it retries
 
   Rule: A producer requests delivery; the outbox retries, dead-letters and redrives it (ADR-167)
-    Each destination kind owns its sending (ARCHITECTURE §9). A producer calls
-    WebhookApi.requestDelivery with a destination, a message and an idempotency key; webhook
-    writes one outbox row and answers at once. The ladder is the endpoint's own, and the fence
-    runs at send. Open questions: .claude/handoffs/request-delivery.md §11.
+    Each destination kind owns its sending (ARCHITECTURE §9). A producer records a deliver intent
+    in its own commit; its outbox calls WebhookApi.requestDelivery after the commit, and webhook
+    appends the message to the endpoint's stream in its own transaction, keyed by the producer's
+    idempotency key, answering at once. The ladder is the endpoint's own; the fence runs at send.
 
     @integration @unimplemented
-    Scenario: The delivery row is written in the producer's transaction
-      Given a producer step that requests delivery to an active endpoint
-      When the producer's step commits
-      Then one outbox row for the delivery is stored by that same commit
-      And when the producer's step rolls back instead, no row is stored and nothing is sent
+    Scenario: A producer requests delivery from a deliver intent its own commit recorded
+      Given a producer step that records a deliver intent for an active endpoint
+      When the producer's step commits and its outbox runs the intent
+      Then webhook stores one delivery for the endpoint in its own transaction
+      And when the producer's step rolls back instead, no intent is stored and nothing is sent
 
-    @unit @unimplemented
+    @unit
     Scenario: A requested delivery answers at once with a stable delivery id
       Given an active endpoint subscribed to the message's type
       When a producer requests delivery of a message to it
       Then the answer carries a delivery id before any request reaches the receiver
-      And the receiver later gets the envelope whose id is that delivery id
+      And the endpoint's stream queues the envelope whose id is that delivery id
 
-    @unit @unimplemented
+    @unit
     Scenario: A repeated request under one idempotency key is delivered once
       Given an active endpoint subscribed to the message's type
       When a producer requests delivery twice under one idempotency key
       Then both answers carry the same delivery id
-      And the receiver gets one request
+      And the endpoint's stream queues one envelope
+
+    @unit
+    Scenario: A requested delivery an endpoint cannot take now is skipped with a delivery id
+      Given an endpoint that is disabled, not subscribed to the message's type, or whose organization lacks webhook endpoints
+      When a producer requests delivery of a message to it
+      Then the answer carries a delivery id
+      And nothing is queued for the endpoint
+
+    @unit
+    Scenario: A requested delivery to an unknown or archived endpoint is refused
+      Given an endpoint id that names no endpoint, or an archived one
+      When a producer requests delivery of a message to it
+      Then the request is refused with webhook_endpoint_not_found
+      And nothing is queued for the endpoint
 
     @integration @unimplemented
     Scenario: A requested delivery's retryable failure waits the endpoint's ladder

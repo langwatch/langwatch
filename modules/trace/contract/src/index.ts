@@ -1,15 +1,25 @@
 export * from "./cost-attribution.ts";
 export * from "./derive-trace-origin.ts";
 export * from "./derive-trace-status.ts";
-export * from "./derive-trace-timestamp.ts";
 export * from "./trace.ts";
 export * from "./trace-view.contract.ts";
 export * from "./trace-explorer.contract.ts";
 export * from "./trace-canonicalisation.ts";
-export * from "./trace-ingress.commands.ts";
 export * from "./trace-ingress.events.ts";
 export * from "./trace-content-part.ts";
-export * from "./trace-content-part.visitor.ts";
+export type {
+  AsyncContentPartVisitor,
+  BinaryPart,
+  ContentPartVisitor,
+  ContentSource,
+} from "./trace-content-part.types.ts";
+export {
+  convertInlineDataToMediaPart,
+  isInlineDataCarrier,
+  normalizeContentSource,
+} from "./trace-content-part.provider-source.ts";
+export { parseBase64DataUri } from "./trace-content-part.file-decoder.ts";
+export { visitContentPart, visitContentPartAsync } from "./trace-content-part.dispatcher.ts";
 export * from "./trace-attributes.ts";
 export { trimAttributesForAnalytics } from "./trace-analytics-attribute-trim.ts";
 export * from "./trace-time-range-presets.ts";
@@ -31,7 +41,6 @@ export * from "./trace-query-parser.ts";
 export * from "./trace-search-route.ts";
 export * from "./trace-query.contract.ts";
 export * from "./trace.queries.ts";
-export * from "./trace-viewer.service.ts";
 export * from "./trace-content-read.service.ts";
 export {
   TraceApi,
@@ -42,25 +51,22 @@ export {
   type TraceRenderedSpanMessages,
   type TraceSuggestionTarget,
   type TraceUsageCount,
+  type ScenarioRoleMetrics,
+  type ScenarioRoleMetricsInput,
 } from "./trace.api.ts";
 export * from "./trace-record.ts";
 export * from "./trace.errors.ts";
 export * from "./otlp-ingest.rest.ts";
 export * from "./traces.trpc.ts";
 export * from "./traces-instant-eval.trpc.ts";
-export * from "./shared-trace.trpc.ts";
 export * from "./export-progress.trpc.ts";
-export * from "./spans.trpc.ts";
 export * from "./trace-edit-overlay.trpc.ts";
 export * from "./trace-projection.ts";
 export * from "./trace-origin-guards.ts";
 export * from "./trace-processing.commands.ts";
-export * from "./trace-scenario-role-metrics.ts";
-export * from "./trace-topic-assignment.ts";
 export * from "./trace-topic-clustering-read.ts";
 export * from "./trace-processing.events.ts";
 export * from "./trace-log-contribution.ts";
-export * from "./trace-metric-correlation.ts";
 export * from "./trace-message.schemas.ts";
 export { safeUnflatten } from "./trace-attribute-unflatten.ts";
 export { predefinedEventTypes, predefinedEventsSchemas } from "./trace-tracked-event.schemas.ts";
@@ -68,13 +74,10 @@ export * from "./trace-evaluation.contract.ts";
 export * from "./trace-format.schemas.ts";
 export * from "./trace-full-read.contract.ts";
 export * from "./event-metrics.ts";
-export * from "./trace-derived-event.ts";
 export * from "./trace-list.queries.ts";
 export * from "./trace-list-view.ts";
 export * from "./trace-media-part.collector.ts";
-export * from "./trace-media-markers.ts";
 export * from "./trace-media-ref.ts";
-export * from "./trace-media-role.ts";
 export * from "./trace-offload.contract.ts";
 export * from "./trace-read.contract.ts";
 export * from "./trace.responses.ts";
@@ -157,6 +160,8 @@ export {
   TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
   TRACE_SUMMARY_PROJECTION_VERSIONS,
   isStorageAnchoredVersion,
+  traceConfig,
+  type TraceServerConfig,
   type TraceProcessingCommandType,
   type TraceProcessingEventType,
 } from "./trace.constants.ts";
@@ -189,22 +194,18 @@ export {
 } from "./trace.otlp.ts";
 export * from "./trace-edit-overlay-apply.ts";
 export * from "./trace-python-repr.ts";
-export * from "./trace-list-window.ts";
 export * from "./trace-model-spend.ts";
 export * from "./trace-collector-common.ts";
 export * from "./trace-rag-chunks.ts";
 export * from "./trace-rag-extraction.ts";
 export * from "./trace-pcm-to-wav.ts";
 export * from "./trace-metadata-editable-keys.ts";
-export * from "./trace-otel-ids.ts";
 export * from "./trace-viewer-protections.contract.ts";
 export * from "./trace-export.errors.ts";
 export * from "./trace-export.vocabulary.ts";
 export * from "./trace-legacy-read.types.ts";
 export * from "./trace-projection.types.ts";
 export * from "./trace-query-evaluation.types.ts";
-export * from "./trace.config.ts";
-export * from "./trace-captured-span.commands.ts";
 
 export * from "./trace-rest.schemas.ts";
 export * from "./trace-project-milestones.events.ts";

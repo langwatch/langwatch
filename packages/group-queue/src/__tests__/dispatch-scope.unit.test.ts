@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveDispatchAllowListRedisKey } from "../dispatch-scope";
+import { resolveDispatchAllowListRedisKey } from "../scripts.ts";
 
 function hashTag(key: string): string | undefined {
   return /\{([^}]+)\}/.exec(key)?.[1];

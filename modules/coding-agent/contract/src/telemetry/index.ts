@@ -1,8 +1,6 @@
-import { claudeCodeAgent } from "./claude-code.ts";
-import { claudeCoworkAgent } from "./claude-cowork.ts";
 import { codexAgent } from "./codex.ts";
+import { claudeCodeAgent, claudeCoworkAgent, copilotAgent } from "./coding-agent-definition.ts";
 import type { CodingAgentDefinition } from "./coding-agent-definition.ts";
-import { copilotAgent } from "./copilot.ts";
 import { geminiCliAgent } from "./gemini-cli.ts";
 import { opencodeAgent } from "./opencode.ts";
 

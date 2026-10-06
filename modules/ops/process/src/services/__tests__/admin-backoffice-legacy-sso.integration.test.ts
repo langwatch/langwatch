@@ -1,9 +1,10 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 /**
  * The backoffice's organization edit, with the routing flip on. The
  * refusal is raised in the ops service graph, and its copy is read from
  * the presentation registry. Spec: specs/identity/sso-onboarding-tiers.feature
  */
-import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
@@ -14,6 +15,8 @@ import { describe, expect, it } from "vitest";
 
 import { OpsOperations } from "../../app/ops-composition.build.ts";
 import type { OpsEventExplorer, OpsProcessExplorer, OpsReplayRunner } from "../../app/ops.app.ts";
+import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
+import { PrismaAdminBackofficeRepository } from "../../repositories/prisma/prisma.instance-admin.repository.ts";
 import { AuditStub, organizationEdit } from "./support/backoffice-doubles.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
@@ -37,8 +40,13 @@ const refuseEveryQuery = new Proxy(
 
 function backoffice(connectionDecides = true) {
   return OpsOperations.create({
+    repositories: {
+      ...MemoryOpsRepositories.create(),
+      instanceAdmin: PrismaAdminBackofficeRepository.create(refuseEveryQuery as never),
+    },
     database: refuseEveryQuery as never,
     audit: new AuditStub(),
+    sessions: createApiFixture<AuthApi>(),
     auditLog: createApiFixture<AuditLogApi>(),
     authz: createApiFixture<AuthzApi>(),
     users: new TestUserApi(),

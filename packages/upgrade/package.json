@@ -1,0 +1,37 @@
+{
+  "name": "@langwatch/upgrade",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The upgrade runner's own ledger: the runner-owned _langwatch_upgrade_run and _langwatch_upgrade_step tables beside _prisma_migrations and goose_db_version, and their first seeding from those two records. Storage-engine-free: the caller hands in the Postgres and ClickHouse connections.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b tsconfig.test.json",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/ksuid": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@clickhouse/client": "catalog:",
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/pg": "^8.20.3",
+    "pg": "^8.22.0",
+    "prisma": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

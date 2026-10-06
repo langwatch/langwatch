@@ -37,6 +37,7 @@ import { moduleClassesRule } from "./rules/module-classes.rule.mjs";
 import { moduleLayersRule } from "./rules/module-layers.rule.mjs";
 import { namespaceClassRule } from "./rules/namespace-class.rule.mjs";
 import { noAliasReexportRule } from "./rules/no-alias-reexport.rule.mjs";
+import { noAmbientContextRule } from "./rules/no-ambient-context.rule.mjs";
 import { noBootHookOutsideGuardRule } from "./rules/no-boot-hook-outside-guard.rule.mjs";
 import { noFormWatchInChildRule } from "./rules/no-form-watch-in-child.rule.mjs";
 import { noHandRolledPlanGateRule } from "./rules/no-hand-rolled-plan-gate.rule.mjs";
@@ -54,6 +55,7 @@ import { planLiteralsRule } from "./rules/plan-literals.rule.mjs";
 import { prismaCountInListQueryRule } from "./rules/prisma-count-in-list-query.rule.mjs";
 import { queryDataInStateRule } from "./rules/query-data-in-state.rule.mjs";
 import { refusalIsAHandledErrorRule } from "./rules/refusal-is-a-handled-error.rule.mjs";
+import { requestDeliveryFromAnIntentRule } from "./rules/request-delivery-from-an-intent.rule.mjs";
 import { requireFetchTimeoutRule } from "./rules/require-fetch-timeout.rule.mjs";
 import { restRouteRule } from "./rules/rest-route.rule.mjs";
 import { schemaOutsideContractRule } from "./rules/schema-outside-contract.rule.mjs";
@@ -117,6 +119,8 @@ const HOUSE_RULES = [
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
+  noAmbientContextRule,
+  requestDeliveryFromAnIntentRule,
   noInlineDynamicImportRule,
   noLoggerSpyRule,
   noPortVocabularyRule,
@@ -209,6 +213,8 @@ export {
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
+  noAmbientContextRule,
+  requestDeliveryFromAnIntentRule,
   noInlineDynamicImportRule,
   noLoggerSpyRule,
   noPortVocabularyRule,

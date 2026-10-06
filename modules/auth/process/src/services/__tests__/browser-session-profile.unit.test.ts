@@ -50,7 +50,7 @@ function harness() {
     id: "session-sam",
     userId: "sam",
     sessionToken: "token-sam",
-    impersonating: null,
+    impersonation: null,
     createdAt: clock,
     updatedAt: clock,
     lastSeenAt: clock,

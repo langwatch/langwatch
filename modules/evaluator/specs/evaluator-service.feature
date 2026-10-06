@@ -1,5 +1,6 @@
 Feature: Evaluator service boundary
 
+  @unit @composition
   Scenario: A process composes one evaluator capability
     Given the application composes the evaluator adapter at startup
     When a REST or tRPC handler requests an evaluator

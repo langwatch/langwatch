@@ -122,7 +122,8 @@ export class ConfiguredActivationService {
     if (!this.deps.connectPermitted) {
       logger.warn(
         context,
-        "LANGWATCH_LICENSE_KEY holds an activation code, but LANGWATCH_CONNECT_DISABLED is set, so it cannot be redeemed; set LANGWATCH_LICENSE_KEY to the signed license key instead",
+        "LANGWATCH_LICENSE_KEY holds an activation code, but LANGWATCH_CONNECT_DISABLED is set, " +
+          "so it cannot be redeemed; set LANGWATCH_LICENSE_KEY to the signed license key instead",
       );
       return { outcome: "connect_disabled" };
     }

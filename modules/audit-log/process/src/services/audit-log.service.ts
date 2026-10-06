@@ -7,8 +7,11 @@ import {
   type RecordedAuditLogEntry,
   type RecordedSinceInput,
 } from "@langwatch/audit-log-contract";
+import { parse } from "@langwatch/ksuid";
 
 import type { AuditLogRepository } from "../repositories/audit-log.repository.ts";
+
+const AUDIT_KEY_RESOURCE = "audit";
 
 const TRUNCATION_LENGTHS = [2048, 1024, 512, 256, 128] as const;
 
@@ -62,14 +65,25 @@ export class AuditLogService {
   }
 
   async record(command: RecordAuditLogCommand): Promise<RecordedAuditLogEntry> {
-    const parsed = recordAuditLogCommandSchema.parse(command);
-    return this.repository.create({
+    const { idempotencyKey, ...parsed } = recordAuditLogCommandSchema.parse(command);
+    const entry = {
       ...parsed,
       args:
         parsed.args === undefined
           ? undefined
           : AuditLogService.boundJson(AuditLogService.redact(parsed.args), this.maxArgsBytes),
       metadata: parsed.metadata === undefined ? undefined : AuditLogService.redact(parsed.metadata),
+    };
+    if (idempotencyKey === undefined) return this.repository.create(entry);
+    // The key was minted when the producer committed, so the row keeps the action's moment.
+    const key = parse(idempotencyKey);
+    if (key.resource !== AUDIT_KEY_RESOURCE) {
+      throw new Error(`an audit idempotency key is an "${AUDIT_KEY_RESOURCE}" KSUID`);
+    }
+    return this.repository.createOnce({
+      entry,
+      id: idempotencyKey,
+      occurredAt: key.date.getTime(),
     });
   }
 

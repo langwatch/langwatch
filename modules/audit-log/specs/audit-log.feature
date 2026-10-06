@@ -88,3 +88,43 @@ Feature: Audit logging
     When somebody updates a workflow through the browser door
     Then the audit trail records the mutation
     And their home strip lists the workflow
+
+  Rule: A producer's audit goes through its own outbox after commit (Alex, Q72, 2026-10-06)
+    The producer records an audit intent, keyed by an audit id it mints once, in its own commit.
+    Its outbox calls AuditLogApi.record after commit and retries until the row is written.
+
+    @unit
+    Scenario: A keyed audit entry recorded twice writes one row
+      Given an audit intent keyed by an audit id
+      When the producer's outbox delivers it twice
+      Then one audit row is stored under that id
+      And both deliveries answer the same row
+
+    @unit
+    Scenario: A keyed audit entry keeps the moment the producer committed it
+      Given an audit intent keyed by an audit id minted when the producer committed
+      When the outbox delivers it later
+      Then the row's time is the moment in the key, not the delivery's
+
+    @unit
+    Scenario: An audit key that is not an audit id is refused
+      When a caller records an entry keyed by an id of another kind
+      Then nothing is written and the call fails
+
+    @integration
+    Scenario: Concurrent deliveries of one keyed audit entry store one row
+      Given an audit intent keyed by an audit id
+      When two deliveries of it race against Postgres
+      Then one audit row is stored under that id
+
+    @unit
+    Scenario: A failed audit delivery is retried from the producer's outbox
+      Given a producer recorded an audit intent in its own commit
+      When the first delivery to the audit log fails
+      Then the outbox delivers it again and the audit row is written once
+
+    @unit @unimplemented
+    Scenario: A rolled-back change records no audit
+      Given a producer whose domain change and audit intent share one commit
+      When that commit rolls back
+      Then no audit intent is left in its outbox and no audit row is written

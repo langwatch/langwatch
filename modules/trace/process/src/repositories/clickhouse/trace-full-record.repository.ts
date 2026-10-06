@@ -32,7 +32,7 @@ import type {
   TraceClickHouseClient,
   TraceClickHouse,
 } from "./clickhouse.trace-member-client.repository.ts";
-import { chBoolean, chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
+import { chBoolean, chNumber, chString, chStringMap } from "./stored-span-row.mapper.ts";
 
 const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 const MAX_SPANS = 10_000;

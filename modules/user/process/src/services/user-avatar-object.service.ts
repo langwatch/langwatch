@@ -16,6 +16,21 @@ export type UserAvatarStorage = Pick<UserAvatarObjectService, "store">;
 
 type AvatarObjects = Pick<StoredObjectApi, "storeFromBytes" | "readById" | "getReadUrlForPurpose">;
 
+/** The object store's bytes as the web stream the response carries, one chunk per pull. */
+function webStreamOf(bytes: AsyncIterable<Uint8Array>): ReadableStream<Uint8Array> {
+  const iterator = bytes[Symbol.asyncIterator]();
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const next = await iterator.next();
+      if (next.done) controller.close();
+      else controller.enqueue(next.value);
+    },
+    async cancel(reason) {
+      await iterator.return?.(reason);
+    },
+  });
+}
+
 /**
  * Main's avatar objects: bytes kept as a user-owned object in the uploader's personal project,
  * through stored-object. A read of a row that is not there answers nothing, and the avatar door
@@ -68,7 +83,7 @@ export class UserAvatarObjectService {
     };
     if ("status" in read) return { status: "missing", metadata };
 
-    return { status: "available", metadata, stream: ReadableStream.from(read.stream) };
+    return { status: "available", metadata, stream: webStreamOf(read.stream) };
   }
 
   /** A signed read URL, only for an avatar object; `UserAvatarNotFoundError` otherwise. */

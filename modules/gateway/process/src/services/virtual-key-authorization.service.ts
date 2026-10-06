@@ -2,18 +2,17 @@ import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authoriz
 import type { VirtualKeyWithScopes, GuardrailAttachment } from "@langwatch/gateway-contract";
 import {
   GatewayGuardrailProjectMismatchError,
-  GatewayScopeOrgMismatchError,
   GuardrailAttachForbiddenError,
-  VirtualKeyNotFoundError,
 } from "@langwatch/gateway-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { VirtualKeyAuthorizationRepository } from "../repositories/virtual-key-authorization.repository.ts";
+import { VirtualKeyMembershipService } from "./virtual-key-membership.service.ts";
 import {
-  isMemberNotFound,
-  seatSharesOrganizationKeys,
-} from "../rules/gateway-organization-peer.rules.ts";
+  VirtualKeyOrgOwnershipService,
+  type GuardrailProjectKey,
+} from "./virtual-key-org-ownership.service.ts";
 import type { VirtualKeyService } from "./virtual-key.service.ts";
 
 /**
@@ -55,14 +54,6 @@ export type ActorContext = {
   permissions: GatewayScopePermissions;
 };
 
-/** A key's scopes as given (or read from the stored key when absent) and its trace destination. */
-type GuardrailProjectKey = {
-  organizationId: string;
-  vkId: string | null;
-  inputScopes: { scopeType: string; scopeId: string }[] | undefined;
-  traceProjectId?: string | null;
-};
-
 const AUTHZ_TIER = {
   ORGANIZATION: "organization",
   TEAM: "team",
@@ -97,26 +88,6 @@ export type MembershipSet = {
   projectIds: Set<string>;
 };
 
-/**
- * Every id must come back from an org-scoped lookup: an id naming another tenant's row simply does
- * not match the where clause, so absence from the result is the refusal and the query never has to
- * compare tenants itself.
- */
-async function assertAllResolve(
-  scopeType: string,
-  ids: string[],
-  lookup: (ids: string[]) => Promise<string[]>,
-): Promise<void> {
-  if (ids.length === 0) {
-    return;
-  }
-
-  const found = new Set(await lookup(ids));
-  if (ids.some((id) => !found.has(id))) {
-    throw new GatewayScopeOrgMismatchError(scopeType);
-  }
-}
-
 /** A virtual-key loader. Structurally satisfied by {@link VirtualKeyService}. */
 export type VirtualKeyReader = Pick<VirtualKeyService, "findById">;
 
@@ -134,38 +105,16 @@ export class VirtualKeyAuthorizationService {
     return new VirtualKeyAuthorizationService(input.directory, input.organizations, input.projects);
   }
 
+  private readonly membership: VirtualKeyMembershipService;
+  private readonly ownership: VirtualKeyOrgOwnershipService;
+
   private constructor(
     private readonly directory: VirtualKeyAuthorizationRepository,
-    private readonly organizations: Pick<OrganizationApi, "getMember" | "findMemberTeamIds">,
+    organizations: Pick<OrganizationApi, "getMember" | "findMemberTeamIds">,
     private readonly projects: Pick<ProjectApi, "findIdentity" | "listIdsByOrganization">,
-  ) {}
-
-  /** The role an enabled member holds here; none for a stranger or a disabled seat. */
-  private async enabledRole(input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<{ role: string } | null> {
-    try {
-      const member = await this.organizations.getMember(input);
-
-      return member.disabledAt === null ? { role: member.role } : null;
-    } catch (error) {
-      if (isMemberNotFound(error)) return null;
-
-      throw error;
-    }
-  }
-
-  /** Of the named projects, those inside this organization. */
-  private async projectIdsInOrganization(input: {
-    organizationId: string;
-    projectIds: string[];
-  }): Promise<string[]> {
-    const inOrganization = new Set(
-      await this.projects.listIdsByOrganization({ organizationId: input.organizationId }),
-    );
-
-    return input.projectIds.filter((id) => inOrganization.has(id));
+  ) {
+    this.membership = VirtualKeyMembershipService.create({ directory, organizations, projects });
+    this.ownership = VirtualKeyOrgOwnershipService.create({ directory, projects });
   }
 
   private async actorHasPermissionAtScope(
@@ -355,41 +304,13 @@ export class VirtualKeyAuthorizationService {
     );
   }
 
-  async loadMembershipSet(input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<MembershipSet> {
-    const [organizationRole, memberTeamIds] = await Promise.all([
-      this.enabledRole(input),
-      this.organizations.findMemberTeamIds(input),
-    ]);
-    const teamIds = new Set(memberTeamIds);
-    const projectIds =
-      teamIds.size > 0
-        ? await this.directory.findProjectIdsForTeams({ teamIds: [...teamIds] })
-        : [];
-
-    return {
-      isOrgMember: organizationRole !== null && seatSharesOrganizationKeys(organizationRole.role),
-      isOrgAdmin: organizationRole?.role === "ADMIN",
-      teamIds,
-      projectIds: new Set(projectIds),
-    };
+  loadMembershipSet(input: { organizationId: string; userId: string }): Promise<MembershipSet> {
+    return this.membership.loadMembershipSet(input);
   }
 
-  /**
-   * What a credential acting in one project reads keys as: organization-wide keys, its team's and
-   * its own, never a sibling team's. An unknown project reaches organization-wide keys only.
-   */
-  async membershipOfProject(projectId: string): Promise<MembershipSet> {
-    const project = await this.projects.findIdentity(projectId);
-
-    return {
-      isOrgMember: true,
-      isOrgAdmin: false,
-      teamIds: new Set(project ? [project.teamId] : []),
-      projectIds: new Set([projectId]),
-    };
+  /** Organization-wide keys, the project's team's and its own; see the membership service. */
+  membershipOfProject(projectId: string): Promise<MembershipSet> {
+    return this.membership.membershipOfProject(projectId);
   }
 
   /**
@@ -418,95 +339,25 @@ export class VirtualKeyAuthorizationService {
     return keys.filter((_key, index) => held[index]);
   }
 
-  /**
-   * Every requested scope must belong to the key's own organization. Proving the caller controls
-   * each scope is not the same as proving it lives in this organization: without this, a caller
-   * with rights in one org could submit another's id plus a scope from theirs.
-   */
-  async assertScopesBelongToOrg({
-    organizationId,
-    scopes,
-  }: {
+  /** Every requested scope must belong to the key's own organization. */
+  assertScopesBelongToOrg(input: {
     organizationId: string;
     scopes: { scopeType: string; scopeId: string }[];
   }): Promise<void> {
-    const idsOfType = (scopeType: string) =>
-      scopes.filter((s) => s.scopeType === scopeType).map((s) => s.scopeId);
-
-    if (scopes.some((s) => s.scopeType === "ORGANIZATION" && s.scopeId !== organizationId)) {
-      throw new GatewayScopeOrgMismatchError("organization");
-    }
-
-    await assertAllResolve("team", idsOfType("TEAM"), (teamIds) =>
-      this.directory.findTeamIdsInOrganization({ organizationId, teamIds }),
-    );
-
-    await assertAllResolve("project", idsOfType("PROJECT"), (projectIds) =>
-      this.projectIdsInOrganization({ organizationId, projectIds }),
-    );
+    return this.ownership.assertScopesBelongToOrg(input);
   }
 
-  /**
-   * The one project a key's guardrails are judged against: its single project scope, else its
-   * trace destination. With neither there is no guardrail surface, so it throws
-   * GatewayGuardrailProjectMismatchError.
-   */
-  async getGuardrailProjectId({
-    organizationId,
-    vkId,
-    inputScopes,
-    traceProjectId,
-  }: GuardrailProjectKey): Promise<string> {
-    let scopes = inputScopes;
-    let storedTraceProjectId: string | null = null;
-    if (!scopes && vkId) {
-      const vk = await this.directory.findVirtualKeyScopes({
-        virtualKeyId: vkId,
-        organizationId,
-      });
-      scopes = vk?.scopes;
-      storedTraceProjectId = vk?.traceProjectId ?? null;
-    }
-
-    const projectScopes = (scopes ?? []).filter((s) => s.scopeType === "PROJECT");
-    if (projectScopes.length === 1) {
-      return projectScopes[0]!.scopeId;
-    }
-
-    // Guardrails are project-scoped and enforce where traces land, so an
-    // org- or team-owned key's guardrail surface is its explicit trace
-    // destination.
-    const destination = traceProjectId ?? storedTraceProjectId;
-    if (!destination) {
-      throw new GatewayGuardrailProjectMismatchError();
-    }
-
-    return destination;
+  /** The one project a key's guardrails are judged against. */
+  getGuardrailProjectId(key: GuardrailProjectKey): Promise<string> {
+    return this.ownership.getGuardrailProjectId(key);
   }
 
-  /**
-   * The explicit trace destination must be a project of the key's own
-   * organization: it decides where traces (and therefore budget debits)
-   * land, and a stray id would route another tenant's costs.
-   */
-  async assertTraceProjectBelongsToOrg({
-    organizationId,
-    traceProjectId,
-  }: {
+  /** The explicit trace destination must be a project of the key's own organization. */
+  assertTraceProjectBelongsToOrg(input: {
     organizationId: string;
     traceProjectId: string | null | undefined;
   }): Promise<void> {
-    if (!traceProjectId) {
-      return;
-    }
-
-    const found = await this.projectIdsInOrganization({
-      organizationId,
-      projectIds: [traceProjectId],
-    });
-    if (found.length === 0) {
-      throw new GatewayScopeOrgMismatchError("project");
-    }
+    return this.ownership.assertTraceProjectBelongsToOrg(input);
   }
 
   /**
@@ -551,62 +402,25 @@ export class VirtualKeyAuthorizationService {
   }
 
   isVisibleToMembership(membership: MembershipSet, scopes: Scope[]): boolean {
-    // Org admins manage the whole org, so list/get visibility mirrors the
-    // permission cascade — list/get only ever pass VKs already scoped to the
-    // caller's org, so a blanket true here can't leak another org's keys.
-    // Without it, the auto-provisioned per-project Langy VK is invisible to
-    // the very admin who owns it (real admins hold no per-team TeamUser rows).
-    if (membership.isOrgAdmin) {
-      return true;
-    }
-
-    return scopes.some((scope) => {
-      if (scope.scopeType === "ORGANIZATION") {
-        return membership.isOrgMember;
-      }
-
-      if (scope.scopeType === "TEAM") {
-        return membership.teamIds.has(scope.scopeId);
-      }
-
-      return membership.projectIds.has(scope.scopeId);
-    });
+    return this.membership.isVisibleToMembership(membership, scopes);
   }
 
-  /**
-   * Precondition every by-id mutation shares: the key must exist. Authorization is a separate,
-   * permission-based decision on the returned key's scopes, so this deliberately does not filter
-   * by visibility — a scope role-binding holder can operate on a key membership never surfaces.
-   */
-  async getExistingVk(
+  /** The key must exist; authorization on its scopes is a separate decision. */
+  getExistingVk(
     reader: VirtualKeyReader,
     id: string,
     organizationId: string,
   ): Promise<VirtualKeyWithScopes> {
-    const vk = await reader.findById(id, organizationId);
-    if (!vk) {
-      throw new VirtualKeyNotFoundError();
-    }
-
-    return vk;
+    return this.membership.getExistingVk(reader, id, organizationId);
   }
 
-  /**
-   * Precondition every by-id read shares: the key must exist and fall inside the caller's
-   * membership set. Both answer not-found, since a distinguishable forbidden would be an existence
-   * oracle. The membership set is derived per door, but the check itself is shared.
-   */
-  async getVisibleVk(
+  /** The key must exist and fall inside the caller's membership set; both answer not-found. */
+  getVisibleVk(
     reader: VirtualKeyReader,
     membership: MembershipSet,
-    { id, organizationId }: { id: string; organizationId: string },
+    key: { id: string; organizationId: string },
   ): Promise<VirtualKeyWithScopes> {
-    const vk = await this.getExistingVk(reader, id, organizationId);
-    if (!this.isVisibleToMembership(membership, vk.scopes)) {
-      throw new VirtualKeyNotFoundError();
-    }
-
-    return vk;
+    return this.membership.getVisibleVk(reader, membership, key);
   }
 }
 

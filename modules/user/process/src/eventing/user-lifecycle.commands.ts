@@ -14,6 +14,8 @@ import {
   RECORD_USER_REGISTERED_COMMAND_TYPE,
   type RecordUserLifecycleCommandData,
   recordUserLifecycleCommandDataSchema,
+  type RecordUserRegisteredCommandData,
+  recordUserRegisteredCommandDataSchema,
   type UserDeactivatedEvent,
   type UserReactivatedEvent,
   type UserRegisteredEvent,
@@ -103,16 +105,16 @@ export class RecordUserReactivatedCommand implements CommandHandler<
 
 /** Records that somebody registered their own account; once per user, however redelivered. */
 export class RecordUserRegisteredCommand implements CommandHandler<
-  Command<RecordUserLifecycleCommandData>,
+  Command<RecordUserRegisteredCommandData>,
   UserRegisteredEvent
 > {
   static readonly schema = defineCommandSchema(
     RECORD_USER_REGISTERED_COMMAND_TYPE,
-    recordUserLifecycleCommandDataSchema,
+    recordUserRegisteredCommandDataSchema,
     "Record that a user registered an account",
   );
 
-  async handle(command: Command<RecordUserLifecycleCommandData>): Promise<UserRegisteredEvent[]> {
+  async handle(command: Command<RecordUserRegisteredCommandData>): Promise<UserRegisteredEvent[]> {
     const data = command.data;
     return [
       EventUtils.createEvent<UserRegisteredEvent>({
@@ -129,7 +131,7 @@ export class RecordUserRegisteredCommand implements CommandHandler<
     ];
   }
 
-  static getAggregateId(payload: RecordUserLifecycleCommandData): string {
+  static getAggregateId(payload: RecordUserRegisteredCommandData): string {
     return payload.userId;
   }
 

@@ -5,8 +5,8 @@
  */
 
 import { trpcQueryKey } from "@langwatch/api/web";
-import { hashKey, QueryClient } from "@tanstack/react-query";
-import { describe, expect, it } from "vitest";
+import { hashKey, QueryClient, QueryObserver, type QueryKey } from "@tanstack/react-query";
+import { describe, expect, it, vi } from "vitest";
 
 import type { UiCachePlan } from "../cache-tiers.ts";
 import {
@@ -49,6 +49,11 @@ const sessionRead = trpcQueryKey("auth.session", { input: {}, type: "query" });
 const orgGraph = trpcQueryKey("organization.getAll", { input: {}, type: "query" });
 const member = trpcQueryKey("organization.getMemberById", { input: { id: "u" }, type: "query" });
 
+const writeBothReads = (qc: QueryClient) => {
+  qc.setQueryData(orgGraph, ["acme"]);
+  qc.setQueryData(member, { id: "u" });
+};
+
 function memoryStore(): UiQueryStore<unknown> & { entries: Map<string, unknown> } {
   const entries = new Map<string, unknown>();
   return {
@@ -60,7 +65,18 @@ function memoryStore(): UiQueryStore<unknown> & { entries: Map<string, unknown> 
   };
 }
 
-/** One document's life: restore, optionally write, let the throttled save land, go away. */
+/** A screen asking for each read over a network that has not answered yet; returns the stop. */
+function askFor({ queryClient, reads }: { queryClient: QueryClient; reads: readonly QueryKey[] }) {
+  const stops = reads.map((queryKey) =>
+    new QueryObserver(queryClient, {
+      queryKey,
+      queryFn: () => new Promise(() => void 0),
+    }).subscribe(() => void 0),
+  );
+  return () => stops.forEach((stop) => stop());
+}
+
+/** One document's life: ask for the reads, optionally write, let the save land, go away. */
 async function session({
   store,
   userId,
@@ -70,6 +86,7 @@ async function session({
   write,
   versions = new Map<string, string>(),
   servedSchemaHashFor,
+  ask = [orgGraph, member],
 }: {
   store: UiQueryStore<unknown>;
   userId: string;
@@ -79,9 +96,10 @@ async function session({
   write?: (queryClient: QueryClient) => void;
   versions?: Map<string, string>;
   servedSchemaHashFor?: (path: string) => string | undefined;
+  ask?: readonly QueryKey[];
 }): Promise<QueryClient> {
   const queryClient = new QueryClient();
-  const { unsubscribe, restored } = persistUiQueries({
+  const { unsubscribe, swept } = persistUiQueries({
     queryClient,
     plan: readPlan,
     userId,
@@ -90,9 +108,11 @@ async function session({
     versions,
     ...(servedSchemaHashFor ? { servedSchemaHashFor } : {}),
   });
-  await restored;
+  await swept;
+  const stopAsking = askFor({ queryClient, reads: ask });
   write?.(queryClient);
   await new Promise((resolve) => setTimeout(resolve, 50));
+  stopAsking();
   unsubscribe();
   return queryClient;
 }
@@ -271,6 +291,49 @@ describe("persistUiQueries", () => {
   });
 });
 
+describe("persistUiQueries lazy restore", () => {
+  describe("given the store holds rows for two reads", () => {
+    /** @scenario "A read is restored from disk only when it is first asked for" */
+    it("opens and paints only the read a screen asks for, then fetches it behind the copy", async () => {
+      const store = memoryStore();
+      await session({ store, userId: "alice", ask: [], write: writeBothReads });
+      const opened: string[] = [];
+      const watched: UiQueryStore<unknown> = {
+        ...store,
+        get: async (key) => {
+          opened.push(key);
+          return store.entries.get(key);
+        },
+      };
+      const queryClient = new QueryClient();
+      const { unsubscribe, swept } = persistUiQueries({
+        queryClient,
+        plan,
+        userId: "alice",
+        store: sealedUiQueryStore({ store: watched, cacheKey: KEY_1, previousCacheKey: void 0 }),
+        sessionQueryKey: sessionRead,
+      });
+      await swept;
+      let answer: (data: unknown) => void = () => void 0;
+      const network = new Promise<unknown>((resolve) => (answer = resolve));
+      const stop = new QueryObserver(queryClient, {
+        queryKey: orgGraph,
+        queryFn: () => network,
+      }).subscribe(() => void 0);
+
+      await vi.waitFor(() => expect(queryClient.getQueryData(orgGraph)).toEqual(["acme"]));
+      expect(opened).toEqual([storedQueryKey({ userId: "alice", queryHash: hashKey(orgGraph) })]);
+      expect(queryClient.getQueryData(member)).toBeUndefined();
+      expect(queryClient.getQueryState(orgGraph)?.fetchStatus).toBe("fetching");
+
+      answer(["acme", "fresh"]);
+      await vi.waitFor(() => expect(queryClient.getQueryData(orgGraph)).toEqual(["acme", "fresh"]));
+      stop();
+      unsubscribe();
+    });
+  });
+});
+
 describe("persistUiQueries versions", () => {
   describe("given an entry that is corrupt", () => {
     /** @scenario "A corrupt entry is dropped and the rest restore" */
@@ -445,6 +508,22 @@ describe("sealedUiQueryStore budget", () => {
     });
   });
 
+  describe("given rows this document never opened", () => {
+    it("still counts them, and evicts the least recently read of them", async () => {
+      const disk = memoryStore();
+      const clock = { at: 1 };
+      const earlier = mirror(disk, clock);
+      await earlier.put("lw-query:alice:a", row("a"));
+      clock.at = 2;
+      await earlier.put("lw-query:alice:b", row("b"));
+
+      clock.at = 3;
+      await mirror(disk, clock).put("lw-query:alice:c", row("c"));
+
+      expect([...disk.entries.keys()].toSorted()).toEqual(["lw-query:alice:b", "lw-query:alice:c"]);
+    });
+  });
+
   describe("given a row read since it was written", () => {
     /** @scenario "Reading a row protects it from eviction" */
     it("keeps it and evicts the one nobody read", async () => {
@@ -525,6 +604,7 @@ describe("persistUiQueries refusal and teardown", () => {
       await session({
         store,
         userId: "alice",
+        ask: [],
         write: (qc) =>
           void qc
             .fetchQuery({
@@ -546,7 +626,7 @@ describe("persistUiQueries refusal and teardown", () => {
       await session({ store, userId: "alice", write: (qc) => qc.setQueryData(orgGraph, ["acme"]) });
       const queryClient = new QueryClient();
 
-      const { unsubscribe, restored } = persistUiQueries({
+      const { unsubscribe, swept } = persistUiQueries({
         queryClient,
         plan,
         userId: "alice",
@@ -554,7 +634,9 @@ describe("persistUiQueries refusal and teardown", () => {
         sessionQueryKey: sessionRead,
       });
       unsubscribe();
-      await restored;
+      await swept;
+      askFor({ queryClient, reads: [orgGraph] })();
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(queryClient.getQueryData(orgGraph)).toBeUndefined();
     });

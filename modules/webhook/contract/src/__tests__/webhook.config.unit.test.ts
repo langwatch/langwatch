@@ -1,7 +1,7 @@
 import { ConfigParseError, parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
-import { webhookConfig } from "../webhook.config.ts";
+import { webhookConfig } from "../webhook.api.ts";
 
 const read = (environment: Record<string, string | undefined>) =>
   parseProcessConfig({ owners: [{ name: "webhook", config: webhookConfig }], environment }).webhook;

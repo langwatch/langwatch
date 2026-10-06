@@ -9,6 +9,7 @@ import type {
   ProcessConfig,
 } from "./config.ts";
 import { buildProcessStores, type ProcessStores } from "./create-members.ts";
+import { objectStoragePrivateAccountsOf } from "./object-storage-private-accounts.ts";
 import type { PipelineParticipation } from "./pipeline-selection.ts";
 
 /** The documented single-replica root, when a filesystem deployment names none. */
@@ -19,6 +20,7 @@ type StorageSecrets = Readonly<{
   secretAccessKey: string | undefined;
   sessionToken: string | undefined;
   accountKey: string | undefined;
+  dataplaneS3: ReadonlyMap<string, string>;
 }>;
 
 function withStorageSecrets<Out>(
@@ -29,7 +31,9 @@ function withStorageSecrets<Out>(
     secrets.into(storesOwner.secrets.s3SecretAccessKey, (secretAccessKey) =>
       secrets.into(storesOwner.secrets.s3SessionToken, (sessionToken) =>
         secrets.into(storesOwner.secrets.azureAccountKey, (accountKey) =>
-          build({ accessKeyId, secretAccessKey, sessionToken, accountKey }),
+          secrets.into(storesOwner.secrets.dataplaneS3, (dataplaneS3) =>
+            build({ accessKeyId, secretAccessKey, sessionToken, accountKey, dataplaneS3 }),
+          ),
         ),
       ),
     ),
@@ -69,10 +73,15 @@ function objectStorageConfig(options: {
   const backend = settings.backend ?? (bucket ? "s3" : "file");
   const azure = azureConfigOf({ settings: settings.azure, values, production });
   const file = { backend: "file", root: settings.localRoot ?? DEFAULT_LOCAL_STORAGE_ROOT } as const;
+  // An organisation with its own S3 account is placed there whatever the shared backend is.
+  const privateAccounts = objectStoragePrivateAccountsOf({
+    family: values.dataplaneS3,
+    ...(settings.s3.region ? { region: settings.s3.region } : {}),
+  });
   switch (backend) {
     case "s3":
       // The legacy S3 selector with no bucket keeps its documented local-filesystem fallback.
-      if (!bucket) return { ...file, legacyAzure: azure };
+      if (!bucket) return { ...file, privateAccounts, legacyAzure: azure };
       return {
         backend,
         s3: {
@@ -81,12 +90,13 @@ function objectStorageConfig(options: {
           ...(settings.s3.region ? { region: settings.s3.region } : {}),
           ...s3Credentials(values),
         },
+        privateAccounts,
         legacyAzure: azure,
       };
     case "azure":
-      return { backend, azure };
+      return { backend, azure, privateAccounts };
     case "file":
-      return { ...file, legacyAzure: azure };
+      return { ...file, privateAccounts, legacyAzure: azure };
   }
 }
 

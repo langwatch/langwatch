@@ -67,10 +67,6 @@ class PrismaAuditLogTestSink implements AuditLogApi {
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
 class NoopIntrospection implements OpsEventingIntrospection {
-  killSwitches() {
-    return [];
-  }
-
   projections() {
     return [];
   }

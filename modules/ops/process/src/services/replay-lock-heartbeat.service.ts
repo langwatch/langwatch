@@ -12,7 +12,7 @@ const REPLAY_LOCK_TTL_SECONDS = 3600;
  * progress callbacks keeps the lock alive even when a single batch phase emits nothing for longer
  * than the lock's lifetime, whose expiry used to silently stop status updates mid-run.
  */
-export const LOCK_REFRESH_INTERVAL_MS = 60_000;
+const LOCK_REFRESH_INTERVAL_MS = 60_000;
 
 /** How long a progress callback may go without re-reading the cancel flag. */
 const CANCEL_CHECK_INTERVAL_MS = 3000;

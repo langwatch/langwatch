@@ -29,18 +29,16 @@ Feature: Personal usage REST API
     And the rollups include this organization's ingestion-source spend
     And the rollups exclude ingestion-source spend from other organizations
 
-  # Gap: behaviour question. The route answers 422 (framework validation_error), the scenario says 400; me-usage.rest.integration.test.ts asserts 422.
-  @unimplemented
+  @integration
   Scenario: A half-specified window is rejected
     When I GET /api/me/usage with only a start time (or only an end time)
-    Then the response status is 400
+    Then the response status is 422
     And the error explains both bounds must be provided together
 
-  # Gap: behaviour question. The route answers 422 (framework validation_error), the scenario says 400; me-usage.rest.integration.test.ts asserts 422.
-  @unimplemented
+  @integration
   Scenario: An inverted window is rejected
     When I GET /api/me/usage with a start time at or after the end time
-    Then the response status is 400
+    Then the response status is 422
     And the error explains the start must be before the end
 
   @integration

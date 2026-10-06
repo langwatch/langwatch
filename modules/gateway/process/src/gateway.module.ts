@@ -11,6 +11,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 
 import { GatewayModule } from "./app/gateway.app.ts";
 import { gatewayGovernanceEventsEventing } from "./eventing/gateway-governance-events.pipeline.ts";
+import { gatewayPulledUsageLedgerEventing } from "./eventing/gateway-pulled-usage-ledger.pipeline.ts";
 import { gatewayRealtimeSessionEventing } from "./eventing/gateway-realtime-session.pipeline.ts";
 import { gatewaySpendEventing } from "./eventing/gateway-spend.pipeline.ts";
 import { gatewayRepositories } from "./repositories/gateway-repositories.registry.ts";
@@ -57,6 +58,7 @@ export const gatewayProcessModule = defineProcessModule("gateway")
   .withEventing(gatewayGovernanceEventsEventing)
   .withEventing(gatewaySpendEventing)
   .withEventing(gatewayRealtimeSessionEventing)
+  .withEventing(gatewayPulledUsageLedgerEventing)
   .withTasks(({ repositories }) => [
     TraceDestinationReportTask.create({ repository: () => repositories.traceDestinationReport }),
     VirtualKeyConfigBackfillTask.create({

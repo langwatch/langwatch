@@ -8,7 +8,7 @@ import {
 } from "@langwatch/ops-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
-import type { AdminBackofficeRepository } from "../repositories/admin-backoffice.repository.ts";
+import type { AdminBackofficeRepository } from "../repositories/instance-admin.repository.ts";
 import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes.rules.ts";
 import type { AdminAuditSink } from "./impersonation.service.ts";
 
@@ -16,7 +16,7 @@ const MUTATING_METHODS = new Set(["create", "update", "updateMany", "delete", "d
 /** User writes that would skip the user module's facts and last-operator rule. */
 const USER_METHODS_REFUSED = new Set(["updateMany", "delete", "deleteMany"]);
 
-export interface AdminBackofficeServiceOptions {
+interface AdminBackofficeServiceOptions {
   repository: AdminBackofficeRepository;
   users: UserApi;
   audit: AdminAuditSink;

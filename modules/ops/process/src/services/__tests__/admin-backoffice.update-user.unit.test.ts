@@ -1,7 +1,7 @@
 import type { AdminOperationInput, AdminOperationResult } from "@langwatch/ops-contract";
 import { describe, expect, it } from "vitest";
 
-import { AdminBackofficeRepository } from "../../repositories/admin-backoffice.repository.ts";
+import { AdminBackofficeRepository } from "../../repositories/instance-admin.repository.ts";
 import { AdminBackofficeService } from "../admin-backoffice.service.ts";
 import { AdminAuditSink } from "../impersonation.service.ts";
 import { backofficeOperator } from "./support/backoffice-doubles.ts";

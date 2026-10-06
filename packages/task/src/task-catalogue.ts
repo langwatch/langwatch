@@ -1,5 +1,4 @@
 import { TaskNotFoundError } from "./task.errors.ts";
-import type { Task } from "./task.ts";
 
 export class TaskCatalogue {
   private readonly tasksByName: ReadonlyMap<string, Task>;
@@ -30,4 +29,12 @@ export class TaskCatalogue {
   names(): readonly string[] {
     return [...this.tasksByName.keys()].toSorted();
   }
+}
+
+export abstract class Task {
+  abstract readonly name: string;
+  abstract readonly description: string;
+
+  /** Chunked tasks should check `signal` between chunks to avoid mid-write shutdown. */
+  abstract run(input: { args: readonly string[]; signal: AbortSignal }): Promise<void>;
 }

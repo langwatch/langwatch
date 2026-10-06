@@ -21,8 +21,8 @@ import {
   type EvaluationAnalyticsWrites,
 } from "../eventing/evaluation-processing-stores.pipeline.ts";
 import { EvaluationRunFoldProjection } from "../eventing/evaluation-run.projection.ts";
-import { MemoryEvaluationAnalyticsFoldCacheRepository } from "../repositories/memory/memory.evaluation-analytics-fold-cache.repository.ts";
 import { MemoryEvaluationRunRepository } from "../repositories/memory/memory.evaluation-run.repository.ts";
+import { MemoryEvaluationAnalyticsFoldCacheRepository } from "../repositories/memory/memory.evaluation.repositories.ts";
 import { EvaluationRunProjectionService } from "../services/evaluation-run-projection.service.ts";
 import {
   experimentReportedEvent,

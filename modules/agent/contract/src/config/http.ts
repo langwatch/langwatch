@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { agentInputBindingSchema } from "../fields.ts";
-import { baseAgentConfigSchema } from "./base.ts";
+import { baseAgentConfigSchema } from "./code.ts";
 
 export const httpHeaderSchema = z.object({
   key: z.string(),

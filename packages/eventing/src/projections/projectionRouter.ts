@@ -5,7 +5,6 @@ import { getLangWatchTracer } from "langwatch";
 
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { Event, Projection } from "../domain/types.ts";
-import { isComponentKilled, type KillSwitch } from "../kill-switch/index.ts";
 import {
   incrementEsFoldPostStoreFailure,
   incrementEsFoldProjectionTotal,
@@ -167,7 +166,6 @@ export class ProjectionRouter<
   private readonly executionTarget?: ExecutionTarget;
   private readonly replayMarkerChecker?: ReplayMarkerChecker;
   private readonly retentionPolicyResolver?: RetentionPolicyResolver;
-  private readonly killSwitch?: KillSwitch;
   private readonly tracer = getLangWatchTracer("langwatch.event-sourcing.projection-router");
   private readonly logger = createLogger("langwatch:event-sourcing:projection-router");
   private readonly foldExecutor = new FoldProjectionExecutor();
@@ -196,7 +194,6 @@ export class ProjectionRouter<
     executionTarget?: ExecutionTarget;
     replayMarkerChecker?: ReplayMarkerChecker;
     retentionPolicyResolver?: RetentionPolicyResolver;
-    killSwitch?: KillSwitch;
     /** One aggregate's leaned events from the log; a state projection rebuilds from it. */
     aggregateHistory?: AggregateHistory<EventType>;
   }) {
@@ -207,7 +204,6 @@ export class ProjectionRouter<
     this.executionTarget = options.executionTarget;
     this.replayMarkerChecker = options.replayMarkerChecker;
     this.retentionPolicyResolver = options.retentionPolicyResolver;
-    this.killSwitch = options.killSwitch;
   }
 
   registerFoldProjection<State>(projection: FoldProjectionDefinition<State, EventType>): void {
@@ -907,15 +903,6 @@ export class ProjectionRouter<
     context: EventStoreReadContext<EventType>;
   }): Promise<void> {
     await this.getFoldProjection(projectionName).open(async (fold) => {
-      if (
-        await this.laneKilled({
-          projectionName,
-          event: missed,
-          customKey: fold.options?.killSwitch?.customKey,
-        })
-      ) {
-        return;
-      }
       const kept = await this.withoutReplaySkipped({ projectionName, events: [missed] });
       if (kept.length === 0) return;
       const storeContext = await this.buildStoreContext({
@@ -956,8 +943,6 @@ export class ProjectionRouter<
     context: EventStoreReadContext<EventType>;
   }): Promise<void> {
     if (!this.aggregateHistory) throw laneNotRegistered({ kind: "state", lane: projectionName });
-    const customKey = projection.options?.killSwitch?.customKey;
-    if (await this.laneKilled({ projectionName, event: missed, customKey })) return;
     const kept = await this.withoutReplaySkipped({ projectionName, events: [missed] });
     if (kept.length === 0) return;
     const history = await this.aggregateHistory({
@@ -978,26 +963,6 @@ export class ProjectionRouter<
       deliveryAttempt: context.deliveryAttempt,
     });
     await projection.store.store(latest, storeContext);
-  }
-
-  private laneKilled({
-    projectionName,
-    event,
-    customKey,
-  }: {
-    projectionName: string;
-    event: EventType;
-    customKey: string | undefined;
-  }): Promise<boolean> {
-    return isComponentKilled({
-      killSwitch: this.killSwitch,
-      aggregateType: this.aggregateType,
-      componentType: "projection",
-      componentName: projectionName,
-      tenantId: event.tenantId,
-      customKey,
-      logger: this.logger,
-    });
   }
 
   private async redeliverToMap({ lane, event }: { lane: string; event: EventType }): Promise<void> {
@@ -1031,7 +996,6 @@ export class ProjectionRouter<
       subscriber,
       event,
       queued: this.queueManager.hasSubscriberQueues(),
-      isKilledFor: this.subscriberKillCheck(lane, subscriber),
     });
   }
 
@@ -1227,26 +1191,6 @@ export class ProjectionRouter<
       : this.processMapsInline(events);
   }
 
-  private mapKilledFor({
-    name,
-    mapProj,
-    tenantId,
-  }: {
-    name: string;
-    mapProj: SealedMapProjection<EventType>["definition"];
-    tenantId: string;
-  }): Promise<boolean> {
-    return isComponentKilled({
-      killSwitch: this.killSwitch,
-      aggregateType: this.aggregateType,
-      componentType: "mapProjection",
-      componentName: name,
-      tenantId,
-      customKey: mapProj.options?.killSwitch?.customKey,
-      logger: this.logger,
-    });
-  }
-
   /** The events one map projection queues, and how many its enqueue filter declined. */
   private async mapEventsToQueue({
     name,
@@ -1262,7 +1206,6 @@ export class ProjectionRouter<
     const accepted: EventType[] = [];
     let declined = 0;
     for (const event of events) {
-      if (await this.mapKilledFor({ name, mapProj, tenantId: event.tenantId })) continue;
       if (mapProj.eventTypes.length > 0 && !mapProj.eventTypes.includes(event.type)) continue;
       if (!this.mapEnqueueAccepts({ openMap, name, event })) {
         declined++;
@@ -1363,7 +1306,6 @@ export class ProjectionRouter<
     openMap: OpenMapProjection<EventType>;
     event: EventType;
   }): Promise<FailedHandoff<EventType>[]> {
-    if (await this.mapKilledFor({ name, mapProj, tenantId: event.tenantId })) return [];
     if (mapProj.eventTypes.length > 0 && !mapProj.eventTypes.includes(event.type)) return [];
 
     const accepted = this.mapEnqueueAccepts({ openMap, name, event });
@@ -1439,11 +1381,9 @@ export class ProjectionRouter<
         subscriber.eventTypes.length === 0
           ? events
           : events.filter((event) => subscriber.eventTypes.includes(event.type));
-      const isKilledFor = this.subscriberKillCheck(name, subscriber);
-
       for (const event of matching) {
         try {
-          await this.deliverToSubscriber({ name, subscriber, event, queued, isKilledFor });
+          await this.deliverToSubscriber({ name, subscriber, event, queued });
         } catch (error) {
           this.reportSubscriberFailure({ name, event, error });
           failures.push({ kind: "subscriber", lane: name, events: [event], error: toError(error) });
@@ -1453,55 +1393,18 @@ export class ProjectionRouter<
     return failures;
   }
 
-  /** Subscriber fan-out is never replayed, so the kill switch resolves once per tenant. */
-  private subscriberKillCheck(
-    name: string,
-    subscriber: EventSubscriberDefinition<EventType>,
-  ): (tenantId: string) => Promise<boolean> {
-    const killedByTenant = new Map<string, boolean>();
-    return async (tenantId) => {
-      const cached = killedByTenant.get(tenantId);
-      if (cached !== undefined) return cached;
-      const killed = await isComponentKilled({
-        killSwitch: this.killSwitch,
-        aggregateType: this.aggregateType,
-        componentType: "subscriber",
-        componentName: name,
-        tenantId,
-        customKey: subscriber.options?.killSwitch?.customKey,
-        logger: this.logger,
-      });
-      killedByTenant.set(tenantId, killed);
-      return killed;
-    };
-  }
-
   private async deliverToSubscriber({
     name,
     subscriber,
     event,
     queued,
-    isKilledFor,
   }: {
     name: string;
     subscriber: EventSubscriberDefinition<EventType>;
     event: EventType;
     queued: boolean;
-    isKilledFor: (tenantId: string) => Promise<boolean>;
   }): Promise<void> {
     const enqueue = subscriber.options?.enqueue;
-    if (await isKilledFor(event.tenantId)) {
-      // Counted, not skipped silently. A kill is permanent loss for this
-      // subscriber, and an operator has to be able to tell it apart from
-      // a quiet subscriber — precisely when they are looking.
-      incrementEsSubscriberEnqueueTotal({
-        pipelineName: this.pipelineName,
-        subscriberName: name,
-        outcome: "killed",
-      });
-      return;
-    }
-
     // Enqueue-time filter (ADR-069 invariant 4): a throw is NOT caught
     // as `false` — it falls to the caller, which records the hand-off.
     if (enqueue?.filter && !enqueue.filter(event)) {
@@ -1692,20 +1595,6 @@ export class ProjectionRouter<
         };
         EventUtils.validateTenantId(readContext, "processStateProjectionEvents");
 
-        if (
-          await isComponentKilled({
-            killSwitch: this.killSwitch,
-            aggregateType: this.aggregateType,
-            componentType: "projection",
-            componentName: projectionName,
-            tenantId: first.tenantId,
-            customKey: projection.options?.killSwitch?.customKey,
-            logger: this.logger,
-          })
-        ) {
-          return;
-        }
-
         const toApply = await this.withoutReplaySkipped({ projectionName, events });
         if (toApply.length === 0) return;
 
@@ -1807,20 +1696,6 @@ export class ProjectionRouter<
       },
       async () => {
         EventUtils.validateTenantId(context, "processFoldProjectionEvent");
-
-        if (
-          await isComponentKilled({
-            killSwitch: this.killSwitch,
-            aggregateType: this.aggregateType,
-            componentType: "projection",
-            componentName: projectionName,
-            tenantId: event.tenantId,
-            customKey: fold.options?.killSwitch?.customKey,
-            logger: this.logger,
-          })
-        ) {
-          return;
-        }
 
         // Defer or skip if projection-replay is active for this aggregate
         if (this.replayMarkerChecker) {
@@ -1971,21 +1846,6 @@ export class ProjectionRouter<
       },
       async () => {
         EventUtils.validateTenantId(context, "processFoldProjectionBatch");
-
-        // All events in a batch share the tenant.
-        if (
-          await isComponentKilled({
-            killSwitch: this.killSwitch,
-            aggregateType: this.aggregateType,
-            componentType: "projection",
-            componentName: projectionName,
-            tenantId: events[0]!.tenantId,
-            customKey: fold.options?.killSwitch?.customKey,
-            logger: this.logger,
-          })
-        ) {
-          return;
-        }
 
         // Defer or skip events for which projection-replay is active.
         let toApply = await this.withoutReplaySkipped({ projectionName, events });

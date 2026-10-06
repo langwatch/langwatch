@@ -33,7 +33,7 @@ function memoryStore(): UiQueryStore<unknown> {
   };
 }
 
-/** A document that restored the organization graph fetched a minute ago in an earlier one. */
+/** A document that asked for, and restored, the organization graph an earlier one fetched. */
 async function restoredDocument(): Promise<QueryClient> {
   const disk = memoryStore();
   const mirror = (queryClient: QueryClient) =>
@@ -46,13 +46,15 @@ async function restoredDocument(): Promise<QueryClient> {
     });
   const earlier = new QueryClient();
   const first = mirror(earlier);
-  await first.restored;
+  await first.swept;
   earlier.setQueryData(orgGraph, ["acme"], { updatedAt: FETCHED_AT });
   await new Promise((resolve) => setTimeout(resolve, 50));
   first.unsubscribe();
 
   const reloaded = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  await mirror(reloaded).restored;
+  await mirror(reloaded).swept;
+  reloaded.getQueryCache().build(reloaded, { queryKey: orgGraph });
+  await waitFor(() => expect(reloaded.getQueryData(orgGraph)).toEqual(["acme"]));
   return reloaded;
 }
 

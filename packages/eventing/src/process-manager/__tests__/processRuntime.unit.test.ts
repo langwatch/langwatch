@@ -1,10 +1,11 @@
 import { createTestLogger } from "@langwatch/test-harness";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { createTenantId } from "../../domain/tenantId.ts";
 import { buildProcessManager } from "../../pipeline/processBuilder.ts";
 import { testEventSchema } from "../../services/__tests__/testHelpers.ts";
+import { ProcessOutboxWorker } from "../outbox/processOutboxWorker.ts";
 import { ProcessRuntime, SCHEDULED_SINGLETON_PROJECT_ID } from "../processRuntime.ts";
 import { InMemoryProcessStore } from "../stores/inMemoryProcessStore.ts";
 import type { ProcessStore } from "../stores/processStore.types.ts";
@@ -76,7 +77,105 @@ function keyedEvent({ id, traceId }: { id: string; traceId: string }): ProcessTe
   };
 }
 
+/** Records which process manager's outbox worker each notify() nudged. */
+function spyOnOutboxNudges(): string[] {
+  const nudged: string[] = [];
+  vi.spyOn(ProcessOutboxWorker.prototype, "notify").mockImplementation(function (
+    this: ProcessOutboxWorker,
+  ) {
+    nudged.push(String(Reflect.get(this, "name")));
+  });
+  return nudged;
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
+
 describe("ProcessRuntime", () => {
+  describe("given a process manager mounted with consumers enabled", () => {
+    /** @scenario "A commit that inserted no intent does not nudge the outbox" */
+    it("nudges its outbox only for a commit that inserted an intent", async () => {
+      const nudged = spyOnOutboxNudges();
+      const store = InMemoryProcessStore.createForTesting();
+      const runtime = new ProcessRuntime({ store, consumersEnabled: true });
+      const definition = buildProcessManager<ProcessTestEvent>({
+        name: "tallyOnly",
+        applier: (pm) =>
+          pm
+            .state(z.object({ count: z.number() }), { count: 0 })
+            .intent("noop", z.object({}), async () => {})
+            .on(testProcessEventSchema, (state, data, ctx) => ({
+              state: { count: state.count + 1 },
+              intents:
+                data.traceId === "send" ? [ctx.intent("noop", `noop:${state.count}`, {})] : [],
+            })),
+      });
+      const [subscriber] = runtime.registerPipeline<ProcessTestEvent>({
+        pipelineName: "automations",
+        processManagers: new Map([["tallyOnly", definition]]),
+      }).subscribers;
+
+      await subscriber!.handle(keyedEvent({ id: "quiet-1", traceId: "quiet" }), {
+        tenantId,
+        aggregateId: "trigger-1",
+      });
+      expect(nudged).toEqual([]);
+
+      await subscriber!.handle(keyedEvent({ id: "send-1", traceId: "send" }), {
+        tenantId,
+        aggregateId: "trigger-1",
+      });
+      expect(nudged).toEqual(["tallyOnly"]);
+      await runtime.stop();
+    });
+  });
+
+  describe("given two scheduled process managers share one runtime", () => {
+    /** @scenario "A wake nudges only the outbox of the process it woke" */
+    it("nudges only the outbox of the process whose wake inserted an intent", async () => {
+      vi.useFakeTimers();
+      const nudged = spyOnOutboxNudges();
+      const store = InMemoryProcessStore.createForTesting();
+      const runtime = new ProcessRuntime({ store, consumersEnabled: true });
+      const sweeping = buildProcessManager<ProcessTestEvent>({
+        name: "sweeping",
+        applier: (pm) =>
+          pm
+            .state(z.object({ count: z.number() }), { count: 0 })
+            .schedule({ everyMs: 1 })
+            .onWake((state, ctx) => ({
+              state,
+              intents: [ctx.intent("sweep", `sweep:${ctx.at}`, {})],
+            }))
+            .intent("sweep", z.object({}), async () => {}),
+      });
+      const resting = buildProcessManager<ProcessTestEvent>({
+        name: "resting",
+        applier: (pm) =>
+          pm
+            .state(z.object({ count: z.number() }), { count: 0 })
+            .schedule({ everyMs: 1 })
+            .onWake((state) => ({ state }))
+            .intent("noop", z.object({}), async () => {}),
+      });
+
+      runtime.registerPipeline<ProcessTestEvent>({
+        pipelineName: "automations",
+        processManagers: new Map([
+          ["sweeping", sweeping],
+          ["resting", resting],
+        ]),
+      });
+      // The wake worker's first scan runs before the schedules arm; the next one finds both.
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      expect(nudged).toEqual(["sweeping"]);
+      await runtime.stop();
+    });
+  });
+
   describe("given a process manager derives an operation key from its event", () => {
     it("persists the process under that key instead of the aggregate ID", async () => {
       const store = InMemoryProcessStore.createForTesting();

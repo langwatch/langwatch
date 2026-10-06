@@ -2,7 +2,7 @@
 import { UiRoute } from "@langwatch/browser-host/capabilities";
 import { describe, expect, it } from "vitest";
 
-import { openDrawerAddress } from "../open-drawer-address.ts";
+import { openDrawerAddress } from "../prompt-host-mount.tsx";
 
 class RecordingRoute extends UiRoute {
   readonly writes: Readonly<Record<string, string | undefined>>[] = [];

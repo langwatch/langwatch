@@ -15,14 +15,20 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
     Scenario: Minting a key answers its token once
       When "ada" mints a service key "ci" on project "alpha"
       Then the answer carries a token starting with "sk-lw-"
-      And the answer carries the key's id, name, masked hint, grants, created and expiry
+      And the answer carries the key's id, name, grants, created and expiry
 
     @integration
     Scenario: No read after the mint carries the token
       Given "ada" minted a key "ci" and kept its token
       When the key is read through the tRPC list, the REST list, the REST get and the organization graph
       Then no response body contains the token or its secret half
-      And each response shows only the masked hint "sk-lw-<first five of the lookup id>..."
+
+    # Gap: no masked hint exists on the key row; main carried none either.
+    @integration @unimplemented
+    Scenario: A key is shown by a masked hint of its lookup id
+      Given "ada" minted a key "ci" and kept its token
+      When the key is read through the tRPC list, the REST list, the REST get and the organization graph
+      Then each response shows only the masked hint "sk-lw-<first five of the lookup id>..."
 
     @integration
     Scenario: No project read carries a project key or the LangWatchQL key
@@ -379,3 +385,5 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
     Scenario: Last used is written at most once a minute per key per process
       Given a key used 100 times within one minute
       Then its last-used time is written once
+      And a use after the minute writes it again
+      And a write that fails lets the next use try again

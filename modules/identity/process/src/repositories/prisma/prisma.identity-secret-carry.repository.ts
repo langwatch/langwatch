@@ -73,6 +73,26 @@ export class PrismaIdentitySecretCarryRepository implements IdentitySecretCarryR
     }));
   }
 
+  async findDriftedUserIdsAfter({
+    cursor,
+    limit,
+  }: {
+    cursor: string | null;
+    limit: number;
+  }): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<{ userId: string }[]>`
+      -- @tenancy: the heal pass enumerates its cohort across users; each is a tenant.
+      SELECT DISTINCT a."userId"
+      FROM "Account" a
+      LEFT JOIN "AccountCredential" c ON c."id" = a."id"
+      WHERE (c."id" IS NULL OR a."updatedAt" > c."updatedAt")
+        AND (${cursor}::text IS NULL OR a."userId" > ${cursor}::text)
+      ORDER BY a."userId"
+      LIMIT ${limit}
+    `;
+    return rows.map((row) => row.userId);
+  }
+
   /**
    * Idempotent by construction: keyed on the pinned account id, a row that already exists is left
    * exactly as it is. Running the carry again inserts nothing, which is what makes it safe on every

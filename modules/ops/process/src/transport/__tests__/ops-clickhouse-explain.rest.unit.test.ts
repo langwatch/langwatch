@@ -79,6 +79,19 @@ describe("POST /api/ops/clickhouse/explain", () => {
     });
   });
 
+  describe("when the caller presents the secret with no Bearer scheme", () => {
+    /** @scenario "A wrong operator secret is refused with main's 401" */
+    it("answers main's 401, as main's scheme-required parse did", async () => {
+      const bare = await explain({ body: "{}", authorization: SECRET });
+      const basic = await explain({ body: "{}", authorization: `Basic ${SECRET}` });
+
+      for (const response of [bare, basic]) {
+        expect(response.status).toBe(401);
+        await expect(response.json()).resolves.toEqual(UNAUTHORIZED);
+      }
+    });
+  });
+
   describe("when the deployment set no operator secret, or a blank one", () => {
     /** @scenario "A deployment without an operator secret refuses every call with main's 401" */
     it("answers main's 401 even to a caller presenting nothing or a blank bearer", async () => {
@@ -103,6 +116,15 @@ describe("POST /api/ops/clickhouse/explain", () => {
       await expect(malformed.json()).resolves.toEqual({ message: "request body must be JSON" });
       expect(invalid.status).toBe(422);
       await expect(invalid.json()).resolves.toEqual({ message: expect.stringMatching(/^query: /) });
+    });
+
+    /** @scenario "A caller with the operator secret has the body judged" */
+    it("reads the scheme in any letter case and trims, as main's parse did", async () => {
+      for (const authorization of [`bearer ${SECRET}`, `  BEARER   ${SECRET}  `]) {
+        const invalid = await explain({ body: "{}", authorization });
+
+        expect(invalid.status, authorization).toBe(422);
+      }
     });
   });
 });

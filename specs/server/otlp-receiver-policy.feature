@@ -71,3 +71,34 @@ Feature: Core OTLP protection applies Enterprise policy without owning it
     Given a request contains resource counters, scope versions, span identifiers and metric values
     When receiver attribution is applied
     Then those unrelated wire fields are retained
+
+  # Q82 (Alex, 2026-10-06): governance records a billing fact; trace folds it and reads its own row at ingest.
+  @unit
+  Scenario: Governance records the billing fact when a coding-assistant config changes
+    Given an organization's coding-assistant config is created, changed, disabled or removed
+    When governance has written the change
+    Then it records one billing fact per assistant kind for that organization
+    And a kind is billed only while an enabled config of that kind is off a bundled plan
+    And a tile that is not a coding assistant records no fact
+
+  @unit
+  Scenario: A backfill records the billing fact for configs written before it existed
+    Given organizations whose coding-assistant configs predate the billing fact
+    When the backfill runs
+    Then every organization holding an enabled coding-assistant config records its billing facts
+
+  # Unimplemented: trace folds the fact and builds the policy at ingest, but no receiver test drives a real key through it yet (handoffs/otlp-trace-fold.md).
+  @unimplemented @integration
+  Scenario: An ingestion-source key reaches every receiver with Governance's policy
+    Given a copilot_vscode ingestion-source key
+    When it posts traces, logs or metrics to the OTLP receivers
+    Then the receiver answers 200
+    And it stamps source, origin and organization, and the non-billable marker on traces and logs only
+    And non-Copilot scopes are dropped from traces and metrics but not from logs
+
+  @unit
+  Scenario: Trace folds the billing fact and an absent row is non-billable
+    Given governance recorded a billing fact for an organization's source
+    When trace folds it into its own projection
+    Then ingest reads billed from trace's row, keeping the latest fact per source
+    And a source with no row is stamped non-billable, as main's failure default

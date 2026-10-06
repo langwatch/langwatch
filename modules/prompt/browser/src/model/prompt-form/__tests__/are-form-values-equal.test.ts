@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { areFormValuesEqual } from "../are-form-values-equal.ts";
+import { areFormValuesEqual } from "../node-data-comparison.ts";
 
 describe("areFormValuesEqual", () => {
   describe("when either value is falsy", () => {

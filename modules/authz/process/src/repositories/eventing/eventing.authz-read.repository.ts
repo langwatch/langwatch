@@ -279,14 +279,14 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     return new Map(usages.map((usage) => [usage.grantId, usage.viewCount]));
   }
 
-  /** Lineage is not a grant: the legacy query, unchanged. */
+  /** Lineage is not a grant. An archived project resolves to nothing (Alex, 2026-10-06, Q153). */
   findProjectLineage = async ({
     projectId,
   }: {
     projectId: string;
   }): Promise<{ teamId: string; organizationId: string } | null> => {
     const project = (await this.database.project.findUnique({
-      where: { id: projectId },
+      where: { id: projectId, archivedAt: null },
       select: { team: { select: { id: true, organizationId: true } } },
     })) as { team: { id: string; organizationId: string } } | null;
     if (!project?.team) return null;

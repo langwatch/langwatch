@@ -29,7 +29,6 @@ export {
 } from "../../../behavior/prompt-tabs-store.ts";
 export { createTabId, createWindowId } from "../../../model/tab-id-generators.ts";
 export { Sidebar } from "./prompt-studio-sidebar.tsx";
-export { SidebarEmptyState } from "./prompt-studio-sidebar-empty-state.tsx";
 export { ChatSendButton, type ChatSendButtonProps } from "./chat-send-button.tsx";
 export { ChatSyncCheckbox, type ChatSyncCheckboxProps } from "./chat-sync-checkbox.tsx";
 export { ChatTextArea, type ChatTextAreaProps } from "./chat-text-area.tsx";

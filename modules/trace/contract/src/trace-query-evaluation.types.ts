@@ -1,8 +1,8 @@
 import type { TagToken } from "liqe";
 
-import type { DerivedTraceEvent } from "./trace-derived-event.ts";
 import type { ResolvedInstantEvalRun } from "./trace-instant-eval-chips.ts";
 import type { TraceSummaryData } from "./trace-projection.ts";
+import type { DerivedTraceEvent } from "./trace.responses.ts";
 
 export interface TraceQueryEvaluationRun {
   evaluatorId: string;

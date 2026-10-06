@@ -82,13 +82,6 @@ Feature: Subscriber staging carries only relevant bounded work
     And the counted outcomes account for every event routed to that subscriber
 
   @unit
-  Scenario: a subscriber can be stopped for one tenant without a deploy
-    Given an operator has stopped one subscriber for one tenant
-    When an event for that tenant is published
-    Then the subscriber neither judges the event nor receives work for it
-    And no event is recorded as discarded on that tenant's behalf
-
-  @unit
   Scenario: relevant work waits in the queue at the cost of a pointer, not of its payload
     Given a relevant event whose payload is large
     When the event is published

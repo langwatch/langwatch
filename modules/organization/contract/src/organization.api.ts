@@ -54,6 +54,7 @@ import type {
   OrganizationUser,
   OrganizationUserRole,
   ProjectRow,
+  PricingModel,
   Team,
   TeamUser,
   User,
@@ -284,6 +285,13 @@ export interface OrganizationApi {
     organizationId: string;
     maxSessionDurationDays: number;
   }): Promise<void>;
+  /**
+   * The organization's pricing model and currency, for workers deciding on its behalf. A system
+   * read: no caller. An unknown organization has no model and the schema's default currency.
+   */
+  getPricing(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<{ pricingModel: PricingModel | null; currency: "USD" | "EUR" }>;
   /** Whether the organization switched Instant Evals on itself; instant-eval's gate reads it. */
   isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean>;
   /** The organization's own Instant Evals consent; a second call keeps the first record. */

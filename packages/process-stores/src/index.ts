@@ -25,6 +25,7 @@ export {
   type UploadFacts,
 } from "./members.ts";
 export {
+  hostedMembers,
   MemberNotConfiguredError,
   MemberSuppliedUndefinedError,
   type MemberSource,
@@ -67,8 +68,6 @@ export {
   AzureBackendMisconfiguredError,
   AzureTokenExchangeError,
 } from "./object-storage-azure-credentials.ts";
-
-export { hostedMembers } from "./hosted-members.ts";
 
 export { storesOwner, type StoresConfig } from "./config-owner.ts";
 export {

@@ -20,6 +20,8 @@ const MIGRATION_RUNNER =
 const SCENARIO_CHILD_PROGRAM = "apps/scenario-child/src/main.ts";
 const SCENARIO_CHILD_SUBPATH = "./scenario-child";
 const SCHEMA_BINDING = new Set(["@hono/zod-validator", "hono-openapi/zod"]);
+/** Seams that let a test stand in for a peer; production code never takes them. */
+const TEST_ONLY_SEAMS = new Set(["@langwatch/process/testing"]);
 
 const RETIRED_PACKAGE_ENTRYPOINTS = new Map([
   ["zod/v3", "zod"],
@@ -300,6 +302,9 @@ function specifierFindings({ file, specifier, cwd, node, typeOnly = false }) {
   if (file.module && SCHEMA_BINDING.has(specifier)) {
     findings.push({ messageId: "schemaBoundary", data: { specifier } });
   }
+  if (TEST_ONLY_SEAMS.has(specifier) && !file.isTest) {
+    findings.push({ messageId: "testSeamOutsideTest", data: { specifier } });
+  }
   const runtime = runtimeFinding(file, specifier);
   if (runtime) findings.push({ messageId: runtime, data: { specifier } });
 
@@ -395,6 +400,11 @@ export const boundaryRule = defineRule({
       what: "`{{specifier}}` binds the module to Hono.",
       why: "A contract is framework-free, so Hono in it couples every reader to one transport.",
       fix: "Export a plain Zod schema from the contract and let the transport adapt it.",
+    },
+    testSeamOutsideTest: {
+      what: "`{{specifier}}` is a test seam, and this file is not a test.",
+      why: "A stand-in peer in production code boots a process on a fake, so a missing peer would never refuse.",
+      fix: "Install the peer's module in the process, or move this boot into a `*.test.ts` or `__tests__/` file. Read the `process-composition` skill.",
     },
     sealedExports: {
       what: "`{{subpath}}` is not in `{{package}}`'s `exports`.",

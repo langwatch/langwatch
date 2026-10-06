@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { Hono } from "hono";
 
 import type { Entitlements } from "../access/access.ts";
+import { SurfaceUnconfiguredError } from "../errors.ts";
 /**
  * Where every declared REST family mounts. Thin on purpose: it states which
  * credential answers which family and hands one application to the hosting.
@@ -36,16 +37,15 @@ export type RestIdentities = Readonly<
 >;
 
 /**
- * Which bearer guards one internal family, by the family's own namespace: a
- * cron bearer must not reach the agent manager. Each bearer's target home is
- * its declaring module's transport declaration; that migration consumes this seam.
+ * Which bearer guards one internal family, by the family's own namespace. Absent, a family
+ * naming `internal_secret` without binding its own door refuses every call.
  */
 export type RestFamilyBearers = (namespace: string) => RestIdentity;
 
 export class RestHost implements FeatureRestHost<MountableRestApp> {
   static create(options: {
     identities: RestIdentities;
-    bearers: RestFamilyBearers;
+    bearers?: RestFamilyBearers | undefined;
     /** Every route-declared trail lands on this ONE sink. */
     audit: RestAuditSink;
     /**
@@ -142,11 +142,21 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
   ): Record<RestDoorCredential, RestIdentity> {
     return {
       ...this.options.identities,
-      internal_secret: this.options.bearers(declaration.namespace),
+      internal_secret:
+        this.options.bearers?.(declaration.namespace) ??
+        unboundInternalSecret(declaration.namespace),
       session_key: SessionKeyIdentity.unbound(declaration.namespace),
       cli_token: CliTokenIdentity.unbound(declaration.namespace),
     };
   }
+}
+
+function unboundInternalSecret(namespace: string): RestIdentity {
+  const refuse = (): never => {
+    throw new SurfaceUnconfiguredError(`${namespace} internal secret`);
+  };
+
+  return { authenticate: refuse, identify: refuse };
 }
 
 /**

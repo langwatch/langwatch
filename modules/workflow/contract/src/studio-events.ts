@@ -1,8 +1,11 @@
 import { z } from "zod";
 
-import { studioOptimizerIdSchema, studioOptimizerParamsSchema } from "./studio-optimization.ts";
+import {
+  studioOptimizerIdSchema,
+  studioOptimizerParamsSchema,
+  studioWorkflowSchema,
+} from "./studio-workflow.ts";
 import type { BaseComponent, StudioWorkflow } from "./studio-workflow.ts";
-import { studioWorkflowSchema } from "./studio-workflow.ts";
 
 export const studioClientEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("is_alive"), payload: z.record(z.string(), z.never()) }),
@@ -112,3 +115,16 @@ export type StudioServerEvent =
   | { type: "debug"; payload: { message: string } }
   | { type: "error"; payload: { message: string } }
   | { type: "done" };
+
+/** The workflow's own lifecycle facts, apart from its runs, which peers react to (§9). */
+export const WORKFLOW_CREATED_EVENT_TYPE = "lw.workflow.created" as const;
+
+/** A workflow was created (not copied), how many the project holds counting it, and when. */
+export const workflowCreatedEventDataSchema = z.object({
+  workflowId: z.string(),
+  projectId: z.string(),
+  userId: z.string(),
+  workflowCount: z.number().int().nonnegative(),
+  occurredAt: z.number().int().nonnegative(),
+});
+export type WorkflowCreatedEventData = z.infer<typeof workflowCreatedEventDataSchema>;

@@ -4,7 +4,7 @@ import type { Readable } from "node:stream";
 import type { Logger } from "@langwatch/observability";
 
 import { BLOB_BACKSTOP_TTL_SECONDS, MAX_BLOB_BYTES } from "./blobConstants.ts";
-import { blobNamespaceId } from "./blobKeys.ts";
+import { blobNamespaceId, blobObjectPath, legacyBlobObjectPath } from "./blobKeys.ts";
 import type { JobBlobStore } from "./jobEnvelope.ts";
 import { gqBlobDecodeCapExceededTotal } from "./metrics.ts";
 import {
@@ -161,14 +161,19 @@ export class TieredBlobStore {
   private async mintUri({
     projectId,
     hash,
+    legacy = false,
   }: {
     projectId: TenantId;
     hash: string;
+    /** The pre-ADR-172 `<projectId>/<hash>` address, read only as a fallback. */
+    legacy?: boolean;
   }): Promise<string> {
     const destination = await this.resolveDestinationCached(projectId);
     return mintUriForDestination({
       destination,
-      objectPath: `${projectId}/${hash}`,
+      objectPath: legacy
+        ? legacyBlobObjectPath({ projectId, hash })
+        : blobObjectPath({ projectId, hash }),
     });
   }
 
@@ -196,8 +201,8 @@ export class TieredBlobStore {
     const hash = contentHash(hashSource ?? data);
     if (data.length > this.s3ThresholdBytes) {
       const uri = await this.mintUri({ projectId, hash });
-      // Idempotent: identical content mints the same URI, so a racing or retried
-      // PUT overwrites the same object instead of duplicating it.
+      // Unconditional: identical content mints the same URI, so a racing or retried
+      // PUT overwrites one object and restarts its lifecycle age (ADR-172).
       await this.objectStoreFor(projectId).put(uri, data, mediaType);
       return { tier: "s3", projectId, hash };
     }
@@ -281,41 +286,39 @@ export class TieredBlobStore {
     }
     // Re-mint OUTSIDE the missing-classification: a destination-resolve / mint
     // failure is transient (retry), never "missing" (ADR-029).
-    let uri: string;
-    try {
-      uri = await this.mintUri({ projectId: ref.projectId, hash: ref.hash });
-    } catch (err) {
-      throw new TransientBlobStoreError({
-        projectId: ref.projectId,
-        hash: ref.hash,
-        cause: err,
-      });
-    }
-    try {
-      return await streamToBuffer(
-        await this.objectStoreFor(ref.projectId).get(uri),
-        MAX_BLOB_BYTES,
-      );
-    } catch (err) {
-      return this.handleObjectFetchError(err, ref);
-    }
+    const readAt = async (legacy: boolean): Promise<Buffer | null> => {
+      let uri: string;
+      try {
+        uri = await this.mintUri({ projectId: ref.projectId, hash: ref.hash, legacy });
+      } catch (err) {
+        throw new TransientBlobStoreError({
+          projectId: ref.projectId,
+          hash: ref.hash,
+          cause: err,
+        });
+      }
+      try {
+        return await streamToBuffer(
+          await this.objectStoreFor(ref.projectId).get(uri),
+          MAX_BLOB_BYTES,
+        );
+      } catch (err) {
+        return this.handleObjectFetchError(err, ref);
+      }
+    };
+    // A blob staged before ADR-172 sits at the old address; remove this
+    // fallback one release after the prefix move.
+    return (await readAt(false)) ?? (await readAt(true));
   }
 
   /**
-   * Explicitly deletes a blob for administrative/direct callers. GQ2 lease
-   * release and transfer paths never call this; normal reclaim is lazy.
+   * Explicitly deletes a Redis-tier blob for administrative callers. No
+   * S3-tier object is ever deleted here: the operator's lifecycle rule on the
+   * `group-queue/` prefix reclaims them (ADR-172).
    */
-  async delete(ref: BlobRef): Promise<void> {
-    if (ref.tier === "redis") {
-      await this.redisBlobs.delete({
-        id: redisBlobId({ projectId: ref.projectId, hash: ref.hash }),
-      });
-      return;
-    }
-    const uri = await this.mintUri({
-      projectId: ref.projectId,
-      hash: ref.hash,
+  async delete(ref: BlobRef & { tier: "redis" }): Promise<void> {
+    await this.redisBlobs.delete({
+      id: redisBlobId({ projectId: ref.projectId, hash: ref.hash }),
     });
-    await this.objectStoreFor(ref.projectId).delete(uri);
   }
 }

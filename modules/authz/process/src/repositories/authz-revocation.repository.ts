@@ -1,17 +1,21 @@
 import { createLogger } from "@langwatch/observability";
 import { type Instant, nowInstant } from "@langwatch/time";
-import { Counter } from "prom-client";
+import { Counter, register } from "prom-client";
 
 const logger = createLogger("langwatch:authz:revocation");
 
 export type AuthzRevocationReason = "revocation" | "offboard";
 
 /** Writes that bypassed the group queue, labelled by cause; the name is an external interface. */
-export const authzDirectProjectionWriteTotal = new Counter({
-  name: "langwatch_authz_direct_projection_write_total",
-  help: "Authorization projection writes that bypassed the group queue, by cause",
-  labelNames: ["reason"],
-});
+export const authzDirectProjectionWriteTotal =
+  (register.getSingleMetric("langwatch_authz_direct_projection_write_total") as
+    | Counter<"reason">
+    | undefined) ??
+  new Counter({
+    name: "langwatch_authz_direct_projection_write_total",
+    help: "Authorization projection writes that bypassed the group queue, by cause",
+    labelNames: ["reason"],
+  });
 
 export type AuthzRevocationMark = {
   organizationId: string;

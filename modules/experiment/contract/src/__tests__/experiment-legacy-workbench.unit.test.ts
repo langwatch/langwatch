@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isLegacyOnlineEvaluationWorkbenchState } from "../experiment-legacy-workbench.ts";
+import { isLegacyOnlineEvaluationWorkbenchState } from "../experiment-legacy.ts";
 
 describe("isLegacyOnlineEvaluationWorkbenchState", () => {
   it("identifies real-time wizard experiments as online evaluation backing data", () => {

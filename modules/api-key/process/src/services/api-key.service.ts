@@ -34,6 +34,7 @@ import { ApiKeyCatalogService } from "./api-key-catalog.service.ts";
 import { ApiKeyCliService } from "./api-key-cli.service.ts";
 import { ApiKeyEnrichmentService } from "./api-key-enrichment.service.ts";
 import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
+import { ApiKeyLastUsedService } from "./api-key-last-used.service.ts";
 import { ApiKeyLifecycleService } from "./api-key-lifecycle.service.ts";
 import { ApiKeyTokenResolutionService } from "./api-key-token-resolution.service.ts";
 import type { ApiKeyTokenService } from "./api-key-token.service.ts";
@@ -64,6 +65,7 @@ export class ApiKeyService {
   private readonly visibility: ApiKeyVisibilityService;
   private readonly cli: ApiKeyCliService;
   private readonly enrichment: ApiKeyEnrichmentService;
+  private readonly lastUsed: ApiKeyLastUsedService;
 
   static create(
     options: ApiKeyDependencies & {
@@ -75,7 +77,7 @@ export class ApiKeyService {
   }
 
   private constructor(
-    private readonly repository: ApiKeyRepository,
+    repository: ApiKeyRepository,
     options: ApiKeyDependencies & { answers: ApiKeyAnswerCacheRepository },
   ) {
     const dependencies = { repository, ...options };
@@ -86,6 +88,7 @@ export class ApiKeyService {
     this.visibility = ApiKeyVisibilityService.create(dependencies);
     this.cli = ApiKeyCliService.create(dependencies, this.policy, this.lifecycle);
     this.enrichment = ApiKeyEnrichmentService.create(dependencies, this.catalog);
+    this.lastUsed = ApiKeyLastUsedService.create({ repository });
   }
 
   async create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
@@ -129,8 +132,8 @@ export class ApiKeyService {
     return this.visibility.resolveVisibleProjects(input);
   }
 
-  markUsed({ id }: { id: string }): void {
-    void this.repository.updateLastUsedAt({ id }).catch(() => void 0);
+  markUsed(input: { id: string }): void {
+    this.lastUsed.markUsed(input);
   }
 
   async list(input: { userId: string; organizationId: string }): Promise<ApiKey[]> {

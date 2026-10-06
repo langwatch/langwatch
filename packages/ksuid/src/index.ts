@@ -65,10 +65,10 @@ export {
   PREFIX_REGEX,
   MAX_TIMESTAMP,
   MAX_DATE,
-} from "./constants.ts";
+  ValidationError,
+} from "./validation.ts";
 
 // Export error classes
-export { ValidationError } from "./validation.ts";
 export { Base62Error } from "./base62.ts";
 
 // Export platform detection functions

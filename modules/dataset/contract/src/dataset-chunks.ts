@@ -1,3 +1,4 @@
+import { z } from "zod";
 /** Tenant-prefixed, ordered chunk key for the object-backed dataset layout. */
 export const chunkKey = (projectId: string, datasetId: string, index: number): string =>
   `datasets/${projectId}/${datasetId}/chunk-${String(index).padStart(5, "0")}.jsonl`;
@@ -33,3 +34,22 @@ export const assertKeyWithinProject = (projectId: string, key: string): void => 
     throw new Error("Invalid key: path traversal attempt detected");
   }
 };
+
+const normalizeTarget = {
+  id: z.string().min(1),
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  datasetId: z.string().min(1),
+  filename: z.string().min(1),
+};
+
+/**
+ * Durable payload for Dataset's normalization worker lane. The `stagingKey`
+ * form was queued by the previous release and is read for one more (ADR-155).
+ */
+export const datasetNormalizePayloadSchema = z.union([
+  z.object({ ...normalizeTarget, sourceStoredObjectId: z.string().min(1) }),
+  z.object({ ...normalizeTarget, stagingKey: z.string().min(1) }),
+]);
+
+export type DatasetNormalizePayload = z.infer<typeof datasetNormalizePayloadSchema>;

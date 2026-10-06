@@ -91,7 +91,7 @@ export class OrganizationInvitationDoorService {
       grants: input.invites.flatMap((invite) => intendedGrants(input.organizationId, invite)),
     });
 
-    const created = await this.#createOrRefuse({ input, requestedBy: by.id });
+    const created = await this.#createOrRefuse({ input, by });
     const withUrls = created.invites.map((record) => ({
       ...record,
       invite: inviteOnWire(record.invite),
@@ -264,13 +264,17 @@ export class OrganizationInvitationDoorService {
 
   async #createOrRefuse({
     input,
-    requestedBy,
+    by,
   }: {
     input: OrganizationApiCreateInvitationsInput;
-    requestedBy: string;
+    by: OrganizationCaller;
   }) {
     try {
-      return await this.deps.invitations.create({ ...input, requestedBy });
+      return await this.deps.invitations.create({
+        ...input,
+        requestedBy: by.id,
+        user: { id: by.id, name: by.name, email: by.email },
+      });
     } catch (error) {
       if (error instanceof OrganizationNotFoundError) throw error;
 

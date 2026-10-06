@@ -13,7 +13,7 @@ const logger = createLogger("langwatch:ops:process-manager-purge");
  * rather than re-declared, so a typed `PrismaClient` satisfies it with no cast.
  * Narrow on purpose: these predicates are cross-tenant by design.
  */
-export type ProcessManagerPurgeDatabase = Pick<
+type ProcessManagerPurgeDatabase = Pick<
   PrismaClient,
   "$queryRaw" | "$executeRaw" | "$executeRawUnsafe"
 >;

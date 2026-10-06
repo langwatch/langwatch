@@ -1,18 +1,11 @@
 import { createLogger } from "@langwatch/observability";
-import {
-  anomalySchema,
-  type Anomaly,
-  type AnomalyKind,
-  type AnomalyTier,
-} from "@langwatch/ops-contract";
+import { anomalySchema, type Anomaly, type AnomalyKind } from "@langwatch/ops-contract";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
 import { AnomalyStateRepository } from "../anomaly.repository.ts";
 
 const logger = createLogger("langwatch:observability:anomalyState");
-
-export type { Anomaly, AnomalyKind, AnomalyTier };
 
 /** Redis persistence for active tenant anomalies shown to operators. */
 export class RedisAnomalyStateRepository extends AnomalyStateRepository {

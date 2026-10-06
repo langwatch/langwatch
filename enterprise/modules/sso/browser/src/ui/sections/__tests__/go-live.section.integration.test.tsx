@@ -5,10 +5,11 @@
  * that is already on says instead.
  */
 
+import { ProvisioningSetupDrawerToken } from "@langwatch/enterprise-scim-contract";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { renderWithSsoHost } from "../../../testing.tsx";
+import { FakeSsoHost, renderWithSsoHost } from "../../../testing.tsx";
 import { GoLiveSection } from "../go-live.section.tsx";
 
 function renderSection(
@@ -109,6 +110,26 @@ describe("given a connection that is already on", () => {
     fireEvent.click(screen.getByRole("button", { name: "Set up provisioning" }));
 
     expect(onSetUpProvisioning).toHaveBeenCalledOnce();
+  });
+
+  /** @scenario "A connection just turned on can carry a provisioning token without a reload" */
+  it("opens the provisioning drawer through the host, so the new connection is offered at once", () => {
+    const host = new FakeSsoHost();
+    renderWithSsoHost(
+      <GoLiveSection
+        {...READY}
+        canManage
+        activated
+        activating={false}
+        settling={false}
+        onActivate={vi.fn()}
+        onSetUpProvisioning={() => host.openOverlay(ProvisioningSetupDrawerToken)}
+      />,
+      host,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Set up provisioning" }));
+
+    expect(host.overlays.map((overlay) => overlay.drawer)).toEqual([ProvisioningSetupDrawerToken]);
   });
 });
 

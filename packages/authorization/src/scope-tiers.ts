@@ -99,6 +99,23 @@ export const declaredScopeIdSchema = z.discriminatedUnion("tier", [
 ]);
 export type AuthzDeclaredScopeId = z.infer<typeof declaredScopeIdSchema>;
 
+/**
+ * The scope a door hands a handler: where it asked, and the organization holding it (null when
+ * the door cannot say). Alex, 2026-10-06, lineage D1.
+ */
+export const handlerScopeSchema = z.discriminatedUnion("tier", [
+  z
+    .object({ tier: z.literal("project"), id: z.string(), organizationId: z.string().nullable() })
+    .strict(),
+  z
+    .object({ tier: z.literal("team"), id: z.string(), organizationId: z.string().nullable() })
+    .strict(),
+  z
+    .object({ tier: z.literal("organization"), id: z.string(), organizationId: z.string() })
+    .strict(),
+]);
+export type AuthzHandlerScope = z.infer<typeof handlerScopeSchema>;
+
 /** The tiers a resource declares, as the registry wrote them. */
 type TiersOf<P extends AuthzPermission> = P extends `${infer R}:${string}`
   ? R extends AuthzResource
@@ -158,3 +175,19 @@ function scopesOf(permission: AuthzPermission): readonly string[] {
   const resource = permission.split(":")[0] as AuthzResource;
   return AUTHZ_RESOURCES[resource]?.scopes ?? [];
 }
+
+export type AuthzScopeLineageInput = Readonly<Partial<Record<ScopeTierField, unknown>>>;
+
+export type AuthzScopeLineageEntry = Readonly<{
+  tier: DeclaredScopeTier;
+  id: string;
+  organizationId: string | null;
+}>;
+
+export type AuthzScopeLineageResult =
+  | Readonly<{ kind: "consistent" }>
+  | Readonly<{
+      kind: "mismatch";
+      widest: Readonly<{ tier: DeclaredScopeTier; id: string }>;
+      entries: readonly AuthzScopeLineageEntry[];
+    }>;

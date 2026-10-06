@@ -4,13 +4,14 @@
  * WIRE FORMAT all three agree on, not what each path does with the result afterwards.
  */
 export {
+  bytesToHex,
+  decodeBase64OpenTelemetryId,
   otlpAnyValueSchema,
   otlpKeyValueSchema,
   type OtlpAnyValue,
   type OtlpKeyValue,
 } from "./any-value.ts";
 export { normalizeOtlpAttributeMap, otlpScalarValue } from "./attribute-map.ts";
-export { bytesToHex, decodeBase64OpenTelemetryId } from "./id.ts";
 export {
   OTLP_MAX_BODY_BYTES,
   otlpProtobufRoot,

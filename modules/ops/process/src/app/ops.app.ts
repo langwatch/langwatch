@@ -236,6 +236,7 @@ import {
 } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
+import { Secret } from "@langwatch/secrets/secret";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { MigrationPassSummary, SystemMigrationPass } from "@langwatch/system-migrations";
 import { nowInstant } from "@langwatch/time";
@@ -253,19 +254,16 @@ import { BugReportIntakeService } from "#services/bug-report-intake.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 
 import { HttpCheckupProbeChannel } from "../channels/http/http.checkup-probe.channel.ts";
+import { HttpSlackAlertChannel } from "../channels/http/http.slack-alert.channel.ts";
 import { HttpUsageReportChannel } from "../channels/http/http.usage-report.channel.ts";
+import { SlackBugReportNotifierChannel } from "../channels/slack/slack.bug-report-notifier.channel.ts";
 import type { AnomalyDetectionTickResult } from "../eventing/ops-anomaly-detection.intent.ts";
 import { PLATFORM_OPERATOR_SEED_TENANT_ID } from "../eventing/ops-platform-operator-seed.process.ts";
 import type { ProjectionReplayRun } from "../eventing/ops-projection-replay.events.ts";
 import { ClickHouseClickHouseHealthRepository } from "../repositories/clickhouse/clickhouse.datastore-health.repository.ts";
-import { PrismaPostgresHealthRepository } from "../repositories/prisma/prisma.datastore-health.repository.ts";
 import { RedisAnomalyRateTrackerRepository } from "../repositories/redis/redis.anomaly-rate-tracker.repository.ts";
-import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
-import { RedisRedisHealthRepository } from "../repositories/redis/redis.datastore-health.repository.ts";
-import { RedisStorageStatsReadingsRepository } from "../repositories/redis/redis.storage-stats-readings.repository.ts";
 import { decideCloudOps } from "../rules/cloud-ops.rules.ts";
 import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
-import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules.ts";
 import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts";
 import { OpsCheckupService } from "../services/ops-checkup.service.ts";
 import { OpsHealthService } from "../services/ops-health.service.ts";
@@ -601,10 +599,6 @@ export interface OpsGrafanaLinks {
 
 export interface OpsAppInfrastructure {
   createCapability(dependencies: OpsAppDependencies): OpsCapability;
-  /**
-   * The live pipeline graph, read for the kill-switch keys an operator may
-   * set. Without it every generated key is unsettable.
-   */
   eventingIntrospection: OpsEventingIntrospection;
   pipelines: OpsPipelineRegistry;
   eventLogWindow: OpsEventLogWindowReader;
@@ -737,6 +731,8 @@ export class OpsModule implements OpsApi {
     licensePrivateKey: licensingSecrets.licensePrivateKey,
     /** The stores' own handle: goose reads migration status from the same ClickHouse. */
     clickhouseUrl: storesOwner.secrets.clickhouse,
+    /** Posts the new-bug-report alert; absent, intake stays silent. */
+    slackBugReportsBotToken: Secret.load("SLACK_BUG_REPORTS_BOT_TOKEN", { optional: true }),
   } as const;
   static readonly publicConfig = opsBrowserConfig.project;
   static readonly reads = ["prisma", "redis", "clickhouse", "eventing"] as const;
@@ -760,18 +756,30 @@ export class OpsModule implements OpsApi {
       featureFlags: setup.dependencies.featureFlags,
     });
     const logger = createLogger("langwatch:ops");
+    const bugReportNotifier = await setup.secrets.into(
+      OpsModule.secrets.slackBugReportsBotToken,
+      (botToken) =>
+        SlackBugReportNotifierChannel.create({
+          transport: HttpSlackAlertChannel.create(),
+          config: {
+            botToken,
+            channel: setup.config.bugReportSlackChannel,
+            baseHost: setup.config.publicBaseUrl,
+          },
+        }),
+    );
     const infrastructure = buildOpsInfrastructure({
+      bugReportNotifier,
       members: setup.members,
       logger,
       config: setup.config,
       resources: setup.resources,
-      processStore: setup.repositories.processStore,
       repositories: setup.repositories,
       rateTracker,
       cloudOps,
     });
 
-    const { dependencies, config } = setup;
+    const { dependencies, config, repositories } = setup;
     const { members } = setup;
     const checkup = OpsCheckupService.create({
       facts: {
@@ -795,14 +803,14 @@ export class OpsModule implements OpsApi {
         lwql: dependencies.analytics,
       },
       repositories: {
-        postgres: PrismaPostgresHealthRepository.create(members.prisma),
+        postgres: repositories.postgresHealth,
         clickhouse: await setup.secrets.into(OpsModule.secrets.clickhouseUrl, (connectionUrl) =>
           ClickHouseClickHouseHealthRepository.create({
             clickhouse: members.clickhouse,
             connectionUrl,
           }),
         ),
-        redis: RedisRedisHealthRepository.create(members.redis),
+        redis: repositories.redisHealth,
       },
       channels: {
         usageReport: HttpUsageReportChannel.create(),
@@ -818,15 +826,15 @@ export class OpsModule implements OpsApi {
 
     const anomalies = AnomalyDetectorService.create({
       rateTracker,
-      anomalyState: RedisAnomalyStateRepository.create(members.redis),
+      anomalyState: repositories.anomalyState,
       featureFlags: dependencies.featureFlags,
     });
 
     // Every process exports the gauges; only the process running `ops_storage_stats` measures.
-    const storageReadings = RedisStorageStatsReadingsRepository.create({ redis: members.redis });
+    const storageReadings = repositories.storageReadings;
     StorageStatsGaugesService.create({ readings: storageReadings }).publish();
     const storageStats = StorageStatsCollectionService.create({
-      resolveInstances: async () => [sharedStorageStatsInstance(members.clickhouse)],
+      resolveInstances: async () => [sharedStorageStatsInstance(repositories.storageFootprint)],
       readings: storageReadings,
       collectBackups: setup.config.collectClickHouseBackupMetrics,
       logger,
@@ -840,7 +848,7 @@ export class OpsModule implements OpsApi {
     const app = OpsModule.fromInfrastructure({
       infrastructure,
       dependencies,
-      repositories: setup.repositories,
+      repositories,
       checkup,
       anomalies,
       storageStats,
@@ -1016,20 +1024,12 @@ export class OpsModule implements OpsApi {
 
   // -- feature flags ---------------------------------------------------------
 
-  /**
-   * Every operator-visible flag: the registry, orphan stored rows, and every
-   * kill switch the live pipeline graph will read even before anyone has
-   * flipped it.
-   */
   getSignUpHealth(input: OpsSignUpHealthInput): Promise<SignUpHealth> {
     return this.#signUpHealth.getSignUpHealth(input);
   }
 
   async featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue> {
-    return withKillSwitchDescriptors({
-      catalogue: await this.#dependencies.featureFlags.listOperatorCatalogue(),
-      descriptors: this.#dependencies.eventingIntrospection.killSwitches(),
-    });
+    return this.#dependencies.featureFlags.listOperatorCatalogue();
   }
 
   /** Turns one registered flag on or off. */
@@ -2025,15 +2025,9 @@ export class OpsModule implements OpsApi {
     return checkup;
   }
 
-  /**
-   * Writes reach explicit registry entries and the kill-switch keys the live
-   * pipeline graph advertises, and nothing else: family-prefix matching alone
-   * would let a typo store an orphan row that never affects anything.
-   */
+  /** Writes reach explicit registry entries and nothing else. */
   private requireRegisteredFlag(key: string): void {
     if (listFeatureFlags().some((flag) => flag.key === key)) return;
-    const killSwitches = this.#dependencies.eventingIntrospection.killSwitches();
-    if (killSwitches.some((d) => d.key === key)) return;
     throw new OpsUnknownFeatureFlagError(key);
   }
 }
@@ -2092,25 +2086,9 @@ export interface OpsDejaViewProjection {
   replay<R>(use: <State>(fold: OpsDejaViewFold<State>) => R): R;
 }
 
-/**
- * One togglable kill switch the live pipeline graph will read at runtime.
- * Advertised before any row exists, because a write refuses a key that is
- * neither a registry entry nor a live descriptor.
- */
-export interface OpsKillSwitchDescriptor {
-  key: string;
-  aggregateType: string;
-  componentType: "projection" | "mapProjection" | "command" | "subscriber";
-  componentName: string;
-  pipelineName: string;
-}
-
 export interface OpsEventingIntrospection {
   /** Every fold, map and state projection mounted across the pipelines. */
   projections(): OpsProjectionMetadata[];
-
-  /** Every kill-switch key the mounted components will consult at runtime. */
-  killSwitches(): OpsKillSwitchDescriptor[];
 
   /** The process-manager state machines mounted across the pipelines. */
   processManagers(): OpsProcessManagerMetadata[];

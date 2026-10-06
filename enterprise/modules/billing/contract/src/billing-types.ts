@@ -220,3 +220,37 @@ export const billingPortalSessionSchema = z.object({ url: z.string() }).strict()
 
 /** A live subscription's lines were changed. */
 export const subscriptionItemsUpdatedSchema = z.object({ success: z.boolean() }).strict();
+
+export const billingStripeWebhookReceiptSchema = z.object({ received: z.literal(true) });
+
+export const billingStripeWebhookHeadersSchema = z.object({
+  "stripe-signature": z.string().optional(),
+});
+
+/** How one delivered event was handled: a 400 tells Stripe not to retry, a 500 asks it to. */
+export type HandleEventResult =
+  | { status: "ok" }
+  | { status: "error"; httpStatus: 400 | 500; message: string };
+
+export const BILLING_FEATURE_ID = "billing" as const;
+
+export abstract class BillingService implements BillingPlanProvider {
+  abstract getActivePlan(
+    organizationId: string,
+    user?: {
+      id?: string;
+      email?: string | null;
+      name?: string | null;
+      impersonator?: { email?: string | null };
+    },
+  ): Promise<PlanInfo>;
+}
+
+/**
+ * Notification types stored in metadata.type field
+ */
+export const NOTIFICATION_TYPES = {
+  USAGE_LIMIT_WARNING: "USAGE_LIMIT_WARNING",
+} as const;
+
+export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];

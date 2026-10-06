@@ -18,6 +18,7 @@ function federationFor({
     passkeysEnabled: false,
     isSaas: false,
     localPasswords: false,
+    mountedSocialMethodIds: [],
   });
 }
 

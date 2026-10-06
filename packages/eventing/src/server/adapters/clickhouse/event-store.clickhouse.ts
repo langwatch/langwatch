@@ -10,7 +10,7 @@ import type {
   EventRecord,
   EventRepository,
 } from "../../../stores/repositories/eventRepository.types.ts";
-import type { EventingRetentionConfiguration } from "../../retention.ts";
+import type { EventingRetentionConfiguration } from "../../eventing-server-runtime.ts";
 
 /**
  * The sentinel {@link EventLogRetentionClassifier} returns for a row that must

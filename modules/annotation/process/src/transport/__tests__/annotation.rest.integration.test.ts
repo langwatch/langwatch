@@ -62,6 +62,7 @@ describe("annotation REST transport declaration", () => {
 
 describe("annotation REST read failures", () => {
   describe("given the annotation store fails with a message naming the database host", () => {
+    /** @scenario "An annotation read failure returns no driver diagnostic" */
     it("answers the canonical internal_error 500 rather than the store's own message", async () => {
       const runtime = createRestRuntime({
         identity: {
@@ -84,7 +85,11 @@ describe("annotation REST read failures", () => {
       expect(response.status).toBe(500);
       const body = await response.json();
       expect(JSON.stringify(body)).not.toContain("postgres.internal.langwatch");
-      expect(body).toMatchObject({ code: "internal_error" });
+      expect(body).toMatchObject({
+        code: "internal_error",
+        message: "An unknown error occurred",
+        retryable: false,
+      });
     });
   });
 });
