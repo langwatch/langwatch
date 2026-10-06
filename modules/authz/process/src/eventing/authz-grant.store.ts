@@ -17,32 +17,27 @@ import {
   type RevokeGrantCommandData,
 } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
-import { Temporal, nowInstant, toDate } from "@langwatch/time";
+import { Temporal, nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import { BindingMissingError, type GrantWrite } from "../repositories/authz-grant.repository.ts";
+import type { AuthzLedgerReadRepository } from "../repositories/authz-ledger-read.repository.ts";
 import type { AuthzMembershipStampRepository } from "../repositories/authz-membership-stamp.repository.ts";
-import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import type { AuthzRevocationRepository } from "../repositories/authz-revocation.repository.ts";
 import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper.ts";
-import { liveGrants, liveRoles } from "../repositories/eventing/eventing.authz-live-rows.mapper.ts";
 import {
   compatBindingFromGrantFact,
-  GRANT_ROW_COLUMNS,
-  grantRowFromStored,
   grantRowToFact,
 } from "../repositories/prisma/prisma.authz-grant.mapper.ts";
 import {
-  carriesRoleKey,
   grantWhereFromBindingWhere,
   grantIdentityWhere,
   newCommandId,
   principalForWhere,
   roleKeyFor,
   samePermissions,
-  storedId,
 } from "../repositories/prisma/prisma.authz-ledger.mapper.ts";
 import {
   membershipFenceFields,
@@ -53,12 +48,7 @@ import type { AuthzGrantsCommandDispatcher } from "../services/authz-grants-comm
 
 const logger = createLogger("langwatch:authz:ledger");
 
-const storedPermissionsSchema = z.object({ permissions: z.array(z.string()) });
-const storedRoleRowSchema = z.object({
-  name: z.string(),
-  description: z.string().nullish(),
-  permissions: z.unknown(),
-});
+const storedPermissionsSchema = z.array(z.string());
 
 /**
  * Which writer authored a runtime fact — the event's `source` field.
@@ -104,19 +94,9 @@ export type AttachOutcome = {
   duplicates: string[];
 };
 
-type LedgerGrantDelegate = {
-  findFirst(args: unknown): Promise<unknown>;
-  findMany(args: unknown): Promise<unknown[]>;
-  count(args: unknown): Promise<number>;
-};
-
-/** The grant head is the only one the writer reads: every organization writes to the ledger. */
-export type AuthzLedgerDatabase = Omit<AuthzDatabase, "grant"> & {
-  grant: LedgerGrantDelegate;
-};
-
 export type EventingAuthzLedgerAdapterOptions = {
-  database: AuthzLedgerDatabase;
+  /** The live Grant and Role heads every read-your-writes hold polls. */
+  reads: AuthzLedgerReadRepository;
   dispatcher: AuthzGrantsCommandDispatcher;
   epoch: AuthzEpochRepository;
   revocation: AuthzRevocationRepository;
@@ -271,16 +251,13 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
         // compatibility-only row is one the fold has not authored, and a
         // revoked one confirms an attach that no longer grants anything.
         check: async () => {
-          const present = await this.options.database.grant.count({
-            where: {
-              organizationId,
-              revokedAt: null,
-              OR: fresh.map((binding) => ({
-                id: binding.bindingId,
-                ...grantIdentityWhere(binding),
-                occurredAt: { gte: toDate(Temporal.Instant.fromEpochMilliseconds(occurredAtMs)) },
-              })),
-            },
+          const present = await this.options.reads.countLandedGrants({
+            organizationId,
+            grants: fresh.map((binding) => ({
+              id: binding.bindingId,
+              ...grantIdentityWhere(binding),
+            })),
+            occurredSince: Temporal.Instant.fromEpochMilliseconds(occurredAtMs),
           });
           return present === wanted.length;
         },
@@ -367,17 +344,14 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     bindings: LedgerBindingAttach[];
   }): Promise<Map<string, string>> {
     if (bindings.length === 0) return new Map();
-    const rows = await liveGrants(this.options.database).findMany({
-      where: {
-        organizationId,
-        OR: bindings.map((binding) => grantIdentityWhere(binding)),
-      },
-      select: GRANT_ROW_COLUMNS,
+    const rows = await this.options.reads.findLiveGrantsByIdentity({
+      organizationId,
+      identities: bindings.map((binding) => grantIdentityWhere(binding)),
     });
     const byIdentity = new Map<string, string>();
     for (const row of rows) {
       const compat = compatBindingFromGrantFact({
-        grant: grantRowToFact(grantRowFromStored(row)),
+        grant: grantRowToFact(row),
         organizationId,
       });
       if (compat.kind === "noCompatForm") continue;
@@ -444,13 +418,13 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     await this.awaitProjection({
       what: `attach of resource grant ${grantId}`,
       organizationId,
-      check: async () => {
-        const row = await liveGrants(this.options.database).findFirst({
-          where: { id: grantId, organizationId, projectId, scopeType: "RESOURCE" },
-          select: { id: true },
-        });
-        return row !== null;
-      },
+      check: () =>
+        this.options.reads.hasLiveGrant({
+          grantId,
+          organizationId,
+          projectId,
+          scopeType: "RESOURCE",
+        }),
     });
     await this.options.epoch.bump({ organizationId });
   }
@@ -549,12 +523,8 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     actor: LedgerActor;
   }): Promise<void> {
     refusePlatformTenant(organizationId);
-    const stored = await liveGrants(this.options.database).findFirst({
-      where: { id: bindingId, organizationId },
-      select: GRANT_ROW_COLUMNS,
-    });
-    if (stored === null || stored === undefined) throw new BindingMissingError();
-    const row = grantRowFromStored(stored);
+    const row = await this.options.reads.findLiveGrant({ grantId: bindingId, organizationId });
+    if (row === null) throw new BindingMissingError();
     const compat = compatBindingFromGrantFact({
       grant: grantRowToFact(row),
       organizationId,
@@ -580,11 +550,11 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       what: `role change on binding ${bindingId}`,
       organizationId,
       check: async () => {
-        const updated = await liveGrants(this.options.database).findFirst({
-          where: { id: bindingId, organizationId },
-          select: { roleKey: true },
+        const updated = await this.options.reads.findLiveGrantRoleKey({
+          grantId: bindingId,
+          organizationId,
         });
-        return carriesRoleKey({ row: updated, roleKey: to });
+        return updated?.roleKey === to;
       },
     });
     await this.options.epoch.bump({ organizationId });
@@ -647,11 +617,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     if (translation.kind === "untranslatable") {
       throw new Error("revokeBindingsWhere refused a filter the grant head cannot express");
     }
-    const grantRows = await liveGrants(this.options.database).findMany({
-      where: translation.where,
-      select: { id: true },
-    });
-    const bindingIds = [...new Set(grantRows.map((row) => storedId(row)))];
+    const bindingIds = await this.options.reads.findLiveGrantIds({ where: translation.where });
     // revokeBindings early-returns on an empty id list, so no selector-only
     // fact is appended when nothing matched — the behaviour the old
     // skipAppendWhenNoMatches flag stood in for, now intrinsic.
@@ -778,13 +744,9 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       // here: a deleted row confirms nothing, and the compat CustomRole rows
       // can carry a definition the fold never authored.
       check: async () => {
-        const found = await liveRoles(this.options.database).findFirst({
-          where: { id: roleId, organizationId },
-          select: { name: true, description: true, permissions: true },
-        });
-        const row = storedRoleRowSchema.safeParse(found).data;
+        const row = await this.options.reads.findLiveRole({ roleId, organizationId });
         return (
-          row !== undefined &&
+          row !== null &&
           row.name === name &&
           (row.description ?? null) === (description || null) &&
           samePermissions({
@@ -833,13 +795,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       await this.awaitProjection({
         what: `deletion of role ${roleId}`,
         organizationId,
-        check: async () => {
-          const present = await liveRoles(this.options.database).findFirst({
-            where: { id: roleId, organizationId },
-            select: { id: true },
-          });
-          return present === null;
-        },
+        check: async () => !(await this.options.reads.hasLiveRole({ roleId, organizationId })),
       });
     }
     await this.options.epoch.bump({ organizationId });
@@ -863,11 +819,8 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     );
     if (platformOnly.length === 0) return;
 
-    const found = await liveRoles(this.options.database).findFirst({
-      where: { id: roleId, organizationId },
-      select: { permissions: true },
-    });
-    const kept = new Set(storedPermissionsSchema.safeParse(found).data?.permissions ?? []);
+    const found = await this.options.reads.findLiveRole({ roleId, organizationId });
+    const kept = new Set(storedPermissionsSchema.safeParse(found?.permissions).data ?? []);
     const added = platformOnly.filter((permission) => !kept.has(permission));
     if (added.length > 0) throw new PlatformPermissionNotAssignableError({ permissions: added });
   }
@@ -908,13 +861,12 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     await this.awaitProjection({
       what: `attach of platform grant ${grantId}`,
       organizationId: PLATFORM_TENANT_ID,
-      check: async () => {
-        const row = await liveGrants(this.options.database).findFirst({
-          where: { id: grantId, organizationId: PLATFORM_TENANT_ID, scopeType: "PLATFORM" },
-          select: { id: true },
-        });
-        return row !== null;
-      },
+      check: () =>
+        this.options.reads.hasLiveGrant({
+          grantId,
+          organizationId: PLATFORM_TENANT_ID,
+          scopeType: "PLATFORM",
+        }),
     });
   }
 

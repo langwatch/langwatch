@@ -21,6 +21,7 @@ import { MemoryAuthzAuditTrailRepository } from "../memory/memory.authz-audit-tr
 import { MemoryAuthzCutoverRepository } from "../memory/memory.authz-cutover.repository.ts";
 import { MemoryAuthzEpochRepository } from "../memory/memory.authz-epoch.repository.ts";
 import { MemoryAuthzGrantProjectionRepository } from "../memory/memory.authz-grant-projection.repository.ts";
+import { MemoryAuthzLedgerReadRepository } from "../memory/memory.authz-ledger-read.repository.ts";
 import { MemoryAuthzListingRepository } from "../memory/memory.authz-listing.repository.ts";
 import { MemoryAuthzManagedGrantRepository } from "../memory/memory.authz-managed-grant.repository.ts";
 import { MemoryAuthzMembershipStampRepository } from "../memory/memory.authz-membership-stamp.repository.ts";
@@ -62,6 +63,7 @@ const backends: readonly Backend[] = [
         read: MemoryAuthzReadRepository.create({ memory }),
         listing: MemoryAuthzListingRepository.create({ memory }),
         migration: MemoryAuthzMigrationRepository.create({ memory }),
+        ledgerReads: MemoryAuthzLedgerReadRepository.create({ memory }),
       };
     },
   },
@@ -385,7 +387,13 @@ function memoryHolderFixture(): HolderFixture {
     outsider: async () => id("user"),
     team: async (memberIds) => {
       const teamId = id("team");
-      memory.teams.push({ id: teamId, organizationId });
+      memory.teams.push({
+        id: teamId,
+        organizationId,
+        name: "Grants",
+        isPersonal: false,
+        ownerUserId: null,
+      });
       for (const userId of memberIds) {
         memory.teamMemberships.push({
           teamId,
@@ -418,6 +426,7 @@ function memoryHolderFixture(): HolderFixture {
         occurredAt: nowInstant(),
         revokedAt: revoked ? nowInstant() : null,
         revokedReason: null,
+        createdAt: nowInstant(),
         updatedAt: nowInstant(),
       });
     },
@@ -630,6 +639,7 @@ function admissionGrant({
     occurredAt,
     revokedAt: revoked ? occurredAt : null,
     revokedReason: revoked ? "revocation" : null,
+    createdAt: occurredAt,
     updatedAt: occurredAt,
   };
 }

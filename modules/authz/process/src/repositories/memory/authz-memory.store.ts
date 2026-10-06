@@ -37,6 +37,7 @@ export type AuthzMemoryUserStandingRow = {
 
 /** A Grant head row: the projected fact, the revocation mark that ends it, the last write. */
 export type AuthzMemoryGrantRow = GrantRowShape & {
+  createdAt: Instant;
   revokedAt: Instant | null;
   revokedReason: string | null;
   updatedAt: Instant;
@@ -73,9 +74,24 @@ export type AuthzMemoryApiKeyRow = {
   organizationId: string;
   name: string;
   userId: string | null;
+  revokedAt: Instant | null;
 };
 
 /** A TeamUser row; its organization is its team's. */
+export type AuthzMemoryTeamRow = {
+  id: string;
+  organizationId: string;
+  name: string;
+  isPersonal: boolean;
+  ownerUserId: string | null;
+};
+
+export type AuthzMemoryInviteRow = {
+  organizationId: string;
+  email: string;
+  status: "PENDING" | "ACCEPTED" | "WAITING_APPROVAL" | "PAYMENT_PENDING" | "REVOKED";
+};
+
 export type AuthzMemoryTeamMembershipRow = {
   teamId: string;
   userId: string;
@@ -124,7 +140,7 @@ export class AuthzMemoryStore {
   readonly groups: AuthzMemoryGroupRow[] = [];
   readonly groupMemberships: { userId: string; groupId: string }[] = [];
   readonly legacySharedTeamMemberships: { organizationId: string; userId: string }[] = [];
-  readonly teams: { id: string; organizationId: string }[] = [];
+  readonly teams: AuthzMemoryTeamRow[] = [];
   readonly teamMemberships: AuthzMemoryTeamMembershipRow[] = [];
   readonly projects: AuthzMemoryProjectRow[] = [];
   /** The grant ledger's Grant head, as the projection writes it. */
@@ -135,6 +151,8 @@ export class AuthzMemoryStore {
   readonly roles: AuthzMemoryCustomRoleRow[] = [];
   readonly shareLinks: (CompatShareLinkRowShape & { viewCount: number; createdAt: Instant })[] = [];
   readonly apiKeys: AuthzMemoryApiKeyRow[] = [];
+  /** The OrganizationInvite rows offboarding clears by email. */
+  readonly organizationInvites: AuthzMemoryInviteRow[] = [];
   /** Organizations that exist, as the bootstrap fence and the import ask. */
   readonly organizations = new Map<string, { createdAt: Instant }>();
   readonly auditLogs: AuthzAuditRow[] = [];
@@ -194,6 +212,7 @@ export class AuthzMemoryStore {
       this.roles,
       this.shareLinks,
       this.apiKeys,
+      this.organizationInvites,
       this.auditLogs,
     ]) {
       rows.length = 0;

@@ -7,6 +7,7 @@ import { EventingAuthzReadRepository } from "../eventing/eventing.authz-read.rep
 import { PrismaAuthzAdmissionRepository } from "./prisma.authz-admission.repository.ts";
 import { PrismaAuthzAuditRepository } from "./prisma.authz-audit.repository.ts";
 import { PrismaAuthzCutoverRepository } from "./prisma.authz-cutover.repository.ts";
+import { PrismaAuthzLedgerReadRepository } from "./prisma.authz-ledger-read.repository.ts";
 import { PrismaAuthzManagedGrantRepository } from "./prisma.authz-managed-grant.repository.ts";
 import { PrismaAuthzMembershipStampRepository } from "./prisma.authz-membership-stamp.repository.ts";
 import { PrismaAuthzMigrationRepository } from "./prisma.authz-migration.repository.ts";
@@ -19,7 +20,7 @@ export type AuthzPostgresRepositories = Omit<AuthzRepositories, "epoch" | "sessi
 /**
  * The Postgres rows: binding facts, engine cutover, admissions, standings, the audit trail, the
  * platform tier, membership stamps, the guarded projection writes, the synchronous deny, the
- * decision and listing reads and the import's reads. The graph builder still builds the ledger.
+ * decision and listing reads, the import's reads and the ledger's.
  */
 export class PostgresAuthzRepositories {
   static create({ prisma }: Readonly<{ prisma: PrismaClient }>): AuthzPostgresRepositories {
@@ -36,6 +37,7 @@ export class PostgresAuthzRepositories {
       read: EventingAuthzReadRepository.create(prisma),
       listing: EventingAuthzListingRepository.create(prisma),
       migration: PrismaAuthzMigrationRepository.create(prisma),
+      ledgerReads: PrismaAuthzLedgerReadRepository.create({ prisma }),
     };
   }
 }

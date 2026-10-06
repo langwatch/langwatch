@@ -3,6 +3,7 @@ import type { AuthzAuditTrailRepository } from "./authz-audit-trail.repository.t
 import type { AuthzCutoverRepository } from "./authz-cutover.repository.ts";
 import type { AuthzEpochRepository } from "./authz-epoch.repository.ts";
 import type { AuthzGrantProjectionRepository } from "./authz-grant-projection.repository.ts";
+import type { AuthzLedgerReadRepository } from "./authz-ledger-read.repository.ts";
 import type { AuthzListingRepository } from "./authz-listing.repository.ts";
 import type { AuthzManagedGrantRepository } from "./authz-managed-grant.repository.ts";
 import type { AuthzMembershipStampRepository } from "./authz-membership-stamp.repository.ts";
@@ -31,4 +32,6 @@ export interface AuthzRepositories {
   readonly listing: AuthzListingRepository;
   /** The ADR-110 import's reads of the legacy tables and the heads it proves. */
   readonly migration: AuthzMigrationRepository;
+  /** What the ledger's read-your-writes hold and the grant writer read. */
+  readonly ledgerReads: AuthzLedgerReadRepository;
 }

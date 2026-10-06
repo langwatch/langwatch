@@ -4,6 +4,8 @@ import { vi } from "vitest";
 
 import { StubAuthzEpoch } from "../../../repositories/__tests__/support/authz-epoch.stub.ts";
 import type { AuthzEpochRepository } from "../../../repositories/authz-epoch.repository.ts";
+import { EventingAuthzReadRepository } from "../../../repositories/eventing/eventing.authz-read.repository.ts";
+import { PrismaAuthzLedgerReadRepository } from "../../../repositories/prisma/prisma.authz-ledger-read.repository.ts";
 import {
   type AuthzMembershipStampTransaction,
   PrismaAuthzMembershipStampRepository,
@@ -13,7 +15,7 @@ import {
   AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
 } from "../../../services/authz-grants-command-dispatcher.service.ts";
-import { type AuthzLedgerDatabase, EventingAuthzLedgerAdapter } from "../../authz-grant.store.ts";
+import { EventingAuthzLedgerAdapter } from "../../authz-grant.store.ts";
 
 export const ORG_ID = "org_fork";
 export const ACTOR: LedgerActor = { type: "user", id: "user_admin" };
@@ -80,7 +82,9 @@ export function harness({
       count: vi.fn().mockResolvedValue(0),
     },
   };
-  const database: AuthzLedgerDatabase = prismaDouble(db);
+  const database = prismaDouble(db);
+  const reads = PrismaAuthzLedgerReadRepository.create({ prisma: database });
+  const lineage = EventingAuthzReadRepository.create(database);
   // The real repository over a stubbed client, so the fence's own SQL is what
   // the cases exercise rather than a hand-written map of stamps.
   const queryRaw = vi.fn<AuthzMembershipStampTransaction["$queryRaw"]>().mockResolvedValue([
@@ -96,7 +100,7 @@ export function harness({
     database: database as never,
   });
   const writer = EventingAuthzLedgerAdapter.create({
-    database,
+    reads,
     dispatcher: dispatcher ?? new RecordingDispatcher(sent),
     epoch,
     revocation,
@@ -105,7 +109,7 @@ export function harness({
     newCommandId: () => "authzcmd_test",
     poll: poll ?? { intervalMs: 0, timeoutMs: 0 },
   });
-  return { writer, db, sent, epoch, queryRaw };
+  return { writer, db, sent, epoch, queryRaw, reads, lineage };
 }
 
 export const binding = {

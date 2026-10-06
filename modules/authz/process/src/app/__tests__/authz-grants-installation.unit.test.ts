@@ -6,8 +6,10 @@
  */
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EventSourcing, EventStoreProducerOnly, InMemoryProcessStore } from "@langwatch/eventing";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp, ResourceScope } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import { authzProcessModule } from "../../authz.module.ts";
@@ -33,9 +35,9 @@ function eventing() {
 
 function process() {
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(authzProcessModule)])
+    .withModules([authzProcessModule])
     .withConfig(AUTHZ_CONFIG)
-    .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
+    .withStores(memoryStores())
     .withEventing(eventing())
     .provide({});
 }
@@ -77,23 +79,25 @@ describe("given a process that installed authz", () => {
   });
 });
 
-type UnsuppliedProcess = { provide(supply: object): { boot(): Promise<unknown> } };
+type InstallSecrets = NonNullable<Parameters<typeof authzProcessModule.install>[0]["secrets"]>;
 
 describe("given a process with dispatch and no database", () => {
   /** @scenario A process with no database composes no AuthZ service */
-  it("refuses the boot naming the database member it cannot supply", async () => {
-    const withoutDatabase = createApp({ role: "api" })
-      .withModules([withMemoryRepositories(authzProcessModule)])
-      .withConfig(AUTHZ_CONFIG)
-      .withEventing(eventing());
-    // wrong-typed input: the builder refuses a missing member at compile time, boot at run time
-    const booting = (withoutDatabase as unknown as UnsuppliedProcess).provide({}).boot();
+  it("refuses the live install naming the database it cannot supply", async () => {
+    const resources = new ResourceScope();
 
-    await expect(booting).rejects.toMatchObject({
-      name: "MissingMemberError",
-      module: "authz",
-      member: "prisma",
-    });
+    await expect(
+      authzProcessModule.install({
+        resources,
+        config: undefined,
+        members: {},
+        repositorySelection: { tier: "live", members: { redis: redisDouble() } },
+        role: "api",
+        secrets: createApiFixture<InstallSecrets>(),
+        resolve: () => undefined,
+      }),
+    ).rejects.toThrow(/prisma/);
+    await resources.close();
   });
 });
 
@@ -111,9 +115,9 @@ async function ledgerOf(role: "api" | "worker") {
     executionTarget: role,
   });
   const runtime = await createApp({ role })
-    .withModules([withMemoryRepositories(authzProcessModule)])
+    .withModules([authzProcessModule])
     .withConfig(AUTHZ_CONFIG)
-    .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
+    .withStores(memoryStores())
     .withEventing(eventSourcing)
     .provide({})
     .boot();

@@ -144,6 +144,7 @@ export class MemoryAuthzGrantProjectionRepository extends AuthzGrantProjectionRe
     if (!existing) {
       this.memory.grants.push({
         ...stored,
+        createdAt: now(),
         revokedAt: null,
         revokedReason: null,
         updatedAt: now(),

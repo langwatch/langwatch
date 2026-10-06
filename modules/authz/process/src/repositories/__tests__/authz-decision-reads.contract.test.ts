@@ -108,7 +108,13 @@ function memoryReadsFixture(): ReadsFixture {
     },
     team: async (orgId = organizationId) => {
       const teamId = id("team");
-      memory.teams.push({ id: teamId, organizationId: orgId });
+      memory.teams.push({
+        id: teamId,
+        organizationId: orgId,
+        name: "Readers",
+        isPersonal: false,
+        ownerUserId: null,
+      });
       return teamId;
     },
     project: async ({ teamId, apiKey = id("key") }) => {
@@ -133,7 +139,13 @@ function memoryReadsFixture(): ReadsFixture {
     },
     apiKey: async ({ userId }) => {
       const apiKeyId = id("apikey");
-      memory.apiKeys.push({ id: apiKeyId, organizationId, name: "Reader key", userId });
+      memory.apiKeys.push({
+        id: apiKeyId,
+        organizationId,
+        name: "Reader key",
+        userId,
+        revokedAt: null,
+      });
       return apiKeyId;
     },
     close: async () => {},

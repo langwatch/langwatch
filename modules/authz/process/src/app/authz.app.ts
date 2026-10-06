@@ -26,21 +26,36 @@ import {
   newAuthzGrantId,
 } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import type { SystemMigration } from "@langwatch/system-migrations";
 
+import { type AuthzGrantPipeline, EventingAuthzAdapter } from "../eventing/authz-grant.pipeline.ts";
+import { EventingAuthzLedgerAdapter } from "../eventing/authz-grant.store.ts";
+import {
+  type AttachGrantLedgerInput,
+  type AuthzEngineLedger,
+  type ChangeGrantRoleLedgerInput,
+  type DefineRoleLedgerInput,
+  type DeleteRoleLedgerInput,
+  LegacyImportAuthzGrantMigration,
+  type RevokeGrantLedgerInput,
+} from "../migrations/legacy-import.authz-grant.migration.ts";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
+import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.authz-grant.repository.ts";
 import { bindingWire } from "../rules/role-binding-read-back.rules.ts";
 import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
+import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
-import { AuthzCommandDispatcherService } from "../services/authz-grants-command-dispatcher.service.ts";
-import type { AuthzPlatformOperatorsService } from "../services/authz-platform-operators.service.ts";
-import type { AuthzSessionVersionService } from "../services/authz-session-version.service.ts";
 import {
-  PostgresAuthzAdapter,
-  type AuthzPipeline,
-  type PostgresAuthzAdapterOptions,
-} from "./authz-composition.build.ts";
+  type AuthzGrantsCommandDispatcher,
+  AuthzCommandDispatcherService,
+} from "../services/authz-grants-command-dispatcher.service.ts";
+import { AuthzGrantsService as AuthzGrantWriteService } from "../services/authz-grants.service.ts";
+import { AuthzPlatformOperatorsService } from "../services/authz-platform-operators.service.ts";
+import { AuthzSessionVersionService } from "../services/authz-session-version.service.ts";
+import { AuthzUserStandingService } from "../services/authz-user-standing.service.ts";
+import { AuthzService as AuthzPermissionService } from "../services/authz.service.ts";
+
+type AuthzPipeline = AuthzGrantPipeline;
 
 /**
  * Private server-side compatibility seam for callers whose legacy operations
@@ -61,18 +76,46 @@ export interface AuthzCompatibilityLedger {
   deleteRole(args: AuthzDeleteRoleInput): Promise<void>;
 }
 
+export type AuthzSetup = FeatureSetup<Readonly<{}>, never, AuthzServerConfig, AuthzRepositories>;
+
 /**
- * The whole adapter surface, as a caller composing this graph BY HAND
- * supplies it beside the selected repositories. The installed module reads the one member
- * it needs and builds the rest itself (see {@link AuthzModule.create}).
+ * The legacy import speaks the command vocabulary directly: it supplies
+ * content-derived command ids and business times, through the same
+ * dispatcher as live writes, so there is one producer topology and error policy.
  */
-export type AuthzInfrastructure = Omit<PostgresAuthzAdapterOptions, "repositories">;
-export type AuthzSetup = FeatureSetup<
-  Readonly<{}>,
-  MembersRead<typeof AuthzModule.reads>,
-  AuthzServerConfig,
-  AuthzRepositories
->;
+class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
+  constructor(private readonly dispatcher: AuthzGrantsCommandDispatcher) {}
+
+  private async commands() {
+    return (await this.dispatcher.commands()).commands;
+  }
+
+  async attachGrant({ organizationId, commandId, grant }: AttachGrantLedgerInput): Promise<void> {
+    await (
+      await this.commands()
+    ).attachGrant.send({ tenantId: organizationId, organizationId, commandId, grant });
+  }
+
+  async defineRole({ organizationId, commandId, role, actor }: DefineRoleLedgerInput) {
+    await (
+      await this.commands()
+    ).defineRole.send({ tenantId: organizationId, organizationId, commandId, role, actor });
+  }
+
+  async changeGrantRole(input: ChangeGrantRoleLedgerInput): Promise<void> {
+    await (
+      await this.commands()
+    ).changeGrantRole.send({ tenantId: input.organizationId, ...input });
+  }
+
+  async revokeGrant(input: RevokeGrantLedgerInput): Promise<void> {
+    await (await this.commands()).revokeGrant.send({ tenantId: input.organizationId, ...input });
+  }
+
+  async deleteRole(input: DeleteRoleLedgerInput): Promise<void> {
+    await (await this.commands()).deleteRole.send({ tenantId: input.organizationId, ...input });
+  }
+}
 
 /** The composed callable authorization boundary. */
 export class AuthzModule implements AuthzApi {
@@ -80,9 +123,6 @@ export class AuthzModule implements AuthzApi {
   static readonly dependencies = {} as const;
   static readonly config = authzServerConfig;
   static readonly publicConfig = authzBrowserConfig.project;
-  /** The ledger's Postgres graph; Redis reaches authz through its live registry. */
-  static readonly reads = ["prisma"] as const;
-
   #permissions: AuthzService;
   #grantIdentity = AuthzGrantIdentityService.create();
   #grants: AuthzGrantsService;
@@ -158,25 +198,77 @@ export class AuthzModule implements AuthzApi {
    * Build AuthZ graph; dispatcher constructed here, connected by eventing
    * (needs pipeline's registered senders). Metrics optional for non-scrape.
    */
-  static create(setup: AuthzSetup): AuthzModule {
+  static create({ config: serverConfig, repositories }: AuthzSetup): AuthzModule {
     const dispatcher = AuthzCommandDispatcherService.create();
-    const config = authzRuntimeConfig(setup.config);
-    const built = PostgresAuthzAdapter.create({
-      database: setup.members.prisma,
+    const config = authzRuntimeConfig(serverConfig);
+    const { epoch } = repositories;
+    const cutover = AuthzCutoverGateService.create({ repository: repositories.cutover });
+    const ledger = EventingAuthzLedgerAdapter.create({
+      reads: repositories.ledgerReads,
       dispatcher,
-      newBindingId: newAuthzGrantId,
-      repositories: setup.repositories,
+      epoch,
+      revocation: repositories.revocation,
+      membershipStamps: repositories.membershipStamps,
+    });
+    const platformOperators = AuthzPlatformOperatorsService.create({
+      grants: repositories.platformGrants,
+      standings: repositories.userStandings,
+      ledger,
+      newGrantId: newAuthzGrantId,
+    });
+    const userStandings = AuthzUserStandingService.create({
+      standings: repositories.userStandings,
+      platformOperators,
+    });
+    // Migration completion still answers compatibility writes and legacy
+    // API-key adoption; every decision and listing reads the grants head.
+    const permissions = AuthzPermissionService.create({
+      repository: repositories.read,
+      listing: repositories.listing,
+      bindings: repositories.bindings,
+      epoch,
+      isOnEngine: (organizationId) => cutover.isOn({ organizationId }),
+      findEngineCutoverAt: (organizationId) => cutover.findFinalizedAt({ organizationId }),
+      platformOperators,
       cacheEnabled: config.cacheEnabled,
       demoProjectId: config.demoProjectId,
-    }).build();
-    return new AuthzModule(built.authz, built.grants, {
+    });
+    const grants = AuthzGrantWriteService.create({
+      repository: EventingAuthzGrantRepository.create({
+        reads: repositories.ledgerReads,
+        lineage: repositories.read,
+        writer: ledger,
+      }),
+      epoch,
+      newBindingId: newAuthzGrantId,
+      ledger,
+      bindings: repositories.bindings,
+      permissions,
+    });
+    const sessionVersions = AuthzSessionVersionService.create({
+      versions: repositories.sessionVersions,
+      bindings: repositories.bindings,
+    });
+    const pipeline = EventingAuthzAdapter.build({
+      authzGrantsWriteStore: repositories.grantProjection,
+      authzAuditTrailStore: repositories.auditTrail,
+      sessionVersions,
+      userStandings,
+    });
+    const migration = LegacyImportAuthzGrantMigration.create({
+      store: repositories.migration,
+      ledger: new DispatcherAuthzEngineLedger(dispatcher),
+      now: Date.now,
+    });
+
+    return new AuthzModule(permissions, grants, {
       demoProjectId: config.demoProjectId(),
-      demoProjectUserId: setup.config.demoProjectUserId,
-      admissions: AuthzAdmissionService.create({ admissions: setup.repositories.admissions }),
-      migration: built.migration,
-      sessionVersions: built.sessionVersions,
-      platformOperators: built.platformOperators,
-      eventing: { pipeline: built.pipeline, dispatcher },
+      demoProjectUserId: serverConfig.demoProjectUserId,
+      admissions: AuthzAdmissionService.create({ admissions: repositories.admissions }),
+      migration,
+      sessionVersions,
+      platformOperators,
+      eventing: { pipeline, dispatcher },
     });
   }
 

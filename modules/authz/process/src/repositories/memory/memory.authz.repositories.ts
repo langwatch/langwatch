@@ -5,6 +5,7 @@ import { MemoryAuthzAuditTrailRepository } from "./memory.authz-audit-trail.repo
 import { MemoryAuthzCutoverRepository } from "./memory.authz-cutover.repository.ts";
 import { MemoryAuthzEpochRepository } from "./memory.authz-epoch.repository.ts";
 import { MemoryAuthzGrantProjectionRepository } from "./memory.authz-grant-projection.repository.ts";
+import { MemoryAuthzLedgerReadRepository } from "./memory.authz-ledger-read.repository.ts";
 import { MemoryAuthzListingRepository } from "./memory.authz-listing.repository.ts";
 import { MemoryAuthzManagedGrantRepository } from "./memory.authz-managed-grant.repository.ts";
 import { MemoryAuthzMembershipStampRepository } from "./memory.authz-membership-stamp.repository.ts";
@@ -36,6 +37,7 @@ export class MemoryAuthzRepositories {
       read: MemoryAuthzReadRepository.create({ memory }),
       listing: MemoryAuthzListingRepository.create({ memory }),
       migration: MemoryAuthzMigrationRepository.create({ memory }),
+      ledgerReads: MemoryAuthzLedgerReadRepository.create({ memory }),
     };
   }
 }

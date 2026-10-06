@@ -4,18 +4,14 @@ import {
   type EventSourcedQueueDefinition,
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
-import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-// Routing keys are cross-process contract; test builds definition through adapter.
-import { describe, expect, it, vi } from "vitest";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+// Routing keys are cross-process contract; test builds definition through the module.
+import { describe, expect, it } from "vitest";
 
-import { PostgresAuthzAdapter } from "../../app/authz-composition.build.ts";
+import { AuthzModule, type AuthzSetup } from "../../app/authz.app.ts";
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../../eventing/authz-grant.pipeline.ts";
 import { MemoryAuthzRepositories } from "../../repositories/memory/memory.authz.repositories.ts";
-import {
-  AuthzGrantsCommandDispatcher,
-  AuthzCommandDispatcherService,
-} from "../authz-grants-command-dispatcher.service.ts";
-import type { AuthzGrantsCommandSenders } from "../authz-grants-command-dispatcher.service.ts";
+import { AuthzCommandDispatcherService } from "../authz-grants-command-dispatcher.service.ts";
 
 const ORGANIZATION = "organization-1";
 const ACTOR = { type: "user", id: "user-1" } as const;
@@ -75,12 +71,6 @@ const COMMANDS = [
   ["deleteRole", { ...IDENTITY, roleId: "role-1", actor: ACTOR, occurredAtMs: 1 }],
 ] as const;
 
-class NullDispatcher extends AuthzGrantsCommandDispatcher {
-  async commands(): Promise<{ commands: AuthzGrantsCommandSenders }> {
-    throw new Error("unused");
-  }
-}
-
 /** Records what a producer enqueued; a producer-only process starts no consumer. */
 function recordingQueue() {
   const sent: Record<string, unknown>[] = [];
@@ -112,12 +102,19 @@ function producerRuntime() {
 }
 
 function buildAuthz() {
-  return PostgresAuthzAdapter.create({
-    database: prismaDouble({ auditLog: { createMany: vi.fn() } }),
+  const app = AuthzModule.create({
+    dependencies: {},
+    config: {
+      epochCacheEnabled: false,
+      demoProjectId: undefined,
+      demoProjectUserId: undefined,
+      demoProjectSlug: undefined,
+    },
+    resources: { own: () => void 0, ownService: () => void 0 },
+    secrets: createApiFixture<AuthzSetup["secrets"]>(),
     repositories: MemoryAuthzRepositories.create(),
-    dispatcher: new NullDispatcher(),
-    newBindingId: () => "rolebinding_test",
-  }).build();
+  });
+  return { pipeline: app.eventingPipeline() };
 }
 
 describe("the grants pipeline registered by a producer-only process", () => {

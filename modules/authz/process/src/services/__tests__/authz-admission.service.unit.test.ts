@@ -123,6 +123,7 @@ function admissionGrant({
     occurredAt,
     revokedAt: revoked ? occurredAt : null,
     revokedReason: revoked ? "revocation" : null,
+    createdAt: occurredAt,
     updatedAt: occurredAt,
   };
 }

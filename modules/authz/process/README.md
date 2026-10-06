@@ -6,15 +6,12 @@ decision and grant services, private repository ports, Prisma-compatible
 adapters, Eventing pipeline and projection, Redis epoch adapter, audit
 subscriber, and the legacy-import system migration.
 
-The public composition entry point is:
-
-```ts
-const feature = PostgresAuthzAdapter.create(options).build();
-// feature.authz      AuthzService
-// feature.grants     AuthzGrantsService
-// feature.pipeline   package-owned Eventing definition
-// feature.migration  package-owned SystemMigration
-```
+The package exports `authzProcessModule`, its installer. A process installs it
+like any other module: the container builds the authz repository registry (the
+`live` tier over Postgres and Redis, the `memory` tier over one in-process
+store) and `AuthzModule.create` composes the decision service, the grants
+service, the ledger, the Eventing pipeline and the legacy-import migration from
+those rows.
 
 `AuthzService` and `AuthzGrantsService` are the only domain capabilities.
 Collectors, repositories, routing gates, caches, ledgers and projections are
@@ -22,8 +19,8 @@ implementation collaborators, not additional services for application code to
 construct.
 
 The package reads no environment variables and imports no application source.
-Its database, Redis handle, telemetry, clocks, ID generation and cache policy
-arrive through `PostgresAuthzAdapter` options. Importing the package registers
+Its stores reach it only through its repository registry, and its cache policy
+and demo project through its declared config. Importing the package registers
 no pipeline, subscriber or migration.
 
 Only an application runtime composition root imports this package. Ordinary

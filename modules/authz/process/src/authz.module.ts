@@ -8,8 +8,6 @@ import { authzGrantRest, grantRestFacts } from "./transport/authz-grant.rest.ts"
 import { authzRoleBindingRest, roleBindingRestFacts } from "./transport/authz-role-binding.rest.ts";
 import { authzTrpcTransport } from "./transport/authz.trpc.ts";
 
-export type { AuthzInfrastructure } from "./app/authz.app.ts";
-
 function organizationFactsOf(credential: {
   organizationId: string;
   apiKeyId: string;

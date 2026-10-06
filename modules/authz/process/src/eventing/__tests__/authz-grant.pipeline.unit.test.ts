@@ -8,8 +8,10 @@ import type { Prisma } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import type { AuthzGrantsEvent } from "../../eventing/authz-grant.events.ts";
-import { PostgresAuthzPipelineAdapter } from "../authz-composition.build.ts";
+import { PrismaAuthzAuditRepository } from "../../repositories/prisma/prisma.authz-audit.repository.ts";
+import { PrismaAuthzProjectionRepository } from "../../repositories/prisma/prisma.authz-projection.repository.ts";
+import type { AuthzGrantsEvent } from "../authz-grant.events.ts";
+import { EventingAuthzAdapter } from "../authz-grant.pipeline.ts";
 
 const ORGANIZATION = "organization_acme";
 const GRANT = "grant_1";
@@ -76,7 +78,10 @@ function recordingDatabase(options: { guard?: number; grantRow?: unknown } = {})
 
 function compose(options: { guard?: number; grantRow?: unknown } = {}) {
   const recording = recordingDatabase(options);
-  const pipeline = PostgresAuthzPipelineAdapter.create({ database: recording.database }).build();
+  const pipeline = EventingAuthzAdapter.build({
+    authzGrantsWriteStore: PrismaAuthzProjectionRepository.create(recording.database),
+    authzAuditTrailStore: PrismaAuthzAuditRepository.create(recording.database),
+  });
   return { ...recording, pipeline };
 }
 
@@ -128,11 +133,11 @@ async function applyAttached(composed: ReturnType<typeof compose>): Promise<void
   });
 }
 
-describe("PostgresAuthzPipelineAdapter", () => {
+describe("the grants ledger pipeline over the Prisma rows", () => {
   describe("given a process holding one typed Prisma client", () => {
     /**
      * Frozen twin: `PipelineRegistry.registerAll` registers the App's own
-     * `AuthzFeature.pipeline`, built by `PostgresAuthzAdapter` from this same
+     * pipeline, built by `AuthzModule.create` from this same
      * `EventingAuthzAdapter`, and both graphs route
      * `${pipeline}:${jobType}:${jobName}` off one `event-sourcing/jobs` queue.
      * The names are LITERAL here rather than imported, because the failure

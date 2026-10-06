@@ -100,7 +100,13 @@ describe("AuthzSessionVersionService", () => {
 
     /** @scenario A binding or unbinding refreshes exactly the users it reaches */
     it("bumps the members of a team the grant attaches to", async () => {
-      memory.teams.push({ id: "team_core", organizationId: ORG });
+      memory.teams.push({
+        id: "team_core",
+        organizationId: ORG,
+        name: "Core",
+        isPersonal: false,
+        ownerUserId: null,
+      });
       memory.teamMemberships.push({
         teamId: "team_core",
         userId: "user_cy",

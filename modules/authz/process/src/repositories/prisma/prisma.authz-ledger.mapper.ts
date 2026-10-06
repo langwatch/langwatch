@@ -3,7 +3,6 @@ import {
   type TeamUserRole as AuthzTeamUserRole,
 } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
-import { z } from "zod";
 
 import type {
   AuthzRoleBindingFilter,
@@ -11,9 +10,6 @@ import type {
 } from "../../eventing/authz-grant.store.ts";
 import type { BindingPrincipalWhere, GrantWrite } from "../authz-grant.repository.ts";
 import { PRINCIPAL_TO_DB } from "./prisma.authz-grant.mapper.ts";
-
-const storedIdSchema = z.object({ id: z.string() });
-const storedRoleKeySchema = z.object({ roleKey: z.string().nullable() });
 
 export type AuthzGrantFilter = Record<string, unknown> & {
   principalType?: unknown;
@@ -37,16 +33,6 @@ const UNTRANSLATABLE: { kind: "untranslatable" } = { kind: "untranslatable" };
 /** Decision 23: user-action paths mint a random command id; retries reuse it. */
 export function newCommandId(): string {
   return generate("authzcmd").toString();
-}
-
-/** The id of a live grant row read with `select: { id: true }`. */
-export function storedId(row: unknown): string {
-  return storedIdSchema.parse(row).id;
-}
-
-/** Whether a live grant row, if there is one, carries this role key. */
-export function carriesRoleKey({ row, roleKey }: { row: unknown; roleKey: string }): boolean {
-  return row != null && storedRoleKeySchema.parse(row).roleKey === roleKey;
 }
 
 /**
