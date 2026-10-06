@@ -22,7 +22,7 @@ export const uiActionsCommand = async (): Promise<CommandResult | void> => {
   let response: Response;
   let text: string;
   try {
-    response = await langwatchFetch(`${endpoint}/api/v1/langy/ui/actions`, {
+    response = await langwatchFetch(`${endpoint}/api/langy/ui/actions`, {
       method: "GET",
       headers: { "X-Auth-Token": apiKey },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
