@@ -22,6 +22,7 @@ import {
 import {
   AGGREGATE_PROJECT_INGEST_REFUSAL,
   AGGREGATE_PROJECT_KIND,
+  APPLICATION_PROJECT_KIND,
   aggregateProjectRouteViolation,
   isAggregateProjectKind,
 } from "~/server/app-layer/projects/project-kinds";
@@ -142,7 +143,9 @@ export const projectRouter = createTRPCRouter({
         language: z.string(),
         framework: z.string(),
         /** ADR-144: an aggregate reads its members and owns no traces. */
-        kind: z.enum(["application", AGGREGATE_PROJECT_KIND]).optional(),
+        kind: z
+          .enum([APPLICATION_PROJECT_KIND, AGGREGATE_PROJECT_KIND])
+          .optional(),
         aggregateRule: aggregateRuleSchema.optional(),
       }),
     )

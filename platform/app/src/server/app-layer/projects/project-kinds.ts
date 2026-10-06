@@ -10,6 +10,12 @@
  */
 
 /**
+ * The ordinary kind: a project that receives its own traces. The column's
+ * default, and the only other kind a caller may ask to create.
+ */
+export const APPLICATION_PROJECT_KIND = "application";
+
+/**
  * The one `Project.kind` value that generic project routes must refuse.
  *
  * Spelled here rather than imported from the governance service so this module

@@ -21,6 +21,7 @@ import { AGGREGATE_DEFAULT_RULE, type AggregateRule } from "./aggregate-rule";
 import type { AggregateRuleService } from "./aggregate-rule.service";
 import {
   AGGREGATE_PROJECT_KIND,
+  type APPLICATION_PROJECT_KIND,
   INTERNAL_GOVERNANCE_PROJECT_KIND,
   isAggregateProjectKind,
 } from "./project-kinds";
@@ -234,7 +235,7 @@ export interface CreateProjectParams {
    * grants and owns no traces. The caller has already decided the actor may
    * (organisation admins only); this service validates the rule.
    */
-  kind?: "application" | typeof AGGREGATE_PROJECT_KIND;
+  kind?: typeof APPLICATION_PROJECT_KIND | typeof AGGREGATE_PROJECT_KIND;
   /** Only read for an aggregate; defaults to {@link AGGREGATE_DEFAULT_RULE}. */
   aggregateRule?: AggregateRule;
 }
