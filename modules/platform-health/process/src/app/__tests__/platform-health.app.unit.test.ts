@@ -19,7 +19,7 @@ describe("given the monitoring key is declared as a secret handle", () => {
     it("reads the key through the handle into the family's door", async () => {
       const app = await PlatformHealthModule.create({
         dependencies: {},
-        members: { publicBaseUrl: undefined },
+        config: { publicBaseUrl: undefined },
         secrets,
       } as never);
 

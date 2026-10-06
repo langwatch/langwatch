@@ -2,6 +2,7 @@ export * from "./code-evaluator.ts";
 export * from "./evaluator.ts";
 export * from "./evaluator-execution.ts";
 export * from "./evaluator.api.ts";
+export * from "./evaluator.config.ts";
 export * from "./evaluator.errors.ts";
 export * from "./evaluator-rest.schemas.ts";
 export * from "./evaluator.schemas.ts";

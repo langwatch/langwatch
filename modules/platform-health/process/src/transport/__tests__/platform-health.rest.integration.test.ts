@@ -18,7 +18,7 @@ async function monitorDoor(key: string | null): Promise<RestIdentity> {
   );
   const app = await PlatformHealthModule.create({
     dependencies: {},
-    members: { publicBaseUrl: undefined },
+    config: { publicBaseUrl: undefined },
     secrets,
   } as never);
 

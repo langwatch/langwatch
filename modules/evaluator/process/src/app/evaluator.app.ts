@@ -10,6 +10,7 @@ import {
   AVAILABLE_EVALUATORS,
   codeEvaluatorConfigSchema,
   EvaluatorApi,
+  evaluatorConfig,
   EvaluatorInvalidConfigError,
   EvaluatorSourcePermissionDeniedError,
   EvaluatorWorkflowEvaluatorExistsError,
@@ -24,6 +25,7 @@ import {
   type EvaluatorIdOrSlugInput,
   type EvaluatorPushToCopiesResult,
   type EvaluatorRelatedEntities,
+  type EvaluatorServerConfig,
   type EvaluatorResultAugmentationInput,
   type EvaluatorSyncFromSourceResult,
   type EvaluatorUpdateInput,
@@ -85,19 +87,10 @@ export interface EvaluatorGraph {
   ) => Promise<void>;
 }
 
-/**
- * Shapes restated rather than imported from `@langwatch/process-stores`: a
- * module depends on contracts. `publicBaseUrl` is the process's own fact,
- * absent where the deployment named no `BASE_HOST`.
- */
-type EvaluatorMembers = Readonly<{
-  publicBaseUrl: string | undefined;
-}>;
-
 type EvaluatorSetup = FeatureSetup<
   typeof EvaluatorModule.dependencies,
-  EvaluatorMembers,
-  undefined,
+  never,
+  EvaluatorServerConfig,
   EvaluatorRepositories
 >;
 
@@ -112,6 +105,7 @@ type EvaluatorAppParts = Readonly<{
 
 export class EvaluatorModule implements EvaluatorApi {
   static readonly contract = EvaluatorApi;
+  static readonly config = evaluatorConfig;
   static readonly dependencies = {
     /** Answers whether the caller may act in a project that is not the request's. */
     permissions: AuthzApi,
@@ -126,8 +120,6 @@ export class EvaluatorModule implements EvaluatorApi {
     /** The monitors that run an evaluator, read and removed with its cascade. */
     monitors: MonitorApi,
   };
-  /** From the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["publicBaseUrl"] as const;
 
   static create(setup: EvaluatorSetup): EvaluatorModule {
     const graph = EvaluatorLinkedRowsService.create({
@@ -144,7 +136,7 @@ export class EvaluatorModule implements EvaluatorApi {
    * is this module's own seam, not a process member.
    */
   static createWithGraph(setup: EvaluatorSetup, graph: EvaluatorGraph): EvaluatorModule {
-    const { dependencies, repositories, members } = setup;
+    const { dependencies, repositories, config } = setup;
 
     return new EvaluatorModule({
       evaluators: EvaluatorRuntimeService.create({
@@ -160,7 +152,7 @@ export class EvaluatorModule implements EvaluatorApi {
       modelProviders: dependencies.modelProviders,
       permissions: dependencies.permissions,
       graph,
-      publicBaseUrl: members.publicBaseUrl,
+      publicBaseUrl: config.publicBaseUrl,
     });
   }
 

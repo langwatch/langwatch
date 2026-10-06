@@ -22,8 +22,6 @@ import type { AgentRepositories } from "../../repositories/agent.repositories.ts
 import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";
 import { AgentModule } from "../agent.app.ts";
 
-type AgentAppMembers = Readonly<{ publicBaseUrl: string | undefined }>;
-
 export function agentFixture(overrides: Partial<Agent> = {}): Agent {
   return agentSchema.parse({
     id: "agent_test",
@@ -79,7 +77,6 @@ export function createAgentAppFixture(
     users?: UserApi;
     workflows?: WorkflowApi;
     repositories?: AgentRepositories;
-    members?: Partial<AgentAppMembers>;
     config?: AgentServerConfig;
   } = {},
 ) {
@@ -98,11 +95,11 @@ export function createAgentAppFixture(
       users: options.users ?? createApiFixture<UserApi>(),
       workflows: options.workflows ?? createApiFixture<WorkflowApi>(),
     },
-    members: {
+    config: options.config ?? {
+      replicaCount: 1,
+      relayMaxPayloadMb: void 0,
       publicBaseUrl: "https://langwatch.test",
-      ...options.members,
     },
-    config: options.config ?? { replicaCount: 1, relayMaxPayloadMb: void 0 },
     resources,
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories,

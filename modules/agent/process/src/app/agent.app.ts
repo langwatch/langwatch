@@ -97,22 +97,13 @@ import { HttpAgentTestService } from "../services/http-agent-test.service.ts";
 const THREAD_KSUID_RESOURCE = "thread";
 
 /**
- * Shapes restated rather than imported from `@langwatch/process-stores`: a
- * module depends on contracts. `publicBaseUrl` is the process's own fact,
- * absent where the deployment named no `BASE_HOST`.
- */
-type AgentMembers = Readonly<{
-  publicBaseUrl: string | undefined;
-}>;
-
-/**
  * The relay behind connected agents runs on the live tier's Redis session
  * state, so a deployment that named no Redis refuses at boot naming this
  * module rather than starting with the relay quietly switched off.
  */
 type AgentSetup = FeatureSetup<
   typeof AgentModule.dependencies,
-  AgentMembers,
+  never,
   AgentServerConfig,
   AgentRepositories
 >;
@@ -134,8 +125,6 @@ export class AgentModule implements AgentApi {
     users: UserApi,
     workflows: WorkflowApi,
   };
-  /** Both names are from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["publicBaseUrl"] as const;
 
   readonly #agents: AgentService;
   readonly #presence = ConnectedAgentPresenceService.create();
@@ -152,7 +141,7 @@ export class AgentModule implements AgentApi {
   readonly #workflows: WorkflowApi;
   readonly #publicBaseUrl: string;
 
-  private constructor({ repositories, dependencies, members, config, resources }: AgentSetup) {
+  private constructor({ repositories, dependencies, config, resources }: AgentSetup) {
     this.#agents = AgentService.create(repositories.agents);
     this.#httpSecrets = AgentHttpSecretsService.create({
       secrets: dependencies.secrets,
@@ -167,7 +156,7 @@ export class AgentModule implements AgentApi {
       workflows: dependencies.workflows,
       voiceRelease: this.#voiceRelease,
     });
-    this.#publicBaseUrl = members.publicBaseUrl ?? "";
+    this.#publicBaseUrl = config.publicBaseUrl ?? "";
     this.#auditLog = dependencies.auditLog;
     this.#permissions = dependencies.permissions;
     this.#projects = dependencies.projects;

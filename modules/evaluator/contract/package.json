@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",

@@ -1,4 +1,4 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import { z } from "zod";
 
 /** Single-replica installs may relay without Redis. No payload limit means the protocol cap. */
@@ -8,6 +8,7 @@ export const agentServerConfig = Config.define((c) => ({
     "LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB",
     z.coerce.number().positive().optional(),
   ),
+  publicBaseUrl,
 }));
 
 export type AgentServerConfig = ConfigOf<typeof agentServerConfig>;

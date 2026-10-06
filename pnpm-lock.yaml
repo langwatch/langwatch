@@ -8066,6 +8066,9 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../../analytics/contract
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error

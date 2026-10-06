@@ -83,8 +83,11 @@ describe("AgentModule.call", () => {
       instance: { instanceId: "private_instance", hostname: "laptop", label: null },
     });
     const { app, resources } = createAgentAppFixture({
-      config: { replicaCount: 1, relayMaxPayloadMb: void 0 },
-      members: { publicBaseUrl: "https://langwatch.test" },
+      config: {
+        replicaCount: 1,
+        relayMaxPayloadMb: void 0,
+        publicBaseUrl: "https://langwatch.test",
+      },
     });
     await app.registerConnected(register);
     const signal = new AbortController().signal;

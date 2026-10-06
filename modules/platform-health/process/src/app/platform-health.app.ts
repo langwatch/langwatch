@@ -5,6 +5,8 @@ import { AutomationApi } from "@langwatch/automation-contract";
 import { LangyApi, type LangyKeyCaller } from "@langwatch/langy-contract";
 import {
   PlatformHealthApi,
+  platformHealthConfig,
+  type PlatformHealthServerConfig,
   type PlatformHealthApi as PlatformHealthApiContract,
   type PlatformHealthCheckName,
   type PlatformHealthCheckInput,
@@ -33,24 +35,16 @@ import {
 
 export type PlatformHealthInfrastructure = SubsystemProbeCollaborators;
 
-/**
- * Shapes restated rather than imported from `@langwatch/process-stores`: a
- * module depends on contracts. `publicBaseUrl` is the process's own fact,
- * drilled in — absent where the deployment named no `BASE_HOST`.
- */
-type PlatformHealthMembers = Readonly<{
-  publicBaseUrl: string | undefined;
-}>;
-
 type PlatformHealthSetup = FeatureSetup<
   typeof PlatformHealthModule.dependencies,
-  PlatformHealthMembers,
-  undefined
+  never,
+  PlatformHealthServerConfig
 >;
 
 /** The process-owned platform-health capability. */
 export class PlatformHealthModule implements PlatformHealthApiContract {
   static readonly contract = PlatformHealthApi;
+  static readonly config = platformHealthConfig;
   static readonly dependencies = {
     automation: AutomationApi,
     workflow: WorkflowApi,
@@ -67,8 +61,6 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
     probeApiKey: Secret.load("PLATFORM_HEALTH_PROBE_API_KEY", { optional: true }),
     apiKey: Secret.load("PLATFORM_HEALTH_API_KEY", { optional: true }),
   };
-  /** The name is from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["publicBaseUrl"] as const;
 
   readonly #health: PlatformHealthService;
   readonly #monitorDoor: RestIdentity;
@@ -89,7 +81,7 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
 
   static async create({
     dependencies,
-    members,
+    config,
     secrets,
   }: PlatformHealthSetup): Promise<PlatformHealthModule> {
     const probeApiKey = await secrets.into(
@@ -100,7 +92,7 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
       BearerIdentity.create({ name: "platform-health", token }),
     );
     const collaborators: SubsystemProbeCollaborators = {
-      canaries: HttpSubsystemProbeChannel.create({ publicBaseUrl: members.publicBaseUrl ?? "" }),
+      canaries: HttpSubsystemProbeChannel.create({ publicBaseUrl: config.publicBaseUrl ?? "" }),
       automation: () => ({
         findById: (input) => dependencies.automation.findById(input),
         getRecentFires: async (input) =>
