@@ -302,6 +302,94 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And it shows the share of people active in the period who were also active in the period before
 
   # ---------------------------------------------------------------------------
+  # Where my agent breaks, and Release check
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: AC60 Where my agent breaks: errors per day are split by what failed first, with changes marked
+    Given the "up-errors" widget
+    Then it counts traces with an error per bucket, named by the error type, else the first step below the root that failed
+    And it draws the error rate of all traces as a line
+    And it marks each prompt version and each newly used model in the period on the time axis
+    # Decision: LangWatch records no deploys, so deploys are not marked
+
+  @unit
+  Scenario: AC61 Where my agent breaks: failing steps show the failures that reached the user
+    Given the "up-where-fails" widget
+    Then it lists the steps below the root with their calls, failures and recovered failures
+    And a failure counts as recovered when the span above it still ended without an error
+    And the steps are ordered by the failures that reached the user
+
+  @unit
+  Scenario: AC62 Where my agent breaks: loops and retries are read from repeated spans
+    Given the "up-loops" widget
+    Then a trace has looped when it calls one tool 3 or more times with the same input
+    And a trace has retried when a failed span is followed under the same parent by the same step, or by another model call
+    And it shows those traces per bucket, their share of all traces, and the cost of the repeated calls
+
+  @unit
+  Scenario: AC63 Where my agent breaks: tool error rate says how many tool errors the agent recovered
+    Given the "tools-error-rate" widget
+    Then it reads only tool spans
+    And it shows the error rate over all tool calls, the share of errors recovered and the worst tool
+
+  @unit
+  Scenario: AC64 Where my agent breaks: wrong tool rate reads one named judge
+    Given the "tools-wrong-tool" widget
+    Then it reads the failures of the evaluator named "Tool choice" per bucket, with changes marked
+    And with no results from that evaluator it names the evaluator it needs and shows the setup step
+
+  @unit
+  Scenario: AC65 Release check: the newest test run is compared with the runs before it
+    Given the "ship-verdict" widget
+    Then it compares the newest batch of scenario runs with every earlier batch of the same scenarios in the period
+    And a scenario got worse only when its pass rate fell by more than its own flake rate
+    And it shows the pass rates, the worse scenarios, the typical run time and the cost per run of both
+    # Decision: the scenario view does not name the target a run tested, so the newest batch stands in for the new version
+
+  @unit
+  Scenario: AC66 Release check: flaky tests show each scenario's last ten runs
+    Given the "ship-flaky" widget
+    Then it shows each scenario's last ten runs in the period, oldest first, as passes and fails
+    And a scenario is flaky when it both passed and failed and its 95% interval does not place it above 90% or below 10%
+
+  @unit
+  Scenario: AC67 Release check: the last test runs are compared with a baseline
+    Given the "ship-compare" widget
+    Then it shows the last five runs of the suite that ran last, newest first
+    And for each it shows scenarios passed, criteria met, cost per scenario and typical run time
+    And each figure is coloured against the run before the newest
+    # Decision: grader scores are left out until the scenario view exposes its evaluations
+
+  @unit
+  Scenario: AC68 Release check: production is compared before and after the newest change
+    Given the "ship-rollout" widget
+    Then it compares up to 7 days after the newest prompt or model change with the same days a week earlier
+    And it shows the error rate, p95 response time and cost per trace on both sides
+    And the checks passed after the change are reweighted to the topic mix before it
+    And with no change in the period it says there is nothing to compare around
+
+  @unit
+  Scenario: AC69 Release check: models are compared from experiments that ran them side by side
+    Given the "ship-models" widget
+    Then it reads experiment runs with two or more targets, naming each target by its model
+    And it shows pass rate, cost per test and p95 reply per model, best quality first
+
+  @unit
+  Scenario: AC70 Release check: the test set is weighted to the topic mix of real traffic
+    Given the "rag-dataset-versions" widget
+    Then it shows each recent run of the experiment that ran last, as run and weighted to production's topic shares
+    And production leaves out traces LangWatch's own runs produced
+    # Decision: datasets carry no version, so each run stands in for a test-set version
+
+  @unit
+  Scenario: AC71 Release check: field accuracy per test run reads two named evaluators
+    Given the "ext-precision-recall" widget
+    Then it shows the average scores of the evaluators named "Field precision" and "Field recall" for each of the last 12 experiment runs
+    And with none of those results it names the evaluators it needs
+    # Decision: no allowlisted page sets up experiments, so the experiment widgets show no setup button
+
+  # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
 
@@ -341,3 +429,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 47: "What users ask: rising and new topics" → Scenario: AC47 What users ask: Rising and new topics compares topic shares with the period before
   # AC 48: "What users ask: topics people ask about" → Scenario: AC48 What users ask: Topics people ask about shows volume, success and cannot-do per topic
   # AC 49: "What users ask: asked again" → Scenario: AC49 What users ask: Asked again shows misread conversations and returning users
+  # AC 60-71: "Where my agent breaks" and "Release check" widgets are built from the prototype's cards → Scenario: AC60 to Scenario: AC71

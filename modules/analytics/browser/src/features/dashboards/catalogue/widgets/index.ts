@@ -12,6 +12,7 @@ import * as table from "../../templates/model/question-table-widgets.ts";
 import { TABLE_ROWS } from "../../templates/model/template-widget.ts";
 import type { WidgetCode } from "../../templates/model/widget-code-parts.ts";
 import { ANSWERS_ASKS_WIDGET_BUILDS } from "./answers-asks-widgets.ts";
+import { BREAKS_RELEASE_WIDGET_BUILDS } from "./breaks-release-widgets.ts";
 
 /** One built widget: its code, its named queries and its place on a board. */
 export interface CatalogueWidgetBuild {
@@ -208,4 +209,5 @@ export const CATALOGUE_WIDGET_BUILDS: Readonly<Record<string, CatalogueWidgetBui
     rows: TABLE_ROWS,
   },
   ...ANSWERS_ASKS_WIDGET_BUILDS,
+  ...BREAKS_RELEASE_WIDGET_BUILDS,
 };
