@@ -121,12 +121,48 @@ func (o *Orchestrator) mailEnv(st domain.Stack) []string {
 // planChildren turns a resolved stack into the supervised process set, layering
 // the overlay env (hostname URLs + ports) onto each child and giving each Go
 // service its SERVER_ADDR.
-func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, langyDockerHost string) []Child {
-	base := append(st.OverlayEnv(), o.credentialEnv(st.Slug, repoDir)...)
-	logDir, _ := domain.StackLogPaths(st.WorktreeDir, st.Slug)
-	logPath := func(name string) string {
-		return filepath.Join(logDir, name+".log")
+func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir string) []Child {
+	p := o.newChildPlan(st, opts, repoDir)
+	// A monolith checkout has neither Node package: one process serves the
+	// browser application and its API, so the ui lane below and the backend
+	// lane at the end are replaced by the single app lane. See plan_monolith.go.
+	mono := monolithPlan{
+		Stack: st, Opts: opts, RepoDir: repoDir, Base: p.base,
+		NodeEnv: p.nodeEnv, LogPath: p.logPath, Port: p.port,
 	}
+	isOneProcess := !st.Layout.IsMonolith() && opts.ShouldRunOneProcess
+	out := []Child{p.frontChild(mono, isOneProcess)}
+	out = append(out, p.goLanes(mono)...)
+	out = append(out, p.devToolChildren()...)
+	if opts.Selection.Langevals {
+		out = append(out, p.langevalsChild())
+	}
+	if opts.Selection.Langy {
+		langy := o.langyChild(st, opts, p.base, p.port("langyagent"), opts.langyDockerHost)
+		langy.LogPath = p.logPath("langyagent")
+		out = append(out, langy)
+	}
+	if st.Layout.IsMonolith() || isOneProcess {
+		return out
+	}
+	return append(out, p.backendChild())
+}
+
+// childPlan is what every child of one stack is planned from: the stack, the
+// options, the checkout and the env every lane starts with.
+type childPlan struct {
+	o       *Orchestrator
+	st      domain.Stack
+	opts    PlanOptions
+	repoDir string
+	logDir  string
+	base    []string
+}
+
+func (o *Orchestrator) newChildPlan(st domain.Stack, opts PlanOptions, repoDir string) *childPlan {
+	p := &childPlan{o: o, st: st, opts: opts, repoDir: repoDir}
+	p.logDir, _ = domain.StackLogPaths(st.WorktreeDir, st.Slug)
+	p.base = append(st.OverlayEnv(), o.credentialEnv(st.Slug, repoDir)...)
 	// Bun and Node use their own bundled CA roots, NOT the macOS system store, so
 	// the app process and the langy worker (Bun) subprocess otherwise
 	// reject the portless HTTPS certs on every gateway/control-plane call ("self
@@ -135,221 +171,242 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 	// Dev/portless only — production serves real certs, and CACertPath is "" when
 	// the CA is absent, so this appends nothing outside a portless stack.
 	if ca := o.proxy.CACertPath(); ca != "" {
-		base = append(base, "NODE_EXTRA_CA_CERTS="+ca)
+		p.base = append(p.base, "NODE_EXTRA_CA_CERTS="+ca)
 	}
-	// The app's own outgoing mail, routed at the sink for both Node lanes — but
-	// never over a provider the developer configured explicitly (see
-	// domain.MailSMTPEnv): haven must not silently rewire mail they deliberately
-	// routed elsewhere. Computed before `base` feeds the ui/backend lanes (and
-	// mono's own copy) below, so a monolith checkout's one lane gets it too.
-	if opts.Selection.Mail {
+	// The simulators' provider settings (mail, storage, voice, analytics, LLM),
+	// computed before `base` feeds the ui/backend lanes (and mono's own copy)
+	// below, so a monolith checkout's one lane gets them too.
+	for _, name := range []string{domain.MailService, domain.StorageService, domain.VoiceService, domain.AnalyticsService, domain.LLMService} {
 		for _, svc := range st.Services {
-			if svc.Name == domain.MailService && svc.SMTPPort != 0 {
-				base = append(base, domain.MailSMTPEnv(resolvedDevEnv(repoDir), svc.SMTPPort)...)
+			if svc.Name == name {
+				p.base = append(p.base, simulatorBaseEnv(opts.Selection, svc, repoDir)...)
 			}
 		}
 	}
-	// The product's object storage, pointed at storagesim unless the developer
-	// chose one (see domain.StorageS3Env). Beside mail's, for the same reason.
-	if opts.Selection.Storage {
-		for _, svc := range st.Services {
-			if svc.Name == domain.StorageService && svc.Port != 0 {
-				base = append(base, domain.StorageS3Env(resolvedDevEnv(repoDir), svc.URL)...)
-			}
-		}
-	}
-	// The voice provider stand-in, opt-in (see domain.VoiceProviderEnv).
-	if opts.Selection.Voice {
-		for _, svc := range st.Services {
-			if svc.Name == domain.VoiceService && svc.Port != 0 {
-				base = append(base, domain.VoiceProviderEnv(resolvedDevEnv(repoDir), svc.Port)...)
-			}
-		}
-	}
-	// The product-analytics stand-in, opt-in (see domain.AnalyticsProviderEnv).
-	if opts.Selection.Analytics {
-		for _, svc := range st.Services {
-			if svc.Name == domain.AnalyticsService && svc.Port != 0 {
-				base = append(base, domain.AnalyticsProviderEnv(resolvedDevEnv(repoDir), svc.URL)...)
-			}
-		}
-	}
-	// The LLM provider stand-in, opt-in (see domain.LLMProviderEnv).
-	if opts.Selection.LLM {
-		for _, svc := range st.Services {
-			if svc.Name == domain.LLMService && svc.Port != 0 {
-				base = append(base, domain.LLMProviderEnv(resolvedDevEnv(repoDir), svc.Port)...)
-			}
-		}
-	}
-	port := func(name string) int {
-		for _, s := range st.Services {
-			if s.Name == name {
-				return s.Port
-			}
-		}
-		return 0
-	}
-	var out []Child
-	// `pnpm -s` drops the `> pkg@ver script` lifecycle banner; DOTENV_CONFIG_QUIET
-	// silences dotenv v17's promo line for lanes that load it via
-	// `import "dotenv/config"`. Together with the `quiet: true` passed in
-	// server.mts / vite.config.ts, this keeps every Node lane starting on real
-	// logs — matching the Go services' clean startup.
-	nodeEnv := func(lane string) []string {
-		env := append(domain.LaneDatabaseEnv(base, lane),
-			"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true", domain.LaneEnv(lane),
-			o.compileCacheEnv(st.Slug))
-		if lane == "ui" || lane == AppLane {
-			env = append(env, "LANGWATCH_VITE_NO_POLLING=1")
-		}
-		return env
-	}
-	// A monolith checkout has neither Node package: one process serves the
-	// browser application and its API, so the ui lane below and the backend
-	// lane at the end are replaced by the single app lane. See plan_monolith.go.
-	mono := monolithPlan{
-		Stack: st, Opts: opts, RepoDir: repoDir, Base: base,
-		NodeEnv: nodeEnv, LogPath: logPath, Port: port,
-	}
-	isOneProcess := !st.Layout.IsMonolith() && opts.ShouldRunOneProcess
+	return p
+}
+
+// simulatorBaseEnv points the product at a selected simulator — but never over
+// a provider the developer configured explicitly (see domain.MailSMTPEnv,
+// domain.StorageS3Env, domain.VoiceProviderEnv, domain.AnalyticsProviderEnv and
+// domain.LLMProviderEnv): haven must not silently rewire what they deliberately
+// routed elsewhere.
+func simulatorBaseEnv(sel domain.Selection, svc domain.Service, repoDir string) []string {
 	switch {
-	case st.Layout.IsMonolith():
-		out = append(out, mono.appChild())
+	case svc.Name == domain.MailService && sel.Mail && svc.SMTPPort != 0:
+		return domain.MailSMTPEnv(resolvedDevEnv(repoDir), svc.SMTPPort)
+	case svc.Name == domain.StorageService && sel.Storage && svc.Port != 0:
+		return domain.StorageS3Env(resolvedDevEnv(repoDir), svc.URL)
+	case svc.Name == domain.VoiceService && sel.Voice && svc.Port != 0:
+		return domain.VoiceProviderEnv(resolvedDevEnv(repoDir), svc.Port)
+	case svc.Name == domain.AnalyticsService && sel.Analytics && svc.Port != 0:
+		return domain.AnalyticsProviderEnv(resolvedDevEnv(repoDir), svc.URL)
+	case svc.Name == domain.LLMService && sel.LLM && svc.Port != 0:
+		return domain.LLMProviderEnv(resolvedDevEnv(repoDir), svc.Port)
+	}
+	return nil
+}
+
+func (p *childPlan) logPath(name string) string {
+	return filepath.Join(p.logDir, name+".log")
+}
+
+func (p *childPlan) port(name string) int {
+	for _, s := range p.st.Services {
+		if s.Name == name {
+			return s.Port
+		}
+	}
+	return 0
+}
+
+// nodeEnv is a Node lane's env. `pnpm -s` drops the `> pkg@ver script`
+// lifecycle banner; DOTENV_CONFIG_QUIET silences dotenv v17's promo line for
+// lanes that load it via `import "dotenv/config"`. Together with the `quiet:
+// true` passed in server.mts / vite.config.ts, this keeps every Node lane
+// starting on real logs — matching the Go services' clean startup.
+func (p *childPlan) nodeEnv(lane string) []string {
+	env := append(domain.LaneDatabaseEnv(p.base, lane),
+		"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true", domain.LaneEnv(lane),
+		p.o.compileCacheEnv(p.st.Slug))
+	if lane == "ui" || lane == AppLane {
+		env = append(env, "LANGWATCH_VITE_NO_POLLING=1")
+	}
+	return env
+}
+
+// frontChild is the lane serving the browser application: the monolith's app
+// lane, the one-process app lane, or the ui lane.
+func (p *childPlan) frontChild(mono monolithPlan, isOneProcess bool) Child {
+	switch {
+	case p.st.Layout.IsMonolith():
+		return mono.appChild()
 	case isOneProcess:
-		out = append(out, oneProcessChild(repoDir, nodeEnv(AppLane), logPath(AppLane)))
-	default:
-		out = append(out, Child{
-			Name: "ui", Dir: repoDir, Color: palette[1], LogPath: logPath("ui"),
-			Shell: "pnpm --silent --filter " + UIPackage + " dev",
-			Env:   nodeEnv("ui"),
-			// No readiness probe: the browser application holds the reader on its
-			// own waiting screen until the API answers, so serving it first is the
-			// boot the reader should see. specs/ui/api-boot-wait.feature.
-		})
+		return oneProcessChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane))
 	}
-	// One Go lane, hosting whichever data-plane services this stack selected.
-	// Each still binds the port haven allocated for its hostname: SERVER_ADDR
-	// cannot answer for two listeners in one process, so each has its own
-	// address variable. A checkout whose dev build links the simulators hosts
-	// them there too; any other runs Haven's bundled copies as their own lanes.
-	var goServices []string
-	goEnv := append(append([]string{}, base...), domain.LaneEnv(GoLane))
-	if opts.Selection.Gateway {
-		goServices = append(goServices, "aigateway")
-		goEnv = append(goEnv, fmt.Sprintf("%s=:%d", GatewayAddrEnv, port("gateway")))
+	return Child{
+		Name: "ui", Dir: p.repoDir, Color: palette[1], LogPath: p.logPath("ui"),
+		Shell: "pnpm --silent --filter " + UIPackage + " dev",
+		Env:   p.nodeEnv("ui"),
+		// No readiness probe: the browser application holds the reader on its
+		// own waiting screen until the API answers, so serving it first is the
+		// boot the reader should see. specs/ui/api-boot-wait.feature.
 	}
-	if opts.Selection.NLP {
-		goServices = append(goServices, "nlpgo")
-		goEnv = append(goEnv, fmt.Sprintf("%s=:%d", NLPAddrEnv, port("nlp")))
-	}
-	// The linked simulators get a lane of their own, so a simulator under load
-	// cannot starve the gateway: a second `service combined` process.
-	simsInGo := !st.Layout.IsMonolith() && goLaneHostsSimulators(opts.RepoRoot)
-	var simServices []string
-	simEnv := append(append([]string{}, base...), domain.LaneEnv(SimsLane))
-	var simulators []Child
-	if opts.Selection.IDP {
-		idpEnv := o.idpEnv(st)
-		if simsInGo {
-			simServices = append(simServices, "idpsim")
-			simEnv = append(append(simEnv, idpEnv...), fmt.Sprintf("%s=:%d", IDPAddrEnv, port("idp")))
-		} else {
-			simulators = append(simulators, Child{
-				Name: "idp", Dir: opts.RepoRoot, Color: palette[6], LogPath: logPath("idp"),
-				Shell: o.simulatorShell("idp"),
-				Env: append(append(append([]string{}, base...), idpEnv...),
-					fmt.Sprintf("SERVER_ADDR=:%d", port("idp")), domain.LaneEnv("idp")),
-			})
-		}
-	}
-	if opts.Selection.Mail {
-		mailEnv := o.mailEnv(st)
-		if simsInGo {
-			simServices = append(simServices, "mailsim")
-			simEnv = append(simEnv, mailEnv...)
-		} else {
-			simulators = append(simulators, Child{
-				Name: "mail", Dir: opts.RepoRoot, Color: palette[7], LogPath: logPath("mail"),
-				Shell: o.simulatorShell("mail"),
-				Env:   append(append(append([]string{}, base...), domain.LaneEnv("mail")), mailEnv...),
-			})
-		}
-	}
-	hostSimulator := func(selected bool, binary string, env func() []string, child func() Child) {
-		if !selected {
-			return
-		}
-		if simsInGo {
-			simServices = append(simServices, binary)
-			simEnv = append(simEnv, env()...)
-			return
-		}
-		simulators = append(simulators, child())
-	}
-	hostSimulator(opts.Selection.Storage, "storagesim",
-		func() []string { return o.storageEnv(st) }, func() Child { return o.storageChild(st, opts.RepoRoot, base) })
-	hostSimulator(opts.Selection.Voice, "voicesim",
-		func() []string { return voiceEnv(st) }, func() Child { return o.voiceChild(st, opts.RepoRoot, base) })
-	hostSimulator(opts.Selection.LLM, "llmsim",
-		func() []string { return llmEnv(st) }, func() Child { return o.llmChild(st, opts.RepoRoot, base) })
-	hostSimulator(opts.Selection.Analytics, "analyticssim",
-		func() []string { return analyticsEnv(st) }, func() Child { return o.analyticsChild(st, opts.RepoRoot, base) })
-	if st.Layout.IsMonolith() {
+}
+
+// goLanes is the Go lane, the simulators' lane and any simulator run as its
+// own lane.
+//
+// One Go lane hosts whichever data-plane services this stack selected. Each
+// still binds the port haven allocated for its hostname: SERVER_ADDR cannot
+// answer for two listeners in one process, so each has its own address
+// variable. A checkout whose dev build links the simulators hosts them there
+// too; any other runs Haven's bundled copies as their own lanes.
+func (p *childPlan) goLanes(mono monolithPlan) []Child {
+	var out []Child
+	goServices, goEnv := p.goServices()
+	if p.st.Layout.IsMonolith() {
 		out = append(out, mono.goChildren()...)
 	} else if len(goServices) > 0 {
 		out = append(out, Child{
-			Name: GoLane, Dir: opts.RepoRoot, Color: palette[2], LogPath: logPath(GoLane),
-			Shell: goCombinedShell(opts.RepoRoot, goServices, opts.ShouldGoWatch),
+			Name: GoLane, Dir: p.opts.RepoRoot, Color: palette[2], LogPath: p.logPath(GoLane),
+			Shell: goCombinedShell(p.opts.RepoRoot, goServices, p.opts.ShouldGoWatch),
 			Env:   goEnv,
 		})
 	}
-	if len(simServices) > 0 {
+	sims := p.planSimulators()
+	if len(sims.services) > 0 {
 		out = append(out, Child{
-			Name: SimsLane, Dir: opts.RepoRoot, Color: palette[8], LogPath: logPath(SimsLane),
-			Shell: goCombinedShell(opts.RepoRoot, simServices, opts.ShouldGoWatch),
-			Env:   simEnv,
+			Name: SimsLane, Dir: p.opts.RepoRoot, Color: palette[8], LogPath: p.logPath(SimsLane),
+			Shell: goCombinedShell(p.opts.RepoRoot, sims.services, p.opts.ShouldGoWatch),
+			Env:   sims.env,
 		})
 	}
-	out = append(out, simulators...)
-	// The two developer tools. Neither is a Node LANE — nothing in the product
-	// degrades without them — so they are planned like the Go services: only
-	// when the worktree has selected them, and never counted among the three.
-	// Each is handed the port haven allocated for its hostname, on the command
-	// line, because both tools otherwise bind a fixed default that a second
-	// worktree would find busy.
-	if opts.Selection.DesignSystem {
+	return append(out, sims.children...)
+}
+
+// goServices is the data-plane services the Go lane hosts, and its env.
+func (p *childPlan) goServices() ([]string, []string) {
+	var services []string
+	env := append(append([]string{}, p.base...), domain.LaneEnv(GoLane))
+	if p.opts.Selection.Gateway {
+		services = append(services, "aigateway")
+		env = append(env, fmt.Sprintf("%s=:%d", GatewayAddrEnv, p.port("gateway")))
+	}
+	if p.opts.Selection.NLP {
+		services = append(services, "nlpgo")
+		env = append(env, fmt.Sprintf("%s=:%d", NLPAddrEnv, p.port("nlp")))
+	}
+	return services, env
+}
+
+// simulatorPlan is where the selected simulators run: inside the sims lane
+// (services, with env) or each as a lane of its own (children).
+type simulatorPlan struct {
+	inGo     bool
+	services []string
+	env      []string
+	children []Child
+}
+
+// host places one selected simulator in the sims lane or as its own lane.
+func (sp *simulatorPlan) host(binary string, env func() []string, child func() Child) {
+	if sp.inGo {
+		sp.services = append(sp.services, binary)
+		sp.env = append(sp.env, env()...)
+		return
+	}
+	sp.children = append(sp.children, child())
+}
+
+// planSimulators places every selected simulator. The linked simulators get a
+// lane of their own, so a simulator under load cannot starve the gateway: a
+// second `service combined` process.
+func (p *childPlan) planSimulators() simulatorPlan {
+	o, st, sel, repoRoot, base := p.o, p.st, p.opts.Selection, p.opts.RepoRoot, p.base
+	sp := simulatorPlan{
+		inGo: !st.Layout.IsMonolith() && goLaneHostsSimulators(repoRoot),
+		env:  append(append([]string{}, base...), domain.LaneEnv(SimsLane)),
+	}
+	if sel.IDP {
+		idpEnv := o.idpEnv(st)
+		sp.host("idpsim", func() []string { return append(idpEnv, fmt.Sprintf("%s=:%d", IDPAddrEnv, p.port("idp"))) }, func() Child {
+			return Child{
+				Name: "idp", Dir: repoRoot, Color: palette[6], LogPath: p.logPath("idp"),
+				Shell: o.simulatorShell("idp"),
+				Env: append(append(append([]string{}, base...), idpEnv...),
+					fmt.Sprintf("SERVER_ADDR=:%d", p.port("idp")), domain.LaneEnv("idp")),
+			}
+		})
+	}
+	if sel.Mail {
+		mailEnv := o.mailEnv(st)
+		sp.host("mailsim", func() []string { return mailEnv }, func() Child {
+			return Child{
+				Name: "mail", Dir: repoRoot, Color: palette[7], LogPath: p.logPath("mail"),
+				Shell: o.simulatorShell("mail"),
+				Env:   append(append(append([]string{}, base...), domain.LaneEnv("mail")), mailEnv...),
+			}
+		})
+	}
+	p.hostBundledSimulators(&sp)
+	return sp
+}
+
+// hostBundledSimulators places storage, voice, LLM and analytics, in that order.
+func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
+	o, st, sel, repoRoot, base := p.o, p.st, p.opts.Selection, p.opts.RepoRoot, p.base
+	for _, sim := range []struct {
+		isSelected bool
+		binary     string
+		env        func() []string
+		child      func() Child
+	}{
+		{sel.Storage, "storagesim", func() []string { return o.storageEnv(st) }, func() Child { return o.storageChild(st, repoRoot, base) }},
+		{sel.Voice, "voicesim", func() []string { return voiceEnv(st) }, func() Child { return o.voiceChild(st, repoRoot, base) }},
+		{sel.LLM, "llmsim", func() []string { return llmEnv(st) }, func() Child { return o.llmChild(st, repoRoot, base) }},
+		{sel.Analytics, "analyticssim", func() []string { return analyticsEnv(st) }, func() Child { return o.analyticsChild(st, repoRoot, base) }},
+	} {
+		if sim.isSelected {
+			sp.host(sim.binary, sim.env, sim.child)
+		}
+	}
+}
+
+// devToolChildren is the two developer tools. Neither is a Node LANE — nothing
+// in the product degrades without them — so they are planned like the Go
+// services: only when the worktree has selected them, and never counted among
+// the three. Each is handed the port haven allocated for its hostname, on the
+// command line, because both tools otherwise bind a fixed default that a
+// second worktree would find busy.
+func (p *childPlan) devToolChildren() []Child {
+	var out []Child
+	if p.opts.Selection.DesignSystem {
 		out = append(out, Child{
-			Name: domain.DesignSystemService, Dir: repoDir, Color: palette[8], LogPath: logPath(domain.DesignSystemService),
+			Name: domain.DesignSystemService, Dir: p.repoDir, Color: palette[8], LogPath: p.logPath(domain.DesignSystemService),
 			Shell: fmt.Sprintf("pnpm --silent --filter %s storybook --port %d --ci",
-				DesignSystemPackage, port(domain.DesignSystemService)),
-			Env: nodeEnv(domain.DesignSystemService),
+				DesignSystemPackage, p.port(domain.DesignSystemService)),
+			Env: p.nodeEnv(domain.DesignSystemService),
 		})
 	}
-	if opts.Selection.MailRoom {
+	if p.opts.Selection.MailRoom {
 		out = append(out, Child{
-			Name: domain.MailRoomService, Dir: repoDir, Color: palette[9], LogPath: logPath(domain.MailRoomService),
+			Name: domain.MailRoomService, Dir: p.repoDir, Color: palette[9], LogPath: p.logPath(domain.MailRoomService),
 			// --strictPort: vite silently moves to the next free port otherwise,
 			// which would leave mail-room.<slug> routed to nothing at all.
 			// --host 127.0.0.1: vite's default "localhost" binds only ::1 on
 			// this machine, and the proxy and the port probe both dial IPv4.
 			Shell: fmt.Sprintf("pnpm --silent --filter %s dev --host 127.0.0.1 --port %d --strictPort",
-				MailPackage, port(domain.MailRoomService)),
-			Env: nodeEnv(domain.MailRoomService),
+				MailPackage, p.port(domain.MailRoomService)),
+			Env: p.nodeEnv(domain.MailRoomService),
 		})
 	}
-	if opts.Selection.Langevals {
-		out = append(out, langevalsChild(repoDir, port(domain.LangevalsService), base, logPath(domain.LangevalsService)))
-	}
-	if opts.Selection.Langy {
-		langy := o.langyChild(st, opts, base, port("langyagent"), langyDockerHost)
-		langy.LogPath = logPath("langyagent")
-		out = append(out, langy)
-	}
-	if st.Layout.IsMonolith() || isOneProcess {
-		return out
-	}
-	out = append(out, Child{
+	return out
+}
+
+// backendChild is the api lane.
+func (p *childPlan) backendChild() Child {
+	return Child{
 		// green, not red: the backend is a healthy lane, and a red prefix reads
 		// as an error even on ordinary info logs. Red (palette[5]) is reserved
 		// for genuine failures, so no lane label uses it — TestNoLaneIsRed pins
@@ -361,11 +418,10 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		// its own configuration and composes its own graph, and nothing reads
 		// WORKERS_IN_PROCESS or START_WORKERS. Production still deploys them
 		// separately.
-		Name: APILane, Dir: repoDir, Color: palette[0], LogPath: logPath(APILane),
+		Name: APILane, Dir: p.repoDir, Color: palette[0], LogPath: p.logPath(APILane),
 		Shell: "pnpm --silent --filter " + BackendPackage + " dev",
-		Env:   nodeEnv(APILane),
-	})
-	return out
+		Env:   p.nodeEnv(APILane),
+	}
 }
 
 // oneProcessChild is a modular checkout's ui and api lanes as one: the UI's

@@ -19,6 +19,7 @@ import (
 // take one is worse than saying so.
 type ShellKind int
 
+// The shells haven knows how to configure; ShellUnknown is every other one.
 const (
 	ShellUnknown ShellKind = iota
 	ShellZsh
@@ -40,10 +41,15 @@ func ShellKindOf(shellPath string) ShellKind {
 	}
 }
 
-// ShellRCPaths is where each shell keeps the config a login shell reads.
-// home is $HOME; zdotdir and xdgConfig are the overrides their shells honour,
-// empty when unset.
-func ShellRCPath(kind ShellKind, home, zdotdir, xdgConfig string) string {
+// ShellDirs is where a shell looks for its config: Home is $HOME; ZDotDir and
+// XDGConfig are the overrides zsh and fish honour, empty when unset.
+type ShellDirs struct {
+	Home, ZDotDir, XDGConfig string
+}
+
+// ShellRCPath is where each shell keeps the config a login shell reads.
+func ShellRCPath(kind ShellKind, dirs ShellDirs) string {
+	home, zdotdir, xdgConfig := dirs.Home, dirs.ZDotDir, dirs.XDGConfig
 	switch kind {
 	case ShellZsh:
 		if zdotdir != "" {
@@ -92,15 +98,15 @@ func PathContains(pathEnv, dir string) bool {
 type HavenPathState int
 
 const (
-	// HavenPathReady: the Go bin dir is on PATH and `haven` resolves.
+	// HavenPathReady means the Go bin dir is on PATH and `haven` resolves.
 	HavenPathReady HavenPathState = iota
-	// HavenPathPending: not on PATH yet, but the rc file already carries the
+	// HavenPathPending means not on PATH yet, but the rc file already carries the
 	// line — so a new shell will have it. Adding it again would duplicate.
 	HavenPathPending
-	// HavenPathOfferable: not on PATH, and haven knows which file to add it
+	// HavenPathOfferable means not on PATH, and haven knows which file to add it
 	// to. The only state where there is anything to ask.
 	HavenPathOfferable
-	// HavenPathManual: not on PATH, and haven does not know this shell well
+	// HavenPathManual means not on PATH, and haven does not know this shell well
 	// enough to edit its config. Print the line and stop.
 	HavenPathManual
 )

@@ -25,12 +25,12 @@ import (
 type Requirement int
 
 const (
-	// PrereqRequired: haven cannot bring a stack up without it.
+	// PrereqRequired means haven cannot bring a stack up without it.
 	PrereqRequired Requirement = iota
-	// PrereqRecommended: haven runs, but a documented part of it does not —
+	// PrereqRecommended means haven runs, but a documented part of it does not —
 	// the Go lanes, the managed Postgres, the managed Redis.
 	PrereqRecommended
-	// PrereqOptional: a convenience for the developer, never for haven.
+	// PrereqOptional means a convenience for the developer, never for haven.
 	PrereqOptional
 )
 
@@ -415,16 +415,16 @@ var Prereqs = []Prereq{{
 type PrereqState int
 
 const (
-	// PrereqSatisfied: at least one candidate is present and current.
+	// PrereqSatisfied means at least one candidate is present and current.
 	PrereqSatisfied PrereqState = iota
-	// PrereqMissing: no candidate is present.
+	// PrereqMissing means no candidate is present.
 	PrereqMissing
-	// PrereqOutdated: present, but not the version haven pins. Only portless
+	// PrereqOutdated means present, but not the version haven pins. Only portless
 	// has a pinned version today, and installing it is an upgrade in place.
 	PrereqOutdated
-	// PrereqSkipped: missing, and the developer said never ask again.
+	// PrereqSkipped means missing, and the developer said never ask again.
 	PrereqSkipped
-	// PrereqNotApplicable: a macOS-only entry on another platform. Reported
+	// PrereqNotApplicable means a macOS-only entry on another platform. Reported
 	// rather than hidden, so the list reads the same everywhere.
 	PrereqNotApplicable
 )
@@ -492,12 +492,20 @@ type Chosen struct {
 func PlanPrereqs(found map[string]Found, skipped map[string]bool, goos string) []PrereqStatus {
 	out := make([]PrereqStatus, 0, len(Prereqs))
 	for _, p := range Prereqs {
-		out = append(out, planOne(p, found, skipped, goos))
+		out = append(out, prereqProbe{found: found, skipped: skipped, goos: goos}.plan(p))
 	}
 	return out
 }
 
-func planOne(p Prereq, found map[string]Found, skipped map[string]bool, goos string) PrereqStatus {
+// prereqProbe is what PlanPrereqs judges each entry against.
+type prereqProbe struct {
+	found   map[string]Found
+	skipped map[string]bool
+	goos    string
+}
+
+func (probe prereqProbe) plan(p Prereq) PrereqStatus {
+	found, skipped, goos := probe.found, probe.skipped, probe.goos
 	st := PrereqStatus{Prereq: p, State: PrereqMissing, Platform: goos}
 	if p.DarwinOnly && goos != "darwin" {
 		st.State = PrereqNotApplicable

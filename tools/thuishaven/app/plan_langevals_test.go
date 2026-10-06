@@ -13,7 +13,7 @@ func langevalsPlan(t *testing.T, sel domain.Selection, repo string) []Child {
 	t.Helper()
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 	st := domain.Stack{Slug: "test", Services: []domain.Service{{Name: domain.LangevalsService, Port: 45562}}}
-	return o.planChildren(st, PlanOptions{Selection: sel}, repo, "")
+	return o.planChildren(st, PlanOptions{Selection: sel}, repo)
 }
 
 // @scenario "Langevals is off until a worktree asks for it"

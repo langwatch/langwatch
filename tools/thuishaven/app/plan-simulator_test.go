@@ -24,7 +24,7 @@ func TestSimulatorLanesUseTheHavenExecutable(t *testing.T) {
 		{Name: "mail", Port: 45580, SMTPPort: 45581, URL: "https://mail.old-branch.langwatch.localhost:1355"},
 	}}
 	for _, watch := range []bool{false, true} {
-		children := o.planChildren(st, PlanOptions{Selection: domain.DefaultSelection(), RepoRoot: repo, ShouldGoWatch: watch}, repo, "")
+		children := o.planChildren(st, PlanOptions{Selection: domain.DefaultSelection(), RepoRoot: repo, ShouldGoWatch: watch}, repo)
 		for _, name := range []string{"mail", "idp"} {
 			child, ok := findChild(children, name)
 			if !ok {

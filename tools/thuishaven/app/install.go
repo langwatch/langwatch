@@ -281,58 +281,89 @@ func (o *Orchestrator) installPrereqsTo(ctx context.Context, w io.Writer, chosen
 		return nil
 	}
 	for i, pick := range ordered {
-		p, ok := domain.LookupPrereq(pick.Key)
-		if !ok {
-			return fmt.Errorf("unknown prerequisite %q — known: %s", pick.Key, strings.Join(domain.PrereqKeys(), ", "))
-		}
-		candidate, ok := domain.LookupCandidate(p, pick.Candidate)
-		if !ok {
-			return fmt.Errorf("%s has no option %q", p.Key, pick.Candidate)
-		}
-		// A declining candidate is an answer, not an install: "none, keep this
-		// machine container-free" settles the question rather than putting
-		// something on the machine.
-		if candidate.Declines {
-			if err := o.recordChoice(w, p, candidate); err != nil {
-				return err
-			}
-			continue
-		}
-		command, manual := candidate.InstallOn(o.platform())
-		if command == "" {
-			fmt.Fprintf(w, "\n· %s — haven does not install this one for you. Run:\n    %s\n", p.Name, manual)
-			// Carrying on past a REQUIRED one haven cannot install is how the
-			// fresh-Mac case produced its worst message: print the Homebrew
-			// line, then run `brew install node`, then report "could not
-			// install Node.js (exit status 127) — run `brew install node` by
-			// hand", which blames the wrong tool. Everything ordered after it
-			// is installed THROUGH it, so this is where the run ends.
-			if p.Requirement == domain.PrereqRequired && i < len(ordered)-1 {
-				return fmt.Errorf("%s has to be installed first — the rest are installed through it. Run the command above, then re-run `haven install`", p.Name)
-			}
-			continue
-		}
-		fmt.Fprintf(w, "\n→ %s: %s\n", p.Name, command)
-		if err := o.runPrereqInstall(ctx, p, command); err != nil {
-			return fmt.Errorf("could not install %s (%w) — run `%s` by hand and try again", p.Name, err, command)
-		}
-		fmt.Fprintf(w, "✓ %s installed\n", p.Name)
-		if candidate.Records != "" {
-			// Installing a runtime is also choosing it. Without this the
-			// developer would pick colima at the picker and haven would still
-			// be guessing the posture on the next run.
-			if err := o.recordChoice(w, p, candidate); err != nil {
-				return err
-			}
-		}
-		// Installing something answers the question the skip was suppressing,
-		// so the skip has served its purpose and would otherwise hide the
-		// entry from a later report that should show it satisfied.
-		if err := o.unskipPrereq(p.Key); err != nil {
+		if err := o.installPick(ctx, w, prereqPick{chosen: pick, hasMore: i < len(ordered)-1}); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// prereqPick is one chosen candidate and whether anything is ordered after it.
+type prereqPick struct {
+	chosen  domain.Chosen
+	hasMore bool
+}
+
+// installPick installs, records or prints the manual command for one pick.
+func (o *Orchestrator) installPick(ctx context.Context, w io.Writer, pick prereqPick) error {
+	p, candidate, err := lookupPick(pick.chosen)
+	if err != nil {
+		return err
+	}
+	// A declining candidate is an answer, not an install: "none, keep this
+	// machine container-free" settles the question rather than putting
+	// something on the machine.
+	if candidate.Declines {
+		return o.recordChoice(w, p, candidate)
+	}
+	command, manual := candidate.InstallOn(o.platform())
+	if command == "" {
+		fmt.Fprintf(w, "\n· %s — haven does not install this one for you. Run:\n    %s\n", p.Name, manual)
+		// Carrying on past a REQUIRED one haven cannot install is how the
+		// fresh-Mac case produced its worst message: print the Homebrew
+		// line, then run `brew install node`, then report "could not
+		// install Node.js (exit status 127) — run `brew install node` by
+		// hand", which blames the wrong tool. Everything ordered after it
+		// is installed THROUGH it, so this is where the run ends.
+		if p.Requirement == domain.PrereqRequired && pick.hasMore {
+			return fmt.Errorf("%s has to be installed first — the rest are installed through it. Run the command above, then re-run `haven install`", p.Name)
+		}
+		return nil
+	}
+	return o.installCandidate(ctx, w, prereqInstall{prereq: p, candidate: candidate, command: command})
+}
+
+// lookupPick resolves a pick to its prerequisite and candidate.
+func lookupPick(pick domain.Chosen) (domain.Prereq, domain.Candidate, error) {
+	p, ok := domain.LookupPrereq(pick.Key)
+	if !ok {
+		return p, domain.Candidate{}, fmt.Errorf("unknown prerequisite %q — known: %s", pick.Key, strings.Join(domain.PrereqKeys(), ", "))
+	}
+	candidate, ok := domain.LookupCandidate(p, pick.Candidate)
+	if !ok {
+		return p, candidate, fmt.Errorf("%s has no option %q", p.Key, pick.Candidate)
+	}
+	return p, candidate, nil
+}
+
+// prereqInstall is a candidate haven installs, and the command that does it.
+type prereqInstall struct {
+	prereq    domain.Prereq
+	candidate domain.Candidate
+	command   string
+}
+
+// installCandidate runs the install command, then records the choice it
+// stands for and clears any skip on the prerequisite.
+func (o *Orchestrator) installCandidate(ctx context.Context, w io.Writer, in prereqInstall) error {
+	p, candidate, command := in.prereq, in.candidate, in.command
+	fmt.Fprintf(w, "\n→ %s: %s\n", p.Name, command)
+	if err := o.runPrereqInstall(ctx, p, command); err != nil {
+		return fmt.Errorf("could not install %s (%w) — run `%s` by hand and try again", p.Name, err, command)
+	}
+	fmt.Fprintf(w, "✓ %s installed\n", p.Name)
+	if candidate.Records != "" {
+		// Installing a runtime is also choosing it. Without this the
+		// developer would pick colima at the picker and haven would still
+		// be guessing the posture on the next run.
+		if err := o.recordChoice(w, p, candidate); err != nil {
+			return err
+		}
+	}
+	// Installing something answers the question the skip was suppressing,
+	// so the skip has served its purpose and would otherwise hide the
+	// entry from a later report that should show it satisfied.
+	return o.unskipPrereq(p.Key)
 }
 
 // recordChoice writes down the machine setting a candidate stands for, and

@@ -20,70 +20,103 @@ type health struct {
 // observability, the managed database servers) in a single one-shot report.
 // asJSON is the agent-friendly form.
 func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) error {
-	ctx := context.Background()
-	stacks := o.store.Stacks()
-	scheme, port := o.proxy.Endpoint()
-	shared := func(svc string) string { return o.cfg.Naming.URL(svc, "", scheme, port) }
-
-	info, daemonUp := o.store.Daemon()
-	proxy := health{OK: o.proxy.Running(), Detail: fmt.Sprintf("%s on :%d", scheme, port)}
-	daemon := health{OK: daemonUp && o.sys.ProcessAlive(info.PID), Detail: fmt.Sprintf("pid %d", info.PID)}
-	servers := map[string]health{}
-	if o.obs != nil {
-		ok, detail := o.obs.Health(ctx)
-		servers["observability"] = health{OK: ok, Detail: detail}
-	}
-	if o.ch != nil && o.cfg.ShouldManageClickHouse {
-		ok, detail := o.ch.Health(ctx)
-		servers["clickhouse"] = health{OK: ok, Detail: detail}
-	}
-	if o.pg != nil && o.cfg.ShouldManagePostgres {
-		ok, detail := o.pg.Health(ctx)
-		servers["postgres"] = health{OK: ok, Detail: detail}
-	}
-	if o.rds != nil && o.cfg.ShouldManageRedis {
-		ok, detail := o.rds.Health(ctx)
-		servers["redis"] = health{OK: ok, Detail: detail}
-	}
-	nxDaemons := o.NxDaemons()
-	stackRSS := o.StackRSSByLauncher()
-	live, rss := o.stackFootprint(stackRSS)
-	selection, haveSelection := o.store.ReadSelection(worktreeDir)
-	if !haveSelection && worktreeDir != "" {
-		selection = domain.DefaultSelection()
-		haveSelection = true
-	}
-
+	r := o.collectStatus(worktreeDir)
 	if asJSON {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(map[string]any{
-			"stacks":        o.stackStatuses(stacks),
-			"dashboard":     shared(domain.HubService),
-			"observability": shared("observability"),
-			"telemetry":     shared("telemetry"),
-			"proxy":         proxy,
-			"daemon":        daemon,
-			"servers":       servers,
-			"footprint":     map[string]any{"live": live, "rssBytes": rss},
-			"selection":     selection,
+			"stacks":        o.stackStatuses(r.stacks),
+			"dashboard":     r.shared(domain.HubService),
+			"observability": r.shared("observability"),
+			"telemetry":     r.shared("telemetry"),
+			"proxy":         r.proxy,
+			"daemon":        r.daemon,
+			"servers":       r.servers,
+			"footprint":     map[string]any{"live": r.live, "rssBytes": r.rss},
+			"selection":     r.selection,
 			"overlay":       o.worktreeOverlay(worktreeDir, reveal),
-			"nxDaemons":     nxDaemons,
+			"nxDaemons":     r.nxDaemons,
 		})
 	}
-
-	if haveSelection {
-		fmt.Printf("this worktree — %s\n\n", selection.Describe())
+	if r.haveSelection {
+		fmt.Printf("this worktree — %s\n\n", r.selection.Describe())
 	}
-	if len(stacks) == 0 {
+	o.printStacks(r)
+	fmt.Println()
+	o.printShared(r)
+	o.printWorktreeOverlay(worktreeDir, reveal)
+	fmt.Printf("\nstacks: %d (%d live, ~%s RAM)   dashboard %s   tld: .%s\n",
+		len(r.stacks), r.live, domain.HumanBytes(int64(r.rss)), r.shared(domain.HubService), o.cfg.Naming.TLD)
+	return nil
+}
+
+// statusReport is everything Status reports, gathered once for either form.
+type statusReport struct {
+	stacks        []domain.Stack
+	shared        func(svc string) string
+	proxy, daemon health
+	servers       map[string]health
+	nxDaemons     []NxDaemon
+	stackRSS      map[int]uint64
+	live          int
+	rss           uint64
+	selection     domain.Selection
+	haveSelection bool
+}
+
+func (o *Orchestrator) collectStatus(worktreeDir string) statusReport {
+	scheme, port := o.proxy.Endpoint()
+	info, daemonUp := o.store.Daemon()
+	r := statusReport{
+		stacks:   o.store.Stacks(),
+		shared:   func(svc string) string { return o.cfg.Naming.URL(svc, "", scheme, port) },
+		proxy:    health{OK: o.proxy.Running(), Detail: fmt.Sprintf("%s on :%d", scheme, port)},
+		daemon:   health{OK: daemonUp && o.sys.ProcessAlive(info.PID), Detail: fmt.Sprintf("pid %d", info.PID)},
+		servers:  o.serverHealth(context.Background()),
+		stackRSS: o.StackRSSByLauncher(),
+	}
+	r.nxDaemons = o.NxDaemons()
+	r.live, r.rss = o.stackFootprint(r.stackRSS)
+	r.selection, r.haveSelection = o.store.ReadSelection(worktreeDir)
+	if !r.haveSelection && worktreeDir != "" {
+		r.selection = domain.DefaultSelection()
+		r.haveSelection = true
+	}
+	return r
+}
+
+// serverHealth is the health of each shared server haven manages here.
+func (o *Orchestrator) serverHealth(ctx context.Context) map[string]health {
+	servers := map[string]health{}
+	probes := []struct {
+		name      string
+		isManaged bool
+		probe     func() (bool, string)
+	}{
+		{"observability", o.obs != nil, func() (bool, string) { return o.obs.Health(ctx) }},
+		{"clickhouse", o.ch != nil && o.cfg.ShouldManageClickHouse, func() (bool, string) { return o.ch.Health(ctx) }},
+		{"postgres", o.pg != nil && o.cfg.ShouldManagePostgres, func() (bool, string) { return o.pg.Health(ctx) }},
+		{"redis", o.rds != nil && o.cfg.ShouldManageRedis, func() (bool, string) { return o.rds.Health(ctx) }},
+	}
+	for _, p := range probes {
+		if p.isManaged {
+			ok, detail := p.probe()
+			servers[p.name] = health{OK: ok, Detail: detail}
+		}
+	}
+	return servers
+}
+
+// printStacks is one line per stack, with its RAM, and a dot per service that
+// is listening.
+func (o *Orchestrator) printStacks(r statusReport) {
+	if len(r.stacks) == 0 {
 		fmt.Println("no stacks running — start one with `haven up` in a worktree")
 	}
-	for _, s := range stacks {
+	for _, s := range r.stacks {
 		ram := ""
-		if o.sys.ProcessAlive(s.LauncherPID) {
-			if treeRSS := stackRSS[s.LauncherPID]; treeRSS > 0 {
-				ram = "  ~" + domain.HumanBytes(int64(treeRSS))
-			}
+		if treeRSS := r.stackRSS[s.LauncherPID]; treeRSS > 0 && o.sys.ProcessAlive(s.LauncherPID) {
+			ram = "  ~" + domain.HumanBytes(int64(treeRSS))
 		}
 		fmt.Printf("%-18s %-6s %s  (%s)%s\n", s.Slug, o.liveness(s), s.Branch, s.WorktreeDir, ram)
 		for _, svc := range s.Services {
@@ -94,30 +127,29 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) erro
 			fmt.Printf("  %s %-10s %s\n", dot, svc.Name, svc.URL)
 		}
 	}
-	fmt.Println()
+}
 
-	ok := func(b bool) string {
-		if b {
-			return "ok  "
-		}
-		return "MISS"
+func statusMark(b bool) string {
+	if b {
+		return "ok  "
 	}
-	fmt.Printf("%s portless proxy (%s)\n", ok(proxy.OK), proxy.Detail)
-	fmt.Printf("%s haven daemon (%s) -> %s\n", ok(daemon.OK), daemon.Detail, shared(o.cfg.Naming.Project))
+	return "MISS"
+}
+
+// printShared is the proxy, the daemon, each managed server and the nx daemons.
+func (o *Orchestrator) printShared(r statusReport) {
+	fmt.Printf("%s portless proxy (%s)\n", statusMark(r.proxy.OK), r.proxy.Detail)
+	fmt.Printf("%s haven daemon (%s) -> %s\n", statusMark(r.daemon.OK), r.daemon.Detail, r.shared(o.cfg.Naming.Project))
 	for _, name := range []string{"observability", "clickhouse", "postgres", "redis"} {
-		h, managed := servers[name]
+		h, managed := r.servers[name]
 		if !managed {
 			continue
 		}
-		fmt.Printf("%s %s — %s\n", ok(h.OK), name, h.Detail)
+		fmt.Printf("%s %s — %s\n", statusMark(h.OK), name, h.Detail)
 	}
-	for _, d := range nxDaemons {
+	for _, d := range r.nxDaemons {
 		fmt.Printf("ok   nx daemon pid %d (%s, ~%s)\n", d.PID, d.Worktree, domain.HumanBytes(d.RSS))
 	}
-	o.printWorktreeOverlay(worktreeDir, reveal)
-	fmt.Printf("\nstacks: %d (%d live, ~%s RAM)   dashboard %s   tld: .%s\n",
-		len(stacks), live, domain.HumanBytes(int64(rss)), shared(domain.HubService), o.cfg.Naming.TLD)
-	return nil
 }
 
 // worktreeOverlay is what this worktree's stack resolved to. Nothing writes it

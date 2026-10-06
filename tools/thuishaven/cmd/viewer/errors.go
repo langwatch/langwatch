@@ -188,6 +188,7 @@ func (t *ErrorsTab) Body(f Frame) []Row {
 	return out[:min(len(out), f.Rows())]
 }
 
+// Footer is the key hint shown under the tab, the detail view's when one is open.
 func (t *ErrorsTab) Footer() string {
 	if t.openSignature != "" {
 		return t.detail.footer()
@@ -195,6 +196,7 @@ func (t *ErrorsTab) Footer() string {
 	return "↑↓ Select failure · enter Details"
 }
 
+// Key handles a key press, reporting whether the tab consumed it.
 func (t *ErrorsTab) Key(k string) bool {
 	if t.openSignature != "" {
 		if k == "esc" {

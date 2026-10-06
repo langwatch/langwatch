@@ -10,7 +10,7 @@ func llmProviderSeedEnv(t *testing.T, sel domain.Selection) (baseURL, key string
 	t.Helper()
 	o := &Orchestrator{cfg: Config{Home: t.TempDir(), SimulatorArgv: []string{"/bin/haven", "simulator"}}, proxy: stubProxy{}}
 	repo := simulatorCheckout(t)
-	children := o.planChildren(simulatorStack(repo, domain.LayoutModular), PlanOptions{Selection: sel, RepoRoot: repo}, repo, "")
+	children := o.planChildren(simulatorStack(repo, domain.LayoutModular), PlanOptions{Selection: sel, RepoRoot: repo}, repo)
 	api, ok := findChild(children, APILane)
 	if !ok {
 		t.Fatal("no api lane was planned")

@@ -71,7 +71,7 @@ func TestStackEnvIsWhatTheOverlayFileHeld(t *testing.T) {
 
 	// Every lane haven supervises starts with the same set, so a shell that
 	// evaluates `haven env` and a lane are looking at one environment.
-	children := (&Orchestrator{proxy: stubProxy{}}).planChildren(st, PlanOptions{Selection: domain.DefaultSelection()}, "/wt/plum", "")
+	children := (&Orchestrator{proxy: stubProxy{}}).planChildren(st, PlanOptions{Selection: domain.DefaultSelection()}, "/wt/plum")
 	if len(children) == 0 {
 		t.Fatal("no children planned")
 	}

@@ -13,7 +13,7 @@ func TestIDPLaneFollowsTheSelection(t *testing.T) {
 		st := domain.Stack{Slug: "test", Services: []domain.Service{
 			{Name: "idp", Port: 5565, DNSPort: 5566, URL: "https://idp.test.langwatch.localhost"},
 		}}
-		return o.planChildren(st, PlanOptions{Selection: sel}, t.TempDir(), "")
+		return o.planChildren(st, PlanOptions{Selection: sel}, t.TempDir())
 	}
 	find := func(children []Child, name string) (Child, bool) {
 		for _, c := range children {

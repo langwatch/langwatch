@@ -33,6 +33,29 @@ func (o *Orchestrator) PruneStrayDatabases(ctx context.Context, shouldAct bool) 
 	}
 	var out []string
 	var firstErr error
+	for _, eng := range o.strayEngines() {
+		dbs, err := eng.lister.StrayDatabases(ctx, ttl)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("%s stray listing: %w", eng.name, err)
+			}
+			continue
+		}
+		out = append(out, o.pruneStrays(ctx, strayPrune{engine: eng, owned: owned, shouldAct: shouldAct}, dbs)...)
+	}
+	return out, firstErr
+}
+
+// strayEngine is a database server haven may prune strays on.
+type strayEngine struct {
+	name   string
+	lister StrayLister
+	drop   func(context.Context, string) error
+}
+
+// strayEngines is each managed server whose adapter can list strays.
+func (o *Orchestrator) strayEngines() []strayEngine {
+	var out []strayEngine
 	for _, eng := range []struct {
 		name    string
 		enabled bool
@@ -42,31 +65,39 @@ func (o *Orchestrator) PruneStrayDatabases(ctx context.Context, shouldAct bool) 
 		{"clickhouse", o.ch != nil && o.cfg.ShouldManageClickHouse, o.ch, func(c context.Context, db string) error { return o.ch.DropDatabase(c, db) }},
 		{"postgres", o.pg != nil && o.cfg.ShouldManagePostgres, o.pg, func(c context.Context, db string) error { return o.pg.DropDatabase(c, db) }},
 	} {
-		lister, ok := eng.srv.(StrayLister)
-		if !eng.enabled || !ok {
-			continue
-		}
-		dbs, err := lister.StrayDatabases(ctx, ttl)
-		if err != nil {
-			if firstErr == nil {
-				firstErr = fmt.Errorf("%s stray listing: %w", eng.name, err)
-			}
-			continue
-		}
-		for _, db := range dbs {
-			if owned[db] || domain.IsProtectedDatabase(db) {
-				continue
-			}
-			if shouldAct {
-				if err := eng.drop(ctx, db); err != nil {
-					o.log.Warn("stray-db prune: drop failed", zap.String("engine", eng.name), zap.String("db", db), zap.Error(err))
-					continue
-				}
-			}
-			out = append(out, fmt.Sprintf("%s (%s)", db, eng.name))
+		if lister, ok := eng.srv.(StrayLister); eng.enabled && ok {
+			out = append(out, strayEngine{name: eng.name, lister: lister, drop: eng.drop})
 		}
 	}
-	return out, firstErr
+	return out
+}
+
+// strayPrune is one engine's pass: the databases stacks own, which are never
+// touched, and whether to drop or only list.
+type strayPrune struct {
+	engine    strayEngine
+	owned     map[string]bool
+	shouldAct bool
+}
+
+// pruneStrays drops (or lists) each unowned, unprotected database, returning
+// "name (engine)" for each; a failed drop is logged and left out.
+func (o *Orchestrator) pruneStrays(ctx context.Context, pass strayPrune, dbs []string) []string {
+	eng := pass.engine
+	var out []string
+	for _, db := range dbs {
+		if pass.owned[db] || domain.IsProtectedDatabase(db) {
+			continue
+		}
+		if pass.shouldAct {
+			if err := eng.drop(ctx, db); err != nil {
+				o.log.Warn("stray-db prune: drop failed", zap.String("engine", eng.name), zap.String("db", db), zap.Error(err))
+				continue
+			}
+		}
+		out = append(out, fmt.Sprintf("%s (%s)", db, eng.name))
+	}
+	return out
 }
 
 // pruneStrayDatabasesQuietly is the daemon's unattended pass.

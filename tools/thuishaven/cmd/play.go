@@ -148,7 +148,7 @@ func runPlay(ctx context.Context, d deps, inv invocation) error {
 		return fmt.Errorf("recording the sandbox launcher: %w", err)
 	}
 	logDir, logPath := domain.StackLogPaths(rec.Checkout, rec.Slug)
-	if err := runPlayViewer(ctx, rec.Slug, logPath, logDir, d.sessionActions(rec.Slug)); err != nil {
+	if err := runPlayViewer(ctx, viewerTarget{slug: rec.Slug, logPath: logPath, logDir: logDir, session: d.sessionActions(rec.Slug)}); err != nil {
 		return err
 	}
 	return teardown()

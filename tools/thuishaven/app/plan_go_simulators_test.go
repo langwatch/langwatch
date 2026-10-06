@@ -52,7 +52,7 @@ func TestTheSimsLaneHostsTheSimulatorsInADevCheckout(t *testing.T) {
 	o := &Orchestrator{cfg: Config{Home: home, SimulatorArgv: []string{"/bin/haven", "simulator"}}, proxy: stubProxy{}}
 	repo := simulatorCheckout(t)
 	children := o.planChildren(simulatorStack(repo, domain.LayoutModular),
-		PlanOptions{Selection: everySimulator(), RepoRoot: repo}, repo, "")
+		PlanOptions{Selection: everySimulator(), RepoRoot: repo}, repo)
 
 	for _, name := range simulatorLanes {
 		if _, ok := findChild(children, name); ok {
@@ -111,7 +111,7 @@ func TestAMonolithKeepsTheBundledSimulatorLanes(t *testing.T) {
 	o := &Orchestrator{cfg: Config{Home: t.TempDir(), SimulatorArgv: []string{"/bin/haven", "simulator"}}, proxy: stubProxy{}}
 	repo := simulatorCheckout(t)
 	children := o.planChildren(simulatorStack(repo, domain.LayoutMonolith),
-		PlanOptions{Selection: everySimulator(), RepoRoot: repo}, repo, "")
+		PlanOptions{Selection: everySimulator(), RepoRoot: repo}, repo)
 	for _, name := range simulatorLanes {
 		child, ok := findChild(children, name)
 		if !ok || !strings.Contains(child.Shell, "'simulator'") {

@@ -33,27 +33,16 @@ import (
 //	haven install redis        installs exactly what is named, skips and all
 
 func runInstall(ctx context.Context, d deps, inv invocation) error {
-	if inv.has("--reset-skips") {
-		if err := resetPrereqSkips(d); err != nil {
-			return err
-		}
-		if len(inv.args) == 0 && !inv.has("--list") && !inv.has("--yes") {
-			return nil
-		}
+	if isDone, err := resetSkipsFirst(d, inv); isDone || err != nil {
+		return err
 	}
-
 	// --list is resolved BEFORE the positional form, and refuses to be
 	// combined with it. It promises to change nothing, and `haven install
 	// --list redis` reaching the installer below would break that promise in
 	// the one place a reader has been told it is safe to look.
 	if inv.has("--list") {
-		if len(inv.args) > 0 {
-			return fmt.Errorf("haven install --list reports on every prerequisite and installs none of them — drop %s, or drop --list to install it", strings.Join(inv.args, " "))
-		}
-		printPrereqReportWithPosture(os.Stdout, d.orch.CheckPrereqs(ctx), resolvedPosture(ctx, d), painterFor(d.isAgent))
-		return nil
+		return listPrereqs(ctx, d, inv)
 	}
-
 	// Naming prerequisites is the one form that does not consult the report:
 	// it is how a developer takes back an earlier "never ask again", and
 	// re-deriving that from a probe would just refuse them on the way in.
@@ -64,7 +53,33 @@ func runInstall(ctx context.Context, d deps, inv invocation) error {
 		}
 		return d.orch.InstallPrereqs(ctx, chosen)
 	}
+	return installFromReport(ctx, d, inv)
+}
 
+// resetSkipsFirst clears the remembered skips on --reset-skips, reporting
+// whether that was all the invocation asked for.
+func resetSkipsFirst(d deps, inv invocation) (bool, error) {
+	if !inv.has("--reset-skips") {
+		return false, nil
+	}
+	if err := resetPrereqSkips(d); err != nil {
+		return true, err
+	}
+	return len(inv.args) == 0 && !inv.has("--list") && !inv.has("--yes"), nil
+}
+
+// listPrereqs is `haven install --list`: the report, installing nothing.
+func listPrereqs(ctx context.Context, d deps, inv invocation) error {
+	if len(inv.args) > 0 {
+		return fmt.Errorf("haven install --list reports on every prerequisite and installs none of them — drop %s, or drop --list to install it", strings.Join(inv.args, " "))
+	}
+	painterFor(d.isAgent).prereqReport(os.Stdout, d.orch.CheckPrereqs(ctx), resolvedPosture(ctx, d))
+	return nil
+}
+
+// installFromReport probes the machine and installs what the report says is
+// missing: everything needed on --yes, or what the developer picks.
+func installFromReport(ctx context.Context, d deps, inv invocation) error {
 	report := d.orch.CheckPrereqs(ctx)
 	// Nothing to do is an answer, and it is the same answer however the
 	// command was invoked. Handled here rather than in each branch because
@@ -77,14 +92,14 @@ func runInstall(ctx context.Context, d deps, inv invocation) error {
 	// takes the whole screen and a question asked underneath it would never
 	// be seen.
 	if !anyActionable(report) {
-		printPrereqReportWithPosture(os.Stdout, report, resolvedPosture(ctx, d), painterFor(d.isAgent))
+		painterFor(d.isAgent).prereqReport(os.Stdout, report, resolvedPosture(ctx, d))
 		return nil
 	}
 	if inv.has("--yes") {
 		return installAuto(ctx, d, report)
 	}
 	if !installCanAsk(d.isAgent, stdoutIsTTY(), stdinIsTTY()) {
-		printPrereqReportWithPosture(os.Stdout, report, resolvedPosture(ctx, d), painterFor(d.isAgent))
+		painterFor(d.isAgent).prereqReport(os.Stdout, report, resolvedPosture(ctx, d))
 		printNonInteractiveHint(os.Stdout, report)
 		return nil
 	}
@@ -192,13 +207,13 @@ func printPrereqReport(w io.Writer, report []domain.PrereqStatus) {
 // printPrereqReportStyled is the report with a painter, so a terminal gets
 // colour and an agent or a pipe gets the same words with none.
 func printPrereqReportStyled(w io.Writer, report []domain.PrereqStatus, paint painter) {
-	printPrereqReportWithPosture(w, report, app.ContainerPosture{}, paint)
+	paint.prereqReport(w, report, app.ContainerPosture{})
 }
 
-// printPrereqReportWithPosture is the report plus the one line that says what
+// prereqReport is the report plus the one line that says what
 // this machine has decided about containers — which is the setting the whole
 // lower half of the report is downstream of.
-func printPrereqReportWithPosture(w io.Writer, report []domain.PrereqStatus, posture app.ContainerPosture, paint painter) {
+func (paint painter) prereqReport(w io.Writer, report []domain.PrereqStatus, posture app.ContainerPosture) {
 	fmt.Fprintln(w, paint(havenui.Title, "haven install"))
 	fmt.Fprintln(w, paint(havenui.Muted, "  what this machine has"))
 	fmt.Fprintln(w)

@@ -38,25 +38,32 @@ type sessionActions struct {
 	Down func() error
 }
 
+// viewerTarget is the stack a viewer opens on: its slug, its resolved log
+// paths and the actions its dashboard can take.
+type viewerTarget struct {
+	slug, logPath, logDir string
+	session               sessionActions
+}
+
 // runUpViewer opens the viewer on a stack until quit or ctx cancel. preferred,
 // when non-empty, names the application whose log sub-tab to land on - `haven
 // up +langy` should open looking at langy. logPath/logDir are the caller's
 // already-resolved paths (d.orch.LogPath/LogDir, or the known worktree for a
 // stack this process just started), so the viewer never re-resolves them.
-func runUpViewer(ctx context.Context, slug, preferred, logPath, logDir string, session sessionActions) error {
-	m := newViewerModel(slug, logPath, logDir)
+func runUpViewer(ctx context.Context, target viewerTarget, preferred string) error {
+	m := newViewerModel(target.slug, target.logPath, target.logDir)
 	m.preferred = preferred
-	m.enableDashboard(session, false)
+	m.enableDashboard(target.session, false)
 	return runViewer(ctx, m)
 }
 
 // runPlayViewer is the same view over a play sandbox, with the opposite quit
 // contract in its banner: quitting `haven play` destroys the sandbox, it never
 // detaches.
-func runPlayViewer(ctx context.Context, slug, logPath, logDir string, session sessionActions) error {
-	m := newViewerModel(slug, logPath, logDir)
+func runPlayViewer(ctx context.Context, target viewerTarget) error {
+	m := newViewerModel(target.slug, target.logPath, target.logDir)
 	m.destroyOnQuit = true
-	m.enableDashboard(session, true)
+	m.enableDashboard(target.session, true)
 	return runViewer(ctx, m)
 }
 
@@ -455,34 +462,59 @@ func (m *viewerModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.help {
 		return m, nil
 	}
-	if msg.X < 0 || msg.Y < 0 || (m.width > 0 && msg.X >= m.width) || (m.height > 0 && msg.Y >= m.height) {
+	if m.isOffScreen(msg) {
 		m.hoverRow = -1
 		return m, nil
 	}
-	if msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress {
-		for _, hit := range m.tabHits {
-			if msg.Y == hit.y && msg.X >= hit.start && msg.X < hit.end {
-				m.selectTab(hit.name)
-				return m, nil
-			}
-		}
-	}
-	if m.onSessionTab() {
-		switch msg.Button {
-		case tea.MouseButtonWheelUp:
-			return m.handleKey("up")
-		case tea.MouseButtonWheelDown:
-			return m.handleKey("down")
-		case tea.MouseButtonLeft:
-			if index, ok := m.serviceRows[msg.Y]; ok && msg.Action == tea.MouseActionPress {
-				m.cursor = index
-				m.openSelectedLogs()
-			}
-		default:
-			// Session rows react only to clicks and vertical scrolling.
-		}
+	if m.clickTab(msg) {
 		return m, nil
 	}
+	if m.onSessionTab() {
+		return m.sessionMouse(msg)
+	}
+	m.bodyMouse(msg)
+	return m, nil
+}
+
+// isOffScreen reports whether the pointer is outside the terminal.
+func (m *viewerModel) isOffScreen(msg tea.MouseMsg) bool {
+	return msg.X < 0 || msg.Y < 0 || (m.width > 0 && msg.X >= m.width) || (m.height > 0 && msg.Y >= m.height)
+}
+
+// clickTab selects the tab under a left click, reporting whether there was one.
+func (m *viewerModel) clickTab(msg tea.MouseMsg) bool {
+	if msg.Button != tea.MouseButtonLeft || msg.Action != tea.MouseActionPress {
+		return false
+	}
+	for _, hit := range m.tabHits {
+		if msg.Y == hit.y && msg.X >= hit.start && msg.X < hit.end {
+			m.selectTab(hit.name)
+			return true
+		}
+	}
+	return false
+}
+
+// sessionMouse scrolls the session tab, and opens a service's logs on a click.
+func (m *viewerModel) sessionMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	switch msg.Button {
+	case tea.MouseButtonWheelUp:
+		return m.handleKey("up")
+	case tea.MouseButtonWheelDown:
+		return m.handleKey("down")
+	case tea.MouseButtonLeft:
+		if index, ok := m.serviceRows[msg.Y]; ok && msg.Action == tea.MouseActionPress {
+			m.cursor = index
+			m.openSelectedLogs()
+		}
+	default:
+		// Session rows react only to clicks and vertical scrolling.
+	}
+	return m, nil
+}
+
+// bodyMouse hovers, scrolls or toggles the body row under the pointer.
+func (m *viewerModel) bodyMouse(msg tea.MouseMsg) {
 	m.hoverRow = m.bodyRow(msg.Y)
 	switch msg.Button {
 	case tea.MouseButtonWheelUp:
@@ -498,7 +530,6 @@ func (m *viewerModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	default:
 		// Every other button/gesture is outside this viewer's scope.
 	}
-	return m, nil
 }
 
 // bodyRow turns a pointer's Y coordinate into a body row, or -1 when it is over
@@ -950,14 +981,7 @@ func (m *viewerModel) View() string {
 	if m.help {
 		return m.helpView(chrome)
 	}
-	var body []string
-	actions := "↑↓ Select · enter Inspect · o Browser · r Restart · a Restart all"
-	if !m.onSessionTab() {
-		actions = m.tabs[m.currentTab()].Footer()
-	}
-	if m.anchorID != 0 {
-		actions = "Inspecting log · ↑↓ Scroll details · click Collapse · f Resume live"
-	}
+	actions := m.footerActions()
 	context := m.footerRows(actions)
 	if m.height > 0 && m.height < 16 {
 		context = []string{cutRow(" "+strings.Split(actions, "\n")[0], m.width)}
@@ -970,17 +994,7 @@ func (m *viewerModel) View() string {
 	if m.toast != "" {
 		budget = max(1, budget-1)
 	}
-	if m.onSessionTab() {
-		m.rowIDs = nil
-		body = m.sessionRows(budget)
-	} else {
-		tab := m.tabs[m.currentTab()]
-		header := m.headerRows(tab)
-		if len(header) >= budget {
-			header = header[:max(0, budget-1)]
-		}
-		body = m.layOutBody(tab, header, max(1, budget-len(header)))
-	}
+	body := m.bodyRows(budget)
 	rows := append([]string{}, chrome...)
 	rows = append(rows, body...)
 	rows = append(rows, "")
@@ -996,17 +1010,49 @@ func (m *viewerModel) View() string {
 	return strings.Join(m.clampToTerminal(rows), "\n")
 }
 
-func (m *viewerModel) chromeRows() []string {
-	status := "\x1b[32m● Running" + sgrReset
-	if !m.snap.Found {
-		status = dimText("◌ Connecting")
-	} else if !m.snap.Live {
-		status = "\x1b[33m○ Stopped" + sgrReset
+// footerActions is the key help for what is on screen: the session tab's, the
+// current tab's own, or the inspector's.
+func (m *viewerModel) footerActions() string {
+	if m.anchorID != 0 {
+		return "Inspecting log · ↑↓ Scroll details · click Collapse · f Resume live"
 	}
-	mode := "haven up"
+	if !m.onSessionTab() {
+		return m.tabs[m.currentTab()].Footer()
+	}
+	return "↑↓ Select · enter Inspect · o Browser · r Restart · a Restart all"
+}
+
+// bodyRows is the session list, or the current tab's pinned header and output,
+// in budget rows.
+func (m *viewerModel) bodyRows(budget int) []string {
+	if m.onSessionTab() {
+		m.rowIDs = nil
+		return m.sessionRows(budget)
+	}
+	tab := m.tabs[m.currentTab()]
+	header := m.headerRows(tab)
+	if len(header) >= budget {
+		header = header[:max(0, budget-1)]
+	}
+	return m.layOutBody(tab, header, max(1, budget-len(header)))
+}
+
+// modeAndStatus is the banner's command name and the stack's state beside it.
+func (m *viewerModel) modeAndStatus() (string, string) {
 	if m.destroyOnQuit {
-		mode, status = "haven play", "\x1b[33m● Ephemeral sandbox"+sgrReset
+		return "haven play", "\x1b[33m● Ephemeral sandbox" + sgrReset
 	}
+	switch {
+	case !m.snap.Found:
+		return "haven up", dimText("◌ Connecting")
+	case !m.snap.Live:
+		return "haven up", "\x1b[33m○ Stopped" + sgrReset
+	}
+	return "haven up", "\x1b[32m● Running" + sgrReset
+}
+
+func (m *viewerModel) chromeRows() []string {
+	mode, status := m.modeAndStatus()
 	rows := []string{cutRow(" \x1b[1;38;5;216m"+mode+sgrReset+"  /  "+m.slug, m.width), " " + status, ""}
 	if m.height > 0 && m.height < 16 {
 		rows = rows[:1]
@@ -1098,20 +1144,7 @@ func (m *viewerModel) layOutBody(tab viewer.Tab, header []string, budget int) []
 	rows := m.visibleRows
 	if m.anchorID != 0 {
 		rows = m.frozenRows
-		total, anchor := 0, 0
-		for _, row := range rows {
-			if row.ID == m.anchorID {
-				anchor = total
-			}
-			if m.expandedIDs[row.ID] || m.expandAll[m.currentTab()] {
-				total += len(expandRow(row, m.width-gutterWidth))
-			} else {
-				total += len(cutBlock(row, m.width-gutterWidth))
-			}
-		}
-		start := max(0, anchor-max(0, m.anchorOffset))
-		m.expansionLimit = max(0, total-budget-start)
-		m.expansionScroll = min(max(0, m.expansionScroll), m.expansionLimit)
+		m.measureExpansion(rows, budget)
 	}
 	fitted := fitRows(rows, fitOptions{
 		anchorID: m.anchorID, anchorOffset: m.anchorOffset, scroll: m.expansionScroll,
@@ -1132,6 +1165,29 @@ func (m *viewerModel) layOutBody(tab viewer.Tab, header []string, budget int) []
 	}
 	m.rowIDs = ids
 	return out
+}
+
+// measureExpansion bounds how far the inspector can scroll through the frozen
+// rows, expanded ones at their full height, below the anchored row.
+func (m *viewerModel) measureExpansion(rows []viewer.Row, budget int) {
+	total, anchor := 0, 0
+	for _, row := range rows {
+		if row.ID == m.anchorID {
+			anchor = total
+		}
+		total += m.rowHeight(row)
+	}
+	start := max(0, anchor-max(0, m.anchorOffset))
+	m.expansionLimit = max(0, total-budget-start)
+	m.expansionScroll = min(max(0, m.expansionScroll), m.expansionLimit)
+}
+
+// rowHeight is how many screen rows a body row takes, expanded or cut.
+func (m *viewerModel) rowHeight(row viewer.Row) int {
+	if m.expandedIDs[row.ID] || m.expandAll[m.currentTab()] {
+		return len(expandRow(row, m.width-gutterWidth))
+	}
+	return len(cutBlock(row, m.width-gutterWidth))
 }
 
 // markSeen stamps the tab on screen as read. A tab never marks itself: the
