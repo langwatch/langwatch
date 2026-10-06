@@ -10,8 +10,9 @@ import {
   useUiDeployment,
   useUiScope,
 } from "@langwatch/browser-host/capabilities";
-import type { UiProjectSwitcherProps } from "@langwatch/browser-host/declarations";
+import { useLent } from "@langwatch/browser-host/lent";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { ProjectSwitcherToken, type ProjectSwitcherProps } from "@langwatch/project-contract";
 import { lazy, Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 
 import {
@@ -58,7 +59,7 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
       failed: (failure: OrganizationFailureNotice) => void;
       overviewCards: readonly AuthenticationOverviewCard[];
       directorySummary: DirectorySummaryBand | undefined;
-      Switcher: ComponentType<UiProjectSwitcherProps> | undefined;
+      Switcher: ComponentType<ProjectSwitcherProps> | undefined;
     },
   ) {
     super();
@@ -127,7 +128,7 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
     this.deps.setQuery(next, options);
   }
 
-  /** The switcher project lends by declaration (ARCHITECTURE §10), as main's audit log header. */
+  /** The switcher project lends by token (ARCHITECTURE §10), as main's audit log header. */
   projectSwitcher(): ReactNode | null {
     const { Switcher } = this.deps;
     if (!Switcher) return null;
@@ -194,10 +195,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
     const [lent] = declarations.declared("directorySummary");
     return lent ? lazy(lent.capability.load) : void 0;
   }, [declarations]);
-  const Switcher = useMemo(() => {
-    const [lent] = declarations.declared("projectSwitcher");
-    return lent ? lazy(lent.capability.load) : void 0;
-  }, [declarations]);
+  const Switcher = useLent(ProjectSwitcherToken);
 
   const host = useMemo(
     () =>

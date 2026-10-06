@@ -97,9 +97,6 @@ export type UiCustomGraphProps = {
 /** What a surface hands navigation's lent command palette, drawn inline rather than as the bar. */
 export type UiInlineCommandPaletteProps = { placeholder: string };
 
-/** Project's lent switcher needs nothing handed in: it reads the scope and the graph itself. */
-export type UiProjectSwitcherProps = Record<string, never>;
-
 /** Organization's lent card of people waiting to join needs nothing handed in: it reads scope. */
 export type UiPendingJoinRequestsProps = Record<string, never>;
 
@@ -663,7 +660,6 @@ export type UiDeclaredCapabilities = {
   parameterLineField: UiDeclaredComponent<UiParameterLineFieldProps>;
   pendingJoinRequests: UiDeclaredComponent<UiPendingJoinRequestsProps>;
   projectDepartmentField: UiDeclaredComponent<UiProjectDepartmentFieldProps>;
-  projectSwitcher: UiDeclaredComponent<UiProjectSwitcherProps>;
   redactedField: UiDeclaredComponent<UiRedactedFieldProps>;
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   resourceLimitRow: UiDeclaredComponent<UiResourceLimitRowProps>;
