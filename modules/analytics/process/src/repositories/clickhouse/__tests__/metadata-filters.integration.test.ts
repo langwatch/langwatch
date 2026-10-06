@@ -113,7 +113,7 @@ describe("analytics metadata filters", () => {
     ] as const) {
       await ch.insert({
         table,
-        values: TRACES.map(row),
+        values: TRACES.map((trace) => row(trace)),
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
       });

@@ -1,4 +1,4 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -16,6 +16,8 @@ export const analyticsServerConfig = Config.define((c) => ({
     accessModelMode: c.env("LWQL_ACCESS_MODEL_MODE", z.string().optional()),
     sqlSingleNode: c.env("LWQL_ACCESS_MODEL_SQL_SINGLE_NODE", z.string().optional()),
   },
+  /** The shared deployment origin a saved chart's platform link is built on. */
+  publicBaseUrl,
 }));
 
 export type AnalyticsServerConfig = ConfigOf<typeof analyticsServerConfig>;

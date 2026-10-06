@@ -17,6 +17,7 @@ import {
 } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
+import type { AnalyticsRepositories } from "../repositories/analytics.repositories.ts";
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import {
   LWQL_RECONVERGENCE_PROCESS_NAME,
@@ -88,7 +89,7 @@ function isReconvergenceApp(app: unknown): app is LwqlReconvergenceApp {
 /** Narrowed to the constructed app, as the licensing transport facts do, not the contract. */
 export const lwqlReconvergenceEventing = defineEventingModule({
   pipeline: LWQL_RECONVERGENCE_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<unknown, AnalyticsApi>) => {
+  build: ({ app }: EventingSetup<AnalyticsRepositories, AnalyticsApi>) => {
     if (!isReconvergenceApp(app)) {
       throw new TypeError(
         "The LangWatchQL reconvergence watch requires the constructed analytics app",

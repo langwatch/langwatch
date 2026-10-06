@@ -3952,7 +3952,7 @@
           "kind": "enum",
           "isList": false,
           "isOptional": false,
-          "documentation": "The organisation role handed to a person admitted without an invitation:\na self-service domain join (`domainJoin`) or an SSO-admitted login.\n`MEMBER` (default, a Full seat) or `DEVELOPER` (ADR-143). Set on the\norganisation settings page only; the join flow never asks, and an\ninvitation always names its own role."
+          "documentation": "The organisation role handed to a person admitted without an invitation:\na self-service domain join (`domainJoin`) or an SSO-admitted login.\n`MEMBER` (default, a Full seat) or `DEVELOPER` (ADR-171). Set on the\norganisation settings page only; the join flow never asks, and an\ninvitation always names its own role."
         },
         {
           "name": "joinDomains",

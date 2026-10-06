@@ -7,7 +7,6 @@
  */
 import type { LangWatchQLKeyReach } from "@langwatch/analytics-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type DataPrivacyApi,
@@ -16,13 +15,12 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { resolveRequestBound } from "@langwatch/plans";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import type { LwqlProvisioningDatabase } from "../../tasks/lwql-provision.task.ts";
+import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { AnalyticsModule } from "../analytics.app.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -122,14 +120,7 @@ async function appOver(input: {
       traces: createApiFixture<TraceApi>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
-    members: {
-      clickhouse: createApiFixture<ClickHouseQueryClient>(),
-      rateLimiter: { check: () => Promise.resolve({ allowed: true }) } satisfies RateLimiter,
-      publicBaseUrl: "https://app.langwatch.test",
-      clickhouseAdmin: { configured: false },
-      databaseTarget: { configured: false },
-      prisma: createApiFixture<LwqlProvisioningDatabase>({}, "prisma"),
-    },
+    repositories: MemoryAnalyticsRepositories.create(),
     config: {
       langwatchQl: {
         url: void 0,
@@ -140,6 +131,7 @@ async function appOver(input: {
         accessModelMode: void 0,
         sqlSingleNode: void 0,
       },
+      publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: {} as never,
