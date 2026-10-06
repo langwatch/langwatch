@@ -146,8 +146,8 @@ function assertDestinationCanHostSpool({
         "between the spool write and its delete leaves the object behind, and only a lifecycle " +
         "rule reaps it. Create a lifecycle management policy on this container that deletes " +
         "blobs under the `trace-blobs/spool/` prefix after 3 days, then set " +
-        "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED=true (chart: " +
-        "`app.dataplane.providers.azureBlob.spoolRetentionConfirmed`). Ingestion continues with " +
+        "OBJECT_RETENTION_CONFIRMED=true (chart: `app.dataplane.objectRetentionConfirmed`; the " +
+        "earlier AZURE_BLOB_SPOOL_RETENTION_CONFIRMED still works). Ingestion continues with " +
         "the full payload inline until then.",
     );
   }
