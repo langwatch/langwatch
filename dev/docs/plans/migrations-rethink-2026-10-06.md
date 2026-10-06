@@ -204,7 +204,7 @@ thing (`.claude/skills/postgres-migration/SKILL.md:39-42`); no migration carries
 | F10 | This branch and main number migrations independently                             | ongoing  | below                                                                   |
 
 F10: main's `20261002090000_join_request_origin` is not on this branch; three branch-only Prisma
-migrations sort below it (`20261001130000_authz_user_standing`, `20261001140000_gateway_trace_export_key`,
+migrations sort below it (`20261001130000_authz_user_standing`, `20261001140000_gateway_trace_export_key`, (renamed to 20261006150001-3 on 2026-10-06)
 `20261001150000_api_key_system_managed`); the branch's goose `00101` to `00104` will collide with main's
 next `00101`. `tools/migrationorder/set.go:40-66` checks a PR against its base only. With stepping, a
 goose version in a later release that sorts below an earlier release's last version is refused by goose,
