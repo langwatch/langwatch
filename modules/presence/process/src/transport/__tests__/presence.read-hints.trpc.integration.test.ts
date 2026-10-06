@@ -78,9 +78,9 @@ function members(): TrpcRuntimeMembers<DoorContext> {
 }
 
 /** The doors over the real presence app, and the fan-out a stream would have listened on. */
-function mountedDoors() {
+async function mountedDoors() {
   const emitters = new TestPresenceEmitters();
-  const app = createPresenceTestApp({ emitters });
+  const app = await createPresenceTestApp({ emitters });
   const root = TrpcRootDefinition.forContext<DoorContext>().create();
   const router = createTrpcRuntime<DoorContext>({
     root,
@@ -96,7 +96,7 @@ function mountedDoors() {
 describe("the mounted presence read-hint doors", () => {
   /** @scenario "A stream for an organization the caller does not belong to is refused" */
   it("refuses a member of acme who opens the stream for globex, listening on nothing", async () => {
-    const { router, emitters } = mountedDoors();
+    const { router, emitters } = await mountedDoors();
     const member = router.createCaller({ actor: { id: "u1" } });
 
     await expect(
@@ -107,7 +107,7 @@ describe("the mounted presence read-hint doors", () => {
 
   /** @scenario "A stream for a project outside the caller's organisation is refused" */
   it("refuses acme with a globex project the caller can view, listening on nothing", async () => {
-    const { router, emitters } = mountedDoors();
+    const { router, emitters } = await mountedDoors();
     const member = router.createCaller({ actor: { id: "u1" } });
 
     await expect(
@@ -118,7 +118,7 @@ describe("the mounted presence read-hint doors", () => {
 
   /** @scenario "An anonymous connection is refused the hint stream" */
   it("refuses a connection with no session on either door, listening on nothing", async () => {
-    const { router, emitters } = mountedDoors();
+    const { router, emitters } = await mountedDoors();
     const anonymous = router.createCaller({ actor: null });
 
     await expect(

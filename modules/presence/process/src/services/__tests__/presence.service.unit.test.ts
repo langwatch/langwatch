@@ -2,7 +2,7 @@ import type { PresenceSession } from "@langwatch/presence-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  createPresenceTestProjects,
+  createPresenceTestSettings,
   RecordingPresenceBroadcast,
   RecordingPresenceDiagnostics,
 } from "../../app/__tests__/presence.fixture.ts";
@@ -25,30 +25,24 @@ class StubRepository extends PresenceRepository {
   findSession = vi.fn(async () => this.current);
 }
 
-function createService(options: { enabled?: boolean } = {}) {
+async function createService(options: { enabled?: boolean } = {}) {
   const repository = new StubRepository();
   const broadcast = new RecordingPresenceBroadcast();
-  const projects = createPresenceTestProjects(options.enabled ?? true);
+  const settings = await createPresenceTestSettings(options.enabled ?? true);
   const service = PresenceService.create({
     repository,
     broadcast,
-    projects,
+    settings,
     diagnostics: new RecordingPresenceDiagnostics(),
     now: () => 42,
   });
-  return { service, repository, broadcast, projects };
+  return { service, repository, broadcast };
 }
 
 describe("PresenceService", () => {
-  /** @scenario "Presence uses Project-owned policy" */
-  it("uses the canonical Project service for the effective policy", async () => {
-    const { service } = createService({ enabled: false });
-    await expect(service.isEnabledForProject({ projectId: "project-1" })).resolves.toBe(false);
-  });
-
   /** @scenario "A first heartbeat joins a project" */
   it("persists and broadcasts the first session heartbeat", async () => {
-    const { service, repository, broadcast } = createService();
+    const { service, repository, broadcast } = await createService();
     await expect(
       service.update({
         projectId: session.projectId,
@@ -77,7 +71,7 @@ describe("PresenceService", () => {
   });
 
   it("publishes an update only when the location changes", async () => {
-    const { service, repository, broadcast } = createService();
+    const { service, repository, broadcast } = await createService();
     repository.current = session;
 
     await service.update({
@@ -109,7 +103,7 @@ describe("PresenceService", () => {
 
   /** @scenario "An unchanged heartbeat refreshes only the TTL" */
   it("refreshes an unchanged session without broadcasting a delta", async () => {
-    const { service, repository, broadcast } = createService();
+    const { service, repository, broadcast } = await createService();
     repository.current = session;
     await service.update({
       projectId: session.projectId,
@@ -123,7 +117,7 @@ describe("PresenceService", () => {
 
   /** @scenario "Leaving twice is idempotent" */
   it("makes leave idempotent", async () => {
-    const { service, repository, broadcast } = createService();
+    const { service, repository, broadcast } = await createService();
     repository.remove.mockResolvedValue(false);
     await expect(
       service.leave({ projectId: "project-1", sessionId: "missing", userId: "user-1" }),
@@ -134,7 +128,7 @@ describe("PresenceService", () => {
   describe("when the session belongs to another member", () => {
     /** @scenario "A member cannot remove another member's presence session" */
     it("refuses the removal and leaves the session published", async () => {
-      const { service, repository, broadcast } = createService();
+      const { service, repository, broadcast } = await createService();
       repository.current = session;
 
       await expect(
@@ -149,7 +143,7 @@ describe("PresenceService", () => {
   describe("when the session belongs to the caller", () => {
     /** @scenario "Leaving the project removes the session immediately" */
     it("removes it and tells peers", async () => {
-      const { service, repository, broadcast } = createService();
+      const { service, repository, broadcast } = await createService();
       repository.current = session;
 
       await service.leave({ projectId: "project-1", sessionId: "tab-1", userId: "user-1" });
@@ -167,7 +161,7 @@ describe("PresenceService", () => {
   });
 
   it("publishes cursor ticks through the rate-limited channel", async () => {
-    const { service, broadcast } = createService();
+    const { service, broadcast } = await createService();
     await service.broadcastCursor({
       projectId: "project-1",
       sessionId: "tab-1",
@@ -200,7 +194,7 @@ describe("PresenceService", () => {
     const service = PresenceService.create({
       repository,
       broadcast,
-      projects: createPresenceTestProjects(),
+      settings: await createPresenceTestSettings(),
       diagnostics,
       now: () => 42,
     });

@@ -32,11 +32,28 @@ Feature: Collaborative presence
     Then the removal is refused as not mine to make
     And that member stays present to everyone watching
 
+  # Project and organization own the presence settings; presence learns them only from their
+  # facts (rulings 2026-10-05, "Presence"), so it holds no peer to ask.
   @unit
-  Scenario: Presence uses Project-owned policy
-    When Presence decides whether a project is enabled
-    Then it asks the canonical Project service
-    And it does not query Project or Organization persistence
+  Scenario: Presence keeps no project or user peer
+    When a process installs presence
+    Then presence names no peer it depends on
+    And it decides whether a project is enabled from its own fold of the settings facts
+
+  @unit
+  Scenario: Presence folds the presence-setting facts project and organization append
+    Given project has appended that a project was created
+    And project has appended that the project's own presence setting is on
+    When organization appends that the project's organization switched presence off
+    Then presence's settings subscribers fold each fact
+    And presence answers that the project is not enabled
+
+  @unit
+  Scenario: A heartbeat counts once presence has folded the project's creation
+    Given a worker installs presence beside project's pipeline
+    And project appends that a project was created
+    When a browser session sends a heartbeat for that project
+    Then the session is listed as present
 
   # Presence folds project's and organization's presence-setting facts into its own durable keys
   # (rulings 2026-10-05, "Presence flag"); answering from that fold, switching off is eventual.

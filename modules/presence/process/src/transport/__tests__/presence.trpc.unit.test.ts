@@ -15,7 +15,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   createPresenceTestApp,
-  createPresenceTestProjects,
   RecordingPresenceBroadcast,
   TestPresenceEmitters,
 } from "../../app/__tests__/presence.fixture.ts";
@@ -24,7 +23,7 @@ import { accessDeclaredBy, presenceTrpcCaller } from "./presence-trpc.fixture.ts
 
 const location: PresenceLocation = { lens: "traces", route: { traceId: "trace-1" } };
 
-function createCaller(
+async function createCaller(
   options: {
     enabled?: boolean;
     permitted?: boolean;
@@ -34,10 +33,10 @@ function createCaller(
 ) {
   const broadcast = new RecordingPresenceBroadcast();
   const emitters = new TestPresenceEmitters();
-  const app = createPresenceTestApp({
+  const app = await createPresenceTestApp({
     broadcast,
     emitters,
-    projects: createPresenceTestProjects(options.enabled ?? true),
+    enabled: options.enabled ?? true,
   });
   const mounted = presenceTrpcCaller({
     declaration: presenceTrpcTransport,
@@ -97,7 +96,7 @@ describe("given the presence declaration", () => {
 describe("when a browser session sends a heartbeat", () => {
   /** @scenario "A user cannot impersonate another user's presence session" */
   it("records the session under the authenticated identity, never the payload's", async () => {
-    const { caller, broadcast, app } = createCaller({ userId: "user-bob" });
+    const { caller, broadcast, app } = await createCaller({ userId: "user-bob" });
 
     await expect(
       caller.update({ projectId: "project-1", sessionId: "tab-1", location }),
@@ -116,7 +115,7 @@ describe("when a browser session sends a heartbeat", () => {
 
   /** @scenario "The presenter's name and image come from the signed-in session" */
   it("shows peers the session person's name and avatar under the authenticated id", async () => {
-    const { caller, app } = createCaller({
+    const { caller, app } = await createCaller({
       userId: "user-grace",
       person: { name: "Grace", image: "https://example.test/grace.png" },
     });
@@ -133,7 +132,7 @@ describe("when a browser session sends a heartbeat", () => {
 
   /** @scenario "A caller with no session person is shown without a name or image" */
   it("shows peers the authenticated id alone when the door binds no session person", async () => {
-    const { caller, app } = createCaller({ userId: "user-grace", person: null });
+    const { caller, app } = await createCaller({ userId: "user-grace", person: null });
 
     await caller.update({ projectId: "project-1", sessionId: "tab-1", location });
 
@@ -154,7 +153,7 @@ describe("when a browser session sends a heartbeat", () => {
   });
 
   it("records nothing when presence is switched off for the project", async () => {
-    const { caller, app } = createCaller({ enabled: false });
+    const { caller, app } = await createCaller({ enabled: false });
 
     await expect(
       caller.update({ projectId: "project-1", sessionId: "tab-1", location }),
@@ -163,7 +162,7 @@ describe("when a browser session sends a heartbeat", () => {
   });
 
   it("refuses the heartbeat when the caller cannot view the project", async () => {
-    const { caller, app } = createCaller({ permitted: false });
+    const { caller, app } = await createCaller({ permitted: false });
 
     await expect(
       caller.update({ projectId: "project-1", sessionId: "tab-1", location }),
@@ -174,7 +173,7 @@ describe("when a browser session sends a heartbeat", () => {
 
 describe("when a browser session leaves", () => {
   it("removes the session it published and tells peers", async () => {
-    const { caller, broadcast } = createCaller();
+    const { caller, broadcast } = await createCaller();
     await caller.update({ projectId: "project-1", sessionId: "tab-1", location });
 
     await expect(caller.leave({ projectId: "project-1", sessionId: "tab-1" })).resolves.toEqual({
@@ -184,7 +183,7 @@ describe("when a browser session leaves", () => {
   });
 
   it("refuses to remove a session another member published", async () => {
-    const { caller, app } = createCaller({ userId: "user-alice" });
+    const { caller, app } = await createCaller({ userId: "user-alice" });
     await caller.update({ projectId: "project-1", sessionId: "tab-1", location });
 
     const bob = presenceTrpcCaller({
@@ -202,7 +201,7 @@ describe("when a browser session leaves", () => {
 
 describe("when a cursor tick arrives", () => {
   it("broadcasts it under the authenticated identity, never the payload's", async () => {
-    const { caller, broadcast } = createCaller({ userId: "user-bob" });
+    const { caller, broadcast } = await createCaller({ userId: "user-bob" });
 
     await expect(
       caller.cursor({
@@ -226,7 +225,7 @@ describe("when a cursor tick arrives", () => {
   });
 
   it("broadcasts nothing when presence is switched off for the project", async () => {
-    const { caller, broadcast } = createCaller({ enabled: false });
+    const { caller, broadcast } = await createCaller({ enabled: false });
 
     await expect(
       caller.cursor({
@@ -241,7 +240,7 @@ describe("when a cursor tick arrives", () => {
 
 describe("when a client subscribes to presence updates", () => {
   it("opens with a snapshot of the sessions the project already has", async () => {
-    const { caller } = createCaller();
+    const { caller } = await createCaller();
     await caller.update({ projectId: "project-1", sessionId: "tab-1", location });
 
     const received: PresenceEvent[] = [];
@@ -255,7 +254,7 @@ describe("when a client subscribes to presence updates", () => {
   });
 
   it("answers an empty snapshot while presence is switched off", async () => {
-    const { caller } = createCaller({ enabled: false });
+    const { caller } = await createCaller({ enabled: false });
 
     const received: PresenceEvent[] = [];
     for await (const event of await caller.onPresenceUpdate({ projectId: "project-1" })) {
@@ -267,7 +266,7 @@ describe("when a client subscribes to presence updates", () => {
 
   /** @scenario "A user without traces:view permission for the project cannot subscribe" */
   it("never reaches the broadcast fabric when the caller cannot view the project", async () => {
-    const { caller, emitters } = createCaller({ permitted: false });
+    const { caller, emitters } = await createCaller({ permitted: false });
 
     await expect(async () => {
       for await (const _event of await caller.onPresenceUpdate({ projectId: "project-1" })) {
@@ -280,7 +279,7 @@ describe("when a client subscribes to presence updates", () => {
 
 describe("when a client subscribes to cursor ticks", () => {
   it("yields nothing while presence is switched off", async () => {
-    const { caller } = createCaller({ enabled: false });
+    const { caller } = await createCaller({ enabled: false });
 
     const received: PresenceCursorEvent[] = [];
     for await (const event of await caller.onPresenceCursor({

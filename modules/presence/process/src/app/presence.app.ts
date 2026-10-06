@@ -18,12 +18,16 @@ import {
   type ReadHintsWatchInput,
 } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
 import type { Cluster, Redis } from "ioredis";
 
+import {
+  buildPresenceSettingsPipeline,
+  type PresenceSettingsPipeline,
+} from "../eventing/presence-settings.pipeline.ts";
 import type { PresenceRepositories } from "../repositories/presence.repositories.ts";
 import { RedisBroadcastRepository } from "../repositories/redis/redis.broadcast.repository.ts";
 import { BroadcastTenantRateLimiterService } from "../services/broadcast-tenant-rate-limiter.service.ts";
+import { PresenceSettingsService } from "../services/presence-settings.service.ts";
 import { PresenceStreamService } from "../services/presence-stream.service.ts";
 import { PresenceService } from "../services/presence.service.ts";
 import { ReadHintStreamService } from "../services/read-hint-stream.service.ts";
@@ -70,10 +74,11 @@ type PresenceSetup = FeatureSetup<
 
 export class PresenceModule implements PresenceApiContract, PresenceBroadcastFabric {
   static readonly contract = PresenceApi;
-  static readonly dependencies = { projects: ProjectApi };
+  static readonly dependencies = {};
   static readonly reads = ["redis", "logger"] as const;
 
   readonly #presence: PresenceService;
+  readonly #settings: PresenceSettingsService;
   readonly #stream: PresenceStreamService;
   readonly #readHints: ReadHintStreamService;
   /** The same fabric {@link PresenceBroadcastFabric} exposes to a peer. */
@@ -82,25 +87,28 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
 
   private constructor({
     presence,
+    settings,
     stream,
     readHints,
     emitters,
     broadcast,
   }: {
     presence: PresenceService;
+    settings: PresenceSettingsService;
     stream: PresenceStreamService;
     readHints: ReadHintStreamService;
     emitters: PresenceEmitter;
     broadcast: PresenceBroadcast;
   }) {
     this.#presence = presence;
+    this.#settings = settings;
     this.#stream = stream;
     this.#readHints = readHints;
     this.#emitters = emitters;
     this.#broadcast = broadcast;
   }
 
-  static create({ repositories, members, dependencies, resources }: PresenceSetup): PresenceModule {
+  static create({ repositories, members, resources }: PresenceSetup): PresenceModule {
     const needsDerivedFabric = !members.broadcast || !members.emitters;
     const derived = needsDerivedFabric
       ? RedisBroadcastRepository.create(members.redis, {
@@ -120,20 +128,27 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
     const diagnostics: PresenceDiagnostics = members.diagnostics ?? {
       warn: (message, context) => members.logger.warn(context, message),
     };
+    const settings = PresenceSettingsService.create({ repository: repositories.settings });
     const presence = PresenceService.create({
       repository: repositories.sessions,
       broadcast,
-      projects: dependencies.projects,
+      settings,
       diagnostics,
     });
 
     return new PresenceModule({
       presence,
+      settings,
       stream: PresenceStreamService.create({ presence, emitters }),
       readHints: ReadHintStreamService.create({ emitters }),
       emitters,
       broadcast,
     });
+  }
+
+  /** The pipeline whose peer subscribers fold the presence-setting facts. */
+  settingsPipeline(): PresenceSettingsPipeline {
+    return buildPresenceSettingsPipeline({ settings: this.#settings });
   }
 
   /** {@link PresenceBroadcastFabric}: the tenant's live-update signals. */
