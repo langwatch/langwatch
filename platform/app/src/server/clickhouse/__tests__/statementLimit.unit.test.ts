@@ -598,12 +598,126 @@ describe("withStatementLimit", () => {
   });
 
   /**
+   * The refusal paths above (queue full, wait timeout, caller abort) all used a
+   * budget of one, where the single shared "all" lane IS the total and nothing
+   * ever waits on a cap. These exercise the same three refusals against a split
+   * budget, where the read CAP fills first and the total still has a slot free —
+   * so the refusal is proven to fire on the lane cap, not only on the total.
+   */
+  describe("given a saturated read lane cap below the total", () => {
+    // 4 with a reserve of 1 caps the read lane at 3; three reads in flight
+    // saturate that cap while the total still has its fourth slot free, so a
+    // further read waits on the CAP and never reaches the total.
+    const saturateReadCap = (limited: ClickHouseClient) =>
+      Array.from({ length: 3 }, (_, index) =>
+        limited.query({ query: `SELECT ${index}` }),
+      );
+
+    describe("when a further read waits past the wait bound", () => {
+      /** @scenario a statement that waits too long is refused, not left waiting */
+      it("refuses it as overload without reaching the driver", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 4,
+          instance,
+          waitTimeoutMs: 20,
+        });
+
+        const inFlight = saturateReadCap(limited);
+        await settleMicrotasks();
+        expect(driver.started).toBe(3);
+
+        const waiting = limited.query({ query: "SELECT waiting" });
+        await expect(waiting).rejects.toBeInstanceOf(ClickHouseOverloadedError);
+
+        // It timed out on the read cap, not the total: the total kept its
+        // fourth slot free the whole time, yet the read never ran.
+        expect(driver.client.query).toHaveBeenCalledTimes(3);
+        expect(driver.started).toBe(3);
+
+        driver.releaseAll();
+        await Promise.all(inFlight);
+      });
+    });
+
+    describe("when the read cap's wait queue is already full", () => {
+      /** @scenario an overloaded process refuses rather than queueing without limit */
+      it("refuses the next read as overload", async () => {
+        const driver = deferrableClient();
+        // A shallow queue so the cap fills without issuing its production depth.
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 4,
+          instance,
+          maxQueued: 2,
+        });
+
+        const inFlight = saturateReadCap(limited);
+        const queued = [
+          limited.query({ query: "SELECT q0" }),
+          limited.query({ query: "SELECT q1" }),
+        ];
+        await settleMicrotasks();
+
+        const startedBeforeShed = driver.started;
+        await expect(
+          limited.query({ query: "SELECT shed" }),
+        ).rejects.toBeInstanceOf(ClickHouseOverloadedError);
+
+        // The read cap's two-deep queue was full, so the next read was shed
+        // before it could reach the driver.
+        expect(driver.started).toBe(startedBeforeShed);
+
+        driver.releaseAll();
+        for (let round = 0; round <= 2; round += 1) {
+          await settleMicrotasks();
+          driver.releaseAll();
+        }
+        await Promise.all([...inFlight, ...queued]);
+      });
+    });
+
+    describe("when the caller abandons a read queued on the cap", () => {
+      /** @scenario a caller that gives up stops waiting */
+      it("reports the abort rather than overload", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 4,
+          instance,
+        });
+
+        const inFlight = saturateReadCap(limited);
+        const controller = new AbortController();
+        const abandoned = limited.query({
+          query: "SELECT abandoned",
+          abort_signal: controller.signal,
+        });
+        await settleMicrotasks();
+
+        controller.abort();
+
+        // Aborting a wait on the cap surfaces as the cancellation it is, never
+        // relabelled as overload.
+        await expect(abandoned).rejects.toBeInstanceOf(AcquireAbortedError);
+        expect(driver.started).toBe(3);
+
+        driver.releaseAll();
+        await Promise.all(inFlight);
+      });
+    });
+  });
+
+  /**
    * The slot-availability check can only be read truthfully at the instant a
-   * limiter is entered: `ConcurrencyLimiter.run` admits a free slot on a
-   * microtask, so a batch issued in one tick all see the total still reading
-   * zero in-flight. A statement with lane room but no total slot would then arm
-   * no wait and queue on the total forever. The bound must be armed lazily, at
-   * the total, when the total is the thing that is full.
+   * limiter is entered. A statement enters the total from inside its lane cap's
+   * granted task, so when it is first handed to the lane cap the total's
+   * occupancy is not yet the one it will face. A batch issued in one tick, each
+   * still only at its lane cap, would arm no wait up front — no statement has
+   * entered the total yet — and one with lane room but no total slot would then
+   * queue on the total forever. The bound must be armed lazily, at the total,
+   * when the total is the thing that is full.
    */
   describe("given the whole budget is taken within one tick", () => {
     describe("when a statement with lane room but no total slot follows in the same tick", () => {
