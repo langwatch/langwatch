@@ -19,6 +19,9 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/eventing/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
@@ -26,6 +29,9 @@
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../organization/contract/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
@@ -44,9 +50,6 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../user/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/authorization/tsconfig.build.json"
