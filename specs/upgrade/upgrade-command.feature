@@ -1,0 +1,129 @@
+# The upgrade command: slice S3 (command half) of dev/docs/plans/migrations-rethink-2026-10-06.md
+# (sections 6.4, 6.6, 6.7, 6.10 and 6.11) and dev/docs/plans/migrations-blitz-2026-10-06.md (section
+# 5.2, row mig-s3-runner; deltas D4 and D6).
+#
+# `pnpm task upgrade` is the one command that changes the schema. It takes the runner lease, plans
+# from the ledger and the shipped manifests, refuses an installation below the LTS floor, applies the
+# plan release by release, records every step and every ClickHouse target in the ledger, runs the
+# reconcilers last and records the run. Exit codes: 0 done, 1 failed, 2 refused, 3 lease not taken.
+# Every integration scenario runs in its own scratch Postgres schema; the schema applier is a fake
+# that records what it was asked to apply.
+
+Feature: The upgrade command
+  As an operator or a deploy pipeline
+  I want one command that brings the database to the image's schema, safely and resumably
+  So that no serving process ever migrates and a failure names its own cause and remedy
+
+  Background:
+    Given a scratch Postgres schema holding the upgrade ledger
+
+  @integration
+  Scenario: A second runner waits for the lease, then exits naming the holder
+    Given a runner on host "pod-a" holds a live upgrade lease
+    When a second runner starts with a lease deadline shorter than the holder's lease
+    Then the second runner exits with code 3
+    And its message names the holder "pod-a" and its image
+    And the schema applier is never called by the second runner
+
+  @integration
+  Scenario: A dead holder's lease is taken over
+    Given a runner on host "pod-a" held an upgrade lease that has expired
+    When a second runner starts
+    Then the second runner takes the lease and completes with code 0
+    And the lease is released when the run ends
+
+  @integration
+  Scenario: The lease is renewed on a heartbeat while the run is in progress
+    Given a run whose schema applier takes longer than the lease's lifetime
+    When the run completes
+    Then the lease never expired while the run held it
+
+  @integration
+  Scenario: A failed Prisma migration is named with the resolve command before anything is applied
+    Given _prisma_migrations holds a row for "20261001000000_broken" that neither finished nor rolled back
+    When the upgrade runs
+    Then it exits with code 1 before the schema applier is called
+    And its message names "20261001000000_broken"
+    And its message gives the command "prisma migrate resolve --rolled-back 20261001000000_broken"
+
+  @integration
+  Scenario: A failing private ClickHouse target fails the run and is recorded per target
+    Given a ClickHouse step the image declares and two targets, "shared" and "private:org_1"
+    And the applier applies it on "shared" and fails on "private:org_1"
+    When the upgrade runs
+    Then it exits with code 1
+    And the ledger records the step on "shared" as done and on "private:org_1" as failed with the error
+    And the step itself is recorded failed
+    And the run is recorded failed
+
+  @integration
+  Scenario: An installation below the LTS floor is refused before any schema change
+    Given the ledger records a succeeded upgrade to 3.16.0 and the LTS floor is 3.20.1
+    When the upgrade runs
+    Then it exits with code 2
+    And its message says to upgrade to 3.20.1 (LTS) first
+    And the schema applier is never called
+
+  @integration
+  Scenario: A fresh install applies the schema and marks every non-schema step not-needed
+    Given an empty database and manifests declaring schema, data and tenant steps
+    When the upgrade runs
+    Then the schema applier is called once
+    And every schema step is recorded done
+    And every data and tenant step is recorded not-needed
+    And the run is recorded succeeded with the image's release and the LTS floor
+
+  @integration
+  Scenario: A database with no Prisma history gets its Postgres schema before the ledger exists
+    Given an empty database with no _prisma_migrations table
+    When the upgrade runs
+    Then the Postgres schema is applied before any ledger table is created
+    And the run still plans as a fresh install, marking data steps not-needed
+    And the upgrade completes with code 0
+
+  @integration
+  Scenario: A second run is a no-op
+    Given a database the upgrade has already brought to the image's release
+    When the upgrade runs again
+    Then it exits with code 0 without calling the schema applier
+    And no step row changes
+
+  @integration
+  Scenario: Blocking code steps run after their release's schema and save their checkpoint
+    Given an installation on 3.20.1 and a 3.21.0 manifest with a blocking data step
+    When the upgrade runs
+    Then the blocking step runs after the schema applier
+    And the step is recorded done with the report it returned
+
+  @integration
+  Scenario: A transient schema failure that left no failed migration is retried with backoff
+    Given an applier that fails once without recording a failed Prisma migration, then succeeds
+    When the upgrade runs
+    Then it waits before the second attempt
+    And it completes with code 0
+
+  @integration
+  Scenario: Reconcilers run last, and a failing one fails the run
+    Given two reconcilers, the second of which fails
+    When the upgrade runs
+    Then both reconcilers run after every schema step
+    And the run is recorded failed naming the failing reconciler
+
+  @integration
+  Scenario: Running an older image marks completed background steps pending again
+    Given the ledger records a succeeded upgrade to 3.22.0 with a done background step of 3.22.0
+    When the upgrade runs from a 3.21.0 image at or above the floor
+    Then the 3.22.0 background step is recorded pending
+
+  @unit
+  Scenario: The Postgres session of a migration carries a lock timeout
+    Given a database URL with and without existing session options
+    When the URL for the migration session is built
+    Then it sets lock_timeout and keeps every option already present
+
+  @unit
+  Scenario: upgrade status and upgrade plan print the reader's and the planner's output
+    When "upgrade status" or "upgrade plan --json" is parsed
+    Then the status subcommand prints the reader's status
+    And the plan subcommand prints the plan as JSON when asked
+    And an unknown subcommand is refused by name
