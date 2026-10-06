@@ -76,6 +76,7 @@ describe("useTraceIdsAcrossPages", () => {
     });
 
     describe("when the hook walks the pages", () => {
+      /** @scenario "The filtered annotations list walks trace pages at the cap" */
       it("returns every id once the last page has no scrollId", async () => {
         const { result } = render({ query: "a", maxPages: 10 });
         await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -84,6 +85,7 @@ describe("useTraceIdsAcrossPages", () => {
     });
 
     describe("when maxPages is reached before the walk ends", () => {
+      /** @scenario "The filtered annotations list walks trace pages at the cap" */
       it("stops paging and returns what it has", async () => {
         const { result } = render({ query: "a", maxPages: 2 });
         await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -94,6 +96,7 @@ describe("useTraceIdsAcrossPages", () => {
   });
 
   describe("given a later page fails", () => {
+    /** @scenario "A failed trace page never shows a partial annotations list" */
     it("reports the error and returns no ids", async () => {
       server.pages = {
         "a:first": { ids: ["t1"], scrollId: "s2" },

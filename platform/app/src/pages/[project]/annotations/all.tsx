@@ -45,12 +45,22 @@ export default function Annotations() {
     sortBy: getSingleQueryParam(router.query.sortBy),
     sortDirection: getSingleQueryParam(router.query.orderBy),
   };
-  const { traceIds: filteredTraceIds, isLoading: tracePagesLoading } =
-    useTraceIdsAcrossPages({
-      input: traceQueryInput,
-      queryOpts,
-      maxPages: MAX_ANNOTATION_TRACE_PAGES,
-    });
+  const {
+    traceIds: filteredTraceIds,
+    isLoading: tracePagesLoading,
+    isError: tracePagesFailed,
+  } = useTraceIdsAcrossPages({
+    input: traceQueryInput,
+    // Unfiltered mode reads allAnnotations, so walking trace pages there would
+    // be wasted reads (#8479).
+    queryOpts: {
+      ...queryOpts,
+      enabled: (queryOpts.enabled ?? true) && hasAnyFilters,
+    },
+    maxPages: MAX_ANNOTATION_TRACE_PAGES,
+  });
+  // A failed page leaves no ids, which would otherwise read as "no annotations".
+  const showTraceWalkError = hasAnyFilters && tracePagesFailed;
 
   const {
     period: { startDate, endDate },
@@ -176,8 +186,16 @@ export default function Annotations() {
           rowTarget="trace"
           exportLabel="Export all"
           onExport={exportAll}
-          noDataTitle="No recent annotations yet, change the date range to see more or annotate your messages"
-          noDataDescription="Annotate your messages to add more context and improve your analysis."
+          noDataTitle={
+            showTraceWalkError
+              ? "Couldn't load the annotations for these filters"
+              : "No recent annotations yet, change the date range to see more or annotate your messages"
+          }
+          noDataDescription={
+            showTraceWalkError
+              ? "Something went wrong while loading matching traces. Reload the page to try again."
+              : "Annotate your messages to add more context and improve your analysis."
+          }
         />
       </Flex>
     </AnnotationsLayout>

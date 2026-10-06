@@ -19,6 +19,7 @@ import { getUserProtectionsForProject } from "../utils";
 import {
   getAllForDownloadInput,
   getAllForProjectInput,
+  MAX_TRACE_DOWNLOAD_PAGE_SIZE,
   tracesFilterInput,
 } from "./traces.schemas";
 
@@ -504,7 +505,7 @@ export const tracesRouter = createTRPCRouter({
       return traceService.getAllTracesForProject(
         {
           ...input,
-          pageSize: input.pageSize ?? 10_000,
+          pageSize: input.pageSize ?? MAX_TRACE_DOWNLOAD_PAGE_SIZE,
         },
         protections,
         {

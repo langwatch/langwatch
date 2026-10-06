@@ -62,19 +62,20 @@ export function useTraceIdsAcrossPages({
   const isLoading = pages.some((page) => page.isLoading) || hasNextPage;
   const walkComplete = !isLoading && !isError;
 
-  const traceIds = useMemo(
-    () =>
-      walkComplete
-        ? pages.flatMap(
-            (page) =>
-              page.data?.groups.flatMap((group) =>
-                group.map((trace) => trace.trace_id),
-              ) ?? [],
-          )
-        : [],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [walkComplete, ...pages.map((page) => page.data)],
-  );
+  const allIds = walkComplete
+    ? pages.flatMap(
+        (page) =>
+          page.data?.groups.flatMap((group) =>
+            group.map((trace) => trace.trace_id),
+          ) ?? [],
+      )
+    : [];
+  // api.useQueries returns a new array every render, and the ids feed a query
+  // key, so keep the same array while the ids are unchanged. JSON.stringify so
+  // distinct lists never alias to one key.
+  const idsKey = JSON.stringify(allIds);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const traceIds = useMemo(() => allIds, [idsKey]);
 
   return { traceIds, isLoading, isError };
 }

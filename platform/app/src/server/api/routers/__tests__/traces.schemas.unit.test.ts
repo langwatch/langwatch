@@ -113,6 +113,7 @@ describe("page size cap", () => {
     ["getAllForProjectInput", getAllForProjectInput],
   ])("given %s", (_name, schema) => {
     describe("when pageSize equals the cap", () => {
+      /** @scenario "A trace list read above the page cap is rejected" */
       it("accepts it", () => {
         const result = schema.safeParse({
           ...base,
@@ -124,6 +125,7 @@ describe("page size cap", () => {
     });
 
     describe.each([[1001], [10_000]])("when pageSize is %i", (pageSize) => {
+      /** @scenario "A trace list read above the page cap is rejected" */
       it("rejects it", () => {
         const result = schema.safeParse({ ...base, pageSize });
 
@@ -143,6 +145,7 @@ describe("page size cap", () => {
 
 describe("getAllForDownloadInput", () => {
   describe("given a download-sized pageSize", () => {
+    /** @scenario "A trace download may read up to the download ceiling" */
     it("accepts 10000 with includeSpans true", () => {
       const result = getAllForDownloadInput.safeParse({
         ...base,
@@ -151,6 +154,21 @@ describe("getAllForDownloadInput", () => {
       });
 
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe("given a pageSize above the download ceiling", () => {
+    /** @scenario "A trace download may read up to the download ceiling" */
+    it("rejects 10001 on the pageSize path", () => {
+      const result = getAllForDownloadInput.safeParse({
+        ...base,
+        includeSpans: true,
+        pageSize: 10_001,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.issues[0]?.path).toEqual(["pageSize"]);
     });
   });
 
@@ -184,6 +202,7 @@ describe("getAllForDownloadInput", () => {
 
 describe("publicTraceSearchPageSizeInput", () => {
   describe("given a pageSize above the list cap", () => {
+    /** @scenario "Public trace search clamps an oversized page instead of rejecting it" */
     it("accepts it, since the route clamps instead of rejecting", () => {
       const result = publicTraceSearchPageSizeInput.safeParse(5000);
 

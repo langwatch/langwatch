@@ -68,10 +68,17 @@ export const publicTraceSearchPageSizeInput = z
   .optional();
 
 /**
- * Downloads are a deliberate bulk read and keep their 10 000 default
- * (see traces.ts), so they are not held to the list page cap (#8479).
+ * Downloads are a deliberate bulk read but still bounded (#8479). Matches the
+ * 10 000 default in traces.ts getAllForDownload.
  */
+export const MAX_TRACE_DOWNLOAD_PAGE_SIZE = 10_000;
+
 export const getAllForDownloadInput = getAllForProjectInput.extend({
   includeSpans: z.boolean(),
-  pageSize: z.number().int().positive().optional(),
+  pageSize: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_TRACE_DOWNLOAD_PAGE_SIZE)
+    .optional(),
 });

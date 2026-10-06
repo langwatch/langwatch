@@ -70,10 +70,14 @@ vi.mock("~/utils/downloadCsv", () => ({
 }));
 vi.mock("~/utils/api", () => ({
   api: {
+    // One settled page with no scrollId per descriptor, so the walk ends at once.
+    useQueries: (
+      build: (t: unknown) => unknown[],
+    ): { data: undefined; isLoading: false; isError: false }[] =>
+      build({
+        traces: { getAllForProject: (input: unknown) => input },
+      }).map(() => ({ data: undefined, isLoading: false, isError: false })),
     traces: {
-      getAllForProject: {
-        useQuery: () => ({ data: undefined, isLoading: false }),
-      },
       getTracesWithSpans: {
         useQuery: () => ({ data: mocks.traces, isLoading: false }),
       },
