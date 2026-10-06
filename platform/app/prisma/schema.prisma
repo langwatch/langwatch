@@ -5681,6 +5681,7 @@ model ProcessManagerOutbox {
   @@unique([processName, projectId, messageKey])
   @@index([processName, projectId, processKey, createdAt])
   @@index([status, nextAttemptAt, leasedUntil])
+  @@index([status, processName, nextAttemptAt])
 }
 
 /// Why an outbox delivery failed, one row per FAILED attempt
