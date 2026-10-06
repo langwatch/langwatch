@@ -115,6 +115,14 @@ Feature: Rotating CREDENTIALS_SECRET
     Then it reports which values the current secret opens and which it does not
     And it writes nothing
 
+  @unit
+  Scenario: A secret in the wrong format refuses the re-seal task and no other task
+    Given a CREDENTIALS_SECRET, NEXTAUTH_SECRET fallback or CREDENTIALS_SECRET_PREVIOUS that is not 64 hex characters
+    When the tasks process builds the credentials-reseal task at boot
+    Then the boot succeeds, so every other task still runs
+    And running the credentials-reseal task refuses, naming the variable
+    And it writes nothing
+
   @integration
   Scenario: The re-seal task makes the previous secret removable
     Given credentials sealed under the previous secret in a text column and inside a JSON column

@@ -1,11 +1,21 @@
 import { randomBytes } from "node:crypto";
 
 import { aesEncryption } from "@langwatch/process-stores";
+import {
+  credentialsSecret,
+  credentialsSecretPrevious,
+  ScopedSecrets,
+  sessionSecret,
+} from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
 import { MemoryCredentialsResealRepository } from "../../repositories/memory/memory.credentials-reseal.repository.ts";
 import { resealText } from "../../rules/credentials-reseal.rules.ts";
-import { CredentialsResealTask, resealCredentials } from "../credentials-reseal.task.ts";
+import {
+  CredentialsResealTask,
+  credentialsResealCiphers,
+  resealCredentials,
+} from "../credentials-reseal.task.ts";
 
 /** @see specs/self-hosting/credentials-secret-rotation.feature */
 
@@ -171,13 +181,82 @@ describe("resealCredentials", () => {
       const { repository, values, valueOf } = seeded();
       const task = CredentialsResealTask.create({
         repository: () => repository,
-        ciphers: { current, previous },
+        ciphers: () => ({ current, previous }),
       });
 
       await expect(
         task.run({ args: ["--dryrun"], signal: new AbortController().signal }),
       ).rejects.toThrow(/--dry-run/);
       expect(valueOf("old")).toBe(values.old);
+    });
+  });
+});
+
+describe("credentialsResealCiphers", () => {
+  const handles = {
+    credentials: credentialsSecret,
+    credentialsFallback: sessionSecret,
+    credentialsPrevious: credentialsSecretPrevious,
+  };
+  const secretsHolding = (values: Record<string, string>) =>
+    new ScopedSecrets(async (handle, build) => build(values[handle.id]));
+  const hexKey = () => randomBytes(32).toString("hex");
+  const taskOver = async (values: Record<string, string>) => {
+    const repository = MemoryCredentialsResealRepository.create();
+    const sealed = previous.encrypt("sealed-before-the-rotation");
+    repository.columns.push({
+      table: "Secret",
+      column: "encryptedValue",
+      rows: new Map([["old", sealed]]),
+    });
+    const ciphers = await credentialsResealCiphers({ secrets: secretsHolding(values), handles });
+    const task = CredentialsResealTask.create({ repository: () => repository, ciphers });
+    return { task, repository, sealed };
+  };
+  const run = (task: CredentialsResealTask) =>
+    task.run({ args: [], signal: new AbortController().signal });
+
+  describe.each<{ given: string; values: Record<string, string>; named: RegExp }>([
+    {
+      given: "a CREDENTIALS_SECRET that is not 64 hex characters",
+      values: { CREDENTIALS_SECRET: "not-a-hex-key" },
+      named: /^CREDENTIALS_SECRET is not a usable key/,
+    },
+    {
+      given: "no CREDENTIALS_SECRET and a NEXTAUTH_SECRET that is not 64 hex characters",
+      values: { NEXTAUTH_SECRET: "a-session-secret-of-any-shape" },
+      named: /^NEXTAUTH_SECRET is not a usable key/,
+    },
+    {
+      given: "a CREDENTIALS_SECRET_PREVIOUS that is not 64 hex characters",
+      values: { CREDENTIALS_SECRET: hexKey(), CREDENTIALS_SECRET_PREVIOUS: "not-a-hex-key" },
+      named: /^CREDENTIALS_SECRET_PREVIOUS is not a usable key/,
+    },
+  ])("given $given", ({ values, named }) => {
+    /** @scenario "A secret in the wrong format refuses the re-seal task and no other task" */
+    it("builds the task, and refuses under the variable's name only when it runs", async () => {
+      const { task, repository, sealed } = await taskOver(values);
+
+      await expect(run(task)).rejects.toThrow(named);
+      expect(repository.columns[0]?.rows.get("old")).toBe(sealed);
+    });
+  });
+
+  describe("given both secrets as 64 hex characters", () => {
+    it("moves a value sealed under the previous one to the current one", async () => {
+      const previousKey = hexKey();
+      const currentKey = hexKey();
+      const { task, repository } = await taskOver({
+        CREDENTIALS_SECRET: currentKey,
+        CREDENTIALS_SECRET_PREVIOUS: previousKey,
+      });
+      const sealedByPrevious = aesEncryption(Buffer.from(previousKey, "hex")).encrypt("moved");
+      repository.columns[0]?.rows.set("old", sealedByPrevious);
+
+      await run(task);
+
+      const stored = repository.columns[0]?.rows.get("old") ?? "";
+      expect(aesEncryption(Buffer.from(currentKey, "hex")).decrypt(stored)).toBe("moved");
     });
   });
 });

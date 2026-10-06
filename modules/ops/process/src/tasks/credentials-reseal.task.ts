@@ -207,10 +207,23 @@ type CredentialsResealSecrets = Readonly<{
   credentialsPrevious: SecretHandle<string | undefined>;
 }>;
 
-const cipherKeyedBy = (hex: string): CredentialCipher => aesEncryption(Buffer.from(hex, "hex"));
+/** Keyed when the task runs: a malformed key refuses the re-seal, never another task's boot. */
+type CredentialsResealCipherSource = () => CredentialsResealCiphers;
+
+/** A malformed key refuses under the name of the variable it came from. */
+function cipherKeyedBy({ hex, name }: { hex: string; name: string }): CredentialCipher {
+  try {
+    return aesEncryption(Buffer.from(hex, "hex"));
+  } catch (error) {
+    throw new Error(
+      `${name} is not a usable key. ${error instanceof Error ? error.message : ""} Nothing was read or written.`,
+      { cause: error },
+    );
+  }
+}
 
 /**
- * Keys the two ciphers where the secrets are resolved, so no key leaves the closure.
+ * Reads the two keys where the secrets are resolved, so no key leaves the closure.
  * The current key follows the stores: CREDENTIALS_SECRET, else NEXTAUTH_SECRET.
  */
 export function credentialsResealCiphers({
@@ -219,16 +232,19 @@ export function credentialsResealCiphers({
 }: {
   secrets: ScopedSecrets;
   handles: CredentialsResealSecrets;
-}): Promise<CredentialsResealCiphers> {
+}): Promise<CredentialsResealCipherSource> {
   return secrets.into(handles.credentials, (credentials) =>
     secrets.into(handles.credentialsFallback, (session) =>
       secrets.into(handles.credentialsPrevious, (previous) => {
         const currentKey = (credentials ?? session)?.trim();
+        const currentName = credentials ? "CREDENTIALS_SECRET" : "NEXTAUTH_SECRET";
         const previousKey = previous?.trim();
-        return {
-          current: currentKey ? cipherKeyedBy(currentKey) : undefined,
-          previous: previousKey ? cipherKeyedBy(previousKey) : undefined,
-        };
+        return () => ({
+          current: currentKey ? cipherKeyedBy({ hex: currentKey, name: currentName }) : undefined,
+          previous: previousKey
+            ? cipherKeyedBy({ hex: previousKey, name: "CREDENTIALS_SECRET_PREVIOUS" })
+            : undefined,
+        });
       }),
     ),
   );
@@ -245,7 +261,7 @@ export class CredentialsResealTask extends Task {
 
   private constructor(
     private readonly repository: () => CredentialsResealRepository,
-    private readonly ciphers: CredentialsResealCiphers,
+    private readonly ciphers: CredentialsResealCipherSource,
   ) {
     super();
   }
@@ -255,7 +271,7 @@ export class CredentialsResealTask extends Task {
     ciphers,
   }: {
     repository: () => CredentialsResealRepository;
-    ciphers: CredentialsResealCiphers;
+    ciphers: CredentialsResealCipherSource;
   }): CredentialsResealTask {
     return new CredentialsResealTask(repository, ciphers);
   }
@@ -271,7 +287,7 @@ export class CredentialsResealTask extends Task {
 
     await resealCredentials({
       repository: this.repository(),
-      ciphers: this.ciphers,
+      ciphers: this.ciphers(),
       dryRun: args.includes("--dry-run"),
       signal,
       ...(batchSize ? { batchSize: Number(batchSize) } : {}),

@@ -141,7 +141,10 @@ describe.skipIf(!DB_URL)("the credentials-reseal task over Postgres", () => {
   describe("when the operator runs it with --dry-run", () => {
     /** @scenario "A dry run reports what would be re-sealed and changes nothing" */
     it("counts the values under the previous key and leaves every one as stored", async () => {
-      await CredentialsResealTask.create({ repository: () => repository, ciphers }).run({
+      await CredentialsResealTask.create({
+        repository: () => repository,
+        ciphers: () => ciphers,
+      }).run({
         args: ["--dry-run"],
         signal: new AbortController().signal,
       });
