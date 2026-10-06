@@ -8,8 +8,13 @@
  *
  * @see specs/governance/aggregate-project.feature
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { GrantPrincipalType, GrantScopeType } from "~/generated/prisma/client";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  GrantPrincipalType,
+  GrantScopeType,
+  OrganizationUserRole,
+} from "~/generated/prisma/client";
 import { NullLwqlKeyMapRepository } from "~/server/analytics/lwql/lwqlKeyMap.repository";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
@@ -35,9 +40,31 @@ import {
   seedAggregateOrganization,
 } from "./aggregateProjectFixture";
 
-const callerFor = (userId: string) =>
+// Invite acceptance asks the identity projection which addresses the user
+// has verified; `null` is its answer for a user not yet on identifiers, which
+// keeps the session-email comparison. The projection has its own suites.
+vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => {
+  const original =
+    await importOriginal<
+      typeof import("~/server/app-layer/identity/runtime")
+    >();
+  return {
+    ...original,
+    identityEmail: () => ({
+      resolveEmail: () => Promise.resolve(null),
+      verifiedEmailsOf: () => Promise.resolve(null),
+    }),
+  };
+});
+
+const callerFor = (
+  userId: string,
+  user: { email?: string; name?: string } = {},
+) =>
   appRouter.createCaller(
-    createInnerTRPCContext({ session: { user: { id: userId }, expires: "1" } }),
+    createInnerTRPCContext({
+      session: { user: { id: userId, ...user }, expires: "1" },
+    }),
   );
 
 const ruleRepository = new PrismaAggregateRuleRepository(prisma);
@@ -107,6 +134,11 @@ describe("Feature: the reconciler keeps members current", () => {
 
   afterAll(async () => {
     try {
+      if (fixture) {
+        await prisma.organizationInvite.deleteMany({
+          where: { organizationId: fixture.organizationId },
+        });
+      }
       await fixture?.cleanup();
     } finally {
       await resetApp();
@@ -150,6 +182,44 @@ describe("Feature: the reconciler keeps members current", () => {
       );
       expect(members).not.toContain(fixture.governance.id);
       expect(members).not.toContain(personalLookingGovernance.id);
+    });
+  });
+
+  /** @scenario "A new personal project joins an all-personal aggregate on creation" */
+  describe("given an aggregate project with the rule all personal projects", () => {
+    describe("when a new member accepts an invite and their personal project is created", () => {
+      it("makes the new personal project a member of the aggregate", async () => {
+        const aggregate = await createAggregate({ kind: "all-personal" });
+        const email = `newcomer-${fixture.ns}@example.com`;
+        const newcomer = await prisma.user.create({
+          data: { email, name: "Newcomer" },
+        });
+        const invite = await prisma.organizationInvite.create({
+          data: {
+            email,
+            inviteCode: nanoid(),
+            expiration: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            organizationId: fixture.organizationId,
+            teamIds: fixture.team.id,
+            role: OrganizationUserRole.MEMBER,
+            status: "PENDING",
+          },
+        });
+
+        await callerFor(newcomer.id, {
+          email,
+          name: "Newcomer",
+        }).invite.acceptInvite({ inviteCode: invite.inviteCode });
+
+        const personal = await prisma.project.findFirstOrThrow({
+          where: {
+            isPersonal: true,
+            ownerUserId: newcomer.id,
+            team: { organizationId: fixture.organizationId },
+          },
+        });
+        expect(await liveMembersOf(aggregate.id)).toContain(personal.id);
+      });
     });
   });
 });
