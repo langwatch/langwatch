@@ -51,9 +51,11 @@ export class GooseClickHouseMigrationExecutor {
   async migrate({
     url,
     settings,
+    managedTables,
   }: {
     url: string;
     settings: ClickHouseMigrationSettings;
+    managedTables: readonly string[];
   }): Promise<void> {
     const { clusterName, coldStorageEnabled, hotDayOverrides, childEnvironment, waitSeconds } =
       settings;
@@ -69,6 +71,7 @@ export class GooseClickHouseMigrationExecutor {
       clusterName,
       coldStorageEnabled,
       hotDayOverrides,
+      managedTables,
       verbose: true,
     });
   }
@@ -92,26 +95,49 @@ export class ClickHouseMigrateTask extends Task {
   readonly name = "clickhouse-migrate";
   readonly description = "Applies ClickHouse schema migrations and reconciles table TTLs.";
 
-  private constructor(
-    private readonly config: ClickHouseMigrationTaskConfig,
-    private readonly executor: GooseClickHouseMigrationExecutor,
-    private readonly lock: ClickHouseSchemaLock,
-  ) {
+  private readonly config: ClickHouseMigrationTaskConfig;
+  private readonly executor: GooseClickHouseMigrationExecutor;
+  private readonly lock: ClickHouseSchemaLock;
+  private readonly managedTables: readonly string[];
+
+  private constructor({
+    config,
+    executor,
+    lock,
+    managedTables,
+  }: {
+    config: ClickHouseMigrationTaskConfig;
+    executor: GooseClickHouseMigrationExecutor;
+    lock: ClickHouseSchemaLock;
+    managedTables: readonly string[];
+  }) {
     super();
+    this.config = config;
+    this.executor = executor;
+    this.lock = lock;
+    this.managedTables = managedTables;
   }
 
   static create({
     source,
     executor = new GooseClickHouseMigrationExecutor(),
     lock = ClickHouseSchemaLock.create(),
+    managedTables = [],
   }: {
     source: Record<string, string | undefined>;
+    /** The tables whose retention TTL the reconciler manages; supplied by the composition. */
+    managedTables?: readonly string[];
     executor?: GooseClickHouseMigrationExecutor;
     /** The schema mutex this run takes. Constructed here to make the file
      * it contends for a task decision, not a shared client one. */
     lock?: ClickHouseSchemaLock;
   }): ClickHouseMigrateTask {
-    return new ClickHouseMigrateTask(resolveClickHouseMigrationTaskConfig(source), executor, lock);
+    return new ClickHouseMigrateTask({
+      config: resolveClickHouseMigrationTaskConfig(source),
+      executor,
+      lock,
+      managedTables,
+    });
   }
 
   /** Test seam: construct directly from an already-resolved config. */
@@ -119,12 +145,14 @@ export class ClickHouseMigrateTask extends Task {
     config,
     executor = new GooseClickHouseMigrationExecutor(),
     lock = ClickHouseSchemaLock.create(),
+    managedTables = [],
   }: {
     config: ClickHouseMigrationTaskConfig;
     executor?: GooseClickHouseMigrationExecutor;
     lock?: ClickHouseSchemaLock;
+    managedTables?: readonly string[];
   }): ClickHouseMigrateTask {
-    return new ClickHouseMigrateTask(config, executor, lock);
+    return new ClickHouseMigrateTask({ config, executor, lock, managedTables });
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -191,6 +219,7 @@ export class ClickHouseMigrateTask extends Task {
       await this.executor.migrate({
         url: endpoint.url,
         settings: this.config.settings ?? NO_SETTINGS,
+        managedTables: this.managedTables,
       });
     } catch (error) {
       if (endpoint.organizationId !== undefined) {

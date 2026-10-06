@@ -25,7 +25,6 @@
   "dependencies": {
     "@clickhouse/client": "catalog:",
     "@langwatch/clickhouse-client": "workspace:*",
-    "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/task": "workspace:*"
   },

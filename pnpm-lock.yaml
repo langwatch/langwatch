@@ -1755,6 +1755,9 @@ importers:
       '@langwatch/data-privacy-process':
         specifier: workspace:*
         version: link:../../modules/data-privacy/process
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../modules/data-retention/contract
       '@langwatch/data-retention-process':
         specifier: workspace:*
         version: link:../../modules/data-retention/process
@@ -7299,6 +7302,9 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
+      '@langwatch/clickhouse-migrations':
+        specifier: workspace:*
+        version: link:../../../packages/clickhouse-migrations
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../contract
@@ -16084,9 +16090,6 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../clickhouse-client
-      '@langwatch/data-retention-contract':
-        specifier: workspace:*
-        version: link:../../modules/data-retention/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability

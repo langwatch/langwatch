@@ -1,6 +1,12 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 
+import {
+  buildRetentionTTLExpression,
+  hasRetentionTTL,
+  TABLE_TTL_CONFIG,
+} from "@langwatch/clickhouse-migrations";
 import {
   INDEFINITE_DEFAULT_RETENTION_TABLES,
   PRODUCTION_STORAGE_METER_TABLES,
@@ -10,13 +16,11 @@ import {
 } from "@langwatch/data-retention-contract/retention-tables";
 import { describe, expect, it } from "vitest";
 
-import {
-  buildRetentionTTLExpression,
-  hasRetentionTTL,
-  TABLE_TTL_CONFIG,
-} from "../ttl.reconciler.ts";
-
-const MIGRATIONS_DIR = join(process.cwd(), "migrations");
+const MIGRATIONS_DIR = join(
+  dirname(createRequire(import.meta.url).resolve("@langwatch/clickhouse-migrations")),
+  "..",
+  "migrations",
+);
 
 /**
  * Migration numbers move whenever a branch rebases past someone else's, so
@@ -153,10 +157,7 @@ describe("gateway_spend retention exemption", () => {
   });
 
   it("declares its fixed 13-month delete in the migration itself", () => {
-    const migration = readFileSync(
-      join(import.meta.dirname, "../../migrations/00067_create_gateway_spend.sql"),
-      "utf8",
-    );
+    const migration = readFileSync(join(MIGRATIONS_DIR, "00067_create_gateway_spend.sql"), "utf8");
     expect(migration).toContain("TTL toDateTime(OccurredAt) + INTERVAL 13 MONTH DELETE");
     expect(migration).not.toContain("_retention_days");
   });

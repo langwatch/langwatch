@@ -25,6 +25,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
