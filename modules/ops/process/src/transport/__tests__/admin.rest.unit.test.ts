@@ -143,7 +143,7 @@ describe("the admin REST declaration", () => {
       },
     });
 
-    /** @scenario "Every back-office resource the console lists answers" */
+    /** @scenario "Every instance admin resource the console lists answers" */
     it.each(
       RESOURCES.flatMap((resource) => [
         [resource, `/api/admin/${resource}`],

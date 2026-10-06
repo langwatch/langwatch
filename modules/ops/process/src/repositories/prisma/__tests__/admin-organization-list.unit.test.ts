@@ -6,7 +6,7 @@
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaAdminBackofficeRepository } from "../prisma.admin-backoffice.repository.ts";
+import { PrismaAdminBackofficeRepository as InstanceAdminRepository } from "../prisma.admin-backoffice.repository.ts";
 
 const LICENSE_KEY = "signed-license-key-material";
 
@@ -60,7 +60,7 @@ describe("the instance admin organization read", () => {
   describe("when an operator lists organizations in the instance admin", () => {
     /** @scenario "The instance admin organizations list does not carry license keys" */
     it("answers every organization without its license key", async () => {
-      const repository = PrismaAdminBackofficeRepository.create(organizationDelegate());
+      const repository = InstanceAdminRepository.create(organizationDelegate());
 
       const result = await repository.execute(LIST_ORGANIZATIONS);
 
@@ -73,7 +73,7 @@ describe("the instance admin organization read", () => {
     });
 
     it("still carries the term the license runs to", async () => {
-      const repository = PrismaAdminBackofficeRepository.create(organizationDelegate());
+      const repository = InstanceAdminRepository.create(organizationDelegate());
 
       const result = await repository.execute(LIST_ORGANIZATIONS);
 
