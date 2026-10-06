@@ -1,3 +1,4 @@
+import { useRouter } from "@langwatch/browser-host/use-router";
 import type { UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -5,6 +6,7 @@ import { api } from "../../../../behavior/langy-api.ts";
 import {
   explainLangyError,
   type LangyErrorPresentation,
+  MODEL_PROVIDERS_SETTINGS_HREF,
   readLangyStreamError,
   resolveLiveTurnError,
 } from "../logic/langy-error-explainer.ts";
@@ -72,9 +74,16 @@ export function useLangyTurnFailure({
   }, [retryEngineTurn, messageCount]);
 
   const [reconnectCodex, setReconnectCodex] = useState(false);
+  // `router` gets a new identity per route change; the handler reads the latest through a ref.
+  const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const onErrorAction = useCallback(
     (kind: ErrorActionKind) => {
       if (kind === "reconnect-codex") setReconnectCodex(true);
+      // router.push keeps the panel mounted, so the failed turn is still there to retry.
+      else if (kind === "configure-model")
+        void routerRef.current.push(MODEL_PROVIDERS_SETTINGS_HREF);
       else if (kind === "retry") retryTurn();
     },
     [retryTurn],
