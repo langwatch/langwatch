@@ -2,6 +2,7 @@
 // Test harness for mounting single sign-on sections: a fake host that records
 // what it was told. Internal only, not exported from the package.
 
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
@@ -17,6 +18,8 @@ import {
 
 export class FakeSsoHost extends SsoHostApi {
   readonly failures: SsoFailureNotice[] = [];
+  /** Every drawer this host was asked to open, in order. */
+  readonly overlays: { drawer: UiDrawerToken<unknown>; props?: unknown }[] = [];
   /** Every acknowledgement this host was asked to show, in order. */
   readonly acknowledgements: SsoSuccessNotice[] = [];
   /** Every test sign-in this host was asked to start, in order. */
@@ -76,6 +79,10 @@ export class FakeSsoHost extends SsoHostApi {
     if (answer instanceof Error) throw answer;
 
     return Promise.resolve(answer ?? {});
+  }
+
+  openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+    this.overlays.push({ drawer: drawer as UiDrawerToken<unknown>, props });
   }
 
   /** The one aliasing the engine actually emits, so the hook is exercised. */
