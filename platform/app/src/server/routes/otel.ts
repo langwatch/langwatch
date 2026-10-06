@@ -582,10 +582,17 @@ secured
 
         const parsed = parseOtlpTraces(body, contentType);
         if (!parsed.ok) {
-          // A body we cannot parse is the client's error: warn, never a PostHog exception (#8481).
+          // A body we cannot parse is the client's error (#8481): warn, never a
+          // PostHog exception, and leave the span status UNSET like any other
+          // customer fault (see recordSpanError in api/trpc.ts) so a broken
+          // exporter does not count against span error rates.
+          span.setAttributes({
+            "langwatch.error.fault": "customer",
+            "langwatch.otlp.parse_error": parsed.error,
+          });
           loggerTraces.warn(
             {
-              fault: "customer",
+              handledErrorFault: "customer",
               error: parsed.error,
               projectId: project.id,
               customerTraceIds,
@@ -593,10 +600,6 @@ secured
             },
             "error parsing traces",
           );
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: "Failed to parse traces",
-          });
           return c.json({ error: "Failed to parse traces" }, { status: 400 });
         }
         const traceRequest = parsed.request;
@@ -662,13 +665,13 @@ secured
         const body = await readOtlpBody(c.req.raw);
         const parsed = parseOtlpLogs(body, c.req.header("content-type"));
         if (!parsed.ok) {
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: "Failed to parse logs",
+          span.setAttributes({
+            "langwatch.error.fault": "customer",
+            "langwatch.otlp.parse_error": parsed.error,
           });
           loggerLogs.warn(
             {
-              fault: "customer",
+              handledErrorFault: "customer",
               error: parsed.error,
               projectId: project.id,
               ...bodyForensics(body),
@@ -755,13 +758,13 @@ secured
         const body = await readOtlpBody(c.req.raw);
         const parsed = parseOtlpMetrics(body, c.req.header("content-type"));
         if (!parsed.ok) {
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: "Failed to parse metrics",
+          span.setAttributes({
+            "langwatch.error.fault": "customer",
+            "langwatch.otlp.parse_error": parsed.error,
           });
           loggerMetrics.warn(
             {
-              fault: "customer",
+              handledErrorFault: "customer",
               error: parsed.error,
               projectId: project.id,
               ...bodyForensics(body),

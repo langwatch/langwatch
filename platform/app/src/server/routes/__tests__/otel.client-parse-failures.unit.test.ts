@@ -1,7 +1,7 @@
 /**
  * specs/otlp/client-parse-failures.feature — a malformed OTLP body is the
- * sender's mistake: 400, one client-attributed warning, no error log and no
- * PostHog exception.
+ * sender's mistake: 400, one client-attributed warning via handledErrorFault,
+ * no error log and no PostHog exception.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -135,7 +135,7 @@ describe("OTLP parse failures", () => {
         expect(parseWarnings).toHaveLength(1);
         expect(mockWarn).toHaveBeenCalledWith(
           expect.objectContaining({
-            fault: "customer",
+            handledErrorFault: "customer",
             projectId: "project-123",
           }),
           `error parsing ${signal}`,
