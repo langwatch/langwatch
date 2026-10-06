@@ -50,7 +50,7 @@ export const experimentV3LegacyRest = defineRestRouter(ExperimentV3RestApi)
 
   .post("/:evaluationSlug/run", "postApiEvaluationsV3BySlugRun")
   .withParams(evaluationSlugParamsSchema)
-  .withRawBody("text", { mediaType: "application/json" })
+  .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withPermission("evaluations:create")
   .withResponse("negotiated", {})

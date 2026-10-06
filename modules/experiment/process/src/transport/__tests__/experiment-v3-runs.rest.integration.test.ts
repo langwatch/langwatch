@@ -395,6 +395,31 @@ describe("POST /api/experiments/:slug/run", () => {
     });
   });
 
+  describe("when the call carries no Content-Type or another one", () => {
+    const missing = { experiments: { findBySlugAndType: async () => null } };
+    const bodiless: RequestInit = { method: "POST" };
+    const textPlain: RequestInit = {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: "{}",
+    };
+
+    /** @scenario "A run call is read whatever Content-Type it carries, as on main" */
+    it.each([
+      ["no body and no Content-Type", bodiless],
+      ["a JSON body under text/plain", textPlain],
+    ])("reads %s at both paths and answers the unknown slug 404", async (_case, init) => {
+      const { request, legacy } = await harness(missing);
+
+      for (const call of [request, legacy]) {
+        const response = await call("/nope/run", init);
+
+        expect(response.status).toBe(404);
+        expect(await response.json()).toMatchObject({ code: "experiment_not_found" });
+      }
+    });
+  });
+
   describe("when the saved setup has no dataset", () => {
     it("refuses 400 as an invalid evaluation input", async () => {
       const { request } = await harness({ experiments: found(savedState([])) });

@@ -87,10 +87,10 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // ── POST /:slug/run  (CI/CD execution) ────────────────────────────────
   .post("/:slug/run", "postApiExperimentsBySlugRun")
   .withParams(slugParamsSchema)
-  // The body is read unparsed: an empty one is a full run, malformed JSON is
-  // a 400 in this family's own words, and `runInputsBodySchema` parses what
-  // is left.
-  .withRawBody("text", { mediaType: "application/json" })
+  // The body is read unparsed under any Content-Type, as main read it: an
+  // empty one is a full run, malformed JSON is a 400 in this family's own
+  // words, and `runInputsBodySchema` parses what is left.
+  .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withPermission("evaluations:create")
   .withResponse("negotiated", {})

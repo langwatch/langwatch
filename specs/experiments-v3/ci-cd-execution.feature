@@ -60,6 +60,12 @@ Feature: CI/CD Execution of Platform Evaluations
     Then I receive 404 Not Found
     And the response contains error "Evaluation not found"
 
+  Scenario: A run call is read whatever Content-Type it carries, as on main
+    Given the SDK posts the run with no body and no Content-Type, or a JSON body under text/plain
+    When it calls /api/experiments/non-existent/run or /api/evaluations/v3/non-existent/run
+    Then the call is never refused 415
+    And I receive 404 Not Found
+
   @unimplemented
   Scenario: Evaluation belongs to different project returns 404
     Given "other-evaluation" belongs to a different project
