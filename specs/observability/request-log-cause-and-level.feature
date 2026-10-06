@@ -103,3 +103,24 @@ Feature: Request log level and where the cause is attached
     When the record is logged at error level
     Then the emitted line carries the failure's message
     And the emitted line carries the failure's stack
+
+  # ---------------------------------------------------------------------------
+  # The cause stays small
+  #
+  # Issue #8483. Loki accepts at most 128 structured-metadata keys per record,
+  # and every nested key of a logged cause becomes one. A validation error with
+  # a list of issues, or a database error with metadata, pushed records past 250
+  # keys, and Loki dropped them whole - the failure vanished exactly when it was
+  # widest. The cause is therefore a bounded summary, never the error object.
+  # ---------------------------------------------------------------------------
+
+  @unit @regression
+  Scenario: A wide failure is logged as a bounded summary
+    When a failure carrying many fields is logged at warning or error level
+    Then the emitted record has fewer than 20 keys once flattened
+    And the cause carries only its type, message, code and stack
+
+  @unit @regression
+  Scenario: Error records carry no superjson metadata
+    When any failure is logged
+    Then no field named "_superjson" is emitted

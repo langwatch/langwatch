@@ -15,7 +15,7 @@ logger.info("hello");
 
 There is intentionally no separate server logger. `createLogger` detects Node.js at runtime:
 
-- **Node.js** uses a shared Pino transport, optional OTel log export, SuperJSON error metadata, and registered async request context.
+- **Node.js** uses a shared Pino transport, optional OTel log export, bounded error summaries (type, message, code, stack), and registered async request context.
 - **Browser** uses Pino's browser output. The root package does not import OpenTelemetry or Node-only modules.
 
 Disable automatic server context injection only for exceptional cases:

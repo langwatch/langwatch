@@ -1,9 +1,12 @@
 import pino from "pino";
-import superjson from "superjson";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { runWithContext } from "../context";
 import { getLogContext } from "../context/logging";
-import { consoleIgnoreFields, createLogger } from "../logger";
+import {
+  NODE_LOG_SERIALIZERS,
+  consoleIgnoreFields,
+  createLogger,
+} from "../logger";
 
 vi.mock("@opentelemetry/api", () => ({
   context: { active: vi.fn(() => ({})) },
@@ -98,25 +101,11 @@ describe("createLogger", () => {
   });
 
   describe("when serializing errors", () => {
-    it("preserves the current superjson metadata shape for Error instances", () => {
+    it("keeps message and type and adds no superjson metadata for Error instances", () => {
       const { dest, chunks } = captureDest();
 
-      // Create a logger that mirrors createLogger's serializer setup
       const logger = pino(
-        {
-          level: "error",
-          serializers: {
-            error: (err: unknown) => {
-              if (!(err instanceof Error))
-                return pino.stdSerializers.err(err as Error);
-              const serialized = superjson.serialize(err);
-              return {
-                ...pino.stdSerializers.err(err),
-                _superjson: serialized.meta,
-              };
-            },
-          },
-        },
+        { level: "error", serializers: NODE_LOG_SERIALIZERS },
         dest,
       );
 
@@ -125,7 +114,7 @@ describe("createLogger", () => {
       const parsed = JSON.parse(chunks[0]!);
       expect(parsed.error.message).toBe("boom");
       expect(parsed.error.type).toBe("Error");
-      expect(parsed.error).toHaveProperty("_superjson");
+      expect(parsed.error).not.toHaveProperty("_superjson");
     });
 
     it("falls back to standard serializer for non-Error values", () => {

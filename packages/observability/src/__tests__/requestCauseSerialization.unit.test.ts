@@ -140,4 +140,100 @@ describe("emitted request-log records", () => {
       expect(errorRecord()).not.toHaveProperty(REQUEST_CAUSE_FIELD);
     });
   });
+
+  describe("given a failure carrying many fields", () => {
+    class ZodError extends Error {
+      name = "ZodError";
+      issues = Array.from({ length: 60 }, (_, i) => ({
+        code: "invalid_type",
+        path: ["items", i, "name"],
+        message: `Expected string at ${i}`,
+        expected: "string",
+        received: "number",
+      }));
+      constructor() {
+        super("Invalid input");
+      }
+    }
+
+    const zodLike = () => new ZodError();
+
+    class PrismaClientKnownRequestError extends Error {
+      code = "P2002";
+      clientVersion = "6.0.0";
+      meta = {
+        modelName: "Project",
+        target: ["organizationId", "slug"],
+        driverAdapterError: { cause: { kind: "UniqueConstraint", fields: ["a", "b"] } },
+      };
+      batchRequestIdx = 0;
+      constructor() {
+        super("Unique constraint failed on the fields: (`slug`)");
+        this.name = "PrismaClientKnownRequestError";
+      }
+    }
+
+    /** Leaf count of the record, objects by key and arrays by index. */
+    function flatten(value: unknown, prefix = ""): string[] {
+      if (value === null || typeof value !== "object") return [prefix];
+      return Object.entries(value).flatMap(([key, child]) =>
+        flatten(child, prefix ? `${prefix}.${key}` : key),
+      );
+    }
+
+    const fixtures = [
+      { name: "ZodError", make: zodLike, code: undefined },
+      {
+        name: "PrismaClientKnownRequestError",
+        make: () => new PrismaClientKnownRequestError(),
+        code: "P2002",
+      },
+    ];
+
+    for (const fixture of fixtures) {
+      for (const { label, statusCode, field } of [
+        { label: "warn", statusCode: 409, field: REQUEST_CAUSE_FIELD },
+        { label: "error", statusCode: 500, field: "error" },
+      ]) {
+        describe(`when a ${fixture.name} is logged at ${label} level`, () => {
+          function emitted() {
+            const records = captureRecords((logger) => {
+              logHttpRequest(logger as never, {
+                method: "POST",
+                url: "/api/thing",
+                statusCode,
+                duration: 5,
+                userAgent: null,
+                error: fixture.make(),
+              });
+            });
+            return records[0]!;
+          }
+
+          /** @scenario A wide failure is logged as a bounded summary */
+          it("emits fewer than 20 keys once flattened", () => {
+            expect(emitted().level).toBe(label.toUpperCase());
+            expect(flatten(emitted()).length).toBeLessThan(20);
+          });
+
+          /** @scenario A wide failure is logged as a bounded summary */
+          it("carries only type, message, code and stack on the cause", () => {
+            const cause = emitted()[field];
+            expect(Object.keys(cause).every((k) =>
+              ["type", "message", "code", "stack"].includes(k),
+            )).toBe(true);
+            expect(cause.type).toBe(fixture.name);
+            expect(cause.message).toContain(fixture.make().message);
+            if (fixture.code) expect(cause.code).toBe(fixture.code);
+          });
+
+          /** @scenario Error records carry no superjson metadata */
+          it("emits no _superjson field", () => {
+            const [line] = JSON.stringify(emitted()).match(/_superjson/) ?? [];
+            expect(line).toBeUndefined();
+          });
+        });
+      }
+    }
+  });
 });

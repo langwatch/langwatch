@@ -3,7 +3,6 @@ import pino, {
   type LoggerOptions,
   type Logger as PinoLogger,
 } from "pino";
-import type SuperJSON from "superjson";
 import { DEFAULT_SERVICE_NAME, REQUEST_CAUSE_FIELD } from "./constants";
 
 type LogContextProvider = () => Record<string, string | null>;
@@ -12,17 +11,6 @@ const isNodeRuntime =
   typeof process !== "undefined" && typeof process.versions?.node === "string";
 
 let logContextProvider: LogContextProvider | undefined;
-let sharedSuperjson: typeof SuperJSON | undefined;
-
-function getSuperjson(): typeof SuperJSON {
-  if (!sharedSuperjson) {
-    const { createRequire } = process.getBuiltinModule("node:module");
-    const loadModule = createRequire(import.meta.url);
-    sharedSuperjson = loadModule("superjson") as typeof SuperJSON;
-  }
-
-  return sharedSuperjson;
-}
 
 /**
  * Registers the server context provider used by every logger mixin.
@@ -36,20 +24,55 @@ export function registerLogContextProvider(provider: LogContextProvider): void {
 }
 
 /**
- * Custom Error serializer using superjson.
- * Avoids expensive manual stack trace formatting while preserving metadata.
+ * A failure reduced to the four fields worth reading.
+ *
+ * Loki accepts at most 128 structured-metadata keys per record, and every
+ * nested key of a logged error becomes one: a ZodError's `issues` or a Prisma
+ * error's `meta` pushed request records past 250 keys, and Loki dropped them
+ * whole (#8483). Type, message, code and stack are what a failure is triaged
+ * by, and they stay a fixed four keys however wide the error is.
+ *
+ * Cause-chain messages and credential masking survive because the summary is
+ * cut from the already-redacted pino serialization.
  */
-const superjsonErrorSerializer = (error: unknown) => {
+export function summarizeError(error: unknown): {
+  type: string;
+  message: string;
+  code?: string | number;
+  stack?: string;
+} {
   if (!(error instanceof Error)) {
-    return pino.stdSerializers.err(error as Error);
+    return {
+      type: error === null ? "null" : typeof error,
+      message: String(error),
+    };
   }
 
-  const serialized = getSuperjson().serialize(error);
+  const { type, message, stack } = redactCommandCredentials(
+    pino.stdSerializers.err(error),
+  );
+  const code = (error as { code?: unknown }).code;
+  return {
+    type,
+    message,
+    ...(typeof code === "string" || typeof code === "number" ? { code } : {}),
+    ...(stack === undefined ? {} : { stack }),
+  };
+}
 
-  return redactCommandCredentials({
-    ...pino.stdSerializers.err(error),
-    _superjson: serialized.meta,
-  });
+/**
+ * Error serializer for every cause key. Request logging hands it an
+ * already-bounded {@link summarizeError} summary - a plain object, passed
+ * through untouched (pino's err serializer would relabel it `type: "Object"`).
+ * Every other `Error` keeps its full pino serialization; only `_superjson` is
+ * gone.
+ */
+const errorSerializer = (error: unknown) => {
+  if (error instanceof Error) {
+    return redactCommandCredentials(pino.stdSerializers.err(error));
+  }
+  if (error !== null && typeof error === "object") return error;
+  return pino.stdSerializers.err(error as Error);
 };
 
 /** Redis commands whose arguments carry a password. */
@@ -133,9 +156,9 @@ function redactCommandCredentials<T extends object>(serialized: T): T {
  * process-level unhandled-rejection record.
  */
 export const NODE_LOG_SERIALIZERS = {
-  error: superjsonErrorSerializer,
-  [REQUEST_CAUSE_FIELD]: superjsonErrorSerializer,
-  reason: superjsonErrorSerializer,
+  error: errorSerializer,
+  [REQUEST_CAUSE_FIELD]: errorSerializer,
+  reason: errorSerializer,
 } as const;
 
 export interface CreateLoggerOptions {
