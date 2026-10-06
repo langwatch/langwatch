@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`CodingAgentApi`)
 
-Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:62`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:63`; nothing else in this package is public.
 
 #### `findBySessionId`
 
@@ -92,6 +92,14 @@ Derives a received span's session facts and contributes them, as main's dispatch
 
 ```typescript
 contributeReceivedSpan(input: CodingAgentReceivedSpan): Promise<void>;
+```
+
+#### `readSessionGroupsForViewer`
+
+The Sessions lens (main's `traces.sessions`): trace's page for the viewer, enriched here.
+
+```typescript
+readSessionGroupsForViewer(input: TraceSessionGroupsInput & { viewerUserId: string }): Promise<TracesSessionsPage>;
 ```
 
 #### `recordPullRequestUsageRead`
@@ -226,7 +234,7 @@ type Response = z.infer<typeof pullRequestUsageResponseSchema>; // src/rules/pul
 
 ### `codingAgents`
 
-Contract `../contract/src/coding-agent.trpc.ts:24`, router `src/transport/coding-agent.trpc.ts:29`.
+Contract `../contract/src/coding-agent.trpc.ts:25`, router `src/transport/coding-agent.trpc.ts:29`.
 
 | Procedure                        | Kind  | Gate                     | Input                                         | Output                                                    |
 | -------------------------------- | ----- | ------------------------ | --------------------------------------------- | --------------------------------------------------------- |
@@ -237,6 +245,7 @@ Contract `../contract/src/coding-agent.trpc.ts:24`, router `src/transport/coding
 | `codingAgents.pullRequestDetail` | query | Permission `traces:view` | `codingAgentTrpcPullRequestDetailInputSchema` | `codingAgentPullRequestDetailSchema`                      |
 | `codingAgents.session`           | query | Permission `traces:view` | inline                                        | inline                                                    |
 | `codingAgents.transcript`        | query | Permission `traces:view` | `codingAgentTrpcTraceScopeSchema`             | `codingAgentTranscriptSchema`                             |
+| `codingAgents.sessionGroups`     | query | Permission `traces:view` | `traceSessionGroupsInputSchema`               | `tracesSessionsPageSchema`                                |
 
 ## Sockets
 

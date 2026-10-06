@@ -1638,7 +1638,7 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
-### Pipeline `organization_audit` (aggregate `organization`)
+### Pipeline `organization_audit` (aggregate `organization_audit`)
 
 Declared at `src/eventing/organization-audit.pipeline.ts:46`. Events: `organizationAuditRecordedEventSchema`.
 

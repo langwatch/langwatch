@@ -488,7 +488,7 @@ type Response = z.infer<typeof dashboardDeletedResponseSchema>; // ../contract/s
 
 |             |                                      |
 | ----------- | ------------------------------------ |
-| Declared at | `src/transport/graph.rest.ts:40`     |
+| Declared at | `src/transport/graph.rest.ts:41`     |
 | Base URL    | `/api/graphs`, twin `/api/v1/graphs` |
 | Addressing  | dated                                |
 | Credential  | project                              |
@@ -498,7 +498,7 @@ type Response = z.infer<typeof dashboardDeletedResponseSchema>; // ../contract/s
 
 List all custom graphs, optionally filtered by dashboard
 
-Permission `analytics:view`. Declared at `src/transport/graph.rest.ts:44`.
+Permission `analytics:view`. Declared at `src/transport/graph.rest.ts:45`.
 
 Answers at `/api/graphs`, `/api/v1/graphs`; also, undocumented, `/api/graphs/2026-08-07`, `/api/v1/graphs/2026-08-07`, `/api/graphs/latest`, `/api/v1/graphs/latest`.
 
@@ -511,7 +511,7 @@ type Response = z.infer<typeof graphListRestResponseSchema>; // ../contract/src/
 
 Get a custom graph by its ID
 
-Permission `analytics:view`. Declared at `src/transport/graph.rest.ts:61`.
+Permission `analytics:view`. Declared at `src/transport/graph.rest.ts:62`.
 
 Answers at `/api/graphs/:id`, `/api/v1/graphs/:id`; also, undocumented, `/api/graphs/2026-08-07/:id`, `/api/v1/graphs/2026-08-07/:id`, `/api/graphs/latest/:id`, `/api/v1/graphs/latest/:id`.
 
@@ -524,7 +524,7 @@ type Response = z.infer<typeof graphRestResponseSchema>; // ../contract/src/dash
 
 Create a custom graph on a dashboard
 
-Permission `analytics:create`. Declared at `src/transport/graph.rest.ts:71`.
+Permission `analytics:create`. Declared at `src/transport/graph.rest.ts:72`.
 
 Answers at `/api/graphs`, `/api/v1/graphs`; also, undocumented, `/api/graphs/2026-08-07`, `/api/v1/graphs/2026-08-07`, `/api/graphs/latest`, `/api/v1/graphs/latest`.
 
@@ -537,7 +537,7 @@ type Response = z.infer<typeof graphRestResponseSchema>; // ../contract/src/dash
 
 Update a custom graph's name, definition, or filters
 
-Permission `analytics:update`. Declared at `src/transport/graph.rest.ts:95`.
+Permission `analytics:update`. Declared at `src/transport/graph.rest.ts:96`.
 
 Answers at `/api/graphs/:id`, `/api/v1/graphs/:id`; also, undocumented, `/api/graphs/2026-08-07/:id`, `/api/v1/graphs/2026-08-07/:id`, `/api/graphs/latest/:id`, `/api/v1/graphs/latest/:id`.
 
@@ -551,7 +551,7 @@ type Response = z.infer<typeof graphRestResponseSchema>; // ../contract/src/dash
 
 Delete a custom graph
 
-Permission `analytics:manage`. Declared at `src/transport/graph.rest.ts:117`.
+Permission `analytics:manage`. Declared at `src/transport/graph.rest.ts:118`.
 
 Answers at `/api/graphs/:id`, `/api/v1/graphs/:id`; also, undocumented, `/api/graphs/2026-08-07/:id`, `/api/v1/graphs/2026-08-07/:id`, `/api/graphs/latest/:id`, `/api/v1/graphs/latest/:id`.
 

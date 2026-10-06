@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`GatewayApi`)
 
-Peers call these through the token, declared at `../contract/src/gateway.api.ts:481`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/gateway.api.ts:519`; nothing else in this package is public.
 It extends `GatewayInternalProtocol`.
 
 #### `internalDoor`
@@ -828,7 +828,7 @@ Answers at `/api/internal/gateway/resolve-key`.
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:130)
-type Headers = z.infer<typeof gatewayInternalHeadersSchema>; // ../contract/src/gateway-internal.schemas.ts:230
+type Headers = z.infer<typeof gatewayInternalHeadersSchema>; // ../contract/src/gateway-internal.schemas.ts:267
 ```
 
 #### `POST /api/internal/gateway/codex/refresh` · `gatewayInternalCodexRefresh`
@@ -849,7 +849,7 @@ Answers at `/api/internal/gateway/config/:vk_id`.
 
 ```typescript
 type Params = z.infer<typeof gatewayInternalConfigParamsSchema>; // ../contract/src/gateway-internal.schemas.ts:25
-type Headers = z.infer<typeof gatewayInternalHeadersSchema>; // ../contract/src/gateway-internal.schemas.ts:230
+type Headers = z.infer<typeof gatewayInternalHeadersSchema>; // ../contract/src/gateway-internal.schemas.ts:267
 ```
 
 #### `GET /api/internal/gateway/changes` · `gatewayInternalChanges`
@@ -859,7 +859,7 @@ Authenticated: the Go data plane signs every call with the deployment's own gate
 Answers at `/api/internal/gateway/changes`.
 
 ```typescript
-type Query = z.infer<typeof gatewayInternalChangesQuerySchema>; // ../contract/src/gateway-internal.schemas.ts:234
+type Query = z.infer<typeof gatewayInternalChangesQuerySchema>; // ../contract/src/gateway-internal.schemas.ts:271
 ```
 
 #### `POST /api/internal/gateway/guardrail/check` · `gatewayInternalGuardrailCheck`
@@ -879,7 +879,7 @@ Authenticated: the Go data plane signs every call with the deployment's own gate
 Answers at `/api/internal/gateway/budget-bucket-spend`.
 
 ```typescript
-type Query = z.infer<typeof gatewayInternalBucketQuerySchema>; // ../contract/src/gateway-internal.schemas.ts:239
+type Query = z.infer<typeof gatewayInternalBucketQuerySchema>; // ../contract/src/gateway-internal.schemas.ts:276
 ```
 
 #### `POST /api/internal/gateway/spend-commands` · `gatewayInternalSpendCommands`
@@ -909,7 +909,7 @@ Authenticated: the Go data plane signs every call with the deployment's own gate
 Answers at `/api/internal/gateway/realtime-sessions/:session_id`.
 
 ```typescript
-type Params = z.infer<typeof gatewayInternalSessionParamsSchema>; // ../contract/src/gateway-internal.schemas.ts:123
+type Params = z.infer<typeof gatewayInternalSessionParamsSchema>; // ../contract/src/gateway-internal.schemas.ts:147
 // Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:202)
 ```
 
@@ -920,7 +920,7 @@ Authenticated: the Go data plane signs every call with the deployment's own gate
 Answers at `/api/internal/gateway/realtime-sessions/:session_id/usage`.
 
 ```typescript
-type Params = z.infer<typeof gatewayInternalSessionParamsSchema>; // ../contract/src/gateway-internal.schemas.ts:123
+type Params = z.infer<typeof gatewayInternalSessionParamsSchema>; // ../contract/src/gateway-internal.schemas.ts:147
 // Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:216)
 ```
 
