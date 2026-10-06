@@ -60,10 +60,14 @@ interface WholeListSupply {
   boot(): Promise<BootedRuntime<Record<string, unknown>, unknown, unknown>>;
 }
 
-/** A SaaS deployment: the flag and a synthetic, never-called Stripe key its reports need. */
+/**
+ * A SaaS deployment: the flag and a synthetic, never-called Stripe key its reports need.
+ * Memory stores have no Redis for the Instant Evals budget holds, so the bound is off.
+ */
 const SAAS_ENVIRONMENT: Readonly<Record<string, string>> = {
   ...SYNTHETIC_ENVIRONMENT,
   IS_SAAS: "true",
+  INSTANT_EVAL_BOUNDED: "false",
   STRIPE_SECRET_KEY: "sk_test_synthetic",
 };
 
