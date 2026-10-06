@@ -188,14 +188,29 @@ func (e *entry) matches(to, subject string) bool {
 // Callers hold st.mu.
 func (st *Store) scan(to, subject string, fn func(*entry) bool) {
 	to, subject = strings.ToLower(to), strings.ToLower(subject)
-	if to == "" {
-		for i := len(st.entries) - 1; i >= 0; i-- {
-			if e := st.entries[i]; e.matches("", subject) && !fn(e) {
-				return
-			}
-		}
-		return
+	candidates := st.entries
+	if to != "" {
+		candidates = st.recipientHits(to)
+	} else {
+		candidates = newestFirst(candidates)
 	}
+	for _, e := range candidates {
+		if e.matches("", subject) && !fn(e) {
+			return
+		}
+	}
+}
+
+// newestFirst returns the inbox reversed, without touching the original.
+func newestFirst(entries []*entry) []*entry {
+	out := slices.Clone(entries)
+	slices.Reverse(out)
+	return out
+}
+
+// recipientHits collects the entries whose recipient matches to, newest first
+// and without duplicates.
+func (st *Store) recipientHits(to string) []*entry {
 	var hits []*entry
 	for addr, list := range st.byRecipient {
 		if strings.Contains(addr, to) {
@@ -203,12 +218,7 @@ func (st *Store) scan(to, subject string, fn func(*entry) bool) {
 		}
 	}
 	slices.SortFunc(hits, func(a, b *entry) int { return cmp.Compare(b.seq, a.seq) })
-	hits = slices.CompactFunc(hits, func(a, b *entry) bool { return a == b })
-	for _, e := range hits {
-		if e.matches("", subject) && !fn(e) {
-			return
-		}
-	}
+	return slices.CompactFunc(hits, func(a, b *entry) bool { return a == b })
 }
 
 // loadMessages reads the newest keep persisted messages back, in arrival order.
