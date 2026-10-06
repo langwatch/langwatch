@@ -3,7 +3,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { OrganizationUserDirectoryRepository } from "../organization-user-directory.repository.ts";
 
 /** Only what this repository touches, so composition names the slice it needs. */
-export type OrganizationUserDirectoryDatabase = Pick<PrismaClient, "user">;
+type OrganizationUserDirectoryDatabase = Pick<PrismaClient, "user">;
 
 /**
  * The organization's own reads of the `User` table: an invited address, the

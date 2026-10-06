@@ -20,7 +20,7 @@ import { OrganizationMembershipService } from "./organization-membership.service
 export type OrganizationDemoProject = Readonly<{ userId: string; projectId: string }>;
 
 /** What this service reads the organization rows through. */
-export interface OrganizationVisibilityReader {
+interface OrganizationVisibilityReader {
   getAllForUser(
     input: Readonly<{
       userId: string;
@@ -37,7 +37,7 @@ export interface OrganizationVisibilityReader {
   ): Promise<OrganizationWithMembersAndTheirTeams["members"][number] | null>;
 }
 
-export interface OrganizationVisibilityDependencies {
+interface OrganizationVisibilityDependencies {
   readonly reader: OrganizationVisibilityReader;
   readonly permissions: AuthzApi;
   readonly demoProject: OrganizationDemoProject;

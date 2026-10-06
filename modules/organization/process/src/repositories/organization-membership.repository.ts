@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repos are intentional no-ops.
 
-import type { AuthzCustomRole, AuthzGrantCaller, GrantScopeTier } from "@langwatch/authz-contract";
+import type { AuthzGrantCaller, GrantScopeTier } from "@langwatch/authz-contract";
 import type {
   CustomRole,
   EnrichedAuditLog as ContractEnrichedAuditLog,
@@ -20,11 +20,11 @@ import type {
 import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
 import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service.ts";
 
-export type TeamWithProjects = Team & {
+type TeamWithProjects = Team & {
   projects: Project[];
 };
 
-export type TeamWithProjectsAndMembers = TeamWithProjects & {
+type TeamWithProjectsAndMembers = TeamWithProjects & {
   members: (TeamUser & {
     assignedRole?: CustomRole | null;
   })[];
@@ -35,22 +35,12 @@ export type FullyLoadedOrganization = Organization & {
   teams: TeamWithProjectsAndMembers[];
 };
 
-export type TeamMemberWithUser = TeamUser & {
-  user: Pick<User, "id" | "name" | "email" | "image">;
-  assignedRole?: AuthzCustomRole | null;
-};
-
-export type TeamMemberWithTeam = TeamUser & {
+type TeamMemberWithTeam = TeamUser & {
   team: Team;
   assignedRole?: CustomRole | null;
 };
 
-export type TeamWithProjectsAndMembersAndUsers = Team & {
-  members: TeamMemberWithUser[];
-  projects: Project[];
-};
-
-export type UserWithTeams = User & {
+type UserWithTeams = User & {
   teamMemberships: TeamMemberWithTeam[];
 };
 

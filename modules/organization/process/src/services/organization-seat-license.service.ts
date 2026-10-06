@@ -22,9 +22,6 @@ export type OrganizationPlanUser = Readonly<{
   email?: string | null;
 }>;
 
-/** Which seat kind a role change is asking the organization to spend. */
-export type OrganizationSeatChangeType = string;
-
 /** What a seat check answers, counts included: the `licenseEnforcement.*` answer. */
 export type OrganizationSeatDecision = LimitCheckResult;
 

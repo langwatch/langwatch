@@ -24,7 +24,7 @@ import type {
 /** Shown where the ledger knows a requester's id but nobody's name. */
 const UNNAMED_COLLEAGUE = "A colleague";
 
-export interface OrganizationJoinDoorDependencies {
+interface OrganizationJoinDoorDependencies {
   readonly joinRequests: OrganizationJoinRequests;
   readonly directory: OrganizationDirectory;
 }

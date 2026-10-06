@@ -91,7 +91,7 @@ type TeamMembershipLike = {
  * four ports.
  */
 /** The grant half of an admission, answered by the authorization peer. */
-export type OrganizationAdmissions = Pick<AuthzApi, "attachBindings" | "completeAdmission">;
+type OrganizationAdmissions = Pick<AuthzApi, "attachBindings" | "completeAdmission">;
 
 export class OrganizationMembershipService {
   static enrichTeamWithGrants<

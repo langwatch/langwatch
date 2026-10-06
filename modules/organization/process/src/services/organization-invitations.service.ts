@@ -32,7 +32,7 @@ export type OrganizationInvitesCreated = Readonly<{
  * management REST family administers, so an administrator and a provisioning
  * tool see one set of invitations with one acceptance link each.
  */
-export type OrganizationInvitationsCreateInput = Readonly<{
+type OrganizationInvitationsCreateInput = Readonly<{
   organizationId: string;
   invites: readonly Readonly<{
     email: string;
@@ -49,16 +49,16 @@ export type OrganizationInvitationsCreateInput = Readonly<{
   validation: OrganizationInviteValidation;
 }>;
 
-export type OrganizationInvitationsResent = Readonly<{
+type OrganizationInvitationsResent = Readonly<{
   invite: OrganizationInvite;
   emailNotSent: boolean;
 }>;
 
-export type OrganizationInvitationsListing = OrganizationInvite &
+type OrganizationInvitationsListing = OrganizationInvite &
   Omit<OrganizationListedInvite, keyof OrganizationInvite>;
 
 /** The two facts an invitation's display status is read from. */
-export type OrganizationInvitationsStatusFacts = Readonly<{
+type OrganizationInvitationsStatusFacts = Readonly<{
   status: string;
   expiration: OrganizationInvite["expiration"];
 }>;

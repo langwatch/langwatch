@@ -12,7 +12,7 @@ export interface OrganizationScopeGraphReader {
   findScopeGraphForUser(input: Readonly<{ userId: string }>): Promise<ScopeGraphOrganization[]>;
 }
 
-export interface OrganizationScopeGraphDependencies {
+interface OrganizationScopeGraphDependencies {
   readonly reader: OrganizationScopeGraphReader;
   readonly permissions: Pick<AuthzApi, "listBindingsForSynthesis">;
 }

@@ -6,8 +6,8 @@ import { nowInstant } from "@langwatch/time";
 
 import type { OrganizationInviteRateLimitRepository } from "../repositories/organization-invite-rate-limit.repository.ts";
 
-export const INVITE_SEND_WINDOW_SECONDS = 60 * 60;
-export const INVITE_SENDS_PER_WINDOW = 3;
+const INVITE_SEND_WINDOW_SECONDS = 60 * 60;
+const INVITE_SENDS_PER_WINDOW = 3;
 
 /**
  * The window, spent against whichever counter the process composed.

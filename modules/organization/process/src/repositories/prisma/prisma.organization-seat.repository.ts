@@ -11,7 +11,7 @@ import { z } from "zod";
 import { OrganizationSeatRepository } from "../organization-seat.repository.ts";
 
 /** Only what this repository needs, named so a caller never names Prisma's own types. */
-export type PrismaOrganizationSeatDatabase = PrismaClient | Prisma.TransactionClient;
+type PrismaOrganizationSeatDatabase = PrismaClient | Prisma.TransactionClient;
 
 /** An invitation's team assignments as stored; anything else reads as none. */
 const teamAssignmentsSchema = z.array(

@@ -99,7 +99,7 @@ export interface MemoryOrganizationInviteRow {
 }
 
 /** One team-scoped membership row (the `TeamUser` join table). */
-export interface MemoryTeamUserRow {
+interface MemoryTeamUserRow {
   teamId: string;
   userId: string;
   role: TeamUserRole;
@@ -109,7 +109,7 @@ export interface MemoryTeamUserRow {
 }
 
 /** One custom role, the fields a seat's assignability check reads. */
-export interface MemoryCustomRoleRow {
+interface MemoryCustomRoleRow {
   id: string;
   organizationId: string;
   name: string;
@@ -140,7 +140,7 @@ export interface MemoryAuditLogRow {
 }
 
 /** One project row, only the columns the personal workspace needs. */
-export interface MemoryProjectRow {
+interface MemoryProjectRow {
   id: string;
   name: string;
   slug: string;

@@ -2,8 +2,6 @@ import { OrganizationUserRole, TeamUserRole } from "@langwatch/organization-cont
 
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 
-export const LITE_MEMBER_VIEWER_ONLY_ERROR = "Lite Member users can only have Viewer team role";
-
 export interface TeamRoleUpdate {
   teamId: string;
   role: TeamRoleValue;

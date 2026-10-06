@@ -7,7 +7,7 @@ import {
 } from "../rules/member-provenance.rules.ts";
 
 /** The domain admissions identity records, asked per call of a peer resolved lazily. */
-export interface MemberDomainAdmissions {
+interface MemberDomainAdmissions {
   findForMembers(args: {
     organizationId: string;
     userIds: readonly string[];

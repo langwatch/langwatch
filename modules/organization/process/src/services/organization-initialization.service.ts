@@ -19,7 +19,7 @@ import type { OrganizationSignals } from "./organization-signals.service.ts";
 const CODING_AGENT_INTENT = "AGENT_GOVERNANCE";
 
 /** What the ceremony creates the organization and everything after it through. */
-export interface OrganizationInitializationDependencies {
+interface OrganizationInitializationDependencies {
   readonly ceremony: OrganizationCeremony;
   readonly signals: OrganizationSignals;
   /** Where the sign-up is recorded as organization's event, for nurturing. */

@@ -94,13 +94,6 @@ export type IntegrationMethodChosenEvent = z.infer<typeof integrationMethodChose
 export type PersonalWorkspaceProvisionedEvent = z.infer<
   typeof personalWorkspaceProvisionedEventSchema
 >;
-export type OrganizationLifecycleEvent =
-  | OrganizationSignedUpEvent
-  | MembersInvitedEvent
-  | InviteAcceptedEvent
-  | IntegrationMethodChosenEvent
-  | PersonalWorkspaceProvisionedEvent;
-
 /** The organization's presence switch; versioned on its own, born after the lifecycle's facts. */
 export const recordPresenceSettingChangedCommandDataSchema =
   organizationPresenceSettingChangedEventDataSchema;

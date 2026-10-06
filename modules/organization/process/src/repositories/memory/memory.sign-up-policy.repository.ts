@@ -4,7 +4,7 @@ import { SignUpPolicyRepository } from "../sign-up-policy.repository.ts";
 import type { MemoryOrganizationDatabase } from "./memory.organization.database.ts";
 
 /** One invitation as the policy reads it. */
-export type MemorySignUpInvite = {
+type MemorySignUpInvite = {
   email: string;
   inviteCode: string;
   status: string;

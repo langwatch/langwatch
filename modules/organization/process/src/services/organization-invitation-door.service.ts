@@ -37,7 +37,7 @@ import type { OrganizationLifecycleNoticeService } from "./organization-lifecycl
 import type { OrganizationSignals } from "./organization-signals.service.ts";
 
 /** What the ceremony needs beside the invitation service itself. */
-export interface OrganizationInvitationDoorDependencies {
+interface OrganizationInvitationDoorDependencies {
   readonly invitations: OrganizationInvitations;
   readonly joinRequests: OrganizationJoinRequests | null;
   readonly signals: OrganizationSignals;

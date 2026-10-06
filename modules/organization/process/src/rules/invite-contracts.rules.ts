@@ -35,7 +35,7 @@ export interface OrganizationInviteSeatCensus {
  * join. A port, not a call into the project feature — same reason as the
  * mail port: an uncomposed process says so by absence, not by reporting zero.
  */
-export interface OrganizationInviteWorkspaceCensus {
+interface OrganizationInviteWorkspaceCensus {
   countProjects(organizationId: string): Promise<number>;
 }
 
@@ -94,7 +94,7 @@ export interface CreateInvitesInviteInput {
 }
 
 /** The validated team side of one requested invite. */
-export interface ResolvedInviteTeams {
+interface ResolvedInviteTeams {
   teamAssignments: TeamAssignmentInput[];
   teamIdsString: string;
 }
