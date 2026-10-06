@@ -139,23 +139,36 @@ export type GrantConditionWire = z.infer<typeof grantConditionSchema>;
  * revocable by no principal. It is only meaningful paired with a token, and
  * tokens exist at RESOURCE scope alone.
  *
- * The `project` principal has exactly two legal placements: the resource tier
- * (a share link whose audience is "members who can see this project"), and
+ * The `project` principal has exactly three legal placements: the resource
+ * tier (a share link whose audience is "members who can see this project"),
  * its OWN project's PROJECT scope — the project-credential self-grant the
- * cutover imports, `Project.apiKey` acting as the project it belongs to. The
- * self-grant is the contract the edge will resolve a project credential
- * against once bare column comparison retires; it is dormant until then (no
- * collector returns PROJECT-principal rows for a user or an api key). Any
- * other placement — a project principal on a foreign project, a team, or the
- * organization — would be a standing cross-scope credential nobody holds, and
- * is refused.
+ * cutover imports, `Project.apiKey` acting as the project it belongs to — and
+ * the shared project read of ADR-144: a `project-reader` role on ANOTHER
+ * project's PROJECT scope that carries a condition. The self-grant is the
+ * contract the edge will resolve a project credential against once bare
+ * column comparison retires; it is dormant until then (no collector returns
+ * PROJECT-principal rows for a user or an api key). Any other placement — a
+ * project principal on a foreign project under any other role, on a team, or
+ * on the organization — would be a standing cross-scope credential nobody
+ * holds, and is refused.
+ *
+ * The shared read is the only shape that carries a condition and the only
+ * one that carries the `project-reader` role; both halves are checked so a
+ * user cannot hold `project-reader` and an own grant cannot carry a window.
+ * The condition's `where` slot is refused while non-empty: nothing compiles
+ * OTTL yet, and a predicate the client cannot apply must not be stored as
+ * if it narrowed anything. Same-organisation placement is a question for
+ * storage, asked by the writer, not the wire.
  */
+export const SHARED_PROJECT_READ_ROLE_KEY = "project-reader";
+
 export const grantShapeRefinement = {
   check: (grant: {
     principal: { type: string; id: string | null };
     roleKey: string | null;
     scope: { type: string; id: string };
     resource?: unknown;
+    condition?: { where?: string };
   }): boolean => {
     const isResourceScope = grant.scope.type === "RESOURCE";
     if (grant.principal.type === "anyone" && !isResourceScope) {
@@ -163,10 +176,27 @@ export const grantShapeRefinement = {
     }
     const isOwnProjectCredential =
       grant.scope.type === "PROJECT" && grant.principal.id === grant.scope.id;
+    const isSharedProjectRead =
+      grant.principal.type === "project" &&
+      grant.scope.type === "PROJECT" &&
+      grant.principal.id !== grant.scope.id &&
+      grant.roleKey === SHARED_PROJECT_READ_ROLE_KEY &&
+      grant.condition !== undefined &&
+      (grant.condition.where === undefined || grant.condition.where === "");
     if (
       grant.principal.type === "project" &&
       !isResourceScope &&
-      !isOwnProjectCredential
+      !isOwnProjectCredential &&
+      !isSharedProjectRead
+    ) {
+      return false;
+    }
+    if ((grant.condition !== undefined) !== isSharedProjectRead) {
+      return false;
+    }
+    if (
+      (grant.roleKey === SHARED_PROJECT_READ_ROLE_KEY) !==
+      isSharedProjectRead
     ) {
       return false;
     }
@@ -176,7 +206,7 @@ export const grantShapeRefinement = {
     );
   },
   message:
-    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; `anyone` principals exist only at RESOURCE scope, and a `project` principal exists at RESOURCE scope or as its own project's credential (a PROJECT scope whose id is the principal's)",
+    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; `anyone` principals exist only at RESOURCE scope; a `project` principal exists at RESOURCE scope, as its own project's credential (a PROJECT scope whose id is the principal's), or as a `project-reader` on another project's PROJECT scope carrying a condition with an empty where; only that shared read carries a condition or the `project-reader` role",
   path: ["resource"] as const,
 };
 
