@@ -18,6 +18,12 @@ import type { SlackConnectionRecord } from "../../slack-connection.repository.ts
 import { PrismaSlackConnectionClaimRepository } from "../prisma.slack-connection-claim.repository.ts";
 import { PrismaSlackConnectionRepository } from "../prisma.slack-connection.repository.ts";
 
+/** Hex, not a cipher: a stored column that spells out the plaintext fails the test. */
+const hexEncryption = {
+  encrypt: (value: string) => Buffer.from(value, "utf8").toString("hex"),
+  decrypt: (value: string) => Buffer.from(value, "hex").toString("utf8"),
+};
+
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const namespace = `test-slack-connections-${randomUUID()}`;
 const organizationId = `${namespace}-organization`;
@@ -32,8 +38,8 @@ function record(overrides: Partial<SlackConnectionRecord> = {}): SlackConnection
     scopeType: "PROJECT",
     scopeId: projectId,
     organizationId,
-    botTokenEncrypted: null,
-    webhookUrlEncrypted: "iv:ciphertext:tag",
+    botToken: null,
+    webhookUrl: "https://hooks.slack.test/services/T/B/token",
     secretFingerprint: `fp-${randomUUID()}`,
     secretHint: "abcd",
     slackTeamId: null,
@@ -60,7 +66,10 @@ describe.skipIf(!databaseUrl)("PrismaSlackConnectionRepository", () => {
       guard: PrismaTenancyGuardService.create(),
       logger: createLogger("langwatch:slack:test:connections"),
     }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }));
-    connections = PrismaSlackConnectionRepository.create(connection.client);
+    connections = PrismaSlackConnectionRepository.create({
+      prisma: connection.client,
+      encryption: hexEncryption,
+    });
     claims = PrismaSlackConnectionClaimRepository.create(connection.client);
   });
 
@@ -88,6 +97,24 @@ describe.skipIf(!databaseUrl)("PrismaSlackConnectionRepository", () => {
       const listed = await connections.findAllUsableByProject({ organizationId, projectId });
 
       expect(listed.map((row) => row.name)).toEqual(["A project", "B org"]);
+    });
+  });
+
+  describe("given a connection stored with its secret", () => {
+    it("seals the secret at rest and opens it on read", async () => {
+      const [created] = await connections.create({ record: record(), actorId: "user-1" });
+      if (!created) throw new Error("the connection was not stored");
+
+      const column = await connection.client.slackIntegration.findUniqueOrThrow({
+        where: { id: created.id },
+        select: { webhookUrlEncrypted: true },
+      });
+      const [read] = await connections.findById({ id: created.id });
+
+      expect(column.webhookUrlEncrypted).toBe(
+        hexEncryption.encrypt("https://hooks.slack.test/services/T/B/token"),
+      );
+      expect(read?.webhookUrl).toBe("https://hooks.slack.test/services/T/B/token");
     });
   });
 

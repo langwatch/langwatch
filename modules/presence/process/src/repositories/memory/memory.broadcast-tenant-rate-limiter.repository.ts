@@ -1,21 +1,12 @@
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
+import type {
+  BroadcastTenantRateLimiterRepository,
+  TierConfig,
+} from "../broadcast-tenant-rate-limiter.repository.ts";
+
 const logger = createLogger("langwatch:presence:broadcast-rate-limit");
-
-export interface BucketConfig {
-  /** Maximum tokens (burst size). */
-  capacity: number;
-  /** Tokens added per second. */
-  refillRate: number;
-}
-
-export interface TierConfig {
-  /** START, END, RUN_FINISHED, RUN_STARTED */
-  structural: BucketConfig;
-  /** CONTENT, TOOL_CALL_ARGS */
-  delta: BucketConfig;
-}
 
 const DEFAULT_TIERS: TierConfig = {
   structural: { capacity: 200, refillRate: 200 },
@@ -30,9 +21,9 @@ interface Bucket {
 const CLEANUP_INTERVAL_MS = 60_000;
 const STALE_THRESHOLD_MS = 60_000;
 
-export class BroadcastTenantRateLimiterService {
-  static create(config?: TierConfig): BroadcastTenantRateLimiterService {
-    return new BroadcastTenantRateLimiterService(config);
+export class MemoryBroadcastTenantRateLimiterRepository implements BroadcastTenantRateLimiterRepository {
+  static create(config?: TierConfig): MemoryBroadcastTenantRateLimiterRepository {
+    return new MemoryBroadcastTenantRateLimiterRepository(config);
   }
 
   private readonly config: TierConfig;

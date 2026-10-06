@@ -53,12 +53,11 @@ function compose(
 
   const suiteRunStateFoldStore = RedisSuiteRunProcessingRepository.create({
     clickhouse: clickhouse as never,
-    defaultRetentionDays: () => 49,
     redis: redis as never,
     ...(options.foldCacheTtlSeconds === undefined
       ? {}
       : { foldCacheTtlSeconds: options.foldCacheTtlSeconds }),
-  }).buildRunStateFoldStore();
+  }).openRunStateFoldStore({ defaultRetentionDays: () => 49 });
   const pipeline: SuiteRunProcessingPipeline = buildSuiteRunProcessingPipeline({
     suiteRunStateFoldStore,
   });

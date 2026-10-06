@@ -1,4 +1,3 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
@@ -12,13 +11,12 @@ import {
   type UsagePipelineDefinition,
   type UsageSenders,
 } from "../eventing/usage.pipeline.ts";
-import { BillableEventsMeterClickHouseRepository } from "../repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
-import { TraceMeterClickHouseRepository } from "../repositories/clickhouse/clickhouse.trace-meter.repository.ts";
+import type { UsageRepositories } from "../repositories/usage.repositories.ts";
 import { BillableEventsMeterAppendService } from "../services/billable-events-meter-append.service.ts";
 import { TraceMeterAppendService } from "../services/trace-meter-append.service.ts";
 import { UsageCountingService } from "../services/usage-counting.service.ts";
 
-export type UsageInfrastructure = Readonly<{ clickhouse: ClickHouseQueryClient; isSaas: boolean }>;
+export type UsageInfrastructure = Readonly<{ isSaas: boolean }>;
 
 type UsageDependencies = Readonly<{
   entitlement: typeof EntitlementApi;
@@ -34,7 +32,7 @@ export class UsageModule implements UsageApiContract {
     billing: BillingApi,
     projects: ProjectApi,
   };
-  static readonly reads = ["clickhouse", "isSaas"] as const;
+  static readonly reads = ["isSaas"] as const;
 
   #senders: UsageSenders | undefined;
 
@@ -45,8 +43,14 @@ export class UsageModule implements UsageApiContract {
   static create({
     dependencies,
     members,
-  }: FeatureSetup<UsageDependencies, UsageInfrastructure, unknown>): UsageModule {
-    const meter = BillableEventsMeterClickHouseRepository.create(members.clickhouse);
+    repositories,
+  }: FeatureSetup<
+    UsageDependencies,
+    UsageInfrastructure,
+    unknown,
+    UsageRepositories
+  >): UsageModule {
+    const meter = repositories.billableEvents;
     const counting = UsageCountingService.create({
       meter,
       entitlement: dependencies.entitlement,
@@ -62,7 +66,7 @@ export class UsageModule implements UsageApiContract {
                 projects: dependencies.projects,
               }),
               traces: TraceMeterAppendService.create({
-                meter: TraceMeterClickHouseRepository.create(members.clickhouse),
+                meter: repositories.traces,
                 projects: dependencies.projects,
               }),
             }

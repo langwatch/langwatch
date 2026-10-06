@@ -1,15 +1,15 @@
 import type { SlackConnectionKind, SlackConnectionScopeType } from "@langwatch/slack-contract";
 import type { Instant } from "@langwatch/time";
 
-/** Everything a stored connection holds, secret already in its at-rest form. */
+/** Everything a stored connection holds; the live repository seals the secret at rest. */
 export interface SlackConnectionRecord {
   name: string;
   kind: SlackConnectionKind;
   scopeType: SlackConnectionScopeType;
   scopeId: string;
   organizationId: string;
-  botTokenEncrypted: string | null;
-  webhookUrlEncrypted: string | null;
+  botToken: string | null;
+  webhookUrl: string | null;
   secretFingerprint: string;
   secretHint: string;
   slackTeamId: string | null;

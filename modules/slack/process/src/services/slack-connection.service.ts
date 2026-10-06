@@ -1,7 +1,6 @@
 import { PermissionDeniedError } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   InvalidSlackConnectionInputError,
@@ -49,12 +48,7 @@ export interface SlackProjectScope {
 /** A secret's stored form: ciphertext, fingerprint, hint and Slack workspace. */
 type StoredSecret = Pick<
   SlackConnectionRecord,
-  | "botTokenEncrypted"
-  | "webhookUrlEncrypted"
-  | "secretFingerprint"
-  | "secretHint"
-  | "slackTeamId"
-  | "slackTeamName"
+  "botToken" | "webhookUrl" | "secretFingerprint" | "secretHint" | "slackTeamId" | "slackTeamName"
 >;
 
 /** The repositories, peer slices, channel and keys the service is composed from. */
@@ -65,7 +59,6 @@ export type SlackConnectionServiceDeps = Readonly<{
   organizations: Pick<OrganizationApi, "getSettings">;
   authorization: Pick<AuthzApi, "hasPermission">;
   webApi: SlackWebApiChannel;
-  cipher: Encryption;
   fingerprintKey: string;
 }>;
 
@@ -343,7 +336,7 @@ export class SlackConnectionService {
         scopeType: "PROJECT",
         scopeId: projectId,
         organizationId,
-        ...this.encryptedSecret({ kind, secret: value }),
+        ...this.secretFields({ kind, secret: value }),
         secretFingerprint,
         secretHint: slackSecretHint({ secret: value }),
         slackTeamId: identity?.teamId ?? null,
@@ -370,7 +363,7 @@ export class SlackConnectionService {
     const [connection] = await this.deps.connections.findById({ id });
     if (!connection) return [];
     if (!(await this.reaches({ connection, projectId }))) return [];
-    return this.decryptedSecret({ connection });
+    return this.connectionSecret({ connection });
   }
 
   /** Claim counts per connection id (absent = none), all but `exceptProjectId`'s. */
@@ -493,7 +486,7 @@ export class SlackConnectionService {
   }): Promise<StoredSecret> {
     const identity = kind === "BOT" ? [await this.verifyBotToken({ token: secret })] : [];
     return {
-      ...this.encryptedSecret({ kind, secret }),
+      ...this.secretFields({ kind, secret }),
       secretFingerprint: this.fingerprint({ secret }),
       secretHint: slackSecretHint({ secret }),
       slackTeamId: identity[0]?.teamId ?? null,
@@ -553,34 +546,24 @@ export class SlackConnectionService {
     return slackSecretFingerprint({ secret, key: this.deps.fingerprintKey });
   }
 
-  private encryptedSecret({ kind, secret }: { kind: SlackConnectionKind; secret: string }): {
-    botTokenEncrypted: string | null;
-    webhookUrlEncrypted: string | null;
+  private secretFields({ kind, secret }: { kind: SlackConnectionKind; secret: string }): {
+    botToken: string | null;
+    webhookUrl: string | null;
   } {
-    const ciphertext = this.deps.cipher.encrypt(secret);
     return kind === "BOT"
-      ? { botTokenEncrypted: ciphertext, webhookUrlEncrypted: null }
-      : { botTokenEncrypted: null, webhookUrlEncrypted: ciphertext };
+      ? { botToken: secret, webhookUrl: null }
+      : { botToken: null, webhookUrl: secret };
   }
 
-  private decryptedSecret({
+  private connectionSecret({
     connection,
   }: {
     connection: SlackConnectionRow;
   }): SlackConnectionSecret[] {
     if (connection.kind === "BOT") {
-      return connection.botTokenEncrypted
-        ? [{ kind: "BOT", token: this.deps.cipher.decrypt(connection.botTokenEncrypted) }]
-        : [];
+      return connection.botToken ? [{ kind: "BOT", token: connection.botToken }] : [];
     }
-    return connection.webhookUrlEncrypted
-      ? [
-          {
-            kind: "INCOMING_WEBHOOK",
-            url: this.deps.cipher.decrypt(connection.webhookUrlEncrypted),
-          },
-        ]
-      : [];
+    return connection.webhookUrl ? [{ kind: "INCOMING_WEBHOOK", url: connection.webhookUrl }] : [];
   }
 }
 

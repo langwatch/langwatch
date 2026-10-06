@@ -10,4 +10,7 @@ export type {
   PresenceEmitter,
 } from "./app/presence.app.ts";
 export type { BroadcastEventType } from "./repositories/redis/redis.broadcast.repository.ts";
-export type { BucketConfig, TierConfig } from "./services/broadcast-tenant-rate-limiter.service.ts";
+export type {
+  BucketConfig,
+  TierConfig,
+} from "./repositories/broadcast-tenant-rate-limiter.repository.ts";

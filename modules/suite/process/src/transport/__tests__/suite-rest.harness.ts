@@ -33,6 +33,7 @@ import { fromDate } from "@langwatch/time";
 
 import { CollapsingRunCommands } from "../../__tests__/support/collapsing-run-commands.ts";
 import { SuiteModule } from "../../app/suite.app.ts";
+import { MemorySuiteRunProcessingRepository } from "../../repositories/memory/memory.suite-run-processing.repository.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
 import { suiteRunOriginFact } from "../../rules/suite-wire-v1.rules.ts";
@@ -441,7 +442,10 @@ export function mountSuiteFamilies(
   const scenarios = memoryScenarioApi(world, commands);
 
   const app = SuiteModule.createForTesting({
-    repositories: { suites: MemorySuiteRepository.create({ database }) },
+    repositories: {
+      suites: MemorySuiteRepository.create({ database }),
+      runProcessing: MemorySuiteRunProcessingRepository.create(),
+    },
     dependencies: {
       scenarios,
       agents: memoryAgentApi(world),

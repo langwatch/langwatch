@@ -3,14 +3,14 @@
  * The installer over memory persistence, in both roles that boot it.
  */
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi as ScenarioApiContract } from "@langwatch/scenario-contract";
@@ -28,25 +28,10 @@ import {
   TEST_PROJECT,
 } from "../../transport/__tests__/suite-rest.harness.ts";
 
-/**
- * The one store-backed member `SuiteModule` declares reading. Installing on
- * the memory tier never reaches a store, so boot needs the member to
- * EXIST — a stub that refuses on use proves it, naming the failure.
- */
-function analyticalWithoutStore(): ClickHouseQueryClient {
-  const client: Partial<ClickHouseQueryClient> = {};
-  return new Proxy(client, {
-    get(_target, property) {
-      throw new Error(`The memory tier must not reach ClickHouse (read "${String(property)}").`);
-    },
-  }) as ClickHouseQueryClient;
-}
-
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(suiteProcessModule)])
-    .withAnalytical(analyticalWithoutStore())
-    .withKeyvalue(null)
+    .withModules([suiteProcessModule])
+    .withStores(memoryStores())
     .withMembers({ publicBaseUrl: undefined })
     .provide({
       scenario: createApiFixture<ScenarioApiContract>({ findTestSuite: async () => null }),
@@ -132,9 +117,8 @@ describe("given a stored run plan in the api role", () => {
     const scenario = world.addScenario({ name: "Refund flow" });
     const agent = world.addAgent();
     const runtime = await createApp({ role: "api" })
-      .withModules([withMemoryRepositories(suiteProcessModule)])
-      .withAnalytical(analyticalWithoutStore())
-      .withKeyvalue(null)
+      .withModules([suiteProcessModule])
+      .withStores(memoryStores())
       .withEventing(
         new EventSourcing({
           eventStore: EventStoreMemory.createForTesting(),

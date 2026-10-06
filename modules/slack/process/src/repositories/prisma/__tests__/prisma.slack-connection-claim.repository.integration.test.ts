@@ -45,8 +45,8 @@ describe.skipIf(!databaseUrl)("PrismaSlackConnectionClaimRepository", () => {
         scopeType: "ORGANIZATION",
         scopeId: organization,
         organizationId: organization,
-        botTokenEncrypted: null,
-        webhookUrlEncrypted: "iv:ciphertext:tag",
+        botToken: null,
+        webhookUrl: "https://hooks.slack.test/services/T/B/token",
         secretFingerprint: `fp-${randomUUID()}`,
         secretHint: "abcd",
         slackTeamId: null,
@@ -85,7 +85,10 @@ describe.skipIf(!databaseUrl)("PrismaSlackConnectionClaimRepository", () => {
       guard: PrismaTenancyGuardService.create(),
       logger: createLogger("langwatch:slack:test:claims"),
     }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }));
-    connections = PrismaSlackConnectionRepository.create(connection.client);
+    connections = PrismaSlackConnectionRepository.create({
+      prisma: connection.client,
+      encryption: { encrypt: (value) => value, decrypt: (value) => value },
+    });
     claims = PrismaSlackConnectionClaimRepository.create(connection.client);
   });
 

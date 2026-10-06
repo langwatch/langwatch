@@ -7,9 +7,9 @@ import {
   type PresenceEmitter,
 } from "./app/presence.app.ts";
 import { presenceSettingsEventing } from "./eventing/presence-settings.pipeline.ts";
+import { MemoryBroadcastTenantRateLimiterRepository } from "./repositories/memory/memory.broadcast-tenant-rate-limiter.repository.ts";
 import { presenceRepositories } from "./repositories/presence-repositories.registry.ts";
 import { RedisBroadcastRepository } from "./repositories/redis/redis.broadcast.repository.ts";
-import { BroadcastTenantRateLimiterService } from "./services/broadcast-tenant-rate-limiter.service.ts";
 import { presenceTrpcTransport } from "./transport/presence.trpc.ts";
 
 export const presenceProcessModule = defineProcessModule("presence")
@@ -26,7 +26,7 @@ export type PresenceBroadcastCapability = PresenceBroadcast &
 /** Composes the tenant broadcast fabric from the process's own Redis. */
 export function createBroadcast(redis: Redis | Cluster | null): PresenceBroadcastCapability {
   return RedisBroadcastRepository.create(redis, {
-    sender: BroadcastTenantRateLimiterService.create(),
-    subscriber: BroadcastTenantRateLimiterService.create(),
+    sender: MemoryBroadcastTenantRateLimiterRepository.create(),
+    subscriber: MemoryBroadcastTenantRateLimiterRepository.create(),
   });
 }

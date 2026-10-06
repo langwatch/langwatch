@@ -58,7 +58,7 @@ class BlindedConnections extends MemorySlackConnectionRepository {
 describe("SlackConnectionService", () => {
   /** @scenario Adding a bot connection for the organization */
   it("stores a bot connection Slack accepted, with its workspace and a hint only", async () => {
-    const { service, repositories } = composeWithBot();
+    const { service } = composeWithBot();
     const created = await service.createSlackConnection(orgBot);
     expect(created).toMatchObject({
       scopeType: "ORGANIZATION",
@@ -68,8 +68,7 @@ describe("SlackConnectionService", () => {
       canManage: true,
     });
     expect(created.id.startsWith("slackintegration")).toBe(true);
-    const [row] = await repositories.connections.findById({ id: created.id });
-    expect(JSON.stringify(row)).not.toContain(BOT);
+    expect(JSON.stringify(created)).not.toContain(BOT);
   });
 
   /** @scenario Adding a webhook connection for one project */

@@ -1,10 +1,8 @@
+import type { SuiteRunProcessingRepository } from "./suite-run-processing.repository.ts";
 import type { SuiteRepository } from "./suite.repository.ts";
 
-/**
- * The rows this feature owns. The run projection is not among them: it is read
- * from ClickHouse through the process's own `clickhouse` member, which the
- * app builds its run repository over.
- */
+/** The rows this feature owns, and the store its run fold is kept in. */
 export interface SuiteRepositories {
   readonly suites: SuiteRepository;
+  readonly runProcessing: SuiteRunProcessingRepository;
 }

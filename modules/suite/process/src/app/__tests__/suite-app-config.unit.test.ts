@@ -13,7 +13,6 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import { SuiteModule } from "../suite.app.ts";
@@ -37,7 +36,7 @@ function buildProductionApp(
       featureFlags: createApiFixture<FeatureFlagApi>({}),
       modelProviders: createApiFixture<ModelProviderApi>({}),
     },
-    members: { clickhouse: clickHouseQueryClientDouble(), publicBaseUrl, redis: null },
+    members: { publicBaseUrl },
     config: undefined,
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

@@ -8,6 +8,7 @@ import { SUITE_RUN_PROJECTION_VERSIONS, type SuiteRunStateData } from "@langwatc
 import type { Cluster, Redis } from "ioredis";
 
 import { ClickhouseSuiteEventingRepository } from "../clickhouse/clickhouse.suite-eventing.repository.ts";
+import type { SuiteRunProcessingRepository } from "../suite-run-processing.repository.ts";
 
 /**
  * The Redis keyspace the suite-run fold's read-through cache occupies. A
@@ -19,8 +20,6 @@ const SUITE_RUN_FOLD_CACHE_KEY_PREFIX = "suite_runs";
 export type ClickHouseSuiteRunProcessingAdapterOptions = {
   /** The process's one ClickHouse client, which routes each statement itself. */
   clickhouse: ClickHouseQueryClient;
-  /** The fallback for rows whose tenant declares no retention override. */
-  defaultRetentionDays: () => number;
   /**
    * The process's own Redis, required rather than optional.
    */
@@ -35,7 +34,7 @@ export type ClickHouseSuiteRunProcessingAdapterOptions = {
  * Durable suite-run processing, composed from the process's own ClickHouse
  * client and its own Redis.
  */
-export class RedisSuiteRunProcessingRepository {
+export class RedisSuiteRunProcessingRepository implements SuiteRunProcessingRepository {
   static create(
     options: ClickHouseSuiteRunProcessingAdapterOptions,
   ): RedisSuiteRunProcessingRepository {
@@ -44,12 +43,16 @@ export class RedisSuiteRunProcessingRepository {
 
   private constructor(private readonly options: ClickHouseSuiteRunProcessingAdapterOptions) {}
 
-  buildRunStateFoldStore(): FoldProjectionStore<SuiteRunStateData> {
+  openRunStateFoldStore({
+    defaultRetentionDays,
+  }: {
+    defaultRetentionDays: () => number;
+  }): FoldProjectionStore<SuiteRunStateData> {
     return new RedisCachedFoldStore<SuiteRunStateData>(
       new RepositoryFoldStore<SuiteRunStateData>(
         ClickhouseSuiteEventingRepository.create({
           clickhouse: this.options.clickhouse,
-          defaultRetentionDays: this.options.defaultRetentionDays,
+          defaultRetentionDays,
         }).build().suiteRunState,
         SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
       ),

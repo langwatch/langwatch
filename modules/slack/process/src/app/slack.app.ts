@@ -1,7 +1,6 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { credentialsSecret, sessionSecret } from "@langwatch/secrets";
 import {
@@ -23,11 +22,9 @@ import type { SlackRepositories } from "../repositories/slack.repositories.ts";
 import { SlackConnectionClaimService } from "../services/slack-connection-claim.service.ts";
 import { SlackConnectionService } from "../services/slack-connection.service.ts";
 
-const slackReads = ["encryption"] as const;
-
 type SlackSetup = FeatureSetup<
   typeof SlackModule.dependencies,
-  MembersRead<typeof slackReads>,
+  never,
   undefined,
   SlackRepositories
 >;
@@ -40,7 +37,6 @@ export class SlackModule implements SlackApiContract {
     organizations: OrganizationApi,
     authorization: AuthzApi,
   };
-  static readonly reads = slackReads;
   static readonly secrets = {
     /** Main's fingerprint key: CREDENTIALS_SECRET, else NEXTAUTH_SECRET. */
     fingerprintKey: credentialsSecret,
@@ -60,7 +56,6 @@ export class SlackModule implements SlackApiContract {
 
   static async create({
     dependencies,
-    members,
     repositories,
     secrets,
     tier,
@@ -76,7 +71,6 @@ export class SlackModule implements SlackApiContract {
       authorization: dependencies.authorization,
       webApi:
         tier === "memory" ? MemorySlackWebApiChannel.create() : HttpSlackWebApiChannel.create(),
-      cipher: members.encryption,
       fingerprintKey,
     });
     return new SlackModule({

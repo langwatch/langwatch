@@ -6,7 +6,8 @@
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { PresenceApi } from "@langwatch/presence-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { PROJECT_CREATED_EVENT_TYPE } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -24,8 +25,8 @@ const heartbeat = {
 /** Presence over memory, no peer supplied; on the worker, it hosts the given eventing. */
 function composePresence(worker?: { eventing: EventSourcing }) {
   const app = createApp({ role: worker ? "worker" : "api" })
-    .withModules([withMemoryRepositories(presenceProcessModule)])
-    .withMembers({ keyvalue: null, logging: { warn: () => undefined } });
+    .withModules([presenceProcessModule])
+    .withStores(memoryStores());
   return worker ? app.withEventing(worker.eventing) : app;
 }
 

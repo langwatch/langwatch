@@ -11,6 +11,7 @@ import { vi } from "vitest";
 
 import { MemoryPresenceSettingsRepository } from "../../repositories/memory/memory.presence-settings.repository.ts";
 import { MemoryPresenceRepository } from "../../repositories/memory/memory.presence.repository.ts";
+import type { PresenceBroadcastRepository } from "../../repositories/presence-broadcast.repository.ts";
 import type { PresenceRepositories } from "../../repositories/presence.repositories.ts";
 import { PresenceSettingsService } from "../../services/presence-settings.service.ts";
 import type { PresenceBroadcast, PresenceDiagnostics, PresenceEmitter } from "../presence.app.ts";
@@ -64,7 +65,31 @@ export async function createPresenceTestRepositories(
 ): Promise<PresenceRepositories> {
   const settings = MemoryPresenceSettingsRepository.create();
   await seedPresenceSettings({ repository: settings, enabled });
-  return { sessions: MemoryPresenceRepository.create(), settings };
+  return {
+    sessions: MemoryPresenceRepository.create(),
+    settings,
+    broadcast: presenceTestFabric({
+      broadcast: new RecordingPresenceBroadcast(),
+      emitters: new TestPresenceEmitters(),
+    }),
+  };
+}
+
+/** A broadcast repository composed from a recording publisher and a test emitter set. */
+export function presenceTestFabric({
+  broadcast,
+  emitters,
+}: {
+  broadcast: PresenceBroadcast;
+  emitters: PresenceEmitter;
+}): PresenceBroadcastRepository {
+  return {
+    publish: (input) => broadcast.publish(input),
+    getTenantEmitter: (tenantId) => emitters.getTenantEmitter(tenantId),
+    cleanupTenantEmitter: (tenantId) => emitters.cleanupTenantEmitter(tenantId),
+    start: async () => undefined,
+    close: async () => undefined,
+  };
 }
 
 export async function createPresenceTestApp(
@@ -72,18 +97,17 @@ export async function createPresenceTestApp(
     repositories?: PresenceRepositories;
     broadcast?: PresenceBroadcast;
     emitters?: PresenceEmitter;
-    diagnostics?: PresenceDiagnostics;
     enabled?: boolean;
   }> = {},
 ): Promise<PresenceModule> {
+  const base = input.repositories ?? (await createPresenceTestRepositories(input.enabled));
   return PresenceModule.create({
-    repositories: input.repositories ?? (await createPresenceTestRepositories(input.enabled)),
-    members: {
-      redis: null,
-      logger: { warn: () => undefined },
-      broadcast: input.broadcast ?? new RecordingPresenceBroadcast(),
-      emitters: input.emitters ?? new TestPresenceEmitters(),
-      diagnostics: input.diagnostics ?? new RecordingPresenceDiagnostics(),
+    repositories: {
+      ...base,
+      broadcast: presenceTestFabric({
+        broadcast: input.broadcast ?? new RecordingPresenceBroadcast(),
+        emitters: input.emitters ?? new TestPresenceEmitters(),
+      }),
     },
     dependencies: {},
     config: void 0,
