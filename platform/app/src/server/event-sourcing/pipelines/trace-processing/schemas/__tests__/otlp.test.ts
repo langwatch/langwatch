@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { anyValueSchema, bytesSchema, idSchema, spanSchema } from "../otlp";
+import {
+  anyValueSchema,
+  bytesSchema,
+  idSchema,
+  resourceSchema,
+  spanSchema,
+} from "../otlp";
 
 describe("otlp schemas", () => {
   describe("idSchema", () => {
@@ -127,6 +133,57 @@ describe("otlp schemas", () => {
         ...overrides,
       };
     }
+
+    describe("when a link omits ProtoJSON default-valued fields", () => {
+      /** @scenario "A link that omits droppedAttributesCount and attributes is accepted" */
+      it("accepts the link with empty attributes and a zero dropped count", () => {
+        const span = makeValidSpan({
+          links: [
+            {
+              traceId: "cccc0000000000000000000000000001",
+              spanId: "dddd000000000001",
+            },
+          ],
+        });
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        expect(result.data?.links[0]).toMatchObject({
+          attributes: [],
+          droppedAttributesCount: 0,
+        });
+      });
+    });
+
+    describe("when an event omits ProtoJSON default-valued fields", () => {
+      /** @scenario "An event that omits attributes and droppedAttributesCount is accepted" */
+      it("accepts the event with empty attributes", () => {
+        const span = makeValidSpan({
+          events: [{ timeUnixNano: "1700000000500000000", name: "evt" }],
+        });
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        expect(result.data?.events[0]?.attributes).toEqual([]);
+      });
+    });
+
+    describe("when the span and resource omit attributes", () => {
+      /** @scenario "A span and resource that omit attributes are accepted" */
+      it("accepts both with empty attributes", () => {
+        const { attributes: _omitted, ...span } = makeValidSpan();
+
+        const spanResult = spanSchema.safeParse(span);
+        const resourceResult = resourceSchema.safeParse({});
+
+        expect(spanResult.success).toBe(true);
+        expect(spanResult.data?.attributes).toEqual([]);
+        expect(resourceResult.success).toBe(true);
+        expect(resourceResult.data?.attributes).toEqual([]);
+      });
+    });
 
     describe("when status is a valid object", () => {
       it("accepts status with code and message", () => {
