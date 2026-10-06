@@ -43,7 +43,7 @@ const STORAGE_BACKEND: Record<StoredObjectStorageDestination["kind"], string> = 
 };
 
 /** What the deployment says about itself, supplied by the process. */
-export interface UsageReportDeployment {
+interface UsageReportDeployment {
   readonly version: string;
   readonly installMethod: string;
   readonly chartVersion: string | undefined;
@@ -79,7 +79,7 @@ export interface UsageReportPeers {
   readonly storage: Pick<StoredObjectApi, "getStorageDestination">;
 }
 
-export interface UsageReportCollectionServiceDependencies {
+interface UsageReportCollectionServiceDependencies {
   readonly peers: UsageReportPeers;
   readonly deployment: () => UsageReportDeployment;
   /** Left out of the report until the process composes it, like `gatewayConfigured`. */

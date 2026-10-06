@@ -28,7 +28,6 @@ import { SystemMigrationRunService } from "./system-migration-run.service.ts";
 
 export type {
   MigrationEnrollmentRecord,
-  MigrationOverview,
   SystemMigrationEnrollmentStore,
   SystemMigrationStateReader,
 } from "../rules/system-migration-support.rules.ts";

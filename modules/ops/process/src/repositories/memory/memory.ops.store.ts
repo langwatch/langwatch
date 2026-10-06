@@ -46,7 +46,7 @@ export interface MemoryOutboxRow {
 }
 
 /** One process-manager instance as the in-memory process store keeps it. */
-export interface MemoryProcessInstanceRow {
+interface MemoryProcessInstanceRow {
   processName: string;
   projectId: string;
   processKey: string;

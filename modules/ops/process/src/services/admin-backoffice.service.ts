@@ -16,7 +16,7 @@ const MUTATING_METHODS = new Set(["create", "update", "updateMany", "delete", "d
 /** User writes that would skip the user module's facts and last-operator rule. */
 const USER_METHODS_REFUSED = new Set(["updateMany", "delete", "deleteMany"]);
 
-export interface AdminBackofficeServiceOptions {
+interface AdminBackofficeServiceOptions {
   repository: AdminBackofficeRepository;
   users: UserApi;
   audit: AdminAuditSink;

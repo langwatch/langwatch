@@ -14,11 +14,11 @@ export const PROJECTION_REPLAY_LEASE_MS = 3600 * 1000;
 export const projectionReplayStateSchema = z.object({
   requestedAt: z.number().nullable(),
 });
-export type ProjectionReplayState = z.infer<typeof projectionReplayStateSchema>;
+type ProjectionReplayState = z.infer<typeof projectionReplayStateSchema>;
 
 export const PROJECTION_REPLAY_INITIAL_STATE: ProjectionReplayState = { requestedAt: null };
 
-export type ProjectionReplayIntents = {
+type ProjectionReplayIntents = {
   execute: IntentSpec<typeof projectionReplayRunSchema>;
 };
 

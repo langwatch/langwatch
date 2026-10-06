@@ -26,7 +26,7 @@ export abstract class AdminAuditSink {
   }): Promise<void>;
 }
 
-export interface ImpersonationServiceOptions {
+interface ImpersonationServiceOptions {
   repository: ImpersonationRepository;
   access: AdminAccess;
   audit: AdminAuditSink;

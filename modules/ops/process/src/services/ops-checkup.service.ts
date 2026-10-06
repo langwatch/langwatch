@@ -58,7 +58,7 @@ const CANARY_TIMEOUT_MS = 150_000;
 const GATEWAY_PROBE_TIMEOUT_MS = 5_000;
 
 /** The process facts the checkup and the usage report read, drilled in. */
-export type OpsCheckupFacts = Readonly<{
+type OpsCheckupFacts = Readonly<{
   isSaas: boolean;
   serviceVersion: string;
   publicBaseUrl: string | undefined;
@@ -67,7 +67,7 @@ export type OpsCheckupFacts = Readonly<{
 }>;
 
 /** Every peer the checkup and the report ask, by the one operation each needs. */
-export type OpsCheckupPeers = UsageReportPeers &
+type OpsCheckupPeers = UsageReportPeers &
   Readonly<{
     organizationDirectory: Pick<OrganizationApi, "findAllIds">;
     licensing: UsageReportInstall & Pick<LicensingApi, "getLicenseStatus" | "getConnectStatus">;
@@ -81,7 +81,7 @@ export type OpsCheckupPeers = UsageReportPeers &
     apiKeys: Pick<ApiKeyApi, "mintRunKey">;
   }>;
 
-export interface OpsCheckupDependencies {
+interface OpsCheckupDependencies {
   readonly facts: OpsCheckupFacts;
   readonly config: OpsServerConfig;
   readonly peers: OpsCheckupPeers;
@@ -96,7 +96,7 @@ export interface OpsCheckupDependencies {
 }
 
 /** Who asks: an install admin reads every detail, anyone else their organization's verdicts. */
-export type CheckupReader = Readonly<{ organizationId: string; installAdmin: boolean }>;
+type CheckupReader = Readonly<{ organizationId: string; installAdmin: boolean }>;
 
 /**
  * The checkup of one organization and the install's usage report, each fact

@@ -10,7 +10,7 @@ export const SYSTEM_MIGRATION_PASS_PROCESS_NAME = "systemMigrationPass";
 /** Outbox rows are bookkeeping, one per pass, pruned like every recurring process's. */
 const PASS_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
-export interface SystemMigrationPassDeps {
+interface SystemMigrationPassDeps {
   /** One pass on this worker, gated on the stored state when it is the re-drive. */
   execute: (input: { redrive: boolean }) => Promise<void>;
   deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;

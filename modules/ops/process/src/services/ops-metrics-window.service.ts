@@ -30,7 +30,7 @@ const REDIS_STATE_TTL_SECONDS = 3600;
 /** Prefix distinguishing a per-job-name counter key from a queue's own. */
 export const JOB_NAME_COUNTER_PREFIX = "jn:";
 
-export interface PersistedMetricsState {
+interface PersistedMetricsState {
   version: 3;
   savedAt: number;
   peakCompletedPerSec: number;
@@ -79,7 +79,7 @@ const EMPTY_PHASE = {
  * `projection`, maps as `handler`, state projections as `stateProjection`.
  * Filing `handler` under `fold` (#7322) left every map row dark.
  */
-export interface PeakBucket {
+interface PeakBucket {
   completedPerSec: number;
   failedPerSec: number;
   latencyP50Ms: number;

@@ -1,7 +1,7 @@
 /** The legacy string columns' write rule, ADR-117 §5: once the connection
  *  projection decides sign-in, a `ssoDomain`/`ssoProvider` edit changes
  *  nothing a person would experience. */
-export const LEGACY_SSO_STRING_COLUMNS = ["ssoDomain", "ssoProvider"] as const;
+const LEGACY_SSO_STRING_COLUMNS = ["ssoDomain", "ssoProvider"] as const;
 
 /**
  * The legacy columns a payload would write, in order, so a refusal can name

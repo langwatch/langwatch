@@ -26,12 +26,12 @@ export type ProviderTestOutcome =
   | { readonly outcome: "unchecked"; readonly reason: string };
 
 /** What a canary route answered. */
-export interface CanaryAnswer {
+interface CanaryAnswer {
   readonly status: number;
   readonly body: unknown;
 }
 
-export type CanaryName = "collector" | "processor" | "evaluations" | "scenarios" | "langy";
+type CanaryName = "collector" | "processor" | "evaluations" | "scenarios" | "langy";
 
 /** Where the daily license sync stands, as the connect settings report it. */
 export interface CheckupConnectView {
@@ -55,7 +55,7 @@ export interface CheckupLicenseView {
   readonly maxMembers?: number;
 }
 
-export interface CheckupGatewayFacts {
+interface CheckupGatewayFacts {
   readonly baseUrl: string | undefined;
   /**
    * Every address this app is reached at, its public address first. The
@@ -67,7 +67,7 @@ export interface CheckupGatewayFacts {
   readonly probeControlPlane: () => Promise<ControlPlaneProbe>;
 }
 
-export interface CheckupEmailFacts {
+interface CheckupEmailFacts {
   readonly provider: string | undefined;
   readonly smtpConfigured: boolean;
   /** The transport logs in to the relay; an internal relay often takes none. */

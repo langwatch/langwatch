@@ -67,7 +67,7 @@ export type SystemMigrationPassRepositories = Pick<
   | "organizationMemberTenants"
 >;
 
-export type SystemMigrationPassOptions = Readonly<{
+type SystemMigrationPassOptions = Readonly<{
   repositories: SystemMigrationPassRepositories;
   /** Cloud pacing is per-organization enrollment; self-hosted admits everyone. */
   isSaaS: () => boolean;

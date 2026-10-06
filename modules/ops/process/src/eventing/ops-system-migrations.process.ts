@@ -13,13 +13,13 @@ export const systemMigrationPassIntentSchema = z.object({
 export const systemMigrationPassStateSchema = z.object({
   lastRequestedAt: z.number().nullable(),
 });
-export type SystemMigrationPassState = z.infer<typeof systemMigrationPassStateSchema>;
+type SystemMigrationPassState = z.infer<typeof systemMigrationPassStateSchema>;
 
 export const SYSTEM_MIGRATION_PASS_INITIAL_STATE: SystemMigrationPassState = {
   lastRequestedAt: null,
 };
 
-export type SystemMigrationPassIntents = {
+type SystemMigrationPassIntents = {
   runPass: IntentSpec<typeof systemMigrationPassIntentSchema>;
 };
 

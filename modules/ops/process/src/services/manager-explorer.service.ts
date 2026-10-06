@@ -23,8 +23,8 @@ import type { ProcessOpsRepository } from "../repositories/process-ops.repositor
  * pending message past due with no lease means delivery is not happening.
  * Thresholds only decide what counts as trouble.
  */
-export const OVERDUE_WAKE_MS = 60 * 1000;
-export const OVERDUE_PENDING_MS = 5 * 60 * 1000;
+const OVERDUE_WAKE_MS = 60 * 1000;
+const OVERDUE_PENDING_MS = 5 * 60 * 1000;
 
 /**
  * Reads the process-manager state machines for a single aggregate: the machine
