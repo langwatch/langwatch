@@ -8,6 +8,7 @@
  *
  * @see specs/governance/aggregate-project.feature
  */
+import { execFileSync } from "node:child_process";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
@@ -196,6 +197,43 @@ describe("Feature: an admin creates an aggregate project", () => {
       expect(
         await prisma.project.count({ where: { teamId: fixture.team.id } }),
       ).toBe(before);
+    });
+  });
+
+  /** ADR-144 gate: the migration's documented down path is a statement that
+   *  runs. Executed through psql inside one transaction that is rolled back,
+   *  so the column is there again for every other suite. */
+  describe("when the aggregate rule migration is rolled back by hand", () => {
+    it("drops the column by the documented down path and keeps every row", async () => {
+      const aggregate = await createAggregate();
+      const databaseUrl = process.env.DATABASE_URL;
+      if (!databaseUrl)
+        throw new Error("DATABASE_URL is not set for this suite");
+
+      const output = execFileSync(
+        "psql",
+        [
+          databaseUrl,
+          "-v",
+          "ON_ERROR_STOP=1",
+          "-tA",
+          "-c",
+          [
+            "BEGIN;",
+            'ALTER TABLE "Project" DROP COLUMN "aggregateRule";',
+            "SELECT count(*) FROM information_schema.columns WHERE table_name = 'Project' AND column_name = 'aggregateRule';",
+            "ROLLBACK;",
+          ].join(" "),
+        ],
+        { encoding: "utf8" },
+      );
+
+      expect(output.trim().split("\n")).toContain("0");
+      const after = await prisma.project.findUniqueOrThrow({
+        where: { id: aggregate.id },
+        select: { aggregateRule: true },
+      });
+      expect(after.aggregateRule).toEqual(AGGREGATE_DEFAULT_RULE);
     });
   });
 });
