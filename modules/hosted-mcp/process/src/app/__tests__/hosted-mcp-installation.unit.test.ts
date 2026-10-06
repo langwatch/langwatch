@@ -4,13 +4,14 @@ import { RawHttpHost } from "@langwatch/api";
 /**
  * @vitest-environment node
  *
- * The hosted MCP feature, booted over its store members and peers alone.
+ * The hosted MCP feature, booted over the memory stores and its peers alone.
  */
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { HostedMcpApi } from "@langwatch/hosted-mcp-contract";
-import { createApp } from "@langwatch/process";
+import { createApp, ResourceScope } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -20,11 +21,7 @@ import { hostedMcpProcessModule } from "../../hosted-mcp.module.ts";
 function process() {
   return createApp({ role: "api" })
     .withModules([hostedMcpProcessModule])
-    .withMember("keyvalue", null)
-    .withMember("encryption", {
-      encrypt: (value: string) => value,
-      decrypt: (value: string) => value,
-    })
+    .withStores(memoryStores())
     .withConfig({ "hosted-mcp": { publicBaseUrl: "https://app.langwatch.ai" } })
     .provide({
       project: createApiFixture<ProjectApi>(),
@@ -49,6 +46,27 @@ describe("hosted MCP app installation", () => {
     } finally {
       await runtime.stop();
     }
+  });
+
+  it("refuses at boot, naming redis, when a live process has no Redis", async () => {
+    const resources = new ResourceScope();
+
+    await expect(
+      hostedMcpProcessModule.install({
+        resources,
+        config: { publicBaseUrl: "https://app.langwatch.ai" },
+        members: {},
+        repositorySelection: {
+          tier: "live",
+          members: {
+            encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+          },
+        },
+        role: "api",
+        resolve: () => createApiFixture<ProjectApi>(),
+      }),
+    ).rejects.toThrow(/redis/i);
+    await resources.close();
   });
 });
 

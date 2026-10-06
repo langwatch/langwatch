@@ -5,7 +5,7 @@ import { getRoutePolicy } from "@langwatch/api";
 import { describe, expect, it } from "vitest";
 
 import { HostedMcpModule } from "../../app/hosted-mcp.app.ts";
-import type { McpSessionCipher } from "../../repositories/mcp-session.repository.ts";
+import { MemoryHostedMcpRepositories } from "../../repositories/memory/memory.hosted-mcp.repositories.ts";
 import { HOSTED_MCP_FAMILY, hostedMcpRoutePolicies } from "../../rules/mcp-routes.rules.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
 import { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
@@ -27,22 +27,12 @@ class NoGrants implements Pick<AuthzMcpSessionGrantService, "stillGranted"> {
   }
 }
 
-class PlainCipher implements McpSessionCipher {
-  encrypt(value: string): string {
-    return value;
-  }
-  decrypt(value: string): string {
-    return value;
-  }
-}
-
 function handler() {
   return HostedMcpModule.fromDependencies({
-    redis: null,
+    repositories: MemoryHostedMcpRepositories.create(),
     projects: new NoProjects(),
     grants: new NoGrants(),
     cliSessions: new FakeCliSessions(),
-    cipher: new PlainCipher(),
     address: HeaderMcpClientAddressService.create(),
     baseHost: "https://app.langwatch.ai",
   }).createHandler();

@@ -36,8 +36,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   return { ...actual, createLogger: () => loggerStub };
 });
 
-import { MemoryMcpSessionRelayChannel } from "../../channels/memory/memory.mcp-session-relay.channel.ts";
 import { MemoryMcpOAuthClientRepository } from "../../repositories/memory/memory.mcp-oauth-client.repository.ts";
+import { MemoryMcpSessionRelayRepository } from "../../repositories/memory/memory.mcp-session-relay.repository.ts";
 import { MemoryMcpSessionRepository } from "../../repositories/memory/memory.mcp-session.repository.ts";
 import { RedisMcpOAuthTokenRepository } from "../../repositories/redis/redis.mcp-oauth-token.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
@@ -205,7 +205,7 @@ describe("Feature: MCP request logging", () => {
   let baseUrl: string;
   // Held here so a test can play the replica that wrote a record or holds a stream.
   const records = MemoryMcpSessionRepository.create();
-  const relay = MemoryMcpSessionRelayChannel.create();
+  const relay = MemoryMcpSessionRelayRepository.create();
   const projects = new LoggingProjectLookup();
   const projectLookup = vi.spyOn(projects, "resolveLiveProjectByApiKey");
 

@@ -1,15 +1,15 @@
-import { McpSessionRelayChannel } from "../mcp-session-relay.channel.ts";
+import { McpSessionRelayRepository } from "../mcp-session-relay.repository.ts";
 
 /** One process is one replica: a message reaches a listener here or nobody. */
-export class MemoryMcpSessionRelayChannel extends McpSessionRelayChannel {
+export class MemoryMcpSessionRelayRepository extends McpSessionRelayRepository {
   readonly #listeners = new Map<string, (raw: string) => void>();
 
   private constructor() {
     super();
   }
 
-  static create(): MemoryMcpSessionRelayChannel {
-    return new MemoryMcpSessionRelayChannel();
+  static create(): MemoryMcpSessionRelayRepository {
+    return new MemoryMcpSessionRelayRepository();
   }
 
   listen({

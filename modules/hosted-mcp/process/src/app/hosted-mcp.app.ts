@@ -9,13 +9,8 @@ import {
 } from "@langwatch/hosted-mcp-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { Cluster, Redis } from "ioredis";
 
-import { mcpSessionRelayChannels } from "../channels/mcp-session-relay-channels.registry.ts";
-import type { McpSessionCipher } from "../repositories/mcp-session.repository.ts";
-import { RedisMcpOAuthClientRepository } from "../repositories/redis/redis.mcp-oauth-client.repository.ts";
-import { RedisMcpOAuthTokenRepository } from "../repositories/redis/redis.mcp-oauth-token.repository.ts";
-import { RedisMcpSessionRepository } from "../repositories/redis/redis.mcp-session.repository.ts";
+import type { HostedMcpRepositories } from "../repositories/hosted-mcp.repositories.ts";
 import type { McpAuthorizeAnswer } from "../rules/mcp-authorize.rules.ts";
 import { AuthzMcpSessionGrantService } from "../services/authz-mcp-session-grant.service.ts";
 import { HeaderMcpClientAddressService } from "../services/header-mcp-client-address.service.ts";
@@ -25,28 +20,15 @@ import type { McpCliSessions } from "../services/mcp-oauth-token.service.ts";
 import { ProjectMcpProjectLookupService } from "../services/project-mcp-project-lookup.service.ts";
 import type { McpAuthorizeApi } from "../transport/mcp-authorize.rest.ts";
 
-/** Shapes restated rather than imported: a module depends on contracts. */
-export type HostedMcpInfrastructure = Readonly<{
-  /** The process's shared Redis connection, for OAuth codes and sessions (ADR-093). */
-  redis: Redis | Cluster | null;
-  /** The deployment's symmetric cipher, for the credential an MCP session record holds. */
-  encryption: Readonly<{
-    encrypt(plaintext: string): string;
-    decrypt(ciphertext: string): string;
-  }>;
-}>;
-
 /** Everything the hosted MCP endpoint needs from the process that mounts it. */
 export type HostedMcpDependencies = Readonly<{
-  /** The process's Redis connection, or nothing when it has none (ADR-093). */
-  redis: Redis | Cluster | null;
+  /** Session records, the replica relay, OAuth codes and clients, from one tier. */
+  repositories: HostedMcpRepositories;
   projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;
   /** Required, not optional: an unwired re-check is a token that never expires. */
   grants: Pick<AuthzMcpSessionGrantService, "stillGranted">;
   /** Mints, rotates and reads the person-bound, project-capped sessions an approval opens. */
   cliSessions: McpCliSessions;
-  /** Seals the credential a session record holds at rest. */
-  cipher: McpSessionCipher;
   address: Pick<HeaderMcpClientAddressService, "clientIp">;
   /** Absent installs no extra tools. */
   sessionTools?: Pick<GovernanceRestApi, "registerMcpTools"> | undefined;
@@ -67,8 +49,9 @@ type HostedMcpDependenciesMap = Readonly<{
 
 type HostedMcpSetup = FeatureSetup<
   HostedMcpDependenciesMap,
-  HostedMcpInfrastructure,
-  HostedMcpServerConfig
+  never,
+  HostedMcpServerConfig,
+  HostedMcpRepositories
 >;
 
 /** Owns the hosted MCP session transport's collaborators for one process. */
@@ -81,7 +64,6 @@ export class HostedMcpModule implements HostedMcpApiContract, McpAuthorizeApi {
     governance: GovernanceRestApi,
   };
   static readonly config = hostedMcpConfig;
-  static readonly reads = ["redis", "encryption"] as const;
 
   #dependencies: HostedMcpDependencies;
   /** The consent page's approval step; absent where a suite composed the endpoint alone. */
@@ -96,7 +78,7 @@ export class HostedMcpModule implements HostedMcpApiContract, McpAuthorizeApi {
   }
 
   /** Refuses by name: a deployment naming no `BASE_HOST` cannot mount MCP. */
-  static create({ members, dependencies, config }: HostedMcpSetup): HostedMcpModule {
+  static create({ dependencies, config, repositories }: HostedMcpSetup): HostedMcpModule {
     if (config.publicBaseUrl === undefined) {
       throw new Error(
         "The hosted MCP endpoint needs a public base URL, but this deployment named no BASE_HOST",
@@ -119,18 +101,17 @@ export class HostedMcpModule implements HostedMcpApiContract, McpAuthorizeApi {
         mayApprove: ({ approver, projectId, permission }) =>
           authorization.hasPermission({ userId: approver.user.id, projectId, permission }),
         isDemoProject: (input) => authorization.isDemoProject(input),
-        clients: RedisMcpOAuthClientRepository.create({ redis: members.redis }),
-        codes: RedisMcpOAuthTokenRepository.create({ redis: members.redis }),
+        clients: repositories.oauthClients,
+        codes: repositories.oauthTokens,
       },
     });
 
     return new HostedMcpModule(
       {
-        redis: members.redis,
+        repositories,
         projects: ProjectMcpProjectLookupService.create({ projects: dependencies.projects }),
         grants: AuthzMcpSessionGrantService.create({ authorization: dependencies.authorization }),
         cliSessions: dependencies.sessions,
-        cipher: members.encryption,
         address: HeaderMcpClientAddressService.create(),
         baseHost: config.publicBaseUrl,
         sessionTools: dependencies.governance,
@@ -152,15 +133,15 @@ export class HostedMcpModule implements HostedMcpApiContract, McpAuthorizeApi {
     return this.#authorization.authorize(input);
   }
 
-  /** A fresh endpoint, with its own sessions, caches and reaper, over this process's stores. */
+  /** A fresh endpoint, with its own sessions, caches and reaper, over this app's repositories. */
   createHandler(): McpHandler {
-    const { redis, cipher, ...collaborators } = this.#dependencies;
+    const { repositories, ...collaborators } = this.#dependencies;
     return McpEndpointService.create({
       ...collaborators,
-      sessionRecords: RedisMcpSessionRepository.create({ redis, cipher }),
-      relay: mcpSessionRelayChannels.live.create({ redis }),
-      oauthTokenRecords: RedisMcpOAuthTokenRepository.create({ redis }),
-      oauthClients: RedisMcpOAuthClientRepository.create({ redis }),
+      sessionRecords: repositories.sessions,
+      relay: repositories.relay,
+      oauthTokenRecords: repositories.oauthTokens,
+      oauthClients: repositories.oauthClients,
     });
   }
 }

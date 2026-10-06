@@ -7,7 +7,7 @@ import type { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js
 import type { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
-import type { McpSessionRelayChannel } from "../channels/mcp-session-relay.channel.ts";
+import type { McpSessionRelayRepository } from "../repositories/mcp-session-relay.repository.ts";
 import type {
   McpSessionRecordLookup,
   McpSessionRepository,
@@ -41,7 +41,7 @@ export type McpSseSession = McpOpenSession<SSEServerTransport>;
 
 type McpSessionCollaborators = Readonly<{
   records: McpSessionRepository;
-  relay: McpSessionRelayChannel;
+  relay: McpSessionRelayRepository;
   sessionTools: Pick<GovernanceRestApi, "registerMcpTools"> | undefined;
 }>;
 

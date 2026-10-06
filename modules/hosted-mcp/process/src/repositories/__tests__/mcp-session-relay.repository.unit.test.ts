@@ -1,16 +1,17 @@
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
-import { mcpSessionRelayChannels } from "../mcp-session-relay-channels.registry.ts";
-import type { McpSessionRelayChannel } from "../mcp-session-relay.channel.ts";
+import type { McpSessionRelayRepository } from "../mcp-session-relay.repository.ts";
+import { MemoryMcpSessionRelayRepository } from "../memory/memory.mcp-session-relay.repository.ts";
+import { RedisMcpSessionRelayRepository } from "../redis/redis.mcp-session-relay.repository.ts";
 
-const TIERS: readonly [string, () => McpSessionRelayChannel][] = [
-  ["redis", () => mcpSessionRelayChannels.live.create({ redis: memoryRedisDouble() })],
-  ["memory", () => mcpSessionRelayChannels.memory.create()],
+const TIERS: readonly [string, () => McpSessionRelayRepository][] = [
+  ["redis", () => RedisMcpSessionRelayRepository.create({ redis: memoryRedisDouble() })],
+  ["memory", () => MemoryMcpSessionRelayRepository.create()],
 ];
 
 /** Resolves with the first message the session hears. */
-function firstMessage(relay: McpSessionRelayChannel, sessionId: string): Promise<string> {
+function firstMessage(relay: McpSessionRelayRepository, sessionId: string): Promise<string> {
   return new Promise((resolve) => {
     void relay.listen({ sessionId, onMessage: resolve });
   });
@@ -54,7 +55,7 @@ describe.each(TIERS)("the %s MCP session relay", (_tier, build) => {
 
 describe("the redis MCP session relay with no Redis configured", () => {
   it("listens to nothing and reaches nobody", async () => {
-    const relay = mcpSessionRelayChannels.live.create({ redis: null });
+    const relay = RedisMcpSessionRelayRepository.create({ redis: null });
     await relay.listen({ sessionId: "session-1", onMessage: () => undefined });
 
     await expect(relay.publish({ sessionId: "session-1", message: "{}" })).resolves.toBe(0);

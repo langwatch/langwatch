@@ -6,9 +6,9 @@ import { initConfig, tryGetConfig } from "@langwatch/mcp-server/config";
 import { classifyClient, createLogger, endpointClassOf } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { McpSessionRelayChannel } from "../channels/mcp-session-relay.channel.ts";
 import type { McpOAuthClientRepository } from "../repositories/mcp-oauth-client.repository.ts";
 import type { McpOAuthTokenRepository } from "../repositories/mcp-oauth-token.repository.ts";
+import type { McpSessionRelayRepository } from "../repositories/mcp-session-relay.repository.ts";
 import type { McpSessionRepository } from "../repositories/mcp-session.repository.ts";
 import {
   AUTHORIZATION_SERVER_METADATA_PATH,
@@ -46,7 +46,7 @@ export interface McpHandler {
 
 export type McpEndpointCollaborators = Readonly<{
   sessionRecords: McpSessionRepository;
-  relay: McpSessionRelayChannel;
+  relay: McpSessionRelayRepository;
   oauthTokenRecords: McpOAuthTokenRepository;
   oauthClients: McpOAuthClientRepository;
   projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;

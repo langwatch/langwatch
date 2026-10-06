@@ -2,7 +2,7 @@
  * Carries a client message to whichever replica holds the SSE stream for that session. The
  * reply travels back down the stream that replica holds, so the message comes to the stream.
  */
-export abstract class McpSessionRelayChannel {
+export abstract class McpSessionRelayRepository {
   /** Starts hearing a session's messages; a relay that cannot listen logs it and hears none. */
   abstract listen(input: { sessionId: string; onMessage: (raw: string) => void }): Promise<void>;
 

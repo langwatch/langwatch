@@ -20,6 +20,7 @@ import {
 } from "vitest";
 
 import { HostedMcpModule } from "../../app/hosted-mcp.app.ts";
+import { LiveHostedMcpRepositories } from "../../repositories/live/live.hosted-mcp.repositories.ts";
 import type { McpSessionCipher } from "../../repositories/mcp-session.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
 import { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
@@ -343,11 +344,13 @@ let handler: McpHandler;
 
 beforeAll(async () => {
   handler = HostedMcpModule.fromDependencies({
-    redis: redisDouble(mockRedis),
+    repositories: LiveHostedMcpRepositories.create({
+      redis: redisDouble(mockRedis),
+      encryption: new ReversibleTestCipher(),
+    }),
     projects: new FakeProjectLookup(),
     grants: sessionGrant,
     cliSessions,
-    cipher: new ReversibleTestCipher(),
     address: HeaderMcpClientAddressService.create(),
     baseHost: "https://app.langwatch.ai",
   }).createHandler();
