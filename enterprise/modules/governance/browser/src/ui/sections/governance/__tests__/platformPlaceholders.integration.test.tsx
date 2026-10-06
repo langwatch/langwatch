@@ -208,3 +208,62 @@ describe("the copy on the Platform screens", () => {
     expect(container.textContent ?? "").not.toMatch(CLAIMS_OF_WORK_DONE);
   });
 });
+
+describe("every screen on the Platform section", () => {
+  const screens: [string, () => ReactElement][] = [
+    ["/governance/analytics", () => <AnalyticsScreen />],
+    ["/governance/insights", () => <InsightsScreen />],
+    ["/governance/signals", () => <SignalsScreen />],
+  ];
+
+  /** @scenario "Every control the Platform screens offer does something when pressed" */
+  it("answers a press on every enabled control of all three screens with a visible change", async () => {
+    for (const [path, page] of screens) {
+      const host = fakeGovernanceHost({
+        enabledFlags: FLAGS,
+        permissions: ["organization:view", "governance:view"],
+      });
+      const controlCount = () =>
+        renderWithGovernanceHost(page(), { host }).container.querySelectorAll(
+          "button:not([disabled])",
+        ).length;
+      const count = controlCount();
+      cleanup();
+      const links = renderWithGovernanceHost(page(), { host }).container.querySelectorAll(
+        "a[href]",
+      );
+      expect(count + links.length).toBeGreaterThan(0);
+      for (const link of links) {
+        expect(link.getAttribute("href"), `${link.textContent} is a dead link`).toMatch(
+          /^\/|^https?:/,
+        );
+      }
+      cleanup();
+
+      for (let index = 0; index < count; index += 1) {
+        const { container } = renderWithGovernanceHost(page(), { host });
+        const control = container.querySelectorAll("button:not([disabled])")[index];
+        if (!control) throw new Error(`no control ${index}`);
+        const label = control.textContent || control.getAttribute("aria-label") || `#${index}`;
+        // The folder already open is where pressing it would take the reader.
+        if (control.getAttribute("aria-current") === "true") {
+          cleanup();
+          continue;
+        }
+        const before = document.body.innerHTML;
+        const navigationsBefore = host.recording.navigations.length;
+        const panelWasOpen = langy.getState().isOpen;
+
+        await userEvent.click(control);
+
+        const acted =
+          document.body.innerHTML !== before ||
+          host.recording.navigations.length !== navigationsBefore ||
+          langy.getState().isOpen !== panelWasOpen;
+        expect(acted, `pressing "${label}" changed nothing on ${path}`).toBe(true);
+        langy.setState({ isOpen: false });
+        cleanup();
+      }
+    }
+  }, 120_000);
+});
