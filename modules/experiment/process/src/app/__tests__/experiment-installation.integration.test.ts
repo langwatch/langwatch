@@ -28,7 +28,6 @@ import { memoryStores, type StoresMemberSource } from "@langwatch/process-stores
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
@@ -127,7 +126,6 @@ async function bootWorker({
       entitlement: createApiFixture<EntitlementApi>({}),
       evaluation: createApiFixture<EvaluationApi>({}),
       "api-key": createApiFixture<ApiKeyApi>({}),
-      suite: createApiFixture<SuiteApi>({}),
       "stored-object": createApiFixture<StoredObjectApi>({}),
       "model-provider": createApiFixture<ModelProviderApi>({
         listCosts: () => Promise.resolve([customCost]),

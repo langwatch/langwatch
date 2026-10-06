@@ -8550,9 +8550,6 @@ importers:
       '@langwatch/stored-object-contract':
         specifier: workspace:*
         version: link:../../stored-object/contract
-      '@langwatch/suite-contract':
-        specifier: workspace:*
-        version: link:../../suite/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time

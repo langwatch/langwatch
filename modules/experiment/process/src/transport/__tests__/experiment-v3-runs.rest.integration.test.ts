@@ -15,7 +15,6 @@ import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { ExecutionSummary, Experiment, ExperimentRun } from "@langwatch/experiment-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import { resolveRequestBound } from "@langwatch/plans";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -30,6 +29,7 @@ import { MemoryExperimentRunEventStreamRepository } from "../../repositories/mem
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
 import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment.repositories.ts";
 import { runRefusalsOf } from "../../rules/experiment-run-availability.rules.ts";
+import type { ExperimentAgentOwnershipService } from "../../services/experiment-agent-ownership.service.ts";
 import type {
   ExecutionDataServices,
   ExperimentWorkflowDsl,
@@ -103,7 +103,7 @@ type Harness = {
   /** A process with the deployment's Redis and public address; without, runs are refused. */
   redis?: boolean;
   /** The personal-agent rule a run's start is checked against; runnable unless given. */
-  ownership?: Pick<SuiteApi, "assertConnectedAgentsRunnable">;
+  ownership?: Pick<ExperimentAgentOwnershipService, "assertConnectedAgentsRunnable">;
   /** What the run pipeline's worker publishes on the run's channel once a start is sent. */
   worker?: (start: { runId: string }) => ExperimentRunStreamMessage[];
   /** Whether the worker's progress fold registers a started run; it does unless told not to. */
@@ -359,12 +359,15 @@ const folded = (
 });
 
 /** An ownership rule that lets every run start. */
-const runnable: Pick<SuiteApi, "assertConnectedAgentsRunnable"> = {
+const runnable: Pick<ExperimentAgentOwnershipService, "assertConnectedAgentsRunnable"> = {
   assertConnectedAgentsRunnable: async () => undefined,
 };
 
 /** An ownership rule that refuses someone else's personal development agent. */
-const refusedOwnership = (): Pick<SuiteApi, "assertConnectedAgentsRunnable"> => ({
+const refusedOwnership = (): Pick<
+  ExperimentAgentOwnershipService,
+  "assertConnectedAgentsRunnable"
+> => ({
   assertConnectedAgentsRunnable: async () => {
     throw new AgentOwnerOnlyError({
       agentId: "agent-1",

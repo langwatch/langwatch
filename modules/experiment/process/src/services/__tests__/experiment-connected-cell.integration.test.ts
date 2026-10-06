@@ -412,8 +412,9 @@ describe("given a personal development agent of another person", () => {
   };
 
   /**
-   * The rule itself lives in the Suite feature. What this file pins is the seam: the run's start
-   * hands the rule every loaded agent and whoever started it, and refuses before any start is sent.
+   * The rule itself is ExperimentAgentOwnershipService's. What this file pins is the seam: the
+   * run's start hands the rule every loaded agent and whoever started it, and refuses before any
+   * start is sent.
    */
   const assertRunnable = vi.fn(async () => {
     throw new AgentOwnerOnlyError({
