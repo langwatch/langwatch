@@ -12,28 +12,29 @@ Feature: Simulation service
     Then the canonical service validates the Zod 4 command
     And the execution port dispatches the existing durable command
 
+  @unit
   Scenario: A disabled analytical store remains a safe empty read
     Given ClickHouse is disabled at boot
     When a caller reads run history or run identifiers
     Then the Simulation service returns the empty result for that read
 
+  @unit
   Scenario: Provider-specific message fields survive validation
     Given a stored simulation message has extra provider fields
     When the Simulation service parses the run
     Then those message fields are retained
 
-  # The delayed metrics retry. A run whose trace is not summarised yet
-  # reschedules its own metrics command as a queue job, and that job's name and
-  # deduplication id are spelled at the registration site rather than declared
-  # by the pipeline — so every graph that stages the queue has to spell them the
-  # same way, and the scenario package is where they are decided.
+  # The delayed metrics retry (ruled 2026-10-05). A run whose trace is not
+  # summarised yet sends its own computeRunMetrics command again, delayed and
+  # deduplicated per run and trace; no separate retry job is registered.
 
   @unit
-  Scenario: The delayed metrics retry keeps one routing key across both graphs
-    Given the legacy graph and the packaged worker both stage the shared job queue
-    When a graph registers the delayed metrics retry
-    Then it uses the routing key and delay the scenario feature decided
-    And it reports the run under the same span attributes
+  Scenario: A metrics retry is the computeRunMetrics command sent after the retry delay
+    Given simulation_processing has registered its senders
+    When a run's metrics retry is scheduled
+    Then the computeRunMetrics command is sent with that payload
+    And the send is delayed by the scenario package's retry delay
+    And it is deduplicated on the run and trace for the retry window
 
   @unit
   Scenario: Retries of one run deduplicate onto one queue entry
@@ -43,11 +44,12 @@ Feature: Simulation service
     And a different run of the same tenant queues separately
 
   @unit
-  Scenario: The worker stages the retry the scenario package decided
-    Given a worker graph with a durable queue
-    When the scenario feature installs
-    Then the registered job carries the package's routing key and delay
-    And the run's own dispatcher receives the payload the job replays
+  Scenario: A run whose trace is not summarised yet asks for its metrics again
+    Given simulation_processing has registered its senders
+    And a computeRunMetrics command whose trace has no summary yet
+    When the command is handled
+    Then computeRunMetrics is sent again for that run and trace with its retry count raised by one
+    And no metrics are recorded for the run yet
 
   # Measured against main on 2026-09-21: every /api/simulation-runs read
   # answered an unattributed 503 on this branch and 200 on main, because the

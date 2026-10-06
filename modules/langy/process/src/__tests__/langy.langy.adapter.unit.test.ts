@@ -217,6 +217,29 @@ describe("LangyPostgresService", () => {
         expect(publicSurfaceOf(service).filter((name) => PERSISTENCE_WORDS.test(name))).toEqual([]);
       });
 
+      /** @scenario "Langy owns its subordinate subjects" */
+      it("reaches conversations, turns, messages, credentials and relay frames through the one service", () => {
+        const instance = LangyPostgresService.create({
+          repositories: PrismaLangyRepositories.create(undefined!),
+        });
+
+        const surface = publicSurfaceOf(instance.build(compositionOptions()));
+
+        const capabilityBySubject = {
+          conversations: ["getPage", "getById", "forkById", "deleteById"],
+          turns: ["startConversationTurn", "stopTurn", "ingestAgentTurnResult"],
+          messages: ["recordUserMessage", "getEventsAfter"],
+          credentials: ["findRunToken", "revokeWorkerSessionKey"],
+          "relay frames": ["openRelayConnection"],
+        };
+        for (const [subject, methods] of Object.entries(capabilityBySubject)) {
+          expect({ subject, missing: methods.filter((name) => !surface.includes(name)) }).toEqual({
+            subject,
+            missing: [],
+          });
+        }
+      });
+
       /** @scenario "application transports use the flat contract" */
       it("publishes every capability as a flat method, naming no subordinate among them", () => {
         const instance = LangyPostgresService.create({

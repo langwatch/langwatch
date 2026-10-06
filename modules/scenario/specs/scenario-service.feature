@@ -18,6 +18,7 @@ Feature: Scenario service boundary
     When its definition includes a default value
     Then validation rejects the definition
 
+  @unit
   Scenario: Scenario input mapping is portable
     Given an agent input mapping is used by authoring and execution
     When either surface resolves it

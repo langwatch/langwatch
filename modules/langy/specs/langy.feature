@@ -6,6 +6,7 @@ Feature: Langy service capability
     When a public or internal adapter handles a Langy request
     Then it delegates to that same service instance
 
+  @unit
   Scenario: Langy owns its subordinate subjects
     Given the Langy feature owns conversations, turns, messages, credentials, and relay frames
     When an application transport needs one of those capabilities

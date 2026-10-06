@@ -61,6 +61,7 @@ Feature: Langy panel header controls and title overflow
     When the user activates Back, presses Escape, or starts a new chat
     Then the panel returns to the message column
 
+  @integration
   Scenario: The header rail carries a one-click layout toggle
     Given the Langy panel is open in floating mode
     Then a "Dock to side" control sits on the header rail
