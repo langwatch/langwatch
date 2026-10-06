@@ -162,6 +162,15 @@ describe("given a session group payload from the sessions procedure", () => {
       expect(group.compactions).toBeNull();
     });
 
+    /** @scenario Conversation status shows worst status across traces */
+    it("shows Error for a conversation holding one errored trace among healthy ones", () => {
+      const group = mapSessionGroupToConversationGroup(
+        payloadItem({ traceCount: 6, errorCount: 1 }),
+      );
+
+      expect(group.worstStatus).toBe("error");
+    });
+
     it("derives the worst status from error and warning counts", () => {
       expect(mapSessionGroupToConversationGroup(payloadItem({ errorCount: 2 })).worstStatus).toBe(
         "error",
