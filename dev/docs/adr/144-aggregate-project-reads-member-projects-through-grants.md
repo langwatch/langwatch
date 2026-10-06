@@ -439,3 +439,31 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   and the analytics rollup table keep their hand-written tenant until a
   fifth time column (`TimeUnixMs`) is admitted to the client's list, which
   is a decision for block F.
+- v4.3 (2026-10-06, implementation note after block D, no decision
+  changed). Choices the text left open, settled in code and recorded here.
+  "Organisation admin" means `OrganizationUser.role` of `ADMIN`; creating
+  an aggregate asks for `organization:manage` and that role. A non-admin
+  gets the ordinary denial, no new reason code names the kind. The admin
+  gate lives in the app's permission decision path, not in the authz
+  server, and reads the kind once per process; the same gate now covers
+  the batch permission paths, the credential batch, the effective
+  permission set and the LangWatchQL readable-project cut, where "admin"
+  for a key is the key owner's role and an ownerless service key is never
+  admitted. No key bound to an aggregate acts for any permission, an
+  admin's included; whether admin-owned keys may read an aggregate over
+  REST once block F lands stays open and defaults to no. The kind rules
+  live in `projects/project-kinds.ts` so permission adapters import no
+  service. An explicit rule naming any foreign, archived, missing,
+  governance or aggregate project id is refused whole; `membersOf` drops
+  ids no longer readable; an aggregate is never its own member nor a
+  member of another aggregate; a department rule must name a live
+  department. Creation mints no Langy virtual key. The navigation hides
+  Home as well as Test, Build and Online Evals; server-side refusal covers
+  monitor creation and copy, while refusing every write under the
+  aggregate's tenant (experiments, simulations, playground) is a block G
+  item. REST edit and archive of an aggregate answer not found unless the
+  key owner is an admin. The aggregate's `apiKey` and `lwqlKey` are
+  blanked on every team and organisation listing. Nothing reads
+  `aggregateRule` back yet; block E adds a parsing read in the repository,
+  on the pattern of `grantConditionFromDb`. The default landing project
+  can still be an aggregate for an admin, left to block F.
