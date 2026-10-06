@@ -1,6 +1,7 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { generate } from "@langwatch/ksuid";
 import {
+  assertNotGovernanceProject,
   ProjectNotFoundError,
   ProjectS3SecretRequiredError,
   type Project,
@@ -160,6 +161,7 @@ export class ProjectOperationsService {
     if (!project) {
       throw new ProjectNotFoundError();
     }
+    assertNotGovernanceProject(project.kind);
     const revoked = await this.dependencies.projects.rotateLegacyApiKey({
       projectId: input.projectId,
       token: `${REVOKED_LEGACY_KEY_PREFIX}${generate(REVOKED_KEY_KSUID_RESOURCE).toString()}`,

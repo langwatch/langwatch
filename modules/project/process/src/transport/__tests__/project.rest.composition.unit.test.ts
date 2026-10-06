@@ -13,7 +13,11 @@ import type {
 } from "@langwatch/data-privacy-contract";
 import { OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
 import { LocalFeatureApis, ResourceScope } from "@langwatch/process";
-import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
+import {
+  GovernanceProjectProtectedError,
+  type Project,
+  type ProjectWithTeam,
+} from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -29,6 +33,7 @@ import { mountProjectRestApplication, ORGANIZATION_ID, USER_ID } from "./project
 import { TestApiKeyService } from "./support/test-api-key-service.ts";
 
 const OTHER_ORGANIZATION_ID = "organization-other";
+const GOVERNANCE_PROJECT_ID = "project_governance";
 const NOW = new Date("2026-09-01T00:00:00.000Z");
 
 /**
@@ -120,6 +125,14 @@ function application(options: { apiKeys?: Partial<TestApiKeyService> } = {}): {
   database.putTeam(team());
   database.putTeam(team({ id: "team-other", organizationId: OTHER_ORGANIZATION_ID }));
   database.putProject(project());
+  database.putProject(
+    project({
+      id: GOVERNANCE_PROJECT_ID,
+      name: "Governance (internal)",
+      slug: "governance-organization-1",
+      kind: "internal_governance",
+    }),
+  );
   database.putProject(
     project({
       id: "project_other",
@@ -412,6 +425,74 @@ describe("the projects REST family over the application the composition builds",
       });
 
       expect(response.status).toBe(400);
+    });
+  });
+
+  describe("given the hidden governance project", () => {
+    /** @scenario Reading the governance area by its id reports it as absent */
+    it("reads as not found, as a project in another organization does", async () => {
+      const { send } = mountProjectRestApplication(application().app);
+
+      expect((await send(`/api/projects/${GOVERNANCE_PROJECT_ID}`)).status).toBe(404);
+    });
+
+    /** @scenario The governance area cannot be archived through the projects API */
+    it("refuses an archive with 403 and leaves it live", async () => {
+      const { app, database } = application();
+      const { send } = mountProjectRestApplication(app);
+
+      const response = await send(`/api/projects/${GOVERNANCE_PROJECT_ID}`, { method: "DELETE" });
+
+      expect(response.status).toBe(403);
+      expect(JSON.stringify(await response.json())).toContain("internal governance record");
+      expect(database.findProject(GOVERNANCE_PROJECT_ID)?.archivedAt).toBeNull();
+    });
+
+    /** @scenario The governance area cannot be renamed or moved through the projects API */
+    it("refuses a rename with 403 and writes nothing", async () => {
+      const { app, database } = application();
+      const { send } = mountProjectRestApplication(app);
+
+      const response = await send(`/api/projects/${GOVERNANCE_PROJECT_ID}`, {
+        method: "PATCH",
+        body: { name: "Renamed" },
+      });
+
+      expect(response.status).toBe(403);
+      expect(database.findProject(GOVERNANCE_PROJECT_ID)?.name).toBe("Governance (internal)");
+    });
+
+    /** @scenario The governance area cannot be re-keyed through the projects API */
+    it("refuses a new key over REST and over the browser door, leaving its key as it was", async () => {
+      const { app, database } = application();
+      const { send } = mountProjectRestApplication(app);
+      const keyBefore = database.findProject(GOVERNANCE_PROJECT_ID)?.apiKey;
+
+      const rest = await send(`/api/projects/${GOVERNANCE_PROJECT_ID}/regenerate-api-key`, {
+        method: "POST",
+        body: {},
+      });
+      const browser = await app
+        .revokeProjectApiKey({ projectId: GOVERNANCE_PROJECT_ID, by: { id: USER_ID } })
+        .catch((error: unknown) => error);
+
+      expect(rest.status).toBe(403);
+      expect(browser).toBeInstanceOf(GovernanceProjectProtectedError);
+      expect(database.findProject(GOVERNANCE_PROJECT_ID)?.apiKey).toBe(keyBefore);
+    });
+
+    /** @scenario An ordinary project is unaffected by the guard */
+    it("still renames, reads and archives an ordinary project beside it", async () => {
+      const { send } = mountProjectRestApplication(application().app);
+
+      const renamed = await send("/api/projects/project_1", {
+        method: "PATCH",
+        body: { name: "Renamed" },
+      });
+      const read = await send("/api/projects/project_1");
+      const archived = await send("/api/projects/project_1", { method: "DELETE" });
+
+      expect([renamed.status, read.status, archived.status]).toEqual([200, 200, 200]);
     });
   });
 });

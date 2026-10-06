@@ -10,6 +10,8 @@ import {
 } from "@langwatch/organization-contract";
 import {
   DestinationTeamNotFoundError,
+  GovernanceProjectProtectedError,
+  GOVERNANCE_PROJECT_ROUTE_REFUSAL,
   PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
   PROJECT_KIND,
@@ -978,6 +980,76 @@ describe("ProjectService", () => {
       }),
     ).rejects.toBeInstanceOf(PersonalProjectProtectedError);
     expect(repository.archive).not.toHaveBeenCalled();
+  });
+
+  describe("given the hidden governance project", () => {
+    const governance = () =>
+      projectWithTeam({ kind: PROJECT_KIND.INTERNAL_GOVERNANCE, id: "governance-project" });
+
+    /** @scenario The governance area cannot be archived through the projects API */
+    it("refuses to archive it, naming it an internal record", async () => {
+      const repository = new StubRepository();
+      repository.findWithTeam.mockResolvedValue(governance());
+
+      const refusal = await createService(repository)
+        .archive({ id: "governance-project", organizationId: "org" })
+        .catch((error: unknown) => error);
+
+      expect(refusal).toBeInstanceOf(GovernanceProjectProtectedError);
+      expect((refusal as Error).message).toBe(GOVERNANCE_PROJECT_ROUTE_REFUSAL);
+      expect((refusal as Error).message).toContain("internal governance record, not a workspace");
+      expect(repository.archive).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The governance area cannot be renamed or moved through the projects API */
+    it("refuses to rename it and refuses to move it to another team", async () => {
+      const repository = new StubRepository();
+      repository.findWithTeam.mockResolvedValue(governance());
+      const organizations = new StubOrganizationService();
+      organizations.findActiveTeam.mockResolvedValue({ id: "team_2", isPersonal: false });
+      const service = createService(repository, organizations);
+
+      await expect(
+        service.update({ id: "governance-project", organizationId: "org", data: { name: "x" } }),
+      ).rejects.toBeInstanceOf(GovernanceProjectProtectedError);
+      await expect(
+        service.update({
+          id: "governance-project",
+          organizationId: "org",
+          data: { teamId: "team_2" },
+        }),
+      ).rejects.toBeInstanceOf(GovernanceProjectProtectedError);
+      expect(repository.update).not.toHaveBeenCalled();
+    });
+
+    it("leaves another organization's project to the repository, not to the guard", async () => {
+      const repository = new StubRepository();
+      repository.findWithTeam.mockResolvedValue(
+        projectWithTeam({
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+          team: { ...projectWithTeam().team, organizationId: "someone-else" },
+        }),
+      );
+
+      await expect(
+        createService(repository).archive({ id: "governance-project", organizationId: "org" }),
+      ).resolves.toMatchObject({ id: applicationProject.id });
+      expect(repository.archive).toHaveBeenCalledOnce();
+    });
+
+    /** @scenario An ordinary project is unaffected by the guard */
+    it("renames and archives an ordinary project as before", async () => {
+      const repository = new StubRepository();
+      repository.findWithTeam.mockResolvedValue(projectWithTeam());
+      const service = createService(repository);
+
+      await expect(
+        service.update({ id: applicationProject.id, organizationId: "org", data: { name: "x" } }),
+      ).resolves.toBe(applicationProject);
+      await expect(
+        service.archive({ id: applicationProject.id, organizationId: "org" }),
+      ).resolves.toMatchObject({ id: applicationProject.id });
+    });
   });
 
   it("mints a slug from the name and generated project id", async () => {
