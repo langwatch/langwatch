@@ -203,6 +203,7 @@ Feature: Enterprise licensing lifecycle
       When it asks for a hosted judgement
       Then it passes the gateway's door and is refused as connect_service_not_entitled
 
+  @unit
   Scenario: Import licensing without side effects
     When a runtime imports the licensing contract or server package
     Then it reads no environment and registers no route, job, or subscriber
