@@ -119,19 +119,61 @@ function isOrTokenAt(masked: string, i: number): boolean {
   return !isWordCharacter(masked[i + 2]);
 }
 
+/** Any tenant predicate an `OR` could disjoin away: bound, literal or a tenant set. */
+const ANY_TENANT_PREDICATE = /(?:^|[\s.(])TenantId\s*(?:=\s*[{'"]|IN\s*\(\s*\{)/gi;
+
+/** Where `TenantId` itself starts in a match whose first character may be a separator. */
+const tokenIndex = (match: RegExpExecArray): number => match.index + match[0].search(/TenantId/i);
+
+const matchesOf = ({ pattern, masked }: { pattern: RegExp; masked: string }): RegExpExecArray[] => [
+  ...masked.matchAll(new RegExp(pattern.source, "gi")),
+];
+
+/** The bracket group each character sits in, and each group's parent; the statement is group 0. */
+function bracketGroups(masked: string): {
+  groupAt: Int32Array;
+  parent: number[];
+  balanced: boolean;
+} {
+  const groupAt = new Int32Array(masked.length);
+  const parent = [-1];
+  const open = [0];
+  let balanced = true;
+  for (let i = 0; i < masked.length; i++) {
+    if (masked[i] === "(") {
+      parent.push(open.at(-1) ?? 0);
+      open.push(parent.length - 1);
+    } else if (masked[i] === ")") {
+      if (open.length === 1) balanced = false;
+      else open.pop();
+    }
+    groupAt[i] = open.at(-1) ?? 0;
+  }
+  return { groupAt, parent, balanced: balanced && open.length === 1 };
+}
+
+const encloses = ({ parent, outer, inner }: { parent: number[]; outer: number; inner: number }) => {
+  for (let group = inner; group !== -1; group = parent[group] ?? -1) {
+    if (group === outer) return true;
+  }
+  return false;
+};
+
 /**
- * Reports an `OR` that can disjoin the tenant predicate away. Depth is the test. An `OR` nested
- * inside a bracketed group cannot weaken a predicate outside it, so only one at the predicate's
- * own depth or shallower counts.
+ * Reports an `OR` that can disjoin a tenant predicate away: one in a predicate's own group or
+ * in a group enclosing it. Otherwise today's depth rule stands, except for an `OR` bracketed
+ * beneath a predicate that binds the claimed tenant. Unbalanced brackets fall back to depth.
  */
 function hasWeakeningDisjunction({
   masked,
   predicateIndex,
+  scopingIndexes,
 }: {
   masked: string;
   predicateIndex: number;
+  scopingIndexes: readonly number[];
 }): boolean {
-  const disjunctionDepths: number[] = [];
+  const disjunctions: { index: number; depth: number }[] = [];
   let depth = 0;
   let predicateDepth = 0;
 
@@ -149,11 +191,27 @@ function hasWeakeningDisjunction({
     }
 
     if (isOrTokenAt(masked, i)) {
-      disjunctionDepths.push(depth);
+      disjunctions.push({ index: i, depth });
     }
   }
 
-  return disjunctionDepths.some((each) => each <= predicateDepth);
+  const { groupAt, parent, balanced } = bracketGroups(masked);
+  if (!balanced) return disjunctions.some((each) => each.depth <= predicateDepth);
+
+  const groupOf = (index: number): number => groupAt[index] ?? 0;
+  const tenantGroups = matchesOf({ pattern: ANY_TENANT_PREDICATE, masked }).map((match) =>
+    groupOf(tokenIndex(match)),
+  );
+  const scopingGroups = scopingIndexes.map(groupOf);
+
+  return disjunctions.some((each) => {
+    const group = groupOf(each.index);
+    if (tenantGroups.some((inner) => encloses({ parent, outer: group, inner }))) return true;
+    const beneathScope = scopingGroups.some(
+      (outer) => outer !== group && encloses({ parent, outer, inner: group }),
+    );
+    return !beneathScope && each.depth <= predicateDepth;
+  });
 }
 
 export function checkTenantScope({
@@ -178,7 +236,10 @@ export function checkTenantScope({
       : { kind: "missing-predicate" };
   }
 
-  if (hasWeakeningDisjunction({ masked: statement, predicateIndex: bound.index })) {
+  const scopingIndexes = matchesOf({ pattern: BOUND_TENANT_PREDICATE, masked: statement })
+    .filter((match) => params?.[match[1] as string] === tenantId)
+    .map(tokenIndex);
+  if (hasWeakeningDisjunction({ masked: statement, predicateIndex: bound.index, scopingIndexes })) {
     return { kind: "weakening-disjunction" };
   }
 
@@ -214,7 +275,16 @@ function checkTenantSetScope({
 }): TenantScopeViolation | null {
   const bound = BOUND_TENANT_SET.exec(statement);
   if (bound === null) return { kind: "missing-predicate" };
-  if (hasWeakeningDisjunction({ masked: statement, predicateIndex: bound.index })) {
+  const declared = new Set(tenantIds);
+  const bindsDeclaredTenants = (match: RegExpExecArray): boolean =>
+    [...(match[1] ?? "").matchAll(PLACEHOLDER_NAME)].every((placeholder) => {
+      const value = params?.[placeholder[1] ?? ""];
+      return typeof value === "string" && declared.has(value);
+    });
+  const scopingIndexes = matchesOf({ pattern: BOUND_TENANT_SET, masked: statement })
+    .filter(bindsDeclaredTenants)
+    .map(tokenIndex);
+  if (hasWeakeningDisjunction({ masked: statement, predicateIndex: bound.index, scopingIndexes })) {
     return { kind: "weakening-disjunction" };
   }
 
@@ -223,7 +293,6 @@ function checkTenantSetScope({
   if (missing !== undefined) return { kind: "missing-param", param: missing };
 
   const values = names.map((name) => params?.[name]);
-  const declared = new Set(tenantIds);
   const matches =
     declared.has(tenantId) &&
     values.every((value) => typeof value === "string" && declared.has(value)) &&
