@@ -9,6 +9,8 @@
  * @see specs/governance/aggregate-project.feature
  */
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
@@ -33,6 +35,30 @@ const callerFor = (userId: string) =>
 const rules = new AggregateRuleService(
   new PrismaAggregateRuleRepository(prisma),
 );
+
+/**
+ * The down statement the aggregate rule migration documents, read from the
+ * migration itself so the test runs what an operator would copy, not a
+ * retyped copy of it.
+ */
+function documentedDownPath(): string {
+  const migration = fs.readFileSync(
+    path.resolve(
+      import.meta.dirname,
+      "../../../../../prisma/migrations/20261006120002_project_aggregate_rule/migration.sql",
+    ),
+    "utf8",
+  );
+  const lines = migration.split("\n");
+  const heading = lines.findIndex((line) =>
+    line.startsWith("-- Down, to roll back by hand:"),
+  );
+  const statement = lines[heading + 1]?.replace(/^--\s+/, "").trim();
+  if (heading < 0 || !statement?.startsWith("ALTER TABLE")) {
+    throw new Error("the migration no longer documents its down path");
+  }
+  return statement;
+}
 
 describe("Feature: an admin creates an aggregate project", () => {
   let fixture: AggregateFixture;
@@ -178,6 +204,34 @@ describe("Feature: an admin creates an aggregate project", () => {
       );
     });
 
+    it("refuses a list that names a project in another organisation and writes nothing", async () => {
+      const foreign = await seedAggregateOrganization(prisma, {
+        label: "agg-create-foreign",
+      });
+      try {
+        const before = await prisma.project.count({
+          where: { teamId: fixture.team.id },
+        });
+
+        await expect(
+          createAggregate({
+            aggregateRule: {
+              kind: "explicit",
+              projectIds: [fixture.shared.id, foreign.shared.id],
+            },
+          }),
+        ).rejects.toMatchObject({
+          cause: { code: "aggregate_rule_outside_organization" },
+        });
+
+        expect(
+          await prisma.project.count({ where: { teamId: fixture.team.id } }),
+        ).toBe(before);
+      } finally {
+        await foreign.cleanup();
+      }
+    });
+
     it("refuses a list that names the hidden governance project and writes nothing", async () => {
       const before = await prisma.project.count({
         where: { teamId: fixture.team.id },
@@ -210,25 +264,27 @@ describe("Feature: an admin creates an aggregate project", () => {
       if (!databaseUrl)
         throw new Error("DATABASE_URL is not set for this suite");
 
+      const columnCount =
+        "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Project' AND column_name = 'aggregateRule';";
       const output = execFileSync(
         "psql",
         [
           databaseUrl,
           "-v",
           "ON_ERROR_STOP=1",
-          "-tA",
+          "-qtA",
+          ...["BEGIN;", columnCount, documentedDownPath(), columnCount].flatMap(
+            (statement) => ["-c", statement],
+          ),
           "-c",
-          [
-            "BEGIN;",
-            'ALTER TABLE "Project" DROP COLUMN "aggregateRule";',
-            "SELECT count(*) FROM information_schema.columns WHERE table_name = 'Project' AND column_name = 'aggregateRule';",
-            "ROLLBACK;",
-          ].join(" "),
+          "ROLLBACK;",
         ],
         { encoding: "utf8" },
       );
 
-      expect(output.trim().split("\n")).toContain("0");
+      // Present before, gone after: a filter that matched nothing would
+      // read 0 both times.
+      expect(output.trim().split("\n")).toEqual(["1", "0"]);
       const after = await prisma.project.findUniqueOrThrow({
         where: { id: aggregate.id },
         select: { aggregateRule: true },

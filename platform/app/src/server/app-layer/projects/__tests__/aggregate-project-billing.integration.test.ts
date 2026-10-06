@@ -6,6 +6,9 @@
  * is ever written under its tenant. Real ClickHouse, the real trace-usage
  * count, and an organisation whose project list includes the aggregate.
  *
+ * This pins today's behaviour: no block D code is under test here, since the
+ * usage count was already per project and nothing writes under the aggregate.
+ *
  * @see specs/governance/aggregate-project.feature
  */
 

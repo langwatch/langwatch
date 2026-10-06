@@ -3,8 +3,13 @@
  *
  * ADR-144 decision 7: the aggregate owns no traces and no credential. Its
  * stored base key exists only because the column is required; the real
- * ingest routes refuse it with a 403, ClickHouse holds nothing under its
- * tenant, and the key is never shown or re-keyed.
+ * ingest routes refuse it with a 403 before anything is dispatched, and the
+ * key is never shown or re-keyed.
+ *
+ * The spec's "the aggregate holds zero spans" is carried by those refusals,
+ * not by a ClickHouse read: this suite wires no ingestion pipeline, so no
+ * span lands for an ordinary project either, and a count of zero under the
+ * aggregate could never fail.
  *
  * @see specs/governance/aggregate-project.feature
  */
@@ -16,7 +21,6 @@ import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
-import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { app as authApp } from "~/server/routes/auth";
 import { app as collectorApp } from "~/server/routes/collector";
 import { app as otelApp } from "~/server/routes/otel";
@@ -126,23 +130,6 @@ describe("Feature: the aggregate project receives no traces", () => {
         expect(response.status).toBe(403);
         const body = (await response.json()) as { error: string };
         expect(body.error).toBe("aggregate_project_has_no_credential");
-      });
-    });
-
-    describe("when the aggregate's tenant is read back", () => {
-      it("holds zero spans", async () => {
-        const clickhouse = getTestClickHouseClient();
-        if (!clickhouse)
-          throw new Error("the ClickHouse test client is not up");
-        const result = await clickhouse.query({
-          query:
-            "SELECT count() AS spans FROM stored_spans WHERE TenantId = {tenantId:String}",
-          query_params: { tenantId: aggregate.id },
-          format: "JSONEachRow",
-        });
-        const [row] = await result.json<{ spans: string }>();
-
-        expect(Number(row?.spans)).toBe(0);
       });
     });
 
