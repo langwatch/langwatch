@@ -37,22 +37,12 @@ Langy, the AI assistant, is part of this install and runs on the node's normal c
 
 ## Architecture at a Glance
 
-```mermaid
-graph LR
-    SDK["Your LLM App"] -->|"OTel / REST"| App["LangWatch App"]
-    Client["LLM Client / IDE"] -->|"virtual key"| Gateway["AI Gateway<br/>(optional)"]
-    Gateway -->|"resolve VK<br/>+ budget check<br/>+ OTel"| App
-    Gateway -->|"completions"| Providers["LLM Providers<br/>(OpenAI / Anthropic / Bedrock / …)"]
-    App -->|"enqueue"| Redis["Redis"]
-    Redis -->|"consume"| Workers["LangWatch Workers"]
-    Workers -->|"events &<br/>projections"| CH["ClickHouse"]
-    Workers -->|"evals"| Evals["LangEvals"]
-    Workers -->|"NLP"| NLP["LangWatch NLP"]
-    App -->|"queries"| CH
-    App -->|"control plane"| PG["PostgreSQL"]
-    App -->|"externalized byte content<br/>(scenario media, datasets, …)"| S3["S3"]
-    CH -->|"cold storage"| S3
-```
+<Frame caption="Every component runs in your environment. The dashed line is the only connection to LangWatch, and each part of it has a switch.">
+  <img src="/images/self-hosting/self-hosting-overview-light.svg" alt="Architecture of a self-hosted LangWatch install: agents, coding tools and the team on the left, the Kubernetes cluster with the LangWatch services and data stores in the middle, model providers on the right, and one optional dashed connection to LangWatch cloud" className="block dark:hidden" />
+  <img src="/images/self-hosting/self-hosting-overview-dark.svg" alt="Architecture of a self-hosted LangWatch install: agents, coding tools and the team on the left, the Kubernetes cluster with the LangWatch services and data stores in the middle, model providers on the right, and one optional dashed connection to LangWatch cloud" className="hidden dark:block" />
+</Frame>
+
+Your agents send traces to the App over OpenTelemetry. The App and the Workers store them in ClickHouse, with PostgreSQL for configuration, Redis for the queue and object storage for older data. Model calls go to the providers you configure, with your keys. The AI Gateway and Langy are optional.
 
 See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers, and [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm) for the gateway sub-chart setup if you want to terminate LLM traffic on your own perimeter.
 
@@ -63,6 +53,11 @@ See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) f
 </Note>
 
 ## Deployment Models
+
+<Frame caption="What LangWatch runs and what you run in each model. Cloud Enterprise is LangWatch Cloud on dedicated, single-tenant instances in the region you choose.">
+  <img src="/images/self-hosting/self-hosting-deployment-models-light.svg" alt="Four deployment models side by side, showing what LangWatch runs and what you run: LangWatch Cloud, Hybrid, Self-managed, and Self-managed with managed databases" className="block dark:hidden" />
+  <img src="/images/self-hosting/self-hosting-deployment-models-dark.svg" alt="Four deployment models side by side, showing what LangWatch runs and what you run: LangWatch Cloud, Hybrid, Self-managed, and Self-managed with managed databases" className="hidden dark:block" />
+</Frame>
 
 <CardGroup cols={2}>
 <Card title="LangWatch Cloud" icon="cloud">

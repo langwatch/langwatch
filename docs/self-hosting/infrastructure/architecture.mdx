@@ -7,51 +7,10 @@ A self-hosted LangWatch deployment runs the app, the workers, the AI Gateway, th
 
 ## System Overview
 
-```mermaid
----
-config:
-  layout: elk
----
-architecture-beta
-    service llmApp(internet)[Your LLM App]
-
-    group platform(cloud)[Your Infrastructure]
-
-    service app(server)[LangWatch App] in platform
-    service postgres(database)[PostgreSQL] in platform
-    service redis(database)[Redis BullMQ] in platform
-
-    group eventSourcing(server)[Event Sourcing Pipeline] in platform
-    service spanPipe(disk)[Ingestion and Enrichment] in eventSourcing
-    service evalPipe(disk)[Evaluations and Experiments] in eventSourcing
-    service reactionPipe(disk)[Reactions and Triggers] in eventSourcing
-
-    group dataLayer(database)[Data Layer] in platform
-    service clickhouse(database)[ClickHouse] in dataLayer
-    service s3(disk)[S3 Cold Storage] in dataLayer
-
-    service nlp(server)[LangWatch NLP] in platform
-    service langevals(server)[LangEvals] in platform
-    service gateway(server)[AI Gateway] in platform
-    service langy(server)[Langy Agent] in platform
-
-    service llmProviders(cloud)[External LLMs]
-    service notify(internet)[Slack Email Webhooks]
-
-    llmApp:B --> T:app
-    app:B --> T:redis
-    app:R --> L:postgres
-    redis:B --> T:spanPipe
-    spanPipe:R --> L:clickhouse
-    evalPipe:B --> T:langevals
-    langevals:R --> L:llmProviders
-    nlp:R --> L:llmProviders
-    gateway:R --> L:llmProviders
-    app:L --> R:langy
-    langy:B --> T:gateway
-    reactionPipe:B --> T:notify
-    clickhouse:R --> L:s3
-```
+<Frame caption="Every component runs in your environment. The dashed line is the only connection to LangWatch, and each part of it has a switch.">
+  <img src="/images/self-hosting/self-hosting-overview-light.svg" alt="Architecture of a self-hosted LangWatch install: agents, coding tools and the team on the left, the Kubernetes cluster with the LangWatch services and data stores in the middle, model providers on the right, and one optional dashed connection to LangWatch cloud" className="block dark:hidden" />
+  <img src="/images/self-hosting/self-hosting-overview-dark.svg" alt="Architecture of a self-hosted LangWatch install: agents, coding tools and the team on the left, the Kubernetes cluster with the LangWatch services and data stores in the middle, model providers on the right, and one optional dashed connection to LangWatch cloud" className="hidden dark:block" />
+</Frame>
 
 <CardGroup cols={3}>
 <Card title="API Layer" icon="globe">
@@ -277,27 +236,18 @@ The pipeline produces three types of output:
 
 ## Data Flow
 
-```mermaid
-sequenceDiagram
-    participant App as Your LLM App
-    participant LW as LangWatch App
-    participant Redis as Redis (BullMQ)
-    participant W as Workers
-    participant CH as ClickHouse
-    participant LE as LangEvals
-    participant Browser as Browser (UI)
+<Frame caption="The path of one trace. PII redaction runs on the Workers before the trace is written to ClickHouse.">
+  <img src="/images/self-hosting/self-hosting-trace-flow-light.svg" alt="The path of one trace: agent, App, Redis queue, Workers, ClickHouse and object storage, with LangEvals and the model provider below" className="block dark:hidden" />
+  <img src="/images/self-hosting/self-hosting-trace-flow-dark.svg" alt="The path of one trace: agent, App, Redis queue, Workers, ClickHouse and object storage, with LangEvals and the model provider below" className="hidden dark:block" />
+</Frame>
 
-    App->>LW: Send spans (OTel / REST)
-    LW->>Redis: Enqueue span ingestion job
-    Redis->>W: Worker picks up job
-    W->>W: Pipeline steps (enrich, evaluate, etc.)
-    W->>CH: Write events + projections
-    W->>LE: Request evaluation (if configured)
-    LE-->>W: Evaluation scores
-    W->>CH: Write evaluation results
-    W->>LW: SSE broadcast
-    LW->>Browser: Real-time update
-```
+1. Your application sends spans to the App over OTLP or REST.
+2. The App enqueues a span ingestion job in Redis (BullMQ).
+3. A Worker picks up the job.
+4. The Worker runs the pipeline steps (enrichment, PII redaction) and writes events and projections to ClickHouse.
+5. When evaluators are configured, the Worker requests the evaluation from LangEvals and writes the scores to ClickHouse.
+6. The Worker broadcasts the change. The App reads ClickHouse and pushes the update to connected browsers over SSE.
+7. After the hot-storage TTL, ClickHouse moves data to object storage.
 
 Periodic work (topic clustering, alert triggers, webhook delivery log pruning) is scheduled on the Workers. The chart ships no Kubernetes CronJobs; `cronjobs.jobs` stays empty unless you add your own.
 

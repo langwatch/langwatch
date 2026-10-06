@@ -64775,51 +64775,10 @@ A self-hosted LangWatch deployment runs the app, the workers, the AI Gateway, th
 
 ## System Overview
 
-```mermaid
----
-config:
-  layout: elk
----
-architecture-beta
-    service llmApp(internet)[Your LLM App]
-
-    group platform(cloud)[Your Infrastructure]
-
-    service app(server)[LangWatch App] in platform
-    service postgres(database)[PostgreSQL] in platform
-    service redis(database)[Redis BullMQ] in platform
-
-    group eventSourcing(server)[Event Sourcing Pipeline] in platform
-    service spanPipe(disk)[Ingestion and Enrichment] in eventSourcing
-    service evalPipe(disk)[Evaluations and Experiments] in eventSourcing
-    service reactionPipe(disk)[Reactions and Triggers] in eventSourcing
-
-    group dataLayer(database)[Data Layer] in platform
-    service clickhouse(database)[ClickHouse] in dataLayer
-    service s3(disk)[S3 Cold Storage] in dataLayer
-
-    service nlp(server)[LangWatch NLP] in platform
-    service langevals(server)[LangEvals] in platform
-    service gateway(server)[AI Gateway] in platform
-    service langy(server)[Langy Agent] in platform
-
-    service llmProviders(cloud)[External LLMs]
-    service notify(internet)[Slack Email Webhooks]
-
-    llmApp:B --> T:app
-    app:B --> T:redis
-    app:R --> L:postgres
-    redis:B --> T:spanPipe
-    spanPipe:R --> L:clickhouse
-    evalPipe:B --> T:langevals
-    langevals:R --> L:llmProviders
-    nlp:R --> L:llmProviders
-    gateway:R --> L:llmProviders
-    app:L --> R:langy
-    langy:B --> T:gateway
-    reactionPipe:B --> T:notify
-    clickhouse:R --> L:s3
-```
+<Frame caption="Every component runs in your environment. The dashed line is the only connection to LangWatch, and each part of it has a switch.">
+  <img src="/images/self-hosting/self-hosting-overview-light.svg" alt="Architecture of a self-hosted LangWatch install: agents, coding tools and the team on the left, the Kubernetes cluster with the LangWatch services and data stores in the middle, model providers on the right, and one optional dashed connection to LangWatch cloud" className="block dark:hidden" />
+  <img src="/images/self-hosting/self-hosting-overview-dark.svg" alt="Architecture of a self-hosted LangWatch install: agents, coding tools and the team on the left, the Kubernetes cluster with the LangWatch services and data stores in the middle, model providers on the right, and one optional dashed connection to LangWatch cloud" className="hidden dark:block" />
+</Frame>
 
 <CardGroup cols={3}>
 <Card title="API Layer" icon="globe">
@@ -65045,27 +65004,18 @@ The pipeline produces three types of output:
 
 ## Data Flow
 
-```mermaid
-sequenceDiagram
-    participant App as Your LLM App
-    participant LW as LangWatch App
-    participant Redis as Redis (BullMQ)
-    participant W as Workers
-    participant CH as ClickHouse
-    participant LE as LangEvals
-    participant Browser as Browser (UI)
+<Frame caption="The path of one trace. PII redaction runs on the Workers before the trace is written to ClickHouse.">
+  <img src="/images/self-hosting/self-hosting-trace-flow-light.svg" alt="The path of one trace: agent, App, Redis queue, Workers, ClickHouse and object storage, with LangEvals and the model provider below" className="block dark:hidden" />
+  <img src="/images/self-hosting/self-hosting-trace-flow-dark.svg" alt="The path of one trace: agent, App, Redis queue, Workers, ClickHouse and object storage, with LangEvals and the model provider below" className="hidden dark:block" />
+</Frame>
 
-    App->>LW: Send spans (OTel / REST)
-    LW->>Redis: Enqueue span ingestion job
-    Redis->>W: Worker picks up job
-    W->>W: Pipeline steps (enrich, evaluate, etc.)
-    W->>CH: Write events + projections
-    W->>LE: Request evaluation (if configured)
-    LE-->>W: Evaluation scores
-    W->>CH: Write evaluation results
-    W->>LW: SSE broadcast
-    LW->>Browser: Real-time update
-```
+1. Your application sends spans to the App over OTLP or REST.
+2. The App enqueues a span ingestion job in Redis (BullMQ).
+3. A Worker picks up the job.
+4. The Worker runs the pipeline steps (enrichment, PII redaction) and writes events and projections to ClickHouse.
+5. When evaluators are configured, the Worker requests the evaluation from LangEvals and writes the scores to ClickHouse.
+6. The Worker broadcasts the change. The App reads ClickHouse and pushes the update to connected browsers over SSE.
+7. After the hot-storage TTL, ClickHouse moves data to object storage.
 
 Periodic work (topic clustering, alert triggers, webhook delivery log pruning) is scheduled on the Workers. The chart ships no Kubernetes CronJobs; `cronjobs.jobs` stays empty unless you add your own.
 
@@ -66985,22 +66935,12 @@ Langy, the AI assistant, is part of this install and runs on the node's normal c
 
 ## Architecture at a Glance
 
-```mermaid
-graph LR
-    SDK["Your LLM App"] -->|"OTel / REST"| App["LangWatch App"]
-    Client["LLM Client / IDE"] -->|"virtual key"| Gateway["AI Gateway<br/>(optional)"]
-    Gateway -->|"resolve VK<br/>+ budget check<br/>+ OTel"| App
-    Gateway -->|"completions"| Providers["LLM Providers<br/>(OpenAI / Anthropic / Bedrock / …)"]
-    App -->|"enqueue"| Redis["Redis"]
-    Redis -->|"consume"| Workers["LangWatch Workers"]
-    Workers -->|"events &<br/>projections"| CH["ClickHouse"]
-    Workers -->|"evals"| Evals["LangEvals"]
-    Workers -->|"NLP"| NLP["LangWatch NLP"]
-    App -->|"queries"| CH
-    App -->|"control plane"| PG["PostgreSQL"]
-    App -->|"externalized byte content<br/>(scenario media, datasets, …)"| S3["S3"]
-    CH -->|"cold storage"| S3
-```
+<Frame caption="Every component runs in your environment. The dashed line is the only connection to LangWatch, and each part of it has a switch.">
+  <img src="/images/self-hosting/self-hosting-overview-light.svg" alt="Architecture of a self-hosted LangWatch install: agents, coding tools and the team on the left, the Kubernetes cluster with the LangWatch services and data stores in the middle, model providers on the right, and one optional dashed connection to LangWatch cloud" className="block dark:hidden" />
+  <img src="/images/self-hosting/self-hosting-overview-dark.svg" alt="Architecture of a self-hosted LangWatch install: agents, coding tools and the team on the left, the Kubernetes cluster with the LangWatch services and data stores in the middle, model providers on the right, and one optional dashed connection to LangWatch cloud" className="hidden dark:block" />
+</Frame>
+
+Your agents send traces to the App over OpenTelemetry. The App and the Workers store them in ClickHouse, with PostgreSQL for configuration, Redis for the queue and object storage for older data. Model calls go to the providers you configure, with your keys. The AI Gateway and Langy are optional.
 
 See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers, and [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm) for the gateway sub-chart setup if you want to terminate LLM traffic on your own perimeter.
 
@@ -67011,6 +66951,11 @@ See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) f
 </Note>
 
 ## Deployment Models
+
+<Frame caption="What LangWatch runs and what you run in each model. Cloud Enterprise is LangWatch Cloud on dedicated, single-tenant instances in the region you choose.">
+  <img src="/images/self-hosting/self-hosting-deployment-models-light.svg" alt="Four deployment models side by side, showing what LangWatch runs and what you run: LangWatch Cloud, Hybrid, Self-managed, and Self-managed with managed databases" className="block dark:hidden" />
+  <img src="/images/self-hosting/self-hosting-deployment-models-dark.svg" alt="Four deployment models side by side, showing what LangWatch runs and what you run: LangWatch Cloud, Hybrid, Self-managed, and Self-managed with managed databases" className="hidden dark:block" />
+</Frame>
 
 <CardGroup cols={2}>
 <Card title="LangWatch Cloud" icon="cloud">
@@ -67117,6 +67062,11 @@ description: "Security model, encryption, secrets management, and hardening for 
 ---
 
 Self-hosted LangWatch authenticates users, encrypts stored credentials, isolates tenants at the query layer, and hardens every pod it authors by default. Three bundled components cannot meet [strict admission control](#strict-admission-control) and must be disabled or replaced there.
+
+<Frame caption="Identity, keys, secrets and network exposure of a self-hosted install.">
+  <img src="/images/self-hosting/self-hosting-security-light.svg" alt="Security view of a self-hosted install: sign-in through your identity provider, API keys for agents, TLS at the ingress with only the App exposed, internal services and data stores, and Kubernetes Secrets synced from your secret manager" className="block dark:hidden" />
+  <img src="/images/self-hosting/self-hosting-security-dark.svg" alt="Security view of a self-hosted install: sign-in through your identity provider, API keys for agents, TLS at the ingress with only the App exposed, internal services and data stores, and Kubernetes Secrets synced from your secret manager" className="hidden dark:block" />
+</Frame>
 
 ## Authentication & Authorization
 

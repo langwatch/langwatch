@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 762" width="1280" height="762" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" role="img" aria-label="Deployment models: who runs each part">
+<title>Deployment models: who runs each part</title>
+<defs><marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#94a3b8"/></marker><marker id="head-out" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#e17100"/></marker><marker id="head-start" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#94a3b8"/></marker><marker id="head-out-start" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#e17100"/></marker></defs>
+<rect width="1280" height="762" fill="#ffffff"/>
+<text x="24" y="42" font-size="22" font-weight="700" fill="#1d293d" text-anchor="start">Deployment models: who runs each part</text>
+<text x="24" y="84" font-size="17" font-weight="700" fill="#1d293d" text-anchor="start">LangWatch Cloud</text>
+<text x="24" y="106" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="start">LangWatch runs everything</text>
+<rect x="24" y="122" width="296" height="226" rx="14" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="40" y="146" font-size="13.5" font-weight="600" fill="#9a4a00" text-anchor="start">Run by LangWatch</text>
+<rect x="24" y="364" width="296" height="318" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="40" y="388" font-size="13.5" font-weight="600" fill="#52637a" text-anchor="start">Your side</text>
+<text x="336" y="84" font-size="17" font-weight="700" fill="#1d293d" text-anchor="start">Hybrid</text>
+<text x="336" y="106" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="start">trace data stays in your network</text>
+<rect x="336" y="122" width="296" height="226" rx="14" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="352" y="146" font-size="13.5" font-weight="600" fill="#9a4a00" text-anchor="start">Run by LangWatch</text>
+<rect x="336" y="364" width="296" height="318" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="352" y="388" font-size="13.5" font-weight="600" fill="#52637a" text-anchor="start">Run by you, in your cloud</text>
+<text x="648" y="84" font-size="17" font-weight="700" fill="#1d293d" text-anchor="start">Self-managed</text>
+<text x="648" y="106" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="start">one Helm chart runs it all</text>
+<rect x="648" y="122" width="296" height="226" rx="14" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="664" y="146" font-size="13.5" font-weight="600" fill="#9a4a00" text-anchor="start">Run by LangWatch</text>
+<rect x="648" y="364" width="296" height="318" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="664" y="388" font-size="13.5" font-weight="600" fill="#52637a" text-anchor="start">Run by you, in your cloud</text>
+<text x="960" y="84" font-size="17" font-weight="700" fill="#1d293d" text-anchor="start">Managed databases</text>
+<text x="960" y="106" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="start">self-managed, chart runs the services</text>
+<rect x="960" y="122" width="296" height="226" rx="14" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="976" y="146" font-size="13.5" font-weight="600" fill="#9a4a00" text-anchor="start">Run by LangWatch</text>
+<rect x="960" y="364" width="296" height="318" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="976" y="388" font-size="13.5" font-weight="600" fill="#52637a" text-anchor="start">Run by you, in your cloud</text>
+<rect x="44" y="158" width="256" height="58" rx="10" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="172" y="183.5" font-size="14.5" font-weight="650" fill="#9a4a00" text-anchor="middle">LangWatch services</text>
+<text x="172" y="203" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">app, workers, evaluators, gateway</text>
+<rect x="44" y="224" width="256" height="46" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="172" y="252.25" font-size="14.5" font-weight="650" fill="#1e4b8f" text-anchor="middle">PostgreSQL, Redis</text>
+<rect x="44" y="280" width="256" height="46" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="172" y="308.25" font-size="14.5" font-weight="650" fill="#1e4b8f" text-anchor="middle">ClickHouse, object storage</text>
+<rect x="44" y="430" width="256" height="58" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="172" y="455.5" font-size="14.5" font-weight="650" fill="#1d293d" text-anchor="middle">Your agents</text>
+<text x="172" y="475" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">send traces to LangWatch Cloud</text>
+<path d="M260 428 L260 350" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)"/>
+<rect x="356" y="158" width="256" height="58" rx="10" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="484" y="183.5" font-size="14.5" font-weight="650" fill="#9a4a00" text-anchor="middle">LangWatch services</text>
+<text x="484" y="203" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">app, workers, evaluators, gateway</text>
+<rect x="356" y="224" width="256" height="46" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="484" y="252.25" font-size="14.5" font-weight="650" fill="#1e4b8f" text-anchor="middle">PostgreSQL, Redis</text>
+<rect x="356" y="430" width="256" height="58" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="484" y="455.5" font-size="14.5" font-weight="650" fill="#1e4b8f" text-anchor="middle">ClickHouse</text>
+<text x="484" y="475" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">traces, evaluations, analytics</text>
+<rect x="356" y="498" width="256" height="58" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="484" y="523.5" font-size="14.5" font-weight="650" fill="#1e4b8f" text-anchor="middle">Object storage</text>
+<text x="484" y="543" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">datasets, older data, backups</text>
+<rect x="356" y="606" width="256" height="58" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="484" y="631.5" font-size="14.5" font-weight="650" fill="#1d293d" text-anchor="middle">Your agents</text>
+<text x="484" y="651" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">send traces to LangWatch Cloud</text>
+<path d="M572 352 L572 428" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)" marker-start="url(#head-start)"/>
+<rect x="384.6875" y="401.75" width="142.625" height="20.5" rx="4" fill="#f8fafc"/>
+<text x="456" y="416.5" font-size="12.5" font-weight="500" fill="#52637a" text-anchor="middle">private link or VPN</text>
+<text x="796" y="228" font-size="15" font-weight="600" fill="#9a4a00" text-anchor="middle">Nothing runs here</text>
+<text x="796" y="250" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">optional license sync and usage report</text>
+<rect x="658" y="394" width="276" height="216" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="674" y="418" font-size="13" font-weight="600" fill="#52637a" text-anchor="start">Kubernetes cluster</text>
+<rect x="668" y="426" width="256" height="58" rx="10" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="796" y="451.5" font-size="14.5" font-weight="650" fill="#9a4a00" text-anchor="middle">LangWatch services</text>
+<text x="796" y="471" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">app, workers, evaluators, gateway</text>
+<rect x="668" y="492" width="256" height="46" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="796" y="520.25" font-size="14.5" font-weight="650" fill="#1e4b8f" text-anchor="middle">PostgreSQL, Redis</text>
+<rect x="668" y="546" width="256" height="46" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="796" y="574.25" font-size="14.5" font-weight="650" fill="#1e4b8f" text-anchor="middle">ClickHouse</text>
+<rect x="668" y="622" width="256" height="46" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="796" y="650.25" font-size="14.5" font-weight="650" fill="#1e4b8f" text-anchor="middle">Object storage</text>
+<text x="1108" y="228" font-size="15" font-weight="600" fill="#9a4a00" text-anchor="middle">Nothing runs here</text>
+<text x="1108" y="250" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">optional license sync and usage report</text>
+<rect x="970" y="394" width="276" height="104" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="986" y="418" font-size="13" font-weight="600" fill="#52637a" text-anchor="start">Kubernetes cluster</text>
+<rect x="980" y="426" width="256" height="58" rx="10" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="1108" y="451.5" font-size="14.5" font-weight="650" fill="#9a4a00" text-anchor="middle">LangWatch services</text>
+<text x="1108" y="471" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">app, workers, evaluators, gateway</text>
+<rect x="970" y="508" width="276" height="164" rx="14" fill="#ffffff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="986" y="532" font-size="13" font-weight="600" fill="#1e4b8f" text-anchor="start">Managed services in your account</text>
+<rect x="980" y="540" width="256" height="46" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="1108" y="568.25" font-size="14.5" font-weight="650" fill="#1e4b8f" text-anchor="middle">PostgreSQL, Redis, ClickHouse</text>
+<rect x="980" y="596" width="256" height="58" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="1108" y="621.5" font-size="14.5" font-weight="650" fill="#1e4b8f" text-anchor="middle">Object storage</text>
+<text x="1108" y="641" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">S3 or Azure Blob</text>
+<text x="24" y="712" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="start">Setup time:</text>
+<text x="117.10000000000001" y="712" font-size="13.5" font-weight="700" fill="#1d293d" text-anchor="start">Minutes</text>
+<text x="336" y="712" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="start">Setup time:</text>
+<text x="429.1" y="712" font-size="13.5" font-weight="700" fill="#1d293d" text-anchor="start">Days</text>
+<text x="648" y="712" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="start">Setup time:</text>
+<text x="741.1" y="712" font-size="13.5" font-weight="700" fill="#1d293d" text-anchor="start">Hours</text>
+<text x="960" y="712" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="start">Setup time:</text>
+<text x="1053.1" y="712" font-size="13.5" font-weight="700" fill="#1d293d" text-anchor="start">Hours</text>
+<text x="24" y="742" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="start">Trace data stays in your network:</text>
+<text x="280.45000000000005" y="742" font-size="13.5" font-weight="700" fill="#1d293d" text-anchor="start">No</text>
+<text x="336" y="742" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="start">Trace data stays in your network:</text>
+<text x="592.45" y="742" font-size="13.5" font-weight="700" fill="#1d293d" text-anchor="start">Yes</text>
+<text x="648" y="742" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="start">Trace data stays in your network:</text>
+<text x="904.45" y="742" font-size="13.5" font-weight="700" fill="#1d293d" text-anchor="start">Yes</text>
+<text x="960" y="742" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="start">Trace data stays in your network:</text>
+<text x="1216.45" y="742" font-size="13.5" font-weight="700" fill="#1d293d" text-anchor="start">Yes</text>
+</svg>
