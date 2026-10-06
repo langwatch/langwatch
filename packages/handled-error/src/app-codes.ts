@@ -463,6 +463,7 @@ export const APP_ERROR_CODES = [
   "lwql_granularity_parameter_type",
   "lwql_granularity_requires_window",
   "lwql_granularity_too_fine",
+  "lwql_invalid_query",
   "lwql_not_enabled",
   "lwql_not_permitted",
   "lwql_parameter_missing",

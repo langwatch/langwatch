@@ -4,6 +4,7 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import {
   LangWatchQLAppFunctionUnavailableError,
+  LangWatchQLInvalidQueryError,
   LangWatchQLProvisioningIncompleteError,
   LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
@@ -23,6 +24,7 @@ import {
   LangWatchQLExecutorRepository,
 } from "../langwatch-ql-executor.repository.ts";
 import {
+  isClickHouseInvalidQueryError,
   isClickHouseObjectAccessDeniedError,
   isClickHouseObjectMissingError,
   isClickHouseResultTooLargeError,
@@ -92,6 +94,12 @@ function refusalFor({
   // server is too old for, which "extraction functions unavailable" misnames.
   if (namesAnAppFunction(sql) && isClickHouseUnknownFunctionError(error)) {
     return new LangWatchQLAppFunctionUnavailableError({ reasons: [toError(error)] });
+  }
+
+  // Last of the specific checks: a code here is a fault in the caller's SQL that the static
+  // validator could not see, so it is theirs to fix rather than an unknown 500.
+  if (isClickHouseInvalidQueryError(error)) {
+    return new LangWatchQLInvalidQueryError({ reasons: [toError(error)] });
   }
 
   return translateClickHouseQueryError(error, durationMs);

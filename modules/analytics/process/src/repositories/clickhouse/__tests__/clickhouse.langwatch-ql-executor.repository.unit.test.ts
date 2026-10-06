@@ -71,3 +71,47 @@ describe("given a statement that calls no app function", () => {
     });
   });
 });
+
+describe("given a statement the server rejects as written", () => {
+  describe.each([
+    [
+      "driver properties",
+      () => Object.assign(new Error("boom"), { code: "184", type: "ILLEGAL_AGGREGATION" }),
+    ],
+    [
+      "raw HTTP text",
+      () =>
+        new Error(
+          "Code: 184. DB::Exception: Aggregate function any(trace_id) AS trace_id is found in WHERE in query. (ILLEGAL_AGGREGATION)",
+        ),
+    ],
+  ])("when the refusal arrives as %s", (_form, refusal) => {
+    /** @scenario "A query the database rejects as written is refused as the caller's fault" */
+    it("refuses with lwql_invalid_query, a customer fault, rather than a 500", async () => {
+      queryMock.mockRejectedValueOnce(refusal());
+
+      expect(
+        await refusalOf(
+          "SELECT any(trace_id) AS trace_id FROM analytics.traces WHERE trace_id = 'x'",
+        ),
+      ).toEqual({
+        code: "lwql_invalid_query",
+        fault: "customer",
+        httpStatus: 400,
+      });
+    });
+  });
+});
+
+describe("given a refusal that describes the deployment", () => {
+  describe("when the server reports a missing object", () => {
+    /** @scenario "A refusal that describes the deployment is not reported as an invalid query" */
+    it("keeps lwql_unavailable ahead of the invalid-query mapping", async () => {
+      queryMock.mockRejectedValueOnce(
+        Object.assign(new Error("boom"), { code: "60", type: "UNKNOWN_TABLE" }),
+      );
+
+      expect((await refusalOf("SELECT 1 FROM analytics.traces")).code).toBe("lwql_unavailable");
+    });
+  });
+});

@@ -390,6 +390,11 @@ const presentations = {
         : "Check the column names against the dataset's columns.";
     },
   },
+  lwql_invalid_query: {
+    title: "The database couldn't run this query",
+    describe: () =>
+      "The SQL reads, but the database rejected it as written, for example an aggregate in WHERE or mismatched types. Adjust the query and try again.",
+  },
   lwql_unparseable: {
     title: "This query couldn't be read",
     describe: () => "Check the SQL syntax and try again.",

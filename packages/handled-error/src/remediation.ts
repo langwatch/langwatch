@@ -207,6 +207,12 @@ const registry = {
       "Column existence is only known when the query runs, so a saved chart can carry this until it is run",
     ],
   },
+  lwql_invalid_query: {
+    tips: [
+      "Check the aggregates, types and function arguments in the SQL; the database refused it as written",
+      "Aggregate functions such as count() or any() belong in SELECT, HAVING or a subquery, not in WHERE",
+    ],
+  },
   lwql_unavailable: {
     tips: [
       "The LangWatchQL analytics SQL API is not provisioned on this deployment; retrying will not help",

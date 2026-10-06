@@ -523,6 +523,20 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And no part of the server's own refusal text reaches the caller, because it echoes the submitted query
 
   @unit
+  Scenario: A query the database rejects as written is refused as the caller's fault
+    Given a query the static validator accepts, such as an aggregate function inside WHERE
+    When the server refuses it as malformed or mis-typed, such as ILLEGAL_AGGREGATION or SYNTAX_ERROR
+    Then the query is refused with error code lwql_invalid_query at HTTP 400, never a 500
+    And the fault is the caller's
+    And the server's own refusal text does not reach the caller, because it echoes the submitted query
+
+  @unit
+  Scenario: A refusal that describes the deployment is not reported as an invalid query
+    Given a query the server refuses because an object is missing or a grant is incomplete
+    When the executor maps the refusal
+    Then the code is the deployment's, not lwql_invalid_query
+
+  @unit
   Scenario: A missing column passed to a function is named in the refusal
     Given a query that passes a column no view carries to a function, as in arrayJoin(Labels)
     When the server refuses it as an unknown expression or function identifier
