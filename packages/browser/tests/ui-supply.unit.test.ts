@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import { z } from "zod";
 
 import {
@@ -8,15 +8,25 @@ import {
   BrowserSupplyMissingError,
   createUi,
   defineBrowserModule,
+  UiFacilitiesSupply,
+  UiShellSupply,
 } from "../src/index.ts";
+import type { UiSupplyName } from "../src/web-module.ts";
 import {
   browserUiTransport,
   configModule,
   documentRoot,
   mountElement,
   publicAppConfig,
+  sessionModule,
   transportModule,
 } from "./ui-supply.fixtures.ts";
+
+/** Render as the build would refuse to call it: the runtime twin of the compile-time check. */
+function renderLaundered(supply: { render: unknown }): Promise<unknown> {
+  if (!(supply.render instanceof Function)) throw new Error("render is not callable at runtime");
+  return Promise.resolve(supply.render()).catch((caught: unknown) => caught);
+}
 
 describe("UI supply", () => {
   /** @scenario "A browser installing one module is asked only for that module's needs" */
@@ -119,6 +129,70 @@ describe("UI supply", () => {
       code: "browser_supply_missing",
       missing: ["transport"],
     });
+  });
+
+  /** @scenario "Supplying nothing names everything missing at once" */
+  it("names configuration, transport and session in one refusal", async () => {
+    const bare = createUi({ document: documentRoot, mount: "root" }).withModules([
+      transportModule,
+      sessionModule,
+      configModule,
+    ]);
+
+    expectTypeOf(bare.render).not.toBeFunction();
+    const refusal = await renderLaundered(bare);
+
+    expect(refusal).toBeInstanceOf(BrowserSupplyMissingError);
+    expect(refusal).toMatchObject({ code: "browser_supply_missing" });
+    expect((refusal as BrowserSupplyMissingError).missing.toSorted()).toEqual([
+      "injected-config",
+      "session",
+      "transport",
+    ]);
+  });
+
+  /** @scenario "Installing a module with its own settings makes a configuration reader required" */
+  it("asks for the injected configuration reader once a module with settings is installed", async () => {
+    const withoutSettings = createUi({ document: documentRoot, mount: "root" })
+      .withModules([transportModule])
+      .withTransport(browserUiTransport);
+    expectTypeOf(withoutSettings.render).toBeFunction();
+    await expect(withoutSettings.render()).resolves.toMatchObject({ config: {} });
+
+    const withSettings = withoutSettings.withModules([configModule]);
+
+    expectTypeOf(withSettings.render).not.toBeFunction();
+    await expect(renderLaundered(withSettings)).resolves.toMatchObject({
+      code: "browser_supply_missing",
+      missing: ["injected-config"],
+    });
+  });
+
+  /** @scenario "The chain supplies nothing a browser may not show" */
+  it("has no call that takes a secret or an encryption key", () => {
+    const chain = createUi({ document: documentRoot, mount: "root" });
+    const callsOf = (prototype: object) =>
+      Object.getOwnPropertyNames(prototype).filter((name) => name !== "constructor");
+    const calls = [
+      ...callsOf(Object.getPrototypeOf(chain) as object),
+      ...callsOf(UiFacilitiesSupply.prototype),
+      ...callsOf(UiShellSupply.prototype),
+    ];
+
+    expect(calls).toContain("withTransport");
+    expect(calls.filter((name) => /secret|key|encrypt|cipher|credential/i.test(name))).toEqual([]);
+    expectTypeOf<UiSupplyName>().toEqualTypeOf<
+      | "injected-config"
+      | "transport"
+      | "session"
+      | "feedback"
+      | "storage"
+      | "document-title"
+      | "analytics"
+      | "toaster"
+      | "graphics-quality"
+      | "boot-refusal"
+    >();
   });
 
   it("refuses Object.assign onto render with a TypeError", () => {
