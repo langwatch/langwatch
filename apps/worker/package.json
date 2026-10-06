@@ -182,6 +182,7 @@
   },
   "devDependencies": {
     "@ai-sdk/openai": "catalog:",
+    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/scenario": "catalog:",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
