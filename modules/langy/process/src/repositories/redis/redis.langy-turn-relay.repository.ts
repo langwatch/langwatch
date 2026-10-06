@@ -222,7 +222,7 @@ export interface LangyRelayConversations {
 /** The run token the turn's handoff carries; `miss` when none is parked for this project. */
 export type LangyHandoffRunTokenLookup = { kind: "hit"; runToken: string } | { kind: "miss" };
 
-export interface LangyTurnRelayDeps {
+interface LangyTurnRelayDeps {
   conversations: LangyRelayConversations;
   buffer: LangyRelayBuffer;
   /**
@@ -268,14 +268,14 @@ export interface LangyTurnRelayDeps {
   baseHost: string;
 }
 
-export type LangyRelayRejection =
+type LangyRelayRejection =
   | "malformed-envelope"
   | "no-run-token"
   | "bad-signature"
   | "wrong-turn"
   | "invalid-payload";
 
-export type LangyRelayOutcome =
+type LangyRelayOutcome =
   | { status: "applied" }
   | { status: "terminal" }
   | { status: "duplicate" }

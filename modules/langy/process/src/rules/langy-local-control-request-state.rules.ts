@@ -7,7 +7,7 @@ import {
   type LangyControlRequestState,
 } from "@langwatch/langy-contract";
 
-export type ControlRequestState = LangyControlRequestState;
+type ControlRequestState = LangyControlRequestState;
 
 /** The part of a conversation event this reading needs. */
 export interface ControlRequestHistoryEvent {
@@ -16,7 +16,7 @@ export interface ControlRequestHistoryEvent {
 }
 
 /** The latest request a conversation recorded, and whether a folder came of it. */
-export interface LatestControlRequest {
+interface LatestControlRequest {
   requestId: string;
   /** Unix ms after which the request is refused. */
   expiresAt: number;

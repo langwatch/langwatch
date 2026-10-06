@@ -1,4 +1,4 @@
-import { LangyConversationNotFoundError, type LangyUsageCount } from "@langwatch/langy-contract";
+import type { LangyUsageCount } from "@langwatch/langy-contract";
 
 export interface LangyConversationRow {
   id: string;
@@ -97,42 +97,4 @@ export abstract class LangyConversationRepository {
     conversationId: string;
     turnId: string;
   }): Promise<boolean>;
-}
-
-export class NullLangyConversationRepository extends LangyConversationRepository {
-  async countUsage(): Promise<LangyUsageCount> {
-    return { turns: 0, activeUsers: 0 };
-  }
-
-  async getVisibleById({ id }: { id: string }): Promise<LangyConversationRow> {
-    throw new LangyConversationNotFoundError(id);
-  }
-
-  async findOwnership(): Promise<"missing"> {
-    return "missing";
-  }
-
-  async findAllForUser(): Promise<LangyConversationRow[]> {
-    return [];
-  }
-
-  async findActiveOwnedIds(): Promise<string[]> {
-    return [];
-  }
-
-  async getResumeState({
-    conversationId,
-  }: {
-    conversationId: string;
-  }): Promise<LangyConversationResumeState> {
-    throw new LangyConversationNotFoundError(conversationId);
-  }
-
-  async hasAdmittedTurn(): Promise<boolean> {
-    return false;
-  }
-
-  async turnExists(): Promise<boolean> {
-    return false;
-  }
 }

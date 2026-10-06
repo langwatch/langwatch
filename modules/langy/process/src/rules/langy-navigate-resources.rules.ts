@@ -11,7 +11,7 @@
  * underscore, so the two namespaces cannot collide.
  */
 
-export const LANGY_NAVIGATE_RESOURCE_KINDS = [
+const LANGY_NAVIGATE_RESOURCE_KINDS = [
   "prompt",
   "dataset",
   "workflow",

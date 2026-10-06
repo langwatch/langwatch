@@ -31,7 +31,7 @@ export type SettlementOutcome =
   | { kind: "terminal"; entry: LangyStreamEntry }
   | { kind: "abandoned" };
 
-export interface SettlementStreaks {
+interface SettlementStreaks {
   settled: number;
   stale: number;
 }

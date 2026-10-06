@@ -10,7 +10,7 @@ export abstract class LangyBlockMetrics {
   abstract blockCounter(): (reason: string) => void;
 }
 
-export const LANGY_BLOCKS_METRIC_NAME = "langwatch_langy_blocks_total";
+const LANGY_BLOCKS_METRIC_NAME = "langwatch_langy_blocks_total";
 
 /**
  * The block-salvage series, pushed over OTLP. `LangyFinalPartsService.build` takes a `countBlock`

@@ -55,7 +55,7 @@ export interface LangyCredentialErrorReporter {
   report(error: unknown, input: { projectId: string; userId: string; context: string }): void;
 }
 
-export type LangyCredentialServiceOptions = {
+type LangyCredentialServiceOptions = {
   repository: LangyCredentialRepository;
   sessionKeys: LangySessionKeyMintingService;
   virtualKeys: LangyVirtualKeyService;

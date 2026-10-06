@@ -52,7 +52,7 @@ export interface LangyFailTurnCommand {
     error: string;
   }): Promise<void>;
 }
-export interface LangyLivenessBuffer {
+interface LangyLivenessBuffer {
   liveness(params: {
     conversationId: string;
     turnId: string;
@@ -62,7 +62,7 @@ export interface LangyLivenessBuffer {
   appendStatus(params: { conversationId: string; turnId: string; status: string }): Promise<void>;
   markError(params: { conversationId: string; turnId: string; error: string }): Promise<void>;
 }
-export interface LangyWorkerDispatch {
+interface LangyWorkerDispatch {
   dispatch(params: {
     intent: "create" | "revive" | "continue";
     conversationId: string;
@@ -78,7 +78,7 @@ export interface LangyWorkerDispatch {
     resumeToken?: string;
   }): Promise<unknown>;
 }
-export interface LangyTurnHandoffRecord {
+interface LangyTurnHandoffRecord {
   projectId: string;
   conversationId: string;
   turnId: string;
@@ -91,10 +91,10 @@ export interface LangyTurnHandoffRecord {
   runToken: string;
   resumeToken?: string;
 }
-export type LangyTurnHandoffRecordLookup =
+type LangyTurnHandoffRecordLookup =
   | { kind: "hit"; handoff: LangyTurnHandoffRecord }
   | { kind: "miss" };
-export interface LangyTurnHandoffReader {
+interface LangyTurnHandoffReader {
   read(params: { conversationId: string; turnId: string }): Promise<LangyTurnHandoffRecordLookup>;
 }
 export interface AgentTurnLivenessSubscriberDeps {

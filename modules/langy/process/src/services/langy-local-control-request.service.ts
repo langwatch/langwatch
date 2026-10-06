@@ -60,16 +60,16 @@ const KEY_BINDING_TTL_SECONDS = 6 * 60 * 60;
 const RECORD_GRACE_MS = 30 * 60 * 1000;
 
 /** What the socket reads to know which conversation a key answers for. */
-export const sessionKeyBindingSchema = z.object({
+const sessionKeyBindingSchema = z.object({
   conversationId: z.string(),
   projectId: z.string(),
   userId: z.string(),
   requestId: z.string(),
 });
-export type SessionKeyBinding = z.infer<typeof sessionKeyBindingSchema>;
+type SessionKeyBinding = z.infer<typeof sessionKeyBindingSchema>;
 
 /** What approving one request hands back to the command line. */
-export interface ApprovedControlRequest {
+interface ApprovedControlRequest {
   request: StoredControlRequest;
   /** The slug of the request's own project, for the conversation's address. */
   projectSlug: string;
@@ -93,7 +93,7 @@ export type ControlRequestProjects = Readonly<{
   getSlug(projectId: string): Promise<string>;
 }>;
 
-export interface ControlRequestServiceOptions {
+interface ControlRequestServiceOptions {
   store: SessionStateStore;
   projects: ControlRequestProjects;
   /** Mints the per-conversation session key the command line authenticates with. */

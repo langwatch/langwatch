@@ -8,7 +8,7 @@ import type {
 } from "./langy-local-control-request.service.ts";
 
 /** The two permissions a control request is read and acted on under. */
-export type ControlRequestPermission = "langy:view" | "langy:create";
+type ControlRequestPermission = "langy:view" | "langy:create";
 
 /**
  * Which of a person's control requests they may still reach. The project is the request's own,

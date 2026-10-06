@@ -39,17 +39,13 @@ import type {
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,
 } from "./langy-conversation-process.schemas.ts";
-import {
-  langyGenerateTitleIntentSchema,
-  langyWorkerDispatchIntentSchema,
-} from "./langy-conversation-process.schemas.ts";
 import type { LangyConversationProcessingEvent } from "./langy-conversation-state.projection.ts";
 
-export interface LangyWorkerDispatcher {
+interface LangyWorkerDispatcher {
   dispatchTurn(params: LangyWorkerDispatchIntent & { projectId: string }): Promise<void>;
 }
 
-export interface LangyTitleGeneration {
+interface LangyTitleGeneration {
   generateTitle(params: LangyGenerateTitleIntent & { projectId: string }): Promise<void>;
 }
 
@@ -75,8 +71,6 @@ export const createLangyGenerateTitleIntent =
       projectId: context.projectId,
     });
   };
-
-export { langyGenerateTitleIntentSchema, langyWorkerDispatchIntentSchema };
 
 /**
  * Langy conversation commands. Most are pure 1:1 command → event mappings via defineCommand;
@@ -159,7 +153,7 @@ const acceptAgentTurnDataSchema = z.object({
   consumeHandoffTurnId: z.string().optional(),
 });
 const acceptAgentTurnCommandSchema = withCommandEnvelope(acceptAgentTurnDataSchema);
-export type LangyAcceptAgentTurnCommandData = z.infer<typeof acceptAgentTurnCommandSchema>;
+type LangyAcceptAgentTurnCommandData = z.infer<typeof acceptAgentTurnCommandSchema>;
 
 export class AcceptAgentTurnCommand implements CommandHandler<
   Command<LangyAcceptAgentTurnCommandData>,

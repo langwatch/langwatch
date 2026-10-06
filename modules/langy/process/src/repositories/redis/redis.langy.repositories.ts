@@ -13,7 +13,7 @@ import { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repo
 import { RedisLangyUiActionRepository } from "./redis.langy-ui-action.repository.ts";
 
 /** The live edge's rows, every one in the process's Redis. */
-export type LangyRedisRows = Pick<
+type LangyRedisRows = Pick<
   LangyRepositories,
   | "turnAccess"
   | "turnHandoff"

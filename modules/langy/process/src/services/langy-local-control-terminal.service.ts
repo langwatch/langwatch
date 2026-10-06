@@ -89,7 +89,7 @@ function controlUser(input: LangyControlOwnerInput): string {
   return input.actor.id;
 }
 
-export type LangyLocalControlTerminalOptions = Readonly<{
+type LangyLocalControlTerminalOptions = Readonly<{
   /** The SAME request store the panel and the worker's door read. */
   requests: TerminalRequests;
   /** Decides a permission on the request's own project, not the login's. */

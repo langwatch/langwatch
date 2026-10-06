@@ -33,7 +33,7 @@ export const LANGY_CONVERSATION_PROCESS_NAME = "langyConversation";
 export { LANGY_AGENT_DISPATCH_TIMEOUT_MS };
 
 /** Margin kept between a worker dispatch timeout and its process lease. */
-export const LANGY_OUTBOX_LEASE_MARGIN_MS = 30_000;
+const LANGY_OUTBOX_LEASE_MARGIN_MS = 30_000;
 
 /** The outbox lease must outlive one accepted worker dispatch. */
 export const LANGY_OUTBOX_LEASE_DURATION_MS =

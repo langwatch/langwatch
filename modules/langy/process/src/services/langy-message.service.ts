@@ -4,12 +4,6 @@ import type {
   LangyMessageRow,
 } from "../repositories/langy-message.repository.ts";
 
-export type {
-  LangyMessageRepository,
-  LangyMessageRow,
-  MessageRole,
-} from "../repositories/langy-message.repository.ts";
-
 export interface LangyMessageRecord {
   id: string;
   role: LangyMessageRow["role"];

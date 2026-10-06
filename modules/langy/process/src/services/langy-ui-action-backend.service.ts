@@ -90,7 +90,7 @@ const logger = createLogger("langwatch:langy:ui-actions:backend");
 /** How a Langy edit is attributed in the saved document's history. */
 const LANGY_ACTOR_LABEL = "langy";
 
-export type LangyUiActionBackendServiceDependencies = {
+type LangyUiActionBackendServiceDependencies = {
   backend: LangyUiActionBackend;
   /** The tenant's slug an away link is built from, for a runner handed only the project id. */
   projects?: Pick<ProjectApi, "findIdentity">;

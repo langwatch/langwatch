@@ -49,7 +49,7 @@ import { LocalCallStoreService } from "./langy-local-call-store.service.ts";
 const logger = createLogger("langwatch:langy:local-control:dispatcher");
 
 /** One poll of a call, or `gone` once its record has expired. */
-export type LocalCallPoll = { outcome: "polled"; answer: PollCallResponse } | { outcome: "gone" };
+type LocalCallPoll = { outcome: "polled"; answer: PollCallResponse } | { outcome: "gone" };
 export type LocalCallLookup = { kind: "hit"; call: StoredLocalCall } | { kind: "miss" };
 
 export class LocalCallDispatcherService {

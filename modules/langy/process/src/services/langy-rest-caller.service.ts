@@ -27,7 +27,7 @@ import { LangyKeyIdentityService } from "./langy-key-identity.service.ts";
 import { LANGY_UI_ACTIONS_FLAG } from "./langy-ui-action-surface.service.ts";
 
 /** What this chain reads that Langy does not own. */
-export type LangyRestCallerMembers = Readonly<{
+type LangyRestCallerMembers = Readonly<{
   /** This deployment's flag store, for the per-project rollout gate. */
   featureFlags: FeatureFlagApi;
   /** The user directory a key's owner is read from. */

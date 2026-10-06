@@ -31,7 +31,7 @@ const logger = createLogger("langwatch:langy:web-push");
 const NOTIFY_TOOL_NAME = "notify";
 
 /** The folded conversation, as far as a notification reads it. */
-export interface LangyWebPushConversationReader {
+interface LangyWebPushConversationReader {
   /** Null until the conversation is folded. */
   find(params: {
     projectId: string;
@@ -40,7 +40,7 @@ export interface LangyWebPushConversationReader {
 }
 
 /** When the turn began, from its folded document; null until it is folded. */
-export type LangyTurnStartReader = (params: {
+type LangyTurnStartReader = (params: {
   projectId: string;
   conversationId: string;
   turnId: string;
@@ -72,7 +72,7 @@ function notifyToolCandidate(toolName: string, input: unknown): Candidate {
 }
 
 /** Which events can become a notification; everything else never reaches the queue. */
-export function langyWebPushCandidate(event: LangyConversationProcessingEvent): Candidate {
+function langyWebPushCandidate(event: LangyConversationProcessingEvent): Candidate {
   switch (event.type) {
     case LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED:
       return event.data.outcome === "completed"

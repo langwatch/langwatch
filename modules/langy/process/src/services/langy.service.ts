@@ -17,12 +17,6 @@ import {
 } from "@langwatch/langy-contract";
 
 import type { LangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
-import {
-  ADOPTABLE_CONVERSATION_ID,
-  type ConversationDetail,
-  type ConversationListItem,
-  type ConversationListPage,
-} from "../rules/langy-conversation-shape.rules.ts";
 import type { LatestControlRequestReading } from "../rules/langy-local-control-request-state.rules.ts";
 import {
   type LangyConversationService,
@@ -31,10 +25,7 @@ import {
 } from "./langy-conversation.service.ts";
 import type { LangyCredentialService } from "./langy-credential.service.ts";
 import type { LangyFeedbackPromptService } from "./langy-feedback-prompt.service.ts";
-import {
-  type LangyMessageService,
-  type LangyTrustedMessageReader,
-} from "./langy-message.service.ts";
+import type { LangyMessageService } from "./langy-message.service.ts";
 import type { LangyTurnService } from "./langy-turn.service.ts";
 
 /**
@@ -42,14 +33,7 @@ import type { LangyTurnService } from "./langy-turn.service.ts";
  */
 export type OpenLangyRelay = (conversations: LangyService) => LangyRelayConnection;
 
-export type {
-  LangyConversationCommands,
-  LangyConversationEventsReader,
-  LangyConversationRuntime,
-  LangyTrustedMessageReader,
-};
-export type { ConversationDetail, ConversationListItem, ConversationListPage };
-export { ADOPTABLE_CONVERSATION_ID };
+export type { LangyConversationCommands, LangyConversationEventsReader, LangyConversationRuntime };
 
 /**
  * The Langy feature's own conversation-and-turn service: the full surface

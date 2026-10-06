@@ -26,7 +26,7 @@ import type { LangySkillGates } from "./langy-skill-gates.service.ts";
 import type { LangyUiActionSurface } from "./langy-ui-action-surface.service.ts";
 
 /** Supplies feature-flag-derived worker-harness selection. */
-export abstract class LangyHarness {
+abstract class LangyHarness {
   /**
    * Property rather than a method on purpose: methods are bivariant in
    * their parameters, so a resolver requiring an extra dependency could
@@ -40,14 +40,14 @@ export abstract class LangyHarness {
 }
 
 /** Preserves process observability without coupling domain code to app metrics. */
-export abstract class LangyTurnMetrics {
+abstract class LangyTurnMetrics {
   abstract count(input: {
     outcome: "accepted" | "busy" | "mismatch" | "rejected" | "replay" | "failed";
   }): void;
 }
 
 /** Renders the already-validated transport context into Langy's system prompt. */
-export abstract class LangyTurnContextRenderer {
+abstract class LangyTurnContextRenderer {
   abstract render(input: { context: object; isUiActionSurfaceOpen: boolean }): string | null;
 }
 
@@ -64,7 +64,7 @@ export abstract class LangyGithubPermit {
 
 export const LANGY_OVERRIDE = LANGY_TURN_OVERRIDE_FALLBACK;
 
-export interface LangyChatMessageInput {
+interface LangyChatMessageInput {
   role: "user" | "assistant" | "system";
   parts: LangyMessagePart[];
 }

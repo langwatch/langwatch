@@ -247,7 +247,7 @@ export class LangyLocalWorkerService {
   }
 }
 
-export type LangyLocalWorkerOptions = Readonly<{
+type LangyLocalWorkerOptions = Readonly<{
   runtime: LocalControlRuntime;
   commands: Pick<LangyConversationCommands, "requestLocalControl" | "changeLocalPolicy">;
   workspace: Pick<

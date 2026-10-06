@@ -24,9 +24,9 @@ import type {
  */
 
 /** How long the page has to CLAIM a published action before it counts as away. */
-export const UI_ACTION_CLAIM_WINDOW_MS = 3_000;
+const UI_ACTION_CLAIM_WINDOW_MS = 3_000;
 /** Execute budget when the action's manifest declares none. */
-export const UI_ACTION_DEFAULT_BUDGET_MS = 10_000;
+const UI_ACTION_DEFAULT_BUDGET_MS = 10_000;
 /**
  * Hard ceiling on any execute budget. The dispatch blocks a `langwatch ui call`, and that command
  * runs inside an agent worker whose harness stops any command at 30 seconds.
@@ -85,7 +85,7 @@ export interface UiActionConversations {
 }
 
 /** Everything the UI-action channel needs from the process that holds it. */
-export type LangyUiActionServiceDependencies = {
+type LangyUiActionServiceDependencies = {
   /** The pending record, the one claim and the result list the dispatch waits on. */
   uiActions: LangyUiActionRepository;
   conversations: UiActionConversations;

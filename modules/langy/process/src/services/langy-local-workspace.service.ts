@@ -9,7 +9,7 @@ import {
 } from "./langy-skip-permissions.service.ts";
 
 /** The GitHub half of the code access card. */
-export type LangyGithubInstallationState = { installed: boolean; accountLogin?: string };
+type LangyGithubInstallationState = { installed: boolean; accountLogin?: string };
 
 /**
  * The peer reads the local doors make: the person's code access choice, the

@@ -8,7 +8,7 @@ import type { LangyFeedbackPromptRepository } from "../repositories/langy-feedba
  * record do not become part of the feature boundary.
  */
 
-export const FEEDBACK_MIN_ANSWERS = 2;
+const FEEDBACK_MIN_ANSWERS = 2;
 export const FEEDBACK_QUIET_PERIOD_MS = 3 * 24 * 60 * 60 * 1000;
 export const FEEDBACK_LONG_CONVERSATION_ANSWERS = 8;
 

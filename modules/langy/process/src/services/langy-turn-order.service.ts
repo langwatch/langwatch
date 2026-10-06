@@ -12,7 +12,7 @@ export type LangyTurnSegment = { kind: "text"; text: string } | { kind: "tool"; 
  * returned, and the paragraph it ended on. A failed turn hands over nothing else, so this is the
  * only account of the plan it wrote and the calls it ran.
  */
-export type LangyTurnAccount = {
+type LangyTurnAccount = {
   order: LangyTurnSegment[];
   toolCalls: LangyFinalToolCall[];
   /** The paragraph the turn ended on, or "" when it ended on a call. */
@@ -137,7 +137,7 @@ export class LangyTurnOrderService implements LangyTurnOrderReader {
 }
 
 /** The live edge, as the order read needs it: the whole turn, from the start. */
-export interface LangyTurnStreamTail {
+interface LangyTurnStreamTail {
   readTail(a: { conversationId: string; turnId: string }): Promise<{
     reads: { entry: LangyStreamEntry }[];
   }>;

@@ -8,8 +8,6 @@ import { LangyTurnStopService } from "./langy-turn-stop.service.ts";
 import { LangyTurnWarmService } from "./langy-turn-warm.service.ts";
 
 export type {
-  LangyChatMessageInput,
-  LangyTurnServiceDeps,
   LangyTurnTechnicalMembers,
   StartConversationTurnInput,
 } from "./langy-turn-shared.service.ts";

@@ -1,5 +1,7 @@
 import { type TenantId } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
+import type { LangyUsageCount } from "@langwatch/langy-contract";
+import { nowInstant } from "@langwatch/time";
 
 import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
 import type { LangyConversationProcessingEvent } from "../eventing/langy-conversation-state.projection.ts";
@@ -9,17 +11,11 @@ import {
   type LangyMessageRepository,
   NullLangyMessageRepository,
 } from "../repositories/langy-message.repository.ts";
-import { LangyFinalPartsService } from "./langy-final-parts.service.ts";
-import type { LangyTurnOrderReader } from "./langy-turn-order.service.ts";
-
-export type { LangyConversationRepository as LangyConversationReadRepository } from "../repositories/langy-conversation-projection.repository.ts";
-
-import type { LangyUsageCount } from "@langwatch/langy-contract";
-import { nowInstant } from "@langwatch/time";
-
 import { LangyConversationLifecycleService } from "./langy-conversation-lifecycle.service.ts";
 import { LangyConversationReadService } from "./langy-conversation-read.service.ts";
 import { LangyConversationTurnService } from "./langy-conversation-turn.service.ts";
+import { LangyFinalPartsService } from "./langy-final-parts.service.ts";
+import type { LangyTurnOrderReader } from "./langy-turn-order.service.ts";
 
 /**
  * Narrow read port over the canonical event log (ADR-059), satisfied by

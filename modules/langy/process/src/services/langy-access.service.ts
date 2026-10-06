@@ -5,7 +5,7 @@ import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-
  * than imported: the other holder of the key is a BROWSER module (`useShowLangy`), which a server
  * package may not reach.
  */
-export const LANGY_RELEASE_FLAG = "release_langy_enabled" as const;
+const LANGY_RELEASE_FLAG = "release_langy_enabled" as const;
 
 /** A session user carries an email for domain-targeted rules; an API key's owner carries none. */
 type LangyAccessUser = { id: string; email?: string | null };

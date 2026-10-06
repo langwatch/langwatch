@@ -38,14 +38,14 @@ export interface LangyMemoryActiveTurn {
 }
 
 /** The project facts the credential and session-key reads look up. */
-export interface LangyMemoryProject {
+interface LangyMemoryProject {
   teamId: string;
   organizationId: string;
   egressAllowlist: unknown;
 }
 
 /** An API key as the session-key reads and the reap see it. */
-export interface LangyMemoryApiKey {
+interface LangyMemoryApiKey {
   id: string;
   name: string;
   revokedAt: Instant | null;
@@ -55,7 +55,7 @@ export interface LangyMemoryApiKey {
 }
 
 /** A virtual key as the credential read sees it. */
-export interface LangyMemoryVirtualKey {
+interface LangyMemoryVirtualKey {
   organizationId: string;
   purpose: string;
   status: string;

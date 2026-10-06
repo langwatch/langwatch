@@ -28,7 +28,7 @@ import type { LangyConversationProcessingEvent } from "./langy-conversation-stat
 const logger = createLogger("langwatch:langy:local-control:connect-turn");
 
 /** The folded conversation, as far as the owed turn reads it. */
-export interface LocalConnectTurnConversationReader {
+interface LocalConnectTurnConversationReader {
   /** Throws `langy_conversation_not_found` until the conversation is folded. */
   getById(params: {
     projectId: string;
@@ -41,7 +41,7 @@ export type LocalConnectTurnPresence = Pick<
   "getByConversationId" | "readOwedConnectTurn" | "settleOwedConnectTurn"
 >;
 
-export interface LocalConnectTurnSubscriberDeps {
+interface LocalConnectTurnSubscriberDeps {
   /** Read at handle time: the process runtime is composed after the pipeline. */
   presence: () => LocalConnectTurnPresence;
   conversations: LocalConnectTurnConversationReader;

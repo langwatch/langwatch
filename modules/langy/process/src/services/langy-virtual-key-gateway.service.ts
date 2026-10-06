@@ -6,7 +6,7 @@ import type { LangyVirtualKeyService } from "./langy-credential.service.ts";
 const LANGY_VK_DISPLAY_NAME = "Langy";
 const LANGY_VK_DESCRIPTION = "Auto-provisioned virtual key for the Langy in-product assistant.";
 
-export interface LangyVirtualKeyGatewayServiceOptions {
+interface LangyVirtualKeyGatewayServiceOptions {
   secrets: Pick<SecretApi, "getValues" | "createReserved">;
   gateway: Pick<GatewayApi, "createVirtualKey">;
 }

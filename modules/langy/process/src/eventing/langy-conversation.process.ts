@@ -56,7 +56,7 @@ export function buildLangyProcessEventView(
   };
 }
 
-export const INITIAL_LANGY_PROCESS_STATE: LangyConversationProcessState = {
+const INITIAL_LANGY_PROCESS_STATE: LangyConversationProcessState = {
   currentTurnId: null,
   turnStatus: "idle",
   titleSource: LANGY_TITLE_SOURCE.DERIVED,
@@ -92,7 +92,7 @@ function shouldGenerateTitle(state: LangyConversationProcessState): boolean {
   return state.titleSource === LANGY_TITLE_SOURCE.DERIVED && !state.autoTitleRequested;
 }
 
-export const handleAgentTurnAccepted: LangyHandler = (state, payload, ctx) => {
+const handleAgentTurnAccepted: LangyHandler = (state, payload, ctx) => {
   const view = langyProcessEventViewSchema.parse(payload);
   if (state.archived || view.turnId === null) return { state };
   // Postgres admission is authoritative. This guard is the final defence
@@ -113,7 +113,7 @@ export const handleAgentTurnAccepted: LangyHandler = (state, payload, ctx) => {
   };
 };
 
-export const handleAgentResponded: LangyHandler = (state, payload, ctx) => {
+const handleAgentResponded: LangyHandler = (state, payload, ctx) => {
   const view = langyProcessEventViewSchema.parse(payload);
   if (view.turnId === null || view.turnId !== state.currentTurnId) {
     return { state };
@@ -138,7 +138,7 @@ export const handleAgentResponded: LangyHandler = (state, payload, ctx) => {
   };
 };
 
-export const handleAgentResponseFailed: LangyHandler = (state, payload) => {
+const handleAgentResponseFailed: LangyHandler = (state, payload) => {
   const view = langyProcessEventViewSchema.parse(payload);
   if (view.turnId === null || view.turnId !== state.currentTurnId) {
     return { state };
@@ -146,11 +146,11 @@ export const handleAgentResponseFailed: LangyHandler = (state, payload) => {
   return { state: { ...state, currentTurnId: null, turnStatus: "failed" } };
 };
 
-export const handleArchived: LangyHandler = (state) => ({
+const handleArchived: LangyHandler = (state) => ({
   state: { ...state, archived: true, currentTurnId: null, turnStatus: "idle" },
 });
 
-export const handleMetadataUpdated: LangyHandler = (state, payload) => {
+const handleMetadataUpdated: LangyHandler = (state, payload) => {
   const view = langyProcessEventViewSchema.parse(payload);
   // A manual rename is sticky and permanently suppresses auto titles.
   if (!view.titleTouched) return { state };
@@ -158,18 +158,18 @@ export const handleMetadataUpdated: LangyHandler = (state, payload) => {
 };
 
 /** A title chosen at creation (a fork, the guided kickoff) is as sticky as a rename. */
-export const handleConversationStarted: LangyHandler = (state, payload) => {
+const handleConversationStarted: LangyHandler = (state, payload) => {
   const view = langyProcessEventViewSchema.parse(payload);
   if (!view.titleTouched) return { state };
   return { state: { ...state, titleSource: LANGY_TITLE_SOURCE.USER } };
 };
 
-export const handleTitleGenerated: LangyHandler = (state) => {
+const handleTitleGenerated: LangyHandler = (state) => {
   if (state.titleSource === LANGY_TITLE_SOURCE.USER) return { state };
   return { state: { ...state, titleSource: LANGY_TITLE_SOURCE.AUTO } };
 };
 
-export const handleHandoffPending: LangyHandler = (state, payload) => {
+const handleHandoffPending: LangyHandler = (state, payload) => {
   const view = langyProcessEventViewSchema.parse(payload);
   // The turn handed off — it did not fail (ADR-048). Back to idle, keep
   // the turn id (identity only, never the token) so the next dispatch
@@ -184,7 +184,7 @@ export const handleHandoffPending: LangyHandler = (state, payload) => {
   };
 };
 
-export const handleHandoffConsumed: LangyHandler = (state) => ({
+const handleHandoffConsumed: LangyHandler = (state) => ({
   state: { ...state, pendingHandoffTurnId: null },
 });
 
@@ -192,7 +192,7 @@ export const handleHandoffConsumed: LangyHandler = (state) => ({
  * Conversation-level or turn-progress activity with no process decision to make. Declared rather
  * than omitted.
  */
-export const handleNoDecision: LangyHandler = (state) => ({ state });
+const handleNoDecision: LangyHandler = (state) => ({ state });
 
 /**
  * Only the effect ports are injected; the topology — state, intents, the content boundary,

@@ -34,7 +34,7 @@ import {
   type LangyConversationRuntime,
 } from "./langy.service.ts";
 
-export abstract class LangyTrustedMessage {
+abstract class LangyTrustedMessage {
   abstract getRecordsByConversation(input: { conversationId: string; projectId: string }): Promise<
     {
       id: string;
@@ -45,7 +45,7 @@ export abstract class LangyTrustedMessage {
 }
 
 /** Application-owned technical credential adapters; the repository remains private. */
-export type LangyCredentialComposition = {
+type LangyCredentialComposition = {
   sessionKeys: LangySessionKeyMintingService;
   virtualKeys: LangyVirtualKeyService;
   github: LangyGithubService;
@@ -88,7 +88,7 @@ export type LangyServiceCompositionOptions = {
   blockMetrics: LangyBlockMetrics;
 };
 
-export interface LangyPostgresServiceOptions {
+interface LangyPostgresServiceOptions {
   repositories: LangyDatabaseRepositories;
 }
 

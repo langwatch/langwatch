@@ -192,7 +192,7 @@ function digestOf({
 }
 
 /** The stable, typed tool name a CLI call is recorded under. */
-export function toolNameOf({ resource, verb }: LangwatchCommand): string {
+function toolNameOf({ resource, verb }: LangwatchCommand): string {
   return `langwatch.${resource}.${verb}`;
 }
 

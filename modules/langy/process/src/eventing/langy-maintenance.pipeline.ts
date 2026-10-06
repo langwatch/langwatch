@@ -30,7 +30,7 @@ import {
   langySessionKeyReapWake,
 } from "./langy-session-key-reap.process.ts";
 
-export interface LangyMaintenancePipelineDeps {
+interface LangyMaintenancePipelineDeps {
   sessionKeyReap: LangySessionKeyReapDeps;
   virtualKeyProvisioning: Pick<LangyVirtualKeyProvisioningService, "provisionCreated">;
 }

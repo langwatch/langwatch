@@ -215,7 +215,7 @@ type LangyAppDependencies = {
 };
 
 /** The local-control runtime, its durable commands, its peer reads and this origin. */
-export interface LangyLocalControl {
+interface LangyLocalControl {
   runtime: LocalControlRuntime;
   commands: LangyConversationCommands;
   workspace: LangyLocalWorkspaceService;
