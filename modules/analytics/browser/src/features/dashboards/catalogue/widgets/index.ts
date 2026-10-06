@@ -11,6 +11,7 @@ import * as sql from "../../templates/model/question-queries.ts";
 import * as table from "../../templates/model/question-table-widgets.ts";
 import { TABLE_ROWS } from "../../templates/model/template-widget.ts";
 import type { WidgetCode } from "../../templates/model/widget-code-parts.ts";
+import { ANSWERS_ASKS_WIDGET_BUILDS } from "./answers-asks-widgets.ts";
 
 /** One built widget: its code, its named queries and its place on a board. */
 export interface CatalogueWidgetBuild {
@@ -206,4 +207,5 @@ export const CATALOGUE_WIDGET_BUILDS: Readonly<Record<string, CatalogueWidgetBui
     width: "half",
     rows: TABLE_ROWS,
   },
+  ...ANSWERS_ASKS_WIDGET_BUILDS,
 };

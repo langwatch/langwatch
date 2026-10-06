@@ -236,6 +236,72 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Langy drafts the widget's prompt when it is picked (AC12); the template's report prompt is drafted on create next
 
   # ---------------------------------------------------------------------------
+  # Answer quality and What users ask widgets
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: AC40 Answer quality: How conversations ended reads the app's outcome first, then the judge
+    Given the "How conversations ended" widget
+    Then its queries take the outcome from the trace's "metadata.outcome" when the app sends one
+    And otherwise from the label of the "Conversation Outcome Judge" evaluation on that trace
+    And it charts the share of closed conversations misunderstood, not doable, refused and handed to a person per bucket
+    And it lists the top 5 reasons with their share against the period before
+
+  @unit
+  Scenario: AC41 Answer quality: Unanswered, by topic is the refused share of closed conversations per topic
+    Given the "Unanswered, by topic" widget
+    Then it ranks topics by the share of their closed conversations with the outcome "refusal"
+    And it shows the share over all closed conversations and its line per bucket
+
+  @unit
+  Scenario: AC42 Answer quality: Judges vs reviewers scores agreement per week from reviewer thumbs
+    Given the "Judges vs reviewers" widget
+    Then it pairs each evaluator's pass or fail with the reviewer thumbs on the same trace from the annotations view
+    And it charts Cohen's kappa per evaluator per week against a 0.8 target
+    And without reviewer thumbs it shows the setup step for reviewer annotations
+
+  @unit
+  Scenario: AC43 Answer quality: To review lists failed checks from the last 3 days with one random audit
+    Given the "To review" widget
+    Then it lists up to 4 traces a check failed in the last 3 days of the period, each with the check's reason
+    And it adds one trace every check passed, picked without regard to its verdicts
+
+  @unit
+  Scenario: AC44 Answer quality: Retrieval or generation splits failed searches by cause
+    Given the "Retrieval or generation" widget
+    Then a failed trace that searched counts once: as "search found nothing" when a retrieval span returned no contexts
+    And otherwise as an error when a span errored, else as a wrong answer when a check failed
+
+  @unit
+  Scenario: AC45 Answer quality: Empty retrieval rate counts questions whose search returned nothing
+    Given the "Empty retrieval rate" widget
+    Then it divides traces with a retrieval span that returned no contexts by traces with a retrieval span, per bucket
+
+  @unit
+  Scenario: AC46 What users ask: Requests it cannot serve counts capability gaps per topic
+    Given the "Requests it cannot serve" widget
+    Then it counts closed conversations with the outcome "capability_gap" per topic, with the most common reason
+
+  @unit
+  Scenario: AC47 What users ask: Rising and new topics compares topic shares with the period before
+    Given the "Rising and new topics" widget
+    Then it compares each topic's share of traces in the period with the equally long period before
+    And it marks a topic with no traces in the period before as new
+    And with no traces in the period before it says there is nothing to compare with
+
+  @unit
+  Scenario: AC48 What users ask: Topics people ask about shows volume, success and cannot-do per topic
+    Given the "Topics people ask about" widget
+    Then it shows per topic its traces, the resolved share of its closed conversations and its capability gaps
+    And without judged outcomes it shows the checks' pass rate instead, under its own header
+
+  @unit
+  Scenario: AC49 What users ask: Asked again shows misread conversations and returning users
+    Given the "Asked again" widget
+    Then it charts the share of closed conversations with the outcome "misunderstood" per bucket
+    And it shows the share of people active in the period who were also active in the period before
+
+  # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
 
@@ -265,3 +331,13 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 16: "The picker offers the catalogue" (added by langwatch/tasks#911: the picker moves from answer shapes to the question tree) → Scenario: AC16 The picker offers every catalogue widget that has code, grouped by the question tree
   # AC 17: "Everything is listed, coming soon until built" (added by langwatch/tasks#911) → Scenario: AC17 Every widget and template is listed, coming soon until it is built
   # AC 18: "Default Langy prompts" (added by langwatch/tasks#911) → Scenario: AC18 Every widget and template carries a default Langy prompt
+  # AC 40: "Answer quality: how conversations ended" → Scenario: AC40 Answer quality: How conversations ended reads the app's outcome first, then the judge
+  # AC 41: "Answer quality: unanswered by topic" → Scenario: AC41 Answer quality: Unanswered, by topic is the refused share of closed conversations per topic
+  # AC 42: "Answer quality: judges vs reviewers" → Scenario: AC42 Answer quality: Judges vs reviewers scores agreement per week from reviewer thumbs
+  # AC 43: "Answer quality: to review" → Scenario: AC43 Answer quality: To review lists failed checks from the last 3 days with one random audit
+  # AC 44: "Answer quality: retrieval or generation" → Scenario: AC44 Answer quality: Retrieval or generation splits failed searches by cause
+  # AC 45: "Answer quality: empty retrieval rate" → Scenario: AC45 Answer quality: Empty retrieval rate counts questions whose search returned nothing
+  # AC 46: "What users ask: requests it cannot serve" → Scenario: AC46 What users ask: Requests it cannot serve counts capability gaps per topic
+  # AC 47: "What users ask: rising and new topics" → Scenario: AC47 What users ask: Rising and new topics compares topic shares with the period before
+  # AC 48: "What users ask: topics people ask about" → Scenario: AC48 What users ask: Topics people ask about shows volume, success and cannot-do per topic
+  # AC 49: "What users ask: asked again" → Scenario: AC49 What users ask: Asked again shows misread conversations and returning users
