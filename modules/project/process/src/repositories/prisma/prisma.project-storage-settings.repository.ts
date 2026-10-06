@@ -8,7 +8,7 @@ import type {
   ProjectStorageSettingsRepository,
 } from "../project-storage-settings.repository.ts";
 
-export type PrismaProjectStorageDatabase = Pick<PrismaClient, "project">;
+type PrismaProjectStorageDatabase = Pick<PrismaClient, "project">;
 
 export class PrismaProjectStorageSettingsRepository
   extends PrismaRepository.for("Project")

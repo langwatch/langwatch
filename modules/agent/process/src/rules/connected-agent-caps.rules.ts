@@ -4,7 +4,7 @@
  */
 
 /** The size of a JSON value on the wire, in bytes. */
-export function jsonByteLength(value: unknown): number {
+function jsonByteLength(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value ?? null), "utf8");
 }
 

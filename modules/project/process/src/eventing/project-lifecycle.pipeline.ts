@@ -41,7 +41,7 @@ function lifecycleCommands() {
     .withCommand("recordPresenceSettingChanged", RecordProjectPresenceSettingChangedCommand);
 }
 
-export type ProjectLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;
+type ProjectLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;
 
 /**
  * project_lifecycle: project records its facts; peers react from their own side (§9). Organization

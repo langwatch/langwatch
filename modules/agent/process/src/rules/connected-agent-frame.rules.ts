@@ -9,7 +9,7 @@ import type { z } from "zod";
 /** The start of the error a call fails with when its result fails the schema. */
 export const UNREADABLE_RESULT_MESSAGE = "the agent answered a result LangWatch cannot read";
 
-export type SdkFrameRead =
+type SdkFrameRead =
   | { kind: "frame"; frame: SdkFrame }
   /** A result under a call id that fails the schema: the call can be failed. */
   | { kind: "unreadable_result"; callId: string; issue: string }

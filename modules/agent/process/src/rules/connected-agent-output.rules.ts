@@ -1,6 +1,6 @@
 import type { ZodError } from "zod";
 
-export type ConnectedAgentOutputFailure = Readonly<{
+type ConnectedAgentOutputFailure = Readonly<{
   issues: readonly Readonly<{ path: string; code: string }>[];
 }>;
 

@@ -76,7 +76,7 @@ const storedSessionSchema = z.object({
 type StoredSession = z.infer<typeof storedSessionSchema>;
 
 /** What one pod keeps per instance it has served: the channel, and who waits on it. */
-export interface LongPollTransportOptions {
+interface LongPollTransportOptions {
   session: AgentSessionService;
   /** How long a poll waits for a frame before it answers empty. */
   pollWaitMs?: number;

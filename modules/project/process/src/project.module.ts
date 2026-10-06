@@ -18,8 +18,6 @@ import {
   type ProjectOldestTeam,
 } from "./services/governance-internal-project.service.ts";
 import { ProjectCredentialsService } from "./services/project-credentials.service.ts";
-import { ProjectMetadataService } from "./services/project-metadata.service.ts";
-import type { ProjectDiagnostics } from "./services/project.service.ts";
 import { ProjectCreatedBackfillTask } from "./tasks/project-created-backfill.task.ts";
 import { ProjectPresenceSettingBackfillTask } from "./tasks/project-presence-setting-backfill.task.ts";
 import { projectRest, projectRestCredential } from "./transport/project.rest.ts";
@@ -54,17 +52,6 @@ export function createProjectCodingAgentActivityRepository(
   options: Readonly<{ prisma: PrismaCodingAgentActivityDatabase }>,
 ): CodingAgentActivityRepository {
   return PrismaCodingAgentActivityRepository.create(options);
-}
-
-/** The read-mostly project metadata surface, for a caller with no credentials or org service. */
-export function createProjectMetadataService(options: {
-  database: PrismaProjectDatabase;
-  diagnostics?: ProjectDiagnostics;
-}): ProjectMetadataService {
-  return ProjectMetadataService.create({
-    repository: PrismaProjectRepository.create({ prisma: options.database }),
-    diagnostics: options.diagnostics,
-  });
 }
 
 /**

@@ -31,8 +31,6 @@ import { z } from "zod";
 
 import { agentConfigWithoutSecrets } from "../rules/agent-secrets.rules.ts";
 
-export { relayCallBodySchema, relayCallResponseSchema } from "@langwatch/agent-contract";
-
 /** The W3C trace context header a call carries, bound by the process from the request. */
 export const agentTraceparent = defineRestMiddleware("traceparent", z.string().nullable());
 

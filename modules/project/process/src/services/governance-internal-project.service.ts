@@ -22,7 +22,7 @@ export abstract class ProjectOldestTeam {
  * satisfies it, and so does the service below — naming the pair lets a
  * background process pull usage without composing a heavier capability.
  */
-export abstract class GovernanceInternalProject {
+abstract class GovernanceInternalProject {
   abstract findWithTeam(id: string): Promise<ProjectWithTeam | null>;
 
   abstract ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;

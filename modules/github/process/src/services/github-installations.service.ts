@@ -19,13 +19,7 @@ import type { GithubInstallationAccessService } from "./github-installation-acce
 
 const logger = createLogger("langwatch:github:installations");
 
-export type GithubWebhookAction =
-  | "created"
-  | "deleted"
-  | "suspend"
-  | "unsuspend"
-  | "added"
-  | "removed";
+type GithubWebhookAction = "created" | "deleted" | "suspend" | "unsuspend" | "added" | "removed";
 
 export class GithubInstallationsService {
   static create({

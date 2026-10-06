@@ -141,7 +141,7 @@ type GithubSetup = FeatureSetup<
 >;
 
 /** What a graph needs beside its rows to answer for a GitHub App. */
-export type GithubComposition = Readonly<{
+type GithubComposition = Readonly<{
   repositories: GithubRepositories;
   organization: OrganizationApiContract;
   project: Pick<ProjectApiContract, "getOrganizationId" | "touchCodingAgentPullRequestSeen">;

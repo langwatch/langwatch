@@ -11,8 +11,8 @@ import type {
 } from "../../app/github.app.ts";
 import { GithubInstallationNotFoundError } from "../github-api.channel.ts";
 
-export type MemoryGithubInstallation = GithubInstallationDetails;
-export type MemoryGithubPullRequest = GithubPullRequestSummary & { owner: string; repo: string };
+type MemoryGithubInstallation = GithubInstallationDetails;
+type MemoryGithubPullRequest = GithubPullRequestSummary & { owner: string; repo: string };
 
 /**
  * The raw GitHub App client, in memory: installations and pull requests come
