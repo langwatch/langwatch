@@ -488,6 +488,7 @@ describe("ProjectService", () => {
     expect(repository.countLiveNonGovernanceProjects).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A feature reads an internal project" */
   it("returns the existing internal project without creating", async () => {
     const repository = new StubRepository();
     repository.existing = project;
@@ -501,6 +502,7 @@ describe("ProjectService", () => {
     expect(repository.createInternalOrFindWinner).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A feature ensures an internal project" */
   it("creates the internal project on the oldest team", async () => {
     const repository = new StubRepository();
 
@@ -519,6 +521,7 @@ describe("ProjectService", () => {
     });
   });
 
+  /** @scenario "A feature ensures an internal project" */
   it("rejects an organization with no team", async () => {
     const repository = new StubRepository();
     const organizations = new StubOrganizationService();
@@ -562,6 +565,7 @@ describe("ProjectService", () => {
     await expect(createService(repository).getOrganizationId("project_1")).resolves.toBe("org");
   });
 
+  /** @scenario "A compatibility caller resolves a project tenant target" */
   it("returns absence for a missing or orphaned compatibility tenant lookup", async () => {
     const repository = new StubRepository();
     repository.findOrganizationId.mockResolvedValue(undefined);
@@ -572,6 +576,7 @@ describe("ProjectService", () => {
     expect(repository.findOrganizationId).toHaveBeenCalledWith("project_missing");
   });
 
+  /** @scenario "A project is created in an existing shared team" */
   it("creates an application project through its own repository", async () => {
     const repository = new StubRepository();
     const organizations = new StubOrganizationService();
@@ -666,6 +671,7 @@ describe("ProjectService", () => {
     });
   });
 
+  /** @scenario "A project is created with a new team" */
   it("asks Organization to create and grant a new team", async () => {
     const repository = new StubRepository();
     const organizations = new StubOrganizationService();
@@ -808,6 +814,8 @@ describe("ProjectService", () => {
     expect(repository.findActiveByScopes).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A project is created in an existing shared team" */
+  /** @scenario "A personal workspace project is protected" */
   it("does not allow an application project into a personal workspace", async () => {
     const repository = new StubRepository();
     const organizations = new StubOrganizationService();
@@ -883,6 +891,7 @@ describe("ProjectService", () => {
   };
 
   /** @scenario Editing a project cannot move it out of a personal workspace */
+  /** @scenario "A personal workspace project is protected" */
   it("refuses to move a personal project into a shared team", async () => {
     const { outcome, repository } = await attemptBoundaryMove({
       current: projectWithTeam({ isPersonal: true, teamId: "personal" }),
@@ -894,6 +903,7 @@ describe("ProjectService", () => {
   });
 
   /** @scenario Editing a project cannot move it into a personal workspace */
+  /** @scenario "A personal workspace project is protected" */
   it("refuses to move a shared project into a personal workspace", async () => {
     const { outcome, repository } = await attemptBoundaryMove({
       current: projectWithTeam({ isPersonal: false, teamId: "shared" }),
@@ -933,6 +943,7 @@ describe("ProjectService", () => {
   });
 
   /** @scenario tRPC project.update rejects cross-org team */
+  /** @scenario "Project settings cross an organization boundary" */
   it("refuses a destination team that belongs to another organization", async () => {
     const repository = new StubRepository();
     const organizations = new StubOrganizationService();
@@ -969,6 +980,7 @@ describe("ProjectService", () => {
   });
 
   /** @scenario Deleting a project cannot empty a personal workspace */
+  /** @scenario "A personal workspace project is protected" */
   it("refuses to archive a personal project", async () => {
     const repository = new StubRepository();
     repository.findWithTeam.mockResolvedValue(projectWithTeam({ isPersonal: true }));

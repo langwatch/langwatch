@@ -79,3 +79,24 @@ describe("definePipeline(...).withEvents", () => {
     });
   });
 });
+
+describe("definePipeline's aggregate type", () => {
+  describe("when the aggregate definition names its type", () => {
+    /** @scenario An aggregate declares its type once */
+    it("derives the pipeline's aggregate type from the definition and accepts no separate registration", () => {
+      const definition = testPipeline().withEvents([startedSchema]).build();
+      expect(definition.aggregate.type).toBe("test");
+      expect(definition.metadata.aggregateType).toBe("test");
+
+      const withSeparateType = definePipeline({
+        name: "with-events",
+        aggregate: defineAggregate({ type: "test" }),
+        // @ts-expect-error the aggregate type is declared on the aggregate alone
+        aggregateType: "other",
+      })
+        .withEvents([startedSchema])
+        .build();
+      expect(withSeparateType.metadata.aggregateType).toBe("test");
+    });
+  });
+});

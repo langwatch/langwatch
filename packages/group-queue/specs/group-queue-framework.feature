@@ -63,7 +63,7 @@ Feature: Group Queue framework boundary
     Then it stops claiming new groups
     And it finishes or safely re-stages the claimed work within that budget
 
-  @typecheck @architecture
+  @typecheck @architecture @unit
   Scenario: Group Queue has no Eventing or application dependency
     Given the Group Queue package dependency graph
     Then it contains no import from Eventing, the platform app or enterprise code

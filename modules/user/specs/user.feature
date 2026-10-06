@@ -91,6 +91,7 @@ Feature: Canonical user lifecycle
     When a registration succeeds through the register route
     Then the account is created and the registration answers it
 
+  @unit
   Scenario: Changing an email refreshes authenticated identity
     When an authorized transport changes a user's normalized email through the User service
     Then the profile is updated

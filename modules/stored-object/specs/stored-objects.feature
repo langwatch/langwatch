@@ -8,7 +8,7 @@ Feature: Stored Objects service and API
   I want durable project-scoped byte references
   So that bytes can be stored and delivered without exposing provider details
 
-  @architecture @typecheck
+  @architecture @typecheck @unit
   Scenario: Stored Objects lives in one feature package
     Given Stored Objects is installed
     Then @langwatch/stored-object-contract contains portable schemas, errors and RPC contracts
@@ -28,7 +28,7 @@ Feature: Stored Objects service and API
     And its ClickHouse import is migrations/clickhouse-import.stored-object.migration.ts
     And no composition, registration, lifecycle, or eventing source directory remains
 
-  @architecture @persistence
+  @architecture @persistence @unit
   Scenario: One Postgres row owns current state
     Given Stored Objects persists operational metadata
     Then StoredObject is its only Postgres domain table

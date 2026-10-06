@@ -270,6 +270,7 @@ describe("UserService", () => {
     });
   });
 
+  /** @scenario "Changing an email refreshes authenticated identity" */
   it("normalizes a changed email, then ends every one of the user's sessions", async () => {
     const revokeAllBrowserSessions = vi.fn(async () => undefined);
     const { service, repository } = createService({

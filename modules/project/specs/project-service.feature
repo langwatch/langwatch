@@ -1,6 +1,7 @@
 Feature: Shared project service
   Project behaviour is implemented once and shared with product features.
 
+  @unit
   Scenario: A peer lists full project paths for copied entities
     Given copied entities reference projects with organization and team names
     When the peer lists paths for those project identifiers
@@ -8,6 +9,7 @@ Feature: Shared project service
     And only the requested projects are returned
     And archived related rows are not silently hidden
 
+  @unit
   Scenario: A feature ensures an internal project
     Given the process has one project service
     When a feature ensures an internal project for an organization and kind
@@ -15,6 +17,7 @@ Feature: Shared project service
     And it gets the oldest team through the organization service
     And concurrent calls resolve to the same project
 
+  @unit
   Scenario: A feature reads an internal project
     Given an internal project exists for an organization and kind
     When a feature asks the project service for it
@@ -35,11 +38,13 @@ Feature: Shared project service
     Then it asks the process-owned project service for the organization
     And unknown or orphaned projects resolve no virtual-key names
 
+  @unit
   Scenario: A compatibility caller resolves a project tenant target
     When it asks for a project's owning organization
     Then the project service returns the tenant for an active or archived project
     And it returns absence for a missing or orphaned project
 
+  @unit
   Scenario: A project is created in an existing shared team
     When the project service creates a project for that team and organization
     Then it verifies the team is active and belongs to the organization
@@ -52,17 +57,20 @@ Feature: Shared project service
     When each mints a slug from the same project name
     Then the two slugs differ
 
+  @unit
   Scenario: A project is created with a new team
     When the project service creates a project with a new team name
     Then it asks Organization to create the team
     And it grants the requesting user team administration
     And it creates the project in that team
 
+  @unit
   Scenario: Project settings cross an organization boundary
     When a project is updated with a team from another organization
     Then the service throws a destination-team error
     And it does not write the project
 
+  @unit
   Scenario: A personal workspace project is protected
     When a caller moves, archives, or creates an additional project in a personal workspace
     Then the service throws a personal-workspace boundary error

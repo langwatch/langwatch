@@ -7,7 +7,7 @@ Feature: Eventing framework boundary and pipeline authoring
   So that its consistency guarantees are visible and invalid combinations are
   rejected before the application starts
 
-  @typecheck @architecture
+  @typecheck @architecture @unit
   Scenario: An aggregate declares its type once
     Given an aggregate definition with its identifier and allowed events
     When a pipeline is defined for that aggregate
@@ -78,7 +78,7 @@ Feature: Eventing framework boundary and pipeline authoring
     Then the subscriber is staged with the event context
     And no projection document is present in its handler contract
 
-  @typecheck @subscriber
+  @typecheck @subscriber @unit
   Scenario: A projection subscriber infers its committed document
     Given a projection registered earlier in the pipeline
     When a projection subscriber is declared after that projection by name
