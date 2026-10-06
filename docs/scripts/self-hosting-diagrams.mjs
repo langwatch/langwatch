@@ -491,7 +491,7 @@ function deployment(p) {
   chip(x(3) + 20, 596, "store", "Object storage", ["S3 or Azure Blob"]);
 
   const facts = [
-    ["Trace data stored in", ["LangWatch Cloud", "Your cloud", "Your cloud", "Your cloud"]],
+    ["Trace data stored in", ["LangWatch", "Your cloud", "Your cloud", "Your cloud"]],
     ["Passes through LangWatch", ["Yes", "Yes", "No", "No"]],
   ];
   facts.forEach(([name, values], r) => {

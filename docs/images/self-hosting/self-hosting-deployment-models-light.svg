@@ -83,7 +83,7 @@
 <text x="1108" y="621.5" font-size="14.5" font-weight="650" fill="#1e4b8f" text-anchor="middle">Object storage</text>
 <text x="1108" y="641" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">S3 or Azure Blob</text>
 <text x="24" y="712" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="start">Trace data stored in:</text>
-<text x="191.35000000000002" y="712" font-size="13.5" font-weight="700" fill="#1d293d" text-anchor="start">LangWatch Cloud</text>
+<text x="191.35000000000002" y="712" font-size="13.5" font-weight="700" fill="#1d293d" text-anchor="start">LangWatch</text>
 <text x="336" y="712" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="start">Trace data stored in:</text>
 <text x="503.35" y="712" font-size="13.5" font-weight="700" fill="#1d293d" text-anchor="start">Your cloud</text>
 <text x="648" y="712" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="start">Trace data stored in:</text>
