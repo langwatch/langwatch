@@ -22,7 +22,7 @@ const MILLISECONDS_PER_SECOND = 1000;
 const INVOICE_PAGE_SIZE = 100;
 
 /** How long an invoice may stay unpaid. */
-export const INVOICE_DAYS_UNTIL_DUE = 30;
+const INVOICE_DAYS_UNTIL_DUE = 30;
 
 /**
  * The pinned SDK has no `billing.creditGrants`, so the one call the commit

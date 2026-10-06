@@ -17,7 +17,7 @@ import type { BillableEventsTotalResult } from "./billable-events-query.service.
 const logger = createLogger("langwatch:billing:instantEvalSpendQuery");
 
 /** The peers the read goes through, each one operation wide. */
-export interface InstantEvalSpendQueryPeers {
+interface InstantEvalSpendQueryPeers {
   /** Whether this deployment has the ledger a judgement's cost is read from. */
   isSpendSourceAvailable(): boolean;
   /** Every project of the organization, archived ones included. */

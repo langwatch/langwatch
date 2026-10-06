@@ -6,7 +6,7 @@ import { OrganizationPricingRepository } from "../organization-pricing.repositor
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type BillingOrganizationPricingDatabase = Pick<PrismaClient, "organization">;
+type BillingOrganizationPricingDatabase = Pick<PrismaClient, "organization">;
 
 export class PrismaOrganizationPricingRepository extends OrganizationPricingRepository {
   private constructor(private readonly prisma: BillingOrganizationPricingDatabase) {

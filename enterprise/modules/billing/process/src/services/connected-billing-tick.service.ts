@@ -17,7 +17,7 @@ import type { ConnectedMonthlyStatementService } from "./connected-monthly-state
 const logger = createLogger("langwatch:billing:connected-billing-tick");
 
 /** What one tick drives, each only as wide as it is used. */
-export type ConnectedBillingJobs = Readonly<{
+type ConnectedBillingJobs = Readonly<{
   /** Absent where no process composed the statement mail: nothing is sent or recorded. */
   statements: Pick<ConnectedMonthlyStatementService, "run"> | undefined;
   renewals: Pick<ConnectedBillingService, "completeRenewalIfDue">;

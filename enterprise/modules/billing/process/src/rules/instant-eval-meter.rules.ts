@@ -10,7 +10,7 @@ import { Temporal } from "@langwatch/time";
 /** Stripe meter event name for Instant Evals, in dollars to four places. */
 export const INSTANT_EVAL_USD_EVENT_NAME = "langwatch_instant_eval_usd";
 
-export const INSTANT_EVAL_METER_UNITS_PER_USD = 10_000;
+const INSTANT_EVAL_METER_UNITS_PER_USD = 10_000;
 
 const NANO_USD_PER_USD = 1_000_000_000;
 

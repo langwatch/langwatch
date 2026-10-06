@@ -18,7 +18,7 @@ export type InviteInput = {
  * on: an `always_invoice` preview, where the invoice IS the immediate one — only the
  * proration lines, not next cycle's recurring and metered usage.
  */
-export type AlwaysInvoicePreview = Pick<Stripe.Invoice, "total" | "amount_due">;
+type AlwaysInvoicePreview = Pick<Stripe.Invoice, "total" | "amount_due">;
 
 /**
  * The two money figures a seat quote reports, read off a previewed invoice.

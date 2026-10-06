@@ -11,7 +11,7 @@ import {
 } from "../seat-event-subscription.repository.ts";
 
 /** Only what this repository touches. */
-export type SeatEventSubscriptionDatabase = Pick<PrismaClient, "subscription">;
+type SeatEventSubscriptionDatabase = Pick<PrismaClient, "subscription">;
 
 export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscriptionRepository {
   private constructor(private readonly prisma: SeatEventSubscriptionDatabase) {

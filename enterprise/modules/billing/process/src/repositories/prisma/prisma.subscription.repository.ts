@@ -52,7 +52,7 @@ function subscriptionRecordOf(row: SubscriptionRow): BillingSubscriptionRecord {
  * CRUD only). `BillingSubscriptionDatabase` below is the narrow client
  * slice composition needs, not the whole generated client.
  */
-export type BillingSubscriptionDatabase = Pick<
+type BillingSubscriptionDatabase = Pick<
   PrismaClient,
   "organization" | "subscription" | "$transaction"
 >;

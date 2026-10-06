@@ -18,7 +18,7 @@ const logger = createLogger("langwatch:notifications:usageWarning");
  * Most calls find the warning already sent this month, or nobody to send it
  * to: "no email went out" is an ordinary outcome, so it is a named result.
  */
-export type CheckAndSendWarningResult =
+type CheckAndSendWarningResult =
   | { outcome: "sent"; notification: Notification }
   | { outcome: "skipped" };
 

@@ -18,7 +18,6 @@ export {
   subscriptionTrpcTransport,
   type BillingSubscriber,
 } from "./transport/subscription.trpc.ts";
-export type { PostgresBillingPersistence } from "./repositories/prisma/prisma.postgres.repository.ts";
 export type { BillingCheckpoint } from "./repositories/billing-checkpoint.repository.ts";
 export type { BillingOrganizationCacheRepository } from "./repositories/billing-organization-cache.repository.ts";
 export {

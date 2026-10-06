@@ -35,7 +35,7 @@ import type {
 } from "../repositories/connected-billing.repository.ts";
 
 /** Days after the term ends in which the last usage invoice can still draw the credit. */
-export const CREDIT_GRANT_GRACE_DAYS = 14;
+const CREDIT_GRANT_GRACE_DAYS = 14;
 
 const HOURS_PER_DAY = 24;
 

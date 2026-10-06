@@ -11,16 +11,14 @@ import {
   usdCentsToInstantEvalMeterUnits,
 } from "../rules/instant-eval-meter.rules.ts";
 
-export type ConnectedUsageCeilingPeers = Readonly<{
+type ConnectedUsageCeilingPeers = Readonly<{
   licensing: Pick<LicensingApi, "getContractTerms">;
   gateway: Pick<GatewayApi, "isSpendSourceAvailable" | "sumSpendNanoUsdByRequestType">;
   projects: { findProjectIds(organizationId: string): Promise<readonly string[]> };
 }>;
 
 /** A connected month's cap in meter units, or none when no term counts or no ledger answers. */
-export type ConnectedUsageCeiling =
-  | { kind: "capped"; remainingUnits: number }
-  | { kind: "uncapped" };
+type ConnectedUsageCeiling = { kind: "capped"; remainingUnits: number } | { kind: "uncapped" };
 
 /** What is left of a connected customer's term cap for one month, in meter units (ADR-156 §7). */
 export class ConnectedUsageCeilingService {

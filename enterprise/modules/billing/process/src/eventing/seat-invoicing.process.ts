@@ -13,11 +13,11 @@ export const seatInvoicingStateSchema = z.object({
   /** Epoch ms of the last pass this process asked for. */
   lastPassAt: z.number().nullable(),
 });
-export type SeatInvoicingState = z.infer<typeof seatInvoicingStateSchema>;
+type SeatInvoicingState = z.infer<typeof seatInvoicingStateSchema>;
 
 export const SEAT_INVOICING_INITIAL_STATE: SeatInvoicingState = { lastPassAt: null };
 
-export type SeatInvoicingIntents = {
+type SeatInvoicingIntents = {
   pass: IntentSpec<typeof seatInvoicingPassSchema>;
 };
 

@@ -11,7 +11,7 @@ import {
 
 const logger = createLogger("langwatch:billing:lifecycle");
 
-export type BillingLifecycleAnnouncerDeps = Readonly<{
+type BillingLifecycleAnnouncerDeps = Readonly<{
   /** The webhook subscription repository, read only for whether a live subscription remains. */
   subscriptions: { findLastNonCancelled(organizationId: string): Promise<unknown> };
   /** The organization's members, read only for their ids. */
