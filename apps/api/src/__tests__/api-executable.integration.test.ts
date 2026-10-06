@@ -6,34 +6,22 @@
  * @see specs/server/api-process-executable.feature
  */
 import { spawn } from "node:child_process";
-import { connect, createServer } from "node:net";
+import { connect } from "node:net";
 import { fileURLToPath } from "node:url";
 
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { startApi } from "../main.ts";
-import { liveDatabaseUrl, liveStoresConfigured } from "./api-live.fixture.ts";
+import {
+  freePort,
+  liveDatabaseUrl,
+  liveStoresConfigured,
+  SYNTHETIC_ENVIRONMENT,
+} from "./api-live.fixture.ts";
 import { startMigratedClickHouseEndpoint } from "./monitor-performance.fixture.ts";
 
 const BOOT_TIMEOUT_MS = 120_000;
 const MAIN_ENTRY = fileURLToPath(new URL("../main.ts", import.meta.url));
-
-const SYNTHETIC_ENVIRONMENT: Readonly<Record<string, string>> = {
-  NODE_ENV: "test",
-  NEXTAUTH_SECRET: "synthetic-nextauth-secret-synthetic",
-  API_KEY_PEPPER: "synthetic-api-key-pepper",
-  LW_VIRTUAL_KEY_PEPPER: "synthetic-virtual-key-pepper",
-  CREDENTIALS_SECRET: "0".repeat(64),
-};
-
-async function freePort(): Promise<number> {
-  const probe = createServer();
-  await new Promise<void>((resolve) => probe.listen(0, "127.0.0.1", resolve));
-  const address = probe.address();
-  await new Promise<void>((resolve) => probe.close(() => resolve()));
-  if (address === null || typeof address === "string") throw new Error("no ephemeral port");
-  return address.port;
-}
 
 /** True when something accepts a connection on the port. */
 function listensOn(port: number): Promise<boolean> {
