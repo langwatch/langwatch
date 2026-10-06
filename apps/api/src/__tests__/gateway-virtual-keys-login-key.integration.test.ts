@@ -1,19 +1,14 @@
 /**
  * The virtual key routes, asked with the organization key `langwatch login` mints, through the
- * door auth binds, over a real Postgres, Redis and ClickHouse.
+ * door auth binds, on the api booted wholly live over Postgres, Redis and ClickHouse (§7).
  * @vitest-environment node
  * @see specs/ai-gateway/public-rest-api.feature
  * @see specs/security/api-endpoint-authorization.feature
  */
 import { createHash, randomBytes } from "node:crypto";
 
-import type { ClickHouseClient } from "@clickhouse/client";
 import { API_KEY_PREFIX } from "@langwatch/api-key-contract";
-import { openApiDoor, type RestIdentity } from "@langwatch/api/hosting";
-import { RestHost, type RestTransportMiddlewareBinding } from "@langwatch/api/rest";
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "@langwatch/authz-contract";
-import { parseProcessConfig } from "@langwatch/config";
-import { EventSourcing } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -24,29 +19,10 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import {
-  bootInstalledProcess,
-  composeApiApplication,
-  type InstallableServerFeature,
-  processConfig,
-  storesBackedMembers,
-  withMemoryRepositories,
-} from "@langwatch/process";
-import {
-  aesEncryption,
-  memoryStores,
-  resolvedSecrets,
-  systemClock,
-  type ProcessMembers,
-} from "@langwatch/process-stores";
-import { RedisConnectionService } from "@langwatch/redis-client";
-import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
-import { createTestLogger } from "@langwatch/test-harness";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { processModules } from "../process-modules.generated.ts";
-import { routedQueryClient, startMigratedClickHouse } from "./monitor-performance.fixture.ts";
+import { bootLiveApi, liveDatabaseUrl, liveStoresConfigured } from "./api-live.fixture.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -54,48 +30,20 @@ class AllowTestQueries extends PrismaQueryGuard {
   }
 }
 
-const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
-const redisUrl = process.env.LANGWATCH_TEST_REDIS_URL;
-const clickHouseUrl = process.env.LANGWATCH_TEST_CLICKHOUSE_URL;
-const stores = databaseUrl && redisUrl && clickHouseUrl;
+const stores = liveStoresConfigured;
 
-const connection = databaseUrl
+/** The suite's own connection, for the rows a device login leaves and for cleanup. */
+const connection = stores
   ? PrismaConnectionService.create({
       logger: createLogger("langwatch:test:virtual-keys-login-key"),
       guard: new AllowTestQueries(),
-    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
+    }).connect(
+      PrismaConfigService.create().resolve({ databaseUrl: liveDatabaseUrl(), log: ["error"] }),
+    )
   : null;
 const prisma = connection?.client as PrismaClient;
 
 const ns = generate("test").toString().toLowerCase();
-const BASE_URL = "http://langwatch.test";
-
-/**
- * What a virtual key request reads and writes. memoryStores() states the memory tier for the whole
- * process (ARCHITECTURE.md §7), so none of these runs live: the suite stays red until it can.
- */
-const LIVE_MODULES: ReadonlySet<string> = new Set([
-  "api-key",
-  "auth",
-  "authz",
-  "gateway",
-  "organization",
-  "project",
-]);
-
-function unreachable<Client extends object>(name: string): Client {
-  return new Proxy({} as Client, {
-    get: (_target, property) => {
-      throw new Error(`${name}.${String(property)} is not reachable in this suite`);
-    },
-  });
-}
-
-function tierOf(module: InstallableServerFeature<never>): InstallableServerFeature<never> {
-  if (module.name === "authz") return { ...module, tier: "live" };
-  if (LIVE_MODULES.has(module.name) || module.repositoryRegistry === void 0) return module;
-  return withMemoryRepositories(module);
-}
 
 const wireBody = z.object({
   code: z.string().optional(),
@@ -107,144 +55,12 @@ const wireBody = z.object({
   requests: z.number().optional(),
 });
 
-/** The api, installed as `main.ts` installs it, serving REST behind the door auth binds. */
-async function bootInstallation({ clickHouse }: { clickHouse: ClickHouseClient }) {
-  const environment: Record<string, string> = {
-    NODE_ENV: "test",
-    BASE_HOST: BASE_URL,
-    NEXTAUTH_URL: BASE_URL,
-    NEXTAUTH_SECRET: "test-secret-test-secret-test-secret",
-    API_KEY_PEPPER: "synthetic-api-key-pepper",
-    LW_VIRTUAL_KEY_PEPPER: "synthetic-virtual-key-pepper",
-  };
-  const owners = processConfig(processModules, "api");
-  const config = parseProcessConfig({ owners, environment });
-  const resolver = SecretsResolver.over(SecretsChain.start({ environment }).withEnv());
-  const redis = new RedisConnectionService().connect({ url: redisUrl });
-  if (!redis) throw new Error("the test Redis did not connect");
-  const refuse = () => {
-    throw new Error("this suite authenticates with an API key only");
-  };
-  const closed: RestIdentity = {
-    authenticate: refuse,
-    identify: refuse,
-    identifyOptional: refuse,
-    authorize: refuse,
-    authorizePlatform: refuse,
-  };
-
-  let rest: RestHost | undefined;
-  const runtime = await bootInstalledProcess({
-    role: "api",
-    modules: processModules.map(tierOf),
-    config,
-    secrets: (owner, declared) => resolver.scopeTo(owner, declared),
-    surface: (peers) => {
-      const door = openApiDoor(peers);
-      const bound = new Set(
-        peers.facts.flatMap(({ facts }) =>
-          facts.flatMap((fact) =>
-            "middleware" in fact ? [(fact as RestTransportMiddlewareBinding).middleware.name] : [],
-          ),
-        ),
-      );
-      const unbound = new Map<string, { middleware: { name: string }; resolve: () => never }>();
-      for (const module of processModules) {
-        for (const transport of module.transports ?? []) {
-          if (transport.protocol !== "rest") continue;
-          const declaration = transport.router() as {
-            routes: readonly { middleware?: readonly { name: string }[] }[];
-          };
-          for (const route of declaration.routes) {
-            for (const fact of route.middleware ?? []) {
-              if (!bound.has(fact.name)) {
-                unbound.set(fact.name, { middleware: fact, resolve: refuse });
-              }
-            }
-          }
-        }
-      }
-      rest = RestHost.create({
-        identities: {
-          ...door.identities,
-          scim_token: closed,
-          instance_admin: closed,
-          browser: closed,
-        },
-        bearers: () => closed,
-        audit: { record: async () => {} },
-        idempotency: async ({ handler }) => {
-          const response = await handler();
-          return { isReplayed: false, status: response.status, response };
-        },
-        rateLimiter: { check: async () => ({ allowed: true }) },
-        facts: [...unbound.values()] as never,
-        entitlements: door.entitlements,
-      });
-      const mountNothing = { mount: () => {} };
-
-      return {
-        hosts: { rest, trpc: mountNothing, websocket: mountNothing, rawhttp: mountNothing },
-        serve: () => void 0,
-      } as never;
-    },
-    members: {
-      ...storesBackedMembers(memoryStores(), {
-        logger: createTestLogger().logger,
-        clock: systemClock(),
-        secrets: resolvedSecrets({}),
-        encryption: aesEncryption(new Uint8Array(32)),
-        telemetry: unreachable<ProcessMembers["telemetry"]>("telemetry"),
-        prisma,
-        clickhouse: routedQueryClient(clickHouse),
-        objectStorage: unreachable<ProcessMembers["objectStorage"]>("objectStorage"),
-        cache: unreachable<ProcessMembers["cache"]>("cache"),
-        idempotency: { claim: async () => true },
-        rateLimiter: { check: async () => ({ allowed: true }) },
-        eventing: new EventSourcing({
-          enabled: false,
-          participation: "produce",
-          processManagerMode: "producer-only",
-        }),
-        redis,
-        publicBaseUrl: config.process.baseHost,
-        serviceVersion: "test",
-        telemetryExporter: {
-          endpoint: void 0,
-          withHeaders: <Out>(build: (headers: Readonly<Record<string, string>>) => Out): Out =>
-            build({}),
-        },
-        nodeEnvironment: config.process.nodeEnvironment,
-        isSaas: config.process.isSaas ?? false,
-        nlpServiceUrl: config.process.nlpServiceUrl,
-        nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
-        nlpInternalSecret: void 0,
-        outboundProxy: config.process.outboundProxy,
-        processName: "langwatch-api",
-        storageResolver: void 0,
-        storage: void 0,
-        queue: void 0,
-        content: void 0,
-        connectJudge: null,
-        monitor: void 0,
-        langwatchQl: {
-          admin: { configured: false },
-          postgres: { configured: false },
-          database: () => prisma,
-        },
-      }),
-      close: async () => void 0,
-    },
-  });
-  if (!rest) throw new Error("the api booted without a REST host");
-  const application = composeApiApplication({ rest });
+/** The live api, asked over HTTP the way the CLI asks the gateway routes. */
+async function bootInstallation() {
+  const api = await bootLiveApi();
 
   return {
-    runtime,
-    stop: async () => {
-      await runtime.stop();
-      await redis.quit();
-    },
+    stop: () => api.close(),
     send: async ({
       path,
       token,
@@ -258,17 +74,15 @@ async function bootInstallation({ clickHouse }: { clickHouse: ClickHouseClient }
       method?: string;
       body?: object;
     }) => {
-      const response = await application.fetch(
-        new Request(`${BASE_URL}/api/gateway/v1${path}`, {
-          method,
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-            ...(projectId ? { "X-Project-Id": projectId } : {}),
-          },
-          ...(body ? { body: JSON.stringify(body) } : {}),
-        }),
-      );
+      const response = await api.fetch(`/api/gateway/v1${path}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          ...(projectId ? { "X-Project-Id": projectId } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
 
       return { status: response.status, answer: wireBody.parse(await response.json()) };
     },
@@ -348,7 +162,7 @@ describe.skipIf(!stores)("given the organization key a CLI login holds", () => {
     otherProjectId = await project("checkout");
     billingProjectId = await project("billing", otherTeamId);
 
-    installation = await bootInstallation({ clickHouse: await startMigratedClickHouse() });
+    installation = await bootInstallation();
 
     // The rows a device login leaves once the worker has folded the key's grant.
     const seedKey = async ({

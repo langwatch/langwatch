@@ -1,16 +1,12 @@
 /**
  * @vitest-environment node
- * SSO onto an unconfirmed password account through the installed api's sign-in door, with auth,
- * identity, organization and user over a live Postgres. Only the identity provider is stubbed.
+ * SSO onto an unconfirmed password account through the sign-in door of the api booted wholly
+ * live over Postgres, Redis and ClickHouse (§7). Only the identity provider is stubbed.
  * @see specs/identity/sso-link-unconfirmed-local-account.feature
  */
 import { readFileSync } from "node:fs";
 
-import { ClientAddress } from "@langwatch/api/policy";
-import { RestHost } from "@langwatch/api/rest";
-import { AuthApi, normalizeSignInErrorCode } from "@langwatch/auth-contract";
-import { parseProcessConfig } from "@langwatch/config";
-import { EventSourcing } from "@langwatch/eventing";
+import { normalizeSignInErrorCode } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -18,39 +14,23 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import {
-  bootInstalledProcess,
-  storesBackedMembers,
-  withMemoryRepositories,
-  type InstallableServerFeature,
-  processConfig,
-} from "@langwatch/process";
-import {
-  aesEncryption,
-  memoryStores,
-  resolvedSecrets,
-  systemClock,
-  type ProcessMembers,
-} from "@langwatch/process-stores";
-import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
-import { createTestLogger } from "@langwatch/test-harness";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { processModules } from "../process-modules.generated.ts";
+import { bootLiveApi, liveDatabaseUrl, liveStoresConfigured } from "./api-live.fixture.ts";
 
-const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
-const connection = databaseUrl
+/** The suite's own connection, for the rows it seeds, the rows it reads back and cleanup. */
+const connection = liveStoresConfigured
   ? PrismaConnectionService.create({
       guard: PrismaTenancyGuardService.create(),
       logger: createLogger("langwatch:test:sso-link-unconfirmed"),
-    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
+    }).connect(
+      PrismaConfigService.create().resolve({ databaseUrl: liveDatabaseUrl(), log: ["error"] }),
+    )
   : null;
 const prisma = connection?.client as PrismaClient;
 
-const BASE_URL = "http://localhost:3000";
 const SUITE = nanoid(8)
   .toLowerCase()
   .replace(/[^a-z0-9]/g, "x");
@@ -62,130 +42,13 @@ const entra = (label: string) => `${ENTRA_HOST}/${SUITE}-${label}/v2.0`;
 const GRAPH_USERINFO = "https://graph.microsoft.com/oidc/userinfo";
 const CLIENT_ID = "langwatch-test-client";
 
-/**
- * The modules a federated sign-in reads and writes. memoryStores() states the memory tier for the
- * whole process (ARCHITECTURE.md §7), so none of these runs live: the suite stays red until it can.
- */
-const LIVE_MODULES: ReadonlySet<string> = new Set(["auth", "identity", "organization", "user"]);
-
 const organizationIds: string[] = [];
 const connectionIds: string[] = [];
 const userIds: string[] = [];
 
-function unreachable<Client extends object>(name: string): Client {
-  return new Proxy({} as Client, {
-    get: (_target, property) => {
-      throw new Error(`${name}.${String(property)} is not reachable in this suite`);
-    },
-  });
-}
-
-function tierOf(module: InstallableServerFeature<never>): InstallableServerFeature<never> {
-  if (LIVE_MODULES.has(module.name) || module.repositoryRegistry === void 0) return module;
-  return withMemoryRepositories(module);
-}
-
-/** The api, installed as `main.ts` installs it, with the sign-in door mounted on a host. */
-async function bootInstallation({ cloud }: { cloud: boolean }) {
-  const environment: Record<string, string> = {
-    NODE_ENV: "test",
-    BASE_HOST: BASE_URL,
-    NEXTAUTH_URL: BASE_URL,
-    NEXTAUTH_SECRET: "test-secret-test-secret-test-secret",
-    API_KEY_PEPPER: "synthetic-api-key-pepper",
-    ...(cloud ? { IS_SAAS: "true" } : {}),
-  };
-  const owners = processConfig(processModules, "api");
-  const config = parseProcessConfig({ owners, environment });
-  const resolver = SecretsResolver.over(SecretsChain.start({ environment }).withEnv());
-  const eventing = new EventSourcing({
-    enabled: false,
-    participation: "produce",
-    processManagerMode: "producer-only",
-  });
-  const runtime = await bootInstalledProcess({
-    role: "api",
-    modules: processModules.map(tierOf),
-    config,
-    secrets: (owner, declared) => resolver.scopeTo(owner, declared),
-    members: {
-      ...storesBackedMembers(memoryStores(), {
-        logger: createTestLogger().logger,
-        clock: systemClock(),
-        secrets: resolvedSecrets({}),
-        encryption: aesEncryption(new Uint8Array(32)),
-        telemetry: unreachable<ProcessMembers["telemetry"]>("telemetry"),
-        prisma,
-        clickhouse: unreachable<ProcessMembers["clickhouse"]>("clickhouse"),
-        objectStorage: unreachable<ProcessMembers["objectStorage"]>("objectStorage"),
-        cache: unreachable<ProcessMembers["cache"]>("cache"),
-        idempotency: { claim: async () => true },
-        rateLimiter: { check: async () => ({ allowed: true }) },
-        eventing,
-        redis: rateLimitingRedis(),
-        publicBaseUrl: config.process.baseHost,
-        serviceVersion: "test",
-        telemetryExporter: {
-          endpoint: void 0,
-          withHeaders: <Out>(build: (headers: Readonly<Record<string, string>>) => Out): Out =>
-            build({}),
-        },
-        nodeEnvironment: config.process.nodeEnvironment,
-        isSaas: config.process.isSaas ?? false,
-        nlpServiceUrl: config.process.nlpServiceUrl,
-        nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
-        nlpInternalSecret: void 0,
-        outboundProxy: config.process.outboundProxy,
-        processName: "langwatch-api",
-        storageResolver: void 0,
-        storage: void 0,
-        queue: void 0,
-        content: void 0,
-        connectJudge: null,
-        monitor: void 0,
-        langwatchQl: {
-          admin: { configured: false },
-          postgres: { configured: false },
-          database: () => prisma,
-        },
-      }),
-      close: async () => void 0,
-    },
-  });
-
-  const closed = {
-    authenticate: () => {
-      throw new Error("the sign-in door authenticates nobody itself");
-    },
-  };
-  const host = RestHost.create({
-    identities: {
-      project: closed,
-      organization: closed,
-      api_key: closed,
-      scim_token: closed,
-      instance_admin: closed,
-      browser: closed,
-    },
-    bearers: () => closed,
-    audit: { record: async () => {} },
-  });
-  const door = processModules
-    .filter((module) => module.apiContract === AuthApi)
-    .flatMap((module) => module.transports ?? [])
-    .find((transport) => transport.protocol === "rest" && transport.namespace === "auth");
-  if (!door) throw new Error("no installed module declares the auth family");
-  host.mount(door.router(), () => runtime.service(AuthApi));
-
-  // Resolved once per request, as the mux does before routing: the browser's own address.
-  const callers = ClientAddress.classifyByAddress();
-  return {
-    runtime,
-    fetch: (request: Request, browser: string) => {
-      callers.handle({ request, socketAddress: browser });
-      return host.app.fetch(request);
-    },
-  };
+/** The live api; `cloud` serves it as the SaaS installation. */
+function bootInstallation({ cloud }: { cloud: boolean }) {
+  return bootLiveApi({ environment: cloud ? { IS_SAAS: "true" } : {} });
 }
 
 type Installation = Awaited<ReturnType<typeof bootInstallation>>;
@@ -481,17 +344,6 @@ async function setUp({
   return { user, providerId };
 }
 
-/**
- * The in-process Redis, with the one script Better Auth's rate limiter runs: an increment
- * that sets the expiry, which an in-process store never enforces anyway.
- */
-function rateLimitingRedis(): ReturnType<typeof memoryRedisDouble> {
-  const redis: ReturnType<typeof memoryRedisDouble> = memoryRedisDouble({
-    script: { eval: async (...args: unknown[]) => redis.incr(String(args[2])) },
-  });
-  return redis;
-}
-
 const startedSchema = z.object({ url: z.string() });
 const sessionSchema = z.object({ user: z.object({ id: z.string() }) }).nullable();
 
@@ -505,31 +357,25 @@ const cookiesOf = (response: Response): string =>
 async function signInThrough(installation: Installation, providerId: string) {
   // A browser of its own, so one test's sign-ins never spend another's rate-limit budget.
   browsers += 1;
-  const browser = `203.0.113.${browsers}`;
-  const started = await installation.fetch(
-    new Request(`${BASE_URL}/api/auth/sign-in/sso`, {
-      method: "POST",
-      headers: { "content-type": "application/json", origin: BASE_URL },
-      body: JSON.stringify({ providerId, callbackURL: `${BASE_URL}/dashboard` }),
-    }),
-    browser,
-  );
+  const browser = { "x-forwarded-for": `203.0.113.${browsers}` };
+  const { baseUrl } = installation;
+  const started = await installation.fetch("/api/auth/sign-in/sso", {
+    method: "POST",
+    headers: { ...browser, "content-type": "application/json", origin: baseUrl },
+    body: JSON.stringify({ providerId, callbackURL: `${baseUrl}/dashboard` }),
+  });
   const authorize = new URL(startedSchema.parse(await started.json()).url);
   const state = authorize.searchParams.get("state") ?? "";
   const callback = await installation.fetch(
-    new Request(
-      `${BASE_URL}/api/auth/sso/callback/${providerId}?code=test-code&state=${encodeURIComponent(state)}`,
-      { method: "GET", redirect: "manual", headers: { cookie: cookiesOf(started) } },
-    ),
-    browser,
+    `/api/auth/sso/callback/${providerId}?code=test-code&state=${encodeURIComponent(state)}`,
+    { method: "GET", redirect: "manual", headers: { ...browser, cookie: cookiesOf(started) } },
   );
   const location = callback.headers.get("location") ?? "";
-  const polled = await installation.fetch(
-    new Request(`${BASE_URL}/api/auth/session`, { headers: { cookie: cookiesOf(callback) } }),
-    browser,
-  );
+  const polled = await installation.fetch("/api/auth/session", {
+    headers: { ...browser, cookie: cookiesOf(callback) },
+  });
   const session = sessionSchema.parse(await polled.json());
-  const error = new URL(location, BASE_URL).searchParams.get("error");
+  const error = new URL(location, baseUrl).searchParams.get("error");
   return { location, session, error: normalizeSignInErrorCode(error) };
 }
 
@@ -557,19 +403,22 @@ const TRAILING_SLASH_MIGRATION = readFileSync(
   "utf8",
 );
 
-describe.skipIf(!databaseUrl)("single sign-on onto an existing password account", () => {
+// No worker folds identity's events here, so each ceremony a sign-in commits waits out the
+// ledger's read-your-writes window (identity-ledger.store.ts awaitFold) before it answers.
+vi.setConfig({ testTimeout: 30_000 });
+
+describe.skipIf(!liveStoresConfigured)("single sign-on onto an existing password account", () => {
   let selfHosted: Installation;
   let cloud: Installation;
 
   beforeAll(async () => {
     stubIdentityProviders();
     selfHosted = await bootInstallation({ cloud: false });
-    cloud = await bootInstallation({ cloud: true });
-  }, 60_000);
+  }, 300_000);
 
   afterAll(async () => {
     globalThis.fetch = realFetch;
-    await Promise.all([selfHosted?.runtime.stop(), cloud?.runtime.stop()]);
+    await Promise.all([selfHosted?.close(), cloud?.close()]);
     await prisma.ssoProvider.deleteMany({ where: { providerId: { in: connectionIds } } });
     for (const userId of userIds) {
       await prisma.session.deleteMany({ where: { userId } });
@@ -603,7 +452,7 @@ describe.skipIf(!databaseUrl)("single sign-on onto an existing password account"
         const first = await signInThrough(selfHosted, providerId);
 
         expect(first.error).toBeNull();
-        expect(first.location).toBe(`${BASE_URL}/dashboard`);
+        expect(first.location).toBe(`${selfHosted.baseUrl}/dashboard`);
         expect(first.session?.user.id).toBe(user.id);
         expect(await addressConfirmed(user.id)).toBe(true);
         expect(await prisma.user.count({ where: { email: user.email } })).toBe(1);
@@ -981,57 +830,6 @@ describe.skipIf(!databaseUrl)("single sign-on onto an existing password account"
     });
   });
 
-  describe("given an unconfirmed password account on LangWatch Cloud", () => {
-    describe("when the identity provider asserts the address is verified", () => {
-      /** @scenario "On LangWatch Cloud an unconfirmed password account is not linked by single sign-on" */
-      it("keeps better-auth's own refusal and leaves the account as it was", async () => {
-        const { user, providerId } = await setUp({
-          label: "cloud",
-          state: "ACTIVE",
-          domainVerified: true,
-        });
-        await identityProviderAsserts({
-          email: user.email,
-          subject: `cloud-${SUITE}`,
-          emailVerified: true,
-        });
-
-        const result = await signInThrough(cloud, providerId);
-
-        expect(result.error).toBe("OAuthAccountNotLinked");
-        expect(result.session).toBeNull();
-        expect(await linkedAccounts(user.id, providerId)).toEqual([]);
-        expect(await addressConfirmed(user.id)).toBe(false);
-      });
-    });
-
-    describe("when Microsoft Entra ID sends xms_edov true and no email_verified claim", () => {
-      /** @scenario "On LangWatch Cloud a provider that sends no email_verified does not link an existing account" */
-      it("keeps better-auth's own refusal and leaves the account as it was", async () => {
-        const issuer = entra("cloud-entra");
-        const { user, providerId } = await setUp({
-          label: "cloud-entra",
-          state: "ACTIVE",
-          domainVerified: true,
-          issuer,
-        });
-        await identityProviderAsserts({
-          email: user.email,
-          subject: `cloud-entra-${SUITE}`,
-          issuer,
-          claims: { xms_edov: true },
-        });
-
-        const result = await signInThrough(cloud, providerId);
-
-        expect(result.error).toBe("OAuthAccountNotLinked");
-        expect(result.session).toBeNull();
-        expect(await linkedAccounts(user.id, providerId)).toEqual([]);
-        expect(await addressConfirmed(user.id)).toBe(false);
-      });
-    });
-  });
-
   describe("given a Microsoft Entra ID connection whose issuer was stored with a trailing slash", () => {
     describe("when a guest signs in before and after the upgrade migration", () => {
       /** @scenario "A Microsoft Entra ID connection stored with a trailing slash signs in after the upgrade" */
@@ -1091,12 +889,69 @@ describe.skipIf(!databaseUrl)("single sign-on onto an existing password account"
         const result = await signInThrough(selfHosted, providerId);
 
         expect(result.error).toBe("sso_issuer_mismatch");
-        const params = new URL(result.location, BASE_URL).searchParams;
+        const params = new URL(result.location, selfHosted.baseUrl).searchParams;
         expect(params.get("expected_issuer")).toBe(expected);
         expect(params.get("received_issuer")).toBe(received);
         expect(params.get("error_description")).toBeNull();
         expect(result.session).toBeNull();
         expect(await linkedAccounts(user.id, providerId)).toEqual([]);
+      });
+    });
+  });
+
+  describe("given an unconfirmed password account on LangWatch Cloud", () => {
+    // One process mounts a module's WebSocket declaration once: the cloud api follows the other.
+    beforeAll(async () => {
+      await selfHosted.close();
+      cloud = await bootInstallation({ cloud: true });
+    }, 300_000);
+
+    describe("when the identity provider asserts the address is verified", () => {
+      /** @scenario "On LangWatch Cloud an unconfirmed password account is not linked by single sign-on" */
+      it("keeps better-auth's own refusal and leaves the account as it was", async () => {
+        const { user, providerId } = await setUp({
+          label: "cloud",
+          state: "ACTIVE",
+          domainVerified: true,
+        });
+        await identityProviderAsserts({
+          email: user.email,
+          subject: `cloud-${SUITE}`,
+          emailVerified: true,
+        });
+
+        const result = await signInThrough(cloud, providerId);
+
+        expect(result.error).toBe("OAuthAccountNotLinked");
+        expect(result.session).toBeNull();
+        expect(await linkedAccounts(user.id, providerId)).toEqual([]);
+        expect(await addressConfirmed(user.id)).toBe(false);
+      });
+    });
+
+    describe("when Microsoft Entra ID sends xms_edov true and no email_verified claim", () => {
+      /** @scenario "On LangWatch Cloud a provider that sends no email_verified does not link an existing account" */
+      it("keeps better-auth's own refusal and leaves the account as it was", async () => {
+        const issuer = entra("cloud-entra");
+        const { user, providerId } = await setUp({
+          label: "cloud-entra",
+          state: "ACTIVE",
+          domainVerified: true,
+          issuer,
+        });
+        await identityProviderAsserts({
+          email: user.email,
+          subject: `cloud-entra-${SUITE}`,
+          issuer,
+          claims: { xms_edov: true },
+        });
+
+        const result = await signInThrough(cloud, providerId);
+
+        expect(result.error).toBe("OAuthAccountNotLinked");
+        expect(result.session).toBeNull();
+        expect(await linkedAccounts(user.id, providerId)).toEqual([]);
+        expect(await addressConfirmed(user.id)).toBe(false);
       });
     });
   });
