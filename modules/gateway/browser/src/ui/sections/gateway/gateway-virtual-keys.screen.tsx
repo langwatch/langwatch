@@ -42,6 +42,7 @@ import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
 import { useGatewayRouter } from "../../../behavior/gateway-router.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
 import { GuidedOnboardingOffer } from "../../../behavior/lent-guided-onboarding-offer.tsx";
+import { useLentGuidedTour } from "../../../behavior/lent-guided-tour.ts";
 import { resolveTracesHrefForKey } from "../../../features/virtual-keys/model/traces-href-for-key.ts";
 import { isExpired } from "../../../features/virtual-keys/model/virtual-key-expiration.ts";
 import {
@@ -118,7 +119,12 @@ function VirtualKeysHeader({
         <PageLayout.Heading>Virtual Keys</PageLayout.Heading>
         <Spacer />
         {canCreate && (
-          <PageLayout.HeaderButton primary data-testid="gateway-virtual-key-new" onClick={onCreate}>
+          <PageLayout.HeaderButton
+            primary
+            data-testid="gateway-virtual-key-new"
+            data-tour="gw-new-key"
+            onClick={onCreate}
+          >
             <Plus size={14} /> New virtual key
           </PageLayout.HeaderButton>
         )}
@@ -187,6 +193,10 @@ function VirtualKeysPage() {
   });
 
   const [createOpen, setCreateOpen] = useState(false);
+  // The guided tour opens the create drawer through the same state the New key button flips.
+  const { useRegisterActions } = useLentGuidedTour();
+  const tourActions = useMemo(() => ({ openVirtualKeyCreate: () => setCreateOpen(true) }), []);
+  useRegisterActions(tourActions);
   const [revealSecret, setRevealSecret] = useState<CreatedSecret | null>(null);
   const [editing, setEditing] = useState<VirtualKeyDetail | null>(null);
   const [rotating, setRotating] = useState<{ id: string; name: string } | null>(null);

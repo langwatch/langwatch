@@ -14,8 +14,9 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Check, Copy, Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
+import { useLentGuidedTour } from "../../../../behavior/lent-guided-tour.ts";
 import { VirtualKeyUsageSnippet } from "./virtual-key-usage-snippet.tsx";
 
 type VirtualKeySecretRevealProps = {
@@ -50,6 +51,10 @@ export function VirtualKeySecretReveal({
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  // The guided tour shows the secret rather than the mask when its cursor lands on it.
+  const { useRegisterActions } = useLentGuidedTour();
+  const tourActions = useMemo(() => ({ revealVirtualKeySecret: () => setRevealed(true) }), []);
+  useRegisterActions(tourActions);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(secret);
@@ -121,6 +126,7 @@ export function VirtualKeySecretReveal({
                 Secret
               </Text>
               <HStack
+                data-tour="vk-secret"
                 border="1px solid"
                 borderColor="border.subtle"
                 borderRadius="md"

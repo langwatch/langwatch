@@ -4,10 +4,12 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { GuidedTourToken } from "@langwatch/onboarding-contract";
 
 import { onboardingFirstTouchAttribution } from "./behavior/first-touch-attribution.capability.ts";
 import { onboardingGuidedPath } from "./features/guided-onboarding/behavior/guided-path-active.capability.ts";
 import { onboardingGuidedTour } from "./features/guided-onboarding/behavior/guided-tour.capability.ts";
+import { onboardingGuidedTourHooks } from "./features/guided-onboarding/behavior/guided-tour.lend.ts";
 
 export const onboardingWeb = defineBrowserModule("onboarding")
   // The tour's state for Langy's tour card, the Home offer a screen draws in its own space,
@@ -52,4 +54,5 @@ export const onboardingWeb = defineBrowserModule("onboarding")
       requires: "project:view",
       load: () => import("./ui/sections/onboarding/setup.screen.tsx"),
     },
-  });
+  })
+  .lends(GuidedTourToken, { value: onboardingGuidedTourHooks });

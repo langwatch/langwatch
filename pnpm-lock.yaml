@@ -8770,6 +8770,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/onboarding-contract':
+        specifier: workspace:*
+        version: link:../../onboarding/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
