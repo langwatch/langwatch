@@ -12,7 +12,6 @@ import { ABSENT_UI_COPY_TARGETS, UiCopyTargets, type UiCopyTarget } from "./copy
 import { NO_UI_DECLARATIONS, type UiDeclarations } from "./declarations.ts";
 import { UiScope, type UiActiveScope } from "./scope.ts";
 import type { UiSessionSnapshot } from "./session.ts";
-import type { UiSlots } from "./slots.tsx";
 
 /** Scope is a capability of its own; this file stays the one ports barrel. */
 export { UiScope, type UiActiveScope };
@@ -372,12 +371,6 @@ export type UiCapabilities = {
    */
   scope?: UiScope;
   session: UiSession;
-  /**
-   * The blocks a core screen leaves for the composition to fill. Optional
-   * because absent and "filled nothing" are the same reading — `useUiSlots`
-   * degrades to the core defaults either way.
-   */
-  slots?: UiSlots;
 };
 
 /** What the composing application chose to answer itself. */
@@ -432,7 +425,6 @@ export function resolveUiCapabilities({
     rpc: install.rpc ?? rpc ?? UNAVAILABLE_UI_RPC,
     scope: install.scope ?? scope ?? UNAVAILABLE_UI_SCOPE,
     session: install.session ?? session ?? UNAVAILABLE_UI_SESSION,
-    slots: install.slots,
   };
 }
 

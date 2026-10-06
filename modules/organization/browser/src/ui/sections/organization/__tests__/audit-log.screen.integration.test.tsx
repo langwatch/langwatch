@@ -111,12 +111,12 @@ afterEach(() => cleanup());
 describe("given an organization below the Enterprise plan", () => {
   describe("when the audit page is opened", () => {
     /** @scenario A deployment below the plan is told what the audit trail would show */
-    it("says what the capability covers instead of hiding it", () => {
+    it("says what the capability covers instead of hiding it", async () => {
       state.planType = "LAUNCH";
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       expect(screen.getByText("Enterprise Feature")).toBeInTheDocument();
-      expect(screen.getByTestId("contact-sales-block")).toBeInTheDocument();
+      expect(await screen.findByTestId("contact-sales-block")).toBeInTheDocument();
     });
 
     /** @scenario A deployment below the plan is told what the audit trail would show */

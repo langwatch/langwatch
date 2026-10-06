@@ -490,7 +490,7 @@ export type UiGuidedTour = {
 
 /**
  * Each capability a peer reads by name, and the shape a declaration must have
- * to fill it: the CORE side of the contract, as `UiSlotProps` is for slots.
+ * to fill it: the CORE side of the contract.
  */
 /** Navigation's sidebar groups: fold, unfold, restore each to its remembered preference. */
 export type UiNavigationSidebar = {

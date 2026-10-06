@@ -6,9 +6,9 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { UiAnalytics } from "@langwatch/browser-host/analytics";
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
-import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
-import { uiSlots } from "@langwatch/browser-host/slots";
+import { uiDeclarations, type UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { ContactSalesToken } from "@langwatch/enterprise-billing-contract";
 import { render } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 
@@ -180,18 +180,25 @@ export class FakeOrganizationHost extends OrganizationHostApi {
   }
 }
 
-/**
- * A composition that filled the sales slot, the way the browser application
- * does. These screens only ask for the block by name; what an application
- * without an enterprise half renders is `browser-host`'s own suite.
- */
-const filledSlots = {
+/** Billing lends the sales card by token, as its declaration does in the browser app. */
+const billingLendsContactSales = {
   ...createUiCapabilitiesFromHost({ route: () => ({ params: {}, query: {} }), navigate: () => {} }),
-  slots: uiSlots({
-    components: {
-      contactSales: () => <div data-testid="contact-sales-block">Need more?</div>,
+  declarations: uiDeclarations([
+    {
+      name: "billing",
+      installation: {
+        capabilities: {},
+        lends: [
+          {
+            token: ContactSalesToken,
+            load: async () => ({
+              default: () => <div data-testid="contact-sales-block">Need more?</div>,
+            }),
+          },
+        ],
+      },
     },
-  }),
+  ]),
 };
 
 /** Renders the screen inside the Design System's provider and a host. */
@@ -205,7 +212,7 @@ export function renderWithOrganizationHost(
     ...render(
       <ChakraProvider value={defaultSystem}>
         <UiCapabilityContextProvider
-          value={{ ...filledSlots, ...(analytics ? { analytics } : {}) }}
+          value={{ ...billingLendsContactSales, ...(analytics ? { analytics } : {}) }}
         >
           <OrganizationHostProvider value={host}>{element}</OrganizationHostProvider>
         </UiCapabilityContextProvider>
