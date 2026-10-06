@@ -53,6 +53,10 @@ export const twoStepVerificationTrpcTransport: TrpcRouterDeclaration<
     reason:
       "the caller asking whether an organization's second-factor requirement holds them; answered for the session's own user id, and the same shape for a member and a stranger",
     allow: { organizationId: "the organization the caller is trying to reach" },
+    mfaRecovery: {
+      reason:
+        "the caller must read their own standing before the enrollment gate can tell them how to satisfy it",
+    },
   })
   .handle(({ app, actor, input }, browserSession) =>
     app.getOrganizationMfaStanding({

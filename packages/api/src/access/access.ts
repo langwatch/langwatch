@@ -162,6 +162,8 @@ export type AccessActor = Actor & Readonly<{ id: string }>;
 export type Caller = Readonly<{
   actor: AccessActor | null;
   scope?: AuthzDeclaredScopeId | null;
+  /** A person in a browser session, the caller the second-factor gate holds (Q184). */
+  browserSession?: Readonly<{ id: string | null }>;
 }>;
 
 /** The authorization decisions one request asks for, and nothing else. */
@@ -178,6 +180,13 @@ export interface Authorize {
     userId: string;
     permission: PlatformTierPermission;
   }): Promise<PlatformDecision>;
+  /** Refuses a person the organization holds at its second-factor gate; absent asks nothing. */
+  assertSecondFactor?(input: {
+    userId: string;
+    sessionId: string | null;
+    organizationId: string;
+    scope: AuthzDeclaredScopeId;
+  }): Promise<void>;
 }
 
 /** The platform question's answer: a platform grant carries no organization role. */
@@ -531,6 +540,31 @@ export async function decide({
 
   if (authorize) await assertScopeLineage({ declaration, input, authorize });
 
+  const decision = await decideDeclared({ declaration, caller, input, authorize, denials });
+  if (authorize) {
+    for (const scope of secondFactorScopes({ declaration, input, decision })) {
+      await assertSecondFactor({ caller, scope, authorize });
+    }
+  }
+
+  return decision;
+}
+
+async function decideDeclared({
+  declaration,
+  caller,
+  input,
+  authorize,
+  denials,
+}: {
+  declaration: Exclude<AccessDeclaration, PlatformPermissionDeclaration>;
+  caller: Caller;
+  input: unknown;
+  authorize: Authorize | undefined;
+  denials: AccessDenial | undefined;
+}): Promise<AccessDecision> {
+  const credentialScope = caller.scope ?? null;
+
   switch (declaration.kind) {
     case "permission":
       return decidePermission({ declaration, caller, input, authorize, denials });
@@ -546,6 +580,60 @@ export async function decide({
     case "service-authorized":
       return { actor: caller.actor, scope: credentialScope };
   }
+}
+
+/**
+ * Where an organization's second-factor requirement is asked, after the permit (main's mfa-gate):
+ * the scope a permission was granted at, or each allowed scope a no-permission input names.
+ * The service-authorized handler and the declared recovery read are not gated.
+ */
+function secondFactorScopes({
+  declaration,
+  input,
+  decision,
+}: {
+  declaration: Exclude<AccessDeclaration, PlatformPermissionDeclaration>;
+  input: unknown;
+  decision: AccessDecision;
+}): AuthzDeclaredScopeId[] {
+  if (declaration.kind === "service-authorized") return [];
+  if (declaration.kind !== "no-permission") return decision.scope ? [decision.scope] : [];
+  if (declaration.mfaRecovery || typeof input !== "object" || input === null) return [];
+
+  const named = input as Record<string, unknown>;
+
+  return Object.keys(declaration.allow ?? {}).flatMap((field) => {
+    const tier = SCOPE_TIER_BY_FIELD[field as ScopeTierField];
+    const id = named[field];
+
+    return tier !== undefined && typeof id === "string" && id !== "" ? [{ tier, id }] : [];
+  });
+}
+
+async function assertSecondFactor({
+  caller,
+  scope,
+  authorize,
+}: {
+  caller: Caller;
+  scope: AuthzDeclaredScopeId;
+  authorize: Authorize;
+}): Promise<void> {
+  const session = caller.browserSession;
+  if (!session || !authorize.assertSecondFactor || caller.actor?.type !== "user") return;
+
+  const organizationId =
+    scope.tier === "organization"
+      ? scope.id
+      : ((await authorize.organizationOf?.({ tier: scope.tier, id: scope.id })) ?? null);
+  if (organizationId === null) return;
+
+  await authorize.assertSecondFactor({
+    userId: caller.actor.id,
+    sessionId: session.id,
+    organizationId,
+    scope,
+  });
 }
 
 /**

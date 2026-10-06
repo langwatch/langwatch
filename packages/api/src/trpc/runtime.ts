@@ -543,6 +543,8 @@ export interface TrpcRouterAccess<
   noPermission(declaration: {
     reason: string;
     allow?: Record<string, string>;
+    /** Exempt from the second-factor gate: the read a held member recovers through. */
+    mfaRecovery?: Readonly<{ reason: string }>;
   }): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
   /** The handler proves standing itself; `enforces` records which fields it covers. */
   serviceAuthorized(declaration: {
@@ -652,6 +654,13 @@ function assertNoTenantQuestion({ contract, name, entitlement }: EntitlementQues
   );
 }
 
+/** The declared second-factor recovery exemption, copied so the declaration cannot change it. */
+function copiedRecovery(mfaRecovery: Readonly<{ reason: string }> | undefined): {
+  mfaRecovery?: Readonly<{ reason: string }>;
+} {
+  return mfaRecovery ? { mfaRecovery: { reason: mfaRecovery.reason } } : {};
+}
+
 function copiedAllowance(
   allow: Record<string, string> | undefined,
 ): Record<string, string> | undefined {
@@ -742,11 +751,16 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
 
         return implement(access);
       },
-      noPermission: (declaration: { reason: string; allow?: Record<string, string> }) =>
+      noPermission: (declaration: {
+        reason: string;
+        allow?: Record<string, string>;
+        mfaRecovery?: Readonly<{ reason: string }>;
+      }) =>
         implement({
           kind: "no-permission",
           reason: declaration.reason,
           allow: copiedAllowance(declaration.allow),
+          ...copiedRecovery(declaration.mfaRecovery),
         }),
       serviceAuthorized: (declaration: {
         reason: string;

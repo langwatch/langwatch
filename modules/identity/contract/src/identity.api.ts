@@ -101,6 +101,7 @@ import type {
   SsoMigrationView,
 } from "./sso-migration.ts";
 import type { SsoConnectionRemoval, SsoSetupCommand, SsoSetupView } from "./sso-setup.ts";
+import type { OrganizationMfaStanding } from "./two-step-verification.ts";
 
 /** One address-lock reaper pass (ADR-116 §6). */
 export interface IdentityNewbornSweepSummary {
@@ -715,6 +716,12 @@ export interface IdentityReservationsApi {
  * reconciliation, user-migration registry, SSO backoffice connection writer.
  */
 export interface IdentityApi {
+  /** Where one person stands with one organization's second-factor requirement, on this session. */
+  getOrganizationMfaStanding(input: {
+    userId: string;
+    organizationId: string;
+    sessionId: string | null;
+  }): Promise<OrganizationMfaStanding>;
   /** Every domain these people proved, one row per person and domain. An address nobody
    *  confirmed is not evidence of who somebody works for. */
   findVerifiedDomainsByUserIds(input: {
