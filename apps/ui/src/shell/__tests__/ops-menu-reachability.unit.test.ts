@@ -79,6 +79,20 @@ describe("given the internal ops pages the route table registers", () => {
     });
   });
 
+  describe("when the identity lookup entry is resolved", () => {
+    const LOOKUP = "/ops/identity-lookup";
+
+    /** @scenario "Every page this surface adds opens from the operator menu" */
+    it("resolves to a route registered for that exact path", () => {
+      const groups = [opsGroup(), instanceGroup(), cloudAdminGroup()];
+      const offered = groups.flatMap((group) => group.items).find((item) => item.href === LOOKUP);
+      expect(offered).toBeDefined();
+
+      expect(addresses).toContain(LOOKUP);
+      expect(isClaimedBy({ address: LOOKUP, groups: menu })).toBe(true);
+    });
+  });
+
   describe("when the event-sourcing tools are looked for", () => {
     const TOOLS = ["/ops/projections", "/ops/blobs", "/ops/dejaview"];
 
