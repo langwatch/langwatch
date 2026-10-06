@@ -18,7 +18,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { StubAnalyticsHost } from "../../../testing.tsx";
 import { PICKER_SECTIONS } from "../catalogue/index.ts";
 import { BOARD_VISIBILITY_LOCKED_REASON } from "../model/board-visibility.ts";
-import { AGENT_FLIGHT_DECK_TEMPLATE } from "../templates/index.ts";
+import { BOARD_TEMPLATES } from "../templates/index.ts";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
 import {
@@ -247,10 +247,13 @@ async function pickerRegions() {
 
 afterEach(cleanup);
 
+const FLIGHT_DECK = BOARD_TEMPLATES.find(({ id }) => id === "cockpit")!;
+
 describe("a member's board", () => {
   describe("given a member opens a board with nothing on it", () => {
     /** @scenario 'AC1 The empty board has no "Add a block" box' */
     /** @scenario "AC10 Blank board matches the reference" */
+    /** @scenario "AC17 Every widget and template is listed, coming soon until it is built" */
     it("shows the template strip and no Add a block box", async () => {
       openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
 
@@ -258,37 +261,38 @@ describe("a member's board", () => {
       expect(await screen.findByText("Start from a template")).toBeInTheDocument();
       expect(
         await screen.findByRole("button", {
-          name: new RegExp(escape(AGENT_FLIGHT_DECK_TEMPLATE.name)),
+          name: new RegExp(escape(FLIGHT_DECK.name)),
         }),
-      ).toBeInTheDocument();
+      ).toBeDisabled();
+      expect(screen.getAllByText(/^Coming soon: \d+ of \d+ widgets built$/).length).toBe(
+        BOARD_TEMPLATES.filter(({ comingSoon }) => comingSoon !== void 0).length,
+      );
       expect(screen.queryByRole("button", { name: /Add a block/ })).toBeNull();
     });
   });
 
-  describe("when the member starts from the Agent Flight Deck template", () => {
+  describe("when the member starts from a template whose widgets are all built", () => {
+    const READY = BOARD_TEMPLATES.find(({ comingSoon }) => comingSoon === void 0)!;
+
     /** @scenario "AC8 Starting from the template makes a new board of editable widgets" */
     it("makes a new board only they see, with every template widget, and opens it", async () => {
       const user = userEvent.setup();
       const server = inMemoryServer({ boards: OWN_BOARDS });
       const { host } = openBoard({ server });
 
-      await user.click(
-        await screen.findByRole("button", {
-          name: new RegExp(escape(AGENT_FLIGHT_DECK_TEMPLATE.name)),
-        }),
-      );
+      await user.click(await screen.findByRole("button", { name: new RegExp(escape(READY.name)) }));
 
       await waitFor(() => expect(host.navigations).toHaveLength(1));
       const [created] = server.state.boards.slice(OWN_BOARDS.length);
       expect(created).toMatchObject({
-        name: AGENT_FLIGHT_DECK_TEMPLATE.name,
+        name: READY.name,
         visibility: "only_me",
-        description: AGENT_FLIGHT_DECK_TEMPLATE.description,
+        description: READY.description,
       });
       expect(host.navigations).toEqual([`/test-project/dashboards/${created!.id}`]);
       const onBoard = server.state.widgets.filter(({ dashboardId }) => dashboardId === created!.id);
       expect(onBoard.map(({ name }) => name).toSorted()).toEqual(
-        AGENT_FLIGHT_DECK_TEMPLATE.widgets.map(({ name }) => name).toSorted(),
+        READY.widgets.map(({ name }) => name).toSorted(),
       );
     });
   });
@@ -314,9 +318,9 @@ describe("a member's board", () => {
         for (const section of PICKER_SECTIONS) {
           const listed = within(within(dialog).getByRole("region", { name: section.title }));
           expect(listed.getAllByRole("button")).toHaveLength(section.questions.length);
-          for (const { question } of section.questions) {
+          for (const { question, comingSoon } of section.questions) {
             const row = listed.getByRole("button", { name: new RegExp(escape(question)) });
-            expect(row).toBeEnabled();
+            expect(row.matches(":disabled"), question).toBe(comingSoon === true);
           }
         }
         expect(await pickerRegions()).toEqual(PICKER_SECTIONS.map(({ title }) => title));
@@ -398,8 +402,11 @@ describe("a member's board", () => {
         });
 
         expect(await pickerRegions()).toEqual(PICKER_SECTIONS.map(({ title }) => title));
-        for (const { question } of PICKER_SECTIONS.flatMap(({ questions }) => questions)) {
-          expect(screen.getByRole("button", { name: new RegExp(escape(question)) })).toBeEnabled();
+        for (const { question, comingSoon } of PICKER_SECTIONS.flatMap(
+          ({ questions }) => questions,
+        )) {
+          const row = screen.getByRole("button", { name: new RegExp(escape(question)) });
+          expect(row.matches(":disabled"), question).toBe(comingSoon === true);
         }
         expect(screen.queryByRole("button", { name: "Ask Langy" })).toBeNull();
       },

@@ -19,6 +19,8 @@ export interface CatalogueTemplate {
   readonly byAgentKind: Readonly<Partial<Record<AgentKind, readonly string[]>>>;
   /** The agent kinds whose projects get this board made for them; empty means gallery only. */
   readonly preloadFor: readonly AgentKind[];
+  /** What Langy is asked when a board is made from the template: a short written report. */
+  readonly reportPrompt: string;
 }
 
 export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
@@ -46,6 +48,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
       "tools-agent",
       "generative",
     ],
+    reportPrompt:
+      'Write a short report on my "Agent Flight Deck" dashboard for the dashboard period. Is my agent doing its job and working normally? One glance. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Is my agent doing its job, and what does each success cost? (2) Is my agent up right now? (3) What is the one problem I should look at first this week? (4) What do users ask for most that my agent cannot do? (5) Does my agent resolve more conversations each day? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "costs",
@@ -70,6 +74,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
       "tools-agent",
       "generative",
     ],
+    reportPrompt:
+      'Write a short report on my "Running costs" dashboard for the dashboard period. See where the money goes, and whether I am on budget. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Will I stay within my AI budget this month? (2) How much of my AI spend goes on testing, and how much on production? (3) Which model costs me the most? (4) How much of my AI spend is wasted? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "unit-cost",
@@ -83,6 +89,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     widgets: ["cost-outcome", "cost-conv", "fd-cost-efficiency", "cost-by-segment"],
     byAgentKind: {},
     preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Cost per result" dashboard for the dashboard period. What does each conversation, customer and success cost me? For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) What does each correct outcome of my agent cost? (2) What does one conversation with my agent cost? (3) What does each successful trace of my agent cost? (4) Which of my customers or teams cost the most? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "models",
@@ -96,6 +104,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     widgets: ["ship-models", "ship-compare", "cost-by-model", "slowest-models", "top-models"],
     byAgentKind: {},
     preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Compare models" dashboard for the dashboard period. I am trying a new model or prompt. Is the new one as good, and cheaper? For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which model gives my agent the same quality for less? (2) How do my last test runs compare? (3) Which model costs me the most? (4) Which model makes my agent slowest? (5) Which models do my traces use most? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "adoption",
@@ -109,6 +119,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     widgets: ["traffic", "users", "return", "conversation-length", "topics"],
     byAgentKind: {},
     preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Usage and adoption" dashboard for the dashboard period. Who uses my agent, how much, and do users come back? For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) How much work did my agent handle? (2) How many users does my agent have, and who are the heaviest users? (3) Do users come back to my agent? (4) Are conversations with my agent getting longer? (5) What do users ask my agent about most? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "asks",
@@ -131,6 +143,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
       "tools-agent",
       "generative",
     ],
+    reportPrompt:
+      'Write a short report on my "What users ask" dashboard for the dashboard period. Learn what users want, and what my agent cannot do yet. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) What do users ask for that my agent cannot do? (2) Which topics do users ask about more than before? (3) Which topics does my agent handle well, and which badly? (4) Do users have to ask again because my agent\'s first answer missed? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "happy",
@@ -144,6 +158,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     widgets: ["satisfaction-shift", "user-thumbs", "ask-again", "return"],
     byAgentKind: {},
     preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Are users happy?" dashboard for the dashboard period. Are users happy, and where are they frustrated? For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Did user satisfaction with my agent shift? (2) Which answers did users rate badly? (3) Do users have to ask again because my agent\'s first answer missed? (4) Do users come back to my agent? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "answers",
@@ -179,6 +195,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
       "tools-agent",
       "generative",
     ],
+    reportPrompt:
+      "Write a short report on my \"Answer quality\" dashboard for the dashboard period. Check whether my agent's answers are good, and where they fail. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) How did my agent's conversations end? (2) Are my agent's checks passing? (3) On which topics does my agent fail to answer? (4) Do my automatic graders agree with human reviewers? (5) Which conversations should a person review? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.",
   },
   {
     id: "unanswered",
@@ -201,6 +219,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
       ],
     },
     preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Questions my agent cannot answer" dashboard for the dashboard period. I know the subject. Show me where my agent fails to answer, and why. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) On which topics does my agent fail to answer? (2) What do users ask for that my agent cannot do? (3) Which conversations should a person review? (4) Do my automatic graders agree with human reviewers? (5) Which of my agent\'s answers scored worst? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "breaks",
@@ -231,6 +251,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
       "tools-agent",
       "generative",
     ],
+    reportPrompt:
+      'Write a short report on my "Where my agent breaks" dashboard for the dashboard period. Find the errors, failing steps and loops in my agent. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which errors does my agent hit each day, and did a change start them? (2) Which step or tool in my agent fails most? (3) Which step makes my agent slow? (4) Does my agent go in circles? (5) Which of my agent\'s traces failed or ran slowest? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "speed",
@@ -258,6 +280,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
       ],
     },
     preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Make my agent faster" dashboard for the dashboard period. Find out what makes my agent slow. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which periods were slower than usual for my agent? (2) How far apart are my agent\'s typical and slowest responses? (3) Which step makes my agent slow? (4) Which model makes my agent slowest? (5) How much did my agent handle, how fast, and with how many errors? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "tools",
@@ -271,6 +295,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     widgets: ["tools-error-rate", "tools-wrong-tool", "up-loops", "up-step-latency", "cost-waste"],
     byAgentKind: {},
     preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Tool use" dashboard for the dashboard period. Does my agent pick the right tools, without wasted steps? For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which of my agent\'s tools fail, and does my agent recover? (2) Does my agent pick the right tool first? (3) Does my agent go in circles? (4) Which step makes my agent slow? (5) How much of my AI spend is wasted? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "release",
@@ -300,6 +326,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
       "tools-agent",
       "generative",
     ],
+    reportPrompt:
+      'Write a short report on my "Release check" dashboard for the dashboard period. Decide if the next version of my agent can go out. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Can the new version of my agent ship? (2) Do my test suites keep passing? (3) Which of my tests flip between pass and fail? (4) How do my last test runs compare? (5) Did my agent get worse in production after my last change? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "change",
@@ -320,6 +348,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     ],
     byAgentKind: {},
     preloadFor: [],
+    reportPrompt:
+      "Write a short report on my \"Did my change help?\" dashboard for the dashboard period. I just changed a prompt, model or tool. Did the change help or hurt? For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Did my agent get worse in production after my last change? (2) How did my agent's conversations end? (3) Which errors does my agent hit each day, and did a change start them? (4) Is my agent's token use drifting up? (5) Is my agent's quality holding while errors move? (6) Who changed my agent's prompts, models and graders, and when? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.",
   },
   {
     id: "evals",
@@ -339,6 +369,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     ],
     byAgentKind: {},
     preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Can I trust my evals?" dashboard for the dashboard period. Check that my automatic graders, tests and test sets tell the truth. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Do my automatic graders agree with human reviewers? (2) How much of my traffic is evaluated? (3) Which evaluators fail most? (4) Which of my tests flip between pass and fail? (5) Does my test set still match what users ask? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "data",
@@ -352,6 +384,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     widgets: ["data-health", "cost-accuracy", "noise", "evaluation-coverage"],
     byAgentKind: {},
     preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Is my data complete?" dashboard for the dashboard period. Check that my traces carry what the dashboards need, and fix what is missing. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Is my data complete? (2) Are my cost figures complete? (3) Which of my traces are noise? (4) How much of my traffic is evaluated? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "safety",
@@ -365,6 +399,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     widgets: ["attacks", "pii", "off-scope", "so-rubric", "so-changes"],
     byAgentKind: {},
     preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Safety and privacy" dashboard for the dashboard period. Is my agent safe: no leaks, no attacks, and on brand? For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Is anyone trying to break my agent? (2) Is personal data leaking through my agent? (3) Does my agent stay on brand and in scope? (4) Does my agent pass each policy check? (5) Who changed my agent\'s prompts, models and graders, and when? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "signoff",
@@ -378,6 +414,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     widgets: ["so-verdict", "so-rubric", "so-queue", "so-changes"],
     byAgentKind: {},
     preloadFor: ["regulated"],
+    reportPrompt:
+      'Write a short report on my "Risk sign-off" dashboard for the dashboard period. Give risk the evidence it needs to sign a release off. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Can risk sign this release of my agent off? (2) Does my agent pass each policy check? (3) Is the human review queue under control? (4) Who changed my agent\'s prompts, models and graders, and when? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "customers",
@@ -391,6 +429,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     widgets: ["att-share", "cost-by-segment", "att-table", "att-change"],
     byAgentKind: {},
     preloadFor: ["vendor"],
+    reportPrompt:
+      'Write a short report on my "By customer" dashboard for the dashboard period. See how each of my customers uses my agent, and how my agent does for them. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which of my customers use my agent most? (2) Which of my customers or teams cost the most? (3) How does my agent do for each of my customers? (4) Did my last change break my agent for any customer? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "calls",
@@ -404,6 +444,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     widgets: ["voice-turn-latency", "voice-call-health", "att-table", "ans-review"],
     byAgentKind: {},
     preloadFor: ["voice"],
+    reportPrompt:
+      'Write a short report on my "Call quality" dashboard for the dashboard period. Check that my voice agent\'s calls feel natural and get the job done. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which stage makes my voice agent slow to reply? (2) Which calls drop, or have my agent repeat itself? (3) How does my agent do for each of my customers? (4) Which conversations should a person review? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "fields",
@@ -417,6 +459,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     widgets: ["ext-field-accuracy", "ext-human-review", "att-table", "att-change"],
     byAgentKind: {},
     preloadFor: ["extraction"],
+    reportPrompt:
+      'Write a short report on my "Field accuracy" dashboard for the dashboard period. See which fields and document types my agent gets wrong. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which fields and document types does my agent get wrong? (2) How many documents does my agent send to a person? (3) How does my agent do for each of my customers? (4) Did my last change break my agent for any customer? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "outputs",
@@ -430,6 +474,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     widgets: ["gen-dropoff", "att-table", "att-change", "cost-by-segment"],
     byAgentKind: {},
     preloadFor: ["generative"],
+    reportPrompt:
+      'Write a short report on my "Outputs users keep" dashboard for the dashboard period. See whether users keep what my agent writes. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) At which step do users drop what my agent wrote? (2) How does my agent do for each of my customers? (3) Did my last change break my agent for any customer? (4) Which of my customers or teams cost the most? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "org",
@@ -443,6 +489,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     widgets: ["inventory", "ai-tools", "org-spend", "fd-gateway", "standard", "fd-coding-agents"],
     byAgentKind: {},
     preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "LangWatch at a glance" dashboard for the dashboard period. See every agent, team and AI tool across my whole org. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which agents run here, and who owns them? (2) Which AI tools do my staff use? (3) What does each team and app spend? (4) Which gateway keys spend the most? (5) Is every one of my agents held to the same checks? (6) What do my staff\'s coding agents cost, and do they succeed? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "me-tokens",
@@ -466,6 +514,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     ],
     byAgentKind: {},
     preloadFor: ["coding"],
+    reportPrompt:
+      "Write a short report on my \"My Token Burn Rate\" dashboard for the dashboard period. Where my coding agents' tokens and money go: by pull request, by model, by token type. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) What have my coding agents cost this period, and am I on pace? (2) Which of my coding sessions cost the most? (3) Which pull requests did my coding tokens go to? (4) Which models do my coding agents spend on? (5) Am I spending faster than in a typical week? (6) How much of my coding agents' input comes from the cache? (7) Which single tool calls sent my coding agent the most tokens? (8) How are my tokens split between the main thread and subagents? (9) Where are my coding agents wasting money? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.",
   },
   {
     id: "me-shipped",
@@ -486,6 +536,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     ],
     byAgentKind: {},
     preloadFor: ["coding"],
+    reportPrompt:
+      'Write a short report on my "What have I shipped" dashboard for the dashboard period. What my merged pull requests cost in coding-agent use. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) What does one merged pull request cost me? (2) How many pull requests did I merge each day? (3) Which of my merged pull requests cost far more than usual? (4) How much does a pull request cost after it opens (CI retries, review fixes)? (5) Which of my pull requests cost the most? (6) Is my output keeping up with my coding-agent spend? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "me-speed",
@@ -506,6 +558,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     ],
     byAgentKind: {},
     preloadFor: ["coding"],
+    reportPrompt:
+      'Write a short report on my "Building speed" dashboard for the dashboard period. My coding sessions through the day: parallel work, idle time, what ran at night. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) What did my coding sessions do today, and when did they wait on me? (2) Which of my coding sessions waited longest for my reply? (3) How long do my coding agents wait for my reply? (4) How many coding sessions do I run at once? (5) What did my coding agents do overnight? (6) How much time do my coding agents work, and how much do they wait on me? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "me-context",
@@ -526,6 +580,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     ],
     byAgentKind: {},
     preloadFor: ["coding"],
+    reportPrompt:
+      'Write a short report on my "Context health" dashboard for the dashboard period. How big my context runs and where I compact. Smaller context means cheaper calls. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) How big is my coding agents\' context each day? (2) Do I compact my context at the right size? (3) What does one model call cost at each context size? (4) How much do I spend carrying oversized context? (5) How much context does each type of subagent carry? (6) How many model calls do my coding agents take per task? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "me-harness",
@@ -547,6 +603,8 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     ],
     byAgentKind: {},
     preloadFor: ["coding"],
+    reportPrompt:
+      'Write a short report on my "My harness" dashboard for the dashboard period. The skills, MCPs and CLIs I installed: use, effect and speed. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Do my skills, MCPs and CLIs make my pull requests cheaper? (2) Which tools send my coding agents the most tokens? (3) Which CLIs and MCP servers do I use, and how much? (4) What changed in my coding setup since last week? (5) Which of my skills run, and how often? (6) Which tools slow my coding agents down? (7) Which MCP servers load into every session but are rarely called? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "me-market",
@@ -566,5 +624,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     ],
     byAgentKind: {},
     preloadFor: ["coding"],
+    reportPrompt:
+      "Write a short report on my \"The market\" dashboard for the dashboard period. My real coding-agent use priced on other vendors' rate cards. Prices only, no quality adjustment. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Is my seat cheaper than paying API list prices? (2) What would my last month cost with other vendors? (3) How many of my calls would be too big for other vendors' context limits? (4) How would my bill change at a different cache hit rate? (5) Do my tokens fall in vendors' peak-price hours? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.",
   },
 ];

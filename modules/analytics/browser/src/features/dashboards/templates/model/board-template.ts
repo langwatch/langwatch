@@ -14,17 +14,14 @@ export interface BoardTemplateWidget {
   readonly layout: { gridColumn: number; gridRow: number; colSpan: number; rowSpan: number };
 }
 
-/** The Agent Flight Deck, then one template per question-picker section, by section id. */
-export type BoardTemplateId =
-  | "agent-flight-deck"
-  | "happen"
-  | "change"
-  | "threshold"
-  | "compare"
-  | "cost-source"
-  | "tradeoff"
-  | "why"
-  | "howto";
+/** A template's id: the catalogue template's, or an earlier template's. */
+export type BoardTemplateId = string;
+
+/** How far a catalogue template is built; it is offered only once every widget has code. */
+export interface TemplateProgress {
+  readonly built: number;
+  readonly total: number;
+}
 
 export interface BoardTemplate {
   readonly id: BoardTemplateId;
@@ -33,4 +30,10 @@ export interface BoardTemplate {
   /** A short, user-facing line for the template card; falls back to `description`. */
   readonly summary?: string;
   readonly widgets: readonly BoardTemplateWidget[];
+  /** The question-tree trunk the template serves; picks its card's icon. */
+  readonly trunk?: string;
+  /** Set while some of its widgets have no code: the card says "Coming soon". */
+  readonly comingSoon?: TemplateProgress;
+  /** What Langy is drafted with once a board is made from the template. */
+  readonly reportPrompt?: string;
 }

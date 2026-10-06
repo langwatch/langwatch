@@ -191,7 +191,22 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then each branch of the question tree with a built widget is a section, in tree order
     And each section lists its built widgets by the question they answer
     And picking one stores it on the board under that question, as AC12 describes
-    # Decision: a catalogue widget without code is not offered until it is built
+    # Decision: a catalogue widget without code is listed as coming soon, and cannot be picked
+
+  @unit @integration
+  Scenario: AC17 Every widget and template is listed, coming soon until it is built
+    Given the picker or the template gallery is open
+    Then every catalogue widget is listed in the picker and every catalogue template in the gallery
+    And a widget without code, or a template with any widget without code, says "Coming soon" and cannot be picked
+    And a coming-soon template says how many of its widgets are built
+    And the templates that can be made today come first
+
+  @unit
+  Scenario: AC18 Every widget and template carries a default Langy prompt
+    Given the dashboards catalogue
+    Then every widget has a prompt that asks its own question over the dashboard period
+    And every template has a report prompt that asks each of its widgets' questions
+    # Langy drafts the widget's prompt when it is picked (AC12); the template's report prompt is drafted on create next
 
   # ---------------------------------------------------------------------------
   # Guard rails
@@ -220,3 +235,5 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 14: "Reviewer thumbs are named as reviewer thumbs" (added by langwatch/tasks#911: the annotations table holds reviewer thumbs, not user feedback) → Scenario: AC14 Reviewer thumbs are named as reviewer thumbs
   # AC 15: "One catalogue of widgets and templates, from the dashboards library" (added by langwatch/tasks#911: the library is the guide for what to build) → Scenario: AC15 Every widget answers a question from the question tree; Scenario: AC15b A project's preloaded boards never repeat a widget; Scenario: AC15c The prototype's boards are the starter set, under the Agent Flight Deck name
   # AC 16: "The picker offers the catalogue" (added by langwatch/tasks#911: the picker moves from answer shapes to the question tree) → Scenario: AC16 The picker offers every catalogue widget that has code, grouped by the question tree
+  # AC 17: "Everything is listed, coming soon until built" (added by langwatch/tasks#911) → Scenario: AC17 Every widget and template is listed, coming soon until it is built
+  # AC 18: "Default Langy prompts" (added by langwatch/tasks#911) → Scenario: AC18 Every widget and template carries a default Langy prompt

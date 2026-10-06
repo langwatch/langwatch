@@ -236,6 +236,8 @@ function QuestionSection({
           detail={question.why}
           icon={QUESTION_ICONS[question.icon]}
           palette={section.palette}
+          disabled={question.comingSoon === true}
+          badge={question.comingSoon ? "Coming soon" : void 0}
           onClick={() => onChoose(question)}
         />
       ))}
@@ -249,6 +251,7 @@ function PickerRow({
   icon: Icon,
   palette,
   disabled = false,
+  badge,
   onClick,
 }: {
   title: string;
@@ -256,6 +259,8 @@ function PickerRow({
   icon: LucideIcon;
   palette: string;
   disabled?: boolean;
+  /** A short status shown at the end of the row, such as "Coming soon". */
+  badge?: string;
   onClick: () => void;
 }) {
   return (
@@ -299,6 +304,20 @@ function PickerRow({
           {detail}
         </Text>
       </VStack>
+      {badge !== void 0 && (
+        <Text
+          flexShrink={0}
+          fontSize="11px"
+          fontWeight="medium"
+          color="fg.muted"
+          background="bg.muted"
+          borderRadius="full"
+          paddingX={2}
+          paddingY={0.5}
+        >
+          {badge}
+        </Text>
+      )}
     </Button>
   );
 }

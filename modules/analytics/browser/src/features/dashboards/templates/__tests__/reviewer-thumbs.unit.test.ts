@@ -5,12 +5,14 @@
 
 import { describe, expect, it } from "vitest";
 
-import { BOARD_TEMPLATES } from "../index.ts";
+import { IMPLEMENTED_WIDGET_IDS, implementedWidget } from "../../catalogue/index.ts";
 import { CALLS_TO_ACTION } from "../model/widget-calls-to-action.ts";
 
-const READS_ANNOTATIONS = BOARD_TEMPLATES.flatMap(({ widgets }) => widgets).filter(
+const READS_ANNOTATIONS = IMPLEMENTED_WIDGET_IDS.flatMap(
+  (id) => implementedWidget(id) ?? [],
+).filter(
   ({ key, definition }) =>
-    key !== "feedback" &&
+    key !== "fd-feedback" &&
     definition.queries.some(({ name, sql }) => name !== "present" && /FROM annotations/.test(sql)),
 );
 

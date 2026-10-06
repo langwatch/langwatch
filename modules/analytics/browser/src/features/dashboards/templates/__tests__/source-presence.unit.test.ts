@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { BOARD_TEMPLATES } from "../index.ts";
+import { IMPLEMENTED_WIDGET_IDS, implementedWidget } from "../../catalogue/index.ts";
 import { statusCode } from "../model/flight-deck-chart-widgets.ts";
 import { PRESENCE_DAYS, PRESENCE_SQL } from "../model/source-presence-queries.ts";
 import { CALLS_TO_ACTION, type WidgetSource } from "../model/widget-calls-to-action.ts";
@@ -51,8 +51,8 @@ describe.each(SOURCES)("given a widget that reads %s", (source) => {
   });
 });
 
-describe("given every board template", () => {
-  const widgets = BOARD_TEMPLATES.flatMap(({ widgets: list }) => list);
+describe("given every built catalogue widget", () => {
+  const widgets = IMPLEMENTED_WIDGET_IDS.flatMap((id) => implementedWidget(id) ?? []);
 
   /** @scenario "AC13c Every template widget checks its own source" */
   it("stores the presence query each widget's empty face asks for", () => {

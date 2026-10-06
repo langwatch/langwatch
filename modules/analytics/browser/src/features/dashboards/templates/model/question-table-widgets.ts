@@ -18,28 +18,6 @@ import {
 /** A share of a whole, "-" when the whole is zero. */
 const SHARE = `const share = (part, whole) => (whole > 0 ? pct(part / whole, 0) : "-");`;
 
-export const ERROR_TYPES_CODE = widgetCode({
-  summary: "The five most frequent error types of failed spans, with their operation.",
-  subtitle: "What the failing traces fail on",
-  source: "requests",
-  parts: [NUMBERS, TABLE],
-  queries: ["types", "traffic"],
-  body: `  if (num(traffic.data[0]?.traces) === 0) return <Panel><CallToAction /></Panel>;
-  if (types.data.length === 0) {
-    return <Panel><Note color={C.green}>No failed spans in this period</Note></Panel>;
-  }
-  const columns = [
-    { header: "Error type", cell: (row) => row.category },
-    { header: "Operation", cell: (row) => mono(row.operation) },
-    { header: "Count", align: "right", cell: (row) => <b>{count(num(row.failures))}</b> },
-  ];
-  return (
-    <Panel>
-      <Table columns={columns} rows={types.data.slice(0, 5)} />
-    </Panel>
-  );`,
-});
-
 export const MODEL_SPEND_CODE = widgetCode({
   summary: "The five models that cost the most, with each one's share of all model spend.",
   subtitle: "The models behind the bill",

@@ -1,26 +1,21 @@
 /**
- * The pieces of a board with nothing on it yet: the "Start from a template"
- * grid, which makes a new board from any template. The dashed "Add a block"
- * target stays only as the compact footer on a non-empty board; the Ask bar
- * and the templates are the empty board's two ways to start.
+ * A board with nothing on it yet: the "Start from a template" grid, which makes a new
+ * board from any built template. The dashed "Add a block" target stays only as the
+ * compact footer on a non-empty board.
  */
 
 import { Box, Button, Grid, Text, VStack } from "@chakra-ui/react";
 import {
   Activity,
-  CircleQuestionMark,
   DollarSign,
   FlaskConical,
   Gauge,
-  GitCompare,
-  Lightbulb,
   type LucideIcon,
   Plus,
-  TrendingDown,
   TriangleAlert,
 } from "lucide-react";
 
-import type { BoardTemplateId } from "../../templates/index.ts";
+import type { BoardTemplateId, TemplateProgress } from "../../templates/index.ts";
 
 /** The compact footer below a board's widgets, opening the question picker. */
 export function AddBlockCard({
@@ -77,19 +72,20 @@ export interface TemplateCard {
   readonly description: string;
   /** A user-facing line for what the board shows; falls back to `description`. */
   readonly summary?: string;
+  /** The question-tree trunk the template serves; picks its icon. */
+  readonly trunk?: string;
+  /** Set while some of its widgets have no code: shown, and cannot be made yet. */
+  readonly comingSoon?: TemplateProgress;
 }
 
-/** Each template's glyph: the Flight Deck's gauge, then the picker section's own icon. */
-const TEMPLATE_ICONS: Readonly<Record<BoardTemplateId, LucideIcon>> = {
-  "agent-flight-deck": Gauge,
-  happen: Activity,
-  change: TrendingDown,
-  threshold: TriangleAlert,
-  compare: GitCompare,
-  "cost-source": DollarSign,
-  tradeoff: FlaskConical,
-  why: CircleQuestionMark,
-  howto: Lightbulb,
+/** The Flight Deck's gauge; every other template takes its trunk's icon. */
+const TEMPLATE_ICONS: Readonly<Partial<Record<BoardTemplateId, LucideIcon>>> = { cockpit: Gauge };
+
+const TRUNK_ICONS: Readonly<Partial<Record<string, LucideIcon>>> = {
+  Profit: DollarSign,
+  Growth: Activity,
+  Protect: TriangleAlert,
+  Foundation: FlaskConical,
 };
 
 function TemplateButton({
@@ -101,8 +97,11 @@ function TemplateButton({
   isCreating: boolean;
   onOpen: () => void;
 }) {
-  const Icon = TEMPLATE_ICONS[template.id];
-  const subtitle = template.summary ?? template.description;
+  const Icon = TEMPLATE_ICONS[template.id] ?? TRUNK_ICONS[template.trunk ?? ""] ?? Gauge;
+  const progress = template.comingSoon;
+  const subtitle = progress
+    ? `Coming soon: ${progress.built} of ${progress.total} widgets built`
+    : (template.summary ?? template.description);
   return (
     <Button
       variant="outline"
@@ -126,6 +125,7 @@ function TemplateButton({
       }}
       loading={isCreating}
       loadingText={`Creating ${template.name}…`}
+      disabled={progress !== void 0}
       onClick={onOpen}
     >
       <Box
