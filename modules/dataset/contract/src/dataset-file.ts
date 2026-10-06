@@ -38,15 +38,15 @@ const getSuffixedColumnName = (
 
 /**
  * Maximum number of rows allowed per file upload. The request-bounds registry
- * owns the number; both tiers quoted there are the same, so any tier answers
- * it — "FREE" is only the spelling of "the tier-agnostic value".
+ * owns the number; every tier quoted there is the same, so any tier answers
+ * it: "FREE" is only the spelling of "the tier-agnostic value".
  */
 export const MAX_ROWS_LIMIT = resolveRequestBound("datasetRowsMax", "FREE");
 
 /**
- * Maximum file size in bytes (25 MB), measured on the server after the
- * content arrives — the client-stated size is not trusted. Same registry
- * derivation as {@link MAX_ROWS_LIMIT}.
+ * Maximum size of one uploaded file when the organization sets nothing,
+ * measured on the server as the content arrives. Same registry derivation as
+ * {@link MAX_ROWS_LIMIT}.
  */
 export const MAX_FILE_SIZE_BYTES = resolveRequestBound("datasetFileBytes", "FREE");
 

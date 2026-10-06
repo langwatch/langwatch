@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
 import { DatasetService } from "../../services/dataset.service.ts";
@@ -70,6 +71,7 @@ describe("DatasetService", () => {
       records: new Records(),
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
+      inlineAttachments: createDatasetTestInlineAttachments(),
     });
     await expect(service.getBySlugOrId({ projectId: "p1", slugOrId: "d1" })).resolves.toMatchObject(
       { id: "d1" },

@@ -7,6 +7,7 @@
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
+import { datasetLimitsSchema } from "./dataset-limits.ts";
 import {
   datasetApiCopyInputSchema,
   datasetApiDatasetInputSchema,
@@ -20,6 +21,8 @@ import {
 } from "./dataset.schemas.ts";
 import {
   appendStoredObjectToDatasetInputSchema,
+  createDatasetAttachmentUploadInputSchema,
+  datasetAttachmentUploadSchema,
   createDatasetFromStoredObjectInputSchema,
   datasetImportAppendedSchema,
   datasetImportStartedSchema,
@@ -83,6 +86,16 @@ export const datasetTrpc = defineTrpcContract("dataset")
   .mutation("appendStoredObject")
   .withInput(appendStoredObjectToDatasetInputSchema)
   .withOutput(datasetImportAppendedSchema)
+
+  /** The size limits the project's organization answers, for the browser's own checks. */
+  .query("getLimits")
+  .withInput(datasetApiProjectInputSchema)
+  .withOutput(datasetLimitsSchema)
+
+  /** The signed upload a file for an image or file cell is sent to. */
+  .mutation("createAttachmentUpload")
+  .withInput(createDatasetAttachmentUploadInputSchema)
+  .withOutput(datasetAttachmentUploadSchema)
 
   /** A dataset whose preparation failed or stalled, prepared again from the same stored file. */
   .mutation("retryNormalize")

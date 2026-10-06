@@ -59,6 +59,12 @@ vi.mock("../../../../behavior/use-stored-object-upload.ts", () => ({
   useDatasetImportTransport: () => importTransport,
 }));
 
+vi.mock("../../../../behavior/use-dataset-limits.ts", async () => {
+  const { DATASET_DEFAULT_LIMITS } = await import("@langwatch/dataset-contract");
+
+  return { useDatasetLimits: () => DATASET_DEFAULT_LIMITS };
+});
+
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "proj" },

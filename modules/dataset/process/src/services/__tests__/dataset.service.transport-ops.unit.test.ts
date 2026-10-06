@@ -1,11 +1,13 @@
 /**
  * @vitest-environment node
  */
-import { BadRequestError, NotFoundError } from "@langwatch/api/rest";
+import { NotFoundError } from "@langwatch/api/rest";
+import { DATASET_DEFAULT_LIMITS } from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
 import { MemoryDatasetRecordRepository } from "../../repositories/memory/memory.dataset-record.repository.ts";
@@ -24,6 +26,7 @@ function serviceOver({ database }: { database: MemoryDatasetDatabase }): Dataset
     generateId: () => "generated-id",
     requestBounds: createDatasetTestRequestBounds(),
     attachments: createDatasetTestAttachments(),
+    inlineAttachments: createDatasetTestInlineAttachments(),
   });
 }
 
@@ -42,7 +45,7 @@ describe("DatasetService operations the transports call", () => {
       } as never);
 
       await expect(
-        datasets.getDatasetWithinLimit({ slugOrId: "one", projectId: "p", limitMb: 25 }),
+        datasets.getDatasetWithinLimit({ slugOrId: "one", projectId: "p" }),
       ).resolves.toMatchObject({ truncated: false });
     });
 
@@ -54,8 +57,11 @@ describe("DatasetService operations the transports call", () => {
       } as never);
 
       await expect(
-        datasets.getDatasetWithinLimit({ slugOrId: "one", projectId: "p", limitMb: 25 }),
-      ).rejects.toThrow(BadRequestError);
+        datasets.getDatasetWithinLimit({ slugOrId: "one", projectId: "p" }),
+      ).rejects.toMatchObject({
+        code: "dataset_too_large_to_read_inline",
+        meta: { maxBytes: DATASET_DEFAULT_LIMITS.inlineReadBytes },
+      });
     });
   });
 

@@ -12,7 +12,12 @@ import { datasetRecordSchema, datasetSchema } from "./dataset.ts";
  */
 export const datasetRecordEditorReadSchema = datasetSchema.safeExtend({
   datasetRecords: z.array(datasetRecordSchema),
+  /** True whenever the dataset holds a row that `datasetRecords` leaves out. */
   truncated: z.boolean(),
+  /** How many rows `datasetRecords` carries. */
+  loadedRows: z.number().int().nonnegative(),
+  /** How many rows the dataset holds. */
+  totalRows: z.number().int().nonnegative(),
 });
 
 /** `datasetRecord.getHead`: the first entries plus the authoritative total. */

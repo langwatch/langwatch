@@ -14,6 +14,7 @@ import {
   type BatchEvaluationRecord,
   type BatchEvaluationSummary,
   type CopyDatasetInput,
+  type CreateDatasetAttachmentUploadInput,
   type CreateDatasetFromStoredObjectInput,
   type CreateDatasetFromUploadInput,
   type CreateDatasetFromUploadResult,
@@ -26,6 +27,7 @@ import {
   type DatasetHead,
   type DatasetImportAppended,
   type DatasetImportStarted,
+  type DatasetLimits,
   type DatasetListResult,
   type DatasetLookupInput,
   type DatasetNameInput,
@@ -51,7 +53,10 @@ import { ExperimentApi, ExperimentNotFoundError } from "@langwatch/experiment-co
 import { generate } from "@langwatch/ksuid";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
-import { StoredObjectApi } from "@langwatch/stored-object-contract";
+import {
+  StoredObjectApi,
+  type StoredObjectsCreateUploadOutput,
+} from "@langwatch/stored-object-contract";
 
 import {
   buildDatasetNormalizationPipeline,
@@ -62,6 +67,7 @@ import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
 import { DatasetAttachmentReferenceService } from "../services/dataset-attachment-reference.service.ts";
 import { DatasetAttachmentUploadService } from "../services/dataset-attachment-upload.service.ts";
 import { DatasetContentService } from "../services/dataset-content.service.ts";
+import { DatasetInlineAttachmentService } from "../services/dataset-inline-attachment.service.ts";
 import { DatasetNormalizeService } from "../services/dataset-normalize.service.ts";
 import { DatasetRequestBoundsService } from "../services/dataset-request-bounds.service.ts";
 import { DatasetUploadService } from "../services/dataset-upload.service.ts";
@@ -105,7 +111,7 @@ export class DatasetModule implements DatasetApi {
     permissions: AuthzApi,
     /** The directory that answers which organization a project belongs to. */
     projects: ProjectApi,
-    /** The tier-effective bounds the record writes refuse above. */
+    /** The bounds the project's organization answers for writes, reads and files. */
     entitlement: EntitlementApi,
     /** Reads the confirmed files a dataset is imported from (ADR-158 §6). */
     storedObjects: StoredObjectApi,
@@ -115,6 +121,7 @@ export class DatasetModule implements DatasetApi {
 
   #datasets: DatasetService;
   #attachmentUploads: DatasetAttachmentUploadService;
+  #requestBounds: DatasetRequestBoundsService;
   #normalization: DatasetNormalizeService;
   #batchEvaluations: DatasetRepositories["batchEvaluations"];
   #count: DatasetRepositories["count"];
@@ -129,10 +136,24 @@ export class DatasetModule implements DatasetApi {
   ) {
     const chunks = repositories.chunks;
 
+    this.#requestBounds = DatasetRequestBoundsService.create({
+      entitlement: dependencies.entitlement,
+      projects: dependencies.projects,
+    });
+    this.#attachmentUploads = DatasetAttachmentUploadService.create({
+      storedObjects: dependencies.storedObjects,
+      requestBounds: this.#requestBounds,
+    });
+    const inlineAttachments = DatasetInlineAttachmentService.create({
+      uploads: this.#attachmentUploads,
+    });
+
     this.#normalization = DatasetNormalizeService.create({
       repository: repositories.content,
       chunks,
       storedObjects: dependencies.storedObjects,
+      requestBounds: this.#requestBounds,
+      inlineAttachments,
     });
 
     this.#datasets = DatasetService.create({
@@ -143,6 +164,8 @@ export class DatasetModule implements DatasetApi {
         records: repositories.recordContent,
         chunks,
         storedObjects: dependencies.storedObjects,
+        requestBounds: this.#requestBounds,
+        inlineAttachments,
       }),
       queue: this.#normalization,
       content: DatasetContentService.create({ datasets: repositories.content, storage: chunks }),
@@ -152,18 +175,13 @@ export class DatasetModule implements DatasetApi {
       // fallback DatasetService would otherwise reach for (`nanoid`) is not
       // this feature's own choice to make on its behalf.
       generateId: () => generate(DATASET_RECORD_KSUID_RESOURCE).toString(),
-      requestBounds: DatasetRequestBoundsService.create({
-        entitlement: dependencies.entitlement,
-        projects: dependencies.projects,
-      }),
+      requestBounds: this.#requestBounds,
       attachments: DatasetAttachmentReferenceService.create({
         storedObjects: dependencies.storedObjects,
       }),
+      inlineAttachments,
     });
 
-    this.#attachmentUploads = DatasetAttachmentUploadService.create({
-      storedObjects: dependencies.storedObjects,
-    });
     this.#batchEvaluations = repositories.batchEvaluations;
     this.#count = repositories.count;
     this.#experiments = dependencies.experiments;
@@ -286,11 +304,21 @@ export class DatasetModule implements DatasetApi {
     return this.#datasets.archiveOrRestoreDataset(input);
   }
 
-  /** The whole dataset inline, refused rather than truncated past `limitMb`. */
-  getDatasetWithinLimit(
-    input: DatasetLookupInput & { limitMb: number },
-  ): Promise<DatasetWithRecords> {
+  /** The whole dataset in one answer, refused rather than truncated when too large for one. */
+  getDatasetWithinLimit(input: DatasetLookupInput): Promise<DatasetWithRecords> {
     return this.#datasets.getDatasetWithinLimit(input);
+  }
+
+  /** The size limits the project's organization answers. */
+  getLimits(input: { projectId: string }): Promise<DatasetLimits> {
+    return this.#requestBounds.limits(input.projectId);
+  }
+
+  /** The signed upload a file for an image or file cell is sent to. */
+  createAttachmentUpload(
+    input: CreateDatasetAttachmentUploadInput,
+  ): Promise<StoredObjectsCreateUploadOutput> {
+    return this.#attachmentUploads.createUpload(input);
   }
 
   /** Entries removed by id, refused when none matched. */
@@ -338,9 +366,9 @@ export class DatasetModule implements DatasetApi {
   // ── Records ──────────────────────────────────────────────────────────────
 
   /**
-   * A dataset and its records, up to the byte budget the CALLER named, in
-   * the slice it asked for. Both stay arguments: the editor, an export and
-   * an evaluation run all want a different budget and a different slice.
+   * A dataset and its records in the slice the caller asked for. With no
+   * `limitMb` the read is held to what the organization answers inline in one
+   * response and reports `truncated`; `null` reads every row or is refused.
    */
   getDatasetWithRecords(
     input: DatasetLookupInput & {
@@ -547,6 +575,8 @@ export abstract class DatasetContent {
     page: number;
     limit: number;
     search: string;
+    /** The rows and bytes one search may read. */
+    caps: { maxRows: number; maxBytes: number };
   }): Promise<DatasetRecordPage>;
   abstract listRecords(input: {
     dataset: Dataset;
@@ -560,7 +590,8 @@ export abstract class DatasetContent {
     dataset: Dataset;
     projectId: string;
     entrySelection: DatasetEntrySelection;
-    limitMb: number | null;
+    /** The byte budget of the read. */
+    limitBytes: number;
   }): Promise<DatasetWithRecords>;
   abstract getDatasetHead(input: { dataset: Dataset }): Promise<DatasetHead>;
   abstract findEntries(input: {

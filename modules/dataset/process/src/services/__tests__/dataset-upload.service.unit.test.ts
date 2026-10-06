@@ -1,5 +1,5 @@
-import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
-import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import type { DatasetLimits } from "@langwatch/dataset-contract";
+import { storedObjectMetadataSchema, type StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
@@ -18,8 +18,13 @@ import type { DatasetRow } from "../../repositories/dataset.repository.ts";
 import { MemoryDatasetContentRepository } from "../../repositories/memory/memory.dataset-content.repository.ts";
 import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
 import { DatasetUploadService } from "../dataset-upload.service.ts";
+import {
+  createDatasetTestInlineAttachments,
+  createDatasetTestRequestBoundsWith,
+} from "../../app/__tests__/dataset.fixture.ts";
 
 const PROJECT_ID = "project-1";
+const PNG_INLINE = `data:image/png;base64,${Buffer.from("89504e470d0a1a0a0000000d49484452", "hex").toString("base64")}`;
 const NULL_BYTE = String.fromCharCode(0);
 
 type WrittenRecord = { id: string; entry: unknown };
@@ -73,7 +78,59 @@ function datasetRow(overrides: Partial<DatasetRow> = {}): DatasetRow {
 function harness({
   row = null,
   storageFails = false,
-}: { row?: DatasetRow | null; storageFails?: boolean } = {}) {
+  limits = {},
+  importBytes = 1024,
+}: {
+  row?: DatasetRow | null;
+  storageFails?: boolean;
+  limits?: Partial<DatasetLimits>;
+  /** The size the import file's stored object records. */
+  importBytes?: number;
+} = {}) {
+  const storedFiles: { mediaType: string | undefined; filename: string }[] = [];
+  const sourceReads: string[] = [];
+  const storedObjects = createApiFixture<StoredObjectApi>(
+    {
+      getMetadata: async ({ projectId, id }) => {
+        sourceReads.push("metadata");
+        return storedObjectMetadataSchema.parse({
+          projectId,
+          id,
+          sha256: "a".repeat(64),
+          byteLength: importBytes,
+          mediaType: "application/x-ndjson",
+          filename: "rows.jsonl",
+          mediaTypeVerified: true,
+          status: "available",
+          audiences: [],
+          generation: 1,
+          provenance: { purpose: "dataset_import", ownerKind: "project", ownerId: projectId },
+          createdAt: "2026-09-24T00:00:00.000Z",
+        });
+      },
+      getById: async () => {
+        sourceReads.push("bytes");
+        throw new Error("the import file is read only when it is within the limit");
+      },
+      storeFromBytes: async (input) => {
+        storedFiles.push({ mediaType: input.mediaType, filename: input.filename });
+        return {
+          isDuplicate: false,
+          reference: {
+            projectId: input.projectId,
+            id: `object-${storedFiles.length}`,
+            sha256: "a".repeat(64),
+            byteLength: 16,
+            filename: input.filename,
+            mediaType: input.mediaType,
+            audience: input.audience,
+          },
+        };
+      },
+    },
+    "storedObjects",
+  );
+  const requestBounds = createDatasetTestRequestBoundsWith(limits);
   const created: CreateDatasetInput[] = [];
   const inlineRecords: WrittenRecord[] = [];
   const chunkLines: WrittenRecord[] = [];
@@ -140,8 +197,12 @@ function harness({
       datasets,
       records,
       chunks: storage,
-      storedObjects: createApiFixture<StoredObjectApi>({}, "storedObjects"),
+      storedObjects,
+      requestBounds,
+      inlineAttachments: createDatasetTestInlineAttachments(storedObjects, requestBounds),
     }),
+    storedFiles,
+    sourceReads,
     created,
     updated,
     inlineRecords,
@@ -356,53 +417,61 @@ describe("DatasetUploadService", () => {
       });
     });
 
-    describe("when the file is larger than the family accepts", () => {
+    describe("when the file is larger than the organization's upload limit", () => {
       /** @scenario "Upload exceeding file size limit is rejected" */
+      /** @scenario "An uploaded file larger than the file limit is refused naming the limit" */
       it("refuses it on the bytes the content carries, not the size the client stated", async () => {
-        const { adapter } = harness({ row: datasetRow() });
+        const { adapter, inlineRecords } = harness({
+          row: datasetRow(),
+          limits: { fileBytes: 256 * 1024 },
+        });
 
         // The client understates the size to zero; the refusal still lands,
-        // because the bound is measured on the server after the content
-        // arrives. The content is not a parseable CSV: size refuses first.
+        // because the bound is measured as the content arrives.
+        const rows = Array.from({ length: 30_000 }, (_, i) => `${i},row ${i}`).join("\n");
         await expect(
           adapter.uploadToExistingDataset({
             slugOrId: "user-feedback",
             projectId: PROJECT_ID,
             filename: "feedback.csv",
-            bytes: bytesOf("x".repeat(MAX_FILE_SIZE_BYTES + 1)),
+            bytes: bytesOf(`input,output\n${rows}\n`),
             fileSize: 0,
           }),
         ).rejects.toMatchObject({
           name: "UploadValidationError",
           kind: "file_too_large",
           httpStatus: 400,
+          message: expect.stringContaining("256 KB"),
         });
+        expect(inlineRecords).toHaveLength(0);
       });
 
       it("accepts a file whose client-stated size overshoots the measured one", async () => {
-        const { adapter } = harness({ row: datasetRow() });
+        const { adapter } = harness({ row: datasetRow(), limits: { fileBytes: 256 * 1024 } });
 
         // The reverse lie must not refuse either: the measured bytes decide,
-        // and they sit well under the cap.
+        // and they sit well under the limit.
         await expect(
           adapter.uploadToExistingDataset({
             slugOrId: "user-feedback",
             projectId: PROJECT_ID,
             filename: "feedback.csv",
             bytes: bytesOf("input,output\nhello,world\n"),
-            fileSize: MAX_FILE_SIZE_BYTES + 1,
+            fileSize: 512 * 1024,
           }),
         ).resolves.toMatchObject({ recordsCreated: 1 });
       });
     });
 
-    describe("when the file carries more rows than the family accepts", () => {
+    describe("when the file carries more rows than the organization's row count limit", () => {
       /** @scenario "Upload exceeding row limit is rejected" */
+      /** @scenario "An uploaded file with more rows than the row count limit is refused naming the limit" */
       it("refuses it on the parsed row count", async () => {
-        const { adapter } = harness({ row: datasetRow() });
-        const rows = Array.from({ length: MAX_ROWS_LIMIT + 1 }, (_, i) => `${i},row ${i}`).join(
-          "\n",
-        );
+        const { adapter, inlineRecords } = harness({
+          row: datasetRow(),
+          limits: { rowsMax: 1_000 },
+        });
+        const rows = Array.from({ length: 1_001 }, (_, i) => `${i},row ${i}`).join("\n");
 
         await expect(
           adapter.uploadToExistingDataset({
@@ -416,7 +485,74 @@ describe("DatasetUploadService", () => {
           name: "UploadValidationError",
           kind: "row_limit_exceeded",
           httpStatus: 400,
+          message: expect.stringContaining("1,000"),
         });
+        expect(inlineRecords).toHaveLength(0);
+      });
+
+      it("accepts more rows than the limit of the earlier release under the default limits", async () => {
+        const { adapter } = harness({ row: datasetRow() });
+        const rows = Array.from({ length: 10_001 }, (_, i) => `${i},row ${i}`).join("\n");
+
+        await expect(
+          upload(adapter, {
+            slugOrId: "user-feedback",
+            filename: "feedback.csv",
+            content: `input,output\n${rows}\n`,
+          }),
+        ).resolves.toMatchObject({ recordsCreated: 10_001 });
+      });
+    });
+
+    describe("when a row holds a picture written inline as base64", () => {
+      /** @scenario "An uploaded file with inline pictures stores each picture and keeps its reference" */
+      it("stores the picture of an image column and keeps its reference in the row", async () => {
+        const { adapter, inlineRecords, storedFiles } = harness({
+          row: datasetRow({
+            columnTypes: [
+              { name: "input", type: "string" },
+              { name: "scan", type: "image" },
+            ],
+          }),
+        });
+
+        await upload(adapter, {
+          slugOrId: "user-feedback",
+          filename: "scans.jsonl",
+          content: `${JSON.stringify({ input: "first", scan: PNG_INLINE })}\n${JSON.stringify({ input: "second", scan: PNG_INLINE })}\n`,
+        });
+
+        expect(storedFiles).toEqual([
+          { mediaType: "image/png", filename: "scan.png" },
+          { mediaType: "image/png", filename: "scan.png" },
+        ]);
+        expect(inlineRecords.map((record) => record.entry)).toEqual([
+          { input: "first", scan: `/api/files/${PROJECT_ID}/object-1/scan.png` },
+          { input: "second", scan: `/api/files/${PROJECT_ID}/object-2/scan.png` },
+        ]);
+      });
+    });
+
+    describe("when a row is larger than the organization's row limit", () => {
+      /** @scenario "An uploaded row larger than the row limit is refused naming the limit" */
+      it("refuses the upload with the row refusal and writes nothing", async () => {
+        const { adapter, inlineRecords } = harness({
+          row: datasetRow(),
+          limits: { rowBytes: 64 * 1024 },
+        });
+
+        await expect(
+          upload(adapter, {
+            slugOrId: "user-feedback",
+            filename: "feedback.jsonl",
+            content: `${JSON.stringify({ input: "ok", output: "ok" })}\n${JSON.stringify({ input: "x".repeat(128 * 1024), output: "big" })}\n`,
+          }),
+        ).rejects.toMatchObject({
+          code: "dataset_row_too_large",
+          httpStatus: 413,
+          meta: { maxBytes: 64 * 1024, measure: "uploaded" },
+        });
+        expect(inlineRecords).toHaveLength(0);
       });
     });
 
@@ -583,13 +719,11 @@ describe("DatasetUploadService", () => {
       });
     });
 
-    describe("when the new dataset's file carries more rows than the family accepts", () => {
+    describe("when the new dataset's file carries more rows than the organization's row count limit", () => {
       /** @scenario "Create + upload rejects file exceeding row limit" */
       it("refuses it on the parsed row count and creates nothing", async () => {
-        const { adapter, created } = harness();
-        const rows = Array.from({ length: MAX_ROWS_LIMIT + 1 }, (_, i) => `${i},row ${i}`).join(
-          "\n",
-        );
+        const { adapter, created } = harness({ limits: { rowsMax: 1_000 } });
+        const rows = Array.from({ length: 1_001 }, (_, i) => `${i},row ${i}`).join("\n");
 
         await expect(
           create(adapter, {
@@ -599,6 +733,74 @@ describe("DatasetUploadService", () => {
           }),
         ).rejects.toMatchObject({ kind: "row_limit_exceeded", httpStatus: 400 });
         expect(created).toHaveLength(0);
+      });
+    });
+
+    describe("when the new dataset's file holds pictures written inline as base64", () => {
+      /** @scenario "An uploaded file with inline pictures stores each picture and keeps its reference" */
+      it("stores each picture, keeps its reference and types the column as an image", async () => {
+        const { adapter, created, chunkLines, storedFiles } = harness();
+
+        await create(adapter, {
+          name: "Scans",
+          filename: "scans.jsonl",
+          content: `${JSON.stringify({ label: "cat", scan: PNG_INLINE })}\n${JSON.stringify({ label: "dog", scan: PNG_INLINE })}\n`,
+        });
+
+        expect(storedFiles).toHaveLength(2);
+        expect(chunkLines.map((line) => line.entry)).toEqual([
+          { label: "cat", scan: `/api/files/${PROJECT_ID}/object-1/scan.png` },
+          { label: "dog", scan: `/api/files/${PROJECT_ID}/object-2/scan.png` },
+        ]);
+        expect(created[0]?.columnTypes).toEqual([
+          { name: "label", type: "string" },
+          { name: "scan", type: "image" },
+        ]);
+      });
+    });
+  });
+
+  describe("given a confirmed import file larger than the organization's upload limit", () => {
+    const tooLarge = { limits: { fileBytes: 1024 * 1024 }, importBytes: 1024 * 1024 + 1 };
+    const refusal = {
+      kind: "file_too_large",
+      message: expect.stringContaining("1 MB"),
+    };
+
+    describe("when a dataset is created from it", () => {
+      /** @scenario "An import of a stored file larger than the upload limit is refused before it is read" */
+      it("refuses before a dataset is made or the file is read", async () => {
+        const { adapter, created, sourceReads } = harness(tooLarge);
+
+        await expect(
+          adapter.createDatasetFromStoredObject({
+            projectId: PROJECT_ID,
+            name: "Too Big",
+            storedObjectId: "object-1",
+          }),
+        ).rejects.toMatchObject(refusal);
+        expect(created).toHaveLength(0);
+        expect(sourceReads).toEqual(["metadata"]);
+      });
+    });
+
+    describe("when its rows are added to a dataset", () => {
+      /** @scenario "An import of a stored file larger than the upload limit is refused before it is read" */
+      it("refuses before the file is read", async () => {
+        const { adapter, inlineRecords, sourceReads } = harness({
+          ...tooLarge,
+          row: datasetRow(),
+        });
+
+        await expect(
+          adapter.appendStoredObjectToDataset({
+            projectId: PROJECT_ID,
+            slugOrId: "user-feedback",
+            storedObjectId: "object-1",
+          }),
+        ).rejects.toMatchObject(refusal);
+        expect(inlineRecords).toHaveLength(0);
+        expect(sourceReads).toEqual(["metadata"]);
       });
     });
   });

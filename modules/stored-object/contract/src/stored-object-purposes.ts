@@ -17,14 +17,27 @@ export type StoredObjectFileViewPermission = (typeof FILE_VIEW_PERMISSIONS)[numb
 
 export interface StoredObjectPurposePolicy {
   readonly uploadable: boolean;
+  /** The byte limit a caller is held to when the owning module names none. */
   readonly maxBytes: number;
+  /**
+   * The highest limit the owning module may name for one caller. Absent, the
+   * purpose has one limit for everyone.
+   */
+  readonly ceilingBytes?: number;
   readonly readPermission: StoredObjectFileViewPermission;
 }
+
+/** The dataset attachment limit an organization answers when it sets nothing. */
+export const DATASET_ATTACHMENT_PURPOSE_DEFAULT_BYTES = 20 * MIB;
+
+/** The highest dataset attachment limit an organization can be raised to. */
+export const DATASET_ATTACHMENT_PURPOSE_CEILING_BYTES = 1024 * MIB;
 
 export const STORED_OBJECT_PURPOSES: Readonly<Record<string, StoredObjectPurposePolicy>> = {
   [DATASET_ATTACHMENT_PURPOSE]: {
     uploadable: true,
-    maxBytes: 20 * MIB,
+    maxBytes: DATASET_ATTACHMENT_PURPOSE_DEFAULT_BYTES,
+    ceilingBytes: DATASET_ATTACHMENT_PURPOSE_CEILING_BYTES,
     readPermission: "datasets:view",
   },
   [DATASET_IMPORT_PURPOSE]: {
@@ -47,4 +60,16 @@ export function purposePolicyOf(purpose: string): StoredObjectPurposePolicy {
   return Object.hasOwn(STORED_OBJECT_PURPOSES, purpose)
     ? (STORED_OBJECT_PURPOSES[purpose] ?? UNLISTED_PURPOSE_POLICY)
     : UNLISTED_PURPOSE_POLICY;
+}
+
+/**
+ * The byte limit one upload is held to: the purpose's own, or the one the
+ * owning module named for this caller, never above the purpose's ceiling.
+ */
+export function purposeByteLimitOf(
+  policy: StoredObjectPurposePolicy,
+  callerMaxBytes: number | undefined,
+): number {
+  if (callerMaxBytes === undefined) return policy.maxBytes;
+  return Math.min(Math.max(callerMaxBytes, 0), policy.ceilingBytes ?? policy.maxBytes);
 }

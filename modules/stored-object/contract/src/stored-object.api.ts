@@ -35,6 +35,11 @@ export interface StoreStoredObjectFromBytesInput extends StoredObjectProvenance 
   mediaType: string;
   audience: StoredObjectDeliveryAudience;
   bytes: StoredObjectByteSource;
+  /**
+   * The limit the owning module answers for this caller, in place of the
+   * general in-process ceiling; never above the purpose's own ceiling.
+   */
+  maxBytes?: number;
 }
 
 export interface StoreStoredObjectFromBytesResult {
@@ -47,7 +52,14 @@ export interface ReadStoredObjectResult {
   bytes: StoredObjectByteStream;
 }
 
-export type CreateStoredObjectUploadInput = StoredObjectsCreateUploadInput;
+/**
+ * `maxBytes` is the limit the owning module answers for this caller, in place
+ * of the purpose's default and never above the purpose's ceiling. Only a peer
+ * module names it: the wire schema is strict and does not carry it.
+ */
+export type CreateStoredObjectUploadInput = StoredObjectsCreateUploadInput & {
+  maxBytes?: number;
+};
 
 export type ConfirmStoredObjectUploadInput = StoredObjectsConfirmUploadInput;
 

@@ -22,6 +22,12 @@ import { z } from "zod";
 
 const STORED_OBJECTS_PUBLIC_API_VERSION = "2026-08-22" as const;
 
+/**
+ * How many uploads one caller may start in a minute: far above a person
+ * filling cells, and enough to load tens of thousands of files in an hour.
+ */
+const UPLOADS_PER_MINUTE = 600;
+
 const SIGNED_URL = "signed URL: the sealed signature in the query is the credential";
 
 /** The project a request names, once it is the key's own: another project's key is refused. */
@@ -45,6 +51,7 @@ export const storedObjectRest = defineRestRouter(StoredObjectApi)
   .post("/uploads", "createStoredObjectUpload")
   .withInput(storedObjectsCreateUploadInputSchema)
   .withPermission("project:update")
+  .withRateLimit({ requests: UPLOADS_PER_MINUTE, seconds: 60 })
   .withOutput(storedObjectsCreateUploadOutputSchema)
   .withDocs({ tags: ["Stored Objects"], summary: "Create a stored-object upload" })
   .handle(async ({ app, input, scope }) =>

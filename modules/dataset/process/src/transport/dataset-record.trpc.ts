@@ -7,13 +7,6 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DatasetApi, datasetRecordTrpc } from "@langwatch/dataset-contract";
 
-/**
- * The editor asks for a wider window than the 5 MB default (~3 rows of
- * base64 images) because it loads into the browser. This is what THIS
- * door asks for, not a dataset fact, so it stays here, not on the shared app.
- */
-const DATASET_EDITOR_READ_LIMIT_MB = 13;
-
 export const datasetRecordTrpcTransport: TrpcRouterDeclaration<
   DatasetApi,
   typeof datasetRecordTrpc
@@ -39,16 +32,23 @@ export const datasetRecordTrpcTransport: TrpcRouterDeclaration<
     }),
   )
 
+  // No budget is named: the read is held to what the organization answers
+  // inline in one response, and says how many rows it carries out of how many.
   .procedure("getAll")
   .withPermission("datasets:view")
   .handle(async ({ app, input }) => {
     const result = await app.getDatasetWithRecords({
       slugOrId: input.datasetId,
       projectId: input.projectId,
-      limitMb: DATASET_EDITOR_READ_LIMIT_MB,
     });
 
-    return { ...result.dataset, datasetRecords: result.records, truncated: result.truncated };
+    return {
+      ...result.dataset,
+      datasetRecords: result.records,
+      truncated: result.truncated,
+      loadedRows: result.records.length,
+      totalRows: result.totalRows ?? result.records.length,
+    };
   })
 
   .procedure("listPaginated")
@@ -72,7 +72,13 @@ export const datasetRecordTrpcTransport: TrpcRouterDeclaration<
       limitMb: null,
     });
 
-    return { ...result.dataset, datasetRecords: result.records, truncated: result.truncated };
+    return {
+      ...result.dataset,
+      datasetRecords: result.records,
+      truncated: result.truncated,
+      loadedRows: result.records.length,
+      totalRows: result.totalRows ?? result.records.length,
+    };
   })
 
   .procedure("getHead")

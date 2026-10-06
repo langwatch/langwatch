@@ -43,13 +43,9 @@ export function AddRowsFromCSVModal({
   onUpdateDataset?: (entries: DatasetRecordEntry[]) => void;
 }) {
   const { project } = useOrganizationTeamProject();
-  const dataset = datasetClient.datasetRecord.getAll.useQuery(
-    { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
-    {
-      enabled: !!project && !!datasetId,
-      refetchOnWindowFocus: false,
-    },
-  );
+  // The rows this modal adds are read back by whoever shows the dataset, so
+  // their cached reads are marked stale rather than loading the dataset here.
+  const utils = datasetClient.useUtils();
 
   const [recordEntries, setRecordEntries] = useState<DatasetRecordEntry[]>([]);
   const [CSVHeaders, setCSVHeaders] = useState<string[]>([]);
@@ -138,7 +134,7 @@ export function AddRowsFromCSVModal({
       },
       {
         onSuccess: () => {
-          void dataset.refetch();
+          void utils.datasetRecord.invalidate();
           setRecordEntries([]);
           setMapping({});
           onClose();

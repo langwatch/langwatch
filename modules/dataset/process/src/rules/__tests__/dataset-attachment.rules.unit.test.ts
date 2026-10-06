@@ -15,7 +15,7 @@ describe("dataset attachment upload policy", () => {
     describe("when the size is checked", () => {
       /** @scenario "A file over the size limit is refused with a clear error" */
       it("refuses it and names the largest size accepted", () => {
-        expect(() => assertDatasetAttachmentWithinLimit(DATASET_ATTACHMENT_MAX_BYTES + 1)).toThrow(
+        expect(() => assertDatasetAttachmentWithinLimit(DATASET_ATTACHMENT_MAX_BYTES + 1, DATASET_ATTACHMENT_MAX_BYTES)).toThrow(
           expect.objectContaining({
             code: "dataset_attachment_too_large",
             meta: expect.objectContaining({ maxBytes: DATASET_ATTACHMENT_MAX_BYTES }),
@@ -29,7 +29,7 @@ describe("dataset attachment upload policy", () => {
     describe("when the size is checked", () => {
       it("accepts it", () => {
         expect(() =>
-          assertDatasetAttachmentWithinLimit(DATASET_ATTACHMENT_MAX_BYTES),
+          assertDatasetAttachmentWithinLimit(DATASET_ATTACHMENT_MAX_BYTES, DATASET_ATTACHMENT_MAX_BYTES),
         ).not.toThrow();
       });
     });

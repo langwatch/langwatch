@@ -1,11 +1,19 @@
-import { DatasetBatchTooLargeError } from "@langwatch/dataset-contract";
+import {
+  DATASET_LIMIT_BOUND_KEYS,
+  DatasetBatchTooLargeError,
+  type DatasetLimits,
+} from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
+type DatasetLimitName = keyof DatasetLimits;
+
+const LIMIT_NAMES = Object.keys(DATASET_LIMIT_BOUND_KEYS) as DatasetLimitName[];
+
 /**
- * The tier-effective dataset batch bound: the transport schemas cap at the
- * registry's enterprise ceiling, this service resolves the number the
- * caller's plan answers through the entitlement peer.
+ * The dataset bounds a project's organization answers: the transport schemas
+ * and body caps declare the highest value any organization can hold, this
+ * service resolves the organization's own number through the entitlement peer.
  */
 export class DatasetRequestBoundsService {
   static create(deps: {
@@ -37,5 +45,32 @@ export class DatasetRequestBoundsService {
     if (count > maxEntries) {
       throw new DatasetBatchTooLargeError({ count, maxEntries });
     }
+  }
+
+  /** One size limit, as the project's organization answers it. */
+  async limit(projectId: string, name: DatasetLimitName): Promise<number> {
+    const organizationId = await this.deps.projects.getOrganizationId(projectId);
+
+    return this.deps.entitlement.requestBound({
+      key: DATASET_LIMIT_BOUND_KEYS[name],
+      organizationId,
+    });
+  }
+
+  /** Every size limit, as the project's organization answers them. */
+  async limits(projectId: string): Promise<DatasetLimits> {
+    const organizationId = await this.deps.projects.getOrganizationId(projectId);
+    const values = await Promise.all(
+      LIMIT_NAMES.map((name) =>
+        this.deps.entitlement.requestBound({
+          key: DATASET_LIMIT_BOUND_KEYS[name],
+          organizationId,
+        }),
+      ),
+    );
+
+    return Object.fromEntries(
+      LIMIT_NAMES.map((name, index) => [name, values[index]!]),
+    ) as DatasetLimits;
   }
 }

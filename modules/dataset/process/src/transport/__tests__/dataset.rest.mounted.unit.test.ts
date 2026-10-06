@@ -1,7 +1,6 @@
 /** REST endpoints mounted with real requests, stubbed application. */
 
 import {
-  BadRequestError,
   bindRestMiddleware,
   canonicalErrorResponse,
   createRestRuntime,
@@ -12,8 +11,10 @@ import {
 import {
   DatasetConflictError,
   DatasetNotFoundError,
+  DatasetPageTooLargeError,
+  DatasetTooLargeToReadInlineError,
   DatasetNotReadyError,
-  MAX_FILE_SIZE_BYTES,
+  DATASET_DEFAULT_LIMITS,
   type DatasetApi,
   type DatasetSummary,
 } from "@langwatch/dataset-contract";
@@ -364,21 +365,19 @@ describe("the mounted dataset REST family", () => {
       expect(bySlug.stub.getDatasetWithinLimit).toHaveBeenCalledWith({
         slugOrId: "my-data",
         projectId: "project-1",
-        limitMb: 25,
       });
       expect(byId.stub.getDatasetWithinLimit).toHaveBeenCalledWith({
         slugOrId: "dataset_xyz",
         projectId: "project-1",
-        limitMb: 25,
       });
       await expect(slugResponse.json()).resolves.toEqual(await idResponse.json());
     });
 
-    /** @scenario "Get dataset enforces 25MB response size limit" */
-    it("refuses rather than truncating when the read exceeds that ceiling", async () => {
+    /** @scenario "Get dataset refuses a dataset too large for one response" */
+    it("refuses rather than truncating, naming the paged address", async () => {
       const { send } = mount({
         getDatasetWithinLimit: vi.fn(async () => {
-          throw new BadRequestError("Dataset size exceeds 25MB limit");
+          throw new DatasetTooLargeToReadInlineError({ maxBytes: 1024, totalRows: 9 });
         }) as never,
       });
 
@@ -386,7 +385,9 @@ describe("the mounted dataset REST family", () => {
 
       expect(response.status).toBe(400);
       await expect(response.json()).resolves.toMatchObject({
-        message: expect.stringContaining("25MB limit"),
+        code: "dataset_too_large_to_read_inline",
+        message: expect.stringContaining("/records"),
+        meta: { maxBytes: 1024, totalRows: 9 },
       });
     });
 
@@ -526,6 +527,60 @@ describe("the mounted dataset REST family", () => {
       });
       await expect(response.json()).resolves.toMatchObject({
         pagination: { page: 1, limit: 50, total: 100 },
+      });
+    });
+
+    /** @scenario "A page of rows carries the dataset it belongs to" */
+    it("carries the dataset's summary beside the rows, on both spellings of the address", async () => {
+      for (const path of ["/api/dataset/my-dataset/records", "/api/dataset/my-dataset/entries"]) {
+        const { send } = mount({
+          listRecords: vi.fn(async () => ({
+            data: [datasetRecord("rec-1", { input: "hello" })],
+            pagination: { page: 1, limit: 50, total: 1, totalPages: 1 },
+            dataset,
+          })) as never,
+        });
+
+        const body = (await (await send("GET", path)).json()) as {
+          data: unknown[];
+          pagination: unknown;
+          dataset: Record<string, unknown>;
+        };
+
+        expect(body.data).toHaveLength(1);
+        expect(body.pagination).toEqual({ page: 1, limit: 50, total: 1, totalPages: 1 });
+        expect(Object.keys(body.dataset).toSorted()).toEqual([
+          "columnTypes",
+          "createdAt",
+          "id",
+          "name",
+          "platformUrl",
+          "slug",
+          "updatedAt",
+        ]);
+        expect(body.dataset.platformUrl).toContain(`/datasets/${dataset.id}`);
+      }
+    });
+
+    /** @scenario "A page of rows too large for one response names a page size that fits" */
+    it("answers 413 with the page size to ask for when a page is too large", async () => {
+      const { send } = mount({
+        listRecords: vi.fn(async () => {
+          throw new DatasetPageTooLargeError({
+            maxBytes: 1024,
+            page: 2,
+            limit: 50,
+            suggestedLimit: 10,
+          });
+        }) as never,
+      });
+
+      const response = await send("GET", "/api/dataset/my-dataset/records?page=2&limit=50");
+
+      expect(response.status).toBe(413);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "dataset_page_too_large",
+        meta: { suggestedLimit: 10, suggestedPage: 6 },
       });
     });
 
@@ -765,14 +820,15 @@ describe("the mounted dataset REST family", () => {
     });
   });
 
-  describe("when a file over the old size limit is posted to the deprecated upload pair", () => {
-    /** @scenario "A posted file over the old size limit is still refused" */
+  describe("when a file over the upload limit is posted to the deprecated upload pair", () => {
+    /** @scenario "A posted file over the upload limit is refused" */
+    /** @scenario "A file posted to the deprecated upload address stops at one full row" */
     it("refuses it as too large before the multipart body is read to the end", async () => {
       for (const path of ["/api/dataset/upload", "/api/dataset/my-dataset/upload"]) {
         const createDatasetFromUpload = vi.fn();
         const uploadToExistingDataset = vi.fn();
         const { sendStream } = mount({ createDatasetFromUpload, uploadToExistingDataset });
-        const fileBytes = MAX_FILE_SIZE_BYTES + 8 * MIB;
+        const fileBytes = DATASET_DEFAULT_LIMITS.rowBytes + 8 * MIB;
         const upload = streamedUpload(fileBytes);
 
         const response = await sendStream(path, upload.body);
@@ -780,7 +836,10 @@ describe("the mounted dataset REST family", () => {
         // The canonical renderer answers `validation_error` at 422 (400 under the retired family
         // handler); the drift is reported in the lint-w9-stored-object-dataset handoff.
         expect(response.status).toBe(422);
-        await expect(response.json()).resolves.toMatchObject({ code: "validation_error" });
+        await expect(response.json()).resolves.toMatchObject({
+          code: "validation_error",
+          message: expect.stringContaining("/api/dataset/imports"),
+        });
         expect(upload.pulled()).toBeLessThan(fileBytes);
         expect(createDatasetFromUpload).not.toHaveBeenCalled();
         expect(uploadToExistingDataset).not.toHaveBeenCalled();

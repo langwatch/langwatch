@@ -79,11 +79,11 @@ Feature: Dataset REST API
     Then the request fails with 404 Not Found
 
   @integration
-  Scenario: Get dataset enforces 25MB response size limit
-    Given a dataset with records exceeding 25MB total
+  Scenario: Get dataset refuses a dataset too large for one response
+    Given a dataset with more records than one response carries
     When I call GET /api/dataset/large-dataset
     Then the request fails with 400 Bad Request
-    And the error indicates the response size exceeds the limit
+    And the error tells me to read the records page by page
 
   # ── Update Dataset ─────────────────────────────────────────────
 

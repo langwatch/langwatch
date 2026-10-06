@@ -1,4 +1,4 @@
-import { BadRequestError, NotFoundError } from "@langwatch/api/rest";
+import { NotFoundError } from "@langwatch/api/rest";
 import {
   copyDatasetInputSchema,
   datasetLookupInputSchema,
@@ -34,6 +34,7 @@ import {
   DatasetNameTakenError,
   DatasetNotFoundError,
   DatasetNotReadyError,
+  DatasetTooLargeToReadInlineError,
 } from "@langwatch/dataset-contract";
 import type * as datasetContractModule from "@langwatch/dataset-contract";
 import { generate } from "@langwatch/ksuid";
@@ -43,8 +44,10 @@ import type { DatasetNormalizeQueue, DatasetUpload, DatasetContent } from "../ap
 import type { DatasetRecordRepository } from "../repositories/dataset-record.repository.ts";
 import type { DatasetRepository, DatasetUpdateInput } from "../repositories/dataset.repository.ts";
 import { assertKnownColumns } from "../rules/dataset-columns.rules.ts";
+import { onceMaxBytes } from "../rules/dataset-inline-file.rules.ts";
 import { datasetSlugOf } from "../rules/dataset-selection.rules.ts";
 import type { DatasetAttachmentReferenceService } from "./dataset-attachment-reference.service.ts";
+import type { DatasetInlineAttachmentService } from "./dataset-inline-attachment.service.ts";
 import { DatasetNamingService } from "./dataset-naming.service.ts";
 import { DatasetRecordService } from "./dataset-record.service.ts";
 import type { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
@@ -60,6 +63,8 @@ export type DatasetServiceOptions = {
   requestBounds: DatasetRequestBoundsService;
   /** Checks the stored-file references a record write brings in (ADR-158 §6). */
   attachments: DatasetAttachmentReferenceService;
+  /** Stores the files a row carries inline and leaves their references. */
+  inlineAttachments: Pick<DatasetInlineAttachmentService, "store" | "storeAll">;
 };
 
 /**
@@ -68,6 +73,9 @@ export type DatasetServiceOptions = {
  * (`dataset.app.ts`'s own `DATASET_RECORD_KSUID_RESOURCE`).
  */
 const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";
+
+/** How many postgres-backed rows a copy moves at a time. */
+const COPY_BATCH_ROWS = 200;
 
 /** Archiving appends `-archived-<id>` to the slug; the live slug is what precedes the last one. */
 function liveSlugOf(slug: string): string {
@@ -146,10 +154,22 @@ export class DatasetService {
     }
 
     if (parsed.datasetRecords && parsed.datasetRecords.length > 0) {
+      const maxBytes = onceMaxBytes(() =>
+        this.options.requestBounds.limit(parsed.projectId, "attachmentBytes"),
+      );
+      parsed.datasetRecords = await this.options.inlineAttachments.storeAll(
+        {
+          projectId: parsed.projectId,
+          columns: { kind: "typed", columnTypes: parsed.columnTypes },
+          maxBytes,
+        },
+        parsed.datasetRecords,
+      );
       await this.options.attachments.assertAccepted({
         projectId: parsed.projectId,
         columnTypes: parsed.columnTypes,
         entries: parsed.datasetRecords,
+        maxBytes,
       });
     }
 
@@ -386,12 +406,19 @@ export class DatasetService {
     return this.records.getDatasetWithRecords(input);
   }
 
-  /** The whole dataset inline, refused rather than truncated when it exceeds `limitMb`. */
-  async getDatasetWithinLimit(
-    input: DatasetLookupInput & { limitMb: number },
-  ): Promise<DatasetWithRecords> {
+  /**
+   * The whole dataset in one answer, refused rather than truncated when it is
+   * larger than the organization answers inline. The refusal names paging,
+   * which has no ceiling on the dataset's size.
+   */
+  async getDatasetWithinLimit(input: DatasetLookupInput): Promise<DatasetWithRecords> {
     const read = await this.getDatasetWithRecords(input);
-    if (read.truncated) throw new BadRequestError(`Dataset size exceeds ${input.limitMb}MB limit`);
+    if (read.truncated) {
+      throw new DatasetTooLargeToReadInlineError({
+        maxBytes: await this.options.requestBounds.limit(input.projectId, "inlineReadBytes"),
+        totalRows: read.totalRows ?? read.records.length,
+      });
+    }
 
     return read;
   }
@@ -516,21 +543,25 @@ export class DatasetService {
       return target;
     }
 
-    const records = await this.options.records.listAll({
-      datasetId: source.id,
-      projectId: parsed.sourceProjectId,
-      page: 1,
-      limit: 200,
-    });
-    if (records.records.length > 0) {
-      await this.options.records.createMany({
-        datasetId: target.id,
-        projectId: parsed.targetProjectId,
-        entries: records.records.map((record) => ({
-          id: this.generateId(),
-          ...record.entry,
-        })),
+    // Every row, one batch in memory at a time.
+    let cursorId: string | undefined;
+    let copied = COPY_BATCH_ROWS;
+    while (copied === COPY_BATCH_ROWS) {
+      const batch = await this.options.records.findPage({
+        datasetId: source.id,
+        projectId: parsed.sourceProjectId,
+        limit: COPY_BATCH_ROWS,
+        cursorId,
       });
+      if (batch.length > 0) {
+        await this.options.records.createMany({
+          datasetId: target.id,
+          projectId: parsed.targetProjectId,
+          entries: batch.map((record) => ({ id: this.generateId(), ...record.entry })),
+        });
+      }
+      copied = batch.length;
+      cursorId = batch.at(-1)?.id;
     }
 
     return target;
