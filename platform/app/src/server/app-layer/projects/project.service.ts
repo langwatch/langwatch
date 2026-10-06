@@ -17,7 +17,10 @@ import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
-import type { AggregateReconciler } from "./aggregate-reconciler.service";
+import type {
+  AggregateReconcileResult,
+  AggregateReconciler,
+} from "./aggregate-reconciler.service";
 import { AGGREGATE_DEFAULT_RULE, type AggregateRule } from "./aggregate-rule";
 import type { AggregateRuleService } from "./aggregate-rule.service";
 import {
@@ -467,6 +470,44 @@ export class ProjectService {
       return;
     }
     await this.aggregateReconciler.start({ aggregateProjectId });
+  }
+
+  /**
+   * ADR-144 block E, trigger "rule edited": replace a live aggregate's rule
+   * and reconcile its members before answering. Unlike creation, a failed
+   * reconcile fails the request: the admin asked for a change in who is read,
+   * a removed project must stop being read now rather than tonight, and
+   * submitting the same rule again is safe. The caller has decided the actor
+   * is an organisation admin.
+   */
+  async updateAggregateRule({
+    projectId,
+    organizationId,
+    aggregateRule,
+  }: {
+    projectId: string;
+    organizationId: string;
+    aggregateRule: AggregateRule;
+  }): Promise<{ project: Project; members: AggregateReconcileResult }> {
+    if (!this.aggregateRules || !this.aggregateReconciler) {
+      throw new Error(
+        "No aggregate rule service or reconciler is wired; an aggregate rule cannot be edited here",
+      );
+    }
+    await this.aggregateRules.assertValid({
+      rule: aggregateRule,
+      organizationId,
+    });
+    const project = await this.repo.updateAggregateRule({
+      id: projectId,
+      organizationId,
+      aggregateRule,
+    });
+    if (!project) throw new ProjectNotFoundError("Project not found");
+    const members = await this.aggregateReconciler.reconcile({
+      aggregateProjectId: project.id,
+    });
+    return { project, members };
   }
 
   /**

@@ -9,7 +9,11 @@ import {
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
 import { parseOnboardingVariant } from "~/server/schemas/sign-up-data.schema";
-import { projectKindsHiddenFrom } from "../project-kinds";
+import type { AggregateRule } from "../aggregate-rule";
+import {
+  AGGREGATE_PROJECT_KIND,
+  projectKindsHiddenFrom,
+} from "../project-kinds";
 import type {
   CreateProjectInput,
   CreateTeamWithBindingInput,
@@ -238,6 +242,28 @@ export class PrismaProjectRepository implements ProjectRepository {
     const result = await this.prisma.project.updateMany({
       where,
       data: { archivedAt: new Date() },
+    });
+    if (result.count === 0) return null;
+    return this.prisma.project.findUnique({ where: { id } });
+  }
+
+  async updateAggregateRule({
+    id,
+    organizationId,
+    aggregateRule,
+  }: {
+    id: string;
+    organizationId: string;
+    aggregateRule: AggregateRule;
+  }): Promise<Project | null> {
+    const result = await this.prisma.project.updateMany({
+      where: {
+        id,
+        kind: AGGREGATE_PROJECT_KIND,
+        archivedAt: null,
+        team: { organizationId, archivedAt: null },
+      },
+      data: { aggregateRule },
     });
     if (result.count === 0) return null;
     return this.prisma.project.findUnique({ where: { id } });

@@ -10,6 +10,7 @@
  */
 
 import { DepartmentService } from "@ee/governance/services/department/department.service";
+import { AuthzCollectorService, AuthzService } from "@langwatch/authz-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
@@ -21,15 +22,21 @@ import { NullLwqlKeyMapRepository } from "~/server/analytics/lwql/lwqlKeyMap.rep
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { AuthorizationService } from "~/server/app-layer/authz/authorization.service";
 import {
   GrantsLedgerWriter,
   resetAuthzGrantsCommandsForTests,
 } from "~/server/app-layer/authz/ledger";
+import { GrantsAuthzReadRepository } from "~/server/app-layer/authz/repositories/authz-read.grants.repository";
+import { SharedReadsGrantsRepository } from "~/server/app-layer/authz/repositories/shared-reads.grants.repository";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PrismaScheduledJobRepository } from "~/server/app-layer/scheduler/scheduled-job.repository";
 import { prisma } from "~/server/db";
 import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
-import { AggregateReconciler } from "../aggregate-reconciler.service";
+import {
+  AGGREGATE_RULE_NO_LONGER_MATCHES,
+  AggregateReconciler,
+} from "../aggregate-reconciler.service";
 import type { AggregateRule } from "../aggregate-rule";
 import { AggregateRuleService } from "../aggregate-rule.service";
 import { ProjectService } from "../project.service";
@@ -78,8 +85,35 @@ const reconciler = new AggregateReconciler({
   schedule: new PrismaScheduledJobRepository(prisma),
 });
 
+/** The door every trace read goes through: what the proof says is readable. */
+const authorizationDoor = () => {
+  const collector = new AuthzCollectorService(
+    new GrantsAuthzReadRepository(prisma),
+  );
+  return new AuthorizationService({
+    authz: new AuthzService(collector),
+    collector,
+    sharedReads: new SharedReadsGrantsRepository(prisma),
+  });
+};
+
 describe("Feature: the reconciler keeps members current", () => {
   let fixture: AggregateFixture;
+
+  /** The projects a trace read on the aggregate may reach through grants. */
+  const sharedProjectsInProof = async (aggregateProjectId: string) => {
+    const proof = await authorizationDoor().authorize({
+      actor: { type: "user", id: fixture.admin.id },
+      principal: { type: "user", id: fixture.admin.id },
+      permission: "traces:view",
+      scope: { projectId: aggregateProjectId },
+      purpose: { kind: "route", route: "traces.list" },
+    });
+    return proof.grants
+      .filter((grant) => grant.kind === "shared")
+      .map((grant) => grant.projectId)
+      .sort();
+  };
 
   /** Every shared-read Grant row the aggregate holds, revoked ones included. */
   const sharedReadRowsOf = (aggregateProjectId: string) =>
@@ -268,6 +302,68 @@ describe("Feature: the reconciler keeps members current", () => {
             departmentId: fixture.departments.engineering.id,
           });
         }
+      });
+    });
+  });
+
+  /** @scenario "Removing a project from an explicit rule revokes its read" */
+  describe("given an aggregate project with an explicit list of two projects", () => {
+    describe("when ana edits the rule to drop one project", () => {
+      it("drops that project from the proof and keeps its grant row, marked revoked", async () => {
+        const kept = fixture.shared.id;
+        const dropped = fixture.personal.seller.id;
+        const aggregate = await createAggregate({
+          kind: "explicit",
+          projectIds: [kept, dropped],
+        });
+        expect(await sharedProjectsInProof(aggregate.id)).toEqual(
+          [kept, dropped].sort(),
+        );
+
+        await callerFor(fixture.admin.id).project.updateAggregateRule({
+          projectId: aggregate.id,
+          aggregateRule: { kind: "explicit", projectIds: [kept] },
+        });
+
+        expect(await sharedProjectsInProof(aggregate.id)).toEqual([kept]);
+        const droppedRows = (await sharedReadRowsOf(aggregate.id)).filter(
+          (row) => row.scopeId === dropped,
+        );
+        expect(droppedRows).toHaveLength(1);
+        expect(droppedRows[0]?.revokedAt).not.toBeNull();
+        expect(droppedRows[0]?.revokedReason).toBe(
+          AGGREGATE_RULE_NO_LONGER_MATCHES,
+        );
+        expect(
+          (
+            await prisma.project.findUniqueOrThrow({
+              where: { id: aggregate.id },
+            })
+          ).aggregateRule,
+        ).toEqual({ kind: "explicit", projectIds: [kept] });
+      });
+    });
+
+    describe("when a member who is not an admin asks to edit the rule", () => {
+      it("is refused and the rule and its reads stay as they were", async () => {
+        const aggregate = await createAggregate({
+          kind: "explicit",
+          projectIds: [fixture.shared.id, fixture.personal.seller.id],
+        });
+
+        await expect(
+          callerFor(fixture.member.id).project.updateAggregateRule({
+            projectId: aggregate.id,
+            aggregateRule: {
+              kind: "explicit",
+              projectIds: [fixture.shared.id],
+            },
+          }),
+        ).rejects.toThrow();
+
+        expect(await liveMembersOf(aggregate.id)).toEqual(
+          [fixture.shared.id, fixture.personal.seller.id].sort(),
+        );
       });
     });
   });

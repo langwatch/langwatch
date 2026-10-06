@@ -15,6 +15,7 @@ import { probeProjectPermission } from "~/server/app-layer/permissions/imperativ
 import { aggregateRuleSchema } from "~/server/app-layer/projects/aggregate-rule";
 import {
   governanceProjectRouteViolation,
+  ProjectNotFoundError,
   personalWorkspaceArchiveViolation,
   personalWorkspaceCreateViolation,
   personalWorkspaceMoveViolation,
@@ -298,6 +299,48 @@ export const projectRouter = createTRPCRouter({
       }
 
       return { success: true, projectSlug: project.slug };
+    }),
+  /**
+   * ADR-144 block E: an organisation admin edits which projects an aggregate
+   * reads. The new rule is validated, written and reconciled before this
+   * answers, so a dropped project's read is revoked by the time the admin
+   * sees the result. Its own mutation rather than a field on `update`, which
+   * any project editor may call.
+   */
+  updateAggregateRule: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        aggregateRule: aggregateRuleSchema,
+      }),
+    )
+    .permission("organization:manage", { via: "projectId" })
+    .mutation(async ({ input, ctx }) => {
+      const current = await getApp().projects.getWithTeam(input.projectId);
+      if (!current || !isAggregateProjectKind(current.kind)) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+      const organizationId = current.team.organizationId;
+      await assertCanOpenAggregates({
+        userId: ctx.session.user.id,
+        organizationId,
+      });
+      try {
+        const { members } = await getApp().projects.updateAggregateRule({
+          projectId: input.projectId,
+          organizationId,
+          aggregateRule: input.aggregateRule,
+        });
+        return { success: true, members };
+      } catch (error) {
+        if (error instanceof ProjectNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
+      }
     }),
   /**
    * The base key grants full access to one project. Revealing it is therefore

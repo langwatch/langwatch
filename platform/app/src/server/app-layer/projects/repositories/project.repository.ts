@@ -145,6 +145,16 @@ export interface ProjectRepository extends ProjectKindRepository {
     id: string;
     organizationId: string;
   }): Promise<Project | null>;
+  /**
+   * ADR-144 block E: replace a live aggregate's stored rule. Null when no live
+   * aggregate of this organisation has the id; the caller has validated the
+   * rule.
+   */
+  updateAggregateRule(params: {
+    id: string;
+    organizationId: string;
+    aggregateRule: AggregateRule;
+  }): Promise<Project | null>;
   findAllByOrganization(params: {
     organizationId: string;
     page: number;
@@ -257,6 +267,14 @@ export class NullProjectRepository implements ProjectRepository {
   async archive(_params: {
     id: string;
     organizationId: string;
+  }): Promise<Project | null> {
+    return null;
+  }
+
+  async updateAggregateRule(_params: {
+    id: string;
+    organizationId: string;
+    aggregateRule: AggregateRule;
   }): Promise<Project | null> {
     return null;
   }
