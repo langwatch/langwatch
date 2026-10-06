@@ -3,7 +3,7 @@ import { Box, type BoxProps, HStack, Text, VStack } from "@langwatch/design-syst
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { RenderInputOutput } from "../../behavior/lent-trace.tsx";
 import { isJson } from "../../model/is-json.ts";
@@ -92,14 +92,14 @@ export function HoverableBigText({
   const [textExpanded, setTextExpanded] = useState<string | undefined>(undefined);
   const expandedVersion_ = expandedVersion ?? children;
 
-  const checkOverflow = () => {
+  const checkOverflow = useCallback(() => {
     setIsOverflown(
       ref.current
         ? Math.abs(ref.current.offsetWidth - ref.current.scrollWidth) > 2 ||
             Math.abs(ref.current.offsetHeight - ref.current.scrollHeight) > 2
         : false,
     );
-  };
+  }, []);
 
   // Re-measure after every render, once the browser has laid the box out.
   // The handle is cleared on unmount and before the next render's probe, so a
@@ -108,6 +108,16 @@ export function HoverableBigText({
     const timeout = setTimeout(checkOverflow, 100);
     return () => clearTimeout(timeout);
   });
+
+  // A resize, a column drag or a sidebar opening reflows the box without a
+  // render, so the box is also watched and re-measured when its size changes.
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(checkOverflow);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [checkOverflow]);
 
   return (
     <>

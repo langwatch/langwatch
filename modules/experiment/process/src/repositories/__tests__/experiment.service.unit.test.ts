@@ -568,6 +568,38 @@ describe("ExperimentService", () => {
     expect(restored.state?.results?.runId).toBe("run_1");
   });
 
+  /** @scenario "An agent edits an experiment through the REST surface" */
+  it("lists both saves and the restore, newest first", async () => {
+    const { service } = build();
+    const created = await service.createEvaluationsV3({
+      projectId: "project_1",
+      state: workbenchState("Original"),
+      actor: { label: "api" },
+    });
+    await service.saveWorkbenchState({
+      projectId: "project_1",
+      id: created.experimentId,
+      state: workbenchState("Changed"),
+      expectedVersion: created.version,
+      actor: { label: "api" },
+    });
+    await service.restoreWorkbenchVersion({
+      projectId: "project_1",
+      id: created.experimentId,
+      version: created.version,
+      actor: { label: "api" },
+    });
+
+    const page = await service.listWorkbenchVersions({
+      projectId: "project_1",
+      id: created.experimentId,
+    });
+
+    const versions = page.versions.map((entry) => entry.version);
+    expect(versions.length).toBeGreaterThanOrEqual(3);
+    expect(versions).toEqual(versions.toSorted((a, b) => b - a));
+  });
+
   /** @scenario "DSPy steps use the Experiment service" */
   it("owns DSPy step writes and reads", async () => {
     const { service } = build();

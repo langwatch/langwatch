@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_PRECONDITION,
+  fieldRequiresKey,
   getAllowedRulesForField,
   getFieldOptionsByCategory,
   getFieldValueType,
@@ -93,6 +94,25 @@ describe("preconditionFieldUtils", () => {
     it("returns subset of rules for array fields like metadata.labels", () => {
       const rules = getAllowedRulesForField("metadata.labels");
       expect(rules).toEqual(["is", "contains", "not_contains"]);
+    });
+
+    /** @scenario "Allowed rules derive from field characteristics" */
+    it("derives every rule set from the field's characteristics", () => {
+      const text = ["is", "contains", "not_contains", "matches_regex"];
+      for (const field of ["input", "output", "metadata.user_id", "metadata.thread_id"] as const) {
+        expect(getAllowedRulesForField(field), field).toEqual(text);
+      }
+      for (const field of ["traces.error", "annotations.hasAnnotation"] as const) {
+        expect(getAllowedRulesForField(field), field).toEqual(["is"]);
+      }
+      for (const field of ["traces.origin", "spans.type", "spans.model"] as const) {
+        expect(getAllowedRulesForField(field), field).toEqual(["is"]);
+      }
+      for (const field of ["metadata.labels", "metadata.prompt_ids"] as const) {
+        expect(getAllowedRulesForField(field), field).toEqual(["is", "contains", "not_contains"]);
+      }
+      expect(getAllowedRulesForField("metadata.value")).toEqual(text);
+      expect(fieldRequiresKey("metadata.value")).not.toBeNull();
     });
   });
 

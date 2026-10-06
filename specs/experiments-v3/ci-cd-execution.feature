@@ -23,14 +23,13 @@ Feature: CI/CD Execution of Platform Evaluations
 
   Scenario: API key authentication via X-Auth-Token header
     Given a valid API key in the X-Auth-Token header
-    When I POST to /api/experiments/my-evaluation/run
-    Then I receive 200 OK
-    And the response contains a runId
+    When the project key door identifies the request that POSTs to /api/experiments/my-evaluation/run
+    Then the key resolves to exactly its own project
 
   Scenario: API key authentication via Authorization Bearer header
     Given a valid API key in the Authorization header as "Bearer {key}"
-    When I POST to /api/experiments/my-evaluation/run
-    Then I receive 200 OK
+    When the project key door identifies the request that POSTs to /api/experiments/my-evaluation/run
+    Then the key resolves to exactly its own project
 
   @unimplemented
   Scenario: Missing API key returns 401

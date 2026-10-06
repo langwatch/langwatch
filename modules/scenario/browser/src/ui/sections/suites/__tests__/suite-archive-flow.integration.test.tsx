@@ -198,6 +198,18 @@ describe("Archiving a suite from the Suites page", () => {
     return { user, dialog: await screen.findByRole("dialog") };
   }
 
+  describe("given a suite is archived from its context menu", () => {
+    /** @scenario "Archive confirmation dialog appears when archiving a suite" */
+    it("asks first, naming the suite and saying it leaves the sidebar", async () => {
+      const { dialog } = await openArchiveDialog();
+
+      expect(within(dialog).getByText("Archive run plan?")).toBeInTheDocument();
+      expect(within(dialog).getByText("My Suite")).toBeInTheDocument();
+      expect(within(dialog).getByText(/no longer appear in the sidebar/)).toBeInTheDocument();
+      expect(archiveMutate).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given the archive confirmation dialog is open", () => {
     /** @scenario Cancel dismisses the archive confirmation dialog without archiving */
     it("closes on Cancel, archives nothing and leaves the suite in the sidebar", async () => {

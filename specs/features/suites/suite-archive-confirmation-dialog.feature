@@ -15,7 +15,7 @@ Feature: Suite archive confirmation dialog
   Scenario: Archive confirmation dialog appears when archiving a suite
     When I right-click on the "Smoke Tests" suite
     And I click "Archive" in the context menu
-    Then I see a confirmation dialog with the title "Archive suite?"
+    Then I see a confirmation dialog with the title "Archive run plan?"
     And the dialog displays the suite name "Smoke Tests"
     And the dialog explains that archived suites no longer appear in the sidebar
 

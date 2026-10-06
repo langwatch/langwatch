@@ -117,6 +117,7 @@ function renderGrants({
 }
 
 describe("given grants answered for the scope the reader is standing in", () => {
+  /** @scenario "Organization permissions are independent of project permissions" */
   it("keeps project grants out of organization permission checks", async () => {
     const view = renderGrants({
       transport: answeringTransport((path, input) =>

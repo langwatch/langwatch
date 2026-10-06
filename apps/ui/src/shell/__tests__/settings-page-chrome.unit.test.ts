@@ -111,3 +111,32 @@ describe("given every page the route table serves under a settings section", () 
     });
   });
 });
+
+/** Every redirect the table declares under a settings section, at any depth. */
+function settingsRedirects(table: readonly UiRouteDescriptor[]): UiRouteDescriptor[] {
+  return table.flatMap((descriptor) => [
+    ...("redirect" in descriptor &&
+    typeof descriptor.path === "string" &&
+    (descriptor.path === "/settings" || descriptor.path.startsWith("/settings/"))
+      ? [descriptor]
+      : []),
+    ...settingsRedirects("children" in descriptor ? (descriptor.children ?? []) : []),
+  ]);
+}
+
+describe("given the settings addresses that only forward", () => {
+  const forwards = settingsRedirects(uiRouteTable);
+
+  describe("when the route table declares them", () => {
+    /** @scenario "An address that only forwards is not framed on the way past" */
+    it("gives each a destination and no layout, page or children to draw", () => {
+      expect(forwards.length).toBeGreaterThan(0);
+      for (const descriptor of forwards) {
+        expect(descriptor, `${descriptor.path} forwards`).toHaveProperty("redirect.to");
+        expect(descriptor, `${descriptor.path} draws nothing`).not.toHaveProperty("layout");
+        expect(descriptor, `${descriptor.path} draws nothing`).not.toHaveProperty("page");
+        expect(descriptor, `${descriptor.path} draws nothing`).not.toHaveProperty("children");
+      }
+    });
+  });
+});
