@@ -1,9 +1,9 @@
 {
   "record": "dev/docs/ARCHITECTURE.md §15, deleted spellings: each spelling's count in code (Alex, plan dev/docs/plans/architecture-teaching-2026-10-05.md step 2). Shrink-only: lower a count in the change that removes a use (node --experimental-transform-types packages/architecture-enforcer/src/tools/deleted-spellings.ts --lower).",
   "findings": {
-    "`*-composition.build.ts` files": 3,
+    "`*-composition.build.ts` files": 2,
     "`*.members.ts` files": 4,
-    "`reads(...)` statics and `static readonly reads`": 42,
+    "`reads(...)` statics and `static readonly reads`": 41,
     "`refusing*` twins": 9,
     "<UiSlot>": 8,
     "absence classes (`Logged*Absence`, `Absent*`)": 4,
@@ -17,14 +17,14 @@
     "MemberName": 16,
     "membersFrom": 4,
     "MemberSource": 21,
-    "MembersRead": 26,
+    "MembersRead": 24,
     "MissingSupply": 9,
     "noMembers": 4,
     "per-module `use-feature-flag.ts` copies": 2,
     "ProcessMembers": 119,
     "public-app-config.projection.ts": 1,
     "RestErrorHandler": 44,
-    "setup.members": 9,
+    "setup.members": 8,
     "storesBackedMembers": 24,
     "SupplyToken": 19,
     "the ops \"backoffice\"": 323,
@@ -38,11 +38,11 @@
     "useDrawer<Map>()": 3,
     "useUiSlot / useUiSlots": 6,
     "withAnalytical": 7,
-    "withKeyvalue": 9,
-    "withMemoryRepositories": 62,
+    "withKeyvalue": 8,
+    "withMemoryRepositories": 56,
     "withPersistence": 1,
     "withProvided": 12,
-    "withRelational": 9,
+    "withRelational": 6,
     "withSlots": 4
   }
 }
