@@ -9,10 +9,7 @@ import type { Project } from "~/generated/prisma/client";
 // Project (personalFeatures, langyEgressAllowlist, aggregateRule) must be
 // listed here.
 export const projectFactory = Factory.define<
-  Omit<
-    Project,
-    "personalFeatures" | "langyEgressAllowlist" | "aggregateRule"
-  >
+  Omit<Project, "personalFeatures" | "langyEgressAllowlist" | "aggregateRule">
 >(({ sequence }) => ({
   id: nanoid(),
   name: `Test Project ${sequence}`,

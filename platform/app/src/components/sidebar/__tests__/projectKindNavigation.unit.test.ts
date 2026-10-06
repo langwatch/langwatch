@@ -22,17 +22,18 @@ describe("given the project navigation", () => {
   });
 
   describe("when the open project is any other kind", () => {
-    it.each(["application", null, undefined])(
-      "keeps the whole menu for %s",
-      (kind) => {
-        expect(projectNavigation(kind)).toEqual({
-          home: true,
-          observe: true,
-          onlineEvaluations: true,
-          test: true,
-          build: true,
-        });
-      },
-    );
+    it.each([
+      "application",
+      null,
+      undefined,
+    ])("keeps the whole menu for %s", (kind) => {
+      expect(projectNavigation(kind)).toEqual({
+        home: true,
+        observe: true,
+        onlineEvaluations: true,
+        test: true,
+        build: true,
+      });
+    });
   });
 });

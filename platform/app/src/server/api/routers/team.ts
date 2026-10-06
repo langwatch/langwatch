@@ -2,9 +2,9 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { TeamUserRole } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { PERSONAL_TEAM_ARCHIVE_REFUSAL } from "~/server/app-layer/teams/team.service";
-import { getApp } from "~/server/app-layer/app";
 import { TeamService } from "~/server/teams/team.service";
 import {
   assertEnterprisePlan,

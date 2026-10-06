@@ -418,8 +418,7 @@ beforeAll(async () => {
   governanceProjectId = (
     await mkProject({ slug: "gov", kind: "internal_governance" })
   ).id;
-  aggregateProjectId = (await mkProject({ slug: "agg", kind: "aggregate" }))
-    .id;
+  aggregateProjectId = (await mkProject({ slug: "agg", kind: "aggregate" })).id;
 
   const user = await prisma.user.create({
     data: { name: "Leak Gate", email: `${ns}@example.com` },
@@ -483,7 +482,10 @@ beforeAll(async () => {
     organizationRole: OrganizationUserRole,
   ) => {
     const person = await prisma.user.create({
-      data: { name: `Leak Gate ${handle}`, email: `${handle}-${ns}@example.com` },
+      data: {
+        name: `Leak Gate ${handle}`,
+        email: `${handle}-${ns}@example.com`,
+      },
     });
     await prisma.organizationUser.create({
       data: { userId: person.id, organizationId, role: organizationRole },
@@ -772,34 +774,39 @@ function roleAwareListings({
 describe("the aggregate project as a non-admin sees it", () => {
   describe("given an aggregate project on a team whose members are not organization admins", () => {
     it.each([
-      ["a member who is not an admin", () => memberUserId, OrganizationUserRole.MEMBER],
-      ["a member holding only a Developer seat", () => developerUserId, OrganizationUserRole.DEVELOPER],
-    ])(
-      "keeps it out of every project list %s can open",
-      async (_who, personId, role) => {
-        const leaked: string[] = [];
-        const blind: string[] = [];
-        for (const surface of roleAwareListings({
-          personId: personId(),
-          role,
-        })) {
-          const ids = await surface.ids();
-          // The Developer seat sees no shared project in the selector at all,
-          // so only the surfaces that list by team, not by grant, can show it
-          // the ordinary project as the control.
-          if (
-            role !== OrganizationUserRole.DEVELOPER &&
-            !ids.includes(applicationProjectId)
-          ) {
-            blind.push(surface.name);
-          }
-          if (ids.includes(aggregateProjectId)) leaked.push(surface.name);
+      [
+        "a member who is not an admin",
+        () => memberUserId,
+        OrganizationUserRole.MEMBER,
+      ],
+      [
+        "a member holding only a Developer seat",
+        () => developerUserId,
+        OrganizationUserRole.DEVELOPER,
+      ],
+    ])("keeps it out of every project list %s can open", async (_who, personId, role) => {
+      const leaked: string[] = [];
+      const blind: string[] = [];
+      for (const surface of roleAwareListings({
+        personId: personId(),
+        role,
+      })) {
+        const ids = await surface.ids();
+        // The Developer seat sees no shared project in the selector at all,
+        // so only the surfaces that list by team, not by grant, can show it
+        // the ordinary project as the control.
+        if (
+          role !== OrganizationUserRole.DEVELOPER &&
+          !ids.includes(applicationProjectId)
+        ) {
+          blind.push(surface.name);
         }
+        if (ids.includes(aggregateProjectId)) leaked.push(surface.name);
+      }
 
-        expect(blind).toEqual([]);
-        expect(leaked).toEqual([]);
-      },
-    );
+      expect(blind).toEqual([]);
+      expect(leaked).toEqual([]);
+    });
 
     it("lists it to an organization admin on the same surfaces", async () => {
       for (const surface of roleAwareListings({
