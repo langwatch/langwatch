@@ -287,6 +287,8 @@ export async function seedAggregateOrganization(
         ["grant", { organizationId }],
         ["roleBinding", { organizationId }],
         ["apiKey", { organizationId }],
+        ["customRole", { organizationId }],
+        ["role", { organizationId }],
         ["teamUser", { team: { organizationId } }],
         ["project", { team: { organizationId } }],
         ["team", { organizationId }],

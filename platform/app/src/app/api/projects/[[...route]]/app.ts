@@ -22,7 +22,10 @@ import {
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
 } from "~/server/app-layer/projects/project.service";
-import { aggregateProjectRouteViolation } from "~/server/app-layer/projects/project-kinds";
+import {
+  aggregateProjectRouteViolation,
+  isAggregateProjectKind,
+} from "~/server/app-layer/projects/project-kinds";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
@@ -279,6 +282,34 @@ async function readableProject({
   return project;
 }
 
+/**
+ * Refuses a write to an aggregate unless the credential's owner is an
+ * organization admin, reading as not found like {@link readableProject}. The
+ * write routes check their permission at the organization, so an
+ * organization-tier custom role would otherwise rename or archive one. Every
+ * other kind is left to the service, which owns its own refusals (the
+ * governance project answers 403 there, naming what it is).
+ */
+async function assertAggregateWritable({
+  id,
+  organizationId,
+  resolved,
+  service,
+}: {
+  id: string;
+  organizationId: string;
+  resolved: OrgResolvedToken;
+  service: ProjectService;
+}): Promise<void> {
+  const project = await service.getWithTeam(id);
+  if (!project || !isAggregateProjectKind(project.kind)) return;
+  const violation = aggregateProjectRouteViolation({
+    kind: project.kind,
+    organizationRole: await credentialOwnerRole({ resolved, organizationId }),
+  });
+  if (violation) throw new NotFoundError("Project not found");
+}
+
 secured
   .access(requires("project:view"))
   .get(
@@ -337,6 +368,13 @@ secured
       const body = c.req.valid("json");
       const service = c.get("projectService") as ProjectService;
 
+      await assertAggregateWritable({
+        id,
+        organizationId: organization.id,
+        resolved: c.get("orgResolvedToken") as OrgResolvedToken,
+        service,
+      });
+
       let project;
       try {
         project = await service.update({
@@ -367,6 +405,13 @@ secured
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
       const service = c.get("projectService") as ProjectService;
+
+      await assertAggregateWritable({
+        id,
+        organizationId: organization.id,
+        resolved: c.get("orgResolvedToken") as OrgResolvedToken,
+        service,
+      });
 
       let project;
       try {
