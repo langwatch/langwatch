@@ -13,8 +13,10 @@ import type { SignInProviderMounts, SsoApi } from "@langwatch/enterprise-sso-con
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
+import type { Logger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -55,6 +57,7 @@ async function appFor(
     mounts?: SignInProviderMounts;
     askedFor?: MountsRequest[];
     identity?: IdentityApi;
+    logger?: Logger;
   } = {},
 ): Promise<AuthModule> {
   return AuthModule.create({
@@ -103,6 +106,7 @@ async function appFor(
       identityEmails: undefined as never,
       invites: null,
       processName: "langwatch-api",
+      logger: providers.logger,
     },
     resources: { own: () => undefined } as never,
     // The deployment's session key reaches the app through its declared handle.
@@ -146,6 +150,25 @@ describe("given a deployment that named one", () => {
     const app = await appFor(true);
 
     expect(await app.betterAuth()).toBe(await app.betterAuth());
+  });
+
+  describe("when several callers ask for Better Auth", () => {
+    /** @scenario "The API composes the stock engine and reports the absent pipeline once" */
+    it("composes the stock Prisma engine and reports the absent identity pipeline once", async () => {
+      const { logger, lines } = createTestLogger();
+      const app = await appFor(true, { logger: logger as Logger });
+
+      await Promise.all([app.betterAuth(), app.betterAuth()]);
+      const context = await (await app.betterAuth()).$context;
+
+      expect(context.adapter.id).toBe("prisma");
+      const absences = lines.filter((line) => Array.isArray(line.absent));
+      expect(absences).toHaveLength(1);
+      expect(absences[0]).toMatchObject({
+        level: 40,
+        absent: ["identity-pipeline", "sign-in-router-shadow"],
+      });
+    });
   });
 
   it("verifies a browser session through that instance and accepts what it accepts", async () => {

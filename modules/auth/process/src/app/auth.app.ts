@@ -61,7 +61,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
@@ -187,6 +187,8 @@ type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
     processName: string;
     /** Process time, injected so session expiry has deterministic tests. */
     now?: (() => Instant) | undefined;
+    /** Where composition notices go, injected so a test can read the one absence line. */
+    logger?: Logger | undefined;
   }>;
 
 /** The peers the app keeps past construction; identity decides where an address signs in. */
@@ -633,6 +635,7 @@ export class AuthModule implements AuthApiContract {
               now,
             }),
             signUpProofs: app.#signUp,
+            passkeySignUpEligibility: app.#signUpEnrollment,
             prisma: members.prisma,
             encryption: members.encryption,
             redis: members.redis,
@@ -656,7 +659,7 @@ export class AuthModule implements AuthApiContract {
             trustedIdpOrigins: config.trustedIdpOrigins,
             idpSimulatorUrl: config.idpSimulatorUrl,
             isProduction: config.nodeEnvironment === "production",
-            logger,
+            logger: members.logger ?? logger,
           });
       } else {
         logger.info(

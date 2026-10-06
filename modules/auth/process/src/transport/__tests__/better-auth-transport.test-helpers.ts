@@ -100,6 +100,7 @@ export function betterAuthTransportFor(
     findGoverningConnections: async () => [],
     /** Sign-up is open, as on an installation that sets neither variable. */
     signUpPolicy: { checkSignUp: async () => ({ allowed: true, via: "open" }) },
+    passkeySignUpEligibility: { enrolsLocally: async () => true },
     credentialGuard: CredentialSessionGuard.create(
       CredentialSignInPolicyService.create({
         routing: null,

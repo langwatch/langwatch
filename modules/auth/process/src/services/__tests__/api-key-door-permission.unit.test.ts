@@ -43,6 +43,19 @@ const projectTokens = new Map<string, ResolvedApiKeyCredential>([
       project: PROJECT,
     },
   ],
+  [
+    "sk-lw-langy",
+    {
+      type: "apiKey",
+      apiKeyId: "key-langy",
+      userId: "user-1",
+      organizationId: ORGANIZATION_ID,
+      ingestSourceType: null,
+      ingestionTemplateId: null,
+      isLangySessionKey: true,
+      project: PROJECT,
+    },
+  ],
 ]);
 const organizationTokens = new Map<string, OrganizationApiKeyResolution>([
   [
@@ -254,5 +267,51 @@ describe("the key door asking a permission", () => {
         expect(asked).toEqual([]);
       },
     );
+  });
+});
+
+/**
+ * A refused Langy session key has two causes that look alike at the ceiling, and only one has an
+ * action behind it: nobody can grant a permission Langy is never delegated.
+ */
+describe("the project door refusing the key a Langy chat mints", () => {
+  const askAsLangy = (permission: "secrets:view" | "prompts:create") =>
+    door.authenticate({
+      request: new Request("http://localhost/api/prompts", {
+        headers: { authorization: "Bearer sk-lw-langy" },
+      }),
+      permissions: [permission],
+    });
+
+  beforeEach(() => {
+    asked.length = 0;
+    held = [];
+  });
+
+  describe("when the permission is one Langy is never delegated", () => {
+    /** @scenario "A permission Langy is never delegated says so" */
+    it("says it is not delegable, pointing at LangWatch rather than a wider key or an admin", async () => {
+      const error = await askAsLangy("secrets:view").then(
+        () => null,
+        (thrown: unknown) => thrown,
+      );
+
+      if (!HandledError.isHandled(error)) throw new Error("the door admitted the key");
+      expect(error).toMatchObject({
+        code: "api_key_permission_not_delegable",
+        httpStatus: 403,
+        meta: { permission: "secrets:view" },
+      });
+      expect(error.tips.join(" ")).not.toMatch(/ask an admin|re-create the api key/i);
+      expect(error.tips.join(" ")).toMatch(/in LangWatch/);
+    });
+  });
+
+  describe("when the permission is one Langy may hold", () => {
+    it("keeps the ordinary refusal, where widening the key is the right advice", async () => {
+      expect(await refusal(askAsLangy("prompts:create"))).toMatchObject({
+        code: "api_key_permission_denied",
+      });
+    });
   });
 });

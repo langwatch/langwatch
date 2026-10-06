@@ -581,11 +581,11 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And the account ceremonies it binds are the bridge ceremonies
 
   @unit
-  Scenario: An API process with no event stack names the branch it did not compose
-    Given an API process that registered no identity pipeline
-    When it composes better-auth
+  Scenario: The API composes the stock engine and reports the absent pipeline once
+    Given an API process with a browser-session identity
+    When it composes better-auth, however many callers ask for it
     Then better-auth's storage is the stock engine
-    And the absence is reported once, naming what a user delete, an account write and an account delete no longer do
+    And the absent identity pipeline is reported once
   # ---------------------------------------------------------------------------
   # Transactions - what the adapter can promise, and what it must not
   # ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
+import { findRegisteredRefusals } from "../../../rules/better-auth-error-code.rules.ts";
 import {
   answerAuthRefusalByRegisteredCode,
   releaseHandledRefusal,
@@ -197,6 +198,42 @@ describe("answerAuthRefusalByRegisteredCode", () => {
 
     expect(answered({ path: "/verify-email?token=t", refused })).toMatchObject({
       code: "identity_verification_invalid",
+    });
+  });
+});
+
+describe("given a passkey ceremony fails for a reason nothing anticipated", () => {
+  describe("when it arrives on a translated path", () => {
+    /** @scenario "A failure we cannot name stays unnamed" */
+    it("passes through byte for byte rather than getting a code invented for it", () => {
+      const refused = APIError.from("INTERNAL_SERVER_ERROR", {
+        code: "SOME_FUTURE_BETTER_AUTH_FAILURE",
+        message: "unexpected",
+      });
+
+      expect(answered({ path: "/passkey/verify-registration", refused })).toBe(refused);
+      expect(
+        findRegisteredRefusals({
+          pathname: "/api/auth/passkey/verify-registration",
+          betterAuthCode: "SOME_FUTURE_BETTER_AUTH_FAILURE",
+        }),
+      ).toEqual([]);
+    });
+
+    /** @scenario "A failure we cannot name stays unnamed" */
+    it("stays unnamed even where the same code IS named on another family", () => {
+      const refused = APIError.from("BAD_REQUEST", { code: "INVALID_TOKEN", message: "no" });
+
+      expect(answered({ path: "/passkey/verify-authentication", refused })).toBe(refused);
+    });
+  });
+
+  describe("given a path outside the families we translate", () => {
+    /** @scenario "A failure we cannot name stays unnamed" */
+    it("is left alone even when the code is one we know elsewhere", () => {
+      const refused = APIError.from("BAD_REQUEST", { code: "CHALLENGE_NOT_FOUND", message: "no" });
+
+      expect(answered({ path: "/sign-in/email", refused })).toBe(refused);
     });
   });
 });
