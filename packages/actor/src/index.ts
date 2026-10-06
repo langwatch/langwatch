@@ -33,6 +33,9 @@ export const SYSTEM_ACTORS = {
   readThroughMint: "system:read-through-mint",
   ssoAutoJoin: "system:sso-auto-join",
   scim: "system:scim",
+  /** ADR-144: the materialiser that turns an aggregate project's scope rule
+   *  into shared project-reader grants and revokes them when it changes. */
+  aggregateReconciler: "system:aggregate-reconciler",
   /** Policy-driven auto-approval of a join request. An approval a person
    *  made carries that person as a user actor instead. */
   joinRequests: "system:join-requests",
