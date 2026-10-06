@@ -73,6 +73,7 @@
     "@langwatch/redaction": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/task": "workspace:*",
@@ -89,7 +90,6 @@
   "devDependencies": {
     "@langwatch/feature-flag-process": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/secrets": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
