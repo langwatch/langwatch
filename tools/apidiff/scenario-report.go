@@ -91,7 +91,7 @@ func (runner *scenarioRunner) judgeAgreement(result *scenarioResult) {
 	method, path, _ := strings.Cut(result.Endpoint, " ")
 	comparison := Comparison{Method: method, Path: path, Case: result.ID, ExactStatus: true}
 	outcome := CompareResults(comparison, result.Main.main, result.Branch.main)
-	if len(outcome.Findings) == 0 {
+	if len(unruledFindings(outcome.Findings)) == 0 {
 		return
 	}
 	result.Verdict, result.Diff = verdictFailDiff, outcome.Findings
