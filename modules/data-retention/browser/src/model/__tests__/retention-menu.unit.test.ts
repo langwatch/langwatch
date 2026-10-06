@@ -18,14 +18,17 @@ describe("buildRetentionMenuItems", () => {
       legacyDays: null,
     });
 
+    /** @scenario "A paid organization sees only the two fixed options" */
     it("offers exactly the two fixed presets, in order", () => {
       expect(labels(items)).toEqual(["1 month", "2 months"]);
     });
 
+    /** @scenario "A paid organization sees only the two fixed options" */
     it("offers no custom option", () => {
       expect(values(items)).not.toContain(CUSTOM_PRESET_VALUE);
     });
 
+    /** @scenario "A paid organization sees only the two fixed options" */
     it("offers no keep-forever option", () => {
       expect(values(items)).not.toContain(INDEFINITE_PRESET_VALUE);
     });
@@ -38,6 +41,7 @@ describe("buildRetentionMenuItems", () => {
       legacyDays: null,
     });
 
+    /** @scenario "An enterprise organization gets the full menu and a custom value" */
     it("offers the full preset list plus custom", () => {
       expect(labels(items)).toEqual([
         "1 month",
@@ -49,6 +53,10 @@ describe("buildRetentionMenuItems", () => {
       ]);
     });
 
+    /**
+     * @scenario "Keep-forever stays a platform-admin capability on every plan"
+     * @scenario The "no retention" option is hidden from non-platform-admins
+     */
     it("does not offer keep-forever to a non-admin", () => {
       expect(values(items)).not.toContain(INDEFINITE_PRESET_VALUE);
     });
@@ -68,6 +76,7 @@ describe("buildRetentionMenuItems", () => {
   });
 
   describe("given a grandfathered out-of-menu value being edited", () => {
+    /** @scenario "A grandfathered value is shown but never silently changed" */
     it("prepends a read-only 'current (legacy)' entry showing the stored days", () => {
       const items = buildRetentionMenuItems({
         isEnterprise: false,

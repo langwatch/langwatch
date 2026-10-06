@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { RetentionScopeGroup } from "../../../model/retention-grouping.ts";
 import { RemoveScopeConfirmDialog } from "../remove-scope-confirm-dialog.tsx";
@@ -26,6 +26,7 @@ describe("RemoveScopeConfirmDialog", () => {
 
   describe("given a scope group targeted for removal", () => {
     describe("when the fallback retention has resolved", () => {
+      /** @scenario "Removal asks for confirmation and previews the real fallback value" */
       it("reassures that no data is deleted", () => {
         render(
           <Wrapper>
@@ -45,6 +46,7 @@ describe("RemoveScopeConfirmDialog", () => {
         expect(screen.getByText(/No data is deleted/i)).toBeTruthy();
       });
 
+      /** @scenario "Removal asks for confirmation and previews the real fallback value" */
       it("shows the current value falling back to the resolved value", () => {
         render(
           <Wrapper>
@@ -64,6 +66,33 @@ describe("RemoveScopeConfirmDialog", () => {
         // current 91 days → fallback 49 days
         expect(screen.getByText("91 days")).toBeTruthy();
         expect(screen.getByText("49 days")).toBeTruthy();
+      });
+    });
+
+    describe("when the admin has not yet confirmed", () => {
+      /** @scenario "Removal asks for confirmation and previews the real fallback value" */
+      it("removes nothing until the Remove policy button is pressed", () => {
+        const onConfirm = vi.fn();
+        render(
+          <Wrapper>
+            <RemoveScopeConfirmDialog
+              group={group}
+              isRemoving={false}
+              onCancel={() => {}}
+              onConfirm={onConfirm}
+              preview={{
+                data: { traces: 49, scenarios: 49, experiments: 49 },
+                isLoading: false,
+                isError: false,
+              }}
+            />
+          </Wrapper>,
+        );
+        expect(onConfirm).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole("button", { name: "Remove policy" }));
+
+        expect(onConfirm).toHaveBeenCalledTimes(1);
       });
     });
 

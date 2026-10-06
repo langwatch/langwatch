@@ -171,6 +171,8 @@ func TestOverlayDisablesGoogleDLPWhenAsked(t *testing.T) {
 // not disarm the production alerts that read them), so haven's own container,
 // which has no backups and therefore no system.backup_log, has to opt out, or
 // every 15s stats tick fails on a missing table.
+//
+// @scenario "haven opts local worktrees out"
 func TestOverlayOptsOutOfBackupMetricsWhenManagingClickHouse(t *testing.T) {
 	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
 		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},

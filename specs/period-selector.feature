@@ -7,6 +7,7 @@ Feature: Period selector remembers relative ranges as relative
   clicking. Only when the user picks an absolute range (by entering explicit
   start/end dates) should the window stay fixed.
 
+  @integration
   Scenario: Picking a relative quick selector stores the selection as relative
     Given the user is on a page with a period selector
     When the user clicks "Last 15 minutes"

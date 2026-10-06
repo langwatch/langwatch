@@ -71,6 +71,7 @@ const inOrganization: RetentionProjectLineage = {
 
 describe("given an organization-scoped storage reading", () => {
   describe("when the caller can view only some of the organization's projects", () => {
+    /** @scenario "Storage never counts a project the caller cannot read" */
     it("sums only the projects the caller may read", async () => {
       const getTotalStorageBytesForTenants = vi.fn().mockResolvedValue(512);
       const service = StorageMeterScopeService.create({
@@ -93,6 +94,35 @@ describe("given an organization-scoped storage reading", () => {
 
       expect(getTotalStorageBytesForTenants).toHaveBeenCalledWith({ tenantIds: ["proj_a"] });
       expect(usage).toEqual({ totalBytes: 512, projectCount: 1 });
+    });
+  });
+
+  describe("when the caller can view every project in the organization", () => {
+    /** @scenario "Storage for an organization scope sums its projects" */
+    it("meters all of them as one figure", async () => {
+      const getTotalStorageBytesForTenants = vi.fn().mockResolvedValue(19);
+      const service = StorageMeterScopeService.create({
+        meter: {
+          getTotalStorageBytes: vi.fn(),
+          getTotalStorageBytesForTenants,
+        },
+        directory: new StubDirectory(inOrganization, [
+          { id: "proj_a", teamId: "team_1" },
+          { id: "proj_b", teamId: "team_2" },
+        ]),
+        permissions: permissionsFor(["proj_a", "proj_b"]),
+      });
+
+      const usage = await service.getScopeUsage({
+        projectId: "proj_a",
+        scope: ORGANIZATION_SCOPE,
+        actor: ACTOR,
+      });
+
+      expect(getTotalStorageBytesForTenants).toHaveBeenCalledWith({
+        tenantIds: ["proj_a", "proj_b"],
+      });
+      expect(usage).toEqual({ totalBytes: 19, projectCount: 2 });
     });
   });
 
