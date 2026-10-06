@@ -1,20 +1,19 @@
 /**
- * One template, as the blank board and the templates library show it: name and trunk, job,
- * preview, agent kinds and "Create board"; a coming-soon one says how far it is built.
- * Given `onFilter`, the trunk and agent kind labels toggle the library's chips.
+ * One template in the library: name and trunk badge, its job, a large preview, the agent kinds
+ * it suits, and "Create board" with the widget count. A coming-soon one says how far it is
+ * built. Given `onFilter`, the trunk badge and agent kind labels toggle the library's filters.
  */
 
 import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { Plus } from "lucide-react";
+import { Clock, Plus } from "lucide-react";
 
-import { AGENT_KIND_LABELS } from "../../catalogue/index.ts";
 import {
   type CatalogueFilterPick,
   type CatalogueFilters,
   isPicked,
 } from "../../model/catalogue-filter.ts";
 import type { LibraryTemplate } from "../../model/template-library.ts";
-import { CatalogueFilterLabel, TRUNK_PALETTES } from "./catalogue-filter-chips.tsx";
+import { AgentKindLabels, CatalogueFilterLabel, TRUNK_PALETTES } from "./catalogue-filters.tsx";
 import { TemplatePreview } from "./template-preview.tsx";
 
 export function TemplateCard({
@@ -33,68 +32,71 @@ export function TemplateCard({
 }) {
   const { board, trunk, agentKinds, widgetCount, preview } = template;
   const progress = board.comingSoon;
-  const label = (pick: CatalogueFilterPick) => ({
-    isActive: filters !== void 0 && isPicked({ filters, pick }),
-    onToggle: onFilter && (() => onFilter(pick)),
-  });
+  const trunkPick: CatalogueFilterPick = { group: "trunks", value: trunk };
   return (
     <VStack
       as="article"
       aria-label={board.name}
       align="stretch"
-      gap={3}
-      padding={4}
+      gap={4}
+      padding={{ base: 5, md: 6 }}
       minWidth={0}
       borderWidth="1px"
-      borderColor="border"
+      borderColor="border.muted"
       borderRadius="xl"
       background="bg.panel"
     >
-      <VStack align="stretch" gap={0.5} minWidth={0}>
+      <VStack align="stretch" gap={1} minWidth={0}>
         <HStack gap={2} minWidth={0}>
-          <Text as="h3" fontSize="14px" fontWeight="semibold" color="fg" truncate>
+          <Text as="h3" fontSize="15px" fontWeight="semibold" color="fg" truncate>
             {board.name}
           </Text>
           <CatalogueFilterLabel
+            shape="badge"
             label={trunk}
             colorPalette={TRUNK_PALETTES[trunk]}
-            {...label({ group: "trunks", value: trunk })}
+            isActive={filters !== void 0 && isPicked({ filters, pick: trunkPick })}
+            onToggle={onFilter && (() => onFilter(trunkPick))}
           />
         </HStack>
-        <Text fontSize="12px" lineHeight="1.5" color="fg.muted" lineClamp={2}>
+        {/* Two lines kept even for a short job, so previews line up across a row. */}
+        <Text fontSize="13px" lineHeight="20px" minHeight="40px" color="fg.muted" lineClamp={2}>
           {board.summary ?? board.description}
         </Text>
       </VStack>
-      <TemplatePreview preview={preview} />
+      <TemplatePreview preview={preview} isMuted={progress !== void 0} />
       <HStack gap={1} wrap="wrap">
-        {agentKinds.length === 0 ? (
-          <CatalogueFilterLabel label="Any agent" />
-        ) : (
-          agentKinds.map((kind) => (
-            <CatalogueFilterLabel
-              key={kind}
-              label={AGENT_KIND_LABELS[kind]}
-              {...label({ group: "agentKinds", value: kind })}
-            />
-          ))
-        )}
+        <AgentKindLabels agentKinds={agentKinds} filters={filters} onFilter={onFilter} />
       </HStack>
-      <HStack gap={2} marginTop="auto" paddingTop={1}>
-        <Button
-          size="sm"
-          variant="solid"
-          aria-label={`Create a board from ${board.name}`}
-          loading={isCreating}
-          loadingText="Creating…"
-          disabled={progress !== void 0}
-          onClick={onCreate}
-        >
-          <Plus size={14} aria-hidden />
-          Create board
-        </Button>
-        <Text marginLeft="auto" fontSize="11px" color="fg.subtle" textAlign="end">
+      <HStack gap={3} marginTop="auto">
+        {progress ? (
+          <Button
+            size="sm"
+            variant="subtle"
+            colorPalette="gray"
+            aria-label={`Create a board from ${board.name}`}
+            disabled
+          >
+            <Clock size={14} aria-hidden />
+            Coming soon
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="solid"
+            colorPalette="accent"
+            aria-label={`Create a board from ${board.name}`}
+            loading={isCreating}
+            loadingText="Creating…"
+            onClick={onCreate}
+          >
+            <Plus size={14} aria-hidden />
+            Create board
+          </Button>
+        )}
+        <Text marginLeft="auto" fontSize="12px" color="fg.subtle" textAlign="end">
           {progress
-            ? `Coming soon: ${progress.built} of ${progress.total} widgets built`
+            ? `${progress.built} of ${progress.total} widgets built`
             : `${widgetCount} widgets`}
         </Text>
       </HStack>

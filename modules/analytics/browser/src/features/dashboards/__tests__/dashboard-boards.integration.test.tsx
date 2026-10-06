@@ -192,19 +192,26 @@ function inMemoryServer({
 
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** A picker row's add button, as opposed to the trunk and agent kind labels beside it. */
-const isRowName = (name: string) => !name.startsWith("Filter by ");
+/** A picker row's add button, as opposed to the labels beside it and their "+N" fold. */
+const isRowName = (name: string) => !name.startsWith("Filter by ") && !name.startsWith("Show ");
 
-const FILTER_GROUPS = ["Filter by trunk", "Filter by agent kind", "Filter by readiness"];
 const TOTAL = PICKER_QUESTIONS.length;
 
-/** One chip in a chip group, by its words; its name ends with its count. */
-const chip = ({ group, name }: { group: string; name: string }) =>
-  within(screen.getByRole("group", { name: group })).getByRole("button", {
+/** One trunk toggle, by its words; its name ends with its count. */
+const trunkChip = (name: string) =>
+  within(screen.getByRole("group", { name: "Filter by trunk" })).getByRole("button", {
     name: new RegExp(`^${escape(name)}\\s*\\d+$`),
   });
 
-/** A chip's whole text: its words, then its count. */
+/** The "Agent kind" or "Status" menu's trigger; it toggles the menu open and shut. */
+const menuTrigger = (menu: string) =>
+  screen.getByRole("button", { name: new RegExp(`^${escape(menu)}`) });
+
+/** One option of the open filter menu, by its words; its name ends with its count. */
+const menuOption = (name: string) =>
+  screen.findByRole("menuitemcheckbox", { name: new RegExp(`^${escape(name)}\\s*\\d+$`) });
+
+/** A filter's whole text: its words, then its count. */
 const chipText = ({ name, count }: { name: string; count: number }) =>
   new RegExp(`^${escape(name)}\\s*${count}$`);
 
@@ -476,18 +483,19 @@ describe("a member's board", () => {
 
     describe("when it opens", () => {
       /** @scenario "AC130 Picker filters: the picker offers the library's chips under the search" */
-      it("offers every chip group on All, each on one sideways-scrolling line, above the footer", async () => {
+      it("offers the trunks on All and the two menus on one sideways-scrolling line, above the footer", async () => {
+        const user = userEvent.setup();
         openPicker();
 
         await screen.findByRole("dialog");
-        for (const group of FILTER_GROUPS) {
-          const all = chip({ group, name: "All" });
-          expect(all, group).toHaveAttribute("aria-pressed", "true");
-          expect(all, group).toHaveTextContent(chipText({ name: "All", count: TOTAL }));
-          expect(screen.getByRole("group", { name: group })).toHaveStyle({ overflowX: "auto" });
-        }
-        expect(chip({ group: "Filter by trunk", name: "Growth" })).toBeInTheDocument();
-        expect(chip({ group: "Filter by readiness", name: "Coming soon" })).toBeInTheDocument();
+        const all = trunkChip("All");
+        expect(all).toHaveAttribute("aria-pressed", "true");
+        expect(all).toHaveTextContent(chipText({ name: "All", count: TOTAL }));
+        expect(trunkChip("Growth")).toBeInTheDocument();
+        expect(screen.getByRole("group", { name: "Filters" })).toHaveStyle({ overflowX: "auto" });
+        await user.click(menuTrigger("Status"));
+        expect(await menuOption("Coming soon")).toHaveAttribute("aria-checked", "false");
+        expect(menuTrigger("Agent kind")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Ask Langy" })).toBeInTheDocument();
       });
 
@@ -512,21 +520,17 @@ describe("a member's board", () => {
         const ready = protect.filter(({ status }) => status === "ready");
 
         await screen.findByRole("dialog");
-        await user.click(chip({ group: "Filter by trunk", name: "Protect" }));
+        await user.click(trunkChip("Protect"));
 
-        expect(chip({ group: "Filter by trunk", name: "Protect" })).toHaveAttribute(
-          "aria-pressed",
-          "true",
-        );
+        expect(trunkChip("Protect")).toHaveAttribute("aria-pressed", "true");
         expect(rowButtons()).toHaveLength(protect.length);
         const regions = within(screen.getByRole("dialog")).getAllByRole("region");
         expect(regions.every((region) => region.getAttribute("data-trunk") === "Protect")).toBe(
           true,
         );
-        expect(chip({ group: "Filter by trunk", name: "All" })).toHaveTextContent(
-          chipText({ name: "All", count: TOTAL }),
-        );
-        expect(chip({ group: "Filter by readiness", name: "Ready" })).toHaveTextContent(
+        expect(trunkChip("All")).toHaveTextContent(chipText({ name: "All", count: TOTAL }));
+        await user.click(menuTrigger("Status"));
+        expect(await menuOption("Ready")).toHaveTextContent(
           chipText({ name: "Ready", count: ready.length }),
         );
       });
@@ -534,7 +538,7 @@ describe("a member's board", () => {
 
     describe("when the member clicks a row's agent kind label", () => {
       /** @scenario "AC138 Picker filters: a row's trunk or agent kind label filters the picker" */
-      it("presses that agent kind's chip and keeps only widgets that suit it", async () => {
+      it("picks that agent kind, shown as a token, and keeps only widgets that suit it", async () => {
         const user = userEvent.setup();
         openPicker();
         const voice = AGENT_KIND_LABELS.voice;
@@ -546,10 +550,7 @@ describe("a member's board", () => {
         const [label] = within(dialog).getAllByRole("button", { name: `Filter by ${voice}` });
         await user.click(label!);
 
-        expect(chip({ group: "Filter by agent kind", name: voice })).toHaveAttribute(
-          "aria-pressed",
-          "true",
-        );
+        expect(screen.getByRole("button", { name: `Remove ${voice} filter` })).toBeInTheDocument();
         expect(rowButtons()).toHaveLength(suits.length);
         for (const each of within(dialog).getAllByRole("button", { name: `Filter by ${voice}` })) {
           expect(each).toHaveAttribute("aria-pressed", "true");
@@ -557,24 +558,18 @@ describe("a member's board", () => {
       });
 
       /** @scenario "AC138 Picker filters: a row's trunk or agent kind label filters the picker" */
-      it("toggles the trunk chip from a row's trunk label", async () => {
+      it("toggles the trunk filter from a row's trunk label", async () => {
         const user = userEvent.setup();
         openPicker();
 
         const dialog = await screen.findByRole("dialog");
         const [label] = within(dialog).getAllByRole("button", { name: "Filter by Growth" });
         await user.click(label!);
-        expect(chip({ group: "Filter by trunk", name: "Growth" })).toHaveAttribute(
-          "aria-pressed",
-          "true",
-        );
+        expect(trunkChip("Growth")).toHaveAttribute("aria-pressed", "true");
 
         const [again] = within(dialog).getAllByRole("button", { name: "Filter by Growth" });
         await user.click(again!);
-        expect(chip({ group: "Filter by trunk", name: "All" })).toHaveAttribute(
-          "aria-pressed",
-          "true",
-        );
+        expect(trunkChip("All")).toHaveAttribute("aria-pressed", "true");
       });
     });
 
@@ -586,8 +581,10 @@ describe("a member's board", () => {
         const traffic = PICKER_QUESTIONS.find(({ id }) => id === "traffic")!;
 
         await screen.findByRole("dialog");
-        await user.click(chip({ group: "Filter by trunk", name: traffic.trunk }));
-        await user.click(chip({ group: "Filter by readiness", name: "Ready" }));
+        await user.click(trunkChip(traffic.trunk));
+        await user.click(menuTrigger("Status"));
+        await user.click(await menuOption("Ready"));
+        await user.click(menuTrigger("Status"));
         await user.click(
           screen.getByRole("button", { name: new RegExp(escape(traffic.question)) }),
         );
@@ -606,7 +603,7 @@ describe("a member's board", () => {
         openPicker();
 
         await screen.findByRole("dialog");
-        await user.click(chip({ group: "Filter by trunk", name: "Profit" }));
+        await user.click(trunkChip("Profit"));
         fireEvent.change(screen.getByRole("searchbox", { name: "Search questions" }), {
           target: { value: "zzz-no-such-widget" },
         });
@@ -646,7 +643,7 @@ describe("a member's board", () => {
     }
 
     /** @scenario "AC136 Picker filters: the filters reset when the picker closes" */
-    it("opens again with an empty search, every group on All and nothing in the address", async () => {
+    it("opens again with an empty search, the trunks on All, no token and nothing in the address", async () => {
       const user = userEvent.setup();
       const host = new StubAnalyticsHost({ flags: LANGY_ON, permissions: LANGY_MEMBER });
       renderDashboards({ element: <ReopenablePicker />, host });
@@ -655,15 +652,17 @@ describe("a member's board", () => {
       fireEvent.change(screen.getByRole("searchbox", { name: "Search questions" }), {
         target: { value: "latency" },
       });
-      await user.click(chip({ group: "Filter by trunk", name: "Growth" }));
+      await user.click(trunkChip("Growth"));
+      await user.click(menuTrigger("Agent kind"));
+      await user.click(await menuOption(AGENT_KIND_LABELS.voice));
+      await user.click(menuTrigger("Agent kind"));
       await user.click(within(dialog).getByRole("button", { name: "Close" }));
       await user.click(await screen.findByRole("button", { name: "Open the picker again" }));
 
       await screen.findByRole("dialog");
       expect(screen.getByRole("searchbox", { name: "Search questions" })).toHaveValue("");
-      for (const group of FILTER_GROUPS) {
-        expect(chip({ group, name: "All" }), group).toHaveAttribute("aria-pressed", "true");
-      }
+      expect(trunkChip("All")).toHaveAttribute("aria-pressed", "true");
+      expect(screen.queryByRole("button", { name: /^Remove .* filter$/ })).toBeNull();
       expect(host.lastQuery).toBeUndefined();
     });
   });

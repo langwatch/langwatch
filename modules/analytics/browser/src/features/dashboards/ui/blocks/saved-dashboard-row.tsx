@@ -4,9 +4,15 @@
  * Duplicate, Delete; Share and Delete only for a member who may use them). Rename edits inline.
  */
 
-import { Box, Button, Link as ChakraLink, HStack, Text } from "@chakra-ui/react";
 import { DASHBOARD_VISIBILITIES, type DashboardVisibility } from "@langwatch/dashboard-contract";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  Box,
+  HStack,
+  IconButton,
+  Link as ChakraLink,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { Check, Copy, Gauge, MoreVertical, Pencil, Share2, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -91,7 +97,7 @@ export function SavedDashboardRow({
             <Gauge size={11} aria-label="Your default dashboard" />
           </Box>
         )}
-        {actions && <Box width="20px" flexShrink={0} marginLeft="auto" />}
+        {actions && <Box width="24px" flexShrink={0} marginLeft="auto" />}
       </ChakraLink>
       {actions && <RowMenu name={name} isActive={isActive} actions={actions} />}
     </Box>
@@ -114,14 +120,22 @@ function RowMenu({
       right={1}
       top="50%"
       transform="translateY(-50%)"
+      display="flex"
       opacity={isActive ? 1 : 0}
       transition="opacity 0.2s"
+      css={{ "&:has([aria-expanded=true])": { opacity: 1 } }}
     >
       <Menu.Root>
         <Menu.Trigger asChild>
-          <Button size="2xs" variant="ghost" color="gray.400" aria-label={`Actions for ${name}`}>
-            <MoreVertical size={14} />
-          </Button>
+          <IconButton
+            size="xs"
+            variant="ghost"
+            color="fg.subtle"
+            _hover={{ color: "fg", background: "bg.muted" }}
+            aria-label={`Actions for ${name}`}
+          >
+            <MoreVertical size={14} aria-hidden />
+          </IconButton>
         </Menu.Trigger>
         <Menu.Content minWidth="196px">
           <Menu.Item
@@ -165,7 +179,9 @@ function MenuRow({
 }) {
   return (
     <HStack width="full" gap={2} fontSize="12.5px">
-      {icon}
+      <Box as="span" display="flex" flexShrink={0}>
+        {icon}
+      </Box>
       <Text as="span" flex="1">
         {children}
       </Text>

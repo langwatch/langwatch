@@ -1,7 +1,7 @@
 /** A widget's "⋮" menu on a board: Edit, Duplicate, Delete. */
 
-import { IconButton } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { IconButton } from "@langwatch/design-system/primitives";
 import { Copy, MoreVertical, Pencil, Trash2 } from "lucide-react";
 
 export function WidgetMenu({
@@ -24,10 +24,11 @@ export function WidgetMenu({
           aria-label={`Actions for ${name}`}
           variant="ghost"
           size="xs"
-          color="gray.400"
+          color="fg.subtle"
+          _hover={{ color: "fg", background: "bg.muted" }}
           disabled={disabled}
         >
-          <MoreVertical size={14} />
+          <MoreVertical size={14} aria-hidden />
         </IconButton>
       </Menu.Trigger>
       <Menu.Content>
