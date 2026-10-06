@@ -152,6 +152,75 @@ describe("a process that names an engine address", () => {
   });
 });
 
+describe("an HTTP component submitted through the composed Workflow API", () => {
+  /** @scenario "HTTP agent execution reaches the composed Workflow API" */
+  it("takes the component's final state from the engine stream with the trace id and inputs intact", async () => {
+    const sent: unknown[] = [];
+    const fetchMock = vi.fn<typeof fetch>(async (_url, init) => {
+      sent.push(JSON.parse(typeof init?.body === "string" ? init.body : "{}"));
+      const frame = (event: unknown) => `data: ${JSON.stringify(event)}\n\n`;
+      return new Response(
+        frame({
+          type: "component_state_change",
+          payload: { component_id: "other", execution_state: { status: "error" } },
+        }) +
+          frame({
+            type: "component_state_change",
+            payload: {
+              component_id: "http_node",
+              execution_state: { status: "success", outputs: { output: "pong" } },
+            },
+          }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const state = await (
+      await appAt({ nlpServiceUrl: "http://engine.test:5561" })
+    ).executeComponent({
+      projectId: "project_1",
+      nodeId: "http_node",
+      traceId: "trace_abc",
+      inputs: { city: "Amsterdam" },
+      origin: "agent_test",
+      workflow: parseStudioWorkflow({
+        workflow_id: "workflow_http",
+        spec_version: "1.5",
+        name: "Agent test",
+        icon: "x",
+        description: "x",
+        version: "1.0",
+        nodes: [
+          {
+            id: "http_node",
+            type: "http",
+            position: { x: 0, y: 0 },
+            data: {
+              name: "HTTP agent",
+              inputs: [{ identifier: "city", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+              parameters: [],
+            },
+          },
+        ],
+        edges: [],
+        state: {},
+      }),
+    });
+
+    expect(state).toMatchObject({ status: "success", outputs: { output: "pong" } });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://engine.test:5561/go/studio/execute",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      type: "execute_component",
+      payload: { trace_id: "trace_abc", node_id: "http_node", inputs: { city: "Amsterdam" } },
+    });
+  });
+});
+
 describe("a process that names no engine at all", () => {
   /** @scenario "A deployment with no engine at all refuses by name" */
   it("refuses a studio run by name instead of sending it nowhere", async () => {

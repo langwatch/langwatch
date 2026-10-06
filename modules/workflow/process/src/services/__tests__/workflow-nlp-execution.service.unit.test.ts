@@ -199,4 +199,112 @@ describe("WorkflowNlpExecutionService", () => {
       temperature: 0.5,
     });
   });
+
+  /** @scenario "Execution dispatch is a Workflow server concern" */
+  it("refuses a run missing a required entry input before anything reaches the engine", async () => {
+    const dispatchNlp = vi.fn();
+    const executor = WorkflowNlpExecutionService.create({
+      ids: new FixedWorkflowId(),
+      modelProviders: new TestModelProviderService(),
+      nlpRuntime: new TestWorkflowNlpRuntime(dispatchNlp),
+      studioEvents: {
+        enrich: async (event) => event.event,
+        prepare: async (event) => event.event,
+      },
+    });
+
+    await expect(
+      executor.execute({
+        ...input,
+        inputs: {},
+        version: {
+          ...input.version,
+          dsl: {
+            ...input.version.dsl,
+            nodes: [
+              {
+                id: "entry",
+                type: "entry",
+                position: { x: 0, y: 0 },
+                data: { name: "Entry", outputs: [{ identifier: "question", type: "str" }] },
+              },
+              {
+                id: "end",
+                type: "end",
+                position: { x: 1, y: 0 },
+                data: { name: "End", inputs: [{ identifier: "question", type: "str" }] },
+              },
+            ],
+            edges: [
+              {
+                id: "edge",
+                source: "entry",
+                sourceHandle: "outputs.question",
+                target: "end",
+                targetHandle: "inputs.question",
+              },
+            ],
+          },
+        },
+      }),
+    ).rejects.toMatchObject({ code: "validation_error", meta: { input: "question" } });
+    expect(dispatchNlp).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Execution dispatch is a Workflow server concern" */
+  it("refuses a run whose model's provider has no key before anything reaches the engine", async () => {
+    const dispatchNlp = vi.fn();
+    const provider = modelProviderSummarySchema.parse({
+      id: "provider_1",
+      organizationId: "organization_1",
+      provider: "openai",
+      name: "OpenAI",
+      enabled: true,
+      routingHandle: null,
+      scopes: [],
+      customKeys: null,
+      customModels: [],
+      customEmbeddingsModels: [],
+      extraHeaders: [],
+      rateLimitRpm: null,
+      rateLimitTpm: null,
+      rateLimitRpd: null,
+      fallbackPriorityGlobal: null,
+      providerConfig: null,
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+      isSystem: false,
+      embeddingsUnsupported: false,
+    });
+    const executor = WorkflowNlpExecutionService.create({
+      ids: new FixedWorkflowId(),
+      modelProviders: new TestModelProviderService({ openai: provider }),
+      nlpRuntime: new TestWorkflowNlpRuntime(dispatchNlp),
+      studioEvents: {
+        enrich: async (event) => event.event,
+        prepare: async (event) => event.event,
+      },
+    });
+
+    await expect(
+      executor.execute({
+        ...input,
+        version: {
+          ...input.version,
+          dsl: {
+            ...input.version.dsl,
+            nodes: [
+              {
+                id: "signature",
+                type: "signature",
+                position: { x: 0, y: 0 },
+                data: { llm: { model: "openai/gpt-5-mini" } },
+              },
+            ],
+          },
+        },
+      }),
+    ).rejects.toMatchObject({ code: "validation_error", meta: { missingKey: "openai" } });
+    expect(dispatchNlp).not.toHaveBeenCalled();
+  });
 });

@@ -267,6 +267,7 @@ const service = (
   });
 
 describe("WorkflowService", () => {
+  /** @scenario "Workflow prepares a Studio event through typed runtime ports" */
   it("delegates Studio preparation through its canonical collaborator", async () => {
     const studioEvents = new FakeStudioEventPreparer();
     const workflowService = service(undefined, { studioEvents });

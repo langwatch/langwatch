@@ -27,6 +27,7 @@ function fixture() {
 }
 
 describe("workflow linkage persistence", () => {
+  /** @scenario "Linked features discover workflow fields without reading workflow tables" */
   it("loads current graph fields in one project-scoped batch excluding archived graphs", async () => {
     const { workflow, repository } = fixture();
     workflow.findMany.mockResolvedValue([
@@ -72,6 +73,7 @@ describe("workflow linkage persistence", () => {
     });
   });
 
+  /** @scenario "A failed peer copy removes only the newly copied workflow" */
   it("clears restrictive references before removing copied versions and their workflow", async () => {
     const { workflow, workflowVersion, repository } = fixture();
     await repository.deleteUncommitted({ projectId: "project-1", workflowId: "wf-1" });

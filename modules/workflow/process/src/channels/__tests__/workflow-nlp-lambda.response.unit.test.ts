@@ -3,7 +3,7 @@
  * caller's deadline and cancellation honoured on both.
  * @see specs/nlp-go/lambda-invoke-response-contract.feature
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AwsNlpLambdaInvokeChannel } from "../aws.nlp-lambda-invoke.channel.ts";
 import {
@@ -128,6 +128,10 @@ describe("NlpInvokeTransportAdapter's answer on the Lambda lane", () => {
 });
 
 describe("NlpInvokeTransportAdapter's limits", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   /** @scenario "A call past its deadline is abandoned on the Lambda lane" */
   it("raises a timeout when the invoke outlives the deadline", async () => {
     const lambda: NlpLambdaInvoke = { invoke: ({ signal }) => hangingUntilAborted(signal) };
@@ -161,6 +165,53 @@ describe("NlpInvokeTransportAdapter's limits", () => {
     controller.abort();
 
     await expect(sent).rejects.toBeInstanceOf(NlpInvokeAbortedError);
+  });
+
+  /** @scenario "A caller with no deadline is unchanged" */
+  it("imposes no signal on either lane when the caller sets neither limit", async () => {
+    const signals: (AbortSignal | undefined)[] = [];
+    const lambda: NlpLambdaInvoke = {
+      invoke: async ({ signal }) => {
+        signals.push(signal);
+        return { statusCode: 200, payload: lwa(200, "ok") };
+      },
+    };
+    const overFetch = vi.fn<typeof fetch>(async (_url, init) => {
+      signals.push(init?.signal ?? undefined);
+      return new Response("ok");
+    });
+
+    const viaLambda = await NlpInvokeTransportAdapter.create({
+      target: ARN,
+      config: CONFIG,
+      lambda,
+    }).send(POST);
+    const viaHttp = await NlpInvokeTransportAdapter.create({
+      target: URL_TARGET,
+      config: CONFIG,
+      fetch: overFetch,
+    }).send(POST);
+
+    expect(signals).toEqual([undefined, undefined]);
+    expect([viaLambda.ok, viaHttp.ok]).toEqual([true, true]);
+  });
+
+  /** @scenario "A caller that passes no dispatcher uses the global fetch" */
+  it("posts to a plain URL through the global fetch when none is injected", async () => {
+    const globalFetch = vi.fn<typeof fetch>(async () => new Response("ok"));
+    vi.stubGlobal("fetch", globalFetch);
+
+    const response = await NlpInvokeTransportAdapter.create({
+      target: URL_TARGET,
+      config: CONFIG,
+    }).send(POST);
+
+    expect(globalFetch).toHaveBeenCalledTimes(1);
+    expect(globalFetch).toHaveBeenCalledWith(
+      "http://nlpgo.test/go/studio/execute_sync",
+      expect.not.objectContaining({ dispatcher: expect.anything() }),
+    );
+    expect(response.ok).toBe(true);
   });
 
   /** @scenario "A turn cancelled before it is sent uploads nothing" */

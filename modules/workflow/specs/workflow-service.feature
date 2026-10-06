@@ -12,6 +12,7 @@ Feature: Workflow service boundary
     When a caller saves it as an evaluator
     Then workflow_not_found is reported and no publication changes
 
+  @unit
   Scenario: Linked features discover workflow fields without reading workflow tables
     Given a project has valid, invalid and archived workflow graphs
     When a peer lists fields for those workflow identifiers
@@ -19,6 +20,7 @@ Feature: Workflow service boundary
     And invalid graphs report unresolved fields
     And valid graphs preserve all declared input and output identifiers
 
+  @unit
   Scenario: A failed peer copy removes only the newly copied workflow
     Given a copied workflow has current and latest version pointers and version parentage
     When the peer deletes its uncommitted workflow in the target project
@@ -66,6 +68,7 @@ Feature: Workflow service boundary
     Then it migrates the graph through the application port
     And updates the current pointer and display metadata together
 
+  @unit
   Scenario: Studio and execution share graph migration
     Given a persisted workflow version uses an older graph shape
     When Studio or execution materialises that version
@@ -145,6 +148,7 @@ Feature: Workflow service boundary
     When Workflow materializes the event with an injected DatasetService
     Then execution receives inline records without accessing application globals
 
+  @unit
   Scenario: Workflow prepares a Studio event through typed runtime ports
     Given a Studio event needs project credentials, model parameters, and datasets
     When a caller invokes prepareStudioEvent for its project
@@ -164,6 +168,7 @@ Feature: Workflow service boundary
     Then it composes Workflow version selection with Evaluation execution
     And Workflow does not own the evaluation run lifecycle
 
+  @unit
   Scenario: Execution dispatch is a Workflow server concern
     Given Workflow resolves a version to run
     When the server executor dispatches it through injected nlpgo infrastructure
