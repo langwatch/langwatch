@@ -10,7 +10,12 @@ export {
   type RecordedAuditLogEntry,
   type RecordedSinceInput,
 } from "./audit-log.ts";
-export { recordAuditLogCommandSchema, type RecordAuditLogCommand } from "./audit-log.ts";
+export {
+  auditLogIntentSchema,
+  recordAuditLogCommandSchema,
+  type AuditLogIntent,
+  type RecordAuditLogCommand,
+} from "./audit-log.ts";
 export { AuditLogApi } from "./audit-log.ts";
 export {
   recentItemSchema,

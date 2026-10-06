@@ -7,11 +7,11 @@ import { createTenantId } from "@langwatch/eventing";
 import { PROMPT_CREATED_EVENT_TYPE } from "@langwatch/prompt-contract";
 import { describe, expect, it } from "vitest";
 
-import { RecordPromptCreatedCommand } from "../prompt-lifecycle.commands.ts";
 import {
+  RecordPromptCreatedCommand,
   PROMPT_CREATED_EVENT_VERSION,
   type PromptCreatedEvent,
-} from "../prompt-lifecycle.events.ts";
+} from "../prompt-lifecycle.commands.ts";
 
 const created = {
   promptId: "prompt-1",

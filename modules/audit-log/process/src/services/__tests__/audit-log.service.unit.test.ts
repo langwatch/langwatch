@@ -20,6 +20,7 @@ function serviceWith(maxArgsBytes?: number) {
   const create = vi.fn<AuditLogRepository["create"]>(async () => ({ id: "audit", occurredAt: 0 }));
   const repository: AuditLogRepository = {
     create,
+    createOnce: async ({ id, occurredAt }) => ({ id, occurredAt }),
     hasRecordedSince: async () => false,
     findEntityHistory: async () => {
       throw new Error("this suite reads no history back");

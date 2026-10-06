@@ -24,7 +24,7 @@ import type {
   TraceEvaluationLoopBlockReason,
 } from "../../services/trace-evaluation-loop-metrics.service.ts";
 import { TraceOriginService } from "../../services/trace-origin.service.ts";
-import { needsOriginResolution } from "../deferred-origin.process.ts";
+import { needsOriginResolution } from "../deferred-origin.subscriber.ts";
 import type {
   TraceEvaluationDispatch,
   TraceEvaluationMonitor,

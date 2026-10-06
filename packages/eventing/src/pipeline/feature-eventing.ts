@@ -27,6 +27,8 @@ export interface FeatureEventingSetup<Repositories, App, ProcessStore, Resources
   readonly eventStore?: OwnEventStore;
   /** The module's resource owner: what a consumer builds, it drains on shutdown here. */
   readonly resources?: Resources;
+  /** Wakes the named process manager's outbox worker in this process; a no-op where none runs. */
+  readonly notifyOutbox?: (processName: string) => void;
 }
 
 /** One aggregate of the reading pipeline's own type; `accepts` keeps the events it declared. */

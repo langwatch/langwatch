@@ -5,11 +5,11 @@
 
 import { quantile } from "@langwatch/experiment-contract";
 
+import { mulberry32 } from "./batch-evaluation-results.bootstrap-ci.ts";
 import {
   type Comparability,
   computeComparability,
 } from "./batch-evaluation-results.comparability.ts";
-import { mulberry32 } from "./random.mulberry32.ts";
 
 export type PairwiseComparison = {
   /** Candidate target ids involved in this comparison (>= 2). */

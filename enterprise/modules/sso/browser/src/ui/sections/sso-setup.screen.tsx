@@ -11,6 +11,7 @@ import {
   SectionNavigationFrame,
   type SectionNavigationLink,
 } from "@langwatch/design-system/section-navigation-frame";
+import { ProvisioningSetupDrawerToken } from "@langwatch/enterprise-scim-contract";
 import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
 import { KeyRound, Plug, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -588,6 +589,7 @@ function SetupJourneySteps({
           settling={activationAccepted}
           refusal={activate.error}
           onActivate={goLive}
+          onSetUpProvisioning={() => host.openOverlay(ProvisioningSetupDrawerToken)}
         />
       </SetupStep>
     </SetupSteps>

@@ -85,6 +85,7 @@ describe("the pulled-usage pipeline's commands", () => {
       expect(pipeline.commands.map((command) => command.definition.name)).toEqual([
         "recordPulledUsage",
         "retractPulledUsage",
+        "recordPulledUsagePriced",
       ]);
     });
   });

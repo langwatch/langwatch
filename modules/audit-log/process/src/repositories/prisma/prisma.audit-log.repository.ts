@@ -39,6 +39,39 @@ export class PrismaAuditLogRepository
     return { id: row.id, occurredAt: row.createdAt.getTime() };
   }
 
+  async createOnce({
+    entry,
+    id,
+    occurredAt,
+  }: {
+    entry: AuditLogEntry;
+    id: string;
+    occurredAt: number;
+  }): Promise<RecordedAuditLogEntry> {
+    try {
+      const row = await this.prisma.auditLog.create({
+        data: {
+          ...entry,
+          id,
+          createdAt: new Date(occurredAt),
+          args: entry.args === null ? Prisma.JsonNull : entry.args,
+          metadata: entry.metadata === null ? Prisma.JsonNull : entry.metadata,
+        },
+        select: { id: true, createdAt: true },
+      });
+      return { id: row.id, occurredAt: row.createdAt.getTime() };
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+        throw error;
+      }
+      const row = await this.prisma.auditLog.findUniqueOrThrow({
+        where: { id },
+        select: { id: true, createdAt: true },
+      });
+      return { id: row.id, occurredAt: row.createdAt.getTime() };
+    }
+  }
+
   async hasRecordedSince(input: RecordedSinceInput): Promise<boolean> {
     const recent = await this.prisma.auditLog.findFirst({
       where: {

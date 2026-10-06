@@ -763,6 +763,9 @@ function installModuleEventing({
       app: state.provided,
       processStore: eventing.processStore,
       resources,
+      ...(eventing.notifyOutbox
+        ? { notifyOutbox: (processName: string) => eventing.notifyOutbox?.(processName) }
+        : {}),
     },
     log: () => eventing.eventStore,
   });

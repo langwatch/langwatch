@@ -65,5 +65,16 @@ export interface AuditLogApi {
 
 export const AuditLogApi = moduleApi<AuditLogApi>()("audit-log");
 
-export const recordAuditLogCommandSchema = auditLogEntrySchema;
+/**
+ * `idempotencyKey` is the row's id, an `audit` KSUID the producer mints once when it records the
+ * intent in its own commit; a repeat delivery writes nothing and answers the first row (Alex, Q72).
+ */
+export const recordAuditLogCommandSchema = z.object({
+  ...auditLogEntrySchema.shape,
+  idempotencyKey: z.string().min(1).optional(),
+});
 export type RecordAuditLogCommand = z.infer<typeof recordAuditLogCommandSchema>;
+
+/** The payload of a producer's audit intent: an entry its outbox records after commit. */
+export const auditLogIntentSchema = recordAuditLogCommandSchema.required({ idempotencyKey: true });
+export type AuditLogIntent = z.infer<typeof auditLogIntentSchema>;

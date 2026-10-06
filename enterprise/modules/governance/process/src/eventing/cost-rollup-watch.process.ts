@@ -1,5 +1,6 @@
 import {
   type PulledUsageObservedEvent,
+  type PulledUsagePricedEvent,
   type PulledUsageRetractedEvent,
   pulledUsageObservedEventSchema,
   pulledUsageRetractedEventSchema,
@@ -121,7 +122,8 @@ function markCostRollupDay({
 
 type PulledUsageChargeEvent =
   | (PulledUsageObservedEvent & Event)
-  | (PulledUsageRetractedEvent & Event);
+  | (PulledUsageRetractedEvent & Event)
+  | (PulledUsagePricedEvent & Event);
 
 /**
  * The daily cost drift check, driven by the charges instead of by a clock

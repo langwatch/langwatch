@@ -14,8 +14,7 @@ import type { OpsOperator } from "@langwatch/ops-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { operatorFact } from "../enterprise-ops-operator.trpc.ts";
-import { licenseRegistryTrpcTransport } from "../license-registry.trpc.ts";
+import { licenseRegistryTrpcTransport, operatorFact } from "../license-registry.trpc.ts";
 import { selfHostedInstancesTrpcTransport } from "../self-hosted-instance.trpc.ts";
 
 type Context = { actor: { type: "user"; id: string } | null; operator: OpsOperator | null };

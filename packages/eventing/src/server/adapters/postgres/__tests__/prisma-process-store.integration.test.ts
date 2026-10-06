@@ -668,6 +668,26 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
     ]);
   });
 
+  /** @scenario "A wake row another scan holds is skipped rather than waited on" */
+  it("skips a due wake whose row another connection holds locked", async () => {
+    await store.commit(commit({ target: ref("held"), nextWakeAt: 1_500, messages: [] }));
+    await store.commit(
+      commit({ target: ref("free"), sourceEventId: "event-2", nextWakeAt: 1_600, messages: [] }),
+    );
+
+    const scanned = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT "id" FROM "ProcessManagerInstance"
+        WHERE "processName" = ${processName} AND "projectId" = 'project-1'
+          AND "processKey" = 'held'
+        FOR UPDATE
+      `;
+      return store.findDueWakes({ now: 2_000, limit: 10, processNames: [processName] });
+    });
+
+    expect(scanned).toEqual([{ ref: ref("free"), revision: 1, wakeAt: 1_600 }]);
+  });
+
   it("filters raw-SQL outbox leases and wake scans by process name", async () => {
     const selected = ref("selected");
     const other = {

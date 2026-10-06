@@ -16,4 +16,3 @@ export {
   type BudgetOverviewItemView,
 } from "./budget-overview-list.tsx";
 export { BudgetExceededBanner, type BudgetExceededBannerProps } from "./budget-exceeded-banner.tsx";
-export { spentSubline } from "./spent-subline.ts";

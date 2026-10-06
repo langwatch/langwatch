@@ -381,8 +381,9 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And an "apiKey.revoke" entry naming the actor and the key id
       And neither entry carries the token
 
-    # Gap: ApiKeyService.markUsed writes on every call; main's fire-and-forget write had no throttle either.
-    @unit @unimplemented
+    @unit
     Scenario: Last used is written at most once a minute per key per process
       Given a key used 100 times within one minute
       Then its last-used time is written once
+      And a use after the minute writes it again
+      And a write that fails lets the next use try again

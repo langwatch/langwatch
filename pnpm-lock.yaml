@@ -4514,6 +4514,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../../packages/design-system
+      '@langwatch/enterprise-scim-contract':
+        specifier: workspace:*
+        version: link:../../scim/contract
       '@langwatch/enterprise-sso-contract':
         specifier: workspace:*
         version: link:../contract
@@ -11517,6 +11520,9 @@ importers:
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
       '@langwatch/stored-object-contract':
         specifier: workspace:*
         version: link:../../stored-object/contract
@@ -11557,9 +11563,6 @@ importers:
       '@langwatch/feature-flag-process':
         specifier: workspace:*
         version: link:../../feature-flag/process
-      '@langwatch/secrets':
-        specifier: workspace:*
-        version: link:../../../packages/secrets
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness

@@ -39,14 +39,14 @@ Feature: A browser cannot boot without what its web modules declared
       Then the browser renders
       And it is never asked for a session source or a configuration slice
 
-    @unit @unimplemented
+    @unit
     Scenario: Supplying nothing names everything missing at once
       Given installed web modules that between them need configuration, a transport and a session
       When the composition supplies none of it
       Then the refusal names all three
       And it does not stop at the first
 
-    @unit @unimplemented
+    @unit
     Scenario: Installing a module with its own settings makes a configuration reader required
       Given a browser composition that needed no configuration
       When a module carrying its own web settings is installed
@@ -110,7 +110,7 @@ Feature: A browser cannot boot without what its web modules declared
       Then the page is reachable at its address
       And no menu lists it
 
-    @integration @unimplemented
+    @integration
     Scenario: Two modules claiming one address are refused by name
       Given two installed web modules whose screens declare the same path
       When the browser boots
@@ -227,7 +227,7 @@ Feature: A browser cannot boot without what its web modules declared
       Then the answer comes from that configuration
       And no browser source reads the bundler or process environment
 
-    @unit @unimplemented
+    @unit
     Scenario: The chain supplies nothing a browser may not show
       Given the browser composition chain
       Then it has no call that takes a secret or an encryption key

@@ -200,6 +200,11 @@ export class EventSourcing {
     return this._processStore;
   }
 
+  /** Wakes one process manager's outbox now; a no-op where no process runtime runs. */
+  notifyOutbox(processName: string): void {
+    this._processRuntimeInstance?.notifyOutbox(processName);
+  }
+
   /**
    * The `withProcessManager` runtime — lazily constructed so an EventSourcing
    * instance with no process declarations pays nothing. Public so the

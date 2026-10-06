@@ -7,7 +7,6 @@ import {
 import { Temporal, toDate } from "@langwatch/time";
 
 import { hasExperiment } from "../rules/experiment-run-key.rules.ts";
-import { normalizeDurationMs } from "./experiment-run-duration.process.ts";
 import {
   type EvaluatorResultEvent,
   evaluatorResultEventSchema,
@@ -15,6 +14,7 @@ import {
   targetResultEventSchema,
 } from "./experiment-run-events.process.ts";
 import { generateDeterministicResultId } from "./experiment-run-id.process.ts";
+import { normalizeDurationMs } from "./experiment-run-state.projection.ts";
 
 /**
  * The `DateTime64(3)` columns. The ClickHouse client serialises a `Date`; an
