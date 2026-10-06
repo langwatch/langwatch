@@ -71850,12 +71850,17 @@
         },
         "description": "the operator tool reads a status and a message: 401, 400, 502 and 503 and the EXPLAIN rows all keep the exact bodies the agent already parses",
         "summary": "Explain a ClickHouse query as the read-only operator account",
-        "security": [],
+        "security": [
+          {
+            "internal_secret": []
+          }
+        ],
         "x-access-policy": {
-          "kind": "public",
+          "kind": "handlerManaged",
           "credential": [
-            "none"
-          ]
+            "internal_secret"
+          ],
+          "permissions": []
         },
         "requestBody": {
           "required": true,
@@ -76159,12 +76164,17 @@
         },
         "description": "An external monitor reads a status and a report: 200 healthy or degraded, 503 unhealthy, 401 unauthorized and 404 for a subsystem this platform does not have.",
         "summary": "Report whether the platform is working",
-        "security": [],
+        "security": [
+          {
+            "internal_secret": []
+          }
+        ],
         "x-access-policy": {
-          "kind": "public",
+          "kind": "handlerManaged",
           "credential": [
-            "none"
-          ]
+            "internal_secret"
+          ],
+          "permissions": []
         },
         "parameters": [
           {
@@ -76329,12 +76339,17 @@
         },
         "description": "An external monitor reads a status and a report: 200 healthy or degraded, 503 unhealthy, 401 unauthorized and 404 for a subsystem this platform does not have.",
         "summary": "Report whether one subsystem is working",
-        "security": [],
+        "security": [
+          {
+            "internal_secret": []
+          }
+        ],
         "x-access-policy": {
-          "kind": "public",
+          "kind": "handlerManaged",
           "credential": [
-            "none"
-          ]
+            "internal_secret"
+          ],
+          "permissions": []
         },
         "parameters": [
           {
@@ -108879,7 +108894,8 @@
             "project_api_key"
           ],
           "permissions": [
-            "workflows:create"
+            "workflows:create",
+            "evaluations:view"
           ]
         },
         "parameters": [
