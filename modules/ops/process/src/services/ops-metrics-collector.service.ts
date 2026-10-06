@@ -6,6 +6,7 @@
 
 import * as os from "node:os";
 
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import type {
   DashboardData,
@@ -21,6 +22,7 @@ import type { AnomalyRateTrackerRepository } from "../repositories/anomaly.repos
 import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
 import type { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
 import type { OpsSnapshotRead } from "../repositories/ops-snapshot.repository.ts";
+import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../rules/anomaly-constants.rules.ts";
 import { totalInFlight as computeTotalInFlight } from "../rules/ops-in-flight.rules.ts";
 import { computeEngineCpuPercent } from "../rules/ops-redis-engine-cpu.rules.ts";
 import { countWaitingJobsByTenant } from "../rules/ops-tenant-backlog.rules.ts";
@@ -60,6 +62,7 @@ export class OpsMetricsCollectorService {
 
   private readonly ops: OpsQueueMetricsSourceRepository;
   private readonly rateTracker: AnomalyRateTrackerRepository;
+  private readonly featureFlags: Pick<FeatureFlagApi, "isEnabled"> | undefined;
   private snapshots: OpsSnapshotService | null;
   /** Identity of this writer in the lease and in every artifact it stamps. */
   private readonly writerId: string;
@@ -84,6 +87,7 @@ export class OpsMetricsCollectorService {
     metrics: OpsMetricsRepository;
     ops: OpsQueueMetricsSourceRepository;
     rateTracker: AnomalyRateTrackerRepository;
+    featureFlags?: Pick<FeatureFlagApi, "isEnabled"> | undefined;
     snapshots?: OpsSnapshotService | null;
     writerId?: string;
   }): OpsMetricsCollectorService {
@@ -95,6 +99,7 @@ export class OpsMetricsCollectorService {
     metrics: OpsMetricsRepository;
     ops: OpsQueueMetricsSourceRepository;
     rateTracker: AnomalyRateTrackerRepository;
+    featureFlags?: Pick<FeatureFlagApi, "isEnabled"> | undefined;
     snapshots?: OpsSnapshotService | null;
   }): OpsMetricsCollectorService {
     if (!OpsMetricsCollectorService.singleton) {
@@ -124,12 +129,14 @@ export class OpsMetricsCollectorService {
     metrics: OpsMetricsRepository;
     ops: OpsQueueMetricsSourceRepository;
     rateTracker: AnomalyRateTrackerRepository;
+    featureFlags?: Pick<FeatureFlagApi, "isEnabled"> | undefined;
     snapshots?: OpsSnapshotService | null;
     writerId?: string;
   }) {
     this.metrics = params.metrics;
     this.ops = params.ops;
     this.rateTracker = params.rateTracker;
+    this.featureFlags = params.featureFlags;
     this.snapshots = params.snapshots ?? null;
     this.writerId = params.writerId ?? `${os.hostname()}:${process.pid}`;
     this.sampling = OpsMetricsSamplingService.create({ metrics: this.metrics });
@@ -440,8 +447,24 @@ export class OpsMetricsCollectorService {
   private async recordTenantBacklogs(queues: QueueInfo[]): Promise<void> {
     const backlogs = countWaitingJobsByTenant({ queues });
     await Promise.all(
-      [...backlogs].map(([tenantId, count]) => this.rateTracker.record(tenantId, count)),
+      [...backlogs].map(async ([tenantId, count]) => {
+        if (await this.isKilledForTenant(tenantId)) return;
+        await this.rateTracker.record(tenantId, count);
+      }),
     );
+  }
+
+  /** The detector's per-tenant kill switch; a failed lookup counts the tenant. */
+  private async isKilledForTenant(tenantId: string): Promise<boolean> {
+    if (!this.featureFlags || !tenantId) return false;
+    try {
+      return await this.featureFlags.isEnabled(ANOMALY_DETECTION_KILL_SWITCH_FLAG, {
+        kind: "project",
+        projectId: tenantId,
+      });
+    } catch {
+      return false;
+    }
   }
 
   /** This process's own CPU share since the last cycle. */

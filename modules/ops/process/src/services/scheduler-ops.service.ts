@@ -13,7 +13,7 @@ import {
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { SchedulerAuditRepository } from "../repositories/ops-audit.repository.ts";
+import type { SchedulerAuditService } from "./scheduler-audit.service.ts";
 
 const logger = createLogger("langwatch:ops:scheduler");
 
@@ -28,12 +28,12 @@ type ReportSchedules = Pick<
 /** The operator view over automation's report schedules; every control is an automation command. */
 export class SchedulerOpsService {
   private readonly schedules: ReportSchedules;
-  private readonly audit: SchedulerAuditRepository;
+  private readonly audit: Pick<SchedulerAuditService, "append" | "findRecent">;
   private readonly projects: Pick<ProjectApi, "listNamesByIds">;
 
   private constructor(deps: {
     schedules: ReportSchedules;
-    audit: SchedulerAuditRepository;
+    audit: Pick<SchedulerAuditService, "append" | "findRecent">;
     projects: Pick<ProjectApi, "listNamesByIds">;
   }) {
     this.schedules = deps.schedules;
@@ -43,7 +43,7 @@ export class SchedulerOpsService {
 
   static create(input: {
     schedules: ReportSchedules;
-    audit: SchedulerAuditRepository;
+    audit: Pick<SchedulerAuditService, "append" | "findRecent">;
     projects: Pick<ProjectApi, "listNamesByIds">;
   }): SchedulerOpsService {
     return new SchedulerOpsService(input);

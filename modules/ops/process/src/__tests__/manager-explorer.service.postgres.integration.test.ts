@@ -31,6 +31,7 @@ import type {
   DeadMessageRedrive,
 } from "../repositories/process-ops.repository.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
+import { ProcessAuditService } from "../services/process-audit.service.ts";
 
 /** The audit log this suite records on: the same rows, written straight to Postgres. */
 class PrismaAuditLogTestSink implements AuditLogApi {
@@ -106,9 +107,9 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
     service = ManagerExplorerService.create({
       store,
       fleet,
-      audit: PrismaProcessAuditRepository.create({
-        prisma,
+      audit: ProcessAuditService.create({
         auditLog: PrismaAuditLogTestSink.create(prisma),
+        history: PrismaProcessAuditRepository.create({ prisma }),
       }),
       introspection: new NoopIntrospection(),
     });

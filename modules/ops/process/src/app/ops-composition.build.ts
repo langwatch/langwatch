@@ -9,6 +9,7 @@ import {
   upcastReplayEventSource,
 } from "@langwatch/eventing";
 import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { Logger } from "@langwatch/observability";
 import {
   type OpsServerConfig,
@@ -29,15 +30,9 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { Instant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
-import type { AnomalyRateTrackerRepository } from "../repositories/anomaly.repository.ts";
 import { OpsClickHouseRuntime } from "../repositories/clickhouse/clickhouse.ops-explain.repository.ts";
 import { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
 import type { OpsRepositories } from "../repositories/ops.repositories.ts";
-import { PrismaProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
-import {
-  PrismaSchedulerAuditRepository,
-  type SchedulerAuditDatabase,
-} from "../repositories/prisma/prisma.scheduler-audit.repository.ts";
 import type { StorageFootprintRepository } from "../repositories/storage-footprint.repository.ts";
 import {
   type AdminAccess,
@@ -61,10 +56,12 @@ import { ManagerExplorerService } from "../services/manager-explorer.service.ts"
 import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service.ts";
 import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service.ts";
 import { OpsService } from "../services/ops.service.ts";
+import { ProcessAuditService } from "../services/process-audit.service.ts";
 import { QueueAuditService } from "../services/queue-audit.service.ts";
 import { QueueService } from "../services/queue.service.ts";
 import { ReplayRetentionService } from "../services/replay-retention.service.ts";
 import { ReplayService } from "../services/replay.service.ts";
+import { SchedulerAuditService } from "../services/scheduler-audit.service.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import type { StorageStatsInstance } from "../services/storage-stats-collection.service.ts";
 import { SystemMigrationPassService } from "../services/system-migration-pass.service.ts";
@@ -181,7 +178,7 @@ export function buildOpsInfrastructure(input: {
   config: OpsServerConfig;
   resources: ResourceOwnership;
   repositories: OpsRepositories;
-  rateTracker: AnomalyRateTrackerRepository;
+  featureFlags: Pick<FeatureFlagApi, "isEnabled"> | undefined;
   cloudOps: boolean;
 }): OpsAppInfrastructure {
   const { members, logger, config, resources, repositories } = input;
@@ -200,7 +197,8 @@ export function buildOpsInfrastructure(input: {
   const queueMetricsWriter = OpsMetricsCollectorService.create({
     metrics: repositories.metrics,
     ops: new QueueOpsMetricsSource(QueueService.create({ repo: repositories.queues })),
-    rateTracker: input.rateTracker,
+    rateTracker: repositories.rateTracker,
+    featureFlags: input.featureFlags,
     snapshots: DefaultOpsSnapshotService.create(repositories.snapshots),
   });
   resources.ownService({
@@ -229,7 +227,6 @@ export function buildOpsInfrastructure(input: {
         // person experiences, so the backoffice refuses rather than accepting
         // a no-op. Asked of identity per organization (ADR-117 §5).
         ssoRouting: organizationSsoRouting(dependencies.identity),
-        database: members.prisma,
         audit: AdminAuditService.create({ auditLog: dependencies.auditLog }),
         sessions: dependencies.auth,
         auditLog: dependencies.auditLog,
@@ -246,9 +243,9 @@ export function buildOpsInfrastructure(input: {
           managerExplorer: ManagerExplorerService.create({
             store: repositories.processStore,
             fleet: repositories.processFleet,
-            audit: PrismaProcessAuditRepository.create({
-              prisma: members.prisma,
+            audit: ProcessAuditService.create({
               auditLog: dependencies.auditLog,
+              history: repositories.processAudit,
             }),
             introspection,
           }) satisfies OpsProcessExplorer,
@@ -316,10 +313,8 @@ export interface OpsOperationsOptions {
   /** The stores the operations read and edit, as the registry built them. */
   repositories: Pick<
     OpsRepositories,
-    "instanceAdmin" | "impersonation" | "queues" | "blobStore" | "anomalyState"
+    "instanceAdmin" | "impersonation" | "queues" | "blobStore" | "anomalyState" | "schedulerAudit"
   >;
-  /** What the scheduler's audit trail reads; the trail itself also takes the audit log. */
-  database: SchedulerAuditDatabase;
   audit: AdminAuditSink;
   /** Auth's session claims, which an impersonation starts, reads and stops. */
   sessions: ImpersonationSessions;
@@ -378,9 +373,9 @@ export class OpsOperations {
       }),
       scheduler: SchedulerOpsService.create({
         ...this.options.scheduler,
-        audit: PrismaSchedulerAuditRepository.create({
-          database: this.options.database,
+        audit: SchedulerAuditService.create({
           auditLog: this.options.auditLog,
+          history: repositories.schedulerAudit,
         }),
       }),
       anomalyState: repositories.anomalyState,

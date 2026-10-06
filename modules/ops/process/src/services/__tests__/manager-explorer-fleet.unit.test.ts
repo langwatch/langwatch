@@ -7,6 +7,7 @@ import { MemoryProcessAuditRepository } from "../../repositories/memory/memory.p
 import { MemoryProcessOpsRepository } from "../../repositories/memory/memory.process-ops.repository.ts";
 import type { ProcessNameCounts } from "../../repositories/process-ops.repository.ts";
 import { ManagerExplorerService } from "../manager-explorer.service.ts";
+import { ProcessAuditService } from "../process-audit.service.ts";
 
 function fakeStore(): ProcessStore {
   return InMemoryProcessStore.createForTesting();
@@ -60,7 +61,10 @@ function serviceWithCounts(rows: ProcessNameCounts[], registryNames: string[] = 
   return ManagerExplorerService.create({
     store: fakeStore(),
     fleet,
-    audit: MemoryProcessAuditRepository.create({ store: MemoryOpsStore.create() }),
+    audit: ProcessAuditService.create({
+      auditLog: { record: async () => ({ id: "audit", occurredAt: 0 }) },
+      history: MemoryProcessAuditRepository.create({ store: MemoryOpsStore.create() }),
+    }),
     introspection: new FakeIntrospection(),
   });
 }

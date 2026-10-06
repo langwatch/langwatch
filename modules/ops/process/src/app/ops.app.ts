@@ -264,8 +264,6 @@ import { SlackBugReportNotifierChannel } from "../channels/slack/slack.bug-repor
 import type { AnomalyDetectionTickResult } from "../eventing/ops-anomaly-detection.intent.ts";
 import { PLATFORM_OPERATOR_SEED_TENANT_ID } from "../eventing/ops-platform-operator-seed.process.ts";
 import type { ProjectionReplayRun } from "../eventing/ops-projection-replay.events.ts";
-import { ClickHouseClickHouseHealthRepository } from "../repositories/clickhouse/clickhouse.datastore-health.repository.ts";
-import { RedisAnomalyRateTrackerRepository } from "../repositories/redis/redis.anomaly-rate-tracker.repository.ts";
 import { decideCloudOps } from "../rules/cloud-ops.rules.ts";
 import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
 import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts";
@@ -757,10 +755,7 @@ export class OpsModule implements OpsApi {
       }),
     );
     // One tracker: the queue-metrics writer records into it, the detector reads it.
-    const rateTracker = RedisAnomalyRateTrackerRepository.create({
-      redis: setup.members.redis,
-      featureFlags: setup.dependencies.featureFlags,
-    });
+    const { rateTracker } = setup.repositories;
     const logger = createLogger("langwatch:ops");
     const bugReportNotifier = await setup.secrets.into(
       OpsModule.secrets.slackBugReportsBotToken,
@@ -781,12 +776,11 @@ export class OpsModule implements OpsApi {
       config: setup.config,
       resources: setup.resources,
       repositories: setup.repositories,
-      rateTracker,
+      featureFlags: setup.dependencies.featureFlags,
       cloudOps,
     });
 
     const { dependencies, config, repositories } = setup;
-    const { members } = setup;
     const checkup = OpsCheckupService.create({
       facts: {
         isSaas: config.isSaas,
@@ -810,7 +804,7 @@ export class OpsModule implements OpsApi {
       },
       repositories: {
         postgres: repositories.postgresHealth,
-        clickhouse: ClickHouseClickHouseHealthRepository.create({ clickhouse: members.clickhouse }),
+        clickhouse: repositories.clickhouseHealth,
         redis: repositories.redisHealth,
         upgradeLedger: repositories.upgradeLedger,
       },

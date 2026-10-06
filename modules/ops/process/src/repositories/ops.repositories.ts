@@ -1,11 +1,12 @@
 import type { ProcessStore } from "@langwatch/eventing";
 import type { MigrationLeaseRepository } from "@langwatch/system-migrations";
 
-import type { AnomalyStateRepository } from "./anomaly.repository.ts";
+import type { AnomalyRateTrackerRepository, AnomalyStateRepository } from "./anomaly.repository.ts";
 import type { BlobStoreRepository } from "./blob-store.repository.ts";
 import type { BugReportRepository } from "./bug-report.repository.ts";
 import type { CredentialsResealRepository } from "./credentials-reseal.repository.ts";
 import type {
+  ClickHouseHealthRepository,
   PostgresHealthRepository,
   RedisHealthRepository,
 } from "./datastore-health.repository.ts";
@@ -13,6 +14,7 @@ import type { EventExplorerRepository } from "./event-explorer.repository.ts";
 import type { ImpersonationRepository } from "./impersonation.repository.ts";
 import type { AdminBackofficeRepository } from "./instance-admin.repository.ts";
 import type { MigrationMembershipRepository } from "./migration-membership.repository.ts";
+import type { ProcessAuditRepository, SchedulerAuditRepository } from "./ops-audit.repository.ts";
 import type { OpsMetricsRepository } from "./ops-metrics.repository.ts";
 import type { OpsSnapshotRepository } from "./ops-snapshot.repository.ts";
 import type { OrganizationTenantSourceRepository } from "./organization-tenant-source.repository.ts";
@@ -54,6 +56,9 @@ export interface OpsRepositories {
   readonly instanceAdmin: AdminBackofficeRepository;
   readonly impersonation: ImpersonationRepository;
   readonly processFleet: ProcessOpsRepository;
+  /** The operator trails as recorded; the acts are written through the audit log. */
+  readonly processAudit: ProcessAuditRepository;
+  readonly schedulerAudit: SchedulerAuditRepository;
   readonly postgresHealth: PostgresHealthRepository;
   /** The dashboard's published snapshots and the queue counters its writer reads. */
   readonly snapshots: OpsSnapshotRepository;
@@ -62,8 +67,11 @@ export interface OpsRepositories {
   readonly blobStore: BlobStoreRepository;
   readonly replay: ReplayRepository;
   readonly anomalyState: AnomalyStateRepository;
+  /** One per process: the queue-metrics writer records into it, the detector reads it. */
+  readonly rateTracker: AnomalyRateTrackerRepository;
   readonly storageReadings: StorageStatsReadingsRepository;
   readonly redisHealth: RedisHealthRepository;
+  readonly clickhouseHealth: ClickHouseHealthRepository;
   readonly events: EventExplorerRepository;
   readonly storageFootprint: StorageFootprintRepository;
   readonly upgradeLedger: UpgradeLedgerRepository;

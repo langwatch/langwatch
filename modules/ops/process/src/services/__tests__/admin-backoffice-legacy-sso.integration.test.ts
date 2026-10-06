@@ -44,7 +44,6 @@ function backoffice(connectionDecides = true) {
       ...MemoryOpsRepositories.create(),
       instanceAdmin: PrismaAdminBackofficeRepository.create(refuseEveryQuery as never),
     },
-    database: refuseEveryQuery as never,
     audit: new AuditStub(),
     sessions: createApiFixture<AuthApi>(),
     auditLog: createApiFixture<AuditLogApi>(),

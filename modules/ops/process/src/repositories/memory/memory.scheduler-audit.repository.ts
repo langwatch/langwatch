@@ -1,13 +1,9 @@
-import { generate } from "@langwatch/ksuid";
-import type { SchedulerAuditEntryView, SchedulerControlAction } from "@langwatch/ops-contract";
-import { nowInstant } from "@langwatch/time";
+import type { SchedulerAuditEntryView } from "@langwatch/ops-contract";
 
 import { SchedulerAuditRepository } from "../ops-audit.repository.ts";
 import type { MemoryOpsStore } from "./memory.ops.store.ts";
 
-const SCHEDULER_AUDIT_KSUID_RESOURCE = "schedaudit";
-
-/** The scheduler-control trail in memory, newest act first on a read. */
+/** The scheduler-control trail in memory, as a test or a seed placed it, newest first. */
 export class MemorySchedulerAuditRepository extends SchedulerAuditRepository {
   static create({ store }: { store: MemoryOpsStore }): MemorySchedulerAuditRepository {
     return new MemorySchedulerAuditRepository(store);
@@ -15,23 +11,6 @@ export class MemorySchedulerAuditRepository extends SchedulerAuditRepository {
 
   private constructor(private readonly store: MemoryOpsStore) {
     super();
-  }
-
-  async append(entry: {
-    actorUserId: string;
-    action: SchedulerControlAction;
-    scheduleId: string;
-    projectId: string;
-    slot: string | null;
-  }): Promise<void> {
-    this.store.schedulerAudit.push({
-      id: generate(SCHEDULER_AUDIT_KSUID_RESOURCE).toString(),
-      at: nowInstant().toString(),
-      action: entry.action,
-      scheduleId: entry.scheduleId,
-      projectId: entry.projectId,
-      actor: entry.actorUserId,
-    });
   }
 
   async findRecent({ limit }: { limit: number }): Promise<SchedulerAuditEntryView[]> {
