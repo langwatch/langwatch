@@ -209,6 +209,16 @@ The outbox index is partial: restricted to `dispatched` rows it indexes
 exactly the reap set, instead of adding write amplification for every pending
 row on the hot insert path.
 
+One outbox index does ship in a Prisma migration: the per-process lease index
+from `20261006150000_process_outbox_lease_by_process_index`, as a plain
+`CREATE INDEX IF NOT EXISTS`. On an install with real traffic, prebuild it
+before deploying that release, so the migration finds it and does nothing:
+
+```sql
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "ProcessManagerOutbox_status_processName_nextAttemptAt_idx"
+  ON "ProcessManagerOutbox" ("status", "processName", "nextAttemptAt");
+```
+
 If a `CONCURRENTLY` build fails or is interrupted, it leaves an `INVALID`
 index behind, and `IF NOT EXISTS` will then see it as present and skip it.
 Check for that before trusting a re-run:
