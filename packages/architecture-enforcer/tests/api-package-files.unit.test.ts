@@ -29,6 +29,7 @@ const TARGET_FILES = new Set([
   "access/access.ts",
   "access/declaration.ts",
   "access/declared-middleware.ts",
+  "access/input-permission.ts",
   // Transport hosting: HTTP mux, API hosts and browser bundle (record section 4).
   "hosting/index.ts",
   "hosting/api-door.ts",
@@ -58,6 +59,7 @@ const TARGET_FILES = new Set([
   "rest/declaration.ts",
   "rest/host.ts",
   "rest/idempotency.ts",
+  "rest/key-credential.ts",
   "rest/openapi.ts",
   "rest/request.ts",
   "rest/response.ts",

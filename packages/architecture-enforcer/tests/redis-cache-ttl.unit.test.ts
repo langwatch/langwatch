@@ -113,7 +113,8 @@ function offendersIn(file: string, source: string): string[] {
 describe("given the Redis cache repositories", () => {
   /** @scenario "A Redis cache repository writes no key without its expiry" */
   it("finds them, so the check below cannot pass on an empty list", () => {
-    expect(cacheRepositories().length).toBeGreaterThanOrEqual(16);
+    // 15 since billing's tenant-organization cache was retired (8c0276278e).
+    expect(cacheRepositories().length).toBeGreaterThanOrEqual(15);
   });
 
   /** @scenario "A Redis cache repository writes no key without its expiry" */
