@@ -66,6 +66,17 @@ export function bindingGrants({
     });
   }
 
+  // ADR-144: a shared project-to-project read. The ledger places it on a
+  // PROJECT scope and nowhere else, and nothing widens or narrows it - not
+  // an organization role, not the EXTERNAL cap - because the principal is a
+  // project, which has neither.
+  if (roleKey === "project-reader") {
+    return (
+      binding.scopeType === "PROJECT" &&
+      builtinRoleGrants({ role: "project-reader", permission })
+    );
+  }
+
   if (roleKey !== "admin" && roleKey !== "member" && roleKey !== "viewer") {
     return false;
   }

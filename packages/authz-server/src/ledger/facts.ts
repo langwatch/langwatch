@@ -36,6 +36,10 @@ export type LedgerScopeType = StoredScopeTier;
  * `join-request` is the opposite case, and deliberately so: somebody asked
  * to join and the request was approved, which is a live change a customer
  * should see. It stays auditable.
+ *
+ * `aggregate-reconciler` (ADR-144) materialises an aggregate project's scope
+ * rule into one shared project-reader grant per member project, and revokes
+ * them when the rule or the membership changes. Live changes, so auditable.
  */
 export const GRANT_EVENT_SOURCES = [
   "grants-service",
@@ -44,6 +48,7 @@ export const GRANT_EVENT_SOURCES = [
   "join-request",
   "read-through-mint",
   "migration",
+  "aggregate-reconciler",
 ] as const;
 
 export type GrantEventSource = (typeof GRANT_EVENT_SOURCES)[number];
