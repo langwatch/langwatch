@@ -66,5 +66,12 @@ export abstract class SlackConnectionRepository {
     actorId: string;
   }): Promise<SlackConnectionRow[]>;
 
+  /** Restamps one row's fingerprint; a collision in its scope leaves the row as it is. */
+  abstract replaceFingerprint(input: {
+    id: string;
+    organizationId: string;
+    secretFingerprint: string;
+  }): Promise<void>;
+
   abstract delete(input: { id: string; organizationId: string }): Promise<void>;
 }

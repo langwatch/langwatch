@@ -11,10 +11,14 @@ import {
 const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
 export class ApiKeyTokenService {
-  private constructor(private readonly pepper: string) {}
+  private constructor(
+    private readonly pepper: string,
+    private readonly previousPepper: string | undefined,
+  ) {}
 
-  static create(pepper: string): ApiKeyTokenService {
-    return new ApiKeyTokenService(pepper);
+  /** `previousPepper` only verifies: every hash written is under `pepper`. */
+  static create(pepper: string, previousPepper?: string): ApiKeyTokenService {
+    return new ApiKeyTokenService(pepper, previousPepper);
   }
 
   generate(options: { prefix?: string } = {}): {
@@ -33,7 +37,12 @@ export class ApiKeyTokenService {
   }
 
   verify(secret: string, hashedSecret: string): ApiKeySecretVerdict {
-    return verifyApiKeySecret({ secret, hashedSecret, pepper: this.pepper });
+    return verifyApiKeySecret({
+      secret,
+      hashedSecret,
+      pepper: this.pepper,
+      previousPepper: this.previousPepper,
+    });
   }
 
   hash(secret: string): string {

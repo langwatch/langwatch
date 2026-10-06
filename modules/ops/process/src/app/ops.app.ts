@@ -237,6 +237,11 @@ import {
 import { PromptApi } from "@langwatch/prompt-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import { Secret } from "@langwatch/secrets/secret";
+import {
+  credentialsSecret,
+  credentialsSecretPrevious,
+  sessionSecret,
+} from "@langwatch/secrets/shared-secrets";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { MigrationPassSummary, SystemMigrationPass } from "@langwatch/system-migrations";
 import { nowInstant } from "@langwatch/time";
@@ -733,6 +738,10 @@ export class OpsModule implements OpsApi {
     clickhouseUrl: storesOwner.secrets.clickhouse,
     /** Posts the new-bug-report alert; absent, intake stays silent. */
     slackBugReportsBotToken: Secret.load("SLACK_BUG_REPORTS_BOT_TOKEN", { optional: true }),
+    /** The stores' own keys: credentials-reseal moves values from the previous to the current. */
+    credentials: credentialsSecret,
+    credentialsFallback: sessionSecret,
+    credentialsPrevious: credentialsSecretPrevious,
   } as const;
   static readonly publicConfig = opsBrowserConfig.project;
   static readonly reads = ["prisma", "redis", "clickhouse", "eventing"] as const;

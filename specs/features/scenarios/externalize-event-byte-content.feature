@@ -578,7 +578,7 @@ Feature: Externalize event byte content to stored_objects
   Scenario: Helm chart exposes a single dataplane object-storage config block covering datasets and stored-objects together
     Given app.dataplaneObjectStorage.enabled is true in values.yaml
     When the chart renders the app and workers deployments
-    Then both pods receive the same S3_BUCKET_NAME / S3_ENDPOINT / USE_S3_STORAGE values
+    Then both pods receive the same S3_BUCKET_NAME / S3_ENDPOINT values
     And the chart documentation calls out that the bucket is shared with datasets
 
   @unit

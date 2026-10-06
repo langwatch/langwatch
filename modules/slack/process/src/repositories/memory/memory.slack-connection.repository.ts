@@ -111,6 +111,22 @@ export class MemorySlackConnectionRepository extends SlackConnectionRepository {
     return Promise.resolve([{ ...next }]);
   }
 
+  replaceFingerprint({
+    id,
+    organizationId,
+    secretFingerprint,
+  }: {
+    id: string;
+    organizationId: string;
+    secretFingerprint: string;
+  }): Promise<void> {
+    const current = this.#rows.get(id);
+    if (!current || current.organizationId !== organizationId) return Promise.resolve();
+    const next = { ...current, secretFingerprint };
+    if (!this.#collides({ candidate: next, exceptId: id })) this.#rows.set(id, next);
+    return Promise.resolve();
+  }
+
   delete({ id, organizationId }: { id: string; organizationId: string }): Promise<void> {
     if (this.#rows.get(id)?.organizationId === organizationId) this.#rows.delete(id);
     return Promise.resolve();

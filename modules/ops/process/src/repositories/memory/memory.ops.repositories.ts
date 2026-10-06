@@ -5,6 +5,7 @@ import type { OpsRepositories } from "../ops.repositories.ts";
 import { NullQueueRepository } from "../queue.repository.ts";
 import { MemoryAnomalyStateRepository } from "./memory.anomaly-state.repository.ts";
 import { MemoryBugReportRepository } from "./memory.bug-report.repository.ts";
+import { MemoryCredentialsResealRepository } from "./memory.credentials-reseal.repository.ts";
 import {
   MemoryPostgresHealthRepository,
   MemoryRedisHealthRepository,
@@ -46,6 +47,7 @@ export class MemoryOpsRepositories {
       bugReports: MemoryBugReportRepository.create({ store }),
       processStore: InMemoryProcessStore.createForLocalDevelopment(),
       processManagerPurge: MemoryProcessManagerPurgeRepository.create(),
+      credentialsReseal: MemoryCredentialsResealRepository.create(),
       migrationState: MemorySystemMigrationStateRepository.create(),
       migrationEnrollments: MemorySystemMigrationEnrollmentRepository.create(),
       migrationMemberships: MemoryMigrationMembershipRepository.create(),

@@ -402,6 +402,8 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 | `size-prod.yaml`        | Production, single-node CH    | ~8.9 CPU, ~23 Gi            |
 | `size-ha.yaml`          | HA production, replicated CH  | ~23 CPU, ~85 Gi             |
 
+`size-prod.yaml` and `size-ha.yaml` run more than one replica, so they need `app.dataplane` (S3 or Azure Blob) for stored objects. `cold-storage-s3.yaml` covers ClickHouse only.
+
 ### Access Overlays
 
 | Overlay                | Description                          |

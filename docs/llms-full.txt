@@ -61841,7 +61841,8 @@ LangWatch is configured through environment variables. How you set them depends 
 | Variable                              | Description                                                                                                                                                                                                                                                                                                                                                                                                           | Required           |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
 | `NEXTAUTH_SECRET`                     | Signs sessions, keys the sign-in lock-out records and unsubscribe links, and encrypts two-step verification backup codes. Changing it signs every user out                                                                                                                                                                                                                                                            | Yes                |
-| `CREDENTIALS_SECRET`                  | AES-256-GCM key for stored credentials (model provider keys, webhook signing secrets, SSO credentials) and the pepper for API key hashes. Must be exactly 64 hex characters (`openssl rand -hex 32`). Falls back to `NEXTAUTH_SECRET` when unset. Changing it makes stored credentials unreadable and invalidates every API key except legacy project keys. See [Security](/self-hosting/security#credentials-secret) | Yes                |
+| `CREDENTIALS_SECRET`                  | AES-256-GCM key for stored credentials (model provider keys, webhook signing secrets, SSO credentials) and the pepper for API key hashes. Must be exactly 64 hex characters (`openssl rand -hex 32`). Falls back to `NEXTAUTH_SECRET` when unset. Changing it without a rotation makes stored credentials unreadable and invalidates every API key except legacy project keys. See [Security](/self-hosting/security#credentials-secret) | Yes                |
+| `CREDENTIALS_SECRET_PREVIOUS`         | The old `CREDENTIALS_SECRET` during a rotation. Read-only: values encrypted or hashed with it are still accepted, and new writes use `CREDENTIALS_SECRET`. Same 64 hex format. Unset it when the rotation is done. See [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret) | No                 |
 | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | Key for the stand-in that replaces an erased identifier. At least 32 characters. Needed once anyone is erased, with the same value on the app and the workers (Helm: `app.extraEnvs` and `workers.extraEnvs`). Never change it after the first erasure                                                                                                                                                                | For erasure        |
 | `LANGWATCH_INSTANCE_ADMIN_API_KEY`    | Bearer credential for the organization provisioning API (`/api/organizations`). At least 32 characters. Unset, that API answers 404                                                                                                                                                                                                                                                                                   | No                 |
 | `API_TOKEN_JWT_SECRET`                | Not used by any feature. No code reads it; it can be left unset                                                                                                                                                                                                                                                                                                                                                       | No                 |
@@ -62181,6 +62182,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.signUp.allowedDomains` | `SIGN_UP_ALLOWED_DOMAINS` (joined with commas) |
 | `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
+| `app.credentialsEncryptionKey.previous.value` | `CREDENTIALS_SECRET_PREVIOUS`, only when set. With `secrets.existingSecret`, name its key in `secrets.secretKeys.credentialsEncryptionKeyPrevious` instead |
 | `app.email.provider` | `EMAIL_PROVIDER` |
 | `app.email.providers.sendgrid.apiKey.value` | `SENDGRID_API_KEY` |
 | `app.email.providers.ses.region` | `AWS_REGION` (with `USE_AWS_SES=true`) |
@@ -62192,11 +62194,10 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.email.providers.smtp.user` | `SMTP_USER` |
 | `app.email.providers.smtp.password.value` | `SMTP_PASSWORD` |
 | `app.email.providers.resend.apiKey.value` | `RESEND_API_KEY` |
-| `app.evaluators.azureOpenAI.endpoint.value` / `.apiKey.value` | `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_KEY` when `app.evaluators.azureOpenAI.enabled` is on. The app does not read them; configure Azure OpenAI in **Settings > Model Providers** |
 | `app.evaluators.google.credentials.value` | `GOOGLE_APPLICATION_CREDENTIALS` when `app.evaluators.google.enabled` is on |
 | `app.telemetry.usage.enabled` | Inverse of `DISABLE_USAGE_STATS` |
-| `app.telemetry.metrics.apiKey.value` | `METRICS_API_KEY` when `app.telemetry.metrics.enabled` is on |
-| `app.dataplane.enabled` | `STORED_OBJECTS_BACKEND=s3` + `USE_S3_STORAGE` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
+| `app.telemetry.metrics.apiKey.value` | `LANGWATCH_METRICS_TOKEN`, with `LANGWATCH_METRICS_MODE=prometheus`, when `app.telemetry.metrics.enabled` is on |
+| `app.dataplane.enabled` | `STORED_OBJECTS_BACKEND=s3` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
 | `app.dataplane.bucket` | `S3_BUCKET_NAME` |
 | `app.dataplane.providers.azureBlob.accountName.value` | `AZURE_BLOB_ACCOUNT_NAME` |
 | `app.dataplane.providers.azureBlob.accountKey.value` | `AZURE_BLOB_ACCOUNT_KEY` (sharedKey mode only) |
@@ -62267,7 +62268,9 @@ prometheus:
 | App       | 5560 | `/metrics` | Trace ingestion, ClickHouse query latency, event loop lag     |
 | Workers   | 2999 | `/metrics` | Queue backlog, job processing time, job success/failure rates |
 
-Both scrape jobs keep only pods annotated `prometheus.io/scrape: "true"`. The chart adds that annotation to the app pods when `app.telemetry.metrics.enabled` is `true`, and never to the workers pods. Without it the chart-managed Prometheus does not reach the workers' `/metrics`. Both `/metrics` endpoints answer 500 until `app.telemetry.metrics.enabled` is on with an API key, and then require that key as a bearer token.
+Each component has its own scrape job. A job keeps only pods annotated `prometheus.io/scrape: "true"` whose `app.kubernetes.io/name` label is that component's (`<release>-app` or `<release>-workers`). The chart adds the annotation to the app and workers pods when `app.telemetry.metrics.enabled` is `true`. Neither component serves `/metrics` until `app.telemetry.metrics.enabled` is on with an API key, and then both require that key as a bearer token.
+
+The chart-managed Prometheus sends the key only when it is set through `app.telemetry.metrics.apiKey.value`. With `apiKey.secretKeyRef`, the pods get the key but the scrape config does not, and both jobs are answered with 401.
 
 ### Access Prometheus
 
@@ -62301,7 +62304,14 @@ prometheus.io/scrape: "true"
 prometheus.io/port: "5560"
 ```
 
-The workers pods carry no scrape annotations. Scrape them on port `2999`, path `/metrics`, or add annotations through `workers.pod.annotations`.
+The workers pods are annotated with:
+
+```yaml
+prometheus.io/scrape: "true"
+prometheus.io/port: "2999"
+```
+
+Both serve the metrics on the path `/metrics`.
 
 ## Grafana
 
@@ -62828,7 +62838,7 @@ LangWatch evaluators use external LLM providers for model-based evaluations (LLM
 
 ### Azure OpenAI
 
-Configure Azure OpenAI for evaluators in **Settings > Model Providers**. The chart still accepts `app.evaluators.azureOpenAI`, which sets `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_KEY` on the app and workers, but the app does not read them.
+Configure Azure OpenAI for evaluators in **Settings > Model Providers**. The Helm chart has no value for it.
 
 ### Google Cloud DLP
 
@@ -63531,7 +63541,7 @@ LANGWATCH_NLP_INTERNAL_SECRET=
 LANGWATCH_LICENSE_KEY=
 ```
 
-See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. Keep `CREDENTIALS_SECRET` stable once LangWatch holds data: changing it makes stored credentials unreadable and invalidates API keys. See [Security](/self-hosting/security#credentials-secret). See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
+See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. Keep `CREDENTIALS_SECRET` stable once LangWatch holds data: changing it makes stored credentials unreadable and invalidates API keys. To replace it, see [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret). See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 
 ## Common Operations
 
@@ -64214,6 +64224,8 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 | `size-dev.yaml`         | Local dev, small teams        | ~2.8 CPU, ~6.9 Gi           |
 | `size-prod.yaml`        | Production, single-node CH    | ~8.9 CPU, ~23 Gi            |
 | `size-ha.yaml`          | HA production, replicated CH  | ~23 CPU, ~85 Gi             |
+
+`size-prod.yaml` and `size-ha.yaml` run more than one replica, so they need `app.dataplane` (S3 or Azure Blob) for stored objects. `cold-storage-s3.yaml` covers ClickHouse only.
 
 ### Access Overlays
 
@@ -67154,15 +67166,64 @@ Two exceptions: `pat-lw-` keys created before the HMAC upgrade keep a plain SHA-
 
 **What else it keys.** The same value is the HMAC pepper for API keys (see Authentication & Authorization above) and signs short-lived tokens (voice session tokens, GitHub App install state).
 
-**Changing it.** There is no key rotation or re-encryption path. Data written under the old value cannot be read under the new one:
+**Changing it without the old value.** Data written under the old value cannot be read under a new one:
 
 - Model provider keys, project secrets, S3 credentials, SSO credentials and integration secrets have to be entered again. Checkup reports model providers whose keys no longer decrypt.
-- Every API key in the current format stops authenticating and has to be recreated. Older project keys, and `pat-lw-` keys still on a plain SHA-256 hash, keep working.
+- Every API key and SCIM token in the current format stops authenticating and has to be recreated. Older project keys, and `pat-lw-` keys still on a plain SHA-256 hash, keep working.
 - In-flight signed tokens are rejected and the user starts that flow again.
 
-The rows are not deleted, so setting the previous value back makes them readable again, except for anything already re-entered under the new value.
+The rows are not deleted, so setting the old value back makes them readable again, except for anything already re-entered under the new value.
 
-Keep the value stable across upgrades, restores and migrations to a new cluster, and back it up together with your PostgreSQL backups. A database restored without its `CREDENTIALS_SECRET` comes back with none of its stored credentials usable.
+Keep the value stable across upgrades, restores and migrations to a new cluster, and back it up together with your PostgreSQL backups. A database restored without its `CREDENTIALS_SECRET` comes back with none of its stored credentials usable. To replace the value while keeping the data, follow the rotation procedure below.
+
+### Rotating the credentials secret
+
+Rotation needs the old value. `CREDENTIALS_SECRET_PREVIOUS` holds it while data moves to the new one. The app and workers write only with `CREDENTIALS_SECRET`. They read with `CREDENTIALS_SECRET` first and fall back to `CREDENTIALS_SECRET_PREVIOUS`.
+
+<Steps>
+  <Step title="Set both values">
+    Generate a new value with `openssl rand -hex 32`. Set it as `CREDENTIALS_SECRET` and set the old value as `CREDENTIALS_SECRET_PREVIOUS`. On Helm the old value goes in `app.credentialsEncryptionKey.previous.value` or `app.credentialsEncryptionKey.previous.secretKeyRef`. With `secrets.existingSecret`, add it to that Secret and name its key in `secrets.secretKeys.credentialsEncryptionKeyPrevious`.
+
+    An install that never set `CREDENTIALS_SECRET` encrypts with `NEXTAUTH_SECRET`. Use that value as `CREDENTIALS_SECRET_PREVIOUS`.
+  </Step>
+  <Step title="Roll every app and worker pod">
+    Wait until no pod is left on the old configuration. A pod that has only the old value cannot read what a pod with the new value writes.
+  </Step>
+  <Step title="Re-encrypt stored credentials">
+    Run the `credentials-reseal` task from a workers pod, first as a dry run:
+
+    ```bash
+    kubectl -n langwatch exec deploy/langwatch-workers -- \
+      sh -c 'cd /app/apps/tasks && HOME=/tmp pnpm run task credentials-reseal --dry-run'
+    ```
+
+    On Docker Compose:
+
+    ```bash
+    docker compose -f infra/compose.yml --project-directory . exec workers \
+      sh -c 'cd /app/apps/tasks && HOME=/tmp pnpm run task credentials-reseal --dry-run'
+    ```
+
+    Run it again without `--dry-run` to write. The task scans the text and JSON columns in PostgreSQL and rewrites each value encrypted with the old secret. It logs one line per column with the counts `resealed`, `alreadyCurrent` and `undecryptable`, then the totals.
+  </Step>
+  <Step title="Let API keys and SCIM tokens move">
+    API key and SCIM token hashes cannot be recomputed from the database. Each one moves to the new secret the next time it is used while `CREDENTIALS_SECRET_PREVIOUS` is set. Keep both values in place long enough for every key in use to make one request.
+  </Step>
+  <Step title="Remove the old value">
+    Run the task once more. When it reports `resealed: 0`, unset `CREDENTIALS_SECRET_PREVIOUS` and roll the pods.
+  </Step>
+</Steps>
+
+The task is safe to run again and safe to interrupt. A value the new secret already opens is left alone. An `undecryptable` count is not a failure: it covers values encrypted with a secret older than both, and unrelated data that has the same shape. The task logs the primary keys of those rows, never their content.
+
+After the old value is removed:
+
+- An API key or SCIM token that made no request during the overlap stops authenticating and has to be issued again.
+- A Slack connection that was not used during the overlap keeps working, but LangWatch no longer recognises its token as already connected, so the same token can be added a second time.
+- Encrypted values held in Redis are read with the old value during the overlap and are not rewritten. They are short-lived caches and queued jobs, so let the queues drain before removing the old value.
+- Signed tokens in flight at the moment of the first roll (voice sessions, GitHub App install state) are rejected and the user starts that flow again.
+
+When `API_KEY_PEPPER` is set, API key hashes use it instead of `CREDENTIALS_SECRET`, so rotating `CREDENTIALS_SECRET` leaves API keys untouched.
 
 ### In Transit
 
@@ -68391,7 +68452,7 @@ description: "How to upgrade LangWatch to the latest version"
 1. **Check release notes** for breaking changes at [github.com/langwatch/langwatch/releases](https://github.com/langwatch/langwatch/releases)
 2. **Back up your databases**: see [Backups](/self-hosting/configuration/backups)
 3. **Test in a staging environment** before upgrading production
-4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable and invalidates API keys. See [Credentials secret](/self-hosting/security#credentials-secret)
+4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable and invalidates API keys. To replace it, follow [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret) as a separate change, not during an upgrade
 
 ## Automatic identity and access migration
 

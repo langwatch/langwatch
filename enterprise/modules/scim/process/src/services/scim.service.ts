@@ -66,6 +66,7 @@ export class ScimService extends ScimServiceContract {
     lifecycle,
     provenOffboarding,
     tokenPepper,
+    previousTokenPepper,
     connections,
   }: {
     prisma: ScimRepository;
@@ -77,6 +78,7 @@ export class ScimService extends ScimServiceContract {
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     tokenPepper: string | undefined;
+    previousTokenPepper?: string | undefined;
     connections: ScimHeldConnections;
   }) {
     super();
@@ -101,6 +103,7 @@ export class ScimService extends ScimServiceContract {
       entitlements,
       lifecycle,
       tokenPepper,
+      previousTokenPepper,
     });
     this.groups = ScimDirectoryService.create({
       prisma,
@@ -120,6 +123,7 @@ export class ScimService extends ScimServiceContract {
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     tokenPepper: string | undefined;
+    previousTokenPepper?: string | undefined;
     connections: ScimHeldConnections;
   }): ScimService {
     return new ScimService(options);

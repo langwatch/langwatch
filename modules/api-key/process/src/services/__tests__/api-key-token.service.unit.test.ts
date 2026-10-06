@@ -129,6 +129,48 @@ describe("verifySecret", () => {
       );
     });
   });
+
+  describe("when the hash was written under the pepper a rotation retired", () => {
+    const secret = "issuedBeforeTheRotation";
+    const hashedSecret = hashApiKeySecret({ secret, pepper: "previous-pepper" });
+
+    it("returns match_legacy while the previous pepper is known, so the caller re-hashes", () => {
+      expect(
+        verifyApiKeySecret({
+          secret,
+          hashedSecret,
+          pepper: PEPPER,
+          previousPepper: "previous-pepper",
+        }),
+      ).toBe("match_legacy");
+    });
+
+    it("returns no_match once the previous pepper is gone", () => {
+      expect(verifyApiKeySecret({ secret, hashedSecret, pepper: PEPPER })).toBe("no_match");
+    });
+
+    it("returns no_match for a wrong secret under either pepper", () => {
+      expect(
+        verifyApiKeySecret({
+          secret: "wrong",
+          hashedSecret,
+          pepper: PEPPER,
+          previousPepper: "previous-pepper",
+        }),
+      ).toBe("no_match");
+    });
+
+    it("returns match, not match_legacy, for a hash already under the current pepper", () => {
+      expect(
+        verifyApiKeySecret({
+          secret,
+          hashedSecret: hashApiKeySecret({ secret, pepper: PEPPER }),
+          pepper: PEPPER,
+          previousPepper: "previous-pepper",
+        }),
+      ).toBe("match");
+    });
+  });
 });
 
 describe("getTokenType", () => {

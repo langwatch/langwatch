@@ -52,7 +52,15 @@ function settings({ organizationId }: { organizationId: string }): OrganizationS
 }
 
 /** The service over memory twins; MANAGER holds every permission, VIEWER none. */
-export function composeSlack({ connections }: { connections?: SlackConnectionRepository } = {}) {
+export function composeSlack({
+  connections,
+  fingerprintKey = "test-key",
+  previousFingerprintKey,
+}: {
+  connections?: SlackConnectionRepository;
+  fingerprintKey?: string;
+  previousFingerprintKey?: string;
+} = {}) {
   const memory = MemorySlackRepositories.create();
   const repositories = connections ? { ...memory, connections } : memory;
   const webApi = MemorySlackWebApiChannel.create();
@@ -69,7 +77,8 @@ export function composeSlack({ connections }: { connections?: SlackConnectionRep
         Promise.resolve(userId === MANAGER),
     },
     webApi,
-    fingerprintKey: "test-key",
+    fingerprintKey,
+    previousFingerprintKey,
   });
   const claims = SlackConnectionClaimService.create({
     claims: repositories.claims,

@@ -10,6 +10,14 @@ export const sessionSecret = Secret.load("NEXTAUTH_SECRET", { optional: true });
 /** The stored-credential key: stores seal with it, scim peppers directory token digests with it. */
 export const credentialsSecret = Secret.load("CREDENTIALS_SECRET", { optional: true });
 
+/**
+ * The value CREDENTIALS_SECRET held before a rotation. It only reads: stores open old values
+ * with it, api-key, scim and slack match old hashes with it, and nothing is written under it.
+ */
+export const credentialsSecretPrevious = Secret.load("CREDENTIALS_SECRET_PREVIOUS", {
+  optional: true,
+});
+
 /** Signs calls to the gateway's internal surface: gateway checks, governance's OTTL signs. */
 export const gatewayInternalSecret = Secret.load("LW_GATEWAY_INTERNAL_SECRET", { optional: true });
 

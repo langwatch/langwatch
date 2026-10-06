@@ -111,11 +111,13 @@ function processConfigOf(options: {
   }>;
   clickhouseRoutes: readonly ClickHousePrivateRoute[];
   encryption: string | undefined;
+  previousEncryption: string | undefined;
   storage: StorageSecrets;
   production: boolean;
 }): ProcessConfig {
   const { name, config, pipelines, urls, clickhouseRoutes, encryption, storage, production } =
     options;
+  const previousEncryptionKey = options.previousEncryption;
   // A deployment whose every tenant is private names no shared URL, and still has ClickHouse.
   const clickhouse =
     urls.clickhouse || clickhouseRoutes.length > 0
@@ -130,6 +132,7 @@ function processConfigOf(options: {
   return {
     processName: name,
     encryptionKey: encryption ?? "",
+    ...(previousEncryptionKey ? { previousEncryptionKey } : {}),
     secrets: {},
     rateLimit: config.rateLimit,
     ...(urls.database ? { database: { url: urls.database } } : {}),
@@ -169,19 +172,22 @@ export function openStores(options: {
         secrets.into(storesOwner.secrets.redis, (redis) =>
           secrets.into(storesOwner.secrets.encryption, (credentials) =>
             secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
-              withStorageSecrets(secrets, (storage) =>
-                buildProcessStores({
-                  config: processConfigOf({
-                    name,
-                    config,
-                    pipelines,
-                    urls: { database, clickhouse, redis },
-                    clickhouseRoutes: clickhouseRoutesOf(routes),
-                    encryption: credentials ?? session,
-                    storage,
-                    production,
+              secrets.into(storesOwner.secrets.encryptionPrevious, (previous) =>
+                withStorageSecrets(secrets, (storage) =>
+                  buildProcessStores({
+                    config: processConfigOf({
+                      name,
+                      config,
+                      pipelines,
+                      urls: { database, clickhouse, redis },
+                      clickhouseRoutes: clickhouseRoutesOf(routes),
+                      encryption: credentials ?? session,
+                      previousEncryption: previous,
+                      storage,
+                      production,
+                    }),
                   }),
-                }),
+                ),
               ),
             ),
           ),
