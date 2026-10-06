@@ -36,3 +36,11 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Ops repositories (Q212): MOVE the peer Api calls into ops' services; repositories take only ops' own store.
 - ClickHouse health (Q212): resolve CLICKHOUSE_URL through secrets.into at boot and pass it in.
 - Blob store (Q211): INJECT mintUri; group-queue takes a mint function and a generic destination type, no module import.
+
+## Round 6 (D, framework seams and lent props)
+
+- ClickHouse managed-table list (Q211): INJECT via the constructor; apps/tasks passes the list into ClickHouseMigrateTask and the data-retention dependency goes.
+- Facet rules (Q211): the two trace rules files become SERVICES; rules stay free of ClickHouse.
+- Lent props naming another module's types (Q202, Q203): STRUCTURAL props, restated as portable shapes; no new edges.
+- React-typed lent props (Q202, Q204): Alex asked back "lent components shouldn't be in contracts?"; clarification asked, see round 6b.
+- Round 6b, token home (Q202, Q204): KEEP the record; tokens stay in the owner's contract, React-shaped props become data (text, ids), and render slots are typed unknown and narrowed by browser-host.
