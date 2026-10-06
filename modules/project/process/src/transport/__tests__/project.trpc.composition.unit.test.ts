@@ -8,7 +8,6 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
-import type * as observabilityModule from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
@@ -34,14 +33,11 @@ const reported = vi.hoisted(() => ({
   entries: [] as { payload: Readonly<Record<string, unknown>>; message: string }[],
 }));
 
-vi.mock("@langwatch/observability", async (importOriginal) => ({
-  ...(await importOriginal<typeof observabilityModule>()),
-  createLogger: () => ({
-    error: (payload: Readonly<Record<string, unknown>>, message: string) => {
-      reported.entries.push({ payload, message });
-    },
-  }),
-}));
+const logger = {
+  error: (payload: Readonly<Record<string, unknown>>, message: string) => {
+    reported.entries.push({ payload, message });
+  },
+};
 
 beforeEach(() => {
   reported.entries.length = 0;
@@ -164,6 +160,7 @@ function application(
   });
 
   const app = ProjectModule.create({
+    logger,
     dependencies: {
       apiKeys: new TestApiKeyService(),
       authorization,

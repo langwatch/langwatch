@@ -6,7 +6,7 @@ import {
   DataPrivacyApi,
   type DataPrivacyPiiRedactionLevel,
 } from "@langwatch/data-privacy-contract";
-import { createLogger, type Logger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import {
@@ -72,6 +72,10 @@ type ProjectDependencies = Readonly<{
   /** Owns the project's PII level, which `/api/projects` reads and writes by name. */
   dataPrivacy: typeof DataPrivacyApi;
 }>;
+/** The one logger member this module reads; a test hands its own through `create`. */
+type ProjectLogger = Readonly<{
+  error: (payload: Readonly<Record<string, unknown>>, message: string) => void;
+}>;
 type ProjectSetup = FeatureSetup<ProjectDependencies, never, undefined, ProjectRepositories>;
 
 /**
@@ -117,7 +121,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #authorization: AuthzApi;
   readonly #trace: TraceApi;
   readonly #dataPrivacy: DataPrivacyApi;
-  readonly #logger: Logger;
+  readonly #logger: ProjectLogger;
   readonly #requests = ProjectRequestService.create({
     projects: this,
     probePermission: (input) => this.probePermission(input),
@@ -141,7 +145,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     authorization: AuthzApi;
     trace: TraceApi;
     dataPrivacy: DataPrivacyApi;
-    logger: Logger;
+    logger: ProjectLogger;
   }) {
     this.#projectService = projectService;
     this.#operations = operations;
@@ -153,8 +157,11 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     this.#logger = logger;
   }
 
-  static create({ dependencies, repositories }: ProjectSetup): ProjectModule {
-    const logger = createLogger("langwatch:project");
+  static create({
+    dependencies,
+    repositories,
+    logger = createLogger("langwatch:project"),
+  }: ProjectSetup & { logger?: ProjectLogger }): ProjectModule {
     const lifecycle = ProjectCreatedNoticeService.create({
       logger,
       projects: repositories.projects,
