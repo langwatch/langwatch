@@ -142,10 +142,12 @@ Rule: Toolbar strip
   Scenario: Lens tabs take remaining horizontal space
     Then the lens tabs flex to fill remaining space before the right cluster
 
+  @integration
   Scenario: Grouping selector shows checkmark on selected item
     When the user opens the grouping dropdown
     Then the selected grouping has a checkmark (not a radio circle)
 
+  @integration
   Scenario: Time range picker shows relative presets and absolute dates
     When the user opens the time range picker
     Then relative presets are available (Last 15m, Last 1h, Last 24h, etc.)
@@ -250,11 +252,13 @@ Rule: Conversations lens
     Given a conversation started at 10:00 and the last trace ended at 10:08:12
     Then the wall-clock duration shows "wall: 8m 12s"
 
+  @integration
   Scenario: Expanding a conversation shows turn rows
     When the user clicks the expand toggle on a conversation
     Then up to 5 turn rows appear below the conversation header
     And each turn shows: turn number, user message, assistant message, tool calls (if any), duration, time-between turns
 
+  @integration
   Scenario: Long pauses between turns are highlighted
     Given two turns are separated by more than 30 seconds
     Then the time-between shows a highlight like "⏱ +12.4s ← long pause"
@@ -317,6 +321,7 @@ Rule: Errors lens
     And line 1 shows: red dot, time, root span name, service, duration, cost, model
     And line 2 shows: erroring span name and exception type + message (truncated, monospace)
 
+  @integration
   Scenario: Erroring span on root shows "(root)"
     Given a trace where the root span itself errored
     Then line 2 shows "(root)" as the span name
@@ -381,21 +386,25 @@ Rule: Default columns and status indicator
     Given the "Timestamp" column is enabled
     Then the Timestamp column shows the full ISO 8601 timestamp
 
+  @integration
   Scenario: Hovering a time cell shows a read-only breakdown
     When the user hovers any time cell
     Then a hover card shows verbose relative, local, UTC, and ISO forms
     And the hover card has no control to change the column's format
 
+  @integration
   Scenario: The row-select column is sticky during horizontal scroll
     When the table scrolls horizontally
     Then the leftmost row-select column stays frozen at the left edge
     # Only the row-select gutter is sticky; no data column (including Time)
     # is pinned.
 
+  @integration
   Scenario: Table header row is sticky during vertical scroll
     When the table scrolls vertically
     Then the header row stays fixed at the top
 
+  @integration
   Scenario: Table scrolls horizontally when columns exceed viewport
     Given many columns are enabled
     When total column width exceeds the container
@@ -460,6 +469,7 @@ Rule: Interactive value chips
     When the user clicks an evaluation chip
     Then `toggleFacet("evaluator", <evaluatorId>)` runs
 
+  @integration
   Scenario: Clicking a prompt chip filters by that prompt
     When the user clicks the prompt chip
     Then `toggleFacet("lastUsedPrompt", <promptId>)` runs
@@ -528,12 +538,14 @@ Rule: Two-zone row format (compact density only)
     And the Observe page is loaded
     And density is "compact"
 
+  @integration
   Scenario: LLM trace row renders the IOPreviewAddon below the header
     Given a trace has both `input` and `output` populated
     And the row is not expanded
     Then a preview sub-row is rendered below the main row
     And the sub-row inherits the row's status border colour on the left edge
 
+  @integration
   Scenario: The I/O preview stops before Labels, Evals, Prompt, or Events
     Given a trace renders the I/O preview sub-row
     Then the preview cell's right edge stops at the leftmost of the Labels, Evals, Prompt, or Events columns
@@ -598,6 +610,7 @@ Rule: Column visibility and reorder
     Given the user is authenticated with "traces:view" permission
     And the Observe page is loaded
 
+  @integration
   Scenario: Columns dropdown shows organized sections
     When the user clicks the "Columns" button in the toolbar
     Then a dropdown appears with sections: Standard, Evaluations, Events
@@ -616,6 +629,7 @@ Rule: Column visibility and reorder
   # That behaviour is owned by specs/traces-v2/evaluations.feature
   # ("Per-evaluator eval columns").
 
+  @integration
   Scenario: Toggling a column checkbox shows or hides the column
     Given the Service column is hidden
     When the user checks "Service" in the dropdown
@@ -800,6 +814,7 @@ Rule: Real-time trace updates via SSE
     Then `useTraceFreshness` invalidates `tracesV2.list` and `tracesV2.newCount`
     And the refresh icon pulses to acknowledge the update
 
+  @integration
   Scenario: Open drawer is invalidated for affected traces
     Given the drawer is open for trace "abc123"
     When a `trace_summary_updated` event arrives that includes "abc123"
