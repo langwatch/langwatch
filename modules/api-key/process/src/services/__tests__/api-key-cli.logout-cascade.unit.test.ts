@@ -1,6 +1,6 @@
 /**
- * `langwatch logout` retires the login key of the session that ended and the
- * ingest keys minted under it, and nothing a second machine holds.
+ * A session that ends (`langwatch logout`, or a refresh auth refused) retires its login key
+ * and the ingest keys minted under it, and nothing a second machine holds.
  * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
  */
 import { newAuthzGrantId, type AuthzApi } from "@langwatch/authz-contract";
@@ -104,6 +104,45 @@ describe("ApiKeyService.revokeCliLoginKeyForLogout", () => {
       expect(row("laptop_ingest")?.revocationCause).toBe("session");
       expect(row("desktop_login")?.revokedAt).toBeNull();
       expect(row("desktop_ingest")?.revokedAt).toBeNull();
+    });
+  });
+});
+
+describe("ApiKeyService.revokeCliSessionKey", () => {
+  describe("given jane's laptop session ran past the organization's max session duration", () => {
+    describe("when auth refuses the refresh and retires the session as expired", () => {
+      /** @scenario A session past its ceiling has its keys retired with cause expired */
+      it("revokes the laptop's login key and its ingest key with cause expired, and leaves the desktop's live", async () => {
+        const { service, row } = janesTwoMachines();
+
+        const revoked = await service.revokeCliSessionKey({
+          apiKeyId: "laptop_login",
+          userId: JANE,
+          organizationId: ORG_ID,
+          cause: "expired",
+        });
+
+        expect(revoked).toEqual({ loginKeyRevoked: true, ingestKeysRevoked: 1 });
+        expect(row("laptop_login")?.revocationCause).toBe("expired");
+        expect(row("laptop_ingest")?.revocationCause).toBe("expired");
+        expect(row("desktop_login")?.revokedAt).toBeNull();
+        expect(row("desktop_ingest")?.revokedAt).toBeNull();
+      });
+    });
+  });
+
+  describe("given a person revokes the laptop session and names no cause", () => {
+    it("revokes the login key as user and its ingest key as session, as before", async () => {
+      const { service, row } = janesTwoMachines();
+
+      await service.revokeCliSessionKey({
+        apiKeyId: "laptop_login",
+        userId: JANE,
+        organizationId: ORG_ID,
+      });
+
+      expect(row("laptop_login")?.revocationCause).toBe("user");
+      expect(row("laptop_ingest")?.revocationCause).toBe("session");
     });
   });
 });

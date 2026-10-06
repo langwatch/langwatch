@@ -35,6 +35,7 @@ import {
   type ApiKeyCallerReadInput,
   type CliKeyScopeSummary,
   type CliSessionKeyRevocation,
+  type CliSessionRevocationCause,
 } from "@langwatch/api-key-contract";
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi, newAuthzGrantId } from "@langwatch/authz-contract";
@@ -396,6 +397,7 @@ export class ApiKeyModule implements ApiKeyApi {
     apiKeyId: string;
     userId: string;
     organizationId: string;
+    cause?: CliSessionRevocationCause;
   }): Promise<CliSessionKeyRevocation> {
     return this.#service.revokeCliSessionKey(input);
   }

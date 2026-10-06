@@ -10,6 +10,7 @@ import {
   type CliKeyScopeSummary,
   type CliKeySelection,
   type CliSessionKeyRevocation,
+  type CliSessionRevocationCause,
 } from "@langwatch/api-key-contract";
 import { isRegistryPermission } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
@@ -271,12 +272,16 @@ export class ApiKeyCliService {
    * Retires a session's login key, then counts the keys minted under it.
    * A key already gone counts as not revoked; the children are still swept.
    */
-  async revokeCliSessionKey(input: {
+  async revokeCliSessionKey({
+    cause = "user",
+    ...input
+  }: {
     apiKeyId: string;
     userId: string;
     organizationId: string;
+    cause?: CliSessionRevocationCause;
   }): Promise<CliSessionKeyRevocation> {
-    return this.revokeSessionKey({ ...input, cause: "user" });
+    return this.revokeSessionKey({ ...input, cause });
   }
 
   /**
@@ -340,7 +345,7 @@ export class ApiKeyCliService {
     apiKeyId: string;
     userId: string;
     organizationId: string;
-    cause: "user" | "expired";
+    cause: CliSessionRevocationCause;
   }): Promise<CliSessionKeyRevocation> {
     let loginKeyRevoked = true;
     try {
