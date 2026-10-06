@@ -568,6 +568,7 @@ export const prismaModelFieldCatalogue = {
     "updatedAt",
     "OrganizationInvite",
     "usageSpendingMaxLimit",
+    "datasetAttachmentMaxMb",
     "maxSessionDurationDays",
     "mfaRequired",
     "lockoutAfterFailedAttempts",

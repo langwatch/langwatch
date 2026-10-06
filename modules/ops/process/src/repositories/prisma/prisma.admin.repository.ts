@@ -106,6 +106,7 @@ export const ORGANIZATION_SAFE_SELECT = {
   createdAt: true,
   updatedAt: true,
   usageSpendingMaxLimit: true,
+  datasetAttachmentMaxMb: true,
   signupData: true,
   signedDPA: true,
   useCustomS3: true,

@@ -48,6 +48,21 @@ export const adminOperationInputSchema = z.object({
   req: adminAuditRequestSchema,
 });
 
+/** The smallest and largest per-file dataset limit an operator can give an organization, in MB. */
+export const ORGANIZATION_DATASET_ATTACHMENT_MIN_MB = 20;
+export const ORGANIZATION_DATASET_ATTACHMENT_MAX_MB = 1024;
+
+/** An organization's per-file dataset limit as the back office writes it: null clears it. */
+export const organizationDatasetAttachmentMaxMbSchema = z
+  .number()
+  .int()
+  .min(ORGANIZATION_DATASET_ATTACHMENT_MIN_MB)
+  .max(ORGANIZATION_DATASET_ATTACHMENT_MAX_MB)
+  .nullable();
+
+/** What an operator is told when the per-file dataset limit they entered is refused. */
+export const ORGANIZATION_DATASET_ATTACHMENT_MAX_MB_REFUSAL = `Enter a whole number of megabytes from ${ORGANIZATION_DATASET_ATTACHMENT_MIN_MB} to ${ORGANIZATION_DATASET_ATTACHMENT_MAX_MB}, or leave it empty for the default.`;
+
 /** `POST /api/admin/impersonate`'s body: who to become, and why. */
 export const adminImpersonationRequestSchema = z.object({
   userIdToImpersonate: z.string().trim().min(1),

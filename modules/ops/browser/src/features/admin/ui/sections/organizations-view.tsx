@@ -16,6 +16,12 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
+import {
+  ORGANIZATION_DATASET_ATTACHMENT_MAX_MB,
+  ORGANIZATION_DATASET_ATTACHMENT_MAX_MB_REFUSAL,
+  ORGANIZATION_DATASET_ATTACHMENT_MIN_MB,
+  organizationDatasetAttachmentMaxMbSchema,
+} from "@langwatch/ops-contract";
 import { Temporal, toEpochMs } from "@langwatch/time";
 import { MoreVertical, Pencil } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -40,6 +46,7 @@ interface AdminOrganization {
   ssoDomain: string | null;
   ssoProvider: string | null;
   usageSpendingMaxLimit: number | null;
+  datasetAttachmentMaxMb: number | null;
   signedDPA: boolean;
   promoCode: string | null;
   stripeCustomerId: string | null;
@@ -154,6 +161,7 @@ interface FormState {
   slug: string;
   phoneNumber: string;
   usageSpendingMaxLimit: string;
+  datasetAttachmentMaxMb: string;
   signedDPA: boolean;
   promoCode: string;
   stripeCustomerId: string;
@@ -197,6 +205,7 @@ function changedOrganizationFields(diff: FormDiff): Record<string, unknown> {
   return {
     ...changedIdentityFields(diff),
     ...changedBillingFields(diff),
+    ...changedLimitFields(diff),
     ...changedLicenseFields(diff),
     ...changedStorageFields(diff),
   };
@@ -229,6 +238,39 @@ function changedBillingFields({ form, organization }: FormDiff): Record<string, 
   return data;
 }
 
+/** An empty input clears the limit, which puts the organization back on the default. */
+function datasetAttachmentMaxMbOf(raw: string): number | null {
+  return raw.trim() === "" ? null : Number(raw);
+}
+
+function changedLimitFields({ form, organization }: FormDiff): Record<string, unknown> {
+  const data: Record<string, unknown> = {};
+  const nextLimit = datasetAttachmentMaxMbOf(form.datasetAttachmentMaxMb);
+  if (nextLimit !== (organization.datasetAttachmentMaxMb ?? null))
+    data.datasetAttachmentMaxMb = nextLimit;
+  return data;
+}
+
+/** The refusal to show on a field, keyed by the field's name. */
+type FieldErrors = Partial<Record<keyof FormState, string>>;
+
+/** What the form refuses before anything is sent. Only a changed value is checked. */
+function refusedFields(data: Record<string, unknown>): FieldErrors {
+  if (!("datasetAttachmentMaxMb" in data)) return {};
+  return organizationDatasetAttachmentMaxMbSchema.validate(data.datasetAttachmentMaxMb)
+    ? {}
+    : { datasetAttachmentMaxMb: ORGANIZATION_DATASET_ATTACHMENT_MAX_MB_REFUSAL };
+}
+
+/** The field refusals a failed save carries, for the fields this form shows them on. */
+function serverRefusedFields(error: unknown): FieldErrors {
+  const fieldErrors = (error as { meta?: { fieldErrors?: Record<string, unknown> } } | null)?.meta
+    ?.fieldErrors;
+  const refusal = fieldErrors?.datasetAttachmentMaxMb;
+  const message: unknown = Array.isArray(refusal) ? refusal[0] : undefined;
+  return typeof message === "string" ? { datasetAttachmentMaxMb: message } : {};
+}
+
 /** Write-only, like the S3 credentials below: an empty input means leave the
  * stored license alone rather than clear it. */
 function changedLicenseFields({ form, organization }: FormDiff): Record<string, unknown> {
@@ -251,7 +293,7 @@ function changedStorageFields({ form, organization }: FormDiff): Record<string, 
   return data;
 }
 
-function OrganizationEditDrawer({
+export function OrganizationEditDrawer({
   organization,
   onClose,
 }: {
@@ -262,14 +304,17 @@ function OrganizationEditDrawer({
   const showErrorToast = useShowErrorToast();
   const update = useAdminUpdate<AdminOrganization>("organization");
   const [form, setForm] = useState<FormState | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   useEffect(() => {
     if (!organization) return;
+    setFieldErrors({});
     setForm({
       name: organization.name ?? "",
       slug: organization.slug ?? "",
       phoneNumber: organization.phoneNumber ?? "",
       usageSpendingMaxLimit: organization.usageSpendingMaxLimit?.toString() ?? "",
+      datasetAttachmentMaxMb: organization.datasetAttachmentMaxMb?.toString() ?? "",
       signedDPA: !!organization.signedDPA,
       promoCode: organization.promoCode ?? "",
       stripeCustomerId: organization.stripeCustomerId ?? "",
@@ -291,14 +336,21 @@ function OrganizationEditDrawer({
     });
   }, [organization]);
 
-  const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+  const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
+    setFieldErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+  };
 
   const handleSave = () => {
     if (!organization || !form) return;
     const data = changedOrganizationFields({ form, organization });
     if (Object.keys(data).length === 0) {
       onClose();
+      return;
+    }
+    const refused = refusedFields(data);
+    if (Object.keys(refused).length > 0) {
+      setFieldErrors(refused);
       return;
     }
     update.mutate(
@@ -308,8 +360,14 @@ function OrganizationEditDrawer({
           toaster.create({ title: "Organization updated", type: "success", duration: 3000 });
           onClose();
         },
-        onError: (err) =>
-          showErrorToast({ error: err, fallbackTitle: "Couldn't update the organization" }),
+        onError: (err) => {
+          const refusedByServer = serverRefusedFields(err);
+          if (Object.keys(refusedByServer).length > 0) {
+            setFieldErrors(refusedByServer);
+            return;
+          }
+          showErrorToast({ error: err, fallbackTitle: "Couldn't update the organization" });
+        },
       },
     );
   };
@@ -332,6 +390,11 @@ function OrganizationEditDrawer({
             <VStack gap={4} align="stretch">
               <IdentityFields form={form} setField={setField} />
               <BillingFields form={form} setField={setField} />
+              <LimitFields
+                form={form}
+                setField={setField}
+                error={fieldErrors.datasetAttachmentMaxMb}
+              />
               <AuthenticationSection />
               <LicenseFields form={form} setField={setField} />
               <CustomS3Fields form={form} setField={setField} />
@@ -445,6 +508,31 @@ function BillingFields({ form, setField }: SectionProps) {
         checked={form.signedDPA}
         onChange={(v) => setField("signedDPA", v)}
       />
+    </>
+  );
+}
+
+function LimitFields({ form, setField, error }: SectionProps & { error: string | undefined }) {
+  return (
+    <>
+      <SectionHeading>Limits</SectionHeading>
+      <Field.Root invalid={!!error}>
+        <Field.Label>Max dataset file size (MB)</Field.Label>
+        <Input
+          type="number"
+          min={ORGANIZATION_DATASET_ATTACHMENT_MIN_MB}
+          max={ORGANIZATION_DATASET_ATTACHMENT_MAX_MB}
+          step={1}
+          value={form.datasetAttachmentMaxMb}
+          onChange={(e) => setField("datasetAttachmentMaxMb", e.target.value)}
+          placeholder="Leave empty for the default"
+        />
+        {error && <Field.ErrorText>{error}</Field.ErrorText>}
+        <Field.HelperText>
+          Largest image or file a dataset cell accepts for this organization. Leave empty for the
+          default of 20 MB. Other dataset limits scale with it.
+        </Field.HelperText>
+      </Field.Root>
     </>
   );
 }

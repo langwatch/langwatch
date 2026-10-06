@@ -334,6 +334,7 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
     readonly usageSpendingMaxLimit: "Int?";
+    readonly datasetAttachmentMaxMb: "Int?";
     readonly maxSessionDurationDays: "Int";
     readonly mfaRequired: "Boolean";
     readonly lockoutAfterFailedAttempts: "Int";
@@ -1183,6 +1184,13 @@ export interface LwqlPrismaRows {
     readonly createdById: "String?";
     readonly updatedById: "String?";
     readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly TraceIngestSourceBilling: {
+    readonly organizationId: "String";
+    readonly sourceType: "String";
+    readonly billed: "Boolean";
+    readonly recordedAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
   readonly RetentionPolicy: {

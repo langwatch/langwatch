@@ -16,7 +16,7 @@ export interface PaginationState {
   onPageChange: (page: number) => void;
 }
 
-/** Dash placeholder for empty cell values in Ops backoffice tables. */
+/** Dash placeholder for empty cell values in Ops instance admin tables. */
 export function EmptyCell({ children }: PropsWithChildren) {
   return (
     <Text color="fg.muted" fontSize="sm">

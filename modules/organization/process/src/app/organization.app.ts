@@ -696,6 +696,12 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.organizations.getPricing(input);
   }
 
+  getDatasetLimits(input: {
+    organizationId: string;
+  }): Promise<{ attachmentMaxBytes: number | null }> {
+    return this.#dependencies.organizations.getDatasetLimits(input);
+  }
+
   isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean> {
     return this.#dependencies.organizations.isInstantEvalsOptedIn(input);
   }

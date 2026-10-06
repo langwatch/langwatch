@@ -3766,6 +3766,15 @@
           "documentation": ""
         },
         {
+          "name": "datasetAttachmentMaxMb",
+          "columnName": "datasetAttachmentMaxMb",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The largest file a dataset image or file cell accepts for this\norganization, in mebibytes. Null means the default. Set by an operator\nfrom the back office only; every other dataset size limit scales with it."
+        },
+        {
           "name": "maxSessionDurationDays",
           "columnName": "maxSessionDurationDays",
           "type": "Int",
@@ -13195,6 +13204,62 @@
         {
           "name": "createdAt",
           "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "TraceIngestSourceBilling",
+      "tableName": "TraceIngestSourceBilling",
+      "documentation": "",
+      "primaryKey": [
+        "organizationId",
+        "sourceType"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "sourceType",
+          "columnName": "sourceType",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "billed",
+          "columnName": "billed",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "recordedAt",
+          "columnName": "recordedAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,

@@ -27,6 +27,9 @@ import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import {
+  deriveDatasetBounds,
+  effectiveDatasetAttachmentMaxBytes,
+  isDatasetDerivedBoundKey,
   resolveRequestBound,
   type RequestBoundKey,
   type RequestBoundsOverrides,
@@ -231,11 +234,33 @@ export class EntitlementModule implements EntitlementApiContract {
   }
 
   /**
+   * The deployment's bound, except that an organization with its own per-file
+   * limit answers the larger of that and what its limit derives, for the
+   * dataset size bounds only. See specs/dataset-bounds-override.feature.
+   */
+  async requestBound(input: { key: RequestBoundKey; organizationId: string }): Promise<number> {
+    const deploymentBound = await this.#deploymentRequestBound(input);
+    if (!isDatasetDerivedBoundKey(input.key)) return deploymentBound;
+
+    const { attachmentMaxBytes } = await this.#organizations.getDatasetLimits({
+      organizationId: input.organizationId,
+    });
+    if (attachmentMaxBytes === null) return deploymentBound;
+
+    const raised = deriveDatasetBounds(effectiveDatasetAttachmentMaxBytes(attachmentMaxBytes));
+
+    return Math.max(deploymentBound, raised[input.key]);
+  }
+
+  /**
    * A plain-number override answers on every tier without a plan lookup;
    * otherwise the active plan resolves through the same path `getActivePlan`
    * uses, and its tier's bound answers — per-tier overrides included.
    */
-  async requestBound(input: { key: RequestBoundKey; organizationId: string }): Promise<number> {
+  async #deploymentRequestBound(input: {
+    key: RequestBoundKey;
+    organizationId: string;
+  }): Promise<number> {
     const override = this.#requestBoundOverrides[input.key];
     if (typeof override === "number") return override;
 
