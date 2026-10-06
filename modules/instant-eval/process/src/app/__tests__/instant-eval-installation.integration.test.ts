@@ -162,7 +162,8 @@ function installation({
   classifier?: "jev" | "null" | "memory" | undefined;
   /** `null` is an install that configured no key of its own. */
   judgeKey?: string | null;
-  isBounded?: boolean;
+  /** `"unset"` is a deployment that never set `INSTANT_EVAL_BOUNDED`. */
+  isBounded?: boolean | "unset";
   /** The gateway operations a hosted call's spend reaches. */
   gateway?: Partial<GatewayApi>;
   /** Whether the organization switched hosted judging on, as licensing answers. */
@@ -187,7 +188,7 @@ function installation({
           classifierModel: undefined,
           globalTokensPerSecond: 300_000,
           tenantTokensPerSecond: 150_000,
-          isBounded,
+          isBounded: isBounded === "unset" ? undefined : isBounded,
           queryTokenBudget: 4_000_000,
           isSaas,
           nodeEnvironment,
@@ -507,6 +508,24 @@ describe("given a deployment that bounds the free budget", () => {
       await expect(installation({ isBounded: true }).boot()).rejects.toThrow(
         /needs a Redis connection for the budget holds/,
       );
+    });
+  });
+});
+
+describe("given a deployment that never set whether the free budget is bounded", () => {
+  describe("when it is the hosted product", () => {
+    it("bounds the free budget", async () => {
+      await expect(installation({ isBounded: "unset", isSaas: true }).boot()).rejects.toThrow(
+        /needs a Redis connection for the budget holds/,
+      );
+    });
+  });
+
+  describe("when it is a self-hosted installation", () => {
+    it("leaves the free budget unbounded", async () => {
+      await expect(
+        withInstallation({ isBounded: "unset", isSaas: false }, async () => "booted"),
+      ).resolves.toBe("booted");
     });
   });
 });

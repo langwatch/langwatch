@@ -36,9 +36,9 @@ export const instantEvalConfig = Config.define((c) => ({
   /**
    * Whether this deployment bills Instant Evals, which is what makes the free
    * allowance a ceiling. An installation that does not bill bounds a run by
-   * its row cap alone. Off by default: only a billing deployment says so.
+   * its row cap alone. Unset follows `isSaas`: see `isInstantEvalBounded`.
    */
-  isBounded: c.env("INSTANT_EVAL_BOUNDED", z.stringbool().default(false)),
+  isBounded: c.env("INSTANT_EVAL_BOUNDED", z.stringbool().optional()),
   /** Input tokens one synchronous query may send. */
   queryTokenBudget: c.env(
     "INSTANT_EVAL_QUERY_TOKEN_BUDGET",
@@ -51,6 +51,17 @@ export const instantEvalConfig = Config.define((c) => ({
 }));
 
 export type InstantEvalServerConfig = ConfigOf<typeof instantEvalConfig>;
+
+/**
+ * The hosted product bills, so it bounds the free budget unless told not to;
+ * a self-hosted installation bills nothing, so it bounds nothing unless told to.
+ */
+export function isInstantEvalBounded({
+  isBounded,
+  isSaas,
+}: Pick<InstantEvalServerConfig, "isBounded" | "isSaas">): boolean {
+  return isBounded ?? isSaas;
+}
 
 export const instantEvalSecrets = {
   classifierApiKey: Secret.load("JEV_API_KEY", { optional: true }),

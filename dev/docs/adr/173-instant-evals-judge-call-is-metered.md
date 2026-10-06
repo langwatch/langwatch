@@ -84,7 +84,7 @@
 
 | Assumption | What breaks if false |
 |---|---|
-| Cloud sets `INSTANT_EVAL_BOUNDED=true` | It is off by default. Without it, no free organization is ever capped. It is not in the cloud Terraform and may sit in the secrets blob. Confirm before the picker merges |
+| Cloud runs Instant Evals with Redis and `IS_SAAS` | Production does not set `INSTANT_EVAL_BOUNDED` (checked on the prod cluster, 2026-10-07), so unset now follows `IS_SAAS`: cloud is bounded, self-hosted is not. Without Redis a bounded process refuses to boot |
 | Every project has an organization | A project with none is uncapped and its spend row is dropped, so it judges for free |
 | The langevals service port is internal in production | Anyone reaching it runs judges with no app in between. It never reaches Instant Evals, so it is not a billing hole |
 | The three judge settings shapes stay as generated today | The builder maps the wrong field. Its tests read the generated schemas |

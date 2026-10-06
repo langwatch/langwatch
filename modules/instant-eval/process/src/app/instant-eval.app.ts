@@ -25,6 +25,7 @@ import {
   type InstantEvalRunWire,
   type InstantEvalServerConfig,
   instantEvalConfig,
+  isInstantEvalBounded,
 } from "@langwatch/instant-eval-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -215,9 +216,10 @@ export class InstantEvalModule implements InstantEvalApiContract {
     const cancellations = repositories.cancellations;
     // A hold one process keeps to itself admits the same organization's runs
     // on every other, so a bounded budget refuses a process-local store.
-    if (setup.config.isBounded && setup.tier !== "live") {
+    const isBounded = isInstantEvalBounded(setup.config);
+    if (isBounded && setup.tier !== "live") {
       throw new Error(
-        "Instant Evals with a bounded free budget (INSTANT_EVAL_BOUNDED) needs a Redis connection for the budget holds, and this process has none",
+        "Instant Evals with a bounded free budget (INSTANT_EVAL_BOUNDED, on by default when IS_SAAS) needs a Redis connection for the budget holds, and this process has none; set INSTANT_EVAL_BOUNDED=false to run unbounded",
       );
     }
     const budget = InstantEvalFreeBudgetService.create({
@@ -229,7 +231,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
         sumSpendNanoUsdByRequestType: (input) => gateway.sumSpendNanoUsdByRequestType(input),
       },
       reservations: repositories.budgetReservations,
-      isBounded: setup.config.isBounded,
+      isBounded,
     });
     const context = InstantEvalRunContextService.create({
       runs: repositories.runs,
