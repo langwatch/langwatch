@@ -69861,6 +69861,15 @@ openapi: "POST /api/v1/dataset/imports"
 
 ---
 
+# FILE: ./api-reference/datasets/create-an-upload-for-an-image-or-file-ce.mdx
+
+---
+title: "Create an upload for an image or file cell"
+openapi: "POST /api/v1/dataset/attachments/uploads"
+---
+
+---
+
 # FILE: ./api-reference/datasets/create-attachments.mdx
 
 ---

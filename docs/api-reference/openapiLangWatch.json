@@ -8766,11 +8766,18 @@
         },
         "description": "Returns a registered frame and instance token, or refuses at the status of the reason.",
         "summary": "Register this process's agents",
-        "security": [],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
         "x-access-policy": {
-          "kind": "public",
+          "kind": "handlerManaged",
           "credential": [
-            "none"
+            "project_api_key"
+          ],
+          "permissions": [
+            "scenarios:manage"
           ]
         },
         "requestBody": {
@@ -9085,11 +9092,18 @@
           }
         },
         "summary": "Wait for call and cancel frames while refreshing this instance's presence",
-        "security": [],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
         "x-access-policy": {
-          "kind": "public",
+          "kind": "handlerManaged",
           "credential": [
-            "none"
+            "project_api_key"
+          ],
+          "permissions": [
+            "scenarios:manage"
           ]
         },
         "parameters": [
@@ -9131,11 +9145,18 @@
           }
         },
         "summary": "Accept this instance's acknowledgements, results and deregistration",
-        "security": [],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
         "x-access-policy": {
-          "kind": "public",
+          "kind": "handlerManaged",
           "credential": [
-            "none"
+            "project_api_key"
+          ],
+          "permissions": [
+            "scenarios:manage"
           ]
         },
         "requestBody": {
@@ -35924,6 +35945,76 @@
                         "totalPages"
                       ],
                       "additionalProperties": false
+                    },
+                    "dataset": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "columnTypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "string",
+                                  "boolean",
+                                  "number",
+                                  "date",
+                                  "list",
+                                  "json",
+                                  "spans",
+                                  "rag_contexts",
+                                  "chat_messages",
+                                  "annotations",
+                                  "evaluations",
+                                  "image",
+                                  "file"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "type"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "platformUrl": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "slug",
+                        "columnTypes",
+                        "createdAt",
+                        "updatedAt",
+                        "platformUrl"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -35936,7 +36027,7 @@
             }
           }
         },
-        "description": "List records for a dataset (paginated)",
+        "description": "List records for a dataset (paginated). Each page also carries the dataset itself. A page too large for one response is refused with `dataset_page_too_large`: ask again with the smaller `limit` the error names.",
         "security": [
           {
             "project_api_key": []
@@ -36201,6 +36292,76 @@
                         "limit",
                         "total",
                         "totalPages"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "dataset": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "columnTypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "string",
+                                  "boolean",
+                                  "number",
+                                  "date",
+                                  "list",
+                                  "json",
+                                  "spans",
+                                  "rag_contexts",
+                                  "chat_messages",
+                                  "annotations",
+                                  "evaluations",
+                                  "image",
+                                  "file"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "type"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "platformUrl": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "slug",
+                        "columnTypes",
+                        "createdAt",
+                        "updatedAt",
+                        "platformUrl"
                       ],
                       "additionalProperties": false
                     }
@@ -36621,7 +36782,7 @@
             "content": {}
           }
         },
-        "description": "Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field. upload the file as a stored object, then put its reference in the cell",
+        "description": "Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field. create the upload, send the file to the address it answers, confirm it as a stored object, then put its reference in the cell",
         "requestBody": {
           "required": true,
           "content": {
@@ -36672,6 +36833,121 @@
             "description": "The project the file is stored for."
           }
         ]
+      }
+    },
+    "/api/v1/dataset/attachments/uploads": {
+      "post": {
+        "operationId": "postApiDatasetAttachmentsUploads",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "objectId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "uploadUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "method": {
+                      "type": "string",
+                      "const": "PUT"
+                    },
+                    "headers": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "objectId",
+                    "uploadUrl",
+                    "method",
+                    "expiresAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The file is larger than the organization's limit.",
+            "content": {}
+          },
+          "415": {
+            "description": "The media type is not accepted.",
+            "content": {}
+          },
+          "429": {
+            "description": "Too many uploads for this project in one minute.",
+            "content": {}
+          }
+        },
+        "description": "Answers the address to PUT the file to. After the PUT, confirm the upload at `POST /api/v1/stored-objects/uploads/{objectId}/confirmation`, then write `/api/files/{projectId}/{objectId}/{filename}` into the cell.",
+        "summary": "Create an upload for an image or file cell",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "datasets:update"
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "filename": {
+                    "description": "The file name the reference will carry.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "mediaType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 127,
+                    "pattern": "^[\\u0020-\\u007e]+$",
+                    "description": "The media type of the file."
+                  },
+                  "byteLength": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "The size of the file, in bytes."
+                  }
+                },
+                "required": [
+                  "filename",
+                  "mediaType",
+                  "byteLength"
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/dataset/{slugOrId}": {
@@ -36801,7 +37077,7 @@
             }
           }
         },
-        "description": "Get a dataset by its slug or id.",
+        "description": "Get a dataset by its slug or id, with every record inline. A dataset too large for one response is refused: read it page by page from `GET /{slugOrId}/records`.",
         "security": [
           {
             "project_api_key": []
@@ -37419,9 +37695,13 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "The body is larger than the organization accepts in one request; `error.code` is `evaluation_log_results_too_large` and `error.meta.maxBytes` is the limit",
+            "content": {}
           }
         },
-        "description": "Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.",
+        "description": "Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 267 MB are accepted, sized for one dataset row with ten 20 MB images inline. A larger body is refused with `evaluation_log_results_too_large`.",
         "summary": "Report batch evaluation results",
         "tags": [
           "Evaluations"
@@ -61806,7 +62086,9 @@
           "credential": [
             "cli_access_token"
           ],
-          "permissions": []
+          "permissions": [
+            "ingestionSources:view"
+          ]
         },
         "parameters": [
           {
@@ -62117,7 +62399,9 @@
           "credential": [
             "cli_access_token"
           ],
-          "permissions": []
+          "permissions": [
+            "activityMonitor:view"
+          ]
         },
         "parameters": [
           {
@@ -62439,7 +62723,9 @@
           "credential": [
             "cli_access_token"
           ],
-          "permissions": []
+          "permissions": [
+            "activityMonitor:view"
+          ]
         },
         "parameters": [
           {

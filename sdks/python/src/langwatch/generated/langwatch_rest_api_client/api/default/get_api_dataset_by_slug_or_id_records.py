@@ -70,7 +70,9 @@ def sync_detailed(
     page: int | Unset = 1,
     limit: int | Unset = 50,
 ) -> Response[GetApiDatasetBySlugOrIdRecordsResponse200]:
-    """List records for a dataset (paginated)
+    """List records for a dataset (paginated). Each page also carries the dataset itself. A page too large
+    for one response is refused with `dataset_page_too_large`: ask again with the smaller `limit` the
+    error names.
 
     Args:
         slug_or_id (str):
@@ -105,7 +107,9 @@ def sync(
     page: int | Unset = 1,
     limit: int | Unset = 50,
 ) -> GetApiDatasetBySlugOrIdRecordsResponse200 | None:
-    """List records for a dataset (paginated)
+    """List records for a dataset (paginated). Each page also carries the dataset itself. A page too large
+    for one response is refused with `dataset_page_too_large`: ask again with the smaller `limit` the
+    error names.
 
     Args:
         slug_or_id (str):
@@ -135,7 +139,9 @@ async def asyncio_detailed(
     page: int | Unset = 1,
     limit: int | Unset = 50,
 ) -> Response[GetApiDatasetBySlugOrIdRecordsResponse200]:
-    """List records for a dataset (paginated)
+    """List records for a dataset (paginated). Each page also carries the dataset itself. A page too large
+    for one response is refused with `dataset_page_too_large`: ask again with the smaller `limit` the
+    error names.
 
     Args:
         slug_or_id (str):
@@ -168,7 +174,9 @@ async def asyncio(
     page: int | Unset = 1,
     limit: int | Unset = 50,
 ) -> GetApiDatasetBySlugOrIdRecordsResponse200 | None:
-    """List records for a dataset (paginated)
+    """List records for a dataset (paginated). Each page also carries the dataset itself. A page too large
+    for one response is refused with `dataset_page_too_large`: ask again with the smaller `limit` the
+    error names.
 
     Args:
         slug_or_id (str):
