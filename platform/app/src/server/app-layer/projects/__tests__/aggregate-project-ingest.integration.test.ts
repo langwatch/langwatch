@@ -17,6 +17,7 @@ import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { app as authApp } from "~/server/routes/auth";
 import { app as collectorApp } from "~/server/routes/collector";
 import { app as otelApp } from "~/server/routes/otel";
 import {
@@ -115,10 +116,22 @@ describe("Feature: the aggregate project receives no traces", () => {
       });
     });
 
+    describe("when an SDK checks the aggregate's key before sending", () => {
+      it("is told the key is refused rather than good", async () => {
+        const response = await authApp.request("/api/auth/validate", {
+          method: "POST",
+          headers: { "x-auth-token": aggregate.apiKey },
+        });
+
+        expect(response.status).toBe(403);
+      });
+    });
+
     describe("when the aggregate's tenant is read back", () => {
       it("holds zero spans", async () => {
         const clickhouse = getTestClickHouseClient();
-        if (!clickhouse) throw new Error("the ClickHouse test client is not up");
+        if (!clickhouse)
+          throw new Error("the ClickHouse test client is not up");
         const result = await clickhouse.query({
           query:
             "SELECT count() AS spans FROM stored_spans WHERE TenantId = {tenantId:String}",
