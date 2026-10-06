@@ -32,6 +32,7 @@ function HeaderActions({ canManage }: { canManage: boolean }) {
   return (
     <>
       <PageLayout.HeaderButton
+        background="bg"
         data-testid="monitor-guardrail-open"
         onClick={() => host.openOverlay({ drawer: "guardrails" })}
       >
@@ -40,7 +41,6 @@ function HeaderActions({ canManage }: { canManage: boolean }) {
       </PageLayout.HeaderButton>
       <PageLayout.HeaderButton
         primary
-
         data-testid="monitor-new-open"
         onClick={() => host.openOverlay({ drawer: "onlineEvaluation" })}
       >

@@ -26,9 +26,10 @@ test("experiment creation keeps the SDK workflow discoverable", async ({ page },
     "background-color",
     "rgb(255, 255, 255)",
   );
+  // The page's one solid primary action (D63), orange as New Experiment above.
   await expect(page.getByRole("button", { name: "New Online Evaluation" }).first()).toHaveCSS(
     "background-color",
-    "rgb(255, 255, 255)",
+    "rgb(221, 107, 32)",
   );
   await expect(page.getByRole("heading", { name: "No online evaluations yet" })).toBeVisible();
   await page.screenshot({

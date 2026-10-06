@@ -302,6 +302,20 @@ describe("given a reader who may manage evaluations", () => {
 
       expect(host.overlays).toEqual([{ drawer: "onlineEvaluation" }, { drawer: "guardrails" }]);
     });
+
+    /** jsdom resolves no tokens: this reads the emotion rule the `background` prop emits. */
+    it("fills the guardrail button with the page background token, as main does", () => {
+      renderWithMonitorHost(<OnlineEvaluationsScreen />);
+
+      const button = screen.getByTestId("monitor-guardrail-open");
+      const rules = Array.from(document.querySelectorAll("style"))
+        .flatMap((style) => (style.textContent ?? "").split("}"))
+        .filter((rule) =>
+          Array.from(button.classList).some((name) => rule.startsWith(`.${name}{`)),
+        );
+
+      expect(rules.join("}")).toContain("background:var(--chakra-colors-bg);");
+    });
   });
 });
 
