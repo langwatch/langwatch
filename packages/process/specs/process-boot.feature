@@ -24,3 +24,10 @@ Feature: What a process refuses and what it skips at boot
     When the process boots
     Then the module installs and its REST family is mounted
     And its tRPC namespace is skipped rather than refused
+
+  @unit
+  Scenario: A booted process container answers a module's Api by its token
+    Given a worker process that installs a module serving an Api
+    When its container boots
+    Then the booted process answers that module's Api by its token
+    And a token no installed module serves is refused by name

@@ -1,12 +1,14 @@
 import { TransportSelection } from "@langwatch/api/hosting/selection";
 import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
 import type { ConfigOwner } from "@langwatch/config";
+import type { ModuleApiToken } from "@langwatch/module";
 import {
   ConsumerPipelines,
   ProducerPipelines,
   type PipelineParticipation,
 } from "@langwatch/process-stores/pipelines";
 
+import type { BootedRuntime } from "./application.ts";
 import type { InstallableServerFeature } from "./feature-installer.ts";
 import type { ServedApplication } from "./server.ts";
 
@@ -17,11 +19,13 @@ export type ProcessModule = InstallableServerFeature<never> & {
 export function isProcessModule(owner: ConfigOwner): owner is ProcessModule {
   return "install" in owner && typeof owner.install === "function";
 }
-/** A booted application: the server hosts it, and only the tasks role answers `tasks` (§9). */
+/**
+ * A booted application: the server hosts it, it answers a module's Api by token only
+ * (§13), and only the tasks role answers `tasks` (§9).
+ */
 export type BootedApplication = ServedApplication &
-  Readonly<{
-    tasks<Task>(isTask: (contribution: unknown) => contribution is Task): readonly Task[];
-  }>;
+  Readonly<{ service<Api>(token: ModuleApiToken<Api>): Api }> &
+  Pick<BootedRuntime<unknown>, "tasks">;
 /** What one role boots: its modules, its pipelines' participation and, on the api, transports. */
 export type ProcessBootInput = Readonly<{
   role: "api" | "worker" | "tasks";
@@ -54,7 +58,7 @@ export class ApiProcessContainer extends ProcessContainer {
     return this;
   }
 
-  boot(): Promise<ServedApplication> {
+  boot(): Promise<Omit<BootedApplication, "tasks">> {
     if (!this.#transports)
       throw new Error("surface must be selected with exposeTransports before boot.");
     const selected = this.#transports.selected;
@@ -72,7 +76,7 @@ export class WorkerProcessContainer extends ProcessContainer {
     super(runtime, modules);
   }
 
-  boot(): Promise<ServedApplication> {
+  boot(): Promise<Omit<BootedApplication, "tasks">> {
     return this.runtime.boot({
       role: "worker",
       modules: this.modules,

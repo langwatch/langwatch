@@ -81,6 +81,26 @@ describe("process container", () => {
     expect(phases).toEqual(["consumer", "start", "drain", "close"]);
   });
 
+  /** @scenario "A booted process container answers a module's Api by its token" */
+  it("answers an installed module's Api by its token and refuses one nothing installed", async () => {
+    const CatalogueApi = moduleApi<{ read(): string }>()("dataset");
+    const MissingApi = moduleApi<{ read(): string }>()("prompt");
+    class CatalogueApp {
+      static readonly contract = CatalogueApi;
+      static readonly dependencies = {};
+      static create(_setup: FeatureSetup<Record<never, never>, object, undefined>) {
+        return { read: () => "one dataset" };
+      }
+    }
+    const module = defineProcessModule("dataset").withApi(CatalogueApp).build();
+
+    const runtime = await new WorkerProcessContainer(containerRuntime([]), [module]).boot();
+
+    expect(runtime.service(CatalogueApi).read()).toBe("one dataset");
+    expect(() => runtime.service(MissingApi)).toThrow(/\bprompt\b/);
+    await runtime.stop();
+  });
+
   /** @scenario "A module installs without the transport whose surface the process did not select" */
   it("installs a module with its tRPC namespace skipped where only REST was selected", async () => {
     const CatalogueApi = moduleApi<{ read(): string }>()("dataset");
