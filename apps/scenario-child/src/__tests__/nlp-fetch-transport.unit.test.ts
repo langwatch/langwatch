@@ -147,6 +147,37 @@ describe("given a dispatcher built by the undici package", () => {
     });
   });
 
+  describe("when the caller needs a socket held past undici's 300s default", () => {
+    /**
+     * @scenario "A dispatcher raises the HTTP lane's own timeouts"
+     */
+    it("sends the request through the pooled dispatcher, by undici's own fetch", async () => {
+      // 615s code budget plus the 30s headroom is the deadline the adapter arms.
+      const dispatcher = HttpNlpFetchChannel.create().dispatcher({ timeoutMs: 645_000 });
+      const dispatch = vi.spyOn(dispatcher, "dispatch");
+      const adapter = new HttpSerializedCodeAgentChannel({
+        config: {
+          type: "code",
+          agentId: "agent_789",
+          code: 'def execute(input):\n    return "pong"',
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          secrets: {},
+          timeoutMs: 615_000,
+        },
+        nlpServiceUrl,
+        projectApiKey: "test-api-key",
+      });
+
+      await expect(adapter.call(input)).resolves.toBe("pong");
+
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      expect(dispatch.mock.calls[0]![0]).toMatchObject({ method: "POST" });
+      expect(receivedBodies).toHaveLength(1);
+      dispatch.mockRestore();
+    });
+  });
+
   describe("when the workflow agent adapter calls nlpgo", () => {
     const config: WorkflowAgentData = {
       type: "workflow",
