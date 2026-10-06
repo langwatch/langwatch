@@ -6,7 +6,7 @@ import type {
 } from "@langwatch/coding-agent-contract";
 
 /** One stored session and the fold events already applied to it. */
-export interface MemoryStoredSession {
+interface MemoryStoredSession {
   row: CodingAgentSession;
   appliedEventIds: string[];
 }

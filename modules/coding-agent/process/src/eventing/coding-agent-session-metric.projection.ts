@@ -21,14 +21,14 @@ type MetricOverlayTotals = Pick<
   | "languagesEdited"
 >;
 
-export interface MetricFactsView {
+interface MetricFactsView {
   seriesId: string;
   metricName: string;
   attributes: Record<string, unknown>;
   value: number;
 }
 
-export interface CodingAgentSessionMetricProjectionInput {
+interface CodingAgentSessionMetricProjectionInput {
   state: CodingAgentSessionData;
   metric: MetricFactsView;
 }

@@ -43,10 +43,10 @@ export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-08-23";
 export const CODING_AGENT_SESSION_PROJECTION_VERSION_PRE_STAMP = "2026-07-21";
 
 /** StartedAt drift window (±7 days); declared once for all callers to share. */
-export const CODING_AGENT_SESSION_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const CODING_AGENT_SESSION_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Coalesce max batch; limited to ~few KB per version to avoid watermark bloat. */
-export const CODING_AGENT_SESSION_COALESCE_MAX_BATCH = 128;
+const CODING_AGENT_SESSION_COALESCE_MAX_BATCH = 128;
 
 /**
  * The fold's state: the derived session plus the bookkeeping the abstract fold
@@ -250,7 +250,7 @@ export class CodingAgentSessionFoldProjection
  * 00053). Mirrors `MetricSeriesFact`, with nullable attributes flattened to
  * empty strings for the ClickHouse tuple and mapped back to null on read.
  */
-export interface CodingAgentSessionMetricSeriesRow {
+interface CodingAgentSessionMetricSeriesRow {
   seriesId: string;
   metricName: string;
   type: string;

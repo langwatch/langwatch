@@ -42,7 +42,7 @@ export const MODEL_CALL_SPAN_NAMES: ReadonlySet<string> = new Set([
   CODEX.SPAN.TURN,
 ]);
 
-export interface SpanFactsView {
+interface SpanFactsView {
   name: string;
   startTimeUnixMs: number;
   endTimeUnixMs: number;
@@ -50,7 +50,7 @@ export interface SpanFactsView {
   attrs: Record<string, unknown>;
 }
 
-export interface CodingAgentSessionSpanProjectionInput {
+interface CodingAgentSessionSpanProjectionInput {
   state: CodingAgentSessionData;
   span: SpanFactsView;
   agent?: string;

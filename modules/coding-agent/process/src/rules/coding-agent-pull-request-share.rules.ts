@@ -16,7 +16,7 @@ export interface StampedUsage {
   costUsd: number;
 }
 
-export const COUNTER_FIELDS = [
+const COUNTER_FIELDS = [
   "inputTokens",
   "outputTokens",
   "cacheReadTokens",
@@ -132,6 +132,6 @@ export function costOf(usage: StampedUsage): number {
   return usage.costUsd > 0 ? usage.costUsd : 0;
 }
 
-export function sum(entries: readonly StampedUsage[], of: (usage: StampedUsage) => number): number {
+function sum(entries: readonly StampedUsage[], of: (usage: StampedUsage) => number): number {
   return entries.reduce((total, usage) => total + of(usage), 0);
 }

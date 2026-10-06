@@ -50,7 +50,7 @@ const LANGWATCH = {
 const RATE_LIMIT_STATUS = "429";
 const ABORTED_SOURCES = new Set(["user_abort"]);
 
-export interface CodingAgentSessionLogProjectionInput {
+interface CodingAgentSessionLogProjectionInput {
   state: CodingAgentSessionData;
   attributes: Record<string, unknown>;
   agent?: string;

@@ -29,7 +29,7 @@ import type { CodingAgentSessionReadService } from "./coding-agent-session-read.
 
 export const USAGE_SESSION_WINDOW_MS = 180 * 24 * 60 * 60 * 1000;
 export const PERSONAL_SESSION_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
-export const PERSONAL_SESSION_LIMIT = 1000;
+const PERSONAL_SESSION_LIMIT = 1000;
 
 /** Private owner of the personal page's pull-request reads and the shared attribution set. */
 export class CodingAgentPersonalPullRequestReadService {

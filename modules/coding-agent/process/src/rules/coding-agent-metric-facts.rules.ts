@@ -15,7 +15,7 @@ const logger = createLogger("langwatch:coding-agent:metric-facts");
 type MetricAttributes = Record<string, string | number | boolean>;
 
 /** A received point either contributes session facts or is no coding-agent session's. */
-export type MetricContribution =
+type MetricContribution =
   | { outcome: "contributes"; contribution: ContributeMetricFactsCommandData }
   | { outcome: "ignored" };
 

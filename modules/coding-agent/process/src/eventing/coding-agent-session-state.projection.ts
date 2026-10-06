@@ -9,7 +9,7 @@ import type { SessionTitleSource } from "../rules/coding-agent-session-state-map
 import { contextUsageKey } from "../rules/coding-agent-session-usage-key.rules.ts";
 
 /** One thing the agent did, in the order it did it. */
-export interface SessionStep {
+interface SessionStep {
   name: string;
   /** Back-to-back runs of the same tool batch into one step. */
   count: number;

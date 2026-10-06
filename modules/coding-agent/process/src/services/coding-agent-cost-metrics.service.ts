@@ -1,6 +1,6 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 
-export type CodingAgentCostMetric = {
+type CodingAgentCostMetric = {
   eventId: string;
   agent: string;
   model: string;
