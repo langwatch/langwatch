@@ -50,8 +50,7 @@ the Zod schema before a rule runs.
 
 ## Contracts and validation
 
-`digestTemplateInputSchema` validates a member's week; `digestTemplateIdSchema` is the closed set
-of template ids. The scenarios in `specs/digest.feature` are the requirements for the pick.
+`digestTemplateInputSchema` validates a member's week. The scenarios in `specs/digest.feature` are the requirements for the pick.
 
 ## Consequences
 
