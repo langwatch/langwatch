@@ -107,6 +107,21 @@ describe("experiment_run_processing without Redis", () => {
       );
     });
 
+    /** @scenario "Result commands of a backed-up row are appended together" */
+    it("coalesces the appends of both result commands and of the result storage", () => {
+      const { pipeline } = build();
+      const batchOf = (name: string) =>
+        pipeline.commands.find((command) => command.definition.name === name)?.definition.options
+          ?.coalesceMaxBatch;
+
+      expect(batchOf("recordTargetResult")).toBeGreaterThan(1);
+      expect(batchOf("recordEvaluatorResult")).toBeGreaterThan(1);
+      expect(
+        pipeline.mapProjections.get("experimentRunResultStorage")?.definition.options
+          ?.coalesceMaxBatch,
+      ).toBeGreaterThan(1);
+    });
+
     it("reads the retention default only when a row is written, never while composing", () => {
       const { retentionReads } = build();
 
