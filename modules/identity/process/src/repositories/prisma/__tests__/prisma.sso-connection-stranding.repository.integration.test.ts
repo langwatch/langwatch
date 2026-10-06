@@ -34,6 +34,10 @@ const unrelatedId = `${namespace}-unrelated`;
 const organizationIds = [organizationId, otherOrganizationId];
 const repository = PrismaSsoConnectionStrandingRepository.create(prisma);
 
+function idpMetadata(providerId: string) {
+  return { issuer: null, providerId, clientIdRef: null, secretRef: null, certRefs: [] };
+}
+
 afterAll(async () => {
   await prisma.$disconnect();
 });
@@ -77,7 +81,7 @@ async function storedConnection(
       approvedDomains: [],
       verifiedDomains: [],
       lapsedDomains: [],
-      idpMetadata: { providerId: "oidc" },
+      idpMetadata: idpMetadata("oidc"),
       source: "self-serve",
       occurredAt: now,
       lastEventId: `${namespace}-event`,
@@ -313,7 +317,7 @@ describe.skipIf(!DB_URL)("PrismaSsoConnectionStrandingRepository", () => {
       where: { id: connectionId },
       data: {
         source: "legacy-grandfathered",
-        idpMetadata: { providerId: "waad|acme" },
+        idpMetadata: idpMetadata("waad|acme"),
       },
     });
     await identifier({

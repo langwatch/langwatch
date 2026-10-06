@@ -37,8 +37,13 @@ describe.skipIf(!DB_URL)("PrismaIdentityUsersRepository.storeUserHashKeyIfMissin
     /** @scenario "A user's hash key is minted once, whichever writer arrives first" */
     it("keeps the first key, because the second write re-reads the row it waited for", async () => {
       await prisma.user.create({ data: { id: userId, email: `${userId}@acme.com` } });
-      const mint = (userHashKey: string) => (tx: Prisma.TransactionClient) =>
-        PrismaIdentityUsersRepository.create(tx).storeUserHashKeyIfMissing({ userId, userHashKey });
+      const mint = (userHashKey: string) => async (tx: Prisma.TransactionClient) => {
+        await PrismaIdentityUsersRepository.create(tx).storeUserHashKeyIfMissing({
+          userId,
+          userHashKey,
+        });
+        return "minted" as const;
+      };
 
       await raceOnOneRow({ prisma, table: "User", first: mint("first"), second: mint("second") });
 
