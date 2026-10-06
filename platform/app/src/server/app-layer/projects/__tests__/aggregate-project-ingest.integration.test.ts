@@ -165,6 +165,39 @@ describe("Feature: the aggregate project receives no traces", () => {
       });
     });
 
+    describe("when an organisation admin reads the team pages that list its projects", () => {
+      it("carries no key for the aggregate, and the ordinary project keeps its own", async () => {
+        const admin = callerFor(fixture.admin.id);
+        const { organizationId } = fixture;
+
+        const everyTeam = await admin.team.getTeamsWithMembers({
+          organizationId,
+        });
+        const oneTeam = await admin.team.getTeamWithMembers({
+          organizationId,
+          slug: fixture.team.slug,
+        });
+        const withBindings = await admin.team.getTeamsWithRoleBindings({
+          organizationId,
+        });
+
+        for (const projects of [
+          everyTeam.flatMap((team) => team.projects),
+          oneTeam.projects,
+          withBindings.flatMap((team) => team.projects),
+        ]) {
+          const listed = projects.find((project) => project.id === aggregate.id);
+          expect(listed).toBeDefined();
+          expect(listed?.apiKey).toBe("");
+          expect(listed?.lwqlKey).toBe("");
+          expect(
+            projects.find((project) => project.id === fixture.shared.id)
+              ?.apiKey,
+          ).toBe(fixture.shared.apiKey);
+        }
+      });
+    });
+
     describe("when an ordinary project's key sends the same trace", () => {
       it("is not refused for being an aggregate", async () => {
         const response = await otelApp.request("/api/otel/v1/traces", {

@@ -21,7 +21,10 @@ import {
   type AccessListingRepository,
 } from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { liveRoles } from "~/server/app-layer/authz/repositories/live-rows";
-import { projectKindsHiddenFrom } from "~/server/app-layer/projects/project-kinds";
+import {
+  projectKindsHiddenFrom,
+  withoutAggregateCredentials,
+} from "~/server/app-layer/projects/project-kinds";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import type {
   RoleBindingRepository,
@@ -335,6 +338,7 @@ export class TeamService {
 
     return {
       ...team,
+      projects: team.projects.map(withoutAggregateCredentials),
       members: this.shapeTeamMembers(byTeam.get(team.id) ?? [], team.id),
     };
   }
@@ -389,6 +393,7 @@ export class TeamService {
 
     return teams.map((team) => ({
       ...team,
+      projects: team.projects.map(withoutAggregateCredentials),
       members: this.shapeTeamMembers(byTeam.get(team.id) ?? [], team.id),
     }));
   }
@@ -706,7 +711,7 @@ export class TeamService {
           id: team.id,
           name: team.name,
           slug: team.slug,
-          projects: team.projects,
+          projects: team.projects.map(withoutAggregateCredentials),
           directMembers,
           projectOnlyAccess: [...projectOnlyMap.values()],
           projectAccess,

@@ -44,6 +44,20 @@ export const NON_DESTINATION_PROJECT_KINDS: readonly string[] = [
   AGGREGATE_PROJECT_KIND,
 ];
 
+/**
+ * The project row with an aggregate's stored keys blanked. An aggregate owns
+ * no credential (ADR-144 decision 7): its base key exists only because the
+ * column is required, and neither it nor the LangWatchQL key is shown to
+ * anyone, its admins included. Every other kind is returned unchanged.
+ */
+export function withoutAggregateCredentials<
+  P extends { kind: string; apiKey: string; lwqlKey: string },
+>(project: P): P {
+  return isAggregateProjectKind(project.kind)
+    ? { ...project, apiKey: "", lwqlKey: "" }
+    : project;
+}
+
 /** The refusal a non-admin gets from any route that opens an aggregate. */
 export const AGGREGATE_PROJECT_ADMIN_ONLY_REFUSAL =
   "Only organization admins can open an aggregate project.";
