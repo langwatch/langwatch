@@ -35,7 +35,11 @@ import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSe
 import { isCustomRole } from "../../../api/enterprise";
 import { CustomRoleNotAssignableError } from "../../../role-bindings/errors";
 import { sessionRevocation } from "../../identity/runtime";
-import { projectKindsHiddenFrom } from "../../projects/project-kinds";
+import {
+  INTERNAL_GOVERNANCE_PROJECT_KIND,
+  NON_DESTINATION_PROJECT_KINDS,
+  projectKindsHiddenFrom,
+} from "../../projects/project-kinds";
 import {
   CannotRemoveSelfAsLastAdminError,
   DeveloperSeatNoSharedAccessError,
@@ -563,8 +567,12 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return this.prisma.project.findMany({
       // Named projects reach a customer — the plan-limit alert email lists
       // them per project. The governance project's usage stays in the
-      // org-level total rather than becoming a line that reveals it.
-      where: { team: { organizationId }, kind: { not: "internal_governance" } },
+      // org-level total rather than becoming a line that reveals it, and an
+      // aggregate holds no usage of its own (ADR-144), so it has no line.
+      where: {
+        team: { organizationId },
+        kind: { notIn: [...NON_DESTINATION_PROJECT_KINDS] },
+      },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     });
@@ -920,7 +928,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
                 // It exists only as a routing/tenancy artifact for IngestionSource
                 // data; never user-visible. See specs/ai-gateway/governance/
                 // architecture-invariants.feature + ui-contract.feature.
-                kind: { not: "internal_governance" },
+                kind: { not: INTERNAL_GOVERNANCE_PROJECT_KIND },
               },
             },
           },

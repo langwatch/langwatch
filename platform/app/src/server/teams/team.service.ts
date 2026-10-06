@@ -433,14 +433,24 @@ export class TeamService {
 
   async getTeamsWithRoleBindings({
     organizationId,
+    callerOrganizationRole,
   }: {
     organizationId: string;
+    /**
+     * Decides whether aggregate projects are listed (ADR-144). The route asks
+     * organization:manage, which a custom role can grant to someone who is
+     * not an organisation admin.
+     */
+    callerOrganizationRole: string | null;
   }) {
     const teams = await this.prisma.team.findMany({
       where: { organizationId, archivedAt: null },
       include: {
         projects: {
-          where: { archivedAt: null, kind: { not: "internal_governance" } },
+          where: {
+            archivedAt: null,
+            kind: { notIn: projectKindsHiddenFrom(callerOrganizationRole) },
+          },
           orderBy: { name: "asc" },
         },
       },

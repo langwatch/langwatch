@@ -36,6 +36,7 @@ import type {
 } from "~/generated/prisma/client";
 import {
   AGGREGATE_PROJECT_KIND,
+  INTERNAL_GOVERNANCE_PROJECT_KIND,
   NON_DESTINATION_PROJECT_KINDS,
 } from "~/server/app-layer/projects/project-kinds";
 import { isDispatchableProvider } from "~/server/modelProviders/registry";
@@ -456,7 +457,7 @@ async function oldestGovernanceProject(
 ): Promise<TraceProject | null> {
   return await client.project.findFirst({
     where: {
-      kind: "internal_governance",
+      kind: INTERNAL_GOVERNANCE_PROJECT_KIND,
       team: { organizationId },
       archivedAt: null,
     },

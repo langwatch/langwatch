@@ -49,6 +49,7 @@ import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
+import { realOrganizationService } from "~/server/app-layer/projects/__tests__/aggregateProjectFixture";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { PrismaTeamRepository } from "~/server/app-layer/teams/repositories/team.prisma.repository";
 import { TeamRestService } from "~/server/app-layer/teams/team.service";
@@ -62,7 +63,9 @@ import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
-wireDefaultTestApp();
+// The cost view and the team routes ask the caller's organisation role,
+// which the test app's null organisation service would answer as nobody's.
+wireDefaultTestApp(() => ({ organizations: realOrganizationService(prisma) }));
 
 const ns = `gov-leak-${nanoid(8)}`;
 
@@ -145,6 +148,7 @@ const surfaces: ListingSurface[] = [
     ids: async () => {
       const teams = await new TeamService({ prisma }).getTeamsWithRoleBindings({
         organizationId,
+        callerOrganizationRole: OrganizationUserRole.ADMIN,
       });
       return teams.flatMap((t) => t.projects.map((p) => p.id));
     },
@@ -312,7 +316,88 @@ const SWEPT_ROOTS = ["src", "ee"];
  * swept.
  */
 const GOVERNANCE_EXCLUSION =
-  /not:\s*(?:"internal_governance"|PROJECT_KIND\.INTERNAL_GOVERNANCE)|kind:\s*\{\s*notIn:\s*(?:projectKindsHiddenFrom\(|\[\.\.\.NON_DESTINATION_PROJECT_KINDS\])/;
+  /not:\s*(?:"internal_governance"|PROJECT_KIND\.INTERNAL_GOVERNANCE|INTERNAL_GOVERNANCE_PROJECT_KIND)|kind:\s*\{\s*notIn:\s*(?:projectKindsHiddenFrom\(|\[\.\.\.NON_DESTINATION_PROJECT_KINDS\])/;
+
+/**
+ * A project filter that hides the governance home and nothing else, so it
+ * lists the aggregate (ADR-144) to whoever reaches it. Every other spelling
+ * the discovery above accepts either asks the caller's role
+ * (`projectKindsHiddenFrom`) or drops both kinds that hold no traces
+ * (`NON_DESTINATION_PROJECT_KINDS`).
+ */
+const GOVERNANCE_ONLY_EXCLUSION =
+  /kind:\s*\{\s*not:\s*(?:"internal_governance"|PROJECT_KIND\.INTERNAL_GOVERNANCE|INTERNAL_GOVERNANCE_PROJECT_KIND)\s*\}/g;
+
+/**
+ * The governance-only filters allowed to stay, per file, with how many there
+ * are and why the aggregate cannot reach a non-admin through them. Counted,
+ * so a second governance-only filter added to a listed file is not covered by
+ * the first one's reason. Anything not here must ask the caller's role.
+ */
+const AGGREGATE_FILTERED_ELSEWHERE: Record<
+  string,
+  { count: number; reason: string }
+> = {
+  "src/server/app-layer/organizations/repositories/organization.prisma.repository.ts":
+    {
+      count: 1,
+      reason:
+        "getAllForUser spans organisations with a different role in each, so it drops the aggregate per organisation with projectKindsHiddenFrom after the one query",
+    },
+  "src/server/data-privacy/dataPrivacyPolicy.read.ts": {
+    count: 1,
+    reason:
+      "lists only projects batchScopePermissions admits for project:update, and the batch closes the aggregate to a non-admin",
+  },
+  "src/server/data-retention/policy/dataRetentionPolicy.read.ts": {
+    count: 1,
+    reason:
+      "lists only projects batchScopePermissions admits for project:update, and the batch closes the aggregate to a non-admin",
+  },
+  "src/server/modelProviders/modelDefaults.read.ts": {
+    count: 2,
+    reason:
+      "both listings keep only projects batchScopePermissions admits, and the batch closes the aggregate to a non-admin",
+  },
+  "src/server/organizations/resolveCallerProjectScope.ts": {
+    count: 1,
+    reason:
+      "cut by batchScopePermissions for a person and by the API key's project batch for a key, both of which close the aggregate to a non-admin",
+  },
+  "src/server/analytics/lwql/readableProjects.ts": {
+    count: 1,
+    reason:
+      "cut by the API key's project batch, which closes the aggregate unless the key's owner is an organisation admin",
+  },
+  "ee/governance/repositories/governanceAgentInventory.repository.ts": {
+    count: 1,
+    reason:
+      "lists connected agents, and an aggregate has none: it accepts no credential and receives no traces",
+  },
+  "ee/governance/services/department/department.service.ts": {
+    count: 1,
+    reason:
+      "behind governance:view, an organisation-tier permission only the admin role carries",
+  },
+  "ee/governance/services/setupState.service.ts": {
+    count: 1,
+    reason: "counts projects that have ingested; returns a number",
+  },
+};
+
+/** Each file's governance-only filters, by count. */
+function governanceOnlyFiltersByModule(): Record<string, number> {
+  const found: Record<string, number> = {};
+  for (const root of SWEPT_ROOTS) {
+    for (const file of walkTypeScript(path.join(PACKAGE_ROOT, root))) {
+      const count =
+        fs.readFileSync(file, "utf8").match(GOVERNANCE_ONLY_EXCLUSION)
+          ?.length ?? 0;
+      if (count > 0) found[path.relative(PACKAGE_ROOT, file)] = count;
+    }
+  }
+  return found;
+}
 
 /**
  * Reads that carry the predicate but hand the caller no project id, so there
@@ -445,10 +530,16 @@ beforeAll(async () => {
     data: { userId, teamId, role: TeamUserRole.ADMIN },
   });
 
-  // The cost view drops a project with no spend in the window, so both
-  // projects need a row or its exclusion would prove nothing.
+  // The cost view drops a project with no spend in the window, so every
+  // project needs a row or its exclusion would prove nothing. An aggregate
+  // never receives cost of its own; its row is here only so the role-aware
+  // case below can tell the filter from an empty answer.
   await prisma.cost.createMany({
-    data: [applicationProjectId, governanceProjectId].map((projectId) => ({
+    data: [
+      applicationProjectId,
+      governanceProjectId,
+      aggregateProjectId,
+    ].map((projectId) => ({
       projectId,
       costType: CostType.TRACE_CHECK,
       referenceType: CostReferenceType.CHECK,
@@ -519,7 +610,11 @@ afterAll(async () => {
   await cleanupTestRows(prisma, [
     [
       "cost",
-      { projectId: { in: [applicationProjectId, governanceProjectId] } },
+      {
+        projectId: {
+          in: [applicationProjectId, governanceProjectId, aggregateProjectId],
+        },
+      },
     ],
     [
       "agent",
@@ -670,6 +765,35 @@ describe("the hidden governance project as a member sees it", () => {
           "registered surfaces whose module no longer filters",
         ).toEqual([]);
       });
+
+      it("fails when a listing hides only the governance home and lets the aggregate through", () => {
+        const found = governanceOnlyFiltersByModule();
+
+        // The sweep's own guard: a regex that stopped matching would report
+        // every file clean.
+        expect(Object.keys(found)).toContain(
+          "src/server/data-privacy/dataPrivacyPolicy.read.ts",
+        );
+
+        const unexplained = Object.entries(found)
+          .filter(
+            ([module, count]) =>
+              AGGREGATE_FILTERED_ELSEWHERE[module]?.count !== count,
+          )
+          .map(([module, count]) => `${module} (${count})`);
+        expect(
+          unexplained,
+          "these files hide only the governance project, so a non-admin would be listed the aggregate: filter with projectKindsHiddenFrom(callerRole), or record why the aggregate cannot reach a non-admin there",
+        ).toEqual([]);
+
+        const stale = Object.keys(AGGREGATE_FILTERED_ELSEWHERE).filter(
+          (module) => !(module in found),
+        );
+        expect(
+          stale,
+          "allow-listed files that no longer hide only the governance project",
+        ).toEqual([]);
+      });
     });
 
     describe("when the remaining settings pickers are opened", () => {
@@ -766,6 +890,39 @@ function roleAwareListings({
           callerOrganizationRole: role,
         });
         return teams.flatMap((t) => t.projects.map((p) => p.id));
+      },
+    },
+    {
+      // Behind organization:manage, which a custom role can grant without
+      // the admin role, so it asks the role like every other listing.
+      name: "team and RBAC settings",
+      module: "src/server/teams/team.service.ts",
+      ids: async () => {
+        const teams = await new TeamService({
+          prisma,
+        }).getTeamsWithRoleBindings({
+          organizationId,
+          callerOrganizationRole: role,
+        });
+        return teams.flatMap((t) => t.projects.map((p) => p.id));
+      },
+    },
+    {
+      name: "cost by project",
+      module: "src/server/api/routers/costs.ts",
+      ids: async () => {
+        const rows = await appRouter
+          .createCaller(
+            createInnerTRPCContext({
+              session: { user: { id: personId }, expires: "1" },
+            }),
+          )
+          .costs.getAggregatedCostsForOrganization({
+            organizationId,
+            startDate: Date.now() - 7 * 24 * 60 * 60 * 1000,
+            endDate: Date.now(),
+          });
+        return rows.map((r) => r.project.id);
       },
     },
   ];

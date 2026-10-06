@@ -123,6 +123,10 @@ export const teamRouter = createTRPCRouter({
       const service = new TeamService({ prisma: ctx.prisma });
       return service.getTeamsWithRoleBindings({
         organizationId: input.organizationId,
+        callerOrganizationRole: await getApp().organizations.getUserOrgRole({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+        }),
       });
     }),
 
