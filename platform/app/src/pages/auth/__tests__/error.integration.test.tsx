@@ -183,7 +183,7 @@ describe("Auth error page referrer redirect", () => {
       vi.useRealTimers();
       // The request never got an answer: the network dropped, or the client
       // threw before asking. Nobody is on their way anywhere.
-      signIn.mockRejectedValueOnce(new Error("Failed to fetch"));
+      signIn.mockRejectedValueOnce(new TypeError("Failed to fetch"));
       searchParamsRef.current = new URLSearchParams(
         "error=SSO_REQUIRED_BY_ORGANIZATION&error_description=ssoc_gone",
       );
