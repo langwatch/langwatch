@@ -87,7 +87,7 @@ Feature: License registry
 
   @unit
   Scenario: A license key is never kept in the audit trail
-    When an organization activates a license, or an operator pastes one into the backoffice
+    When an organization activates a license, or an operator pastes one into the instance admin
     Then the audit entry for that action records that a license key was supplied
     And it does not hold the key
 
@@ -109,7 +109,7 @@ Feature: License registry
 
   @unit
   Scenario: Issuing a license never asks the operator for the private key
-    When an operator issues a license from the backoffice
+    When an operator issues a license from the instance admin
     Then the license is signed with the key from the server secret
     And the request carries no private key
 
@@ -133,21 +133,21 @@ Feature: License registry
   @unit
   Scenario: A license issued before the registry existed is registered by pasting it
     Given a license that LangWatch signed before the registry existed
-    When an operator pastes it into the backoffice and links it to customer organization "ACME"
+    When an operator pastes it into the instance admin and links it to customer organization "ACME"
     Then the signature is verified
     And the registry holds a row for it linked to "ACME" with the seats and term read from the license
 
   @unit
   Scenario: A pasted license with a bad signature is refused
     Given a license whose payload was edited after signing
-    When an operator pastes it into the backoffice
+    When an operator pastes it into the instance admin
     Then the request is refused because the signature does not verify
     And nothing is written to the registry
 
   @unit
   Scenario: Registering the same license twice is refused
     Given a license that is already in the registry
-    When an operator pastes it into the backoffice again
+    When an operator pastes it into the instance admin again
     Then the request is refused because the license is already registered
     And the existing row is unchanged
 
