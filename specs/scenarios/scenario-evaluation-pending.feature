@@ -184,11 +184,11 @@ Feature: A run reports that its evaluators have not run yet
     Then the finished event carries the attachments its suite attaches now
 
   @unit
-  Scenario: The evaluation job is queued with the attachments the run carries
-    Given a finished event carrying two attachments
-    When the evaluation subscriber handles it
-    Then the job payload carries those two attachments
-    And the suite and the run plan are not read again
+  Scenario: The grading job is queued with the run's ids, not its attachments
+    Given a finished event carrying attachments
+    When the evaluations process handles it
+    Then the job payload carries only the tenant, run, scenario and plan ids
+    And no attachment rides on the job
 
   @unit
   Scenario: The worker grades a run with the attachments its job carries
@@ -235,10 +235,11 @@ Feature: A run reports that its evaluators have not run yet
     Then the finished event carries the field values and the definitions the run was queued with
 
   @unit
-  Scenario: The evaluation job is queued with the field values and the definitions the run carries
-    Given a finished event carrying field values and evaluator definitions
-    When the evaluation subscriber handles it
-    Then the job payload carries the same field values and definitions
+  Scenario: The grading process keeps no field values or definitions of the run
+    Given a finished event
+    When the evaluations process records what it needs to queue the grading
+    Then it keeps only the scenario, the set, the status and the attachment count
+    And none of the conversation, the field values or the evaluator definitions
 
   @unit
   Scenario: A scenario field edited while the batch executes does not change what a queued run is graded against

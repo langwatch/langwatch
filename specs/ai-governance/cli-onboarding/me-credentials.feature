@@ -154,12 +154,12 @@ Feature: /me credentials just work - CLI credential resolution after device logi
     And the CLI persists personal_project into ~/.langwatch/config.json
 
   @bdd @cli-onboarding @credentials @integration
-  Scenario: device-login exchange stays valid when the personal project key is withheld
+  Scenario: device-login exchange returns the personal project without its key
     Given a device code was approved for a user with a personal workspace
-    And the user does not have permission to manage the personal project
     When the CLI polls POST /api/auth/cli/exchange
-    Then the device_session response is still successful
-    And personal_project is omitted from the response
+    Then the device_session response is successful
+    And personal_project carries only its id, slug and name
+    And no project API key is returned
 
   @bdd @cli-onboarding @credentials @integration
   Scenario: a session created before this change lazily exchanges once and rewrites the session file

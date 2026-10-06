@@ -67,6 +67,7 @@ describe("startNewConversation", () => {
       expect(state.discardedProposalIds.size).toBe(0);
     });
 
+    /** @scenario "Starting a new chat starts with no context chosen" */
     it("drops the page-context chips and restores the feedback prompt", () => {
       useLangyStore.getState().startNewConversation();
       const state = useLangyStore.getState();

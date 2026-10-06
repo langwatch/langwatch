@@ -420,7 +420,8 @@ Feature: Governance home — route, nav promotion, persona detection
       | hasIngestionSources  | boolean | any non-archived IngestionSource in org   |
       | hasAnomalyRules      | boolean | any non-archived AnomalyRule in org       |
       | hasRecentActivity    | boolean | any gateway_activity_event in last 30d    |
-      | governanceActive     | boolean | OR of the five hasFoo flags above         |
+      | hasApplicationTraces | boolean | any project in org that has traces        |
+      | governanceActive     | boolean | OR of the first five flags above          |
     And the procedure is gated on "governance:view" — an org member
       without it is refused (governance.rbac.integration.test.ts pins
       the FORBIDDEN), not the any-member read this scenario once claimed

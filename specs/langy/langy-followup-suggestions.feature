@@ -27,11 +27,10 @@ Feature: Langy suggests the next step after a result
   Rule: A trace search offers the next steps on the traces it found
 
     @integration
-    Scenario: The traces card suggests carrying the search into the traces view
-      When Langy searches for traces and finds some
-      Then the traces card offers to show those traces in the traces view
-      And choosing it opens the traces view already filtered to that same search
-      And I do not have to retype the query
+    Scenario: The traces card puts the offer that carries the search first
+      When Langy searches traces for the words "checkout failed" and finds some
+      Then the traces card offers at most three next steps
+      And the alert offer, which carries the search, comes before the offers that only open a surface
 
     @integration
     Scenario: A search that filtered on errors carries the error filter across
@@ -39,21 +38,6 @@ Feature: Langy suggests the next step after a result
       And I choose to show them in the traces view
       Then the traces view opens showing only errored traces
       And the time range is the last day
-
-    @integration
-    Scenario: A free-text search carries the text across
-      When Langy searches traces for the words "refund policy"
-      And I choose to show them in the traces view
-      Then the traces view opens searching for that same text
-
-    @integration
-    Scenario: The traces card suggests saving the search as a lens
-      When Langy searches for traces and finds some
-      Then the traces card offers to save that search as a lens
-      When I choose it and name the lens
-      Then a lens with that name is saved for the project
-      And the lens is locked to the search Langy ran
-      And nothing is saved until I choose the suggestion
 
     # The graph builder filters on fields only — a free-text search has nowhere
     # to go there, so the offer must not pretend to bring it along.
@@ -64,12 +48,6 @@ Feature: Langy suggests the next step after a result
       But the offer reads as opening the surface, not as graphing that search
 
     @integration
-    Scenario: The traces card suggests adding the traces to a dataset
-      When Langy searches for traces and finds some
-      Then the traces card offers to add those traces to a dataset
-      And choosing it opens the add-to-dataset flow preloaded with the traces Langy listed
-
-    @integration
     Scenario: The traces card suggests alerting on the search
       When Langy searches traces for the words "checkout failed"
       Then the traces card offers to set up an alert for that search
@@ -77,17 +55,18 @@ Feature: Langy suggests the next step after a result
       And nothing is created until I act there
 
     @integration
-    Scenario: A search with nothing to carry still offers the alert surface honestly
+    Scenario: A search with nothing to carry offers no alert
       When Langy searches traces with neither a filter nor a search term
-      Then the alert offer reads as opening the surface, not as alerting on that search
+      Then the traces card offers no alert, since there is no search to alert on
+      And it offers the Analytics, Annotations and Datasets surfaces as plain chips
 
   Rule: A suggestion only appears when it can actually be carried out
 
     @unit
     Scenario: A search with no filters and no text suggests nothing to carry
       When Langy searches traces with neither a filter nor a search term
-      Then the traces card does not offer to save an empty search as a lens
-      And it does not offer to graph an empty search
+      Then no offer claims to carry the search
+      And every offer only opens its surface
 
     @integration
     Scenario: A search that matched nothing offers no dataset suggestion
@@ -103,15 +82,10 @@ Feature: Langy suggests the next step after a result
   Rule: A single trace offers the next steps on that one trace
 
     @integration
-    Scenario: A trace lookup suggests adding that trace to a dataset
+    Scenario: A trace lookup offers the surfaces that act on traces
       When Langy looks up a single trace
-      Then the trace card offers to add that trace to a dataset
-
-    @integration
-    Scenario: A trace lookup suggests finding traces like it
-      When Langy looks up a single trace
-      Then the trace card offers to find similar traces
-      And choosing it opens the traces view filtered to traces sharing that trace's conversation
+      Then the trace card offers the Analytics, Annotations and Datasets surfaces as plain chips
+      And it offers no alert, since a lookup carries no search
 
   Rule: Suggestions read as offers, not as things already done
 

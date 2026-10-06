@@ -87,7 +87,8 @@ Feature: CLI login never lands a user on a personal project
       Given a pending device code with credential_type "project_api_key"
       And a shared project on a team the org admin does not directly belong to
       When the org admin who can write the project approves with its id
-      Then the response is 200 and returns that project's API key
+      Then the response is 200 and names that project
+      And no API key is returned
 
     @integration @project-picker @rbac
     Scenario: project-login approval denies a project the caller cannot manage
@@ -129,14 +130,6 @@ Feature: CLI login never lands a user on a personal project
       When the CLI exchanges that device code
       Then the response is the fatal 410 "access_denied" and the project's API key is NOT returned
       And the device code is consumed, so a further exchange reports it expired
-
-    @integration @project-picker @rbac
-    Scenario: project-login exchange returns a key rotated after approval
-      Given a device code approved while the caller could manage the project
-      And the project's base API key is rotated after approval
-      When the CLI exchanges that device code
-      Then the response contains the current base API key
-      And the approval-time base API key is NOT returned
 
     @unit @project-picker
     Scenario: the project picker lists the caller's personal project explicitly and omits internal-governance projects

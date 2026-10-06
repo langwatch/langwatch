@@ -58,6 +58,7 @@ describe("deriveFollowUpChips", () => {
         });
       });
 
+      /** @scenario "The traces card puts the offer that carries the search first" */
       it("puts the chip that carries the search before the ones that only navigate", () => {
         const chips = deriveFollowUpChips({
           call: traceSearch(),
@@ -112,6 +113,23 @@ describe("deriveFollowUpChips", () => {
             href: "/demo/datasets",
             carried: false,
           },
+        ]);
+      });
+
+      /** @scenario "A search with nothing to carry offers no alert" */
+      it("offers no alert, since there is no search to alert on", () => {
+        const chips = deriveFollowUpChips({
+          call: traceSearch({
+            input: { command: "langwatch trace search --limit 25" },
+          }),
+          projectSlug: "demo",
+        });
+
+        expect(chips.map((chip) => chip.id)).not.toContain("traces:triggers");
+        expect(chips.map((chip) => chip.label)).toEqual([
+          "Open in Analytics",
+          "Open in Annotations",
+          "Open in Datasets",
         ]);
       });
     });
@@ -229,6 +247,42 @@ describe("deriveFollowUpChips", () => {
       it("offers no chip at all — no destination can receive a prompt", () => {
         expect(deriveFollowUpChips({ call: promptList, projectSlug: "demo" })).toEqual([]);
       });
+    });
+  });
+
+  describe("given a single trace lookup", () => {
+    /** @scenario "A trace lookup offers the surfaces that act on traces" */
+    it("offers the trace surfaces as plain chips and no alert, since a lookup carries no search", () => {
+      const chips = deriveFollowUpChips({
+        call: {
+          name: "langwatch.trace.get",
+          state: "output-available",
+          input: { command: "langwatch trace get trace_1 -o json" },
+          output: JSON.stringify({ trace_id: "trace_1", spans: [] }),
+        },
+        projectSlug: "demo",
+      });
+
+      expect(chips).toEqual([
+        {
+          id: "traces:observability.analytics",
+          label: "Open in Analytics",
+          href: "/demo/analytics",
+          carried: false,
+        },
+        {
+          id: "traces:observability.annotations",
+          label: "Open in Annotations",
+          href: "/demo/annotations",
+          carried: false,
+        },
+        {
+          id: "traces:library.datasets",
+          label: "Open in Datasets",
+          href: "/demo/datasets",
+          carried: false,
+        },
+      ]);
     });
   });
 
