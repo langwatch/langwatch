@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Dataset application.
 
-Peers call these through the token, declared at `../contract/src/dataset.api.ts:74`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/dataset.api.ts:73`; nothing else in this package is public.
 
 #### `upsertDataset`
 
@@ -585,8 +585,8 @@ Run by the tasks process, before serve.
 
 ## Configuration
 
-| Kind   | Leaf            | Environment variable | Declared at                          |
-| ------ | --------------- | -------------------- | ------------------------------------ |
-| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/dataset.api.ts:178` |
+| Kind   | Leaf            | Environment variable | Declared at                           |
+| ------ | --------------- | -------------------- | ------------------------------------- |
+| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/dataset.config.ts:5` |
 
 <!-- readme:generated:end -->

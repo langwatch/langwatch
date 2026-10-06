@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Suite application.
 
-Peers call these through the token, declared at `../contract/src/suite.api.ts:35`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/suite.api.ts:34`; nothing else in this package is public.
 
 #### `listByIds`
 
@@ -530,8 +530,8 @@ Declared at `src/eventing/suite-run-processing.pipeline.ts:68`. Events: `SuiteRu
 
 ## Configuration
 
-| Kind   | Leaf            | Environment variable | Declared at                        |
-| ------ | --------------- | -------------------- | ---------------------------------- |
-| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/suite.api.ts:127` |
+| Kind   | Leaf            | Environment variable | Declared at                         |
+| ------ | --------------- | -------------------- | ----------------------------------- |
+| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/suite.config.ts:5` |
 
 <!-- readme:generated:end -->

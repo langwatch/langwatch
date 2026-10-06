@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`EvaluatorApi`)
 
-Peers call these through the token, declared at `../contract/src/evaluator.api.ts:62`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/evaluator.api.ts:61`; nothing else in this package is public.
 
 #### `executeCode`
 
@@ -364,8 +364,8 @@ None: evaluator declares no pipeline, process manager, subscriber or task.
 
 ## Configuration
 
-| Kind   | Leaf            | Environment variable | Declared at                            |
-| ------ | --------------- | -------------------- | -------------------------------------- |
-| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/evaluator.api.ts:159` |
+| Kind   | Leaf            | Environment variable | Declared at                             |
+| ------ | --------------- | -------------------- | --------------------------------------- |
+| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/evaluator.config.ts:4` |
 
 <!-- readme:generated:end -->

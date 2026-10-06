@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The demo agents a caller runs to see its own project fill with traces.
 
-Peers call these through the token, declared at `../contract/src/sample-agents.api.ts:7`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/sample-agents.api.ts:6`; nothing else in this package is public.
 
 #### `runHotelBot`
 
@@ -40,9 +40,9 @@ Platform permission `ops:manage`. Credential `browser`. Hidden from the OpenAPI 
 Answers at `/api/demo/hotel_bot`.
 
 ```typescript
-type Body = z.infer<typeof hotelBotRequestSchema>; // ../contract/src/sample-agents.api.ts:14
-type Headers = z.infer<typeof hotelBotHeadersSchema>; // ../contract/src/sample-agents.api.ts:17
-type Response = z.infer<typeof hotelBotReplySchema>; // ../contract/src/sample-agents.api.ts:28
+type Body = z.infer<typeof hotelBotRequestSchema>; // ../contract/src/sample-agents.api.ts:13
+type Headers = z.infer<typeof hotelBotHeadersSchema>; // ../contract/src/sample-agents.api.ts:16
+type Response = z.infer<typeof hotelBotReplySchema>; // ../contract/src/sample-agents.api.ts:27
 ```
 
 ## tRPC transport
@@ -59,9 +59,9 @@ None: sample-agents declares no pipeline, process manager, subscriber or task.
 
 ## Configuration
 
-| Kind   | Leaf            | Environment variable | Declared at                               |
-| ------ | --------------- | -------------------- | ----------------------------------------- |
-| secret | `openAi`        | `OPENAI_API_KEY`     | `src/app/sample-agents.app.ts:30`         |
-| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/sample-agents.api.ts:37` |
+| Kind   | Leaf            | Environment variable | Declared at                                 |
+| ------ | --------------- | -------------------- | ------------------------------------------- |
+| secret | `openAi`        | `OPENAI_API_KEY`     | `src/app/sample-agents.app.ts:30`           |
+| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/sample-agents.config.ts:5` |
 
 <!-- readme:generated:end -->

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The callable Hosted MCP capability exposed to process transports.
 
-Peers call these through the token, declared at `../contract/src/mcp-authorize.schemas.ts:60`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/mcp-authorize.schemas.ts:59`; nothing else in this package is public.
 
 #### `createHandler`
 
@@ -57,8 +57,8 @@ None: hosted-mcp declares no pipeline, process manager, subscriber or task.
 
 ## Configuration
 
-| Kind   | Leaf            | Environment variable | Declared at                                   |
-| ------ | --------------- | -------------------- | --------------------------------------------- |
-| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/mcp-authorize.schemas.ts:77` |
+| Kind   | Leaf            | Environment variable | Declared at                              |
+| ------ | --------------- | -------------------- | ---------------------------------------- |
+| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/hosted-mcp.config.ts:5` |
 
 <!-- readme:generated:end -->

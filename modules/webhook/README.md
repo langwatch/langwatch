@@ -11,7 +11,7 @@ Webhook endpoints: creating and managing them, signing secrets, and delivering e
 | Classification | core (`modules/catalogue.json`)                                                                       |
 | Subjects       | webhook                                                                                               |
 | Halves         | [contract](contract) · [process](process/README.md)                                                   |
-| Api token      | `WebhookApi` = `moduleApi<WebhookApi>()("webhook")`, `contract/src/webhook.api.ts:91` (21 operations) |
+| Api token      | `WebhookApi` = `moduleApi<WebhookApi>()("webhook")`, `contract/src/webhook.api.ts:89` (21 operations) |
 | Other token    | `WebhookSpendReplayApi`, `process/src/transport/webhook-spend-replay.rest.ts:27`                      |
 | Installed by   | api, worker, tasks (process)                                                                          |
 
@@ -22,7 +22,7 @@ Webhook endpoints: creating and managing them, signing secrets, and delivering e
 | Postgres table  | `WebhookEndpoint`                                                                                                                                                                        | `process/src/repositories/prisma/prisma.webhook-endpoint.repository.ts:162` |
 | Postgres table  | `WebhookEndpointDelivery`                                                                                                                                                                | `process/src/repositories/prisma/prisma.webhook-endpoint.repository.ts:162` |
 | Stores required | prisma, clickhouse, encryption, redis, rateLimiter                                                                                                                                       | `process/src/repositories/prisma/prisma.webhook.repositories.ts:58`         |
-| Config          | `allowInsecureLocalUrls` (WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS), `allowAmbientAwsCredentials` (WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS), `isSaas` (IS_SAAS), `outboundProxy` (HTTPS_PROXY) | `contract/src/webhook.api.ts:102`                                           |
+| Config          | `allowInsecureLocalUrls` (WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS), `allowAmbientAwsCredentials` (WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS), `isSaas` (IS_SAAS), `outboundProxy` (HTTPS_PROXY) | `contract/src/webhook.config.ts:13`                                         |
 
 Anything else webhook needs belongs to another module and is reached through its `*Api`.
 

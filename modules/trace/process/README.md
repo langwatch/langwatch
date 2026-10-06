@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Public Trace operations shared by process peers after boot composition.
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:145`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:150`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -637,8 +637,10 @@ readTraceList(params: { tenantId: string; timeRange: { from: number; to: number 
 
 #### `readSessionGroups`
 
+One page of the Sessions lens through the viewer's protections: content redacted and spend gated, with `codingAgent` left null for coding-agent, which serves the lens, to fill and gate.
+
 ```typescript
-readSessionGroups(params: unknown): Promise<unknown>;
+readSessionGroups(input: TraceSessionGroupsInput & { protections: Protections }): Promise<TracesSessionsPage>;
 ```
 
 #### `readFilteredFacets`
@@ -1291,7 +1293,7 @@ Contract `../contract/src/export-progress.trpc.ts:20`, router `src/transport/exp
 
 ### `sharedTrace`
 
-Contract `../contract/src/traces.trpc.ts:601`, router `src/transport/shared-trace.trpc.ts:30`.
+Contract `../contract/src/traces.trpc.ts:598`, router `src/transport/shared-trace.trpc.ts:30`.
 
 | Procedure         | Kind  | Gate                                                                                                                                                | Input                       | Output                 |
 | ----------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ---------------------- |
@@ -1299,7 +1301,7 @@ Contract `../contract/src/traces.trpc.ts:601`, router `src/transport/shared-trac
 
 ### `spans`
 
-Contract `../contract/src/traces.trpc.ts:610`, router `src/transport/spans.trpc.ts:10`.
+Contract `../contract/src/traces.trpc.ts:607`, router `src/transport/spans.trpc.ts:10`.
 
 | Procedure                  | Kind  | Gate                     | Input              | Output                   |
 | -------------------------- | ----- | ------------------------ | ------------------ | ------------------------ |
@@ -1331,7 +1333,7 @@ Contract `../contract/src/traces-instant-eval.trpc.ts:20`, router `src/transport
 
 ### `traces`
 
-Contract `../contract/src/traces.trpc.ts:144`, router `src/transport/traces.trpc.ts:51`.
+Contract `../contract/src/traces.trpc.ts:155`, router `src/transport/traces.trpc.ts:47`.
 
 | Procedure                              | Kind         | Gate                       | Input                               | Output                             |
 | -------------------------------------- | ------------ | -------------------------- | ----------------------------------- | ---------------------------------- |
@@ -1352,7 +1354,6 @@ Contract `../contract/src/traces.trpc.ts:144`, router `src/transport/traces.trpc
 | `traces.getAllForDownload`             | mutation     | Permission `traces:view`   | inline                              | `tracesForProjectResultSchema`     |
 | `traces.onTraceUpdate`                 | subscription | Permission `traces:view`   | inline                              | inline                             |
 | `traces.list`                          | query        | Permission `traces:view`   | inline                              | `tracesListPageSchema`             |
-| `traces.sessions`                      | query        | Permission `traces:view`   | inline                              | `tracesSessionsPageSchema`         |
 | `traces.listEvents`                    | query        | Permission `traces:view`   | inline                              | `tracesListEventsSchema`           |
 | `traces.newCount`                      | query        | Permission `traces:view`   | inline                              | `tracesNewCountSchema`             |
 | `traces.suggest`                       | query        | Permission `traces:view`   | inline                              | `tracesSuggestSchema`              |
@@ -1426,11 +1427,11 @@ Declared at `src/eventing/trace-project-milestones.pipeline.ts:21`. Events: `fir
 
 ## Configuration
 
-| Kind   | Leaf                       | Environment variable           | Declared at                              |
-| ------ | -------------------------- | ------------------------------ | ---------------------------------------- |
-| config | `spanProcessingShards`     | `TRACE_SPAN_PROCESSING_SHARDS` | `../contract/src/trace.constants.ts:193` |
-| config | `tokenizer.bpeDirectory`   | `TIKTOKENS_PATH`               | `../contract/src/trace.constants.ts:195` |
-| config | `tokenizer.fetchTimeoutMs` | `TIKTOKEN_FETCH_TIMEOUT_MS`    | `../contract/src/trace.constants.ts:196` |
-| config | `publicBaseUrl`            | `BASE_HOST`                    | `../contract/src/trace.constants.ts:201` |
+| Kind   | Leaf                       | Environment variable           | Declared at                          |
+| ------ | -------------------------- | ------------------------------ | ------------------------------------ |
+| config | `spanProcessingShards`     | `TRACE_SPAN_PROCESSING_SHARDS` | `../contract/src/trace.config.ts:9`  |
+| config | `tokenizer.bpeDirectory`   | `TIKTOKENS_PATH`               | `../contract/src/trace.config.ts:11` |
+| config | `tokenizer.fetchTimeoutMs` | `TIKTOKEN_FETCH_TIMEOUT_MS`    | `../contract/src/trace.config.ts:12` |
+| config | `publicBaseUrl`            | `BASE_HOST`                    | `../contract/src/trace.config.ts:17` |
 
 <!-- readme:generated:end -->

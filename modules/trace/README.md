@@ -11,7 +11,7 @@ Traces: ingestion and canonicalisation of spans, the projections built from them
 | Classification | core (`modules/catalogue.json`)                                                                 |
 | Subjects       | trace, trace-ingestion                                                                          |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                        |
-| Api token      | `TraceApi` = `moduleApi<TraceApi>()("trace")`, `contract/src/trace.api.ts:844` (138 operations) |
+| Api token      | `TraceApi` = `moduleApi<TraceApi>()("trace")`, `contract/src/trace.api.ts:855` (138 operations) |
 | Other token    | `CollectorApi`, `process/src/transport/collector.rest.ts:94`                                    |
 | Other token    | `TrackedEventApi`, `process/src/transport/tracked-event.rest.ts:41`                             |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                      |
@@ -26,7 +26,7 @@ Traces: ingestion and canonicalisation of spans, the projections built from them
 | ClickHouse table (writes) | `trace_summaries`                                                                                                                                                                     | `process/src/repositories/clickhouse/trace-summary.repository.ts:220`           |
 | Stores required           | prisma, clickhouse, redis, rateLimiter                                                                                                                                                | `process/src/repositories/live/live.trace.repositories.ts:16`                   |
 | Stores required           | prisma, clickhouse                                                                                                                                                                    | `process/src/repositories/prisma/prisma.trace.repositories.ts:31`               |
-| Config                    | `spanProcessingShards` (TRACE_SPAN_PROCESSING_SHARDS), `tokenizer.bpeDirectory` (TIKTOKENS_PATH), `tokenizer.fetchTimeoutMs` (TIKTOKEN_FETCH_TIMEOUT_MS), `publicBaseUrl` (BASE_HOST) | `contract/src/trace.constants.ts:193`                                           |
+| Config                    | `spanProcessingShards` (TRACE_SPAN_PROCESSING_SHARDS), `tokenizer.bpeDirectory` (TIKTOKENS_PATH), `tokenizer.fetchTimeoutMs` (TIKTOKEN_FETCH_TIMEOUT_MS), `publicBaseUrl` (BASE_HOST) | `contract/src/trace.config.ts:9`                                                |
 
 Anything else trace needs belongs to another module and is reached through its `*Api`.
 

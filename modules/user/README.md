@@ -11,7 +11,7 @@ Users: profiles and avatars, account and single sign-on status, and the sign-in 
 | Classification | core (`modules/catalogue.json`)                                                            |
 | Subjects       | user, user-avatar                                                                          |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                   |
-| Api token      | `UserApi` = `moduleApi<UserApi>()("user")`, `contract/src/user.api.ts:219` (63 operations) |
+| Api token      | `UserApi` = `moduleApi<UserApi>()("user")`, `contract/src/user.api.ts:218` (63 operations) |
 | Other token    | `UserAvatarFileApi`, `process/src/transport/user-avatar.rest.ts:23`                        |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                 |
 
@@ -25,7 +25,7 @@ Users: profiles and avatars, account and single sign-on status, and the sign-in 
 | Postgres table                 | `Passkey`                                     | `process/src/repositories/prisma/prisma.user.repository.ts:93`                       |
 | Postgres, accessed not claimed | `Organization`, `OrganizationUser`, `Project` | `process/src/repositories/prisma/prisma.user-organization-directory.repository.ts:8` |
 | Stores required                | prisma, redis                                 | `process/src/repositories/live/live.user.repositories.ts:11`                         |
-| Config                         | `publicBaseUrl` (BASE_HOST)                   | `contract/src/user.api.ts:224`                                                       |
+| Config                         | `publicBaseUrl` (BASE_HOST)                   | `contract/src/user.config.ts:6`                                                      |
 
 Anything else user needs belongs to another module and is reached through its `*Api`.
 

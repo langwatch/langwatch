@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`MonitorApi`)
 
-Peers call these through the token, declared at `../contract/src/monitor.api.ts:34`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/monitor.api.ts:33`; nothing else in this package is public.
 
 #### `list`
 
@@ -289,8 +289,8 @@ None: monitor declares no pipeline, process manager, subscriber or task.
 
 ## Configuration
 
-| Kind   | Leaf            | Environment variable | Declared at                         |
-| ------ | --------------- | -------------------- | ----------------------------------- |
-| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/monitor.api.ts:80` |
+| Kind   | Leaf            | Environment variable | Declared at                           |
+| ------ | --------------- | -------------------- | ------------------------------------- |
+| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/monitor.config.ts:5` |
 
 <!-- readme:generated:end -->

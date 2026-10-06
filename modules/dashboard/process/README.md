@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Flat operations a door or a peer calls once the dashboard app is composed.
 
-Peers call these through the token, declared at `../contract/src/dashboard.api.ts:37`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/dashboard.api.ts:36`; nothing else in this package is public.
 
 #### `getAll`
 
@@ -742,8 +742,8 @@ None: dashboard declares no pipeline, process manager, subscriber or task.
 
 ## Configuration
 
-| Kind   | Leaf            | Environment variable | Declared at                            |
-| ------ | --------------- | -------------------- | -------------------------------------- |
-| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/dashboard.api.ts:234` |
+| Kind   | Leaf            | Environment variable | Declared at                             |
+| ------ | --------------- | -------------------- | --------------------------------------- |
+| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/dashboard.config.ts:5` |
 
 <!-- readme:generated:end -->

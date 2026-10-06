@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`WebhookApi`)
 
-Peers call these through the token, declared at `../contract/src/webhook.api.ts:32`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/webhook.api.ts:30`; nothing else in this package is public.
 
 #### `create`
 
@@ -395,11 +395,11 @@ The chain builds early when `!input.deliveryProcess || !input.governanceProcess 
 
 ## Configuration
 
-| Kind   | Leaf                         | Environment variable                        | Declared at                          |
-| ------ | ---------------------------- | ------------------------------------------- | ------------------------------------ |
-| config | `allowInsecureLocalUrls`     | `WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS`          | `../contract/src/webhook.api.ts:102` |
-| config | `allowAmbientAwsCredentials` | `WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS` | `../contract/src/webhook.api.ts:103` |
-| config | `isSaas`                     | `IS_SAAS`                                   | `../contract/src/webhook.api.ts:105` |
-| config | `outboundProxy`              | `HTTPS_PROXY`                               | `../contract/src/webhook.api.ts:107` |
+| Kind   | Leaf                         | Environment variable                        | Declared at                            |
+| ------ | ---------------------------- | ------------------------------------------- | -------------------------------------- |
+| config | `allowInsecureLocalUrls`     | `WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS`          | `../contract/src/webhook.config.ts:13` |
+| config | `allowAmbientAwsCredentials` | `WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS` | `../contract/src/webhook.config.ts:14` |
+| config | `isSaas`                     | `IS_SAAS`                                   | `../contract/src/webhook.config.ts:16` |
+| config | `outboundProxy`              | `HTTPS_PROXY`                               | `../contract/src/webhook.config.ts:18` |
 
 <!-- readme:generated:end -->

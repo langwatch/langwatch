@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Every owner tells nurturing through a subscriber on its own pipeline (§9); nurturing names no peer.
 
-Peers call these through the token, declared at `../contract/src/nurturing-types.ts:185`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/nurturing-types.ts:183`; nothing else in this package is public.
 
 #### `recordSignal`
 
@@ -76,9 +76,9 @@ Declared at `src/eventing/nurturing.pipeline.ts:157`. Events: `nurturingSignalRe
 | Kind   | Leaf                | Environment variable   | Declared at                              |
 | ------ | ------------------- | ---------------------- | ---------------------------------------- |
 | secret | `–`                 | `CUSTOMER_IO_API_KEY`  | `src/app/nurturing.app.ts:32`            |
-| config | `customerIoRegion`  | `CUSTOMER_IO_REGION`   | `../contract/src/nurturing-types.ts:195` |
-| config | `customerIoBaseUrl` | `CUSTOMER_IO_BASE_URL` | `../contract/src/nurturing-types.ts:197` |
-| config | `posthogKey`        | `POSTHOG_KEY`          | `../contract/src/nurturing-types.ts:198` |
-| config | `posthogHost`       | `POSTHOG_HOST`         | `../contract/src/nurturing-types.ts:199` |
+| config | `customerIoRegion`  | `CUSTOMER_IO_REGION`   | `../contract/src/nurturing.config.ts:7`  |
+| config | `customerIoBaseUrl` | `CUSTOMER_IO_BASE_URL` | `../contract/src/nurturing.config.ts:9`  |
+| config | `posthogKey`        | `POSTHOG_KEY`          | `../contract/src/nurturing.config.ts:10` |
+| config | `posthogHost`       | `POSTHOG_HOST`         | `../contract/src/nurturing.config.ts:11` |
 
 <!-- readme:generated:end -->

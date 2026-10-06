@@ -11,7 +11,7 @@ Suites (run plans): their definitions, the scenario references they hold and the
 | Classification | core (`modules/catalogue.json`)                                                                |
 | Subjects       | suite                                                                                          |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                       |
-| Api token      | `SuiteApi` = `moduleApi<SuiteApi>()("suite")`, `contract/src/suite.api.ts:123` (28 operations) |
+| Api token      | `SuiteApi` = `moduleApi<SuiteApi>()("suite")`, `contract/src/suite.api.ts:122` (28 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                     |
 
 ## What suite owns
@@ -20,7 +20,7 @@ Suites (run plans): their definitions, the scenario references they hold and the
 | ------------------------------ | ----------------------------- | --------------------------------------------------------------------------- |
 | Postgres, accessed not claimed | `Scenario`, `SimulationSuite` | `process/src/repositories/prisma/prisma.suite.repository.ts:63`             |
 | ClickHouse table (writes)      | `suite_runs`                  | `process/src/repositories/clickhouse/clickhouse.suite-run.repository.ts:97` |
-| Config                         | `publicBaseUrl` (BASE_HOST)   | `contract/src/suite.api.ts:127`                                             |
+| Config                         | `publicBaseUrl` (BASE_HOST)   | `contract/src/suite.config.ts:5`                                            |
 
 Anything else suite needs belongs to another module and is reached through its `*Api`.
 

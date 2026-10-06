@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`PlatformHealthApi`)
 
-Peers call these through the token, declared at `../contract/src/platform-health.ts:95`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/platform-health.ts:94`; nothing else in this package is public.
 
 #### `checkAll`
 
@@ -44,7 +44,7 @@ Public: a project key presented as X-Auth-Token or Authorization: Bearer is reso
 Answers at `/api/health/collector`.
 
 ```typescript
-type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:67
+type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:66
 // Response: "forwarded" (inline, src/transport/platform-health-probe.rest.ts:42)
 ```
 
@@ -55,7 +55,7 @@ Public: a project key presented as X-Auth-Token or Authorization: Bearer is reso
 Answers at `/api/health/evaluations`.
 
 ```typescript
-type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:67
+type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:66
 // Response: "forwarded" (inline, src/transport/platform-health-probe.rest.ts:51)
 ```
 
@@ -66,7 +66,7 @@ Public: a project key presented as X-Auth-Token or Authorization: Bearer is reso
 Answers at `/api/health/processor`.
 
 ```typescript
-type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:67
+type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:66
 // Response: "forwarded" (inline, src/transport/platform-health-probe.rest.ts:60)
 ```
 
@@ -77,8 +77,8 @@ Public: a project key presented as X-Auth-Token or Authorization: Bearer is reso
 Answers at `/api/health/triggers`.
 
 ```typescript
-type Query = z.infer<typeof platformHealthQuerySchema>; // ../contract/src/platform-health.ts:59
-type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:67
+type Query = z.infer<typeof platformHealthQuerySchema>; // ../contract/src/platform-health.ts:58
+type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:66
 // Response: "forwarded" (inline, src/transport/platform-health-probe.rest.ts:70)
 ```
 
@@ -89,8 +89,8 @@ Public: a project key presented as X-Auth-Token or Authorization: Bearer is reso
 Answers at `/api/health/workflows`.
 
 ```typescript
-type Query = z.infer<typeof platformHealthQuerySchema>; // ../contract/src/platform-health.ts:59
-type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:67
+type Query = z.infer<typeof platformHealthQuerySchema>; // ../contract/src/platform-health.ts:58
+type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:66
 // Response: "forwarded" (inline, src/transport/platform-health-probe.rest.ts:87)
 ```
 
@@ -101,8 +101,8 @@ Public: a project key presented as X-Auth-Token or Authorization: Bearer is reso
 Answers at `/api/health/scenarios`.
 
 ```typescript
-type Query = z.infer<typeof scenarioCanaryQuerySchema>; // ../contract/src/platform-health.ts:76
-type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:67
+type Query = z.infer<typeof scenarioCanaryQuerySchema>; // ../contract/src/platform-health.ts:75
+type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:66
 // Response: "forwarded" (inline, src/transport/platform-health-probe.rest.ts:104)
 ```
 
@@ -143,8 +143,8 @@ Authenticated: PLATFORM_HEALTH_API_KEY is the bearer this door compares in const
 Answers at `/api/v1/platform-health`.
 
 ```typescript
-type Query = z.infer<typeof platformHealthQuerySchema>; // ../contract/src/platform-health.ts:59
-type Response = z.infer<typeof platformHealthReportSchema>; // ../contract/src/platform-health.ts:50
+type Query = z.infer<typeof platformHealthQuerySchema>; // ../contract/src/platform-health.ts:58
+type Response = z.infer<typeof platformHealthReportSchema>; // ../contract/src/platform-health.ts:49
 ```
 
 #### `GET /:check` · `getPlatformHealthSubsystem`
@@ -157,8 +157,8 @@ Answers at `/api/v1/platform-health/:check`.
 
 ```typescript
 // Params: z.object({ check: z.string() }) (inline, src/transport/platform-health.rest.ts:50)
-type Query = z.infer<typeof platformHealthQuerySchema>; // ../contract/src/platform-health.ts:59
-type Response = z.infer<typeof platformHealthReportSchema>; // ../contract/src/platform-health.ts:50
+type Query = z.infer<typeof platformHealthQuerySchema>; // ../contract/src/platform-health.ts:58
+type Response = z.infer<typeof platformHealthReportSchema>; // ../contract/src/platform-health.ts:49
 ```
 
 ## tRPC transport
@@ -175,10 +175,10 @@ None: platform-health declares no pipeline, process manager, subscriber or task.
 
 ## Configuration
 
-| Kind   | Leaf            | Environment variable            | Declared at                              |
-| ------ | --------------- | ------------------------------- | ---------------------------------------- |
-| secret | `probeApiKey`   | `PLATFORM_HEALTH_PROBE_API_KEY` | `src/app/platform-health.app.ts:61`      |
-| secret | `apiKey`        | `PLATFORM_HEALTH_API_KEY`       | `src/app/platform-health.app.ts:62`      |
-| config | `publicBaseUrl` | `BASE_HOST`                     | `../contract/src/platform-health.ts:106` |
+| Kind   | Leaf            | Environment variable            | Declared at                                   |
+| ------ | --------------- | ------------------------------- | --------------------------------------------- |
+| secret | `probeApiKey`   | `PLATFORM_HEALTH_PROBE_API_KEY` | `src/app/platform-health.app.ts:61`           |
+| secret | `apiKey`        | `PLATFORM_HEALTH_API_KEY`       | `src/app/platform-health.app.ts:62`           |
+| config | `publicBaseUrl` | `BASE_HOST`                     | `../contract/src/platform-health.config.ts:4` |
 
 <!-- readme:generated:end -->

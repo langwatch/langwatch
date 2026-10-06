@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Portable User use cases exposed to process peers and transports.
 
-Peers call these through the token, declared at `../contract/src/user.api.ts:84`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/user.api.ts:83`; nothing else in this package is public.
 
 #### `findById`
 
@@ -572,8 +572,8 @@ Declared at `src/eventing/user-lifecycle.pipeline.ts:23`. Events: `userDeactivat
 
 ## Configuration
 
-| Kind   | Leaf            | Environment variable | Declared at                       |
-| ------ | --------------- | -------------------- | --------------------------------- |
-| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/user.api.ts:224` |
+| Kind   | Leaf            | Environment variable | Declared at                        |
+| ------ | --------------- | -------------------- | ---------------------------------- |
+| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/user.config.ts:6` |
 
 <!-- readme:generated:end -->
