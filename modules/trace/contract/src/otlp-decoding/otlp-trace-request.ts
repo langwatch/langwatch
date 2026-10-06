@@ -1,22 +1,28 @@
 import { TraceState } from "@opentelemetry/core";
-import {
-  ESpanKind,
-  type EStatusCode,
-} from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types.js";
 import { match } from "ts-pattern";
 
-import { normalizeOtlpId } from "../rules/otlp-span-identity.rules.ts";
-import { OtlpAttributeFlatteningService } from "./otlp-attribute-flattening.service.ts";
-
-const { parseJsonStringValues, reconstructFlattenedArrays } = OtlpAttributeFlatteningService;
+import type { OtlpAnyValue, OtlpKeyValue, OtlpSpan } from "../trace.otlp.ts";
 import {
-  type OtlpAnyValue,
-  type OtlpKeyValue,
-  type OtlpSpan,
   type NormalizedAttributes,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "@langwatch/trace-contract";
+} from "../trace.spans.ts";
+import { OtlpAttributeFlatteningService } from "./otlp-attribute-flattening.ts";
+import { normalizeOtlpId } from "./otlp-span-identity.ts";
+
+const { parseJsonStringValues, reconstructFlattenedArrays } = OtlpAttributeFlatteningService;
+
+/** OTLP's numeric span kinds, inlined from the OTLP transformer's `ESpanKind`. */
+const ESpanKind = {
+  SPAN_KIND_UNSPECIFIED: 0,
+  SPAN_KIND_INTERNAL: 1,
+  SPAN_KIND_SERVER: 2,
+  SPAN_KIND_CLIENT: 3,
+  SPAN_KIND_PRODUCER: 4,
+  SPAN_KIND_CONSUMER: 5,
+} as const;
+type ESpanKind = (typeof ESpanKind)[keyof typeof ESpanKind];
+type EStatusCode = 0 | 1 | 2;
 
 const TRACE_FLAGS_MASK = 0xff as const; // bits 0–7
 const TRACE_FLAGS_IS_REMOTE_MASK = 1 << 8; // bit 8

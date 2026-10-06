@@ -54,11 +54,6 @@ function consumer({ resolveDeferredOrigin }: Pick<Reactions, "resolveDeferredOri
     traceUpdateBroadcast: noop,
     projectMetadata: noop,
     experimentMetricsSync: noop,
-    codingAgentSpanFactsDispatch: {
-      name: "codingAgentSpanFactsDispatch",
-      eventTypes: [],
-      handle: noop,
-    },
     spanStorageBroadcast: noop,
     broadcastDisabled: false,
   });

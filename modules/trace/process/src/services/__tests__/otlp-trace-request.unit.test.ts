@@ -1,7 +1,6 @@
 import type { OtlpAnyValue } from "@langwatch/trace-contract";
+import { OtlpTraceRequestService } from "@langwatch/trace-contract/otlp-decoding";
 import { describe, expect, it } from "vitest";
-
-import { OtlpTraceRequestService } from "../otlp-trace-request.service.ts";
 
 describe("traceRequest.utils", () => {
   describe("normalizeOtlpAttributes()", () => {

@@ -244,7 +244,7 @@ describe("the worker process installation", () => {
   });
 
   /** @scenario "The worker forwards coding-agent spans, logs and metric points to coding-agent" */
-  it("hosts the span dispatch on trace and coding-agent's log and metric peer lanes", async () => {
+  it("hosts coding-agent's span, log and metric peer lanes on coding-agent, none on trace", async () => {
     const { runtime, eventing } = await bootWorker();
 
     try {
@@ -255,13 +255,14 @@ describe("the worker process installation", () => {
         ...(byName
           .get("trace_processing")
           ?.open((definition) => [...definition.eventSubscribers.keys()]) ?? []),
-      ]).toContain("codingAgentSpanFactsDispatch");
+      ]).not.toContain("codingAgentSpanFactsDispatch");
       expect(
         byName
           .get("coding_agent_processing")
           ?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
       ).toEqual(
         expect.arrayContaining([
+          "coding_agent_processing.codingAgentSpanFactsDispatch",
           "coding_agent_processing.codingAgentLogFactsDispatch",
           "coding_agent_processing.codingAgentMetricFactsDispatch",
         ]),

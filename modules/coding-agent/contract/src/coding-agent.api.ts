@@ -2,7 +2,6 @@ import { moduleApi } from "@langwatch/module";
 import type { TraceSessionGroupsInput, TracesSessionsPage } from "@langwatch/trace-contract";
 
 import type { ContributeSpanFactsCommandData } from "./coding-agent-processing.events.ts";
-import type { CodingAgentReceivedSpan } from "./coding-agent-span-admission.ts";
 import type {
   CodingAgentTracePullRequestInput,
   CodingAgentTracePullRequestLink,
@@ -97,8 +96,6 @@ export interface CodingAgentApi {
   ): Promise<CodingAgentSessionListRow[]>;
   /** Queues one span's bounded session facts onto coding_agent_processing (ADR-056/069). */
   contributeSpanFacts(data: ContributeSpanFactsCommandData): Promise<void>;
-  /** Derives a received span's session facts and contributes them, as main's dispatch did. */
-  contributeReceivedSpan(input: CodingAgentReceivedSpan): Promise<void>;
   /** The Sessions lens (main's `traces.sessions`): trace's page for the viewer, enriched here. */
   readSessionGroupsForViewer(
     input: TraceSessionGroupsInput & { viewerUserId: string },

@@ -1,6 +1,5 @@
 import { AnnotationApi } from "@langwatch/annotation-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -75,7 +74,6 @@ function unreachablePeers() {
   for (const token of [
     AnnotationApi,
     AuthzApi,
-    CodingAgentApi,
     DataPrivacyApi,
     DataRetentionApi,
     EntitlementApi,
@@ -92,7 +90,6 @@ function unreachablePeers() {
   return {
     annotations: apis.reference(AnnotationApi),
     authz: apis.reference(AuthzApi),
-    codingAgents: apis.reference(CodingAgentApi),
     dataPrivacy: apis.reference(DataPrivacyApi),
     dataRetention: apis.reference(DataRetentionApi),
     plans: apis.reference(EntitlementApi),

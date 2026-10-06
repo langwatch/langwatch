@@ -27,7 +27,6 @@ import {
   type CodingAgentTranscript,
   codingAgentTranscriptSchema,
   type ContributeSpanFactsCommandData,
-  type CodingAgentReceivedSpan,
   type CodingAgentSessionEventsPage,
   type CodingAgentSessionEventsPageInput,
 } from "@langwatch/coding-agent-contract";
@@ -60,7 +59,6 @@ import {
   encodeSessionCursor,
   readSessionCursor,
 } from "../rules/coding-agent-session-cursor.rules.ts";
-import { liftSpanContribution } from "../rules/coding-agent-span-facts.rules.ts";
 import { CodingAgentCallerScopeService } from "../services/coding-agent-caller-scope.service.ts";
 import { SystemCodingAgentClockService } from "../services/coding-agent-clock.service.ts";
 import { CodingAgentCommandDispatcherService } from "../services/coding-agent-command-dispatcher.service.ts";
@@ -281,10 +279,6 @@ export class CodingAgentModule implements CodingAgentApi {
 
   contributeSpanFacts(data: ContributeSpanFactsCommandData): Promise<void> {
     return this.#commands.contributeSpanFacts(data);
-  }
-
-  contributeReceivedSpan(input: CodingAgentReceivedSpan): Promise<void> {
-    return this.contributeSpanFacts(liftSpanContribution(input));
   }
 
   findBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null> {

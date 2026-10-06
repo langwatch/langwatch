@@ -34,9 +34,8 @@ function receiver({
   collected = { outcome: "collected", acceptedDataPoints: 1, rejectedDataPoints: 0 },
   keyless = false,
 }: { collected?: MetricRequestCollectionResult; keyless?: boolean } = {}) {
-  const calls: { markedUsed: string[]; reported: number; collectedFor: string[] } = {
+  const calls: { markedUsed: string[]; collectedFor: string[] } = {
     markedUsed: [],
-    reported: 0,
     collectedFor: [],
   };
   const traces = createApiFixture<TraceApi>({
@@ -54,7 +53,6 @@ function receiver({
     },
     otlpUsageLimit: async () => {},
     otlpMarkCredentialUsed: ({ apiKeyId }) => void calls.markedUsed.push(apiKeyId),
-    otlpReportError: () => void calls.reported++,
   });
   const service = OtlpMetricReceiverService.create({
     traces,
@@ -83,7 +81,7 @@ describe("OtlpMetricReceiverService", () => {
       const { post, calls } = receiver();
 
       await expect(post("/api/otel/v1/metrics")).resolves.toEqual({ status: 200, body: {} });
-      expect(calls).toEqual({ markedUsed: ["key-1"], reported: 0, collectedFor: ["project-1"] });
+      expect(calls).toEqual({ markedUsed: ["key-1"], collectedFor: ["project-1"] });
     });
 
     /** @scenario "A metrics suffix under a traces base is metric ingestion" */
@@ -150,7 +148,7 @@ describe("OtlpMetricReceiverService", () => {
         status: 400,
         body: { error: "Failed to parse metrics" },
       });
-      expect(calls).toEqual({ markedUsed: [], reported: 0, collectedFor: [] });
+      expect(calls).toEqual({ markedUsed: [], collectedFor: [] });
     });
   });
 

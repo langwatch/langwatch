@@ -62,7 +62,6 @@ const PINO_WARN = 40;
 const PINO_ERROR = 50;
 
 function mount() {
-  const reportError = vi.fn();
   const traces = createApiFixture<TraceApi>({
     otlpCredential: async () => ({
       project: { id: "project-123", teamId: "team-1", organizationId: "organization-1" },
@@ -74,7 +73,6 @@ function mount() {
       },
     }),
     otlpUsageLimit: async () => {},
-    otlpReportError: reportError,
   });
   const receiver = OtlpLogReceiverService.create({
     traces,
@@ -104,7 +102,7 @@ function mount() {
       body: "{not json",
     });
 
-  return { postMalformed, reportError };
+  return { postMalformed };
 }
 
 const parseWarnings = () =>
@@ -119,7 +117,7 @@ describe("the OTLP logs receiver", () => {
   describe("when a project sends a malformed body", () => {
     /** @scenario "A malformed logs body is treated as the client's error" */
     it("answers 400, warns once as the client's fault, logs no error and reports nothing", async () => {
-      const { postMalformed, reportError } = mount();
+      const { postMalformed } = mount();
 
       const response = await postMalformed();
 
@@ -131,7 +129,6 @@ describe("the OTLP logs receiver", () => {
         expect.objectContaining({ handledErrorFault: "customer", projectId: "project-123" }),
       ]);
       expect(receiverLog.lines.filter((line) => line.level === PINO_ERROR)).toEqual([]);
-      expect(reportError).not.toHaveBeenCalled();
     });
 
     /** @scenario "A malformed body leaves the ingest span status unset and records the customer fault" */

@@ -25,9 +25,8 @@ function receiver({
   collected = { outcome: "collected", acceptedLogRecords: 1, rejectedLogRecords: 0 },
   keyless = false,
 }: { collected?: LogRequestCollectionResult; keyless?: boolean } = {}) {
-  const calls: { markedUsed: string[]; reported: number; collectedFor: string[] } = {
+  const calls: { markedUsed: string[]; collectedFor: string[] } = {
     markedUsed: [],
-    reported: 0,
     collectedFor: [],
   };
   const traces = createApiFixture<TraceApi>({
@@ -45,7 +44,6 @@ function receiver({
     },
     otlpUsageLimit: async () => {},
     otlpMarkCredentialUsed: ({ apiKeyId }) => void calls.markedUsed.push(apiKeyId),
-    otlpReportError: () => void calls.reported++,
   });
   const service = OtlpLogReceiverService.create({
     traces,
@@ -74,7 +72,7 @@ describe("OtlpLogReceiverService", () => {
       const { post, calls } = receiver();
 
       await expect(post("/api/otel/v1/logs")).resolves.toEqual({ status: 200, body: {} });
-      expect(calls).toEqual({ markedUsed: ["key-1"], reported: 0, collectedFor: ["project-1"] });
+      expect(calls).toEqual({ markedUsed: ["key-1"], collectedFor: ["project-1"] });
     });
 
     it("serves a logs suffix appended to a traces base as log ingestion", async () => {
@@ -137,7 +135,7 @@ describe("OtlpLogReceiverService", () => {
         status: 400,
         body: { error: "Failed to parse logs" },
       });
-      expect(calls).toEqual({ markedUsed: [], reported: 0, collectedFor: [] });
+      expect(calls).toEqual({ markedUsed: [], collectedFor: [] });
     });
   });
 

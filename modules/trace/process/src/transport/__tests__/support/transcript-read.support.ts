@@ -1,6 +1,5 @@
 // Real implementations everywhere; only the two stores are mocked.
 
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import {
   CONTENT_KEY_CATALOG,
   PRIVACY_DROPPED_MARKER_ATTR,
@@ -27,14 +26,10 @@ import type { TracesReadMembers } from "../../../services/trace-transcript-read.
 import type { TraceViewerProtectionService } from "../../../services/trace-viewer-protection.service.ts";
 
 // Real TraceModule required: readSpans decides tenant key and visibility cutoff.
-export function createTranscriptApp(
-  codingAgents: CodingAgentApi,
-  protections?: Partial<TraceViewerProtectionService>,
-) {
+export function createTranscriptApp(protections?: Partial<TraceViewerProtectionService>) {
   const getSpansByTraceId = vi.fn<TracesSpanReader["getSpansByTraceId"]>();
   const getLogsByTraceId = vi.fn<TraceLogRecordReader["getLogsByTraceId"]>();
   const app = createTraceAppHarness({
-    codingAgents,
     ...(protections
       ? { protections: createApiFixture<TraceViewerProtectionService>(protections, "protections") }
       : {}),

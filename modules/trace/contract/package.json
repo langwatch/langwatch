@@ -18,6 +18,10 @@
       "types": "./dist/conversation/index.d.ts",
       "default": "./src/conversation/index.ts"
     },
+    "./otlp-decoding": {
+      "types": "./dist/otlp-decoding/index.d.ts",
+      "default": "./src/otlp-decoding/index.ts"
+    },
     "./transcript": {
       "types": "./dist/transcript/index.d.ts",
       "default": "./src/transcript/index.ts"

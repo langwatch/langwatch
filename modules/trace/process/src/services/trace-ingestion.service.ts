@@ -12,6 +12,7 @@ import {
   type PIIRedactionLevel,
   type RecordSpanCommandData,
 } from "@langwatch/trace-contract";
+import { normalizeOtlpId } from "@langwatch/trace-contract/otlp-decoding";
 import { SpanKind as ApiSpanKind, type Span as OtelSpan } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
@@ -22,7 +23,6 @@ import {
   stampCodexHelperThread,
   type ScopedSpans,
 } from "../rules/codex-helper-thread.rules.ts";
-import { normalizeOtlpId } from "../rules/otlp-span-identity.rules.ts";
 import { storableSpanTimesOf, type UnstorableSpanTime } from "../rules/storable-span-time.rules.ts";
 import { TraceIngestionMetricsService } from "./trace-ingestion-metrics.service.ts";
 
@@ -123,20 +123,20 @@ export class TraceIngestionService {
   private readonly outcomeMetrics = TraceIngestionMetricsService.create();
 
   private constructor(
-    private readonly codingAgents: CodingAgentIngestFilter,
+    private readonly codingAgentFilter: CodingAgentIngestFilter,
     private readonly codingAgentSpanFilterEnabled: boolean,
     private readonly collection: TraceSpanCollectionService,
   ) {}
 
   static create(options: {
-    codingAgents: CodingAgentIngestFilter;
+    codingAgentFilter: CodingAgentIngestFilter;
     codingAgentSpanFilterEnabled: boolean;
     dedup: TraceSpanDedupRepository;
     commands: TraceIngressCommand;
     payloads?: TraceIngressPayload;
   }): TraceIngestionService {
     return new TraceIngestionService(
-      options.codingAgents,
+      options.codingAgentFilter,
       options.codingAgentSpanFilterEnabled,
       TraceSpanCollectionService.create({
         dedup: options.dedup,
@@ -281,7 +281,7 @@ export class TraceIngestionService {
 
     const isFilteredCodingAgentSpan =
       this.codingAgentSpanFilterEnabled &&
-      this.codingAgents.shouldFilterSpan({
+      this.codingAgentFilter.shouldFilterSpan({
         scopeName: input.scope?.name,
         spanName: span.name,
         attributeKeys: span.attributes.map((attribute) => attribute.key),

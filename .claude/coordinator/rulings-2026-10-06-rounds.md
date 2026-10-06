@@ -126,3 +126,10 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Upgrading (U1-b): RUN stands in until the lease table lands
 - Reader wire (U1-c): USE HandledError now; packages/upgrade takes the handled-error dependency (not the recommended plain error)
 - Refused run (S3-REFUSED-RUN): RECORD a refused upgrade as a failed run with report.refused
+
+## Round 18 (C, S3-IMAGE, held:67 (ledger widening), U3-a, U3-b)
+
+- Image ver (S3-IMAGE): NEWEST manifest
+- DB clock (mig-ledger-widen): DATABASE clock
+- Checkup row (U3-a): NEW code checkup_clickhouse_migration_failed (not the recommended reuse)
+- Doctor (U3-b): RUN the task; status unavailable leaves the exit code alone

@@ -1,4 +1,3 @@
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
@@ -23,7 +22,6 @@ import { TraceMediaReferenceService } from "../services/trace-media-reference.se
 import { TraceModelCostService } from "../services/trace-model-cost.service.ts";
 import type { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
 import { TraceSpanNormalizationAdapterService } from "../services/trace-span-normalization-adapter.service.ts";
-import { createCodingAgentSpanFactsDispatchSubscriber } from "./coding-agent-span-facts-dispatch.subscriber.ts";
 import { createCustomEvaluationSyncHandler } from "./custom-evaluation-sync.subscriber.ts";
 import { createDeferredOriginHandler } from "./deferred-origin.subscriber.ts";
 import { createEvaluationTriggerSubscriber } from "./evaluation-trigger.subscriber.ts";
@@ -50,7 +48,6 @@ import {
 } from "./tracked-event-sync.subscriber.ts";
 
 interface TraceProcessingPeers {
-  codingAgents: Pick<CodingAgentApi, "contributeReceivedSpan">;
   dataPrivacy: Pick<DataPrivacyApi, "redactSpan" | "dropSpanContent">;
   dataRetention: Pick<
     DataRetentionApi,
@@ -172,7 +169,6 @@ export class TraceProcessingRuntimeAdapter {
 
   #reactions(): Parameters<typeof buildTraceProcessingConsumer>[1] {
     const { peers, commands } = this.input;
-    const normalization = TraceSpanNormalizationAdapterService.create(this.input.canonicalisation);
     const resolveOrigin = createDeferredOriginHandler((data) => commands.resolveOrigin(data));
     return {
       resolveDeferredOrigin: async ({ tenantId, traceId }) => {
@@ -205,16 +201,6 @@ export class TraceProcessingRuntimeAdapter {
           const found = await peers.experiments.lookupExperimentId({ tenantId, runId });
           return found.kind === "recorded" ? found.experimentId : null;
         },
-      }),
-      codingAgentSpanFactsDispatch: createCodingAgentSpanFactsDispatchSubscriber({
-        normalize: (event) =>
-          normalization.normalizeSpanReceived({
-            tenantId: String(event.tenantId),
-            span: event.data.span,
-            resource: event.data.resource,
-            instrumentationScope: event.data.instrumentationScope,
-          }),
-        contributeReceivedSpan: (input) => peers.codingAgents.contributeReceivedSpan(input),
       }),
       spanStorageBroadcast: createSpanStorageBroadcastHandler({ broadcast: this.input.broadcast }),
       broadcastDisabled: false,

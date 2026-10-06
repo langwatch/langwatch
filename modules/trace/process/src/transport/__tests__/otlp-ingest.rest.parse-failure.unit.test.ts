@@ -70,11 +70,9 @@ const CREDENTIAL: OtlpIngestCredential = {
 };
 
 function mount() {
-  const reportError = vi.fn();
   const app = createApiFixture<TraceApi>({
     otlpCredential: async () => CREDENTIAL,
     otlpUsageLimit: async () => {},
-    otlpReportError: reportError,
   });
   const hono = createRestRuntime({
     identity: {
@@ -97,7 +95,7 @@ function mount() {
       body: "{not json",
     });
 
-  return { postMalformed, reportError };
+  return { postMalformed };
 }
 
 const parseWarnings = () =>
@@ -112,7 +110,7 @@ describe("the OTLP traces receiver", () => {
   describe("when a project sends a malformed body", () => {
     /** @scenario "A malformed traces body is treated as the client's error" */
     it("answers 400, warns once as the client's fault, logs no error and reports nothing", async () => {
-      const { postMalformed, reportError } = mount();
+      const { postMalformed } = mount();
 
       const response = await postMalformed();
 
@@ -124,7 +122,6 @@ describe("the OTLP traces receiver", () => {
         expect.objectContaining({ handledErrorFault: "customer", projectId: "project-123" }),
       ]);
       expect(doorLog.lines.filter((line) => line.level === PINO_ERROR)).toEqual([]);
-      expect(reportError).not.toHaveBeenCalled();
     });
 
     /** @scenario "A malformed body leaves the ingest span status unset and records the customer fault" */

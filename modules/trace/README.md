@@ -11,7 +11,7 @@ Traces: ingestion and canonicalisation of spans, the projections built from them
 | Classification | core (`modules/catalogue.json`)                                                                 |
 | Subjects       | trace, trace-ingestion                                                                          |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                        |
-| Api token      | `TraceApi` = `moduleApi<TraceApi>()("trace")`, `contract/src/trace.api.ts:855` (138 operations) |
+| Api token      | `TraceApi` = `moduleApi<TraceApi>()("trace")`, `contract/src/trace.api.ts:861` (139 operations) |
 | Other token    | `CollectorApi`, `process/src/transport/collector.rest.ts:94`                                    |
 | Other token    | `TrackedEventApi`, `process/src/transport/tracked-event.rest.ts:41`                             |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                      |
@@ -37,7 +37,6 @@ Anything else trace needs belongs to another module and is reached through its `
 | `annotations`    | `AnnotationApi`    | [annotation](../annotation/README.md)         |
 | `apiKeys`        | `ApiKeyApi`        | [api-key](../api-key/README.md)               |
 | `authz`          | `AuthzApi`         | [authz](../authz/README.md)                   |
-| `codingAgents`   | `CodingAgentApi`   | [coding-agent](../coding-agent/README.md)     |
 | `dataPrivacy`    | `DataPrivacyApi`   | [data-privacy](../data-privacy/README.md)     |
 | `dataRetention`  | `DataRetentionApi` | [data-retention](../data-retention/README.md) |
 | `evaluations`    | `EvaluationApi`    | [evaluation](../evaluation/README.md)         |

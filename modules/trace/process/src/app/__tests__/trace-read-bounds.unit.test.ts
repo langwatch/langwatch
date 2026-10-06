@@ -76,7 +76,6 @@ function harness(tier: "free" | "paid" | "enterprise") {
       cleanupTenantEmitter: () => undefined,
     },
     evaluations: {} as never,
-    codingAgents: {} as never,
     share: {} as never,
     projects: {
       getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,

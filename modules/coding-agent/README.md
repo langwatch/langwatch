@@ -11,7 +11,7 @@ Coding-agent observability: sessions built from coding-agent traces, their trans
 | Classification | core (`modules/catalogue.json`)                                                                                          |
 | Subjects       | coding-agent                                                                                                             |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                                 |
-| Api token      | `CodingAgentApi` = `moduleApi<CodingAgentApi>()("coding-agent")`, `contract/src/coding-agent.api.ts:149` (22 operations) |
+| Api token      | `CodingAgentApi` = `moduleApi<CodingAgentApi>()("coding-agent")`, `contract/src/coding-agent.api.ts:146` (21 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                               |
 
 ## What coding-agent owns
@@ -43,6 +43,6 @@ Anything else coding-agent needs belongs to another module and is reached throug
 
 ## Who depends on coding-agent
 
-[github](../github/README.md), [ops](../ops/README.md), [trace](../trace/README.md) (as a peer).
+[github](../github/README.md), [ops](../ops/README.md) (as a peer).
 
 <!-- readme:generated:end -->

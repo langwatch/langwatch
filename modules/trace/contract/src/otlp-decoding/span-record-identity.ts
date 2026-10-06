@@ -1,14 +1,14 @@
 import { createHash } from "crypto";
 
-import { EventUtils } from "@langwatch/eventing";
 import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
-import type { SpanReceivedEvent } from "@langwatch/trace-contract";
 
+import type { SpanReceivedEvent } from "../trace-ingress.events.ts";
 import {
   convertUnixNanoToUnixMs,
   normalizeOtlpUnixNano,
-} from "../rules/otlp-span-identity.rules.ts";
-import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
+  checkTenantIsolation,
+} from "./otlp-span-identity.ts";
+import { OtlpTraceRequestService } from "./otlp-trace-request.ts";
 
 /**
  * KSUID resource prefixes for the two identifiers this module mints. The
@@ -92,7 +92,7 @@ export class SpanRecordIdentityService {
     spanId: string;
     startTimeUnixMs: number;
   }): string {
-    EventUtils.validateTenantId({ tenantId }, "generateDeterministicSpanRecordIdFromData");
+    checkTenantIsolation({ tenantId, operation: "generateDeterministicSpanRecordIdFromData" });
 
     return this.makeDeterministicKsuid({
       hashKey: `${tenantId}:${traceId}:${spanId}`,
@@ -119,7 +119,7 @@ export class SpanRecordIdentityService {
     traceId: string,
     startTimeUnixMs: number,
   ): string {
-    EventUtils.validateTenantId({ tenantId }, "generateDeterministicTraceSummaryIdFromData");
+    checkTenantIsolation({ tenantId, operation: "generateDeterministicTraceSummaryIdFromData" });
 
     return this.makeDeterministicKsuid({
       hashKey: `${tenantId}:${traceId}`,

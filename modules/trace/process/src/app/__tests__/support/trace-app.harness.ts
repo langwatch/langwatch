@@ -23,7 +23,6 @@ export function createTraceAppHarness({
       "spanCostSuggestions",
     ),
     evaluations: createApiFixture<TraceAppDependencies["evaluations"]>({}, "evaluations"),
-    codingAgents: createApiFixture<TraceAppDependencies["codingAgents"]>({}, "codingAgents"),
     share: createApiFixture<TraceAppDependencies["share"]>({}, "share"),
     projects: createApiFixture<TraceAppDependencies["projects"]>({}, "projects"),
     requestBounds: createApiFixture<TraceAppDependencies["requestBounds"]>({}, "requestBounds"),

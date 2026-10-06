@@ -1,7 +1,6 @@
 import {
   defineEventingModule,
   throttledWindow,
-  type EventSubscriberDefinition,
   type EventingSetup,
   type TriggerContext,
 } from "@langwatch/eventing";
@@ -62,7 +61,6 @@ interface TraceProcessingReactions {
   traceUpdateBroadcast: SummaryHandler;
   projectMetadata: SummaryHandler;
   experimentMetricsSync: SummaryHandler;
-  codingAgentSpanFactsDispatch: EventSubscriberDefinition<TraceProcessingEvent>;
   spanStorageBroadcast: (
     event: TraceProcessingEvent,
     context: TriggerContext<unknown>,
@@ -135,10 +133,6 @@ export function buildTraceProcessingConsumer(
       ttl: EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
       handler: (event, context) => reactions.experimentMetricsSync(event, context),
     })
-    .withEventSubscriber(
-      reactions.codingAgentSpanFactsDispatch.name,
-      reactions.codingAgentSpanFactsDispatch,
-    )
     .withProjectionSubscriber("spanStorageBroadcast", {
       map: "spanStorage",
       runIn: ["worker"],

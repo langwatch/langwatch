@@ -5,7 +5,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { openProtections } from "../../repositories/clickhouse/__tests__/open-protections.ts";
-import { TestCodingAgentService } from "../../services/__tests__/support/coding-agent.service.fake.ts";
 import { createTranscriptApp } from "../../transport/__tests__/support/transcript-read.support.ts";
 
 const PROJECT_ID = "project_test";
@@ -17,10 +16,7 @@ describe("TraceModule.readCodingAgentTranscript", () => {
     /** @scenario "The transcript is redacted by the viewer's own protections" */
     it("resolves that viewer's protections and reads spans inside the window", async () => {
       const resolve = vi.fn(async () => ({ ...openProtections, visibilityCutoffMs: CUTOFF_MS }));
-      const { app, getSpansByTraceId, getLogsByTraceId } = createTranscriptApp(
-        new TestCodingAgentService(),
-        { resolve },
-      );
+      const { app, getSpansByTraceId, getLogsByTraceId } = createTranscriptApp({ resolve });
       getSpansByTraceId.mockResolvedValue([]);
       getLogsByTraceId.mockResolvedValue([]);
 
@@ -45,10 +41,9 @@ describe("TraceModule.readCodingAgentTranscript", () => {
   describe("given the log records of a trace", () => {
     /** @scenario "the transcript is derived from the canonical log read the trace module is composed with" */
     it("reads them from the composed log read, for the project and trace asked", async () => {
-      const { app, getSpansByTraceId, getLogsByTraceId } = createTranscriptApp(
-        new TestCodingAgentService(),
-        { resolve: async () => openProtections },
-      );
+      const { app, getSpansByTraceId, getLogsByTraceId } = createTranscriptApp({
+        resolve: async () => openProtections,
+      });
       getSpansByTraceId.mockResolvedValue([]);
       getLogsByTraceId.mockResolvedValue([]);
 

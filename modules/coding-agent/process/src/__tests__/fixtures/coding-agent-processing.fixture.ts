@@ -295,6 +295,7 @@ export class TestModelProviderService implements ModelProviderApi {
 
 /** The log and metric reactions, inert unless a test hands its own. */
 export const inertReceivedFacts: CodingAgentProcessingPipelineDeps["receivedFacts"] = {
+  contributeReceivedSpan: async () => undefined,
   contributeReceivedLogRecord: async () => undefined,
   contributeReceivedMetricPoint: async () => undefined,
 };

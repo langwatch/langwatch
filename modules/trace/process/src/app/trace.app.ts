@@ -8,7 +8,6 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { PrincipalRef } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
-  CodingAgentApi,
   type CodingAgentTranscript,
   shouldFilterCodingAgentSpan,
 } from "@langwatch/coding-agent-contract";
@@ -155,6 +154,8 @@ import {
   type AssignTopicCommandData,
   type CanonicalizeLogRecordInput,
   type CanonicalizeLogRecordResult,
+  type CanonicalizeSpanAttributesInput,
+  type CanonicalizeSpanAttributesResult,
   type ClassifyClaudeCallInput,
   type ClassifyClaudeCallResult,
   type LogRecordReceivedEventData,
@@ -683,7 +684,6 @@ export interface TraceAppDependencies {
   instantEvals?: InstantEvalApi;
   /** The AI search composer's model seam; absent, the three AI operations refuse by name. */
   models?: Pick<ModelProviderApi, "generateText" | "generateStructured">;
-  codingAgents: CodingAgentApi;
   presence?: PresenceApi;
   share: ShareApi;
   projects: ProjectApi;
@@ -798,7 +798,6 @@ type TraceReaderCompositionOptions = {
   evaluations: TraceAppDependencies["evaluations"];
   /** The Instant Eval peer the Explorer's judged searches run through. */
   instantEvals?: TraceAppDependencies["instantEvals"];
-  codingAgents: TraceAppDependencies["codingAgents"];
   storedObjects: TraceAppDependencies["storedObjects"];
   /**
    * Gates the edge media hook (`release_trace_media_extraction`). Absent, the
@@ -856,7 +855,6 @@ export class TraceModule implements TraceApi, CollectorApp {
      */
     apiKeys: ApiKeyApi,
     authz: AuthzApi,
-    codingAgents: CodingAgentApi,
     dataPrivacy: DataPrivacyApi,
     dataRetention: DataRetentionApi,
     plans: EntitlementApi,
@@ -1084,7 +1082,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       // command sender across both, so a span posted to `/api/collector` and the
       // same span exported over OTLP are one record, not two.
       ingestion: TraceIngestionService.create({
-        codingAgents: options.ingestCodingAgents ?? {
+        codingAgentFilter: options.ingestCodingAgents ?? {
           shouldFilterSpan: shouldFilterCodingAgentSpan,
         },
         codingAgentSpanFilterEnabled: CODING_AGENT_SPAN_FILTER_ENABLED,
@@ -1111,7 +1109,6 @@ export class TraceModule implements TraceApi, CollectorApp {
       }),
       evaluations: options.evaluations,
       ...(options.instantEvals ? { instantEvals: options.instantEvals } : {}),
-      codingAgents: options.codingAgents,
       storedObjects: options.storedObjects,
       ...(options.presence ? { presence: options.presence } : {}),
       share: options.share,
@@ -2034,6 +2031,12 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   canonicalizeLogRecord(input: CanonicalizeLogRecordInput): CanonicalizeLogRecordResult {
     return this.#dependencies.traces.canonicalisation.canonicalizeLogRecord(input);
+  }
+
+  canonicalizeSpanAttributes(
+    input: CanonicalizeSpanAttributesInput,
+  ): CanonicalizeSpanAttributesResult {
+    return this.#dependencies.traces.canonicalisation.canonicalizeSpanAttributes(input);
   }
 
   extractLogRecordIO(input: LogRecordReceivedEventData): {
@@ -3465,17 +3468,6 @@ export class TraceModule implements TraceApi, CollectorApp {
     return ingestion
       .handleOtlpTraceRequest(input.tenantId, input.traceRequest, DEFAULT_PII_REDACTION_LEVEL)
       .then((result) => result ?? {});
-  }
-
-  /** A failure the receiver answered but did not raise. */
-  otlpReportError(
-    error: Error,
-    context: Readonly<{ projectId: string; customerTraceIds: string[] }>,
-  ): void {
-    logger.error(
-      { error, projectId: context.projectId, customerTraceIds: context.customerTraceIds },
-      "the OTLP receiver answered a failure",
-    );
   }
 }
 

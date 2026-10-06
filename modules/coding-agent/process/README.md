@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`CodingAgentApi`)
 
-Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:63`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:62`; nothing else in this package is public.
 
 #### `findBySessionId`
 
@@ -84,14 +84,6 @@ Queues one span's bounded session facts onto coding_agent_processing (ADR-056/06
 
 ```typescript
 contributeSpanFacts(data: ContributeSpanFactsCommandData): Promise<void>;
-```
-
-#### `contributeReceivedSpan`
-
-Derives a received span's session facts and contributes them, as main's dispatch did.
-
-```typescript
-contributeReceivedSpan(input: CodingAgentReceivedSpan): Promise<void>;
 ```
 
 #### `readSessionGroupsForViewer`
@@ -255,21 +247,22 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `coding_agent_processing` (aggregate `coding_agent_session`)
 
-Declared at `src/eventing/coding-agent-processing.pipeline.ts:115`. Events: `spanFactsContributedEventSchema`, `logFactsContributedEventSchema`, `metricFactsContributedEventSchema`.
+Declared at `src/eventing/coding-agent-processing.pipeline.ts:131`. Events: `spanFactsContributedEventSchema`, `logFactsContributedEventSchema`, `metricFactsContributedEventSchema`.
 
 | Kind                       | Name                                                                                           | Handles                                                                   | Declared at                                            |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------ |
-| command                    | –                                                                                              | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:192` |
-| command                    | –                                                                                              | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:198` |
-| command                    | –                                                                                              | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:204` |
-| subscriber                 | `codingAgentCostDrift`                                                                         | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:157` |
-| peer subscriber            | `codingAgentLogFactsDispatch`                                                                  | `lw.obs.log.record_received` from [log](../../log/README.md)              | `src/eventing/coding-agent-processing.pipeline.ts:165` |
-| peer subscriber            | `codingAgentMetricFactsDispatch`                                                               | `lw.obs.metric.data_point_received` from [metric](../../metric/README.md) | `src/eventing/coding-agent-processing.pipeline.ts:177` |
-| ClickHouse fold projection | `≈ CodingAgentSessionFoldProjection.create({ store: sessionStore, traceCanonicalisation: dep…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:126` |
-| ClickHouse map projection  | `≈ CodingAgentTraceSessionsMapProjection.create({ store: EventingCodingAgentTraceSessionAppe…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:133` |
-| ClickHouse map projection  | `≈ SessionMetricSeriesMapProjection.create({ store: EventingSessionMetricSeriesAppendService…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:141` |
-| ClickHouse map projection  | `≈ CodingAgentSessionEventsMapProjection.create({ store: EventingCodingAgentSessionEventsApp…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:149` |
-| projection subscriber      | `pullRequestMapping`                                                                           | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:214` |
+| command                    | –                                                                                              | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:228` |
+| command                    | –                                                                                              | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:234` |
+| command                    | –                                                                                              | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:240` |
+| subscriber                 | `codingAgentCostDrift`                                                                         | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:173` |
+| peer subscriber            | `codingAgentSpanFactsDispatch`                                                                 | `lw.obs.trace.span_received` from [trace](../../trace/README.md)          | `src/eventing/coding-agent-processing.pipeline.ts:181` |
+| peer subscriber            | `codingAgentLogFactsDispatch`                                                                  | `lw.obs.log.record_received` from [log](../../log/README.md)              | `src/eventing/coding-agent-processing.pipeline.ts:201` |
+| peer subscriber            | `codingAgentMetricFactsDispatch`                                                               | `lw.obs.metric.data_point_received` from [metric](../../metric/README.md) | `src/eventing/coding-agent-processing.pipeline.ts:213` |
+| ClickHouse fold projection | `≈ CodingAgentSessionFoldProjection.create({ store: sessionStore, traceCanonicalisation: dep…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:142` |
+| ClickHouse map projection  | `≈ CodingAgentTraceSessionsMapProjection.create({ store: EventingCodingAgentTraceSessionAppe…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:149` |
+| ClickHouse map projection  | `≈ SessionMetricSeriesMapProjection.create({ store: EventingSessionMetricSeriesAppendService…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:157` |
+| ClickHouse map projection  | `≈ CodingAgentSessionEventsMapProjection.create({ store: EventingCodingAgentSessionEventsApp…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:165` |
+| projection subscriber      | `pullRequestMapping`                                                                           | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:250` |
 
 ## Configuration
 

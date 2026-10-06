@@ -1,4 +1,5 @@
 import {
+  admitsCodingAgentSpan,
   type CodingAgentProjectionPersistence,
   CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
   type CodingAgentProcessingEvent,
@@ -24,7 +25,13 @@ import {
   canonicalMetricDataPointSchema,
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
 } from "@langwatch/metric-contract";
-import type { TraceApi } from "@langwatch/trace-contract";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  spanReceivedEventDataSchema,
+  type SpanReceivedEventData,
+  type TraceApi,
+} from "@langwatch/trace-contract";
+import { z } from "zod";
 
 import type { CodingAgentModule } from "../app/coding-agent.app.ts";
 import type { CodingAgentSessionFoldCacheRepository } from "../repositories/coding-agent-session-fold-cache.repository.ts";
@@ -57,6 +64,15 @@ import { createPullRequestMappingSubscriber } from "./pull-request-mapping.subsc
 import { SessionMetricSeriesMapProjection } from "./session-metric-series.projection.ts";
 
 const metricPointIdOf = canonicalMetricDataPointSchema.pick({ pointId: true });
+const spanIdOf = z.object({ span: spanReceivedEventDataSchema.shape.span.pick({ spanId: true }) });
+
+/** Only spans a coding agent claims by name and scope mint a job (main's dispatch filter). */
+function isCodingAgentSpan(data: SpanReceivedEventData): boolean {
+  return admitsCodingAgentSpan({
+    name: data.span.name,
+    scopeName: data.instrumentationScope?.name ?? null,
+  });
+}
 
 export interface CodingAgentProcessingPipelineDeps {
   traceCanonicalisation: Pick<TraceApi, "classifyClaudeCall">;
@@ -76,7 +92,7 @@ export interface CodingAgentProcessingPipelineDeps {
   /** Lifts what log and metric received into this pipeline's contribution commands. */
   receivedFacts: Pick<
     CodingAgentReceivedFactsService,
-    "contributeReceivedLogRecord" | "contributeReceivedMetricPoint"
+    "contributeReceivedSpan" | "contributeReceivedLogRecord" | "contributeReceivedMetricPoint"
   >;
 }
 
@@ -162,6 +178,26 @@ export class EventingCodingAgentProcessingAdapter {
           traceCanonicalisation: deps.traceCanonicalisation,
         }),
       )
+      .withPeerSubscriber("codingAgentSpanFactsDispatch", {
+        eventType: SPAN_RECEIVED_EVENT_TYPE,
+        data: spanReceivedEventDataSchema,
+        options: {
+          delay: 2_000,
+          deduplication: {
+            // Span ids are unique only within a trace, so the key carries the trace too.
+            makeId: (event) =>
+              `coding-agent-span-facts:${event.tenantId}:${String(event.aggregateId)}:${spanIdOf.parse(event.data).span.spanId}`,
+            ttlMs: 60_000,
+          },
+          enqueue: { filter: isCodingAgentSpan },
+        },
+        handle: (data, context) =>
+          deps.receivedFacts.contributeReceivedSpan({
+            tenantId: String(context.tenantId),
+            occurredAt: context.occurredAt,
+            data,
+          }),
+      })
       .withPeerSubscriber("codingAgentLogFactsDispatch", {
         eventType: CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
         data: canonicalLogRecordSchema,

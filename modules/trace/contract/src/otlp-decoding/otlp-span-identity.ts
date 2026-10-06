@@ -1,4 +1,8 @@
-import type { Fixed64 } from "@opentelemetry/otlp-transformer-next/build/esm/common/internal-types.js";
+import type { z } from "zod";
+
+import type { fixed64Schema } from "../trace.otlp.ts";
+
+type Fixed64 = z.infer<typeof fixed64Schema>;
 
 export const normalizeOtlpId = (id: string | Uint8Array): string => {
   if (id instanceof Uint8Array) {
@@ -32,4 +36,17 @@ export const normalizeOtlpUnixNano = (value: Fixed64): number => {
 
 export const convertUnixNanoToUnixMs = (unixNano: number): number => {
   return Math.round(unixNano / 1_000_000);
+};
+
+/** Eventing's `validateTenantId` tenant-isolation check, inlined so decoding needs no eventing. */
+export const checkTenantIsolation = ({
+  tenantId,
+  operation,
+}: {
+  tenantId: string | undefined;
+  operation: string;
+}): void => {
+  if (!tenantId || tenantId.trim().length === 0) {
+    throw new Error(`${operation} requires a tenantId for tenant isolation`);
+  }
 };

@@ -83,7 +83,7 @@ function fixture(
   const dedup = new TestTraceSpanDedup();
   const commands = new TestTraceIngressCommand();
   const service = TraceIngestionService.create({
-    codingAgents: options.filterEverything
+    codingAgentFilter: options.filterEverything
       ? filterEverything
       : { shouldFilterSpan: shouldFilterCodingAgentSpan },
     codingAgentSpanFilterEnabled: options.codingAgentSpanFilterEnabled ?? false,
@@ -669,7 +669,7 @@ describe("TraceIngestionService.handleOtlpTraceRequest edge media fail-open seri
         },
       ]);
       const service = TraceIngestionService.create({
-        codingAgents: { shouldFilterSpan: shouldFilterCodingAgentSpan },
+        codingAgentFilter: { shouldFilterSpan: shouldFilterCodingAgentSpan },
         codingAgentSpanFilterEnabled: false,
         dedup: new TestTraceSpanDedup(),
         commands,

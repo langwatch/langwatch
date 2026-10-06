@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Public Trace operations shared by process peers after boot composition.
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:150`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:152`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -877,6 +877,14 @@ Lifts a log record's attributes into Trace's canonical names.
 
 ```typescript
 canonicalizeLogRecord(input: CanonicalizeLogRecordInput): CanonicalizeLogRecordResult;
+```
+
+#### `canonicalizeSpanAttributes`
+
+Lifts a decoded span's attributes and events into Trace's canonical names, as ingest does.
+
+```typescript
+canonicalizeSpanAttributes(input: CanonicalizeSpanAttributesInput): CanonicalizeSpanAttributesResult;
 ```
 
 #### `extractLogRecordIO`

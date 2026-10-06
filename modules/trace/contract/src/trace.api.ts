@@ -15,6 +15,8 @@ import type {
   ClassifyClaudeCallResult,
   CanonicalizeLogRecordInput,
   CanonicalizeLogRecordResult,
+  CanonicalizeSpanAttributesInput,
+  CanonicalizeSpanAttributesResult,
   DeriveClaudeResponseContentInput,
   DeriveClaudeResponseContentResult,
 } from "./trace-canonicalisation.ts";
@@ -794,6 +796,10 @@ export interface TraceApi extends TraceOtlpIngestApi {
   ): DeriveClaudeResponseContentResult;
   /** Lifts a log record's attributes into Trace's canonical names. */
   canonicalizeLogRecord(input: CanonicalizeLogRecordInput): CanonicalizeLogRecordResult;
+  /** Lifts a decoded span's attributes and events into Trace's canonical names, as ingest does. */
+  canonicalizeSpanAttributes(
+    input: CanonicalizeSpanAttributesInput,
+  ): CanonicalizeSpanAttributesResult;
   /** A log record's input and output, each cut to Trace's 64 KiB projection preview. */
   extractLogRecordIO(input: LogRecordReceivedEventData): {
     input: string | null;

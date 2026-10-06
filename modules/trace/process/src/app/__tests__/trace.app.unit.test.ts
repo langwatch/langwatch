@@ -1,4 +1,3 @@
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -143,7 +142,6 @@ function harness(
       cleanupTenantEmitter: () => undefined,
     },
     evaluations: {} as EvaluationApi,
-    codingAgents: {} as CodingAgentApi,
     share: {} as ShareApi,
     projects: {
       getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
