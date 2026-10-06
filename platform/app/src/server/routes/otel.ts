@@ -666,7 +666,6 @@ secured
             code: SpanStatusCode.ERROR,
             message: "Failed to parse logs",
           });
-          span.recordException(new Error(parsed.error));
           loggerLogs.warn(
             {
               fault: "customer",
@@ -760,7 +759,6 @@ secured
             code: SpanStatusCode.ERROR,
             message: "Failed to parse metrics",
           });
-          span.recordException(new Error(parsed.error));
           loggerMetrics.warn(
             {
               fault: "customer",

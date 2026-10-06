@@ -86,17 +86,14 @@ const signals = [
   {
     signal: "traces",
     path: "/api/otel/v1/traces",
-    scenario: "A malformed traces body is treated as the client's error",
   },
   {
     signal: "logs",
     path: "/api/otel/v1/logs",
-    scenario: "A malformed logs body is treated as the client's error",
   },
   {
     signal: "metrics",
     path: "/api/otel/v1/metrics",
-    scenario: "A malformed metrics body is treated as the client's error",
   },
 ] as const;
 
