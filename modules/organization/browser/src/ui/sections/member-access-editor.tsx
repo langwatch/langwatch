@@ -22,6 +22,7 @@ import {
   type RouterOutputs,
 } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
+import { directoryOwnershipCopy } from "../../model/group-source.ts";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
 import { IdentityChip } from "../elements/identity-row.tsx";
 import { OrganizationUserRoleField } from "../elements/organization-user-role-field.tsx";
@@ -429,7 +430,7 @@ function MemberGroups({
               {group.scimSource ? (
                 <IdentityChip
                   label="Directory"
-                  title={`Membership of this group is managed by ${group.scimSource}.`}
+                  title={directoryOwnershipCopy({ source: group.scimSource })}
                 />
               ) : null}
             </HStack>

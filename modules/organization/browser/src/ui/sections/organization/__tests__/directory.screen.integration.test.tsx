@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
   requests: [] as unknown[],
   departments: [] as { id: string; name: string }[],
   twoStepShow: false,
+  extraGroups: [] as unknown[],
 }));
 
 vi.mock("../../../../behavior/organization-api.ts", () => {
@@ -84,12 +85,17 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
     "team.getTeamsWithGrants": [],
   };
 
+  const answerFor = (path: string): unknown => {
+    if (path === "departments.list") return state.departments;
+    if (path === "group.listAll") return [...(answers[path] as unknown[]), ...state.extraGroups];
+    return answers[path] ?? [];
+  };
   const endpoint = (path: string) => ({
     useQuery: () =>
       path === "organization.getMemberProvenance" && state.provenanceFails
         ? { data: undefined, isError: true, isLoading: false, refetch: vi.fn() }
         : {
-            data: path === "departments.list" ? state.departments : (answers[path] ?? []),
+            data: answerFor(path),
             isError: false,
             isLoading: false,
             refetch: vi.fn(),
@@ -173,6 +179,7 @@ beforeEach(() => {
   state.requests = [];
   state.departments = [];
   state.twoStepShow = false;
+  state.extraGroups = [];
 });
 
 afterEach(() => {
@@ -260,6 +267,25 @@ describe("the directory page", () => {
       const chips = screen.getAllByTestId("group-directory-chip");
       expect(chips).toHaveLength(1);
       expect(rows[0]).toContainElement(chips[0] ?? null);
+    });
+  });
+
+  describe("when the directory that sent a group names no product", () => {
+    beforeEach(() => {
+      state.extraGroups = [
+        { id: "g3", name: "Protocol-only", scimSource: "scim", grants: [], memberCount: 2 },
+      ];
+    });
+
+    /** @scenario A directory that names no product is still not called by its protocol */
+    it("marks the group as coming from the directory, never under the protocol's name", () => {
+      renderDirectory({ query: { tab: "groups" } });
+
+      const row = screen.getAllByTestId("group-row")[2];
+      expect(row).toHaveTextContent("Protocol-only");
+      expect(row).toContainElement(screen.getAllByTestId("group-directory-chip")[1] ?? null);
+      expect(screen.getAllByTestId("group-directory-chip")[1]).toHaveTextContent("Directory");
+      expect(row).not.toHaveTextContent(/SCIM/i);
     });
   });
 

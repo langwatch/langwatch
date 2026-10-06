@@ -22,6 +22,7 @@ import { api } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { useOrganizationTeams } from "../../behavior/use-organization-teams.ts";
+import { directoryChipLabel } from "../../model/group-source.ts";
 import {
   getDefaultTeamRoleForOrganizationRole,
   isGrantRoleAllowedForOrganizationRole,
@@ -47,7 +48,7 @@ export function SourceBadge({ scimSource }: { scimSource: string | null }) {
   if (!scimSource) return <Badge colorPalette="gray">Manual</Badge>;
   return (
     <Badge colorPalette="blue" data-testid="group-directory-chip">
-      {scimSource.toUpperCase()}
+      {directoryChipLabel({ source: scimSource })}
     </Badge>
   );
 }
