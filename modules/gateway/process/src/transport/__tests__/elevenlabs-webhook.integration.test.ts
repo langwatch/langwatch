@@ -63,6 +63,10 @@ function database(): PrismaClient {
   return client;
 }
 
+function refuseUnsuppliedStore(name: string): never {
+  throw new Error(`This integration test supplies no "${name}" store`);
+}
+
 /** Recorded so a confirmation can be asserted without the whole spend spine. */
 const sentConfirmations: unknown[] = [];
 
@@ -144,6 +148,8 @@ async function mountWebhook(): Promise<MountableRestApp> {
         allowLoopbackVoiceProviders: false,
       },
     })
+    // The live tier, over only the stores supplied below: real Postgres, no ClickHouse.
+    .withStores({ tier: "live", order: [], read: (name) => refuseUnsuppliedStore(name) })
     .withRelational(database())
     .withAnalytical(peer("analytical store"))
     .withKeyvalue(memoryRedisDouble())
