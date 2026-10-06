@@ -6,6 +6,7 @@ import { ApiKeyService } from "../api-key.service";
 import {
   API_KEY_LAST_USED_WINDOW_MS,
   ApiKeyLastUsedRecorder,
+  MAX_API_KEY_LAST_USED_HOLDS,
 } from "../api-key-last-used";
 
 vi.mock("@langwatch/observability", () => ({
@@ -71,6 +72,89 @@ describe("ApiKeyLastUsedRecorder", () => {
       recorder.markUsed({ id: "key-1", write });
 
       expect(write).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("given the most keys it holds at once", () => {
+    /** Counts the entries any large Map yields while `run` executes. */
+    function entriesVisited(run: () => void): number {
+      const iterate = Map.prototype[Symbol.iterator];
+      let visited = 0;
+      const spy = vi
+        .spyOn(Map.prototype, Symbol.iterator)
+        .mockImplementation(function (this: Map<unknown, unknown>) {
+          const entries = iterate.call(this);
+          if (this.size < 1_000) return entries;
+          const next = entries.next.bind(entries);
+          return Object.assign(entries, {
+            next: () => {
+              visited += 1;
+              return next();
+            },
+          });
+        });
+      try {
+        run();
+      } finally {
+        spy.mockRestore();
+      }
+      return visited;
+    }
+
+    function holdTenThousand() {
+      const clock = makeRecorder();
+      const write = vi.fn().mockResolvedValue(undefined);
+      for (let key = 0; key < MAX_API_KEY_LAST_USED_HOLDS; key += 1) {
+        clock.recorder.markUsed({ id: `key-${key}`, write });
+      }
+      return { ...clock, write };
+    }
+
+    it("serves a hot key without walking the holds", () => {
+      const { recorder, write } = holdTenThousand();
+
+      const visited = entriesVisited(() => {
+        for (let use = 0; use < 100; use += 1) {
+          recorder.markUsed({ id: "key-0", write });
+        }
+      });
+
+      expect(visited).toBe(0);
+      expect(write).toHaveBeenCalledTimes(MAX_API_KEY_LAST_USED_HOLDS);
+    });
+
+    it("evicts the oldest hold to admit a new key, and only that one", () => {
+      const { recorder, write } = holdTenThousand();
+
+      recorder.markUsed({ id: "key-new", write });
+      recorder.markUsed({ id: "key-0", write });
+      recorder.markUsed({ id: "key-2", write });
+
+      // key-new evicted key-0, whose next use writes and evicts key-1; key-2
+      // is still held.
+      expect(write).toHaveBeenCalledTimes(MAX_API_KEY_LAST_USED_HOLDS + 2);
+    });
+
+    it("admits a new key without walking the holds", () => {
+      const { recorder, write } = holdTenThousand();
+
+      const visited = entriesVisited(() => {
+        recorder.markUsed({ id: "key-new", write });
+      });
+
+      expect(visited).toBeLessThanOrEqual(1);
+    });
+
+    it("drops every expired hold once the window has passed", () => {
+      const { recorder, advance, write } = holdTenThousand();
+      advance(API_KEY_LAST_USED_WINDOW_MS);
+      recorder.markUsed({ id: "key-new", write });
+
+      // Every earlier hold went with that write, so none is evicted to admit
+      // the next key and key-new is still held.
+      recorder.markUsed({ id: "key-newer", write });
+      recorder.markUsed({ id: "key-new", write });
+      expect(write).toHaveBeenCalledTimes(MAX_API_KEY_LAST_USED_HOLDS + 2);
     });
   });
 
