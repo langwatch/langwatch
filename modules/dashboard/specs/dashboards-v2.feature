@@ -609,7 +609,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC101 Templates library: every template is listed by trunk, ready ones first
     Given the member opens the templates library with no search and no filters
     Then they see "Dashboard templates" and a one-line introduction
-    And every catalogue template is listed once, in sections Profit, Growth, Protect and Foundation
+    And every catalogue template is listed once, in sections Profit, Growth, Protect and Trust
     And inside each section the templates that can be made today come before those coming soon
     And each section header, card accent and trunk badge carries its trunk's colour
 
@@ -825,7 +825,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @unit @integration
   Scenario: AC134 Picker filters: sections are branches in trunk order, coloured by trunk
     Given the picker
-    Then each branch of the question tree is a section, in trunk order: Profit, Growth, Protect, Foundation
+    Then each branch of the question tree is a section, in trunk order: Profit, Growth, Protect, Trust
     And each section heading's icon and each row's icon take the trunk's colour, as in the templates library
     And built widgets come first in each section
 

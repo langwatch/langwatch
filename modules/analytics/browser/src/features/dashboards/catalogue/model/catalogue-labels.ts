@@ -78,7 +78,7 @@ export const QUESTION_TYPE_LABELS: Readonly<Record<QuestionType, string>> = {
   prove: "Can I show or prove it?",
 };
 
-export const TRUNKS = ["Profit", "Growth", "Protect", "Foundation"] as const;
+export const TRUNKS = ["Profit", "Growth", "Protect", "Trust"] as const;
 export type Trunk = (typeof TRUNKS)[number];
 
 /** Whether a widget reads one project or the whole org. */

@@ -11,8 +11,8 @@ import {
   Bot,
   ChevronDown,
   DollarSign,
-  FlaskConical,
   type LucideIcon,
+  ShieldCheck,
   TriangleAlert,
   X,
 } from "lucide-react";
@@ -40,14 +40,14 @@ export const TRUNK_PALETTES: Readonly<Record<Trunk, string>> = {
   Profit: "green",
   Growth: "blue",
   Protect: "orange",
-  Foundation: "purple",
+  Trust: "purple",
 };
 
 export const TRUNK_ICONS: Readonly<Record<Trunk, LucideIcon>> = {
   Profit: DollarSign,
   Growth: Activity,
   Protect: TriangleAlert,
-  Foundation: FlaskConical,
+  Trust: ShieldCheck,
 };
 
 /** The height every control in the filter row shares, so the row reads as one line. */

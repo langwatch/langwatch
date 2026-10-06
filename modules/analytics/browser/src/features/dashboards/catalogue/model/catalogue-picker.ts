@@ -20,7 +20,7 @@ const TRUNK_QUESTIONS: Readonly<Record<Trunk, string>> = {
   Profit: "Am I spending well?",
   Growth: "Is it growing my business?",
   Protect: "Can it hurt me?",
-  Foundation: "Can I trust the numbers?",
+  Trust: "Can I trust the numbers?",
 };
 
 const ICONS: Readonly<Record<QuestionType, BlockQuestionIcon>> = {

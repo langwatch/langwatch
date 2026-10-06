@@ -122,7 +122,7 @@ describe("the templates library", () => {
 
       expect(counts.trunks).toEqual({
         all: 2,
-        byValue: { Profit: 1, Growth: 1, Protect: 0, Foundation: 0 },
+        byValue: { Profit: 1, Growth: 1, Protect: 0, Trust: 0 },
       });
       expect(counts.statuses).toEqual({ all: 2, byValue: { ready: 1, "coming-soon": 1 } });
       expect(counts.agentKinds.all).toBe(1);

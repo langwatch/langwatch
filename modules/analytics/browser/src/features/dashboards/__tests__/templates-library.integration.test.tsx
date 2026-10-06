@@ -93,7 +93,7 @@ describe("the templates library", () => {
       const regions = screen.getAllByRole("region");
       expect(
         regions.map((region) => within(region).getByRole("heading", { level: 2 }).textContent),
-      ).toEqual(["Profit", "Growth", "Protect", "Foundation"]);
+      ).toEqual(["Profit", "Growth", "Protect", "Trust"]);
       expect(screen.getAllByRole("article")).toHaveLength(TEMPLATE_LIBRARY.length);
     });
   });
