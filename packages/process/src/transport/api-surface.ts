@@ -88,6 +88,7 @@ class ApiSurface {
     const { members, stores } = composition;
     // auth binds the one door; a process without it refuses here, by name (record §8).
     const door = openApiDoor(peers);
+    composition.sockets.withDoor(door);
     const sessions = SessionReader.create({ verify: door.sessions });
     const idempotency = stores.database
       ? IdempotencyLedger.create({

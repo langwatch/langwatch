@@ -116,7 +116,6 @@ describe("connected instance ownership", () => {
       agents,
       publicBaseUrl: "https://example.test",
       replicaCount: 1,
-      credentials: { resolve: async () => resolved("alice") },
     });
 
     await expect(session.refreshPresence(original.session)).rejects.toMatchObject({
@@ -139,16 +138,15 @@ describe("connected instance ownership", () => {
       agents,
       publicBaseUrl: "https://example.test",
       replicaCount: 1,
-      credentials: { resolve: async ({ token }) => resolved(token) },
     });
     const polling = LongPollTransportService.create({ session, pollWaitMs: 1 });
     try {
-      const owner = { authorization: "Bearer alice", projectId: "project" };
+      const owner = { caller: resolved("alice") };
       const registration = await polling.register({ body: frame, credentials: owner });
       expect(registration.frame.type).toBe("registered");
       await expect(
         polling.poll({
-          credentials: { authorization: "Bearer bob", projectId: "project" },
+          credentials: { caller: resolved("bob") },
           token: registration.instanceToken,
           inFlightCallIds: [],
         }),

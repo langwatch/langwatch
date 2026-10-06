@@ -18,13 +18,35 @@ import {
   resultFrameSchema,
 } from "./connected-agent.protocol.ts";
 
-export const agentConnectCredentialsSchema = z.object({
-  authorization: z.string().optional(),
-  projectId: z.string().optional(),
+/** The caller the project door admitted, in the form a connected session stores it. */
+export const agentConnectCallerSchema = z.object({
+  project: z.object({ id: z.string(), slug: z.string() }),
+  userId: z.string().nullable(),
+  /** `user:<id>`, `key:<id>` or `legacy-project:<id>`: live sessions store it, never reword it. */
+  principalId: z.string(),
+});
+
+export type AgentConnectCaller = z.infer<typeof agentConnectCallerSchema>;
+
+/** The protocol's own header: the instance token a poll and a frames post carry. */
+export const agentConnectHeadersSchema = z.object({
   instanceToken: z.string().optional(),
 });
 
+export const agentConnectCredentialsSchema = z.object({
+  ...agentConnectHeadersSchema.shape,
+  caller: agentConnectCallerSchema,
+});
+
 export type AgentConnectCredentials = z.infer<typeof agentConnectCredentialsSchema>;
+
+/** What the socket's door decided: the admitted credentials, or the refusal to frame. */
+export const agentConnectAdmissionSchema = z.union([
+  z.object({ admitted: agentConnectCredentialsSchema }),
+  z.object({ refused: z.instanceof(Error) }),
+]);
+
+export type AgentConnectAdmission = z.infer<typeof agentConnectAdmissionSchema>;
 
 export const agentConnectRegisterInputSchema = registerFrameSchema;
 export const agentConnectRegisterOutputSchema = z.object({

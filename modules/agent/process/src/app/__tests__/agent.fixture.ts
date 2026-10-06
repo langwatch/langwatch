@@ -1,5 +1,4 @@
 import { agentSchema, type Agent, type AgentServerConfig } from "@langwatch/agent-contract";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -66,7 +65,6 @@ export function secretStoreFixture(initial: Record<string, string> = {}) {
 
 export function createAgentAppFixture(
   options: {
-    apiKeys?: ApiKeyApi;
     auditLog?: AuditLogApi;
     featureFlags?: FeatureFlagApi;
     permissions?: AuthzApi;
@@ -84,7 +82,6 @@ export function createAgentAppFixture(
   const resources = new ResourceScope();
   const app = AgentModule.create({
     dependencies: {
-      apiKeys: options.apiKeys ?? createApiFixture<ApiKeyApi>(),
       auditLog: options.auditLog ?? createApiFixture<AuditLogApi>(),
       featureFlags: options.featureFlags ?? createApiFixture<FeatureFlagApi>(),
       permissions: options.permissions ?? createApiFixture<AuthzApi>(),

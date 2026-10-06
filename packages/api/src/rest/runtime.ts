@@ -776,8 +776,8 @@ const earlyFacts = new WeakMap<Context, ReadonlyMap<string, unknown>>();
 
 /**
  * Credential, then body, then what the body names (Alex, 2026-09-30): a public route's
- * credential facts refuse before its body is capped, parsed or validated. A guarded route's
- * facts stay after its authorisation, which reads the parsed input.
+ * credential facts refuse before its body is capped, parsed or validated. A capped door route
+ * resolves them here too, since the cap replaces the request its door recorded the credential on.
  */
 function credentialFacts({
   route,
@@ -788,7 +788,7 @@ function credentialFacts({
 }): MiddlewareHandler[] {
   const early = (route.middleware ?? []).filter((fact) => fact.source === undefined);
 
-  if (route.access?.kind !== "public" || early.length === 0) return [];
+  if (early.length === 0 || (route.access?.kind !== "public" && !route.bodyLimit)) return [];
 
   return [
     async (context, next) => {

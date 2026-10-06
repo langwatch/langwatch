@@ -8,14 +8,14 @@ import {
   type InstanceNudge,
   instanceNudgeSchema,
   type AgentConnection,
-  type AgentConnectCredentials,
+  type AgentConnectAdmission,
+  type AgentConnectCaller,
 } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Unsubscribe } from "@langwatch/redis-client/session-state";
 
 import { readSdkFrame, UNREADABLE_RESULT_MESSAGE } from "../rules/connected-agent-frame.rules.ts";
 import { instanceChannel, pendingKey } from "../rules/connected-agent-keys.rules.ts";
-import type { ResolvedConnectCredential } from "./connected-agent-credential.service.ts";
 import type { AgentSessionService, SessionInfo } from "./connected-agent-session.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:gateway");
@@ -68,41 +68,22 @@ export class ConnectedAgentConnectionService {
   }
 
   /**
-   * Authenticates the upgrade, then waits for the register frame. Every
+   * Answers what the door decided, then waits for the register frame. Every
    * refusal is one `refused` frame followed by a close.
    */
-  async accept(ws: AgentConnection, credentials: AgentConnectCredentials): Promise<void> {
+  accept(ws: AgentConnection, admission: AgentConnectAdmission): void {
     const findReplicaRefusal = this.#core.findReplicaRefusal();
     if (findReplicaRefusal) {
       this.#refuse(ws, findReplicaRefusal);
       return;
     }
-
-    // The SDK sends its register frame the moment the socket opens, which is before the
-    // credential lookup below has answered. The first frame is held until then, so it is never
-    // lost to an unattached listener. Later frames are dropped: only the register frame is
-    // read here, and a peer that is not authenticated yet must not be able to fill the memory
-    // of the process with the frames after it.
-    let held: string | undefined;
-    const hold = (raw: string) => {
-      held ??= raw;
-    };
-    const releaseHeldFrame = ws.onMessage(hold);
-
-    let resolved: ResolvedConnectCredential;
-    try {
-      resolved = await this.#core.authenticate(credentials);
-    } catch (error) {
-      releaseHeldFrame();
-      this.#refuse(ws, error);
+    if ("refused" in admission) {
+      this.#refuse(ws, admission.refused);
       return;
     }
 
-    releaseHeldFrame();
-    if (held !== void 0) {
-      void this.#register(ws, resolved, held);
-      return;
-    }
+    // The door answered before the socket opened, so this listener is attached before any frame.
+    const resolved = admission.admitted.caller;
     const release = ws.onMessage((raw) => {
       release();
       void this.#register(ws, resolved, raw);
@@ -110,11 +91,7 @@ export class ConnectedAgentConnectionService {
   }
 
   /** Handles the register frame: rows, presence, subscriptions, reply. */
-  async #register(
-    ws: AgentConnection,
-    resolved: ResolvedConnectCredential,
-    raw: string,
-  ): Promise<void> {
+  async #register(ws: AgentConnection, resolved: AgentConnectCaller, raw: string): Promise<void> {
     const read = readSdkFrame(raw);
     if (read.kind !== "frame" || read.frame.type !== "register") {
       this.#refuse(

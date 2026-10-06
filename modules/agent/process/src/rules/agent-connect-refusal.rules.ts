@@ -6,6 +6,7 @@
 import {
   AgentRegisterRefusedError,
   PROTOCOL_VERSION,
+  type RefusedCode,
   type RefusedFrame,
 } from "@langwatch/agent-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -44,6 +45,72 @@ export function framesRefusal(failure: Error): AgentConnectRefusal {
 
 function refusedFrameOf(failure: Error): AgentConnectRefusal {
   return failure instanceof AgentRegisterRefusedError ? frameOf(failure) : DECLINED;
+}
+
+/** A door refusal the connect protocol answers as its own frame, or one it never framed. */
+export type ConnectRefusal =
+  | Readonly<{
+      framed: true;
+      refusal: Readonly<{ reason: RefusedCode; message: string; meta?: Record<string, unknown> }>;
+    }>
+  | Readonly<{ framed: false }>;
+
+const INVALID_KEY = "The API key is not valid for this project.";
+
+const PERMISSION_DENIALS: ReadonlySet<string> = new Set([
+  "api_key_permission_denied",
+  "api_key_permission_not_delegable",
+]);
+
+const UNFRAMED: ConnectRefusal = { framed: false };
+
+/**
+ * A door refusal at main's connect reason and message. A person's access token stays an
+ * unknown key, as on main; anything else the protocol never framed stays unframed.
+ */
+export function connectRefusalOf(failure: Error): ConnectRefusal {
+  if (!HandledError.isHandled(failure)) return UNFRAMED;
+  if (PERMISSION_DENIALS.has(failure.code)) {
+    return framed({
+      reason: "permission_denied",
+      message: "The API key needs the scenarios:manage permission to connect an agent.",
+    });
+  }
+
+  switch (failure.code) {
+    case "missing_credentials":
+      return framed({
+        reason: "api_key_invalid",
+        message: "Send the API key as Authorization: Bearer <key>.",
+      });
+    case "invalid_credentials":
+      return framed({ reason: "api_key_invalid", message: INVALID_KEY });
+    case "key_type_not_allowed":
+      return failure.meta.kind === "access_token"
+        ? framed({ reason: "api_key_invalid", message: INVALID_KEY })
+        : framed({
+            reason: "key_type_not_allowed",
+            message:
+              "An ingestion key or a Langy session key cannot connect an agent. Use a personal or a project API key.",
+          });
+    case "project_required":
+      return framed({
+        reason: "project_required",
+        message:
+          "This API key reaches several projects. Send the project id in the X-Project-Id header.",
+        meta: { projects: failure.meta.projects ?? [] },
+      });
+    default:
+      return UNFRAMED;
+  }
+}
+
+function framed(refusal: {
+  reason: RefusedCode;
+  message: string;
+  meta?: Record<string, unknown>;
+}): ConnectRefusal {
+  return { framed: true, refusal };
 }
 
 function frameOf(refused: AgentRegisterRefusedError): AgentConnectRefusal {

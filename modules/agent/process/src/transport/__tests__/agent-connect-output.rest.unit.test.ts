@@ -1,11 +1,10 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { RestCaller } from "@langwatch/api/hosting";
 /**
  * @vitest-environment node
  * A connect answer that breaks its schema is kept, and logged without its content.
  * @see specs/agents/connected-agents.feature
  */
-import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
+import { createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
@@ -16,14 +15,15 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => log,
 }));
 
-import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
+import { createAgentConnectRest } from "../agent-connect.rest.ts";
+import { connectCredentialsFact, connectDoor } from "./agent-connect-door.fixture.ts";
 
 const CONTENT_MARKER = "content-marker";
 
 function buildApi(connectFrames: AgentApi["connectFrames"]) {
   const app = createApiFixture<AgentApi>({ connectFrames });
   const runtime = createRestRuntime({
-    identity: { authenticate: (): RestCaller => ({ actor: null, scope: null }) },
+    identity: connectDoor(),
   } as never);
   const hono = new Hono();
   hono.route(
@@ -31,13 +31,7 @@ function buildApi(connectFrames: AgentApi["connectFrames"]) {
     runtime.mount(createAgentConnectRest().router(), {
       app: () => app,
       onError: canonicalErrorResponse,
-      facts: [
-        bindRestMiddleware(agentConnectHeaders, (context) => ({
-          authorization: context.req.header("authorization"),
-          projectId: context.req.header("x-project-id"),
-          instanceToken: context.req.header("x-agent-instance-token"),
-        })),
-      ],
+      facts: [connectCredentialsFact],
     }),
   );
   return hono;

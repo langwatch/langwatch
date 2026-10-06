@@ -36,7 +36,13 @@ export {
 
 export type { RateLimiter, ResponseCache, UpgradeHandler } from "./ports.ts";
 export { ConnectUpgradeRouter } from "./ports.ts";
-export { WebSocketHost, WebSocketProtocol, type ProtocolConnection } from "./websocket.ts";
+export {
+  WebSocketHost,
+  WebSocketProtocol,
+  type ProtocolConnection,
+  type WebSocketCaller,
+  type WebSocketDoor,
+} from "./websocket.ts";
 export {
   RAW_SOCKET_LIVENESS_PATH,
   RawSocketHost,

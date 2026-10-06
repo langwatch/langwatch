@@ -8,7 +8,6 @@ import { memorySessionState } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
 import { callKey, callAckKey, resultKey } from "../rules/connected-agent-keys.rules.ts";
-import type { ConnectedAgentCredentials } from "../services/connected-agent-credential.service.ts";
 import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
 import {
   AgentSessionService,
@@ -21,19 +20,12 @@ const instanceId = "inst_stranger";
 const callId = "call_1";
 
 const fakeAgents = createConnectedAgentFixture();
-const fakeCredentials: ConnectedAgentCredentials = {
-  resolve: async () => {
-    throw new Error("Credential lookup is not configured for this test");
-  },
-};
-
 function build() {
   const store = memorySessionState();
   const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
   const core = AgentSessionService.create({
     runtime,
     agents: fakeAgents,
-    credentials: fakeCredentials,
     publicBaseUrl: "https://example.test",
     replicaCount: 1,
   });
