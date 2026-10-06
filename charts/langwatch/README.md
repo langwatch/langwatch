@@ -238,7 +238,6 @@ Create the secret first:
 ```bash
 kubectl create secret generic langwatch-secrets -n langwatch \
   --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
-  --from-literal=cronApiKey=$(openssl rand -hex 16) \
   --from-literal=nextAuthSecret=$(openssl rand -hex 16)
 ```
 
@@ -414,7 +413,6 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `secrets.existingSecret`                              | Name of an existing secret containing required keys.                              | `""`                            |
 | `secrets.secretKeys.credentialsEncryptionKey`         | Key name for credentials encryption.                                              | `""`                            |
 | `secrets.secretKeys.credentialsEncryptionKeyPrevious` | Key name for the previous credentials encryption key, set only during a rotation. | `""`                            |
-| `secrets.secretKeys.cronApiKey`                       | Key name for cron API key.                                                        | `""`                            |
 | `secrets.secretKeys.nextAuthSecret`                   | Key name for NextAuth secret.                                                     | `""`                            |
 | `secrets.secretKeys.virtualKeyPepper`                 | Key name for AI Gateway virtual-key pepper.                                       | `""`                            |
 | `secrets.secretKeys.lwqlClickhousePassword`           | Key name for the LangWatchQL ClickHouse password.                                 | `LWQL_CLICKHOUSE_PASSWORD`      |
@@ -459,9 +457,6 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `app.credentialsEncryptionKey.previous`                          | Previous credentials encryption key, set only during a rotation.                                                                                                                                                                                                                    |                              |
 | `app.credentialsEncryptionKey.previous.value`                    | Previous encryption key value (not recommended in production).                                                                                                                                                                                                                      | `""`                         |
 | `app.credentialsEncryptionKey.previous.secretKeyRef`             | Reference to a secret holding the previous encryption key.                                                                                                                                                                                                                          | `{}`                         |
-| `app.cronApiKey`                                                 | API key used by cron jobs for authentication.                                                                                                                                                                                                                                       |                              |
-| `app.cronApiKey.value`                                           | Cron API key value.                                                                                                                                                                                                                                                                 | `""`                         |
-| `app.cronApiKey.secretKeyRef`                                    | Reference to a secret holding the cron API key.                                                                                                                                                                                                                                     | `{}`                         |
 | `app.virtualKeyPepper`                                           | Pepper for hashing AI Gateway virtual-key secrets.                                                                                                                                                                                                                                  |                              |
 | `app.virtualKeyPepper.value`                                     | Pepper value (not recommended inline for production).                                                                                                                                                                                                                               | `""`                         |
 | `app.virtualKeyPepper.secretKeyRef`                              | Reference to a secret holding the pepper.                                                                                                                                                                                                                                           | `{}`                         |

@@ -4,6 +4,7 @@ import type {
   NurturingSignal,
   NurturingSignalOf,
 } from "@langwatch/enterprise-nurturing-contract";
+import type { GuidedOnboardingTurnFailedEventData } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { onboardingExperimentProperties } from "@langwatch/onboarding-contract";
 import { Temporal } from "@langwatch/time";
@@ -22,6 +23,7 @@ import {
   fireGuidedOnboardingPaths,
   fireGuidedOnboardingPostHog,
   fireGuidedOnboardingProgress,
+  fireGuidedTurnFailedPostHog,
 } from "../rules/nurturing-guided-onboarding-service.rules.ts";
 import {
   fireInviteAccepted,
@@ -102,6 +104,19 @@ export class NurturingDeliveryService {
     if (await this.withinCustomerIoDebounce(signal)) return this.toPostHogSafely(signal);
     this.toCustomerIo(signal);
     this.toPostHogSafely(signal);
+  }
+
+  /** Langy's failed guided turn: PostHog only, once per source event, never failing the fact. */
+  async deliverGuidedTurnFailed(data: GuidedOnboardingTurnFailedEventData): Promise<void> {
+    const posthog = this.deps.posthog;
+    if (!posthog) return;
+    const key = `nurturing:guided_onboarding_turn_failed:${data.sourceEventId}`;
+    if (!(await this.deps.claims.claim(key, DELIVERED_WINDOW_SECONDS))) return;
+    try {
+      posthog.track(fireGuidedTurnFailedPostHog(data));
+    } catch (error) {
+      reportFailure(error);
+    }
   }
 
   /** A PostHog channel that throws only logs: analytics never fails the delivery. */

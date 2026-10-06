@@ -18,6 +18,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
+import { WorkflowCardDisplay } from "@langwatch/design-system/workflow-card";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import { type EvaluatorOutputs } from "@langwatch/evaluator-client";
 import {
@@ -51,7 +52,7 @@ import {
   EvaluatorEditorHeading as EvaluatorEditorHeadingPresentation,
 } from "../../elements/evaluator-editor-chrome.tsx";
 import { FormServerError } from "../../elements/workflow/studio-host/errors.tsx";
-import { WorkflowCardDisplay, WorkflowCardLink } from "../../elements/workflow/workflow-card.tsx";
+import { WorkflowCardLink } from "../../elements/workflow/workflow-card.tsx";
 import DynamicZodForm from "../checks/dynamic-zod-form.tsx";
 import { EvaluatorMappingsSection } from "./evaluator-mappings-section.tsx";
 

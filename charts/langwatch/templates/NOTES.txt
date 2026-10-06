@@ -275,7 +275,6 @@ CreateContainerConfigError; `kubectl describe pod` names the missing key.
 
   {{ include "langwatch.appSecretName" . }} keys (always required):
     - credentialsEncryptionKey
-    - cronApiKey
     - nextAuthSecret
     - virtualKeyPepper
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
@@ -326,7 +325,6 @@ CreateContainerConfigError; `kubectl describe pod` names the missing key.
 
     kubectl -n {{ .Release.Namespace }} create secret generic {{ include "langwatch.appSecretName" . }} \
       --from-literal=credentialsEncryptionKey="$(openssl rand -hex 32)" \
-      --from-literal=cronApiKey="$(openssl rand -hex 32)" \
       --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
       --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
 {{- if and .Values.gateway .Values.gateway.chartManaged }}

@@ -418,6 +418,14 @@
     "./ai-sparkles-loader": {
       "types": "./dist/components/icons/ai-sparkles-loader.d.ts",
       "default": "./src/components/icons/ai-sparkles-loader.tsx"
+    },
+    "./variable-mapping": {
+      "types": "./dist/components/variable-mapping/index.d.ts",
+      "default": "./src/components/variable-mapping/index.ts"
+    },
+    "./workflow-card": {
+      "types": "./dist/components/workflow-card.d.ts",
+      "default": "./src/components/workflow-card.tsx"
     }
   },
   "scripts": {

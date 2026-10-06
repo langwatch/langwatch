@@ -18,6 +18,7 @@ function harness(pairs: AccountSecretPair[]) {
   const overwriteCredential = vi.fn(async () => undefined);
   const reads: IdentitySecretCarryRepository = {
     findAccountSecretPairs: async () => pairs,
+    findDriftedUserIdsAfter: async () => [],
     insertCredentialIfMissing,
     overwriteCredential,
   };

@@ -99,13 +99,19 @@ Feature: Guided onboarding tour
     And the path is reported as having no tour
 
   # A tour step or a Langy page name pointing at an address the router does
-  # not know lands the demo on the 404 page. The route table is the check.
+  # not know lands the demo on the 404 page. The shell's route-pattern list is
+  # the check; each module binds the clause for the addresses it owns.
   @unit
   Scenario: every address the guided onboarding navigates to is a registered route
-    Given the application's route table
+    Given the shell's list of route patterns
     Then each path's landing after the sign-up and the page Langy starts from match a route of their own
     And every address a tour step navigates to matches a route of its own
-    And every page name Langy's navigate command opens matches a route of its own, under the project slug for a project page and at the top level for an organization page
+    And none of them falls through to the 404 catch-all
+
+  @unit
+  Scenario: every page name Langy's navigate command opens is a registered route
+    Given the shell's list of route patterns
+    Then every page name Langy's navigate command opens matches a route of its own, under the project slug for a project page and at the top level for an organization page
     And none of them falls through to the 404 catch-all
 
   @unit

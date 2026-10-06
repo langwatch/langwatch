@@ -43,6 +43,7 @@ function served() {
       organizationRole: "MEMBER",
     }),
     checkScopeLineage: async () => ({ kind: "consistent" }),
+    organizationOf: async () => null,
   });
   const decisions = vi.spyOn(authz, "getDecision");
   const lineages = vi.spyOn(authz, "checkScopeLineage");

@@ -4,6 +4,7 @@
  */
 import type {
   ApiKeyApi,
+  ApiKeyProject,
   ApiKeyTokenResolutionInput,
   OrganizationApiKeyResolution,
   ResolvedApiKeyCredential,
@@ -29,19 +30,30 @@ const PROJECT = {
 /** An in-memory key store: tokens it knows resolve, everything else is unusable. */
 class KeyStore implements Pick<
   ApiKeyApi,
-  "findResolvedToken" | "resolveOrganizationToken" | "markUsed"
+  "findResolvedToken" | "resolveOrganizationToken" | "markUsed" | "getOrgProjects"
 > {
   readonly used: string[] = [];
 
   constructor(
     private readonly projectTokens: ReadonlyMap<string, ResolvedApiKeyCredential>,
     private readonly organizationTokens: ReadonlyMap<string, OrganizationApiKeyResolution>,
+    /** An organization's projects, and what a token resolves to when it names one (`token@id`). */
+    private readonly organizations: Readonly<{
+      projects: ReadonlyMap<string, ApiKeyProject[]>;
+      named: ReadonlyMap<string, ResolvedApiKeyCredential>;
+    }> = { projects: new Map(), named: new Map() },
   ) {}
 
   findResolvedToken({
     token,
+    projectId,
   }: ApiKeyTokenResolutionInput): Promise<ResolvedApiKeyCredential | null> {
-    return Promise.resolve(this.projectTokens.get(token) ?? null);
+    const named = projectId ? this.organizations.named.get(`${token}@${projectId}`) : undefined;
+    return Promise.resolve(named ?? this.projectTokens.get(token) ?? null);
+  }
+
+  getOrgProjects({ organizationId }: { organizationId: string }): Promise<ApiKeyProject[]> {
+    return Promise.resolve(this.organizations.projects.get(organizationId) ?? []);
   }
 
   resolveOrganizationToken({ token }: { token: string }): Promise<OrganizationApiKeyResolution> {
@@ -113,6 +125,10 @@ const store = new KeyStore(
   ]),
 );
 const door = doorOver(store);
+const ORG_KEY: OrganizationApiKeyResolution = {
+  ok: true,
+  resolved: { type: "apiKey-org", apiKeyId: "key-org", userId: null, organizationId: "org-2" },
+};
 
 async function refusalCode(attempt: Promise<unknown>): Promise<string> {
   const error = await attempt.then(
@@ -273,6 +289,92 @@ describe("the project door", () => {
       expect(
         await refusalCode(door[method]({ request: asked, permissions: ["traces:view"] })),
       ).toBe("project_required");
+    });
+  });
+
+  describe("given a live key that reaches several projects, holding the route's permission in some", () => {
+    const projectOf = (id: string) => ({
+      ...PROJECT,
+      id,
+      name: `Project ${id}`,
+      organizationId: "org-2",
+    });
+    const keyAt = (id: string): ResolvedApiKeyCredential => ({
+      type: "apiKey",
+      apiKeyId: "key-org",
+      userId: null,
+      organizationId: "org-2",
+      ingestSourceType: null,
+      ingestionTemplateId: null,
+      project: projectOf(id),
+    });
+    const reaching = new KeyStore(new Map(), new Map([["sk-lw-org", ORG_KEY]]), {
+      projects: new Map([
+        [
+          "org-2",
+          ["project-a", "project-b", "project-c"].map((id) => ({
+            id,
+            name: `Project ${id}`,
+            teamId: "team-1",
+          })),
+        ],
+      ]),
+      // The key resolves project-a and project-b; project-c is outside its bindings.
+      named: new Map([
+        ["sk-lw-org@project-a", keyAt("project-a")],
+        ["sk-lw-org@project-b", keyAt("project-b")],
+      ]),
+    });
+    const holdsAt = new Set(["project-a"]);
+    const reachingDoor = ApiRestCredentialsService.create({
+      apiKeys: reaching,
+      authz: {
+        hasApiKeyPermission: ({ scope }) => Promise.resolve(holdsAt.has(scope.id)),
+        getApiKeyProjectDecision: () => Promise.reject(new Error("asked through the ceiling")),
+        hasProjectPermission: () => Promise.reject(new Error("no person is asked")),
+        listApiKeyBindings: () => Promise.reject(new Error("no bindings are listed")),
+        getScope: () => Promise.reject(new Error("no scope is read")),
+      },
+      cliProjects: {
+        getCliAccessProject: () => Promise.reject(new Error("no CLI session is read")),
+      },
+      organizations: { getSettings: () => Promise.reject(new Error("no organization is read")) },
+    });
+
+    async function refusalOf(attempt: Promise<unknown>): Promise<HandledError> {
+      const error = await attempt.then(
+        () => new Error("the door admitted the request"),
+        (refusal: unknown) => refusal,
+      );
+      if (!HandledError.isHandled(error)) throw error;
+      return error;
+    }
+
+    /** @scenario "A key that names no project is told the projects it may name for the route" */
+    it("lists only the projects the key reaches and holds the route's permission in", async () => {
+      const refusal = await refusalOf(
+        reachingDoor.authenticate({
+          request: request({ authorization: "Bearer sk-lw-org" }),
+          permissions: ["scenarios:manage"],
+        }),
+      );
+
+      expect(refusal).toMatchObject({ code: "project_required", httpStatus: 400 });
+      expect(refusal.meta).toEqual({ projects: [{ id: "project-a", name: "Project project-a" }] });
+    });
+
+    /** @scenario "A key asked no permission is told every project it reaches" */
+    it("lists every project the key resolves when the route asks nothing of it", async () => {
+      const refusal = await refusalOf(
+        reachingDoor.identify({ request: request({ authorization: "Bearer sk-lw-org" }) }),
+      );
+
+      expect(refusal.meta).toEqual({
+        projects: [
+          { id: "project-a", name: "Project project-a" },
+          { id: "project-b", name: "Project project-b" },
+        ],
+      });
     });
   });
 

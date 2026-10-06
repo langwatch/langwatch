@@ -18,4 +18,8 @@ export class MemoryIdentityLatchRepository extends IdentityLatchRepository {
   async isFinalized(args: { userId: string }): Promise<boolean> {
     return this.store.finalizedUsers.has(args.userId);
   }
+
+  async recordFinalized(args: { userId: string; report: unknown }): Promise<void> {
+    this.store.finalizedUsers.add(args.userId);
+  }
 }

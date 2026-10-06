@@ -62,11 +62,17 @@ export type ApiKeyDoorCredential = Readonly<{
   markUsed: () => void;
 }>;
 
+/** How many organization projects a `project_required` refusal looks through (main's 50). */
+const REACHABLE_PROJECTS_LISTED = 50;
+
 /** How far the key door asks a permission of a key; absent, its project, else its organization. */
 export type ApiKeyPermissionReach = "grants" | "organization";
 
 export type ApiRestCredentialPeers = Readonly<{
-  apiKeys: Pick<ApiKeyApi, "findResolvedToken" | "resolveOrganizationToken" | "markUsed">;
+  apiKeys: Pick<
+    ApiKeyApi,
+    "findResolvedToken" | "resolveOrganizationToken" | "markUsed" | "getOrgProjects"
+  >;
   authz: Pick<
     AuthzApi,
     | "hasApiKeyPermission"
@@ -113,7 +119,10 @@ export class ApiRestCredentialsService {
     /** The key kinds the route admits (E7): refused once the key resolves, before permission. */
     keyKinds?: readonly RestKeyKind[];
   }): Promise<ApiProjectCredential> {
-    const credential = await this.identify({ request: input.request });
+    const credential = await this.identify({
+      request: input.request,
+      permissions: input.permissions,
+    });
     if (input.keyKinds) {
       assertKeyKind({ key: keyCredentialOf(credential.resolved), admitted: input.keyKinds });
     }
@@ -173,7 +182,11 @@ export class ApiRestCredentialsService {
     return new ApiKeyPermissionDeniedError(permission);
   }
 
-  async identify(input: { request: Request }): Promise<ApiProjectCredential> {
+  async identify(input: {
+    request: Request;
+    /** What the route asks, so a key naming no project is told the ones it may name. */
+    permissions?: readonly AuthzPermission[];
+  }): Promise<ApiProjectCredential> {
     const person = await this.#cliAccessCredential(input.request);
     if (person) return person;
 
@@ -181,7 +194,12 @@ export class ApiRestCredentialsService {
     if (!credentials) throw new ProjectMissingCredentialsError();
 
     const resolved = await this.apiKeys.findResolvedToken(credentials);
-    if (!resolved) throw await this.unresolvedProjectRefusal(credentials);
+    if (!resolved) {
+      throw await this.unresolvedProjectRefusal({
+        credentials,
+        permissions: input.permissions ?? [],
+      });
+    }
 
     return {
       project: resolved.project,
@@ -460,14 +478,52 @@ export class ApiRestCredentialsService {
    * project the key cannot reach stays an unknown credential, so a key learns nothing about
    * projects outside its grants.
    */
-  private async unresolvedProjectRefusal(
-    credentials: ApiKeyRequestCredentials,
-  ): Promise<HandledError> {
+  private async unresolvedProjectRefusal(input: {
+    credentials: ApiKeyRequestCredentials;
+    permissions: readonly AuthzPermission[];
+  }): Promise<HandledError> {
+    const { credentials, permissions } = input;
     if (credentials.projectId) return new ProjectInvalidCredentialsError();
 
     const key = await this.apiKeys.resolveOrganizationToken({ token: credentials.token });
+    if (!key.ok) return new ProjectInvalidCredentialsError();
 
-    return key.ok ? new ProjectRequiredError() : new ProjectInvalidCredentialsError();
+    return new ProjectRequiredError({
+      projects: await this.findReachableProjects({
+        token: credentials.token,
+        organizationId: key.resolved.organizationId,
+        permissions,
+      }),
+    });
+  }
+
+  /** The key's projects that hold every asked permission, among the organization's first fifty. */
+  private async findReachableProjects(input: {
+    token: string;
+    organizationId: string;
+    permissions: readonly AuthzPermission[];
+  }): Promise<{ id: string; name: string }[]> {
+    const projects = await this.apiKeys.getOrgProjects({ organizationId: input.organizationId });
+    const reachable = await Promise.all(
+      projects.slice(0, REACHABLE_PROJECTS_LISTED).map(async (project) => {
+        const resolved = await this.apiKeys.findResolvedToken({
+          token: input.token,
+          projectId: project.id,
+        });
+        if (!resolved) return [];
+        const credential: ApiProjectCredential = {
+          project: resolved.project,
+          resolved,
+          markUsed: () => {},
+        };
+        for (const permission of input.permissions) {
+          if (!(await this.#projectHolds({ credential, permission }))) return [];
+        }
+        return [{ id: project.id, name: project.name }];
+      }),
+    );
+
+    return reachable.flat();
   }
 
   private async resolveOrganization(token: string): Promise<ResolvedOrganizationApiKeyToken> {

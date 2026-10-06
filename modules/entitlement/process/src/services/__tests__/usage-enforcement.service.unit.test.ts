@@ -264,6 +264,7 @@ describe("UsageService.checkLimit against the plan's allowance", () => {
 
   describe("given a team that resolves to no organization", () => {
     /** @scenario "A team that resolves to no organization is not metered against nobody's plan" */
+    /** @scenario "The limit check refuses a tenant that resolves to no organization" */
     it("refuses to answer and reads no plan and no count", async () => {
       const planResolver = vi.fn().mockResolvedValue(plan(1_000));
       const countTracesByProjects = vi.fn().mockResolvedValue([]);

@@ -1,4 +1,5 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import { createTenantId } from "@langwatch/eventing";
@@ -88,6 +89,7 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
       database,
       authz: createApiFixture<AuthzApi>(),
       audit: { record: async () => undefined },
+      sessions: createApiFixture<AuthApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
       users: {} as UserApi,
       scheduler: {

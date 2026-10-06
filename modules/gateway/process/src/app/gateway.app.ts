@@ -158,6 +158,10 @@ import {
   buildGatewayGovernanceEventsPipeline,
   type GatewayGovernanceEventsDefinition,
 } from "../eventing/gateway-governance-events.pipeline.ts";
+import {
+  buildGatewayPulledUsageLedgerPipeline,
+  type GatewayPulledUsageLedgerPipeline,
+} from "../eventing/gateway-pulled-usage-ledger.pipeline.ts";
 import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
 import type { GatewaySpendProcessingEvent } from "../eventing/gateway-spend.intent.ts";
 import {
@@ -1393,6 +1397,13 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   /** governance_events_processing: the same commands in every role; webhook subscribes itself. */
   governanceEventsPipeline(): GatewayGovernanceEventsDefinition {
     return buildGatewayGovernanceEventsPipeline();
+  }
+
+  /** gateway_pulled_usage_ledger: the ledger debits governance's priced pulled usage (Q208C). */
+  pulledUsageLedgerPipeline(): GatewayPulledUsageLedgerPipeline {
+    return buildGatewayPulledUsageLedgerPipeline({
+      ledger: this.#dependencies.budgetSpend ? this.#budgetLedgerService : void 0,
+    });
   }
 
   /** Binds the crossing and lifecycle senders the debit writer and key services record through. */

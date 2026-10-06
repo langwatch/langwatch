@@ -30,6 +30,8 @@ export type UsageLimit = z.infer<typeof usageLimitSchema>;
 export const monthCountedEventDataSchema = z.object({
   ...envelope,
   billableEvents: z.number().int().nonnegative(),
+  /** The month's traces, counted only when a capped plan is held in traces. */
+  traces: z.number().int().nonnegative().optional(),
   limit: usageLimitSchema,
 });
 export type MonthCountedEventData = z.infer<typeof monthCountedEventDataSchema>;

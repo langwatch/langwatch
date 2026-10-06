@@ -42,7 +42,7 @@ import {
 import { IdentityService } from "../services/identity.service.ts";
 import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
 import { LinkProposalService } from "../services/link-proposal.service.ts";
-import { StubPlatformOperators } from "./support/in-memory-connections.ts";
+import { identityLookupDoor, refusalOf } from "./support/identity-lookup-door.ts";
 import { fact, headsWith, InMemoryHeads, USER } from "./support/in-memory-heads.ts";
 import { InMemoryReservations } from "./support/in-memory-reservations.ts";
 import { InMemoryUsers } from "./support/in-memory-users.ts";
@@ -125,7 +125,6 @@ beforeEach(() => {
       listBrowserSessions: async () => [],
     }),
     invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
-    authorization: new StubPlatformOperators([OLIVE.userId]),
     auditLog,
     rateLimiter: noopRateLimiter(),
   });
@@ -219,12 +218,24 @@ describe("identity lookup, end to end at the read surface", () => {
   describe("when mallory holds no platform operator access", () => {
     /** @scenario "A refused lookup is recorded as an attempt, and reveals nothing" */
     it("refuses the request and records only that she made an attempt", async () => {
-      await expect(
-        service.lookupAddress({ address: "sam@acme.com", operator: MALLORY }),
-      ).rejects.toMatchObject({ code: "not_found" });
+      const door = identityLookupDoor({ app: service, operators: [OLIVE.userId] });
 
+      const refusal = await door
+        .as(MALLORY.userId)
+        .resolve({ address: "sam@acme.com" })
+        .catch((error: unknown) => error);
+
+      expect(refusalOf(refusal)).toEqual({
+        trpc: "NOT_FOUND",
+        code: "not_found",
+        message: "Not found",
+      });
+      expect(JSON.stringify(refusal)).not.toContain("sam@acme.com");
       expect(auditLog.rows).toHaveLength(1);
-      expect(auditLog.rows[0]?.userId).toBe(MALLORY.userId);
+      expect(auditLog.rows[0]).toMatchObject({
+        userId: MALLORY.userId,
+        action: "identityLookup.resolve",
+      });
     });
   });
 
@@ -277,7 +288,6 @@ describe("identity lookup, the repairs and the panels main's surface serves", ()
       router: { route: async () => CONNECTED_ROUTE },
       identity: () => createApiFixture<Pick<IdentityService, "detachIdentifier">>({}),
       links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
-      authorization: new StubPlatformOperators([OLIVE.userId]),
       auditLog,
       rateLimiter: noopRateLimiter(),
       sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({
@@ -396,9 +406,17 @@ describe("identity lookup, the repairs and the panels main's surface serves", ()
 
   describe("when somebody outside the staff list asks for the claim queue", () => {
     it("refuses with the generic not_found", async () => {
-      await expect(
-        repairingService().findDomainClaimQueue({ operator: MALLORY }),
-      ).rejects.toMatchObject({ code: "not_found" });
+      const door = identityLookupDoor({
+        app: repairingService(),
+        operators: [OLIVE.userId],
+      });
+
+      const refusal = await door
+        .as(MALLORY.userId)
+        .claimQueue({})
+        .catch((error: unknown) => error);
+
+      expect(refusalOf(refusal).code).toBe("not_found");
     });
   });
 
@@ -470,7 +488,6 @@ describe("identity lookup, deciding a sign-in waiting on a human", () => {
           },
         }),
       }),
-      authorization: new StubPlatformOperators([OLIVE.userId]),
       auditLog,
       rateLimiter: noopRateLimiter(),
       sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({
@@ -593,13 +610,17 @@ describe("identity lookup, deciding a sign-in waiting on a human", () => {
 
   describe("when somebody outside the staff list tries to decide it", () => {
     it("records the attempt, refuses with the generic not_found, and decides nothing", async () => {
-      await expect(
-        decidingService().confirmProposedSignIn({
-          userId: SAM,
-          proposalId: "prop_1",
-          operator: MALLORY,
-        }),
-      ).rejects.toMatchObject({ code: "not_found" });
+      const door = identityLookupDoor({
+        app: decidingService(),
+        operators: [OLIVE.userId],
+      });
+
+      const refusal = await door
+        .as(MALLORY.userId)
+        .confirmProposedSignIn({ userId: SAM, proposalId: "prop_1" })
+        .catch((error: unknown) => error);
+
+      expect(refusalOf(refusal).code).toBe("not_found");
 
       expect(auditLog.rows[0]?.action).toBe("identityLookup.confirmProposedSignIn");
       expect(store.identityEvents.map((event) => event.type)).toEqual([LINK_PROPOSED_EVENT_TYPE]);
@@ -641,7 +662,6 @@ describe("identity lookup, what an operator sees waiting on a person", () => {
         listBrowserSessions: async () => [],
       }),
       invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
-      authorization: new StubPlatformOperators([OLIVE.userId]),
       auditLog,
       rateLimiter: noopRateLimiter(),
       now: () => 1_000,
@@ -710,7 +730,6 @@ describe("identity lookup, detaching a sign-in method", () => {
       links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
       sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({}),
       invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
-      authorization: new StubPlatformOperators([OLIVE.userId]),
       auditLog,
       rateLimiter: noopRateLimiter(),
     });
@@ -764,7 +783,6 @@ describe("identity lookup, detaching a sign-in method", () => {
       links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
       sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({}),
       invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
-      authorization: new StubPlatformOperators([OLIVE.userId]),
       auditLog,
       rateLimiter: noopRateLimiter(),
     });

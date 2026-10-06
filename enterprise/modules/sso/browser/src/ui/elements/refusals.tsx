@@ -105,3 +105,21 @@ export function AvailabilityRefusalNotice({
     </Alert.Root>
   );
 }
+
+/**
+ * The organization's plan, not the reader, is what refuses single sign-on.
+ * Said instead of the journey, so no control is offered that would refuse.
+ */
+export function EnterprisePlanRequiredNotice() {
+  return (
+    <Alert.Root status="info" data-testid="sso-enterprise-required">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>Single sign-on needs an Enterprise plan</Alert.Title>
+        <Alert.Description>
+          Upgrade this organization to Enterprise, and you can set single sign-on up here.
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}

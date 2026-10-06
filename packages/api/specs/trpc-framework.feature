@@ -200,6 +200,15 @@ Feature: tRPC framework boundary
     And a map whose keys are not exactly the values the field parses as, or an entry naming a tier that cannot grant its permission, is refused where it is written, and by the compiler where the input is known
 
   @unit
+  Scenario: A procedure's handler is handed the organization holding the scope its door asked at
+    Given a procedure whose permission is asked at a project, a team or an organization its input names
+    When an authenticated caller passes the door (Alex, 2026-10-06, lineage D1)
+    Then the handler's scope names the tier and id the permission was asked at, and the organization holding it
+    And the organization holding a project or team is asked of authz once per call, and an organization is its own
+    And a door that cannot say which organization holds the scope hands a null organization rather than a guess
+    And a procedure the door resolved no scope for is handed none
+
+  @unit
   Scenario: A procedure asks whether its tenant holds a named plan capability
     Given a procedure declares that its tenant must hold the webhook endpoints capability (Alex, 2026-10-05, E6)
     When a caller the access check admitted reaches it

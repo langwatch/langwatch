@@ -99,11 +99,7 @@ function buildLangyConversationProducerPipeline(input: {
   };
   const guidedOnboarding = {
     reader: { getByProject: refuse("read a project's guided onboarding") },
-    analytics: {
-      track: () => {
-        throw producerOnly(processName, "track a guided onboarding turn failure");
-      },
-    },
+    facts: { recordTurnFailed: refuse("record a guided onboarding turn failure") },
   };
 
   return EventingLangyConversationAdapter.create({

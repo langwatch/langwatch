@@ -50,13 +50,6 @@ Feature: The standalone API process has an executable start
       # tenancy, agents and Auth this package now builds for itself.
 
     @integration
-    Scenario: A host's product services override what the process would compose
-      Given a host supplies the API executable with its own product services
-      When the API executable starts
-      Then those services are the ones the process serves
-      And the process composes none of its own in their place
-
-    @integration
     Scenario: The started process answers its health route
       Given the API executable started
       When a caller requests its health route
@@ -88,20 +81,13 @@ Feature: The standalone API process has an executable start
 
   Rule: A process that cannot serve product traffic says what it is missing
 
-    @integration
-    Scenario: A collaborator the process goes on to compose itself is not announced as absent
-      Given a deployment that supplies no Better Auth browser-session transport
-      When the API executable starts
-      Then it announces no adapter as one no package implements
-      And it serves its lifecycle surface rather than refusing to start
+  Rule: A process missing a store it needs refuses to boot
 
-    @integration
-    Scenario: Each absent collaborator is named on its own line
-      Given a deployment that configured neither Postgres nor Redis
-      When the API executable starts
-      Then the absent database, the absent queue and the absent dispatch are each named
-      # One line per fact. A reader of the boot log should not have to derive
-      # "no AuthZ" from "no Redis".
+    # No host injects collaborators and no boot line announces an absent one:
+    # a missing DATABASE_URL or REDIS_URL refuses the boot, naming the setting
+    # (typed-process-supply.feature, "A store a module needs ..." and "A queue
+    # a module needs ..."), and a missing peer module refuses by name
+    # (declarative-process-composition.feature).
 
   Rule: Traffic is accepted only after the readiness gate passes
 

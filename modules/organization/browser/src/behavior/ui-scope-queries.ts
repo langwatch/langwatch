@@ -34,7 +34,7 @@ export function useUiOrganizations({
   enabled,
   userId,
 }: {
-  transport: UiFeatureApiTransport;
+  transport: Pick<UiFeatureApiTransport, "query">;
   isDemo: boolean;
   enabled: boolean;
   userId: string | undefined;

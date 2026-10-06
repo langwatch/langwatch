@@ -139,6 +139,7 @@ function harness(options?: {
     // WHEN it runs is this pass's contract — only for a user the proof
     // finalized — and WHAT it copies is its own suite's.
     secrets: IdentitySecretCarryService.create({
+      findDriftedUserIdsAfter: async () => [],
       findAccountSecretPairs: async () => {
         carried.push("looked");
         return [];

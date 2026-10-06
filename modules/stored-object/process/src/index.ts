@@ -17,4 +17,3 @@ export type {
   MigrationPageRequest,
   MigrationProject,
 } from "./repositories/object-storage-migration-inventory.repository.ts";
-export type { PayloadStagingS3Target } from "#repositories/s3/s3.payload-staging.repository";

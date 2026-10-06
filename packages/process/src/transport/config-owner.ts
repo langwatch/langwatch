@@ -29,7 +29,6 @@ export const apiOwner = {
     assetBase: c.env("LANGWATCH_ASSET_BASE", z.string().optional()),
   })),
   secrets: {
-    cron: Secret.load("CRON_API_KEY", { optional: true }),
     instanceAdmin: Secret.load("LANGWATCH_INSTANCE_ADMIN_API_KEY", { optional: true }),
   },
 } as const;

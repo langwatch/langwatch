@@ -36,7 +36,7 @@ the envelope limits.
 
 Durable keys are kind first, tenant second: `group-queue/{projectId}/{contentHash}`
 (ADR-172), so an operator lifecycle rule on the `group-queue/` prefix reaches every
-object and the owner can purge `group-queue/{projectId}/`.
+object. Project deletion purges nothing; the lifecycle rule alone reclaims them.
 
 Each staged job holds a lease on referenced content. Identical bodies may
 share the content while retaining distinct holder leases. Deduplication,

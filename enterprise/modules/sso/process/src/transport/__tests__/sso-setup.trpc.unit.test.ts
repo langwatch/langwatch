@@ -108,6 +108,7 @@ async function harness(
     record: null,
     goLive: null,
     legacyRoute: null,
+    enterpriseRequired: false,
     migration: null,
   };
   const auditLog = {
@@ -243,6 +244,7 @@ describe("the organization's own single sign-on surface", () => {
           record: null,
           goLive: null,
           legacyRoute: null,
+          enterpriseRequired: false,
           migration: null,
         },
       });

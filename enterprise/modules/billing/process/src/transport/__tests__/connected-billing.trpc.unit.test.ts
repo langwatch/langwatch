@@ -4,7 +4,8 @@ import { AdminSurfaceHiddenError, type OpsOperator } from "@langwatch/ops-contra
 /**
  * @vitest-environment node
  * The `connectedBilling.*` surface: which staff member the mount hands billing for the operator
- * behind the request, and that an impersonator billing cannot name is refused.
+ * behind the request, and that an impersonator billing cannot name is refused. The platform
+ * door is open here; its refusals are in connected-billing.trpc.door.unit.test.ts.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
@@ -26,10 +27,20 @@ function mounted() {
     },
   });
   const trpc = initTRPC.context<BillingTrpcTestContext>().create();
+  const base = trpcTestMembers<BillingTrpcTestContext>();
+  const members = {
+    ...base,
+    authorization: {
+      forRequest: (ctx: BillingTrpcTestContext) => ({
+        ...base.authorization.forRequest(ctx),
+        getPlatformDecision: async () => ({ permitted: true }),
+      }),
+    },
+  };
   const router = createTrpcRuntime<BillingTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: trpcTestMembers<BillingTrpcTestContext>(),
+    members,
   }).mount(connectedBillingTrpcTransport, () => billing, {
     facts: [bindTrpcFact(operatorFact, (ctx) => ctx.operator ?? null)],
   });

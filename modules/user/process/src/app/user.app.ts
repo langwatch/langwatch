@@ -426,8 +426,9 @@ export class UserModule implements UserApi {
   // -- credentials -----------------------------------------------------------
 
   /** Mints an account that signs in with a password. */
-  createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser> {
-    return this.#users.createCredentialUser(input);
+  async createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser> {
+    const { id } = await this.#users.createCredentialUser(input);
+    return { id };
   }
 
   /** Mints the account a passkey ceremony is about to register its key against. */
@@ -498,9 +499,13 @@ export class UserModule implements UserApi {
       ? await this.#users.createConfirmedCredentialUser(account)
       : await this.#users.createCredentialUser(account);
 
-    await this.#lifecycle.registered({ userId: created.id, at: this.#now() });
+    await this.#lifecycle.registered({
+      userId: created.id,
+      at: this.#now(),
+      account: { accountId: created.accountId, createdAtMs: created.accountCreatedAtMs, email },
+    });
 
-    return created;
+    return { id: created.id };
   }
 
   /**

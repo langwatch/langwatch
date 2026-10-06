@@ -3,10 +3,10 @@
  */
 
 import { Box, Text, VStack } from "@langwatch/design-system/primitives";
+import type { Variable } from "@langwatch/design-system/variable-mapping";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 import type { FieldMapping } from "@langwatch/workflow-contract";
 
-import type { Variable } from "../prompt/variables/variables-section.tsx";
 import { ScenarioInputMappingSection } from "./scenario-input-mapping-section.tsx";
 
 /** A prompt as the run-plan form knows it. */

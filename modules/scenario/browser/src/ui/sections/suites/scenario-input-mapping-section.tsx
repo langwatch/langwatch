@@ -4,6 +4,7 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import { Box, Separator, Text, VStack } from "@langwatch/design-system/primitives";
+import { type Variable, VariablesSection } from "@langwatch/design-system/variable-mapping";
 import { type AvailableSource, type FieldMapping } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
 
@@ -13,7 +14,6 @@ import {
   toOutputFieldState,
 } from "../../../model/suite/output-field-state.ts";
 import { renderSourceTypeIcon } from "../../elements/workflow/workflow-icons.tsx";
-import { type Variable, VariablesSection } from "../prompt/variables/variables-section.tsx";
 
 /** The scenario fields shown as input mapping rows. */
 const SCENARIO_FIELDS: Variable[] = [

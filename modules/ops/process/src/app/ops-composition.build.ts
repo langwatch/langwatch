@@ -50,7 +50,11 @@ import {
 import { BlobStoreService } from "../services/blob-store.service.ts";
 import { EventExplorerService } from "../services/event-explorer.service.ts";
 import { EventingIntrospectionService } from "../services/eventing-introspection.service.ts";
-import { type AdminAuditSink, ImpersonationService } from "../services/impersonation.service.ts";
+import {
+  type AdminAuditSink,
+  ImpersonationService,
+  type ImpersonationSessions,
+} from "../services/impersonation.service.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
 import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service.ts";
 import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service.ts";
@@ -222,6 +226,7 @@ export function buildOpsInfrastructure(input: {
         ssoRouting: organizationSsoRouting(dependencies.identity),
         database: members.prisma,
         audit: AdminAuditService.create({ auditLog: dependencies.auditLog }),
+        sessions: dependencies.auth,
         auditLog: dependencies.auditLog,
         users: dependencies.users,
         scheduler: {
@@ -311,6 +316,8 @@ export interface OpsOperationsOptions {
   /** What the scheduler's audit trail reads; the trail itself also takes the audit log. */
   database: SchedulerAuditDatabase;
   audit: AdminAuditSink;
+  /** Auth's session claims, which an impersonation starts, reads and stops. */
+  sessions: ImpersonationSessions;
   /** The shared audit log every operator act is recorded on. */
   auditLog: AuditLogApi;
   access?: AdminAccess | undefined;
@@ -359,6 +366,7 @@ export class OpsOperations {
       blobStore: BlobStoreService.create(repositories.blobStore),
       impersonation: ImpersonationService.create({
         repository: repositories.impersonation,
+        sessions: this.options.sessions,
         access,
         audit: this.options.audit,
         now: this.options.now,

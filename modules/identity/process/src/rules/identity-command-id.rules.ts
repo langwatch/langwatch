@@ -40,3 +40,8 @@ export function detachOrphanCommandId({
 }): string {
   return `backfill:detach:${identifierId}:${accountId}`;
 }
+
+/** Stating the credential identifier a registration opened; a redelivered fact restates it. */
+export function signUpAttachCommandId({ accountId }: { accountId: string }): string {
+  return `sign-up:${accountId}`;
+}

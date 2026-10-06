@@ -55,6 +55,7 @@ import { planLiteralsRule } from "./rules/plan-literals.rule.mjs";
 import { prismaCountInListQueryRule } from "./rules/prisma-count-in-list-query.rule.mjs";
 import { queryDataInStateRule } from "./rules/query-data-in-state.rule.mjs";
 import { refusalIsAHandledErrorRule } from "./rules/refusal-is-a-handled-error.rule.mjs";
+import { requestDeliveryFromAnIntentRule } from "./rules/request-delivery-from-an-intent.rule.mjs";
 import { requireFetchTimeoutRule } from "./rules/require-fetch-timeout.rule.mjs";
 import { restRouteRule } from "./rules/rest-route.rule.mjs";
 import { schemaOutsideContractRule } from "./rules/schema-outside-contract.rule.mjs";
@@ -119,6 +120,7 @@ const HOUSE_RULES = [
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
   noAmbientContextRule,
+  requestDeliveryFromAnIntentRule,
   noInlineDynamicImportRule,
   noLoggerSpyRule,
   noPortVocabularyRule,
@@ -212,6 +214,7 @@ export {
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
   noAmbientContextRule,
+  requestDeliveryFromAnIntentRule,
   noInlineDynamicImportRule,
   noLoggerSpyRule,
   noPortVocabularyRule,

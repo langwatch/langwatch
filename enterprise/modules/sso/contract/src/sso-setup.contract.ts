@@ -212,6 +212,8 @@ export const ssoSetupPageViewSchema = z
     /** Where the cutover stands, when this connection replaces a
      *  grandfathered one. Null for every connection outside a pair. */
     migration: ssoSetupMigrationSchema.nullable(),
+    /** The plan, not the person, is what refuses: the screen offers no control that would only be refused. */
+    enterpriseRequired: z.boolean(),
     /** The addresses an identity provider is pointed at. This module serves
      *  them, so identity's own read does not answer them. */
     serviceProvider: z

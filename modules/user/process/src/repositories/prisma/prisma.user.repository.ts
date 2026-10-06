@@ -30,6 +30,7 @@ import {
 
 import type {
   CreateCredentialUserRow,
+  CreatedCredentialUser,
   CreatePasskeyUserRow,
   SetFirstUserPasswordRow,
   UserDeactivationOutcome,
@@ -183,25 +184,28 @@ export class PrismaUserRepository
     );
   }
 
-  async createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedUser> {
-    return createdUserSchema.parse(
-      await this.transaction(async (transaction) => {
-        const user = await transaction.user.create({
-          data: { name: input.name, email: input.email, emailVerified: input.emailVerified },
-          select: createdUserSelect,
-        });
-        const parsed = createdUserSchema.parse(user);
-        await transaction.account.create({
-          data: credentialAccountData({
-            userId: parsed.id,
-            issuer: input.issuer,
-            password: input.passwordHash,
-          }),
-        });
+  async createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser> {
+    return this.transaction(async (transaction) => {
+      const user = await transaction.user.create({
+        data: { name: input.name, email: input.email, emailVerified: input.emailVerified },
+        select: createdUserSelect,
+      });
+      const parsed = createdUserSchema.parse(user);
+      const account = await transaction.account.create({
+        data: credentialAccountData({
+          userId: parsed.id,
+          issuer: input.issuer,
+          password: input.passwordHash,
+        }),
+        select: { id: true, createdAt: true },
+      });
 
-        return { id: parsed.id };
-      }),
-    );
+      return {
+        id: parsed.id,
+        accountId: account.id,
+        accountCreatedAtMs: account.createdAt.getTime(),
+      };
+    });
   }
 
   async createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser> {

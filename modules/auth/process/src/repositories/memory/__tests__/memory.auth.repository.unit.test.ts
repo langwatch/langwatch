@@ -8,14 +8,14 @@ import { MemoryCliDeviceSessionRepository } from "../memory.cli-device-session.r
 import { MemorySignUpVerificationTokenRepository } from "../memory.signup-verification-token.repository.ts";
 
 const NOW = Temporal.Instant.from("2026-08-28T00:00:00.000Z");
-const SESSION = { sessionToken: "token", impersonating: null };
+const SESSION = { sessionToken: "token", impersonation: null };
 
 function sessions() {
   const memory = MemoryAuthDatabase.create();
 
-  memory.sessions.set("s1", { id: "s1", userId: "u1", sessionToken: "t1", impersonating: null });
-  memory.sessions.set("s2", { id: "s2", userId: "u1", sessionToken: "t2", impersonating: null });
-  memory.sessions.set("s3", { id: "s3", userId: "u2", sessionToken: "t3", impersonating: null });
+  memory.sessions.set("s1", { id: "s1", userId: "u1", sessionToken: "t1", impersonation: null });
+  memory.sessions.set("s2", { id: "s2", userId: "u1", sessionToken: "t2", impersonation: null });
+  memory.sessions.set("s3", { id: "s3", userId: "u2", sessionToken: "t3", impersonation: null });
 
   return MemoryAuthSessionRepository.create({ memory });
 }

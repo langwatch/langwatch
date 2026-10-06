@@ -7,6 +7,12 @@ import { SIGNED_UP_EVENT_TYPE } from "@langwatch/auth-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
 import {
+  GUIDED_ONBOARDING_TURN_FAILED_EVENT_TYPE,
+  GUIDED_ONBOARDING_TURN_FAILED_EVENT_VERSION,
+  LANGY_GUIDED_ONBOARDING_AGGREGATE_TYPE,
+  type GuidedOnboardingTurnFailedEventData,
+} from "@langwatch/langy-contract";
+import {
   GUIDED_ONBOARDING_AGGREGATE_TYPE,
   GUIDED_ONBOARDING_RECORDED_EVENT_TYPE,
   GUIDED_ONBOARDING_RECORDED_EVENT_VERSION,
@@ -80,6 +86,7 @@ function nurturingOverMemoryPostHog() {
   const pipeline = buildNurturingPipeline({
     deliver: (input) => delivery.deliver(input),
     projectCreated: async () => undefined,
+    guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
     evaluationCompleted: async () => [],
     simulationRunFinished: async () => [],
   });
@@ -283,6 +290,97 @@ describe("nurturing's guidedOnboardingRecorded peer subscriber", () => {
         ["guided_onboarding_tour_replayed", "gateway"],
       ]);
       expect(customerIoFetch).not.toHaveBeenCalled();
+    });
+  });
+});
+
+/** Langy's fact for one failed guided turn, as its langy_guided_onboarding pipeline records it. */
+function turnFailedFact(overrides: Partial<GuidedOnboardingTurnFailedEventData> = {}): Event {
+  const data: GuidedOnboardingTurnFailedEventData = {
+    tenantId: "project-1",
+    occurredAt: 1_000,
+    sourceEventId: "evt-failed",
+    organizationId: "org-1",
+    userId: "user-1",
+    conversationId: "conv-1",
+    turnId: "turn-1",
+    code: "langy_github_not_connected",
+    path: "gateway",
+    onboardingVariant: "guided",
+    ...overrides,
+  };
+  return {
+    id: "evt-turn-failed-fact",
+    aggregateId: data.conversationId,
+    aggregateType: LANGY_GUIDED_ONBOARDING_AGGREGATE_TYPE,
+    tenantId: createTenantId("project-1"),
+    createdAt: 1_000,
+    occurredAt: 1_000,
+    type: GUIDED_ONBOARDING_TURN_FAILED_EVENT_TYPE,
+    version: GUIDED_ONBOARDING_TURN_FAILED_EVENT_VERSION,
+    data,
+    idempotencyKey: `guided-turn-failed:${data.sourceEventId}`,
+  } as Event;
+}
+
+describe("nurturing's guidedOnboardingTurnFailed peer subscriber", () => {
+  describe("when langy records a failed turn of the guided conversation", () => {
+    /** @scenario "A failed guided turn langy recorded is tracked against the conversation's user" */
+    it("tracks it in PostHog against the user and makes no Customer.io call", async () => {
+      const { posthog, customerIoFetch, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(turnFailedFact());
+      await settle();
+
+      expect(posthog.tracked).toEqual([
+        {
+          userId: "user-1",
+          event: "guided_onboarding_turn_failed",
+          uuid: expect.stringMatching(/^[0-9a-f-]{36}$/),
+          properties: {
+            code: "langy_github_not_connected",
+            path: "gateway",
+            conversation_id: "conv-1",
+            turn_id: "turn-1",
+            organization_id: "org-1",
+            "$feature/experiment_onboarding_langy_guided": "guided",
+            projectId: "project-1",
+          },
+        },
+      ]);
+      expect(customerIoFetch).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A failed guided turn of an organization without a variant carries no experiment property" */
+    it("carries no experiment property for an organization without a variant", async () => {
+      const { posthog, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(turnFailedFact({ onboardingVariant: null, path: null }));
+      await settle();
+
+      expect(posthog.tracked).toHaveLength(1);
+      expect(posthog.tracked[0]?.properties).toEqual({
+        code: "langy_github_not_connected",
+        path: null,
+        conversation_id: "conv-1",
+        turn_id: "turn-1",
+        organization_id: "org-1",
+        projectId: "project-1",
+      });
+    });
+
+    /** @scenario "A redelivered failed-turn fact is tracked once" */
+    it("tracks one event for a fact delivered twice, under one uuid per source event", async () => {
+      const { posthog, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(turnFailedFact());
+      await deliverFact(turnFailedFact());
+      await deliverFact(turnFailedFact({ sourceEventId: "evt-failed-2", turnId: "turn-2" }));
+      await settle();
+
+      const uuids = posthog.tracked.map(({ uuid }) => uuid);
+      expect(posthog.tracked).toHaveLength(2);
+      expect(new Set(uuids).size).toBe(2);
     });
   });
 });

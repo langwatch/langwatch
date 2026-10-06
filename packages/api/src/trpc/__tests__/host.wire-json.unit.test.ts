@@ -54,6 +54,7 @@ function served() {
       organizationRole: "MEMBER",
     }),
     checkScopeLineage: async () => ({ kind: "consistent" }),
+    organizationOf: async () => null,
   });
   const trpc = TrpcHost.create({
     sessions: SessionReader.create({ verify: async () => ({ userId: "sam" }) }),

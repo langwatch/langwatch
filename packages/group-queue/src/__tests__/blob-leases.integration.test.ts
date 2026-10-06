@@ -421,7 +421,7 @@ describe("BlobLeases", () => {
 
     describe("given an S3-tier blob whose only holder retires", () => {
       describe("when that holder releases its lease", () => {
-        /** @scenario "An S3-tier release leaves the object to the GroupQueue durable-tier sweep" */
+        /** @scenario "An S3-tier release leaves the object to the operator's lifecycle rule" */
         it("graces the bookkeeping keys without touching any object store", async () => {
           await leases.take({
             projectId: PROJECT,

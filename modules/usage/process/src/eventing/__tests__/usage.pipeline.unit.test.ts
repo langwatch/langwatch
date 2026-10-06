@@ -22,6 +22,7 @@ function build({ saas }: { saas: boolean }) {
     countMonth: CountMonthCommand.create({
       counting: UsageCountingService.create({
         meter,
+        traceMeter: MemoryTraceMeterRepository.create(),
         entitlement: { getActivePlan: refuse },
         billing: { getPricingModel: refuse },
       }),

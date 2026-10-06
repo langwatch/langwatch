@@ -28,12 +28,11 @@ import {
   type IngestionPullProcessState,
   IngestionPullProcess,
 } from "../../eventing/ingestion-pull.process.ts";
-import { PulledUsageLedgerIntent } from "../../eventing/pulled-usage-ledger.intent.ts";
+import {
+  PulledUsageLedgerIntent,
+  type PulledUsagePricingDeps,
+} from "../../eventing/pulled-usage-ledger.intent.ts";
 import { PulledUsageEventingAdapter } from "../../eventing/pulled-usage.pipeline.ts";
-import type {
-  PulledUsageLedgerRepository,
-  PulledUsageLedgerRow,
-} from "../../repositories/pulled-usage-ledger.repository.ts";
 import { IngestionPullListingService } from "../ingestion-pull-listing.service.ts";
 import type { IngestionPullMetricsSink } from "../ingestion-pull-metrics.service.ts";
 import {
@@ -119,12 +118,12 @@ class RecordingPullMetrics implements IngestionPullMetricsSink {
   }
 }
 
-class RecordingPulledUsageLedger implements PulledUsageLedgerRepository {
-  readonly rows: PulledUsageLedgerRow[] = [];
-  insert(rows: PulledUsageLedgerRow[]): Promise<void> {
-    this.rows.push(...rows);
+class RecordingPulledUsageLedger implements PulledUsagePricingDeps {
+  readonly rows: Parameters<PulledUsagePricingDeps["sendRecordPulledUsagePriced"]>[0][] = [];
+  sendRecordPulledUsagePriced: PulledUsagePricingDeps["sendRecordPulledUsagePriced"] = (data) => {
+    this.rows.push(data);
     return Promise.resolve();
-  }
+  };
 }
 
 function processEvent(
@@ -414,7 +413,7 @@ describe("ingestion pull retry outcomes", () => {
 });
 
 describe("pulled usage ledger process", () => {
-  it("writes integer nano-USD and all quantities without changing scope", async () => {
+  it("records the priced fact in integer nano-USD with all quantities and its scope", async () => {
     const ledger = new RecordingPulledUsageLedger();
     const intent = PulledUsageLedgerIntent.create(ledger);
     await intent.execute({

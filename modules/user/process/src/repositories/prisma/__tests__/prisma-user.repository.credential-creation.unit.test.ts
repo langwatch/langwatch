@@ -44,7 +44,7 @@ function selectFrom(select?: object | null): Record<string, unknown> {
 
 function makeDatabase() {
   const userCreate = vi.fn(async (args: { select?: object | null }) => selectFrom(args.select));
-  const accountCreate = vi.fn(async () => ({}));
+  const accountCreate = vi.fn(async () => ({ id: "account-1", createdAt: new Date(1_000) }));
   const accountUpdate = vi.fn(async () => ({}));
   const userUpdate = vi.fn(async () => ({}));
   const passkeyCount = vi.fn(async () => 0);
@@ -105,7 +105,7 @@ describe("PrismaUserRepository credential creation", () => {
         issuer: ISSUER,
         emailVerified: true,
       }),
-    ).resolves.toEqual({ id: "user-1" });
+    ).resolves.toEqual({ id: "user-1", accountId: "account-1", accountCreatedAtMs: 1_000 });
     expect(userCreate).toHaveBeenCalledWith({
       data: { name: "Ada", email: "ada@example.com", emailVerified: true },
       select: { id: true },
@@ -119,6 +119,7 @@ describe("PrismaUserRepository credential creation", () => {
         providerAccountId: "user-1",
         password: "hash",
       },
+      select: { id: true, createdAt: true },
     });
   });
 
@@ -153,7 +154,7 @@ describe("PrismaUserRepository credential creation", () => {
           issuer: ISSUER,
           emailVerified: false,
         }),
-      ).resolves.toEqual({ id: "user-1" });
+      ).resolves.toEqual({ id: "user-1", accountId: "account-1", accountCreatedAtMs: 1_000 });
       expect(userCreate.mock.calls[0]?.[0].select).toEqual({ id: true });
     });
 

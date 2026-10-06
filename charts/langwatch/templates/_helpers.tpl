@@ -43,7 +43,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       pods land on the same Secret with zero operator config).
   Used by app/secrets.yaml, app/deployment.yaml, the gateway subchart
   bridge, the preflight Job, and NOTES.txt so every site agrees on the
-  one Secret that holds credentialsEncryptionKey + cronApiKey +
+  one Secret that holds credentialsEncryptionKey +
   nextAuthSecret + virtualKeyPepper + LW_GATEWAY_INTERNAL_SECRET +
   LW_GATEWAY_JWT_SECRET. this release collapsed the older split (separate
   langwatch-gateway-auth Secret) into this one because there was no
@@ -159,18 +159,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if not .Values.autogen.enabled }}
     {{- if empty .Values.secrets.existingSecret }}
       {{- $errors = append $errors "app.credentialsEncryptionKey must have either value, secretKeyRef, or autogen must be enabled" }}
-    {{- end }}
-  {{- end }}
-{{- end }}
-
-{{- if .Values.app.cronApiKey.secretKeyRef.name }}
-  {{- if empty .Values.app.cronApiKey.secretKeyRef.key }}
-    {{- $errors = append $errors "app.cronApiKey.secretKeyRef.name is set but key is empty" }}
-  {{- end }}
-{{- else if empty .Values.app.cronApiKey.value }}
-  {{- if not .Values.autogen.enabled }}
-    {{- if empty .Values.secrets.existingSecret }}
-      {{- $errors = append $errors "app.cronApiKey must have either value, secretKeyRef, or autogen must be enabled" }}
     {{- end }}
   {{- end }}
 {{- end }}
@@ -524,7 +512,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      this release collapsed the separate langwatch-gateway-auth Secret into
      the umbrella's app Secret: both langwatch-app and the gateway pod
      mount LW_GATEWAY_INTERNAL_SECRET + LW_GATEWAY_JWT_SECRET from the
-     same Secret that holds credentialsEncryptionKey / cronApiKey /
+     same Secret that holds credentialsEncryptionKey /
      nextAuthSecret / virtualKeyPepper. So the existing
      `autogen is disabled but no existingSecret is provided` check
      above already covers the gateway case — when chartManaged is on,
@@ -600,7 +588,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      the NLP credential. Refuse, for the same reason the Langy check does:
      these credentials have separate blast radii on purpose. */}}
 {{- $nlpKey := include "langwatch.nlpInternalSecretKey" . }}
-{{- $nlpReserved := list "credentialsEncryptionKey" "cronApiKey" "nextAuthSecret" "virtualKeyPepper" }}
+{{- $nlpReserved := list "credentialsEncryptionKey" "nextAuthSecret" "virtualKeyPepper" }}
 {{- if (.Values.gateway).chartManaged }}
   {{- $nlpReserved = concat $nlpReserved (list (include "langwatch.gatewayInternalSecretKey" .) (include "langwatch.gatewayJwtSecretKey" .)) }}
 {{- end }}
@@ -629,7 +617,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
        radii are meant to be separate. Only when both live in the same Secret;
        an operator-owned Secret elsewhere may name its key whatever it likes. */}}
   {{- if eq $langySecretName (include "langwatch.appSecretName" .) }}
-    {{- $reserved := list "credentialsEncryptionKey" "cronApiKey" "nextAuthSecret" "virtualKeyPepper" }}
+    {{- $reserved := list "credentialsEncryptionKey" "nextAuthSecret" "virtualKeyPepper" }}
     {{- if (.Values.gateway).chartManaged }}
       {{- $reserved = concat $reserved (list (include "langwatch.gatewayInternalSecretKey" .) (include "langwatch.gatewayJwtSecretKey" .)) }}
     {{- end }}
@@ -1928,27 +1916,6 @@ here, once, by name, so both consuming templates agree.
 {{- if .Values.app.assetBase }}
 - name: LANGWATCH_ASSET_BASE
   value: {{ .Values.app.assetBase | quote }}
-{{- end }}
-
-# Cron API key
-{{- if .Values.app.cronApiKey.secretKeyRef.name }}
-- name: CRON_API_KEY
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.app.cronApiKey.secretKeyRef.name }}
-      key: {{ .Values.app.cronApiKey.secretKeyRef.key }}
-{{- else if .Values.secrets.existingSecret }}
-- name: CRON_API_KEY
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.secrets.existingSecret }}
-      key: {{ .Values.secrets.secretKeys.cronApiKey | default "cronApiKey" }}
-{{- else if .Values.autogen.enabled }}
-- name: CRON_API_KEY
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "langwatch.appSecretName" . }}
-      key: cronApiKey
 {{- end }}
 
 # AI Gateway virtual-key pepper (control-plane only).

@@ -49,6 +49,7 @@ import {
 } from "../channels/http/http.better-auth.channel.ts";
 import { CredentialSessionGuard } from "../channels/http/http.credential-session-guard.channel.ts";
 import type { IdTokenIssuerRefusalChannel } from "../channels/http/http.id-token-issuer-refusal.channel.ts";
+import type { OAuthProfileEmailChannel } from "../channels/http/http.oauth-profile-email.channel.ts";
 import type { SignUpVerification } from "../channels/http/http.passkey-sign-up.channel.ts";
 import { SignInRouterShadow } from "../channels/http/http.sign-in-router-shadow.channel.ts";
 import type { SignUpAddressConfirmation } from "../channels/http/http.sign-up-confirmation.channel.ts";
@@ -338,6 +339,8 @@ type BuildBetterAuthOptions = Readonly<{
   identity: BetterAuthDeploymentIdentity;
   /** Shared with the sign-in door, which names an ID token refused for its issuer. */
   idTokenIssuerRefusals?: IdTokenIssuerRefusalChannel;
+  /** Where each OAuth provider's profile mapping notes the address, for a refused link. */
+  oauthProfileEmails?: OAuthProfileEmailChannel;
   /** Main's sign-up announcement, for a user who joins through their domain. */
   signupAnnouncements: SignupAnnouncementService;
   /** Where a sign-up, a session and a domain auto-join are recorded for nurturing. */
@@ -460,8 +463,13 @@ export async function buildBetterAuth(
       trustedIdpOrigins: options.trustedIdpOrigins,
       idpSimulatorUrl: options.idpSimulatorUrl,
       isProduction: options.isProduction,
-      socialProviders,
-      genericOAuthConfigs,
+      socialProviders: capturingProfileEmails({
+        providers: socialProviders,
+        channel: options.oauthProfileEmails,
+      }),
+      genericOAuthConfigs: genericOAuthConfigs.map(
+        (config) => options.oauthProfileEmails?.capturing(config) ?? config,
+      ),
     },
     federation: ModuleBetterAuthFederation.create({
       authProvider: options.authProvider,
@@ -525,4 +533,21 @@ export async function buildBetterAuth(
       }),
     ),
   });
+}
+
+/** Each mounted social provider, its profile mapping noting the address it maps. */
+function capturingProfileEmails<P extends Record<string, unknown>>({
+  providers,
+  channel,
+}: {
+  providers: P;
+  channel: OAuthProfileEmailChannel | undefined;
+}): P {
+  if (!channel) return providers;
+  const wrapped: Record<string, unknown> = {};
+  for (const [id, config] of Object.entries(providers)) {
+    wrapped[id] =
+      typeof config === "object" && config !== null ? channel.capturing(config) : config;
+  }
+  return { ...providers, ...wrapped };
 }

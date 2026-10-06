@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { describe, expect, it } from "vitest";
 
-import { MemoryNurturingClaimRepository } from "../memory.nurturing-claim.repository.ts";
+import { MemoryNurturingClaimRepository } from "../memory.nurturing.repositories.ts";
 
 describe("MemoryNurturingClaimRepository", () => {
   describe("when a key is claimed twice inside its window", () => {

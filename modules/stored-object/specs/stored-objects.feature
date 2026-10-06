@@ -109,6 +109,21 @@ Feature: Stored Objects service and API
     Then one canary object is written under the project's checkup prefix
     And the canary object is removed again
 
+  @unit @migration
+  Scenario: The purge removes main-era evaluation input objects and keeps every other purpose
+    Given stored objects with purpose evaluation_inputs in several projects and objects of other purposes
+    When the purge runs with apply
+    Then the bytes and the rows of the evaluation_inputs objects are deleted, page by page
+    And objects of every other purpose are untouched
+    And without apply the purge only counts what it would delete
+
+  @unit @migration
+  Scenario: A purge that cannot delete an object's bytes keeps its row for the next run
+    Given an evaluation_inputs object whose bytes storage refuses to delete
+    When the purge runs with apply
+    Then that row is kept and counted as failed
+    And the other evaluation_inputs objects are still deleted
+
   @unimplemented @integration @api @authorization
   Scenario: The public API uses the unified API package
     Given the Stored Objects public API is installed

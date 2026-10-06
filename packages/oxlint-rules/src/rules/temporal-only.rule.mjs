@@ -10,7 +10,8 @@ const TIME_PACKAGE = /^packages\/time\//;
 // The published SDK, MCP server and ksuid cannot resolve the private
 // @langwatch/time the fix names, so they are out of scope; their wire contract
 // stays ISO 8601 (specs/tooling/lint-temporal-only.feature).
-const PUBLISHED_ARTEFACT = /^(?:sdks\/typescript\/|mcp\/typescript\/|packages\/ksuid\/)/;
+const PUBLISHED_ARTEFACT =
+  /^(?:sdks\/typescript\/|mcp\/typescript\/|packages\/ksuid\/|packages\/webhook-verify\/)/;
 // The seams where a driver binds a real `Date` and will not take an `Instant`.
 // Eventing's Prisma stores predate `repositories/prisma/`; the path goes when they move.
 const PERSISTENCE_SEAM =

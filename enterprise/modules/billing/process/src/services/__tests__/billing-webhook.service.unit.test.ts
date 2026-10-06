@@ -1601,6 +1601,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       subscriptions: subRepo,
       organizations: { getAllMembers: async () => [{ id: "user-1" }] },
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
+      planLimitAlerts: { notifyPlanLimitReached: async () => {} },
     });
     announcer.connect({
       recordSubscriptionChanged: { send: async () => {}, ...unused },

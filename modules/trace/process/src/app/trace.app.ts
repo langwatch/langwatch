@@ -299,6 +299,7 @@ import {
 } from "../services/trace-export-bounds.service.ts";
 import { TraceExportDownloadService } from "../services/trace-export-download.service.ts";
 import { TraceExportService } from "../services/trace-export.service.ts";
+import { TraceIngestAllowanceService } from "../services/trace-ingest-allowance.service.ts";
 import { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
 import { TraceIngestSourceBillingService } from "../services/trace-ingest-source-billing.service.ts";
 import {
@@ -696,6 +697,8 @@ export interface TraceAppDependencies {
    * reaches it: absent members raise by name, never admit a caller.
    */
   ingestCredential?: TraceIngestCredentialService;
+  /** The plan's monthly allowance both ingestion doors ask; absent, a test graph meters nothing. */
+  ingestAllowance?: TraceIngestAllowanceService;
   /** Trace's fold of governance's billing fact; its pipeline folds, the OTLP door reads. */
   ingestSourceBilling?: TraceIngestSourceBillingService;
   /**
@@ -743,6 +746,8 @@ type TraceSetup = FeatureSetup<
 
 /** What one process composes Trace's read graph over: its registry, collaborators and peers. */
 type TraceReaderCompositionOptions = {
+  /** The allowance both ingestion doors ask, over entitlement's usage limit. */
+  ingestAllowance?: TraceIngestAllowanceService | undefined;
   /** The rows the registry chose for this process, one tier over both stores. */
   repositories: TraceRepositories;
   /** Absent on a process that composed no ClickHouse: every read refuses by name. */
@@ -895,6 +900,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         dedup: repositories.spanDedup,
         ...(publicBaseUrl === undefined ? {} : { publicBaseUrl }),
         requestBounds: dependencies.plans,
+        ingestAllowance: TraceIngestAllowanceService.create({ entitlement: dependencies.plans }),
         exportBounds: TraceExportBoundsService.create({
           entitlement: dependencies.plans,
           projects: dependencies.projects,
@@ -1116,6 +1122,7 @@ export class TraceModule implements TraceApi, CollectorApp {
             }),
           }
         : {}),
+      ...(options.ingestAllowance ? { ingestAllowance: options.ingestAllowance } : {}),
       ingestSourceBilling,
       publicBaseUrl: options.publicBaseUrl,
       scenarioRoleMetrics: ScenarioRoleMetricsDerivationService.create({
@@ -3239,13 +3246,12 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#dependencies.ingestCredential.resolveForCollector(input);
   }
 
-  /**
-   * The plan's monthly allowance. Accepts every batch — no module contract
-   * yet publishes a usage meter, so this deployment enforces none here. A
-   * member rather than an absence because the door reads it by name.
-   */
-  collectorUsageLimit(_input: { project: CollectorProject }): Promise<void> {
-    return Promise.resolve();
+  /** The plan's monthly allowance: throws the plan limit; a failed reading admits the batch. */
+  async collectorUsageLimit({ project }: { project: CollectorProject }): Promise<void> {
+    await this.#dependencies.ingestAllowance?.assertWithinAllowance({
+      projectId: project.id,
+      organizationId: project.organizationId,
+    });
   }
 
   /** Where one already-normalized span goes: the receiver both doors share. */
@@ -3414,16 +3420,19 @@ export class TraceModule implements TraceApi, CollectorApp {
     this.#dependencies.ingestCredential.markOtlpCredentialUsed(input);
   }
 
-  /**
-   * The plan's monthly allowance — unenforced here, same gap as
-   * {@link collectorUsageLimit}. Must close at both doors together, or
-   * one becomes the way around the other.
-   */
-  otlpUsageLimit(_input: {
+  /** The same allowance as {@link collectorUsageLimit}, so neither door is the way around. */
+  async otlpUsageLimit({
+    project,
+    customerTraceIds,
+  }: {
     project: OtlpIngestProject;
     customerTraceIds: string[];
   }): Promise<void> {
-    return Promise.resolve();
+    await this.#dependencies.ingestAllowance?.assertWithinAllowance({
+      projectId: project.id,
+      organizationId: project.organizationId,
+      customerTraceIds,
+    });
   }
 
   /** The trace signal: the same receiver `POST /api/collector` writes through. */

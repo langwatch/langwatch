@@ -1,5 +1,4 @@
 import {
-  browserSessionImpersonationSchema,
   browserSessionInventoryEntrySchema,
   browserSessionSchema,
   SessionIsCurrentError,
@@ -7,6 +6,8 @@ import {
   type BrowserSession,
   type BrowserSessionResolution,
   type BrowserSessionInventoryEntry,
+  type SessionImpersonation,
+  type SessionImpersonationState,
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
 import {
@@ -17,7 +18,7 @@ import {
   type SignedInWith,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import { Temporal, fromDate, toDate, type Instant } from "@langwatch/time";
+import { toDate, type Instant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { AuthSessionCacheRepository } from "../repositories/auth-session-cache.repository.ts";
@@ -25,6 +26,7 @@ import type {
   AuthSessionRepository,
   StoredBrowserSession,
 } from "../repositories/auth-session.repository.ts";
+import { liveImpersonation } from "../rules/impersonation-claims.rules.ts";
 import type { SessionBoundService } from "./session-bound.service.ts";
 
 const CACHE_PREFIX = "better-auth:";
@@ -141,30 +143,28 @@ export class BrowserSessionService {
     stored: StoredBrowserSession;
     session: BrowserSession;
   }): Promise<BrowserSession> {
-    const impersonation = browserSessionImpersonationSchema.safeParse(stored.impersonating);
-    if (!impersonation.success) return session;
-    const impersonationExpired =
-      Temporal.Instant.compare(fromDate(impersonation.data.expires), this.deps.now()) <= 0;
-    if (impersonationExpired) return session;
-
-    const { user: impersonatedUser, identityEmail } = await this.person({
-      userId: impersonation.data.id,
+    const state = liveImpersonation({
+      sessionUserId: stored.userId,
+      claims: stored.impersonation,
+      now: this.deps.now(),
     });
-    if (!impersonatedUser || impersonatedUser.deactivatedAt !== null) {
-      return session;
-    }
+    if (state.kind === "none") return session;
+    const { subjectUserId } = state.impersonation;
+
+    // The subject is read fresh, never copied at start: a retired subject is not acted for.
+    const { user: subject, identityEmail } = await this.person({ userId: subjectUserId });
+    if (!subject || subject.deactivatedAt !== null) return session;
 
     return browserSessionSchema.parse({
       ...session,
       user: {
-        id: impersonation.data.id,
-        name: impersonation.data.name ?? null,
+        id: subjectUserId,
+        name: subject.name ?? null,
         email:
           (identityEmail?.kind === "resolved" ? identityEmail.email : null) ??
-          impersonatedUser.email ??
-          impersonation.data.email ??
+          subject.email ??
           null,
-        image: impersonation.data.image ?? null,
+        image: subject.image ?? null,
         pendingSsoSetup: false,
         impersonator: {
           id: session.user.id,
@@ -203,6 +203,29 @@ export class BrowserSessionService {
     }
 
     return true;
+  }
+
+  /** The live {actor, subject} claims a session carries (D06); a gone session reads as none. */
+  async getImpersonation({ sessionId }: { sessionId: string }): Promise<SessionImpersonationState> {
+    const stored = await this.deps.sessions.findById({ id: sessionId });
+    if (!stored) return { kind: "none" };
+
+    return liveImpersonation({
+      sessionUserId: stored.userId,
+      claims: stored.impersonation,
+      now: this.deps.now(),
+    });
+  }
+
+  startImpersonation({
+    sessionId,
+    ...claims
+  }: SessionImpersonation & { sessionId: string; reason: string }): Promise<void> {
+    return this.deps.sessions.writeImpersonation({ sessionId, claims });
+  }
+
+  stopImpersonation({ sessionId }: { sessionId: string }): Promise<void> {
+    return this.deps.sessions.clearImpersonation({ sessionId });
   }
 
   /**

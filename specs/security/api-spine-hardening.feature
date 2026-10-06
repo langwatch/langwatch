@@ -22,12 +22,8 @@ Feature: API spine hardening — licence-aware federation, provenance-checked cl
       When the sign-in method policy is resolved
       Then the policy reports federation as licensed
 
-    @unit
-    Scenario: A deployment with no licensing service reports unlicensed and says so at boot
-      Given a self-hosted deployment composed with no licensing service
-      When the Better Auth transport is composed
-      Then the operator is warned that federation reports unlicensed
-      And the resolved sign-in method policy reports federation as not licensed
+    # A deployment with no licensing module is refused at boot (Q17), so no
+    # scenario covers composing one without it.
 
   Rule: a forwarding header is read only from a trusted hop
 

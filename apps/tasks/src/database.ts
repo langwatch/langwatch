@@ -29,6 +29,7 @@ export function openTasksDatabase(databaseUrl: string, config: TasksConfig): Tas
 
   return {
     client: connection.client,
+    sql: pool,
     hold: (run) => holdMigrationLock(pool, run),
     close: async () => {
       await pool.end();

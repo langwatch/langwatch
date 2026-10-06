@@ -21,3 +21,15 @@ export const userLifecycleEventDataSchema = z.object({
   actor: ledgerActorSchema.optional(),
 });
 export type UserLifecycleEventData = z.infer<typeof userLifecycleEventDataSchema>;
+
+/**
+ * A registration also names the credential row it opened, so identity can state its
+ * identifier against that row. Optional: facts recorded before 2026-10-06 carry none.
+ */
+export const userRegisteredEventDataSchema = z.object({
+  ...userLifecycleEventDataSchema.shape,
+  accountId: z.string().min(1).optional(),
+  createdAtMs: z.number().int().nonnegative().optional(),
+  email: z.string().min(1).optional(),
+});
+export type UserRegisteredEventData = z.infer<typeof userRegisteredEventDataSchema>;

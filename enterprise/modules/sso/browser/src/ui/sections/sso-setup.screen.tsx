@@ -34,7 +34,11 @@ import { useSsoHost } from "../../model/sso-host.ts";
 import { ConnectionNameRow } from "../elements/connection-name-row.tsx";
 import { IssuerRow } from "../elements/issuer-row.tsx";
 import { LegacyRouteNotice } from "../elements/legacy-route-notice.tsx";
-import { AvailabilityRefusalNotice, LoadFailure } from "../elements/refusals.tsx";
+import {
+  AvailabilityRefusalNotice,
+  EnterprisePlanRequiredNotice,
+  LoadFailure,
+} from "../elements/refusals.tsx";
 import { SetupStep, SetupSteps, SetupStepsSkeleton } from "../elements/setup-step.tsx";
 import { ArrivalsSection } from "./arrivals.section.tsx";
 import { BreakGlassSection } from "./break-glass.section.tsx";
@@ -114,6 +118,8 @@ function SsoSetupPage({ organizationId }: { organizationId: string }) {
   if (!view.availability.available) {
     return <AvailabilityRefusalNotice refusal={view.availability.refusal} />;
   }
+
+  if (view.enterpriseRequired) return <EnterprisePlanRequiredNotice />;
 
   if (view.connection === null) {
     return view.legacyRoute ? (

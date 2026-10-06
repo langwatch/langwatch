@@ -94,7 +94,7 @@ autogen:
   # Custom secret names for each service (auto-generated if not specified)
   secretNames:
     # Single canonical Secret holding every chart-materialised value: the
-    # app keys (credentialsEncryptionKey, cronApiKey, nextAuthSecret,
+    # app keys (credentialsEncryptionKey, nextAuthSecret,
     # virtualKeyPepper) AND the AI gateway shared-auth keys
     # (LW_GATEWAY_INTERNAL_SECRET, LW_GATEWAY_JWT_SECRET) when
     # gateway.chartManaged=true. langwatch-app and the gateway pod both
@@ -126,9 +126,6 @@ secrets:
     # not set.
     ## @param secrets.secretKeys.credentialsEncryptionKeyPrevious [string] Key name for the previous credentials encryption key, set only during a rotation.
     credentialsEncryptionKeyPrevious: ""
-    # Key for cron API key (used by app and cronjobs)
-    ## @param secrets.secretKeys.cronApiKey [string] Key name for cron API key.
-    cronApiKey: "cronApiKey"
     # Key for NextAuth secret (used by app)
     ## @param secrets.secretKeys.nextAuthSecret [string] Key name for NextAuth secret.
     nextAuthSecret: "nextAuthSecret"
@@ -259,15 +256,6 @@ app:
     previous:
       value: ""
       secretKeyRef: { name: "", key: "" }
-
-  # API key for internal cron job authentication
-  # Used by scheduled tasks to authenticate with the application
-  ## @extra app.cronApiKey API key used by cron jobs for authentication.
-  ## @param app.cronApiKey.value [string] Cron API key value.
-  ## @param app.cronApiKey.secretKeyRef [object] Reference to a secret holding the cron API key.
-  cronApiKey:
-    value: ""
-    secretKeyRef: { name: "", key: "" }
 
   # Pepper used when hashing AI Gateway virtual-key secrets (HMAC-SHA256).
   # Control-plane only — this value is NEVER shared with the gateway pod.
