@@ -1865,7 +1865,8 @@ throws to be retried. Analytics writes a new project's LangWatchQL key-map row f
 records that project as created from its own side. A peer subscriber writes its own read-model row
 directly; it sends its own command only when the reaction is a fact others react to, since the
 lane already gives retry safety (Alex, 2026-09-30). A peer subscriber may declare its own enqueue
-shaping (`options`: delay, dedup, group lane) and is handed the event's `occurredAt`. Automation
+shaping (`options`: delay, dedup, group lane, and `enqueue.filter` over the parsed data, so a
+declined event mints no job; Alex, 2026-10-06) and is handed the event's `occurredAt`. Automation
 reacts to trace's span and origin events and evaluation's completed and reported events this way,
 keeping main's settle windows and reading fold state through `TraceApi.findSummary` and
 `EvaluationApi.findRunByEvaluationId`; neither owner knows automation (Alex, 2026-10-01).

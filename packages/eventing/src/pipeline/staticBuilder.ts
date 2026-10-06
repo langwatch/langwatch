@@ -209,7 +209,7 @@ export class PipelineBuilder<
               eventId: event.id,
               ...(event.idempotencyKey && { idempotencyKey: event.idempotencyKey }),
             }),
-          options: subscriber.options,
+          options: peerSubscriberOptions(subscriber),
         }),
     });
     return this;
@@ -695,6 +695,24 @@ export class PipelineDeclaration {
     };
     return new PipelineBuilder(this.name, this.aggregate, { eventSchemas, parseEvent });
   }
+}
+
+/** A peer subscriber's options on its lane, its data filter lifted to the staged event. */
+function peerSubscriberOptions<Data extends z.ZodType>(
+  subscriber: PeerSubscriberDefinition<Data>,
+): EventSubscriberOptions | undefined {
+  const { enqueue, ...options } = subscriber.options ?? {};
+  const filter = enqueue?.filter;
+  if (!filter) return subscriber.options && options;
+  return {
+    ...options,
+    enqueue: {
+      filter: (event) => {
+        const parsed = subscriber.data.safeParse(event.data);
+        return parsed.success ? filter(parsed.data) : true;
+      },
+    },
+  };
 }
 
 /** The `type` a queued event claims, read before the schema for that type parses it. */
