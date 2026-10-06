@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { ownProof } from "~/test-utils/authorizationProofs";
 import { spanStorageRepositoryFor } from "~/test-utils/spanStorageRepository";
 import {
   deserializeAttributes,
   mapSpanSummaryRow,
-  type SpanStorageClickHouseRepository,
   type SpanSummaryQueryRow,
   serializeAttributes,
 } from "../span-storage.clickhouse.repository";
@@ -245,9 +245,7 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
     const query = vi.fn().mockResolvedValue({ json: async () => [] });
     const repo = spanStorageRepositoryFor((async () => ({
       query,
-    })) as unknown as ConstructorParameters<
-      typeof SpanStorageClickHouseRepository
-    >[0]);
+    })) as unknown as ClickHouseClientResolver);
     return { repo, query };
   }
 
@@ -341,9 +339,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
     query.mockResolvedValue({ json: async () => [] });
     const repo = spanStorageRepositoryFor((async () => ({
       query,
-    })) as unknown as ConstructorParameters<
-      typeof SpanStorageClickHouseRepository
-    >[0]);
+    })) as unknown as ClickHouseClientResolver);
     return { repo, query };
   }
 
@@ -497,9 +493,7 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
     const query = vi.fn().mockResolvedValue({ json: async () => [] });
     const repo = spanStorageRepositoryFor((async () => ({
       query,
-    })) as unknown as ConstructorParameters<
-      typeof SpanStorageClickHouseRepository
-    >[0]);
+    })) as unknown as ClickHouseClientResolver);
     return { repo, query };
   }
 
