@@ -3569,7 +3569,7 @@ export interface paths {
         put?: never;
         /**
          * Create a project
-         * @description Create a new project in the organization. Returns the project with its API key (sk-lw-...) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.
+         * @description Create a new project in the organization. Returns the project with a newly minted service API key (serviceApiKey) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.
          */
         post: operations["createProject"];
         delete?: never;
@@ -3587,7 +3587,7 @@ export interface paths {
         };
         /**
          * Get a project
-         * @description Get a project by ID, including its API key. Requires project:view permission.
+         * @description Get a project by ID. Requires project:view permission.
          */
         get: operations["getProject"];
         put?: never;

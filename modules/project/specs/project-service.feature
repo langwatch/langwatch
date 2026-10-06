@@ -104,8 +104,8 @@ Feature: Shared project service
   Scenario: A project is born with packaged credentials
     Given a process composes the project service
     When the service creates a project
-    Then the feature package mints the project identifier and the ingestion key
-    And the ingestion key keeps the prefixed 54-byte alphanumeric shape the onboarding snippets are sized against
+    Then the feature package mints the project identifier
+    And the legacy key column holds a value that never authenticates
     And no composition root describes either format
 
   @unit

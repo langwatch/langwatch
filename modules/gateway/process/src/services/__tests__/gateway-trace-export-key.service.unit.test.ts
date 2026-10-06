@@ -29,7 +29,10 @@ function harness() {
 const project = { organizationId: "org-1", projectId: "proj-1" };
 
 describe("the gateway trace export key", () => {
-  /** @scenario "The bundle exports spans with a trace-export key, never the project key" */
+  /**
+   * @scenario "The bundle exports spans with a trace-export key, never the project key"
+   * @scenario "No internal caller reads the legacy key"
+   */
   it("is an ownerless, hidden key holding only traces:create on its project", async () => {
     const { minted, service } = harness();
 
