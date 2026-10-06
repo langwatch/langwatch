@@ -35,6 +35,8 @@ export * from "./ingestion-templates.trpc.ts";
 export * from "./ingestion-pull.commands.ts";
 export * from "./ingestion-pull.events.ts";
 export * from "./ingestion-source-key.commands.ts";
+export * from "./coding-assistant-billing.commands.ts";
+export * from "./coding-assistant-billing.events.ts";
 export * from "./ottl.ts";
 export * from "./ocsf-export.ts";
 export * from "./persona-home.ts";
@@ -46,7 +48,4 @@ export * from "./pulled-usage.commands.ts";
 export * from "./pulled-usage.events.ts";
 export * from "./quarantine-fill.ts";
 
-export type {
-  GovernanceOtlpPolicyInput,
-  GovernanceOtlpReceiverPolicies,
-} from "./otlp-receiver-policy.ts";
+export * from "./otlp-receiver-policy.ts";

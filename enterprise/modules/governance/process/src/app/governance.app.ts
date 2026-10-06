@@ -208,6 +208,7 @@ import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
 import { AnthropicAdminPullerService } from "../services/anthropic-admin-puller.service.ts";
 import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
 import { DefaultGovernanceCliSessionInventoryService } from "../services/cli-session-inventory.service.ts";
+import { CodingAssistantBillingFactService } from "../services/coding-assistant-billing-fact.service.ts";
 import { CostRollupDayComparerService } from "../services/cost-rollup-day-comparer.service.ts";
 import { DatabricksGeniePullerService } from "../services/databricks-genie-puller.service.ts";
 import { DepartmentService } from "../services/department.service.ts";
@@ -545,6 +546,11 @@ export class GovernanceModule implements GovernanceRestApi {
     this.costAttributionPolicy = PostgresGovernancePolicyService.create(
       repositories.costAttributionPolicies,
     );
+    this.codingAssistantBilling = CodingAssistantBillingFactService.create({
+      policies: repositories.costAttributionPolicies,
+      record: (command) =>
+        this.codingAssistantBillingSender("recordCodingAssistantBilling").send(command),
+    });
     this.sessionPolicy = OrganizationSessionPolicyService.create({
       organizations: dependencies.organizations,
       loginKeys: dependencies.apiKeys,
@@ -626,6 +632,7 @@ export class GovernanceModule implements GovernanceRestApi {
       routingPolicies: dependencies.enterpriseGateway,
       sources: repositories.ingestionSources,
       members: dependencies.organizations,
+      billingFacts: this.codingAssistantBilling,
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
     });
     this.ingestionKeys = PersonalIngestionKeyService.create({
@@ -853,6 +860,8 @@ export class GovernanceModule implements GovernanceRestApi {
   private readonly cliSessions: DefaultGovernanceCliSessionInventoryService;
   private readonly sessionPolicy: OrganizationSessionPolicyService;
   private readonly costAttributionPolicy: PostgresGovernancePolicyService;
+  /** Q82: the billed facts trace folds; the backfill task records them for existing configs. */
+  readonly codingAssistantBilling: CodingAssistantBillingFactService;
   private readonly people: GovernancePeopleScreenService;
   private readonly agentsScreen: GovernanceAgentsScreenService;
   private readonly costBreakdown: GovernanceCostBreakdownService;
@@ -884,6 +893,7 @@ export class GovernanceModule implements GovernanceRestApi {
   private readonly http: GovernanceHttpClient;
   private ingestionPullCommands: EventingSenders | undefined;
   private pulledUsageCommands: EventingSenders | undefined;
+  private codingAssistantBillingCommands: EventingSenders | undefined;
   private readonly personalUsageDashboards: PersonalUsageDashboardService;
   private readonly cliBootstraps: DefaultGovernanceCliBootstrapService;
   private readonly cliAccessService: GovernanceCliAccessApi;
@@ -989,6 +999,16 @@ export class GovernanceModule implements GovernanceRestApi {
 
   connectPulledUsage(commands: EventingSenders): void {
     this.pulledUsageCommands = commands;
+  }
+
+  connectCodingAssistantBilling(commands: EventingSenders): void {
+    this.codingAssistantBillingCommands = commands;
+  }
+
+  private codingAssistantBillingSender(name: string) {
+    const sender = this.codingAssistantBillingCommands?.[name];
+    if (!sender) throw new Error(`coding_assistant_billing is not registered for ${name}`);
+    return sender;
   }
 
   /** Main's `agentListingDispatcher`: no pull pipeline here is a named refusal. */
