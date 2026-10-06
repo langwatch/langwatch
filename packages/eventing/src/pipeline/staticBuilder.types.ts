@@ -16,6 +16,7 @@ import type { DeduplicationStrategy } from "../queues/queue.types.ts";
 import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
+import type { PipelineUpcasts } from "../upcast/eventUpcast.ts";
 import type { ProcessManagerDefinition } from "./processManagerDefinition.ts";
 import type { PipelineMetadata } from "./types.ts";
 
@@ -108,6 +109,9 @@ export interface StaticPipelineDefinition<
    * the owning module's data-retention dependency. Registration prefers it to the runtime's (§9).
    */
   retentionPolicyResolver?: RetentionPolicyResolver;
+
+  /** Stored event types read as current ones, declared with `.withUpcasts` (§9). */
+  upcasts?: PipelineUpcasts;
 
   /** Fold projections (stateful, reduce events into state) registered in this pipeline */
   foldProjections: Map<

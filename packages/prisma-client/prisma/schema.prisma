@@ -6824,6 +6824,7 @@ model LangwatchUpgradeRun {
   outcome    String?
   plan       Json?
   report     Json?
+  floor      String?
 
   @@map("_langwatch_upgrade_run")
   @@ignore
@@ -6831,20 +6832,63 @@ model LangwatchUpgradeRun {
 
 /// One row per step of every kind the upgrade ledger knows; see LangwatchUpgradeRun.
 model LangwatchUpgradeStep {
-  id         String    @id
-  kind       String
-  release    String?
-  mode       String
-  status     String
-  inferred   Boolean   @default(false)
-  attempt    Int       @default(0)
-  lastError  String?   @map("last_error")
-  report     Json?
-  runId      String?   @map("run_id")
-  startedAt  DateTime? @map("started_at")
-  finishedAt DateTime? @map("finished_at")
-  updatedAt  DateTime  @map("updated_at")
+  id          String    @id
+  kind        String
+  release     String?
+  mode        String
+  status      String
+  inferred    Boolean   @default(false)
+  attempt     Int       @default(0)
+  lastError   String?   @map("last_error")
+  report      Json?
+  runId       String?   @map("run_id")
+  startedAt   DateTime? @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+  updatedAt   DateTime  @map("updated_at")
+  owner       String?
+  description String?
 
   @@map("_langwatch_upgrade_step")
+  @@ignore
+}
+
+/// One row per target of a step (one ClickHouse endpoint); the step row's status is the aggregate.
+model LangwatchUpgradeTarget {
+  stepId    String   @map("step_id")
+  target    String
+  status    String
+  version   String?
+  lastError String?  @map("last_error")
+  updatedAt DateTime @map("updated_at")
+
+  @@id([stepId, target])
+  @@map("_langwatch_upgrade_target")
+  @@ignore
+}
+
+/// The runner lease: one row per named lease, taken over only once expired.
+model LangwatchUpgradeLease {
+  name        String   @id
+  owner       String
+  image       String
+  host        String
+  heartbeatAt DateTime @map("heartbeat_at")
+  expiresAt   DateTime @map("expires_at")
+
+  @@map("_langwatch_upgrade_lease")
+  @@ignore
+}
+
+/// One row per serving process: its image and the step ids that image declares. No tenant data.
+model LangwatchUpgradePresence {
+  processId   String   @id @map("process_id")
+  role        String
+  image       String
+  release     String?
+  steps       Json     @default("[]")
+  startedAt   DateTime @map("started_at")
+  heartbeatAt DateTime @map("heartbeat_at")
+
+  @@map("_langwatch_upgrade_presence")
   @@ignore
 }

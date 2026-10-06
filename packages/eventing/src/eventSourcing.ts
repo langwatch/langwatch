@@ -48,6 +48,8 @@ import {
 import { JOB_ROUTING_FIELD, type JobTenants, readJobRouting } from "./services/queues/jobLane.ts";
 import type { JobRegistryEntry } from "./services/queues/queueManager.ts";
 import type { EventStore } from "./stores/eventStore.types.ts";
+import { EventUpcaster, type PipelineUpcasts } from "./upcast/eventUpcast.ts";
+import { upcastEventStore } from "./upcast/upcastEventStore.ts";
 
 const logger = createLogger("langwatch:event-sourcing");
 
@@ -129,6 +131,10 @@ export class EventSourcing {
   private _eventStore?: EventStore;
   private _globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   private readonly _globalJobRegistry = new Map<string, JobRegistryEntry>();
+  private readonly _upcastDrains = new Map<
+    string,
+    { pipeline: string; jobNames: ReadonlyMap<string, string> }
+  >();
   private _initialized = false;
   private _consumersHeld = false;
   private _loggedDisabledWarning = false;
@@ -303,8 +309,10 @@ export class EventSourcing {
   private parseRegisteredEvent(value: unknown): Event {
     const type =
       typeof value === "object" && value !== null && "type" in value ? value.type : undefined;
-    const owner = this._definitions.find((definition) =>
-      definition.aggregate.events.some((event) => event.type === type),
+    const owner = this._definitions.find(
+      (definition) =>
+        definition.aggregate.events.some((event) => event.type === type) ||
+        definition.open((opened) => EventUpcaster.of(opened.upcasts).declaresFrom(type)),
     );
     if (!owner) {
       throw new ValidationError({
@@ -482,7 +490,12 @@ export class EventSourcing {
       return disabled as ReturnType;
     }
 
-    const eventStore = this.eventStore as EventStore<EventType>;
+    const eventStore = upcastEventStore({
+      store: this.eventStore as EventStore<EventType>,
+      upcaster: EventUpcaster.of(definition.upcasts),
+      parseEvent: definition.parseEvent,
+    });
+    this.registerUpcastDrain(definition.upcasts);
 
     const serviceOptions = buildServiceOptions(definition);
 
@@ -673,6 +686,32 @@ export class EventSourcing {
     return this._processStore;
   }
 
+  /** A former pipeline's queued jobs drain into the lanes of the pipeline that renamed it (§9). */
+  private registerUpcastDrain(upcasts: PipelineUpcasts | undefined): void {
+    const drain = upcasts?.drain;
+    if (!drain) return;
+    this._upcastDrains.set(drain.pipeline, {
+      pipeline: upcasts.pipeline,
+      jobNames: new Map(Object.entries(drain.jobNames ?? {})),
+    });
+  }
+
+  /** The current lane a job queued under a former pipeline's key drains into, if declared. */
+  private drainedEntry({
+    pipelineName,
+    jobType,
+    jobName,
+  }: {
+    pipelineName: string;
+    jobType: string;
+    jobName: string;
+  }): JobRegistryEntry | undefined {
+    const drain = this._upcastDrains.get(pipelineName);
+    if (!drain) return undefined;
+    const current = drain.jobNames.get(jobName) ?? jobName;
+    return this._globalJobRegistry.get(`${drain.pipeline}:${jobType}:${current}`);
+  }
+
   /**
    * Strips routing metadata and looks up the registry entry for a job payload,
    * returning null on no handler. Resolution runs several times per job, so a
@@ -691,7 +730,9 @@ export class EventSourcing {
     }
 
     const registryKey = `${pipelineName}:${jobType}:${jobName}`;
-    const entry = this._globalJobRegistry.get(registryKey);
+    const entry =
+      this._globalJobRegistry.get(registryKey) ??
+      this.drainedEntry({ pipelineName, jobType, jobName });
     if (!entry) {
       logger.debug({ registryKey }, "No handler registered for job");
       return null;

@@ -1786,6 +1786,14 @@ parsing with its own schema at the queue boundary — never `any`, never a rule 
 Per-payload routing (group key, score, coalesce size, dedup id) travels in one reserved `__routing` field on
 the job envelope; `withEvents([])` types a pipeline's events as `never`; a command's lane parse is its only
 validation, handed to `processCommand` (Alex, 2026-09-27).
+A renamed or reshaped event type is upcast, never rewritten first (Alex, 2026-10-06): the owning
+pipeline declares `.withUpcasts({ events: [{ from: { type, aggregateType? }, to, version?, data? }],
+drain? })` after `.withEvents`, `to` one of its declared types and `data` a pure payload transform.
+Its queued-event parse, its event-store reads (the renamed aggregate type read beside its own) and
+replay apply it, so consumers and type filters see only the current type; `drain: { pipeline,
+jobNames? }` routes jobs a previous release queued under the former pipeline's keys into the current
+lanes for one release. Each upcast is an `event-upcast` background step in the upgrade ledger, and
+`EventUpcastReader` answers the stored events it still covers (`packages/eventing/specs/event-upcast.feature`).
 A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and
 registers with `.on(eventSchema, handler)` (or reads its `.toPayload(schema, map)` view); no cast (Alex, 2026-09-27).
 Per-entity calendar work (a report's cron) is a keyed process manager on its owner's pipeline, arming

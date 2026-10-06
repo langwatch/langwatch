@@ -15,6 +15,20 @@ export type {
   ReadHintTarget,
 } from "./pipeline/feature-eventing.ts";
 export { PipelineEventStore, type OwnEventLog } from "./stores/pipelineEventStore.ts";
+export {
+  type EventUpcast,
+  type PipelineUpcasts,
+  type UpcastDeclaration,
+  type UpcastDrain,
+  upcastStepId,
+} from "./upcast/eventUpcast.ts";
+export {
+  type ActiveUpcast,
+  activeUpcastSchema,
+  EventUpcastReader,
+  type UpcastCoverageSource,
+} from "./upcast/eventUpcastReader.ts";
+export { pipelineUpcastsOf, upcastReplayEventSource } from "./upcast/upcastReplayEventSource.ts";
 
 // Commands
 export type { Command, CommandHandler, CommandHandlerResult } from "./commands/command.ts";

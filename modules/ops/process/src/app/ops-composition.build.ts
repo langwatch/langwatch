@@ -3,8 +3,10 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   type EventSourcing,
   ReplayService as EventingReplayService,
+  pipelineUpcastsOf,
   replayLeanOf,
   replayProjectionsOf,
+  upcastReplayEventSource,
 } from "@langwatch/eventing";
 import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server";
 import type { Logger } from "@langwatch/observability";
@@ -110,9 +112,12 @@ class OpsReplayRuntimes implements OpsReplayRuntimeFactory {
     const connection = redis.duplicate();
     const definitions = eventing.definitions;
     const service = new EventingReplayService({
-      eventSource: new EventingClickHouseReplayEventSource({
-        clickhouse,
-        lean: replayLeanOf(definitions),
+      eventSource: upcastReplayEventSource({
+        source: new EventingClickHouseReplayEventSource({
+          clickhouse,
+          lean: replayLeanOf(definitions),
+        }),
+        upcasts: pipelineUpcastsOf(definitions),
       }),
       redis: connection,
       retentionPolicyResolver: ReplayRetentionService.create(this.input.retention),
