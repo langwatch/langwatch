@@ -35,6 +35,10 @@ import type {
  *  how stale a route's view of access may be. */
 export const AUTHORIZATION_MAX_AGE_MS = 5 * 60 * 1000;
 
+/** How long a project's organisation is remembered for internal mints. A
+ *  project never changes organisation, so this bounds memory, not staleness. */
+const INTERNAL_SCOPE_CACHE_MS = 60 * 1000;
+
 export type AuthorizationServiceDeps = {
   authz: Pick<AuthzService, "checkDetailed" | "effectivePermissions">;
   collector: Pick<AuthzCollectorService, "resolveScopeRef">;
@@ -43,7 +47,69 @@ export type AuthorizationServiceDeps = {
 };
 
 export class AuthorizationService {
+  private readonly internalScopes = new Map<
+    string,
+    { organizationId: string; until: number }
+  >();
+
   constructor(private readonly deps: AuthorizationServiceDeps) {}
+
+  /**
+   * Mint the proof for platform code reading on its own behalf - a
+   * projection folding a trace, a worker scoring one. No permission is
+   * evaluated: the platform is trusted on its own data, and the proof
+   * exists so the store client fences the read to the one project the
+   * caller named rather than to a tenant it was handed by string. The own
+   * grant carries only the permission asked for, and there is never a
+   * shared grant: internal work does not read across projects.
+   */
+  async authorizeInternal({
+    actor,
+    projectId,
+    permission,
+    purpose,
+  }: {
+    actor: Extract<Actor, { type: "internal" | "system" }>;
+    projectId: string;
+    permission: AuthzPermission;
+    purpose: AuthorizationPurpose;
+  }): Promise<Authorization> {
+    const now = this.deps.now?.() ?? Date.now();
+    const organizationId = await this.organizationOf({ projectId, now });
+    if (organizationId === undefined) {
+      throw new AccessNotGrantedError(permission);
+    }
+    return sealAuthorization({
+      actor,
+      principal:
+        actor.type === "system"
+          ? { type: "system", name: actor.name }
+          : { type: "internal", codePath: actor.codePath },
+      scope: { organizationId },
+      grants: [{ projectId, permissions: [permission], via: [], kind: "own" }],
+      expiresAt: now + AUTHORIZATION_MAX_AGE_MS,
+      purpose,
+    });
+  }
+
+  private async organizationOf({
+    projectId,
+    now,
+  }: {
+    projectId: string;
+    now: number;
+  }): Promise<string | undefined> {
+    const cached = this.internalScopes.get(projectId);
+    if (cached !== undefined && cached.until > now)
+      return cached.organizationId;
+    const scopeRef = await this.deps.collector.resolveScopeRef({ projectId });
+    if (scopeRef?.type !== "project") return undefined;
+    this.internalScopes.set(projectId, {
+      organizationId: scopeRef.organizationId,
+      until: now + INTERNAL_SCOPE_CACHE_MS,
+    });
+    return scopeRef.organizationId;
+  }
 
   /**
    * Mint the proof for one route call. The own grant carries the caller's

@@ -109,6 +109,9 @@ export const authorizationSchema = z
       z.object({ type: z.literal("anonymous") }).strict(),
       z.object({ type: z.literal("project"), id: z.string().min(1) }).strict(),
       z.object({ type: z.literal("system"), name: systemActorNameSchema }).strict(),
+      z
+        .object({ type: z.literal("internal"), codePath: z.string().min(1) })
+        .strict(),
     ]),
     scope: z.object({ organizationId: z.string().min(1) }).strict(),
     grants: z.array(authorizationGrantSchema).min(1).readonly(),

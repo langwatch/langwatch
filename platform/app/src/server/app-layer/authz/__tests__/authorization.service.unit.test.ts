@@ -215,3 +215,69 @@ describe("authorize", () => {
     });
   });
 });
+
+describe("AuthorizationService.authorizeInternal", () => {
+  describe("given platform code reading a project on its own behalf", () => {
+    describe("when it asks for a proof", () => {
+      it("mints an own-only proof for the one project without evaluating a permission", async () => {
+        const { service, deps } = door({ allowed: false, rows: [sharedRow()] });
+        const proof = await service.authorizeInternal({
+          actor: {
+            type: "internal",
+            codePath: "trace-processing/traceSummary.store",
+          },
+          projectId: AGGREGATE,
+          permission: "traces:view",
+          purpose: { kind: "event", eventId: "evt_1" },
+        });
+        expect(isSealedAuthorization(proof)).toBe(true);
+        expect(proof.principal).toEqual({
+          type: "internal",
+          codePath: "trace-processing/traceSummary.store",
+        });
+        expect(proof.scope).toEqual({ organizationId: ORG });
+        expect(proof.grants).toEqual([
+          {
+            projectId: AGGREGATE,
+            permissions: ["traces:view"],
+            via: [],
+            kind: "own",
+          },
+        ]);
+        expect(proof.expiresAt).toBe(NOW + AUTHORIZATION_MAX_AGE_MS);
+        expect(deps.authz.checkDetailed).not.toHaveBeenCalled();
+        expect(deps.sharedReads.findLiveSharedReads).not.toHaveBeenCalled();
+      });
+
+      it("remembers the project's organisation across mints", async () => {
+        const { service, deps } = door();
+        const mint = () =>
+          service.authorizeInternal({
+            actor: { type: "system", name: "aggregateReconciler" },
+            projectId: AGGREGATE,
+            permission: "traces:view",
+            purpose: { kind: "operator", entry: "reconcile" },
+          });
+        await mint();
+        await mint();
+        expect(deps.collector.resolveScopeRef).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("given a project that does not exist", () => {
+    describe("when platform code asks for a proof on it", () => {
+      it("refuses it as not granted", async () => {
+        const { service } = door({ scope: null });
+        await expect(
+          service.authorizeInternal({
+            actor: { type: "internal", codePath: "x" },
+            projectId: "proj_missing",
+            permission: "traces:view",
+            purpose: { kind: "event", eventId: "evt_1" },
+          }),
+        ).rejects.toBeInstanceOf(AccessNotGrantedError);
+      });
+    });
+  });
+});
