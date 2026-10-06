@@ -332,6 +332,14 @@ jobs:
                 exit 0
               fi
             done
+            # The CLI gave up (or died): print the app's own lines now, since
+            # the trailing service shutdown buries the first app error.
+            if grep -q "langwatch did not become healthy" "$GITHUB_WORKSPACE/_smoke.log" 2>/dev/null \
+              || ! kill -0 "$(cat "$GITHUB_WORKSPACE/_smoke.pid")" 2>/dev/null; then
+              echo "✗ the CLI reported a failed boot after ${SECONDS}s — langwatch lines:"
+              grep -E "langwatch|migrat|exited|Error" "$GITHUB_WORKSPACE/_smoke.log" | tail -n 300 || true
+              exit 1
+            fi
             if [ $((i % 24)) -eq 0 ]; then
               echo "  …still waiting at ${SECONDS}s — last cli.log lines:"
               tail -n 10 "$GITHUB_WORKSPACE/_smoke.log" 2>/dev/null | sed 's/^/    /' || true
@@ -339,6 +347,7 @@ jobs:
             sleep 5
           done
           echo "✗ langwatch never reported healthy on any port slot within ${SECONDS}s"
+          grep -E "langwatch|migrat|exited|Error" "$GITHUB_WORKSPACE/_smoke.log" | tail -n 300 || true
           exit 1
 
       - name: Probe service health endpoints
