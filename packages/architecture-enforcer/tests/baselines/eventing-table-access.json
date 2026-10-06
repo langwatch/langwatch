@@ -21,7 +21,6 @@
     "ops|modules/ops/process/src/repositories/prisma/prisma.process-ops.repository.ts|sql:ProcessManagerInstance": 4,
     "ops|modules/ops/process/src/repositories/prisma/prisma.process-ops.repository.ts|sql:ProcessManagerOutbox": 11,
     "ops|modules/ops/process/src/services/storage-stats-collection.service.ts|named:event_log": 1,
-    "topic|modules/topic/process/src/repositories/prisma/prisma.topic-clustering.repository.ts|delegate:ProcessManagerInstance": 1,
     "trace|modules/trace/process/src/repositories/clickhouse/trace-event-payload.repository.ts|sql:event_log": 1,
     "trace|modules/trace/process/src/services/trace-blob-store.service.ts|sql:event_log": 1
   }

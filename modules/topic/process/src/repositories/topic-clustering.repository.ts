@@ -86,11 +86,4 @@ export abstract class TopicClusteringRepository {
 
   /** The subset that already has a topic-model cursor row. */
   abstract findOwnedTopicModelProjectIds(projectIds: string[]): Promise<string[]>;
-
-  /**
-   * The subset of `projectIds` that already has a scheduled topic clustering
-   * wake. Those are skipped: re-requesting is a harmless no-op, but on a
-   * large fleet it would append an event per project on every pass.
-   */
-  abstract findAlreadyScheduledProjectIds(projectIds: string[]): Promise<string[]>;
 }

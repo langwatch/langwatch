@@ -23,7 +23,6 @@ function fakeRepository() {
     findProjectsWithTopicsPage: vi.fn().mockResolvedValue([]),
     findEligibleProjectsPage: vi.fn().mockResolvedValue([]),
     findOwnedTopicModelProjectIds: vi.fn().mockResolvedValue([]),
-    findAlreadyScheduledProjectIds: vi.fn().mockResolvedValue([]),
   };
   const _checked: TopicClusteringRepository = repository;
   return repository;
@@ -37,6 +36,7 @@ function makeMigration(repository: TopicClusteringRepository) {
       recordTopics: vi.fn().mockResolvedValue(undefined),
       requestClustering: vi.fn().mockResolvedValue(undefined),
     },
+    schedule: { findNextWakeAt: vi.fn().mockResolvedValue(null) },
   });
 }
 

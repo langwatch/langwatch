@@ -29,7 +29,6 @@ export type MemoryClusteringCost = Readonly<{
 export type MemoryClusteringProject = {
   exists: boolean;
   eligible: boolean;
-  scheduled: boolean;
   topicModelCursorId: string | null;
   topicIndex: TopicClusteringTopicIndexRow[];
   modelTopics: TopicClusteringModelRow[];
@@ -42,7 +41,6 @@ export function emptyClusteringProject(): MemoryClusteringProject {
   return {
     exists: true,
     eligible: false,
-    scheduled: false,
     topicModelCursorId: null,
     topicIndex: [],
     modelTopics: [],

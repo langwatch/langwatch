@@ -1,3 +1,4 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryTopicClusteringClaimRepository } from "../../repositories/memory/memory.topic-clustering-claim.repository.ts";
@@ -14,7 +15,7 @@ import { LegacyImportTopicClusteringMigration } from "../legacy-import.topic-clu
 /** A fake repository whose eligible-project walk serves `pages` in order, then empties. */
 function fakeRepository(overrides: { pages: string[][]; alreadyScheduled?: string[] }) {
   const pageCalls: { afterId: string | null; take: number }[] = [];
-  const scheduledLookups: string[][] = [];
+  const scheduledLookups: string[] = [];
   const repository: TopicClusteringRepository = {
     findProject: vi.fn(),
     findTopicIndexRows: vi.fn(),
@@ -30,16 +31,23 @@ function fakeRepository(overrides: { pages: string[][]; alreadyScheduled?: strin
       return (overrides.pages[index] ?? []).map((id) => ({ id }));
     },
     findOwnedTopicModelProjectIds: vi.fn(),
-    findAlreadyScheduledProjectIds: async (projectIds: string[]) => {
-      scheduledLookups.push(projectIds);
-      return overrides.alreadyScheduled ?? [];
+  };
+  const schedule = {
+    findNextWakeAt: async ({ projectId }: { projectId: string }) => {
+      scheduledLookups.push(projectId);
+      return overrides.alreadyScheduled?.includes(projectId) ? Temporal.Now.instant() : null;
     },
   };
-  return { repository, pageCalls, scheduledLookups };
+  return { repository, schedule, pageCalls, scheduledLookups };
+}
+
+/** The repository and schedule halves of one fake, as the migration's two collaborators. */
+function schedulerFor(fake: ReturnType<typeof fakeRepository>) {
+  return { repository: fake.repository, schedule: fake.schedule };
 }
 
 function makeMigration(
-  repository: TopicClusteringRepository,
+  fake: ReturnType<typeof fakeRepository>,
   options: {
     requestClustering?: (args: {
       tenantId: string;
@@ -51,7 +59,7 @@ function makeMigration(
   } = {},
 ) {
   return LegacyImportTopicClusteringMigration.create({
-    repository,
+    ...schedulerFor(fake),
     claims: options.claims ?? unansweredClaims(),
     commands: {
       recordTopics: vi.fn().mockResolvedValue(undefined),
@@ -66,12 +74,9 @@ describe("backfillTopicClusteringSchedules", () => {
     describe("when the walk runs", () => {
       it("counts one success per project and no failures", async () => {
         const requestClustering = vi.fn().mockResolvedValue(undefined);
-        const migration = makeMigration(
-          fakeRepository({ pages: [["p1", "p2", "p3"]] }).repository,
-          {
-            requestClustering,
-          },
-        );
+        const migration = makeMigration(fakeRepository({ pages: [["p1", "p2", "p3"]] }), {
+          requestClustering,
+        });
 
         const summary = await migration.seedClusteringSchedules();
 
@@ -88,10 +93,9 @@ describe("backfillTopicClusteringSchedules", () => {
       });
 
       it("continues bootstrapping the projects after it", async () => {
-        const migration = makeMigration(
-          fakeRepository({ pages: [["p1", "p2", "p3", "p4"]] }).repository,
-          { requestClustering: failing },
-        );
+        const migration = makeMigration(fakeRepository({ pages: [["p1", "p2", "p3", "p4"]] }), {
+          requestClustering: failing,
+        });
 
         const summary = await migration.seedClusteringSchedules();
 
@@ -100,10 +104,9 @@ describe("backfillTopicClusteringSchedules", () => {
       });
 
       it("reports the real outcome split rather than a blanket total", async () => {
-        const migration = makeMigration(
-          fakeRepository({ pages: [["p1", "p2", "p3", "p4"]] }).repository,
-          { requestClustering: failing },
-        );
+        const migration = makeMigration(fakeRepository({ pages: [["p1", "p2", "p3", "p4"]] }), {
+          requestClustering: failing,
+        });
 
         const summary = await migration.seedClusteringSchedules();
 
@@ -117,8 +120,7 @@ describe("backfillTopicClusteringSchedules", () => {
       it("counts them as skipped without issuing a bootstrap request", async () => {
         const requestClustering = vi.fn().mockResolvedValue(undefined);
         const migration = makeMigration(
-          fakeRepository({ pages: [["p1", "p2", "p3"]], alreadyScheduled: ["p1", "p3"] })
-            .repository,
+          fakeRepository({ pages: [["p1", "p2", "p3"]], alreadyScheduled: ["p1", "p3"] }),
           { requestClustering },
         );
 
@@ -135,7 +137,7 @@ describe("backfillTopicClusteringSchedules", () => {
       it("bootstraps every project across all pages", async () => {
         const requestClustering = vi.fn().mockResolvedValue(undefined);
         const migration = makeMigration(
-          fakeRepository({ pages: [["p1", "p2"], ["p3", "p4"], ["p5"]] }).repository,
+          fakeRepository({ pages: [["p1", "p2"], ["p3", "p4"], ["p5"]] }),
           { requestClustering, schedulePageSize: 2 },
         );
 
@@ -153,7 +155,7 @@ describe("backfillTopicClusteringSchedules", () => {
 
       it("advances the keyset cursor to the last id of the previous page", async () => {
         const fake = fakeRepository({ pages: [["p1", "p2"], ["p3", "p4"], ["p5"]] });
-        const migration = makeMigration(fake.repository, { schedulePageSize: 2 });
+        const migration = makeMigration(fake, { schedulePageSize: 2 });
 
         await migration.seedClusteringSchedules();
 
@@ -166,20 +168,20 @@ describe("backfillTopicClusteringSchedules", () => {
 
       it("stops on a short page instead of querying again", async () => {
         const fake = fakeRepository({ pages: [["p1", "p2"], ["p3"]] });
-        const migration = makeMigration(fake.repository, { schedulePageSize: 2 });
+        const migration = makeMigration(fake, { schedulePageSize: 2 });
 
         await migration.seedClusteringSchedules();
 
         expect(fake.pageCalls).toHaveLength(2);
       });
 
-      it("looks up already-scheduled projects once per page, scoped to that page", async () => {
+      it("asks the schedule about each project of each page, once", async () => {
         const fake = fakeRepository({ pages: [["p1", "p2"], ["p3"]] });
-        const migration = makeMigration(fake.repository, { schedulePageSize: 2 });
+        const migration = makeMigration(fake, { schedulePageSize: 2 });
 
         await migration.seedClusteringSchedules();
 
-        expect(fake.scheduledLookups).toEqual([["p1", "p2"], ["p3"]]);
+        expect(fake.scheduledLookups).toEqual(["p1", "p2", "p3"]);
       });
     });
   });
@@ -193,7 +195,7 @@ describe("backfillTopicClusteringSchedules", () => {
             if (tenantId === "p1") throw new Error("boom");
           });
         const migration = makeMigration(
-          fakeRepository({ pages: [["p1", "p2"], ["p3", "p4"], ["p5"]] }).repository,
+          fakeRepository({ pages: [["p1", "p2"], ["p3", "p4"], ["p5"]] }),
           { requestClustering: failingFirst, schedulePageSize: 2 },
         );
 
@@ -208,7 +210,7 @@ describe("backfillTopicClusteringSchedules", () => {
     describe("when the walk runs", () => {
       it("returns a zeroed summary without touching the bootstrap command", async () => {
         const requestClustering = vi.fn();
-        const migration = makeMigration(fakeRepository({ pages: [[]] }).repository, {
+        const migration = makeMigration(fakeRepository({ pages: [[]] }), {
           requestClustering,
         });
 
@@ -233,7 +235,7 @@ describe("seedClusteringSchedules claim coordination", () => {
     requestClustering = vi.fn().mockResolvedValue(undefined),
   ) =>
     LegacyImportTopicClusteringMigration.create({
-      repository: fakeRepository({ pages: [["p1"]] }).repository,
+      ...schedulerFor(fakeRepository({ pages: [["p1"]] })),
       claims,
       commands: {
         recordTopics: vi.fn().mockResolvedValue(undefined),
@@ -244,10 +246,10 @@ describe("seedClusteringSchedules claim coordination", () => {
   describe("given a claims store that cannot answer", () => {
     it("runs the walk on every call", async () => {
       const requestClustering = vi.fn().mockResolvedValue(undefined);
-      await makeMigration(fakeRepository({ pages: [["p1"]] }).repository, {
+      await makeMigration(fakeRepository({ pages: [["p1"]] }), {
         requestClustering,
       }).seedClusteringSchedules();
-      await makeMigration(fakeRepository({ pages: [["p1"]] }).repository, {
+      await makeMigration(fakeRepository({ pages: [["p1"]] }), {
         requestClustering,
       }).seedClusteringSchedules();
       expect(requestClustering).toHaveBeenCalledTimes(2);
@@ -260,7 +262,7 @@ describe("seedClusteringSchedules claim coordination", () => {
       const claims = MemoryTopicClusteringClaimRepository.create();
       const requestClustering = vi.fn();
       await LegacyImportTopicClusteringMigration.create({
-        repository: fakeRepository({ pages: [[]] }).repository,
+        ...schedulerFor(fakeRepository({ pages: [[]] })),
         claims,
         commands: {
           recordTopics: vi.fn().mockResolvedValue(undefined),
