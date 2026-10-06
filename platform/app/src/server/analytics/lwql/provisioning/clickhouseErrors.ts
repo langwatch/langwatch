@@ -79,15 +79,6 @@ export interface ClickHouseErrorSummary {
   readonly syscall?: string;
 }
 
-/**
- * The safe-to-log shape of a provisioning error: its numeric ClickHouse code and
- * exception type, and for a non-ClickHouse error (a connection failure, a Prisma
- * error) only the primitive system fields — never the message. A ClickHouse
- * error's message echoes the failing statement, which carries the password; a
- * connection error's message carries the `CLICKHOUSE_URL`/`DATABASE_URL` with
- * credentials. Both are omitted; only `code`, `errno` and `syscall`, which
- * cannot contain either, are surfaced.
- */
 function errorTypeName(error: unknown): string {
   const type = (error as { type?: unknown } | null)?.type;
   if (typeof type === "string" && type.length > 0) return type;
@@ -123,6 +114,15 @@ function systemErrorFields(error: unknown): {
   return fields;
 }
 
+/**
+ * The safe-to-log shape of a provisioning error: its numeric ClickHouse code and
+ * exception type, and for a non-ClickHouse error (a connection failure, a Prisma
+ * error) only the primitive system fields — never the message. A ClickHouse
+ * error's message echoes the failing statement, which carries the password; a
+ * connection error's message carries the `CLICKHOUSE_URL`/`DATABASE_URL` with
+ * credentials. Both are omitted; only `code`, `errno` and `syscall`, which
+ * cannot contain either, are surfaced.
+ */
 export function clickHouseErrorSummary(error: unknown): ClickHouseErrorSummary {
   const code = clickHouseErrorCode(error);
   return {
