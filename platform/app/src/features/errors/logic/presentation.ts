@@ -45,6 +45,11 @@ import {
 export interface ErrorPresentation {
   title: string;
   /**
+   * A headline for one variant of the code, when a single code covers
+   * failures with different fixes. Returning nothing keeps `title`.
+   */
+  titleFor?: (error: HandledErrorShape) => string | undefined;
+  /**
    * Optional body copy. Receives the error so it can use `meta` — but only
    * where this registry knows the shape of that meta, which is the whole
    * point: `meta` is a contract per code, not a bag to rummage through.
@@ -234,6 +239,20 @@ const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * What a provider slot is missing when the gateway answers
+ * `provider_config_invalid`, as `meta.problem` (ConfigProblem in
+ * services/aigateway/domain/errors.go). A closed set: the sentence is picked
+ * by matching it, and a value outside it reads as the remainder.
+ */
+export const PROVIDER_CONFIG_PROBLEMS: ReadonlySet<string> = new Set([
+  "api_key_missing",
+  "endpoint_missing",
+  "deployment_missing",
+  "operation_unsupported",
+  "model_not_served",
+]);
+
+/**
  * The upstream-HTTP-status fallback reasons (llmproxy.go's
  * upstreamReasonCodes), used when the provider's own body carried no
  * discriminant of its own. Grouped the same way PROVIDER_ALLOWANCE_REASONS
@@ -253,6 +272,15 @@ export const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   "permission_error",
   "invalid_api_key",
   "AccessDeniedException",
+  // A wrong AWS secret, an unknown or expired AWS access key.
+  "InvalidSignatureException",
+  "UnrecognizedClientException",
+  "ExpiredTokenException",
+  "InvalidClientTokenId",
+  "SignatureDoesNotMatch",
+  // Google's statuses for the same two refusals.
+  "UNAUTHENTICATED",
+  "PERMISSION_DENIED",
 ]);
 
 /**
@@ -4340,8 +4368,37 @@ const presentations = {
   },
   provider_config_invalid: {
     title: "This provider is not set up to serve that model",
+    // The body names the gap, so the headline has to name the same one.
+    titleFor: (error) => {
+      switch (str(error, "problem", "")) {
+        case "api_key_missing":
+          return "This provider has no API key saved";
+        case "endpoint_missing":
+          return "This provider has no endpoint URL saved";
+        case "deployment_missing":
+          return "This provider has no deployment for that model";
+        case "operation_unsupported":
+          return "This provider does not support this kind of request";
+      }
+      return undefined;
+    },
     describe: (error) => {
       const model = str(error, "model", "");
+      // One code, several different things to change. Telling a customer whose
+      // provider was saved with no API key to "add the model" sends them to the
+      // wrong field, so the gateway names the gap and each gets its sentence.
+      switch (str(error, "problem", "")) {
+        case "api_key_missing":
+          return "This model provider is enabled with no API key saved, so the request never reached it. Add the API key in Settings → Model Providers.";
+        case "endpoint_missing":
+          return "This model provider has no endpoint URL saved, so there was nowhere to send the request. Add the endpoint in Settings → Model Providers.";
+        case "deployment_missing":
+          return model
+            ? `This model provider has no deployment mapped for ${model}. Add the deployment mapping in Settings → Model Providers.`
+            : "This model provider has no deployment mapped for that model. Add the deployment mapping in Settings → Model Providers.";
+        case "operation_unsupported":
+          return "This model provider does not support this kind of request. Pick a model from a provider that does.";
+      }
       if (model) {
         return `No provider on this project is configured for ${model}. Add it to one in Settings → Model Providers.`;
       }
@@ -5178,7 +5235,7 @@ export function explainHandledError(
   }
 
   return {
-    title: presentation.title,
+    title: presentation.titleFor?.(error) ?? presentation.title,
     description: presentation.describe?.(error) ?? "",
     isRegistered: true,
   };
