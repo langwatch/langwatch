@@ -15,6 +15,8 @@ interface UseRunHistoryPaginationOptions {
   startDateMs: number;
   /** While the SSE stream is connected, fallback freshness polling stops. */
   sseConnected?: boolean;
+  /** The suites page polls the probe while the stream is down; results tabs do not. */
+  adaptivePolling?: boolean;
 }
 
 /**
@@ -25,6 +27,7 @@ export function useRunHistoryPagination({
   scenarioSetId,
   startDateMs,
   sseConnected = false,
+  adaptivePolling = false,
 }: UseRunHistoryPaginationOptions) {
   const { project } = useOrganizationTeamProject();
 
@@ -58,6 +61,7 @@ export function useRunHistoryPagination({
     runs: allRuns,
     enabled: pages.length <= 1,
     sseConnected,
+    adaptivePolling,
   });
 
   const allScenarioSetIds = useMemo(() => {

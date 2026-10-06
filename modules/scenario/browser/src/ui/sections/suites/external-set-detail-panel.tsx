@@ -148,6 +148,7 @@ export function ExternalSetDetailPanel({
     runs: runData ?? [],
     enabled: !!project,
     sseConnected,
+    adaptivePolling: true,
   });
 
   // Fetch scenarios for filter options

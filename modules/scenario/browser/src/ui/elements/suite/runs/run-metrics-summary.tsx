@@ -1,4 +1,4 @@
-/** Compact metrics pill for run/group row headers with pass rate, duration, and cost. */
+/** The metrics pill of a run group header: pass rate, average agent latency and total cost. */
 
 import { Box, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -284,11 +284,11 @@ export function RunMetricsSummary({ summary, size = "sm" }: RunMetricsSummaryPro
           </>
         )}
 
-        {/* Total duration */}
-        {summary.totalDurationMs !== null && (
+        {/* Average agent latency */}
+        {summary.averageAgentLatencyMs !== null && (
           <HStack gap={1}>
             <Icon as={Clock} boxSize={3} />
-            <Text fontWeight="medium">{formatLatency(summary.totalDurationMs)}</Text>
+            <Text fontWeight="medium">{formatLatency(summary.averageAgentLatencyMs)}</Text>
           </HStack>
         )}
 
