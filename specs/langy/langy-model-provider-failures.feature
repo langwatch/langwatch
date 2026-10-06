@@ -61,6 +61,7 @@ Feature: A turn that the model provider refused says so
       Given a turn the provider refused with a 401 or 403 and its own code for it
       When the customer reads the card
       Then it is the provider card saying the provider refused this key or its access to the model
+      And its headline says the provider rejected the API key
       And it offers to open the model settings
       And it does not offer to try again
 
