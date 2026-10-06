@@ -7440,7 +7440,7 @@ The gateway never writes spend on the request path. The spend interceptor append
 
 Records seal into segments every second. A drainer ships sealed segments oldest first to `POST /api/internal/gateway/spend-commands`, at least once: a segment is deleted only after the control plane acknowledges it. On a failed ship the drainer retries with a backoff from 1 second doubling to 60 seconds.
 
-On the control plane, the spend processing pipeline turns the commands into ledger rows in `gateway_budget_ledger_events` and appends a `BUDGET_UPDATED` change event for each budget it debited. The gateway then re-fetches the key config and sees the new spend on its next precheck.
+On the control plane, the spend processing pipeline turns the commands into ledger rows in `gateway_budget_ledger_events` and appends a `BUDGET_UPDATED` change event for each budget it debited. The gateway then re-fetches the key config in the background, without holding a request for it, and enforces the new spend once the fetch lands.
 
 | Variable | Default | Purpose |
 |---|---|---|
