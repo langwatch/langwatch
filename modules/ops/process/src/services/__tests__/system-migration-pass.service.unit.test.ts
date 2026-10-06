@@ -58,11 +58,13 @@ function stubDatabase({
   });
   const findMany = vi.fn().mockResolvedValue([]);
   const projectFindMany = vi.fn().mockResolvedValue([]);
+  const organizationFindMany = vi.fn().mockResolvedValue([]);
   const projectOrganization = vi.fn().mockResolvedValue({ team: { organizationId: "org_acme" } });
   return {
     findUnique,
     findMany,
     projectFindMany,
+    organizationFindMany,
     projectOrganization,
     database: prismaDouble({
       systemMigrationEnrollment: { findMany: vi.fn().mockResolvedValue(enrollments) },
@@ -70,7 +72,7 @@ function stubDatabase({
       // that skips tenants already terminal for every migration the pass
       // drives; an empty page ends the leg without touching Redis.
       $queryRaw: vi.fn().mockResolvedValue([]),
-      organization: { findMany: vi.fn().mockResolvedValue([]) },
+      organization: { findMany: organizationFindMany },
       project: { findMany: projectFindMany, findUniqueOrThrow: projectOrganization },
       user: { findMany: vi.fn().mockResolvedValue([]), findUnique },
       organizationUser: { findMany },
@@ -304,6 +306,7 @@ function enrollmentsOf(database: PrismaClient) {
 describe("project-rooted migration composition", () => {
   afterEach(() => vi.restoreAllMocks());
 
+  /** @scenario "A project-rooted migration keeps enrollment and execution axes distinct" */
   it("uses project ids for execution and checkpoints, but organization ids for cloud enrollment", async () => {
     const name = "project-audit-repair";
     const { database, projectFindMany, projectOrganization } = stubDatabase({
@@ -347,8 +350,12 @@ describe("project-rooted migration composition", () => {
     });
   });
 
+  /** @scenario "Project-rooted startup migrations prove completion for projects" */
   it("checks project-scoped startup completion instead of enumerating organizations", async () => {
-    const { database, projectFindMany } = stubDatabase({ enrollments: [], memberships: {} });
+    const { database, projectFindMany, organizationFindMany } = stubDatabase({
+      enrollments: [],
+      memberships: {},
+    });
     const adapter = SystemMigrationPassService.create({
       repositories: passRepositoriesOver(database),
       isSaaS: () => true,
@@ -372,5 +379,6 @@ describe("project-rooted migration composition", () => {
       select: { id: true },
       take: 100,
     });
+    expect(organizationFindMany).not.toHaveBeenCalled();
   });
 });

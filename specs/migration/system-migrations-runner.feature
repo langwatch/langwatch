@@ -17,6 +17,7 @@ Feature: Running system migrations across organizations
     Given a registered system migration
     And an organization "org_acme"
 
+  @unit
   Scenario: A project-rooted migration keeps enrollment and execution axes distinct
     Given an explicitly configured project-rooted migration
     And project "project_one" belongs to enrolled organization "org_acme"
@@ -25,6 +26,7 @@ Feature: Running system migrations across organizations
     And the migration receives "project_one" as its tenant identifier
     And its persisted checkpoint is keyed by "project_one"
 
+  @unit
   Scenario: Project-rooted startup migrations prove completion for projects
     Given an explicitly configured project-rooted startup migration
     When startup drives and verifies the migration

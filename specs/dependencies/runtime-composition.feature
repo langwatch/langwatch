@@ -14,7 +14,7 @@ Feature: App and worker runtime encapsulation
     And worker activity drains before Redis, ClickHouse and Prisma close
     And every shared client is closed exactly once
 
-  @architecture @migration
+  @architecture @migration @unit
   Scenario: New features do not use the global App singleton
     Given a feature is implemented as a physical package
     When its service and runtime adapters are composed

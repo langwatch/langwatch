@@ -67,7 +67,7 @@ Feature: Composing a process from feature installers
       And accessing an undeclared users dependency fails type checking
       And supplying an incompatible factory context fails type checking
 
-    @typecheck
+    @typecheck @unit
     Scenario: An app must implement its linked callable API
       Given a server app linked to an annotation API with callable use cases
       When its factory returns an object missing one use case
@@ -136,7 +136,7 @@ Feature: Composing a process from feature installers
       Then the retained operation refuses further calls
       And cleanup still attempts every acquired resource
 
-    @typecheck
+    @typecheck @unit
     Scenario: A provided client must implement the complete interface
       Given a root providing an implementation through a feature API token
       When the root explicitly widens its generic API type to an empty object
@@ -351,7 +351,7 @@ Feature: Composing a process from feature installers
 
   Rule: migration checks must prove that plausible regressions fail
 
-    @typecheck
+    @typecheck @unit
     Scenario: Compiler-negative cases start from a valid declaration
       Given a fixture whose app, dependency graph and infrastructure compile successfully
       When one forbidden dependency, config or infrastructure change is introduced

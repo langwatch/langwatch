@@ -72,6 +72,7 @@ Feature: What a scheduled report actually sends
 
   Rule: The author can see the report before it is scheduled
 
+    @unit
     Scenario: The preview renders against report data
       Given the author is editing a report's message
       Then the preview shows example traces or chart data, not an empty message

@@ -10,17 +10,20 @@ Feature: Seeing what your automations are doing
 
   Rule: I can see what is going to happen next
 
+    @integration
     Scenario: A report shows when it next runs
       Given a report scheduled every Monday at 09:00
       When I look at the automations page
       Then it shows when the report next runs
       And it shows when it last ran
 
+    @integration
     Scenario: A paused report shows no next run
       Given a report that is turned off
       When I look at the automations page
       Then it does not claim a next run time
 
+    @integration
     Scenario: A report that has never run
       Given a report saved a moment ago that has not run yet
       When I look at the automations page
@@ -29,12 +32,14 @@ Feature: Seeing what your automations are doing
 
   Rule: I can see what is reacting to events
 
+    @integration
     Scenario: An alert that is currently breaching
       Given an alert whose metric is over its threshold
       When I look at the automations page
       Then the alert is shown as firing
       And it shows when it last fired
 
+    @integration
     Scenario: An automation that matches traces
       Given an automation that has fired several times this month
       When I look at the automations page
@@ -49,6 +54,7 @@ Feature: Seeing what your automations are doing
 
   Rule: I can see what already happened
 
+    @integration
     Scenario: Reviewing recent activity across everything
       Given automations, alerts, and reports that have all fired
       When I look at the history
@@ -71,6 +77,7 @@ Feature: Seeing what your automations are doing
       Then no trace ids or trace content are shown
       # Fire history is gated by a weaker permission than trace content is.
 
+    @integration
     Scenario: Nothing has happened yet
       Given a project whose automations have never fired
       When I look at the history

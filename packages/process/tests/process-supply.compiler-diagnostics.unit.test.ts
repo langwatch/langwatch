@@ -201,6 +201,7 @@ beforeAll(() => {
 }, 30_000);
 
 describe("compiler checked process supply", () => {
+  /** @scenario "Compiler-negative cases start from a valid declaration" */
   it.each([
     "member",
     "memberType",
@@ -312,6 +313,7 @@ describe("compiler checked process supply", () => {
     expect(outstanding).toContain("more");
   });
 
+  /** @scenario "Compiler-negative cases start from a valid declaration" */
   it.each([
     "goodClock",
     "goodCustom",
