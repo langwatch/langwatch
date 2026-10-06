@@ -655,7 +655,32 @@ export class ProjectService {
 
     const project = await this.repo.archive({ id, organizationId });
     if (!project) throw new ProjectNotFoundError("Project not found");
+    if (isAggregateProjectKind(project.kind)) {
+      await this.stopAggregate({ aggregateProjectId: project.id });
+    }
     return project;
+  }
+
+  /**
+   * An archived aggregate reads nothing, so its nightly sweep is switched
+   * off. Its grants are left as they stand: an archived project is opened by
+   * no route, and leaving them keeps an unarchive a matter of one reconcile.
+   * Never throws: a sweep left running on an archived aggregate reconciles
+   * nothing, which is noise, not harm.
+   */
+  async stopAggregate({
+    aggregateProjectId,
+  }: {
+    aggregateProjectId: string;
+  }): Promise<void> {
+    try {
+      await this.aggregateReconciler?.unscheduleSweep({ aggregateProjectId });
+    } catch (error) {
+      logger.error(
+        { projectId: aggregateProjectId, error },
+        "failed to switch off an archived aggregate's nightly sweep; it will reconcile nothing until it is",
+      );
+    }
   }
 
   async listByOrganization(params: {

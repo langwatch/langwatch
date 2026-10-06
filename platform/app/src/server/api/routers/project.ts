@@ -602,6 +602,11 @@ export const projectRouter = createTRPCRouter({
         where: { id: input.projectToArchiveId, archivedAt: null },
         data: { archivedAt: new Date() },
       });
+      if (result.count > 0 && isAggregateProjectKind(target?.kind)) {
+        await getApp().projects.stopAggregate({
+          aggregateProjectId: input.projectToArchiveId,
+        });
+      }
       return { success: true, alreadyArchived: result.count === 0 };
     }),
 

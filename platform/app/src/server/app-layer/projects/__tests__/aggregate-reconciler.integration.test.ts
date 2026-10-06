@@ -31,11 +31,14 @@ import { GrantsAuthzReadRepository } from "~/server/app-layer/authz/repositories
 import { SharedReadsGrantsRepository } from "~/server/app-layer/authz/repositories/shared-reads.grants.repository";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PrismaScheduledJobRepository } from "~/server/app-layer/scheduler/scheduled-job.repository";
+import { SchedulerRegistry } from "~/server/app-layer/scheduler/scheduler.registry";
 import { prisma } from "~/server/db";
 import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import {
+  AGGREGATE_RECONCILE_SWEEP,
   AGGREGATE_RULE_NO_LONGER_MATCHES,
   AggregateReconciler,
+  aggregateReconcileSweepHandler,
 } from "../aggregate-reconciler.service";
 import type { AggregateRule } from "../aggregate-rule";
 import { AggregateRuleService } from "../aggregate-rule.service";
@@ -386,6 +389,92 @@ describe("Feature: the reconciler keeps members current", () => {
         expect(after).toEqual(before);
         const live = after.filter((row) => row.revokedAt === null);
         expect(new Set(live.map((row) => row.scopeId)).size).toBe(live.length);
+      });
+    });
+  });
+
+  /** @scenario "A nightly sweep catches a missed trigger" */
+  describe("given an aggregate project with the rule all personal projects", () => {
+    describe("and a personal project created while the reconciler was unavailable", () => {
+      describe("when the nightly sweep runs for the organisation", () => {
+        it("makes that personal project a member", async () => {
+          const aggregate = await createAggregate({ kind: "all-personal" });
+          const job = await prisma.scheduledJob.findFirstOrThrow({
+            where: {
+              projectId: aggregate.id,
+              targetType: AGGREGATE_RECONCILE_SWEEP.targetType,
+            },
+          });
+          expect(job).toMatchObject({
+            targetId: aggregate.id,
+            cron: AGGREGATE_RECONCILE_SWEEP.cron,
+            timezone: AGGREGATE_RECONCILE_SWEEP.timezone,
+            active: true,
+          });
+
+          // Written past every trigger, the way an outage would leave it.
+          const latecomer = await fixture.makeUser({
+            handle: "latecomer",
+            organizationRole: OrganizationUserRole.MEMBER,
+          });
+          const latecomerTeam = await prisma.team.create({
+            data: {
+              name: `latecomer workspace ${fixture.ns}`,
+              slug: `--test-personal-latecomer-${fixture.ns}`,
+              organizationId: fixture.organizationId,
+              isPersonal: true,
+              ownerUserId: latecomer.id,
+            },
+          });
+          const missed = await prisma.project.create({
+            data: {
+              name: `latecomer personal ${fixture.ns}`,
+              slug: `--test-personal-project-latecomer-${fixture.ns}`,
+              apiKey: `test-key-latecomer-${fixture.ns}`,
+              teamId: latecomerTeam.id,
+              language: "python",
+              framework: "openai",
+              isPersonal: true,
+              ownerUserId: latecomer.id,
+            },
+          });
+          expect(await liveMembersOf(aggregate.id)).not.toContain(missed.id);
+
+          // The job as the scheduler fires it: the registered handler, handed
+          // the row's own identity.
+          const registry = new SchedulerRegistry();
+          registry.register({
+            targetType: AGGREGATE_RECONCILE_SWEEP.targetType,
+            handler: aggregateReconcileSweepHandler(reconciler),
+          });
+          await registry.get(job.targetType)?.({
+            projectId: job.projectId,
+            targetType: job.targetType,
+            targetId: job.targetId,
+            slot: job.nextRunAt,
+          });
+
+          expect(await liveMembersOf(aggregate.id)).toContain(missed.id);
+        });
+      });
+    });
+
+    describe("when the aggregate is archived", () => {
+      it("switches its nightly sweep off", async () => {
+        const aggregate = await createAggregate({ kind: "all-personal" });
+
+        await callerFor(fixture.admin.id).project.archiveById({
+          projectId: fixture.shared.id,
+          projectToArchiveId: aggregate.id,
+        });
+
+        const job = await prisma.scheduledJob.findFirstOrThrow({
+          where: {
+            projectId: aggregate.id,
+            targetType: AGGREGATE_RECONCILE_SWEEP.targetType,
+          },
+        });
+        expect(job.active).toBe(false);
       });
     });
   });
