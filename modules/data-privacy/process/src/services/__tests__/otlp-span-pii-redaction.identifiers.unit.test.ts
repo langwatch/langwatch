@@ -31,7 +31,9 @@ function policyAt(level: "essential" | "strict"): ResolvedDataPrivacy {
 
 /** The redaction service with only the analysis transport doubled; `submitted()` is its intake. */
 function makeService(level: "essential" | "strict") {
-  const batchSpy = vi.fn(async (texts: string[]) => texts.map(() => null));
+  const batchSpy = vi.fn(async (texts: string[]): Promise<(string | null)[]> =>
+    texts.map(() => null),
+  );
   const transport: Pick<PiiAnalysisService, "clearGoogleDlp" | "clearPresidio" | "close"> = {
     clearGoogleDlp: async (): Promise<PiiClearing> => ({ kind: "unchanged" }),
     clearPresidio: async ({ texts }) => batchSpy(texts),

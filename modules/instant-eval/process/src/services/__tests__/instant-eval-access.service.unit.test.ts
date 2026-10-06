@@ -127,6 +127,7 @@ describe("given a judge that judges for some organizations and not others", () =
       const access = InstantEvalAccessService.create({
         flags: released,
         projects,
+        optIns: NEVER_OPTED_IN,
         isJudgeConfigured: () => true,
         judge: {
           isAvailableForOrganization: async (organizationId) => {
@@ -147,6 +148,7 @@ describe("given a judge that judges for some organizations and not others", () =
       const access = InstantEvalAccessService.create({
         flags: released,
         projects,
+        optIns: NEVER_OPTED_IN,
         isJudgeConfigured: () => true,
         judge: { isAvailableForOrganization: async () => true },
       });
