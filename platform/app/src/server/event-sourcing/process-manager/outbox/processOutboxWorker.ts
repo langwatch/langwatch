@@ -31,6 +31,20 @@ function madeNoProgress(report: DispatchReport | undefined): boolean {
   );
 }
 
+/** A drain that leased a full batch likely left a backlog: drain again at once. */
+function leasedFullBatch(
+  report: DispatchReport | undefined,
+  batchSize: number,
+): boolean {
+  if (!report) return false;
+  const { dispatched, retried, dead, released, fenced } = report;
+  const leased = [dispatched, retried, dead, released, fenced].reduce(
+    (total, keys) => total + keys.length,
+    0,
+  );
+  return leased >= batchSize;
+}
+
 export interface ProcessOutboxWorkerOptions {
   dispatcher: Pick<OutboxDispatcherService, "runOnce">;
   logger: Logger;
@@ -241,6 +255,7 @@ export class ProcessOutboxWorker {
       this.pollIntervalMs = madeNoProgress(report)
         ? Math.min(this.pollIntervalMs * 2, this.maxIdleIntervalMs)
         : this.intervalMs;
+      if (leasedFullBatch(report, this.batchSize)) this.drainRequested = true;
       this.resume();
     });
   }

@@ -369,6 +369,34 @@ describe("ProcessOutboxWorker", () => {
     });
 
     /** @scenario "An idle outbox worker backs off its recovery poll until notified" */
+    it("drains again at once after a full batch, and waits a poll after a partial one", async () => {
+      vi.useFakeTimers();
+      const fullBatch = { ...report(), dispatched: ["message-1", "message-2"] };
+      const runOnce = vi
+        .fn()
+        .mockResolvedValueOnce(fullBatch)
+        .mockResolvedValueOnce(fullBatch)
+        .mockResolvedValueOnce(busyReport())
+        .mockResolvedValue(report());
+      const worker = new ProcessOutboxWorker({
+        dispatcher: { runOnce },
+        logger: makeLogger(),
+        intervalMs: 1_000,
+        batchSize: 2,
+      });
+
+      worker.start();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(runOnce).toHaveBeenCalledTimes(3);
+
+      await vi.advanceTimersByTimeAsync(999);
+      expect(runOnce).toHaveBeenCalledTimes(3);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(runOnce).toHaveBeenCalledTimes(4);
+      await worker.stop();
+    });
+
+    /** @scenario "An idle outbox worker backs off its recovery poll until notified" */
     it("backs off while drains fail, rather than polling at the base interval", async () => {
       vi.useFakeTimers();
       const runOnce = vi
