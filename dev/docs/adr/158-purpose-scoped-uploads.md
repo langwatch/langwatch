@@ -265,10 +265,11 @@ confirmUpload(input: { projectId; objectId }): Promise<StoredObjectReference>
 The two multipart `/upload` routes and `POST /api/dataset/attachments` are a **time-boxed exception
 to the no-bytes rule**.
 
-- The `/upload` pair keeps main's behaviour: a body of up to 25 MB, parsed in the request, over the
-  unchanged `createDatasetFromUpload` and `uploadToExistingDataset`.
+- The `/upload` pair keeps main's wire, parsed in the request, over `createDatasetFromUpload` and
+  `uploadToExistingDataset`. Its body is buffered, so it is capped at one full dataset row
+  (`datasetRowBytes`, about 268 MiB); a larger file goes through the stored-object import.
 - `/attachments` keeps main's wire: a multipart body of up to 21 MB (the 20 MB file cap plus framing),
-  30 uploads a minute, answered `{ url, name, mediaType, sizeBytes }`. The one deprecated operation
+  600 uploads a minute (`datasetAttachmentUploadsPerMinute`), answered `{ url, name, mediaType, sizeBytes }`. The one deprecated operation
   `storeAttachmentUpload` refuses what main refused, then stores the file through
   `storedObjects.storeFromBytes` with the purpose `dataset_attachment`.
 - Each carries `.withDeprecated({ successor, notice })`.

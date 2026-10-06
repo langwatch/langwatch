@@ -132,6 +132,7 @@ import { WorkflowCodeCompletionService } from "../services/workflow-code-complet
 import { WorkflowCommitMessageService } from "../services/workflow-commit-message.service.ts";
 import { WorkflowCopyLineageService } from "../services/workflow-copy-lineage.service.ts";
 import { ContractWorkflowDslMigrationService } from "../services/workflow-dsl-migration.service.ts";
+import { WorkflowEngineAttachmentLimitService } from "../services/workflow-engine-attachment-limit.service.ts";
 import { WorkflowExecuteSyncRelayService } from "../services/workflow-execute-sync-relay.service.ts";
 import { WorkflowHttpSecretsService } from "../services/workflow-http-secrets.service.ts";
 import { WorkflowLinkedRowsService } from "../services/workflow-linked-rows.service.ts";
@@ -623,7 +624,8 @@ export class WorkflowModule implements WorkflowApi {
       runKeys: setup.dependencies.apiKeys,
       dispatchKeyFloorMs: dispatchKeyFloorMs({ onLambda: engine.fleet !== undefined }),
     });
-    const nlpRuntime = engine.runtime;
+    const attachmentLimits = WorkflowEngineAttachmentLimitService.create({ datasets });
+    const nlpRuntime = attachmentLimits.limitedRuntime(engine.runtime);
     const ids = KsuidWorkflowId.create();
     const workflows = WorkflowService.create({
       repository: setup.repositories.workflows,
@@ -641,7 +643,7 @@ export class WorkflowModule implements WorkflowApi {
 
     const modelProviders = setup.dependencies.modelProviders;
     const studioDispatch = WorkflowStudioDispatchService.create({
-      stream: engine.stream,
+      stream: attachmentLimits.limitedStream(engine.stream),
       modelProviders,
     });
 

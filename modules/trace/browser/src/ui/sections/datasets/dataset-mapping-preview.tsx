@@ -4,9 +4,9 @@
  */
 import type { WireOf } from "@langwatch/api/web";
 import type {
-  Dataset,
   DatasetColumns,
   DatasetRecordEntry,
+  DatasetWire,
   MappingState,
 } from "@langwatch/dataset-contract";
 import {
@@ -38,7 +38,7 @@ interface DatasetMappingPreviewProps {
   traces: Trace[];
   columnTypes: DatasetColumns;
   rowData: DatasetRecordEntry[];
-  selectedDataset: Pick<WireOf<Dataset>, "id" | "columnTypes" | "mapping">;
+  selectedDataset: Pick<WireOf<DatasetWire>, "id" | "columnTypes" | "mapping">;
   onEditColumns: () => void;
   onRowDataChange: (entries: DatasetRecordEntry[]) => void;
   paragraph?: string;

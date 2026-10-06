@@ -1,3 +1,4 @@
+import { DATASET_ATTACHMENT_MAX_BYTES } from "@langwatch/dataset-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
@@ -9,5 +10,6 @@ export function createNoAttachmentsFixture(): ExperimentAttachmentInputService {
   return ExperimentAttachmentInputService.create({
     storedObjects: createApiFixture<StoredObjectApi>({}, "storedObjects"),
     links: MemoryExperimentAttachmentLinkChannel.create(),
+    limits: { maxBytesFor: async () => DATASET_ATTACHMENT_MAX_BYTES },
   });
 }

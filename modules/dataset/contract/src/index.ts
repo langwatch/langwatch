@@ -3,6 +3,7 @@ export * from "./dataset-lent-components.ts";
 export * from "./dataset.responses.ts";
 export * from "./dataset-file.ts";
 export * from "./dataset-attachment-policy.ts";
+export * from "./dataset-limits.ts";
 export * from "./dataset-attachment-ref.ts";
 export * from "./dataset-record-count.ts";
 export * from "./dataset-chunks.ts";

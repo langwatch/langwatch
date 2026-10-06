@@ -123,6 +123,40 @@ Feature: Workflow service boundary
     Then execution receives inline records without accessing application globals
 
   @unit
+  Scenario: A saved entry dataset larger than one run reads refuses the Studio run
+    Given a Studio evaluation event references a saved dataset
+    And the dataset's rows total more than the organization's whole-dataset limit
+    When Workflow materializes the event
+    Then the run is refused as "workflow_dataset_too_large_to_run"
+    And no partial dataset is sent to the engine
+
+  @unit
+  Scenario: Exporting a workflow whose dataset was read in part says so
+    Given a workflow whose entry dataset is larger than the page loads in one read
+    When the workflow is exported with its dataset
+    Then a warning says how many rows the file carries out of how many the dataset holds
+    And an export that carries every row shows no warning
+
+  @unit
+  Scenario: Every run sent to the engine carries the organization's file limit
+    Given a project whose organization answers its own file limit
+    When Workflow sends a run to the engine on the streaming or the synchronous route
+    Then the event names that limit as the largest attachment the engine may fetch
+    And the runs of one project ask for the limit once
+
+  @unit
+  Scenario: Events that run no graph are sent to the engine unchanged
+    Given a liveness probe or a stop event
+    When Workflow sends it to the engine
+    Then the event is sent as it was
+
+  @unit
+  Scenario: A failed file limit lookup does not stop the run
+    Given the organization's file limit cannot be resolved
+    When Workflow sends a run to the engine
+    Then the event is sent without a limit, and the engine holds its default
+
+  @unit
   Scenario: Workflow prepares a Studio event through typed runtime ports
     Given a Studio event needs project credentials, model parameters, and datasets
     When a caller invokes prepareStudioEvent for its project

@@ -30,14 +30,19 @@ const RECORD_KSUID_RESOURCE = "record";
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import type { ChunkOffset } from "../rules/dataset-chunking.rules.ts";
+import { assertStoredRowWithinLimit } from "../rules/dataset-row-limits.rules.ts";
 import {
-  DATASET_SEARCH_MAX_BYTES,
-  DATASET_SEARCH_MAX_ROWS,
   matchesDatasetSearch,
   measureRowsBytes,
   refuseSearchScan,
+  type DatasetSearchCaps,
 } from "../rules/dataset-search.rules.ts";
+import {
+  limitDatasetRecordsByBytes,
+  selectDatasetRecords,
+} from "../rules/dataset-selection.rules.ts";
 import { DatasetChunkReadService } from "../services/dataset-chunk-read.service.ts";
+import { StreamingChunkWriterService } from "../services/dataset-chunk-writer.service.ts";
 import { DatasetChunkService } from "../services/dataset-chunk.service.ts";
 
 /** Object-backed Dataset content; all storage selection is injected at boot. */
@@ -120,19 +125,20 @@ export class DatasetContentService implements DatasetContent {
     page: number;
     limit: number;
     search: string;
+    caps: DatasetSearchCaps;
   }): Promise<DatasetRecordPage> {
-    const { dataset } = input;
+    const { dataset, caps } = input;
     this.assertReady(dataset);
-    if ((dataset.rowCount ?? 0) > DATASET_SEARCH_MAX_ROWS) {
+    if ((dataset.rowCount ?? 0) > caps.maxRows) {
       throw new DatasetTooLargeToSearchError({
         rowCount: dataset.rowCount ?? 0,
-        maxRows: DATASET_SEARCH_MAX_ROWS,
+        maxRows: caps.maxRows,
       });
     }
-    if (dataset.sizeBytes !== null && dataset.sizeBytes > BigInt(DATASET_SEARCH_MAX_BYTES)) {
+    if (dataset.sizeBytes !== null && dataset.sizeBytes > BigInt(caps.maxBytes)) {
       throw new DatasetTooLargeToSearchError({
         sizeBytes: Number(dataset.sizeBytes),
-        maxBytes: DATASET_SEARCH_MAX_BYTES,
+        maxBytes: caps.maxBytes,
       });
     }
 
@@ -147,7 +153,11 @@ export class DatasetContentService implements DatasetContent {
     let measuredBytes = 0;
 
     for (const offset of offsets) {
-      refuseSearchScan(rowsRead, Math.max(measuredBytes, recordedBytes + (offset.byteSize ?? 0)));
+      refuseSearchScan(
+        rowsRead,
+        Math.max(measuredBytes, recordedBytes + (offset.byteSize ?? 0)),
+        caps,
+      );
       const rows = await storage.readChunk({
         projectId: input.projectId,
         datasetId: dataset.id,
@@ -156,7 +166,7 @@ export class DatasetContentService implements DatasetContent {
       rowsRead += rows.length;
       recordedBytes += offset.byteSize ?? 0;
       measuredBytes += measureRowsBytes(rows);
-      refuseSearchScan(rowsRead, Math.max(measuredBytes, recordedBytes));
+      refuseSearchScan(rowsRead, Math.max(measuredBytes, recordedBytes), caps);
       for (const row of rows) {
         const record = toDatasetRecord(row, dataset);
         if (!matchesDatasetSearch({ entry: record.entry, search: input.search })) continue;
@@ -200,33 +210,40 @@ export class DatasetContentService implements DatasetContent {
     dataset,
     projectId,
     entrySelection,
-    limitMb,
+    limitBytes,
   }: {
     dataset: Dataset;
     projectId: string;
     entrySelection: DatasetEntrySelection;
-    limitMb: number | null;
+    limitBytes: number;
   }): Promise<DatasetWithRecords> {
     this.assertReady(dataset);
     if (!dataset.chunkCount) {
       throw new DatasetChunkCountMissingError(dataset.id);
     }
-    const storage = this.storage;
-    const lines = await storage.readChunks({
+    if (entrySelection === "all") {
+      return this.reads.readWithinBudget({
+        dataset,
+        limitBytes,
+        storage: this.storage,
+        toRecord: (line) => toDatasetRecord(line, dataset),
+      });
+    }
+
+    const lines = await this.storage.readChunks({
       projectId,
       datasetId: dataset.id,
       chunkCount: dataset.chunkCount,
     });
     const records = lines.map((line) => toDatasetRecord(line, dataset));
-    const selected = selectRecords(records, entrySelection);
-    const bounded =
-      limitMb === null
-        ? selected
-        : selected.filter((record) => JSON.stringify(record.entry).length <= limitMb * 1024 * 1024);
+    const selected = selectDatasetRecords(records, entrySelection);
+    const bounded = limitDatasetRecordsByBytes(selected, limitBytes);
+
     return {
       dataset,
-      records: bounded,
-      truncated: bounded.length !== selected.length,
+      records: bounded.records,
+      truncated: bounded.truncated,
+      totalRows: selected.length,
     };
   }
 
@@ -267,6 +284,7 @@ export class DatasetContentService implements DatasetContent {
     dataset: Dataset;
     input: UpdateDatasetRecordInput & { recordId: string };
   }): Promise<DatasetRecordMutationResult> {
+    assertStoredRowWithinLimit(input.updatedRecord);
     const storage = this.storage;
     const result = await this.chunks.editRecord({
       dataset,
@@ -290,6 +308,7 @@ export class DatasetContentService implements DatasetContent {
   }): Promise<DatasetRecord[]> {
     const forcedIds = input.entries.map((entry) => entry.id);
     const entries = input.entries.map(({ id: _id, ...entry }) => entry);
+    entries.forEach((entry) => assertStoredRowWithinLimit(entry));
     const storage = this.storage;
     await this.chunks.append({
       dataset,
@@ -332,34 +351,31 @@ export class DatasetContentService implements DatasetContent {
     if (!source.chunkCount) {
       throw new DatasetChunkCountMissingError(source.id);
     }
-    const sourceStorage = this.storage;
-    const targetStorage = this.storage;
-    const rows = await sourceStorage.readChunks({
-      projectId: sourceProjectId,
-      datasetId: source.id,
-      chunkCount: source.chunkCount,
-    });
-    const entries = rows.map(toStoredEntry);
-    const chunks = await targetStorage.writeChunks({
+    // One chunk in memory at a time, whatever the dataset's size.
+    const writer = StreamingChunkWriterService.create({
+      storage: this.storage,
       projectId: targetProjectId,
       datasetId: target.id,
-      records: entries,
     });
+    for (let index = 0; index < source.chunkCount; index++) {
+      const rows = await this.storage.readChunk({
+        projectId: sourceProjectId,
+        datasetId: source.id,
+        index,
+      });
+      for (const row of rows) await writer.push(toStoredEntry(row));
+    }
+    const written = await writer.finalize();
     await this.datasets.update({
       id: target.id,
       projectId: targetProjectId,
       data: {
         contentLayout: "s3_jsonl",
         status: "ready",
-        rowCount: entries.length,
-        chunkCount: chunks.length,
-        sizeBytes: BigInt(chunks.reduce((total, chunk) => total + chunk.byteSize, 0)),
-        chunkOffsets: chunks.map((chunk) => ({
-          index: chunk.index,
-          startRow: chunk.startRow,
-          endRow: chunk.endRow,
-          byteSize: chunk.byteSize,
-        })),
+        rowCount: written.rowCount,
+        chunkCount: written.chunkCount,
+        sizeBytes: BigInt(written.sizeBytes),
+        chunkOffsets: written.chunkOffsets,
       },
     });
   }
@@ -474,19 +490,4 @@ function toDatasetRecord(line: unknown, dataset: Dataset): DatasetRecord {
     createdAt: dataset.createdAt,
     updatedAt: dataset.updatedAt,
   });
-}
-
-function selectRecords(
-  records: DatasetRecord[],
-  selection: DatasetEntrySelection,
-): DatasetRecord[] {
-  if (selection === "all") return records;
-  if (records.length === 0) return [];
-
-  if (selection === "first") return [records[0]!];
-  if (selection === "last") return [records[records.length - 1]!];
-  if (selection === "random") return [records[Math.floor(Math.random() * records.length)]!];
-
-  const index = Math.max(0, Math.min(selection, records.length - 1));
-  return [records[index]!];
 }

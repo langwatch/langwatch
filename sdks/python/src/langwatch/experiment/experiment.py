@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
     from langwatch.evaluation import EvaluationResultModel
 
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 from tqdm.auto import tqdm
 
 import langwatch
@@ -55,6 +55,10 @@ from langwatch.experiment.platform_run import (
 from langwatch.telemetry.tracing import LangWatchTrace
 from langwatch.utils.auth import build_request_headers
 from langwatch.utils.exceptions import better_raise_for_status
+from langwatch.utils.log_results_batching import (
+    is_payload_too_large,
+    send_log_results_in_parts,
+)
 from langwatch.utils.transformation import SerializableWithStringFallback
 
 from coolname import generate_slug  # type: ignore
@@ -1114,7 +1118,7 @@ class Experiment:
 
             # Start a new thread to send the batch
             thread = threading.Thread(
-                target=Experiment._log_results,
+                target=Experiment._log_results_in_parts,
                 args=(langwatch.get_api_key(), body),
             )
             thread.start()
@@ -1125,9 +1129,17 @@ class Experiment:
             self.last_sent = time.time()
 
     @classmethod
+    def _log_results_in_parts(cls, api_key: str, body: Dict[str, Any]):
+        """Send one batch, as several requests when it is too large for one."""
+        send_log_results_in_parts(
+            body, post=lambda part: cls._log_results(api_key, part)
+        )
+
+    @classmethod
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception(lambda error: not is_payload_too_large(error)),
         reraise=True,
     )
     def _log_results(cls, api_key: str, body: Dict[str, Any]):

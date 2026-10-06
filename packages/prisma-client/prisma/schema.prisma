@@ -1123,6 +1123,10 @@ model Organization {
   updatedAt                  DateTime             @default(now()) @updatedAt
   OrganizationInvite         OrganizationInvite[]
   usageSpendingMaxLimit      Int?
+  /// The largest file a dataset image or file cell accepts for this
+  /// organization, in mebibytes. Null means the default. Set by an operator
+  /// from the back office only; every other dataset size limit scales with it.
+  datasetAttachmentMaxMb     Int?
   /// Phase 8 - admin-configurable max lifetime for CLI device-flow
   /// sessions, in days. 0 = unbounded (default, mirrors GitHub CLI /
   /// gh-style flows). Companies that need finite session lifetime

@@ -1,6 +1,6 @@
 /**
  * Every dataset in the project: find, open, manage, via `DatasetHostApi`.
- * Row type is `DatasetSummary`, not a router inference a screen closure
+ * Row type is `DatasetSummaryWire`, not a router inference a screen closure
  * can't name. Specs: datasets-list-page, rbac/lite-member-restrictions.feature.
  */
 
@@ -10,7 +10,7 @@ import {
   type DatasetColumns,
   datasetColumnsSchema,
   datasetDisplayRecordCount,
-  type DatasetSummary,
+  type DatasetSummaryWire,
 } from "@langwatch/dataset-contract";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { ListTable } from "@langwatch/design-system/list-table";
@@ -82,7 +82,7 @@ function UploadOrCreateDatasetMenu({
   );
 }
 
-type DatasetRow = WireOf<DatasetSummary>;
+type DatasetRow = WireOf<DatasetSummaryWire>;
 
 function DatasetTableBody({
   columnsOf,
@@ -260,7 +260,7 @@ export default function DatasetsScreen() {
    * object or a malformed value. A bad row must be displayable and deletable,
    * never crash the whole datasets page.
    */
-  const columnsOf = (dataset: WireOf<DatasetSummary>): DatasetColumns => {
+  const columnsOf = (dataset: WireOf<DatasetSummaryWire>): DatasetColumns => {
     const parsed = datasetColumnsSchema.safeParse(dataset.columnTypes);
     return parsed.success ? parsed.data : [];
   };

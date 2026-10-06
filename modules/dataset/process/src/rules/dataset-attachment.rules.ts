@@ -3,16 +3,15 @@
  * @see specs/datasets/dataset-attachments.feature
  */
 import {
-  DATASET_ATTACHMENT_MAX_BYTES,
   DatasetAttachmentTooLargeError,
   DatasetAttachmentTypeRefusedError,
   isRefusedAttachmentMediaType,
 } from "@langwatch/dataset-contract";
 
-/** Refuses a file over the attachment size cap. */
-export function assertDatasetAttachmentWithinLimit(sizeBytes: number): void {
-  if (sizeBytes > DATASET_ATTACHMENT_MAX_BYTES) {
-    throw new DatasetAttachmentTooLargeError(DATASET_ATTACHMENT_MAX_BYTES);
+/** Refuses a file over the per-file limit the organization answers. */
+export function assertDatasetAttachmentWithinLimit(sizeBytes: number, maxBytes: number): void {
+  if (sizeBytes > maxBytes) {
+    throw new DatasetAttachmentTooLargeError(maxBytes);
   }
 }
 

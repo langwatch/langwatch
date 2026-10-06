@@ -6,12 +6,29 @@ import type {
 import type { StoredObjectReference } from "@langwatch/stored-object-contract";
 import { useMemo } from "react";
 
+import type { DatasetAttachmentUploadTransport } from "./attachment-upload.ts";
 import { datasetApi } from "./dataset-api.ts";
 import { type StoredObjectUploadTransport, uploadStoredObject } from "./stored-object-upload.ts";
 
 /** The stored-object upload procedures, bound to the application's tRPC transport. */
 export function useStoredObjectUploadTransport(): StoredObjectUploadTransport {
   const createUpload = datasetApi.storedObjects.createUpload.useMutation();
+  const confirmUpload = datasetApi.storedObjects.confirmUpload.useMutation();
+  return useMemo(
+    () => ({
+      createUpload: createUpload.mutateAsync,
+      confirmUpload: confirmUpload.mutateAsync,
+    }),
+    [createUpload.mutateAsync, confirmUpload.mutateAsync],
+  );
+}
+
+/**
+ * The attachment upload procedures: the dataset answers the signed upload,
+ * held to the organization's per-file limit, and the stored object confirms it.
+ */
+export function useDatasetAttachmentUploadTransport(): DatasetAttachmentUploadTransport {
+  const createUpload = datasetClient.dataset.createAttachmentUpload.useMutation();
   const confirmUpload = datasetApi.storedObjects.confirmUpload.useMutation();
   return useMemo(
     () => ({

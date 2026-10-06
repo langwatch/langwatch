@@ -1,4 +1,4 @@
-import { datasetWithRecordsSchema } from "@langwatch/dataset-contract";
+import { DATASET_DEFAULT_LIMITS, datasetWithRecordsSchema } from "@langwatch/dataset-contract";
 import {
   nodeDatasetSchema,
   studioClientEventSchema,
@@ -136,11 +136,35 @@ describe("StudioDatasetMaterializerService", () => {
         slugOrId: "ds_xyz",
         projectId: PROJECT_ID,
         entrySelection: "all",
-        limitMb: null,
+        limitMb: DATASET_DEFAULT_LIMITS.wholeReadBytes / (1024 * 1024),
       },
     ]);
     expect(entryData(enriched).dataset?.inline?.records).toEqual({
       question: ["q1", "q2"],
+    });
+  });
+
+  /** @scenario "A saved entry dataset larger than one run reads refuses the Studio run" */
+  it("refuses an evaluation run over a dataset the read had to cut short", async () => {
+    const datasets = new TestDatasetService({ ...savedDataset(), truncated: true, totalRows: 9 });
+    const event = makeEvent(
+      "execute_evaluation",
+      { id: "ds_xyz", name: "Saved" },
+      {
+        run_id: "run_1",
+        workflow_version_id: "v1",
+        evaluate_on: "full",
+      },
+    );
+
+    await expect(
+      StudioDatasetMaterializerService.create(datasets.api).materialize({
+        event,
+        projectId: PROJECT_ID,
+      }),
+    ).rejects.toMatchObject({
+      code: "workflow_dataset_too_large_to_run",
+      meta: { maxBytes: DATASET_DEFAULT_LIMITS.wholeReadBytes, totalRows: 9 },
     });
   });
 

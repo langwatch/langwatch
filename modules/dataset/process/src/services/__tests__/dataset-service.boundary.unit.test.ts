@@ -14,6 +14,7 @@ import { ZodError } from "zod";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
 import { MemoryDatasetRecordRepository } from "../../repositories/memory/memory.dataset-record.repository.ts";
@@ -44,6 +45,7 @@ function serviceOverMemory() {
     generateId: () => `record_${(minted += 1)}`,
     requestBounds: createDatasetTestRequestBounds(),
     attachments: createDatasetTestAttachments(),
+    inlineAttachments: createDatasetTestInlineAttachments(),
   });
 
   return { database, service, spies };

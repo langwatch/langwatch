@@ -12,6 +12,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
+	"github.com/langwatch/langwatch/services/nlpgo/app"
 )
 
 // DefaultSandboxPython is the interpreter a code block runs on when nothing
@@ -110,9 +111,12 @@ func defaultConfig() Config {
 	return Config{
 		Environment: "local",
 		Server: config.Server{
-			Addr:                ":5562",
-			GracefulSeconds:     10,
-			MaxRequestBodyBytes: config.DefaultMaxRequestBodyBytes,
+			Addr:            ":5562",
+			GracefulSeconds: 10,
+			// One dataset row with every attachment inline; see the
+			// derivation on app.DefaultMaxRequestBodyBytes. An operator
+			// overrides it with SERVER_MAX_REQUEST_BODY_BYTES.
+			MaxRequestBodyBytes: app.DefaultMaxRequestBodyBytes,
 		},
 		Engine: EngineConfig{
 			StreamHeartbeatSeconds: 15,

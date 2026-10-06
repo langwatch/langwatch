@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
 import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
@@ -26,6 +27,7 @@ function service(tier: "free" | "paid" | "enterprise" = "free") {
     })(),
     requestBounds: createDatasetTestRequestBounds(tier),
     attachments: createDatasetTestAttachments(),
+    inlineAttachments: createDatasetTestInlineAttachments(),
   });
   return { datasets };
 }

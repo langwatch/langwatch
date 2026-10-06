@@ -641,6 +641,17 @@ const presentations = {
     title: "That published version is missing",
     describe: () => "Publish the workflow again, then run it.",
   },
+  workflow_dataset_too_large_to_run: {
+    title: "This dataset is too large to run",
+    describe: (error) => {
+      const maxBytes = error.meta.maxBytes;
+      const limit =
+        typeof maxBytes === "number"
+          ? `Its rows total more than the ${Math.floor(maxBytes / 1024 / 1024)} MB one run reads. `
+          : "";
+      return `${limit}Store images and files as attachments in image or file columns instead of pasting their data into cells, or split the dataset.`;
+    },
+  },
   workflow_execution_failed: {
     // fault: platform. The execution engine is our own infra, so this is an
     // incident on our side — never dressed up as something the customer
@@ -907,9 +918,33 @@ const presentations = {
       "The dataset or workflow version it names may have been deleted. Check the ids you sent, then try again.",
   },
   experiment_evaluation_too_many_rows: {
-    title: "Too many rows for one evaluation",
+    title: "Too many rows sent with this run",
     describe: () =>
-      "Your plan limits how many rows one run can evaluate. Send fewer rows, or run against a saved dataset.",
+      "Your plan limits how many rows one request can carry. Send fewer rows, or save them as a dataset and run against it.",
+  },
+  experiment_dataset_too_many_rows: {
+    title: "This dataset has too many rows for one run",
+    describe: (error) => {
+      const maxRows = error.meta.maxRows;
+      return typeof maxRows === "number"
+        ? `One run reads at most ${maxRows.toLocaleString("en-US")} rows. Split the dataset into smaller ones and run each.`
+        : "Split the dataset into smaller ones and run each.";
+    },
+  },
+  experiment_dataset_too_large_to_run: {
+    title: "This dataset is too large to run",
+    describe: (error) => {
+      const maxBytes = error.meta.maxBytes;
+      const limit =
+        typeof maxBytes === "number"
+          ? `Its rows total more than the ${Math.floor(maxBytes / 1024 / 1024)} MB one run reads. `
+          : "";
+      return `${limit}Store images and files as attachments in image or file columns instead of pasting their data into cells, or split the dataset.`;
+    },
+  },
+  experiment_dataset_changed_during_read: {
+    title: "The dataset changed while the run was starting",
+    describe: () => "Wait until the dataset is no longer being edited, then start the run again.",
   },
   experiment_workflow_not_found: {
     title: "This evaluation's workflow is gone",
@@ -2237,6 +2272,17 @@ const presentations = {
       "Your organization's plan doesn't include this. Talk to your account team about upgrading.",
   },
   evaluation_not_found: { title: "Evaluation not found" },
+  evaluation_log_results_too_large: {
+    title: "That batch of results is too large",
+    describe: (error) => {
+      const maxBytes = error.meta.maxBytes;
+      const limit =
+        typeof maxBytes === "number"
+          ? `One batch carries at most ${Math.floor(maxBytes / 1024 / 1024)} MB. `
+          : "";
+      return `${limit}Send fewer results per batch, and send images as links or dataset attachments instead of inline data.`;
+    },
+  },
   project_permission_denied: {
     // Names the permission when the server sent one: "ask an admin for access"
     // is an errand with no address, whereas "ask an admin for `datasets:manage`"
@@ -3604,6 +3650,39 @@ const presentations = {
         ? `Pick a file under ${Math.round(maxBytes / 1024 / 1024)} MB.`
         : "Pick a smaller file.";
     },
+  },
+  dataset_inline_file_unreadable: {
+    title: "A file in this row could not be read",
+    describe: (error) => {
+      const column = str(error, "column", "");
+      return column
+        ? `The content in "${column}" is not a readable file. Upload the file again, or put a link in the cell.`
+        : "The content is not a readable file. Upload the file again, or put a link in the cell.";
+    },
+  },
+  dataset_page_too_large: {
+    title: "That page is too large to load",
+    describe: (error) => {
+      const suggestedLimit = error.meta.suggestedLimit;
+      return typeof suggestedLimit === "number"
+        ? `Ask for ${suggestedLimit} rows per page instead.`
+        : "Ask for fewer rows per page.";
+    },
+  },
+  dataset_row_too_large: {
+    title: "A row is too large",
+    describe: (error) => {
+      const maxBytes = error.meta.maxBytes;
+      const limit =
+        typeof maxBytes === "number" ? ` over ${Math.floor(maxBytes / 1024 / 1024)} MB` : "";
+      return error.meta.measure === "uploaded"
+        ? `One row in the file is${limit || " too large"}. Split the row, or attach its files instead of writing them into the row.`
+        : `One row is${limit || " too large"}. Set the column type to image or file so its files are stored beside the row.`;
+    },
+  },
+  dataset_too_large_to_read_inline: {
+    title: "This dataset is too large to load at once",
+    describe: () => "Read it page by page, or download it as a file.",
   },
   dataset_attachment_type_refused: {
     // `meta.refused` is our own list of media types, not customer input. The

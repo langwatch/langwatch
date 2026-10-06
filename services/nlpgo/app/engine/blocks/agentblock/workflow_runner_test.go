@@ -236,3 +236,34 @@ func TestWorkflowRunner_ValidationErrors(t *testing.T) {
 		})
 	}
 }
+
+// A nested workflow run fetches attachments under the limit of the run that
+// started it, so the runner states that limit on the call.
+func TestWorkflowRunner_ForwardsMaxAttachmentBytesHeader(t *testing.T) {
+	for _, tc := range []struct {
+		limit int64
+		want  string
+	}{{0, ""}, {-1, ""}, {104857600, "104857600"}} {
+		var got string
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			got = r.Header.Get("X-LangWatch-Max-Attachment-Bytes")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"result":{"answer":"4"}}`))
+		}))
+		runner := agentblock.NewWorkflowRunner(agentblock.WorkflowRunnerOptions{})
+		_, err := runner.Execute(context.Background(), agentblock.WorkflowRunRequest{
+			BaseURL:            srv.URL,
+			APIKey:             "tok",
+			WorkflowID:         "workflow_abc",
+			Inputs:             map[string]any{"question": "q"},
+			MaxAttachmentBytes: tc.limit,
+		})
+		srv.Close()
+		if err != nil {
+			t.Fatalf("Execute: %v", err)
+		}
+		if got != tc.want {
+			t.Errorf("limit %d: header = %q, want %q", tc.limit, got, tc.want)
+		}
+	}
+}

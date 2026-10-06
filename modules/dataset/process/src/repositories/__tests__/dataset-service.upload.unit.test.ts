@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
 import type { DatasetUpload } from "../../app/dataset.app.ts";
@@ -99,6 +100,7 @@ describe("DatasetService upload boundary", () => {
       uploads,
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
+      inlineAttachments: createDatasetTestInlineAttachments(),
     });
     await expect(
       service.appendStoredObjectToDataset({

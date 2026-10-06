@@ -299,6 +299,13 @@ export interface OrganizationApi {
   getPricing(
     input: Readonly<{ organizationId: string }>,
   ): Promise<{ pricingModel: PricingModel | null; currency: "USD" | "EUR" }>;
+  /**
+   * The per-file dataset limit an operator set for the organization, in bytes. A system read:
+   * no caller. Null when none is set, and for an unknown organization.
+   */
+  getDatasetLimits(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<{ attachmentMaxBytes: number | null }>;
   /** Whether the organization switched Instant Evals on itself; instant-eval's gate reads it. */
   isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean>;
   /** The organization's own Instant Evals consent; a second call keeps the first record. */

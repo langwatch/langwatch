@@ -100,7 +100,17 @@ export const datasetReferenceSchema = z.object({
   datasetId: z.string().optional(),
   columns: z.array(datasetColumnSchema),
   savedRecords: z.array(savedRecordSchema).optional(),
+  savedRecordsCut: z
+    .object({
+      loadedRows: z.number().int().nonnegative(),
+      totalRows: z.number().int().nonnegative(),
+    })
+    .optional(),
 });
+
+/** Set when the page loaded fewer rows of a saved dataset than it holds. */
+export type SavedRecordsCut = { loadedRows: number; totalRows: number };
+
 export type DatasetReference = {
   id: string;
   name: string;
@@ -109,6 +119,7 @@ export type DatasetReference = {
   datasetId?: string;
   columns: DatasetColumn[];
   savedRecords?: SavedRecord[];
+  savedRecordsCut?: SavedRecordsCut;
 };
 
 export { localPromptConfigSchema };
@@ -620,7 +631,11 @@ export type EvaluationsV3Actions = {
   loadState: (workbenchState: unknown) => void;
 
   // Update saved dataset records (used when loading from database)
-  setSavedDatasetRecords: (datasetId: string, records: SavedRecord[]) => void;
+  setSavedDatasetRecords: (
+    datasetId: string,
+    records: SavedRecord[],
+    cut?: SavedRecordsCut,
+  ) => void;
 };
 
 export type EvaluationsV3Store = EvaluationsV3State & EvaluationsV3Actions;

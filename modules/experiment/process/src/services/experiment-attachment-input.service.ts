@@ -4,7 +4,6 @@
  * @see specs/experiments-v3/attachment-inputs.feature
  */
 import {
-  DATASET_ATTACHMENT_MAX_BYTES,
   DatasetAttachmentTooLargeError,
   DatasetAttachmentUnavailableError,
   attachmentDisplayName,
@@ -26,6 +25,7 @@ import {
   columnTypeOfInputFor,
   type AttachmentDatasetColumn,
 } from "../rules/experiment-attachment-input.rules.ts";
+import type { ExperimentAttachmentLimitService } from "./experiment-attachment-limit.service.ts";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
 
 const logger = createLogger("langwatch:experiment:attachments");
@@ -38,13 +38,16 @@ export class ExperimentAttachmentInputService {
   static create(deps: {
     storedObjects: StoredObjectApi;
     links: ExperimentAttachmentLinkChannel;
+    /** The per-file limit the project's organization answers. */
+    limits: Pick<ExperimentAttachmentLimitService, "maxBytesFor">;
   }): ExperimentAttachmentInputService {
-    return new ExperimentAttachmentInputService(deps.storedObjects, deps.links);
+    return new ExperimentAttachmentInputService(deps.storedObjects, deps.links, deps.limits);
   }
 
   private constructor(
     private readonly storedObjects: StoredObjectApi,
     private readonly links: ExperimentAttachmentLinkChannel,
+    private readonly limits: Pick<ExperimentAttachmentLimitService, "maxBytesFor">,
   ) {}
 
   /**
@@ -94,11 +97,13 @@ export class ExperimentAttachmentInputService {
 
       const ref = parseDatasetAttachmentRef(value);
       if (ref) {
-        resolved[field] = await this.readStoredInput({ projectId, ref, value });
+        const maxBytes = await this.limits.maxBytesFor(projectId);
+        resolved[field] = await this.readStoredInput({ projectId, ref, value, maxBytes });
         changed = true;
       } else if (shouldFetchExternal && isExternalUrl(value)) {
+        const maxBytes = await this.limits.maxBytesFor(projectId);
         resolved[field] = attachmentDataUrl(
-          await this.links.fetchAttachment({ url: value, columnType }),
+          await this.links.fetchAttachment({ url: value, columnType, maxBytes }),
         );
         changed = true;
       }
@@ -111,10 +116,12 @@ export class ExperimentAttachmentInputService {
     projectId,
     ref,
     value,
+    maxBytes,
   }: {
     projectId: string;
     ref: DatasetAttachmentRef;
     value: string;
+    maxBytes: number;
   }): Promise<string> {
     const fileName = ref.name ?? attachmentDisplayName(value);
     // A run reads only its own project's objects, never across tenants.
@@ -126,7 +133,7 @@ export class ExperimentAttachmentInputService {
       throw new DatasetAttachmentUnavailableError(fileName);
     }
 
-    const found = await this.readStored({ projectId, objectId: ref.objectId });
+    const found = await this.readStored({ projectId, objectId: ref.objectId, maxBytes });
     if (!found) {
       logger.warn({ projectId, objectId: ref.objectId }, "Dataset attachment no longer resolves");
       throw new DatasetAttachmentUnavailableError(fileName);
@@ -139,9 +146,11 @@ export class ExperimentAttachmentInputService {
   private async readStored({
     projectId,
     objectId,
+    maxBytes,
   }: {
     projectId: string;
     objectId: string;
+    maxBytes: number;
   }): Promise<AttachmentBytes | null> {
     const found = await this.storedObjects
       .readById({ projectId, id: objectId })
@@ -159,17 +168,17 @@ export class ExperimentAttachmentInputService {
       return null;
     }
 
-    return { mediaType: found.row.media_type, bytes: await readCapped(found.stream) };
+    return { mediaType: found.row.media_type, bytes: await readCapped(found.stream, maxBytes) };
   }
 }
 
-async function readCapped(stream: StoredObjectByteStream): Promise<Buffer> {
+async function readCapped(stream: StoredObjectByteStream, maxBytes: number): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of stream) {
     total += chunk.byteLength;
-    if (total > DATASET_ATTACHMENT_MAX_BYTES) {
-      throw new DatasetAttachmentTooLargeError(DATASET_ATTACHMENT_MAX_BYTES);
+    if (total > maxBytes) {
+      throw new DatasetAttachmentTooLargeError(maxBytes);
     }
     chunks.push(Buffer.from(chunk));
   }

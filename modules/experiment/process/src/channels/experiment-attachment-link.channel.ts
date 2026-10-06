@@ -5,6 +5,10 @@
 import type { AttachmentBytes } from "../rules/attachment-parts.rules.ts";
 
 export interface ExperimentAttachmentLinkChannel {
-  /** The bytes at `url`, refused when too large or, for an image column, not a picture. */
-  fetchAttachment(args: { url: string; columnType?: string }): Promise<AttachmentBytes>;
+  /** The bytes at `url`, refused above `maxBytes` or, for an image column, when not a picture. */
+  fetchAttachment(args: {
+    url: string;
+    columnType?: string;
+    maxBytes: number;
+  }): Promise<AttachmentBytes>;
 }

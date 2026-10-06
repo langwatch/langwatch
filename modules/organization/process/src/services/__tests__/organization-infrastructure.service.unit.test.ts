@@ -71,6 +71,10 @@ class StubRepository extends OrganizationRepository {
     return { pricingModel: null, currency: "EUR" };
   }
 
+  async getDatasetLimits(): Promise<{ attachmentMaxBytes: number | null }> {
+    return { attachmentMaxBytes: null };
+  }
+
   async isInstantEvalsOptedIn(): Promise<boolean> {
     return false;
   }

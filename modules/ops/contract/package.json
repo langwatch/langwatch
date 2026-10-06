@@ -24,6 +24,7 @@
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",
+    "@langwatch/plans": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/time": "workspace:*",

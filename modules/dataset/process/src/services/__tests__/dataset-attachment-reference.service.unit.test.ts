@@ -1,4 +1,4 @@
-import type { DatasetColumns } from "@langwatch/dataset-contract";
+import { DATASET_ATTACHMENT_MAX_BYTES, type DatasetColumns } from "@langwatch/dataset-contract";
 import {
   StoredObjectNotFoundError,
   type StoredObjectApi,
@@ -34,6 +34,8 @@ function stored(overrides: Partial<StoredObjectMetadata> = {}): StoredObjectMeta
   };
 }
 
+const maxBytes = async () => DATASET_ATTACHMENT_MAX_BYTES;
+
 function service(metadata: StoredObjectMetadata | Error) {
   const getMetadata = vi.fn(async () => {
     if (metadata instanceof Error) throw metadata;
@@ -55,6 +57,7 @@ describe("DatasetAttachmentReferenceService", () => {
       await expect(
         references.assertAccepted({
           projectId,
+          maxBytes,
           columnTypes,
           entries: [{ receipt: ref("receipt.png") }],
         }),
@@ -78,6 +81,7 @@ describe("DatasetAttachmentReferenceService", () => {
       await expect(
         references.assertAccepted({
           projectId,
+          maxBytes,
           columnTypes,
           entries: [{ contract: ref("rows.csv") }],
         }),
@@ -95,6 +99,7 @@ describe("DatasetAttachmentReferenceService", () => {
       await expect(
         references.assertAccepted({
           projectId,
+          maxBytes,
           columnTypes,
           entries: [{ contract: ref("contract.pdf", "project-2") }],
         }),
@@ -106,7 +111,12 @@ describe("DatasetAttachmentReferenceService", () => {
       const { references } = service(new StoredObjectNotFoundError());
 
       await expect(
-        references.assertAccepted({ projectId, columnTypes, entries: [{ receipt: ref("a.png") }] }),
+        references.assertAccepted({
+          projectId,
+          maxBytes,
+          columnTypes,
+          entries: [{ receipt: ref("a.png") }],
+        }),
       ).rejects.toMatchObject({ meta: { reason: "not_found", column: "receipt" } });
     });
   });
@@ -120,6 +130,7 @@ describe("DatasetAttachmentReferenceService", () => {
       await expect(
         references.assertAccepted({
           projectId,
+          maxBytes,
           columnTypes,
           entries: [{ receipt: ref("contract.pdf") }],
         }),
@@ -136,6 +147,7 @@ describe("DatasetAttachmentReferenceService", () => {
       await expect(
         references.assertAccepted({
           projectId,
+          maxBytes,
           columnTypes,
           entries: [{ contract: ref("contract.pdf") }],
         }),
@@ -149,6 +161,7 @@ describe("DatasetAttachmentReferenceService", () => {
 
       await references.assertAccepted({
         projectId,
+        maxBytes,
         columnTypes,
         entries: [{ receipt: "https://example.com/a.png", contract: "data:image/png;base64,AAAA" }],
       });
@@ -163,6 +176,7 @@ describe("DatasetAttachmentReferenceService", () => {
 
       await references.assertAccepted({
         projectId,
+        maxBytes,
         columnTypes,
         entries: [{ receipt: ref("receipt.png") }],
         findHeld: async () => [{ receipt: ref("receipt.png") }],

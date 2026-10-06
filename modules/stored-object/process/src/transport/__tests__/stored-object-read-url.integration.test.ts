@@ -87,6 +87,7 @@ function installed() {
         throw new Error("The signed read asks no credential of the door.");
       },
     },
+    rateLimiter: { check: async () => ({ allowed: true }) },
   }).mount(storedObjectRest.router(), { app: () => app, onError: renderHandled });
 
   return {

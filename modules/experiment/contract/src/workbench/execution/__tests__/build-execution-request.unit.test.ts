@@ -391,3 +391,33 @@ describe("buildExecutionRequest", () => {
     });
   });
 });
+
+describe("given a workbench whose active dataset is saved and only partly loaded in the grid", () => {
+  describe("when the run request is built", () => {
+    /** @scenario "A run on a saved dataset names the dataset and sends none of the grid's rows" */
+    it("names the saved dataset by its id and carries none of the grid's rows", () => {
+      const saved: DatasetReference = {
+        id: "ds-1",
+        name: "Scans",
+        type: "saved",
+        datasetId: "dataset-1",
+        columns: [{ id: "input", name: "input", type: "string" }],
+        savedRecords: [
+          { id: "record-1", input: "one" },
+          { id: "record-2", input: "two" },
+        ],
+        savedRecordsCut: { loadedRows: 2, totalRows: 10_000 },
+      };
+
+      const built = buildExecutionRequest({
+        state: { ...baseState(), datasets: [saved], targets: [promptTarget("baseline")] },
+        projectId: "project-1",
+        scope: { type: "full" },
+      });
+
+      expect(built?.request.dataset).toMatchObject({ type: "saved", datasetId: "dataset-1" });
+      expect(built?.request.dataset.savedRecords).toBeUndefined();
+      expect(built?.request.dataset).not.toHaveProperty("savedRecordsCut");
+    });
+  });
+});

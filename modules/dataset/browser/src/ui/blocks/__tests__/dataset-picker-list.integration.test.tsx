@@ -1,5 +1,5 @@
 import type { WireOf } from "@langwatch/api/web";
-import type { Dataset } from "@langwatch/dataset-contract";
+import type { DatasetWire } from "@langwatch/dataset-contract";
 /**
  * @vitest-environment jsdom
  * Dataset's picker list, as it lends it to the workflow dataset node.
@@ -12,7 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DatasetPickerList } from "../dataset-picker-list.tsx";
 
-const turn10: WireOf<Dataset> = {
+const turn10: WireOf<DatasetWire> = {
   id: "ds-1",
   projectId: "proj-1",
   name: "turn 10",
