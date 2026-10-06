@@ -29,7 +29,7 @@ const onError = createCanonicalFamilyErrorHandler({
 });
 
 /** One organization, its team and its administrator, with the groups family mounted over it. */
-async function application() {
+async function application({ foreignTeamId }: { foreignTeamId?: string } = {}) {
   const permissions = TestAuthzApi.create({
     people: [{ id: ADMIN_ID, name: "Admin", email: "admin@acme.test" }],
   });
@@ -37,7 +37,11 @@ async function application() {
   permissions.findPermissionsBeyondCaller = async () => [];
   permissions.listOrganizationBindings = async () => [];
   permissions.getScope = async ({ teamId }) =>
-    ({ type: "team", id: teamId, organizationId: ORGANIZATION_ID }) as never;
+    ({
+      type: "team",
+      id: teamId,
+      organizationId: teamId === foreignTeamId ? "organization-2" : ORGANIZATION_ID,
+    }) as never;
   const setup = organizationModuleSetup({ permissions });
   await setup.repositories.membership(permissions).createAndAssign({
     userId: ADMIN_ID,
@@ -81,7 +85,7 @@ async function application() {
       }),
     );
 
-  return { send };
+  return { send, permissions };
 }
 
 describe("given an organization whose groups family is composed with the real application", () => {
@@ -110,6 +114,25 @@ describe("given an organization whose groups family is composed with the real ap
         scopeType: "TEAM",
         scopeId: TEAM_ID,
       });
+    });
+  });
+
+  describe("when a binding names a team of another organization", () => {
+    /** @scenario "POST /api/groups/:id/bindings rejects cross-org scope" */
+    it("answers 422 scope_not_in_organization and stores no binding", async () => {
+      const { send, permissions } = await application({ foreignTeamId: "team-external" });
+      const created = (await (
+        await send("/api/groups", { method: "POST", body: { name: "Engineering" } })
+      ).json()) as { id: string };
+
+      const refused = await send(`/api/groups/${created.id}/bindings`, {
+        method: "POST",
+        body: { role: "MEMBER", scopeType: "TEAM", scopeId: "team-external" },
+      });
+
+      expect(refused.status).toBe(422);
+      expect(await refused.json()).toMatchObject({ code: "scope_not_in_organization" });
+      expect(permissions.bindings).toEqual([]);
     });
   });
 });
