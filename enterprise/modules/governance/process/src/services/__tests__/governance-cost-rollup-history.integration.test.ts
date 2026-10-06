@@ -241,6 +241,54 @@ describe.skipIf(
     });
   });
 
+  describe("given the organization has trace cost for a day", () => {
+    describe("when that day is summarized and read", () => {
+      /** @scenario Trace cost stays out of the rollup */
+      it("holds no row for trace cost under any lane", async () => {
+        const tenantId = `proj-trace-cost-${nanoid(8)}`;
+        await clickhouse.insert({
+          table: "trace_summaries",
+          values: [
+            {
+              ProjectionId: `projn-${nanoid()}`,
+              TenantId: tenantId,
+              TraceId: `trace-${nanoid()}`,
+              Version: "v1",
+              OccurredAt: `${DAY} 10:00:00.000`,
+              TotalDurationMs: 250,
+              SpanCount: 1,
+              ContainsErrorStatus: false,
+              ContainsOKStatus: true,
+              Models: ["gpt-5-mini"],
+              TotalCost: 7.5,
+              TokensEstimated: false,
+            },
+          ],
+          format: "JSONEachRow",
+          clickhouse_settings: { date_time_input_format: "best_effort" },
+        });
+        await foldAll({
+          tenantId,
+          events: recorded({
+            label: "trace-cost",
+            reads: [
+              readOf({
+                tenantId,
+                bills: [bill({ day: DAY, costMinor: "1.00" })],
+                observedAt: FIRST_READ,
+              }),
+            ],
+          }),
+        });
+
+        const lanes = await repository.sumDaysByLane({ tenantId, fromDay: DAY, toDay: DAY });
+
+        expect(lanes.map(({ costSource }) => costSource)).toEqual(["pulled"]);
+        expect(lanes[0]?.amountNanoUsd).toBe(NANO);
+      });
+    });
+  });
+
   describe("given a populated summary", () => {
     const historyOf = (tenantId: string) =>
       recorded({

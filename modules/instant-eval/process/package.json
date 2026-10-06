@@ -51,6 +51,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@clickhouse/client": "catalog:",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",
