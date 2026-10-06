@@ -16,12 +16,14 @@ Feature: Migration order check
     And the migration-order workflow compares the PR against the tip of the base branch
     And only the migrations the PR adds are judged
 
+  @unit
   Scenario: Migrations numbered above everything on main pass
     Given the newest migration on main is numbered 41
     When the PR adds a migration numbered 42
     Then the check passes
     And no comment is posted
 
+  @unit
   Scenario: A migration numbered below the newest on main fails
     Given the newest migration on main is numbered 42
     When the PR adds a migration numbered 39
@@ -29,33 +31,39 @@ Feature: Migration order check
     And a comment explains that it is numbered below 42 and would run out of order
     And the comment gives the git mv that renumbers it above 42
 
+  @unit
   Scenario: Two PRs that picked the same number
     Given a migration numbered 41 merged into main while the PR was open
     When the PR adds a different migration numbered 41
     Then the check fails
     And the comment says the key is already taken on main
 
+  @unit
   Scenario: Two migrations in one PR share a key
     When the PR adds two migrations numbered 41
     Then the check fails
     And each is offered a different free key
 
+  @unit
   Scenario: A PR changes a migration that already merged
     Given a migration exists on main
     When the PR modifies, renames or deletes it
     Then the check fails
     And the comment gives the git checkout that restores it
 
+  @unit
   Scenario: A migration is added with no ordering key
     When the PR adds a migration whose name has no key prefix
     Then the check fails
     And the comment gives the expected naming format
 
+  @unit
   Scenario: Migrations already on main are never judged
     Given main carries a migration with no key and two that share a key
     When the PR adds no migrations
     Then the check passes
 
+  @unit
   Scenario: A PR into a long-running branch ports a migration main already released
     Given the PR targets a branch other than main
     And that branch's newest migration is numbered above one main has released
@@ -63,6 +71,7 @@ Feature: Migration order check
     Then the check passes, because main is read as a release line whose migrations are history
     And a migration the PR adds that main never released is still judged against the branch
 
+  @unit
   Scenario: A new migration shares a key with a released migration the PR ports
     Given the PR ports a migration main released, numbered 41
     When the PR also adds a migration main never released, numbered 41
@@ -70,23 +79,27 @@ Feature: Migration order check
     And the comment says the key is taken by the ported migration
     And the renumbering it offers lands above the ported migration's key
 
+  @unit
   Scenario: A ported migration differs from the copy main released
     Given main released a migration, under its old migration root or the current one
     When the PR adds a migration with that exact name but different contents
     Then the check fails, because migrations that have run somewhere cannot change
     And the comment gives the commands that restore main's copy under the current root
 
+  @unit
   Scenario: The comment goes away once the migration is renumbered
     Given a PR carries a migration-order comment
     When the author applies the rename and pushes
     Then the check passes
     And the comment is deleted
 
+  @unit
   Scenario: An unchanged finding is not re-posted on every push
     Given a PR carries a migration-order comment
     When a new commit leaves the findings unchanged
     Then the existing comment is left as it is
 
+  @unit
   Scenario: A fork PR still fails, without a comment
     Given a PR is opened from a fork
     When the migration-order workflow runs
@@ -95,6 +108,7 @@ Feature: Migration order check
 
   # Goose keeps one row per version, so two files at one version cannot both
   # run, whether or not a release carries either yet (rethink F10, plan D11).
+  @unit
   Scenario: A PR into a long-running branch takes a goose number main already used
     Given the PR targets a branch other than main
     And main's newest commit carries ClickHouse migration 00101, which no release has shipped yet
@@ -103,6 +117,7 @@ Feature: Migration order check
     And the comment says main already took that goose number
     And the renumbering it offers lands above main's newest goose number
 
+  @unit
   Scenario: A Prisma timestamp main used for another name is not a collision
     Given the PR targets a branch other than main
     And main carries a Prisma migration timestamped 20261002090000
@@ -111,6 +126,7 @@ Feature: Migration order check
 
   # A code step a release manifest names has run on real installs: its file is
   # frozen exactly as a merged migration is (rethink 6.5 point 2).
+  @unit
   Scenario: A PR changes the file of a code step a release manifest names
     Given a release manifest on the base branch names the code step "topic:seed-clusters"
     And a module file on the base branch declares that step id
@@ -119,12 +135,14 @@ Feature: Migration order check
     And the comment says the release shipped the step and a released step cannot change
     And the comment gives the git checkout that restores it
 
+  @unit
   Scenario: A code step no release manifest names yet may still change
     Given a module file declares the code step "topic:seed-clusters"
     And no release manifest names that step
     When the PR modifies that file
     Then the check passes
 
+  @unit
   Scenario: A release manifest that is not valid JSON stops the check
     Given a release manifest on the base branch is not valid JSON
     When the migration-order check runs
