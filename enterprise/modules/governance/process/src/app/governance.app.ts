@@ -1589,7 +1589,8 @@ export class GovernanceModule implements GovernanceRestApi {
       by,
       feature: "ANOMALY_RULES",
     });
-    return this.anomalyRules.list(input.organizationId);
+    const rules = await this.anomalyRules.list(input.organizationId);
+    return rules.map((rule) => this.anomalyRules.forReader(rule));
   }
 
   async anomalyRuleGetById(
@@ -1601,7 +1602,7 @@ export class GovernanceModule implements GovernanceRestApi {
       by,
       feature: "ANOMALY_RULES",
     });
-    return this.anomalyRules.getById(input);
+    return this.anomalyRules.forReader(await this.anomalyRules.getById(input));
   }
 
   async anomalyRuleCreate(
@@ -1613,9 +1614,10 @@ export class GovernanceModule implements GovernanceRestApi {
       by,
       feature: "ANOMALY_RULES",
     });
-    return this.anomalyRules.createRule(input).catch((error: unknown) => {
+    const created = await this.anomalyRules.createRule(input).catch((error: unknown) => {
       throw this.anomalyRuleConfigError(error, input.ruleType);
     });
+    return this.anomalyRules.forReader(created);
   }
 
   async anomalyRuleUpdate(
@@ -1627,9 +1629,10 @@ export class GovernanceModule implements GovernanceRestApi {
       by,
       feature: "ANOMALY_RULES",
     });
-    return this.anomalyRules.updateRule(input).catch((error: unknown) => {
+    const updated = await this.anomalyRules.updateRule(input).catch((error: unknown) => {
       throw this.anomalyRuleConfigError(error, input.ruleType);
     });
+    return this.anomalyRules.forReader(updated);
   }
 
   async anomalyRuleArchive(
@@ -1641,7 +1644,7 @@ export class GovernanceModule implements GovernanceRestApi {
       by,
       feature: "ANOMALY_RULES",
     });
-    return this.anomalyRules.archive(input);
+    return this.anomalyRules.forReader(await this.anomalyRules.archive(input));
   }
 
   /** A config that fails its schema is main's handled complaint; any other failure passes through. */

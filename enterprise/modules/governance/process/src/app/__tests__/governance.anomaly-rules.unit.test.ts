@@ -4,7 +4,10 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
-import { DEFAULT_SPEND_SPIKE_CONFIG } from "@langwatch/enterprise-governance-contract";
+import {
+  DEFAULT_SPEND_SPIKE_CONFIG,
+  SHARED_SECRET_REDACTED,
+} from "@langwatch/enterprise-governance-contract";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -119,6 +122,58 @@ describe("anomaly rules from the console", () => {
       await app.anomalyRuleList({ organizationId: "org-1" }, ADMIN);
 
       expect(plansAsked).toEqual([{ organizationId: "org-1", operator: { id: "user-1" } }]);
+    });
+  });
+
+  describe("given a rule whose destination carries a shared secret", () => {
+    const withSecret = {
+      ...rule,
+      thresholdConfig: { ...DEFAULT_SPEND_SPIKE_CONFIG },
+      destinationConfig: {
+        destinations: [
+          {
+            type: "webhook",
+            url: "https://siem.example/ingest",
+            sharedSecret: "TheRealSigningSecret",
+          },
+        ],
+      },
+    };
+
+    describe("when the rule is read by a viewer", () => {
+      /** @scenario "Reading an anomaly rule reports that a shared secret is set, not what it is" */
+      it("serves the marker in place of the secret on every read and write result", async () => {
+        const { app } = await buildApp("ENTERPRISE");
+        const created = await app.anomalyRuleCreate(withSecret, ADMIN);
+        const listed = await app.anomalyRuleList({ organizationId: "org-1" }, ADMIN);
+        const fetched = await app.anomalyRuleGetById(
+          { id: created.id, organizationId: "org-1" },
+          ADMIN,
+        );
+        const renamed = await app.anomalyRuleUpdate(
+          { id: created.id, organizationId: "org-1", name: "Renamed" },
+          ADMIN,
+        );
+
+        const archived = await app.anomalyRuleArchive(
+          { id: created.id, organizationId: "org-1" },
+          ADMIN,
+        );
+
+        for (const served of [created, listed, fetched, renamed, archived]) {
+          expect(JSON.stringify(served)).not.toContain("TheRealSigningSecret");
+        }
+        expect(fetched.destinationConfig).toEqual({
+          destinations: [
+            {
+              type: "webhook",
+              url: "https://siem.example/ingest",
+              sharedSecret: SHARED_SECRET_REDACTED,
+            },
+          ],
+        });
+        expect(fetched.name).toBe("Spend spike");
+      });
     });
   });
 

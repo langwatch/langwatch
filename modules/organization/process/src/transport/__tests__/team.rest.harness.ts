@@ -83,6 +83,8 @@ const statusOf = (error: object): ContentfulStatusCode | undefined => {
 /** What a test may narrow about the credential the door is reached with. */
 export type TeamRestAccess = Readonly<{
   granted?: readonly string[];
+  /** The credential's grant at a named team, where it differs from the organization grant. */
+  grantedOnTeam?: Readonly<Record<string, readonly string[]>>;
   /** The member the credential acts as, or `null` for a service key. */
   actor?: Readonly<{ type: "user"; id: string }> | null;
 }>;
@@ -127,8 +129,8 @@ export function mountTeamsRestApplication(
 
         return caller;
       },
-      authorize: ({ permission }) => ({
-        permitted: granted.has(permission),
+      authorize: ({ permission, target }) => ({
+        permitted: (options.grantedOnTeam?.[target.id] ?? [...granted]).includes(permission),
         organizationRole: null,
       }),
     },

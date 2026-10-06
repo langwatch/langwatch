@@ -805,4 +805,48 @@ describe("given the teams REST family over the application the composition build
       });
     });
   });
+  /**
+   * Finding H4 of the 2026-09-04 feature-surface security pass.
+   * Spec: specs/security/resource-scope-permission-checks.feature
+   */
+  describe("given a credential whose grant covers one team and not another", () => {
+    // The organization grant stays held, so a check resolved at the organization would pass
+    // every route below: what refuses the other team is the team scope, and nothing else.
+    const SCOPED = {
+      granted: ["team:view", "team:manage"],
+      grantedOnTeam: {
+        [SHARED_TEAM_ID]: ["team:view", "team:manage"],
+        [PERSONAL_TEAM_ID]: [],
+      },
+    };
+
+    /** @scenario A team route resolves its permission at the team it names */
+    it("refuses every route naming the other team before the team service is asked", async () => {
+      const { app, repositories } = await application();
+      const asked = vi.spyOn(app, "getTeam");
+      const { send } = mountTeamsRestApplication(app, SCOPED);
+      const other = `/api/teams/${PERSONAL_TEAM_ID}`;
+
+      const statuses = [
+        (await send(other)).status,
+        (await send(other, { method: "PATCH", body: { name: "Renamed" } })).status,
+        (await send(other, { method: "DELETE" })).status,
+        (await send(`${other}/members`)).status,
+        (await send(`${other}/members`, { method: "POST", body: { userId: COLLEAGUE_ID } })).status,
+        (await send(`${other}/members/${USER_ID}`, { method: "DELETE" })).status,
+        (await send(`${other}/projects`)).status,
+      ];
+
+      expect(statuses).toEqual(statuses.map(() => 403));
+      expect(asked).not.toHaveBeenCalled();
+      expect((await repositories.team.getById(PERSONAL_TEAM_ID)).name).not.toBe("Renamed");
+    });
+
+    it("still serves the team the grant does name", async () => {
+      const { app } = await application();
+      const { send } = mountTeamsRestApplication(app, SCOPED);
+
+      expect((await send(`/api/teams/${SHARED_TEAM_ID}`)).status).toBe(200);
+    });
+  });
 });

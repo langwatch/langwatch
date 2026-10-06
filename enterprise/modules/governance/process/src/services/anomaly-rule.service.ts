@@ -6,6 +6,7 @@ import {
   AnomalyRuleNotFoundError,
   type AnomalyRule,
   type CreateAnomalyRuleInput,
+  redactDestinationConfig,
   restoreKeptSharedSecrets,
   unsupportedValue,
   type UpdateAnomalyRuleInput,
@@ -30,6 +31,14 @@ export class AnomalyRuleService {
     now?: () => Instant;
   }): AnomalyRuleService {
     return new AnomalyRuleService(options.repository, options.now ?? nowInstant);
+  }
+
+  /**
+   * The rule as a reader may see it: the shared secret that signs outbound SIEM alerts is told
+   * as set, never shown. Writes still take it; the service itself keeps the stored row whole.
+   */
+  forReader(rule: AnomalyRule): AnomalyRule {
+    return { ...rule, destinationConfig: redactDestinationConfig(rule.destinationConfig) };
   }
 
   async list(organizationId: string): Promise<AnomalyRule[]> {
