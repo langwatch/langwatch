@@ -38,6 +38,7 @@ export const reads = {
   "@langwatch/stored-object-process": [
     "modules/**/*",
     "enterprise/modules/**/*",
+    "apps/*/package.json",
     "apps/tasks/**/*",
     "apps/worker/**/*",
     "charts/langwatch/**/*",
@@ -45,6 +46,7 @@ export const reads = {
     "packages/clickhouse-migrations/migrations/00023_create_stored_objects.sql",
     ".env.example",
   ],
+  "@langwatch/authz-process": ["modules/**/*", "enterprise/modules/**/*"],
   "@langwatch/workflow-process": [
     "sdks/go/**/*",
     "services/nlpgo/**/*",
