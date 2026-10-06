@@ -203,13 +203,23 @@ export const nurturingSignalSchema = z.discriminatedUnion("kind", [
     event: z.enum(["paths_selected", "path_begun"]),
     previousPaths: z.array(guidedPathSchema),
     paths: z.array(guidedPathSchema),
+    payload: z
+      .record(z.string(), z.union([z.string(), z.array(z.string()), z.number()]))
+      .optional(),
   }),
   z.object({
     kind: z.literal("guided_onboarding_progress"),
     ...signalSource,
     userId: id,
     organizationId: id,
-    event: z.enum(["provider_connected", "tour_completed", "tour_skipped", "path_completed"]),
+    event: z.enum([
+      "provider_connected",
+      "provider_skipped",
+      "tour_completed",
+      "tour_skipped",
+      "tour_replayed",
+      "path_completed",
+    ]),
     payload: z.record(z.string(), z.union([z.string(), z.array(z.string()), z.number()])),
     state: guidedOnboardingStateSchema,
   }),

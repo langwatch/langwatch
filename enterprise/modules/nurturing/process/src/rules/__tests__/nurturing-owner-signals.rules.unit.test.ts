@@ -43,6 +43,7 @@ describe("guidedOnboardingSignal", () => {
       event: "paths_selected",
       previousPaths: [],
       paths: ["gateway", "llmops"],
+      payload: {},
     });
   });
 
@@ -58,6 +59,32 @@ describe("guidedOnboardingSignal", () => {
       payload: { path: "gateway" },
       state: recorded.state,
     });
+  });
+});
+
+describe("guidedOnboardingSignal for the steps only PostHog is told of", () => {
+  it("raises a provider skip and a tour replay as progress, with the current path", () => {
+    for (const event of ["provider_skipped", "tour_replayed"] as const) {
+      expect(
+        guidedOnboardingSignal({
+          aggregateId: "org-1",
+          data: { ...recorded, event, state: { ...recorded.state, currentPath: "gateway" } },
+        }),
+      ).toMatchObject({
+        kind: "guided_onboarding_progress",
+        event,
+        state: { currentPath: "gateway" },
+      });
+    }
+  });
+
+  it("carries the path a path_begun names, so PostHog can track it", () => {
+    expect(
+      guidedOnboardingSignal({
+        aggregateId: "org-1",
+        data: { ...recorded, event: "path_begun", payload: { path: "governance" } },
+      }),
+    ).toMatchObject({ kind: "guided_onboarding_paths", payload: { path: "governance" } });
   });
 });
 

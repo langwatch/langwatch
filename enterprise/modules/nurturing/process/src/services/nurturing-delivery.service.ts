@@ -19,6 +19,7 @@ import {
 } from "../rules/nurturing-feature-adoption-service.rules.ts";
 import {
   fireGuidedOnboardingPaths,
+  fireGuidedOnboardingPostHog,
   fireGuidedOnboardingProgress,
 } from "../rules/nurturing-guided-onboarding-service.rules.ts";
 import {
@@ -219,6 +220,28 @@ export class NurturingDeliveryService {
         },
       });
     switch (signal.kind) {
+      case "guided_onboarding_paths":
+        return posthog.track(
+          fireGuidedOnboardingPostHog({
+            userId: signal.userId,
+            organizationId: signal.organizationId,
+            event: signal.event,
+            payload: signal.payload ?? {},
+            paths: signal.paths,
+            currentPath: undefined,
+          }),
+        );
+      case "guided_onboarding_progress":
+        return posthog.track(
+          fireGuidedOnboardingPostHog({
+            userId: signal.userId,
+            organizationId: signal.organizationId,
+            event: signal.event,
+            payload: signal.payload,
+            paths: signal.state.paths,
+            currentPath: signal.state.currentPath,
+          }),
+        );
       case "scenario_created": {
         const variant = signal.onboardingVariant;
         return track({

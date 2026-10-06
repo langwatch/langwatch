@@ -318,13 +318,13 @@ describe("OnboardingModule records its guided writes for peers", () => {
     ]);
   });
 
-  it("records only the tour skip when the provider is skipped, not the provider skip", async () => {
+  it("records the provider skip and the tour skip when the provider is skipped", async () => {
     const { app } = buildApp();
     const sent = connectLifecycle(app);
 
     await app.recordProviderSkipped({ organizationId: ORGANIZATION_ID, userId: USER_ID });
 
-    expect(sent.map((data) => data.event)).toEqual(["tour_skipped"]);
+    expect(sent.map((data) => data.event)).toEqual(["provider_skipped", "tour_skipped"]);
   });
 
   it("leaves the conversation and the key reveal off what it records", async () => {

@@ -877,7 +877,7 @@ describe("NurturingDeliveryService", () => {
     });
 
     /** @scenario 'without a Customer.io key nothing is sent' */
-    it("guided onboarding: makes no request at all and raises nothing", async () => {
+    it("guided onboarding: reaches PostHog only, and raises nothing", async () => {
       const posthog = MemoryPostHogChannel.create();
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
@@ -913,7 +913,10 @@ describe("NurturingDeliveryService", () => {
         },
       });
 
-      expect(posthog.tracked).toEqual([]);
+      expect(posthog.tracked.map(({ event }) => event)).toEqual([
+        "guided_onboarding_paths_selected",
+        "guided_onboarding_path_completed",
+      ]);
     });
   });
 });

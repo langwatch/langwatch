@@ -6,6 +6,12 @@
 import { SIGNED_UP_EVENT_TYPE } from "@langwatch/auth-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
+import {
+  GUIDED_ONBOARDING_AGGREGATE_TYPE,
+  GUIDED_ONBOARDING_RECORDED_EVENT_TYPE,
+  GUIDED_ONBOARDING_RECORDED_EVENT_VERSION,
+  type GuidedOnboardingRecordedEventData,
+} from "@langwatch/onboarding-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   USER_AGGREGATE_TYPE,
@@ -190,6 +196,93 @@ describe("nurturing's authSignedUp peer subscriber", () => {
       await settle();
 
       expect(posthog.tracked).toEqual([{ userId: "user-1", event: "signed_up", properties: {} }]);
+    });
+  });
+});
+
+/** Onboarding's guided_onboarding_lifecycle fact for one guided write, as it records it. */
+function guidedFact(
+  data: Pick<GuidedOnboardingRecordedEventData, "event" | "payload" | "state" | "previousPaths">,
+): Event {
+  return {
+    id: `evt-guided-${data.event}`,
+    aggregateId: "org-1",
+    aggregateType: GUIDED_ONBOARDING_AGGREGATE_TYPE,
+    tenantId: createTenantId("org-1"),
+    createdAt: 1_000,
+    occurredAt: 1_000,
+    type: GUIDED_ONBOARDING_RECORDED_EVENT_TYPE,
+    version: GUIDED_ONBOARDING_RECORDED_EVENT_VERSION,
+    data: {
+      tenantId: "org-1",
+      occurredAt: 1_000,
+      organizationId: "org-1",
+      userId: "user-1",
+      ...data,
+    },
+    idempotencyKey: `org-1:org-1:${data.event}:1000`,
+  } as Event;
+}
+
+describe("nurturing's guidedOnboardingRecorded peer subscriber", () => {
+  describe("when onboarding records the picked paths, delivered twice", () => {
+    /** @scenario "a guided state write reaches PostHog through the service" */
+    /** @scenario "selecting paths tracks the paths and the primary path" */
+    /** @scenario "every guided onboarding event carries the experiment property" */
+    it("tracks exactly one guided_onboarding_paths_selected against the user, with the person properties", async () => {
+      const { posthog, deliverFact } = nurturingOverMemoryPostHog();
+      const fact = guidedFact({
+        event: "paths_selected",
+        payload: { paths: ["gateway", "llmops"], primaryPath: "gateway" },
+        previousPaths: [],
+        state: { paths: ["gateway", "llmops"], donePaths: [] },
+      });
+
+      await deliverFact(fact);
+      await deliverFact(fact);
+      await settle();
+
+      expect(posthog.tracked).toEqual([
+        {
+          userId: "user-1",
+          event: "guided_onboarding_paths_selected",
+          properties: {
+            paths: ["gateway", "llmops"],
+            primary_path: "gateway",
+            "$feature/experiment_onboarding_langy_guided": "guided",
+            organization_id: "org-1",
+            $set: {
+              onboarding_variant: "guided",
+              onboarding_paths: ["gateway", "llmops"],
+              onboarding_primary_path: "gateway",
+            },
+          },
+        },
+      ]);
+    });
+  });
+
+  describe("when onboarding records a step Customer.io is not told of", () => {
+    /** @scenario "skipping the provider is tracked" */
+    /** @scenario "completing, skipping and replaying the tour are tracked with the current path" */
+    /** @scenario "skipping the provider, replaying the tour and attaching a conversation send nothing" */
+    it("tracks it in PostHog and makes no Customer.io call", async () => {
+      const { posthog, customerIoFetch, deliverFact } = nurturingOverMemoryPostHog();
+      const state = { paths: ["gateway" as const], donePaths: [], currentPath: "gateway" as const };
+
+      await deliverFact(
+        guidedFact({ event: "provider_skipped", payload: {}, previousPaths: [], state }),
+      );
+      await deliverFact(
+        guidedFact({ event: "tour_replayed", payload: {}, previousPaths: [], state }),
+      );
+      await settle();
+
+      expect(posthog.tracked.map(({ event, properties }) => [event, properties?.path])).toEqual([
+        ["guided_onboarding_provider_skipped", undefined],
+        ["guided_onboarding_tour_replayed", "gateway"],
+      ]);
+      expect(customerIoFetch).not.toHaveBeenCalled();
     });
   });
 });

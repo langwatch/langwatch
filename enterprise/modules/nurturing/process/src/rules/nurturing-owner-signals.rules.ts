@@ -37,7 +37,7 @@ type OwnerEvent<Data> = Readonly<{ data: Data; aggregateId: string }>;
 /** An owner's event whose data names no tenant: the delivery context's is the event's own. */
 type TenantEvent<Data> = OwnerEvent<Data> & Readonly<{ tenantId: string }>;
 
-/** The picks reach nurturing as `guided_onboarding_paths`, the finished steps as progress. */
+/** The picks reach nurturing as `guided_onboarding_paths`, every other step as progress. */
 export function guidedOnboardingSignal({
   data,
   aggregateId,
@@ -58,10 +58,13 @@ export function guidedOnboardingSignal({
         event: data.event,
         previousPaths: data.previousPaths,
         paths: data.state.paths,
+        payload: data.payload,
       };
     case "provider_connected":
+    case "provider_skipped":
     case "tour_completed":
     case "tour_skipped":
+    case "tour_replayed":
     case "path_completed":
       return {
         kind: "guided_onboarding_progress",

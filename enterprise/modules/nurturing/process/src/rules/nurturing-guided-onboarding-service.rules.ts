@@ -4,10 +4,11 @@ import type {
   CioOrgTraits,
   CioPersonTraits,
 } from "@langwatch/enterprise-nurturing-contract";
-import type {
-  GuidedOnboardingState,
-  GuidedPath,
-  OnboardingVariant,
+import {
+  onboardingExperimentProperties,
+  type GuidedOnboardingState,
+  type GuidedPath,
+  type OnboardingVariant,
 } from "@langwatch/onboarding-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -131,7 +132,13 @@ export function fireGuidedOnboardingProgress({
 }: {
   userId: string;
   organizationId: string;
-  event: "provider_connected" | "tour_completed" | "tour_skipped" | "path_completed";
+  event:
+    | "provider_connected"
+    | "provider_skipped"
+    | "tour_completed"
+    | "tour_skipped"
+    | "tour_replayed"
+    | "path_completed";
   payload: Record<string, string | string[] | number | undefined>;
   state: GuidedOnboardingState;
 }): CioBatchCall[] {
@@ -176,5 +183,96 @@ export function fireGuidedOnboardingProgress({
         },
       ];
     }
+    case "provider_skipped":
+    case "tour_replayed":
+      return [];
   }
+}
+
+type GuidedPostHogEventName =
+  | "paths_selected"
+  | "path_begun"
+  | "provider_connected"
+  | "provider_skipped"
+  | "tour_completed"
+  | "tour_skipped"
+  | "tour_replayed"
+  | "path_completed";
+
+const POSTHOG_EVENT: Record<GuidedPostHogEventName, string> = {
+  paths_selected: "guided_onboarding_paths_selected",
+  path_begun: "guided_onboarding_path_begun",
+  provider_connected: "guided_onboarding_provider_connected",
+  provider_skipped: "guided_onboarding_provider_skipped",
+  tour_completed: "guided_onboarding_tour_completed",
+  tour_skipped: "guided_onboarding_tour_skipped",
+  tour_replayed: "guided_onboarding_tour_replayed",
+  path_completed: "guided_onboarding_path_completed",
+};
+
+/**
+ * Only the named fields of the payload reach PostHog: nothing but the provider name and
+ * the model may leave the process for a provider connection.
+ */
+function guidedPostHogProperties({
+  event,
+  payload,
+  paths,
+  currentPath,
+}: {
+  event: GuidedPostHogEventName;
+  payload: Record<string, string | string[] | number | undefined>;
+  paths: GuidedPath[];
+  currentPath: GuidedPath | undefined;
+}): Record<string, unknown> {
+  switch (event) {
+    case "paths_selected":
+      return { paths, primary_path: paths[0] };
+    case "provider_connected":
+      return { provider: payload.provider, model: payload.model };
+    case "tour_completed":
+    case "tour_skipped":
+    case "tour_replayed":
+      return { path: currentPath };
+    case "path_begun":
+    case "path_completed":
+      return { path: payload.path };
+    case "provider_skipped":
+      return {};
+  }
+}
+
+/**
+ * The PostHog event a guided write is tracked as: the step's own properties, the experiment
+ * property, the organization, and the person properties the A/B split reads.
+ */
+export function fireGuidedOnboardingPostHog({
+  userId,
+  organizationId,
+  event,
+  payload,
+  paths,
+  currentPath,
+}: {
+  userId: string;
+  organizationId: string;
+  event: GuidedPostHogEventName;
+  payload: Record<string, string | string[] | number | undefined>;
+  paths: GuidedPath[];
+  currentPath: GuidedPath | undefined;
+}): { userId: string; event: string; properties: Record<string, unknown> } {
+  return {
+    userId,
+    event: POSTHOG_EVENT[event],
+    properties: {
+      ...guidedPostHogProperties({ event, payload, paths, currentPath }),
+      ...onboardingExperimentProperties("guided"),
+      organization_id: organizationId,
+      $set: {
+        onboarding_variant: "guided",
+        onboarding_paths: paths,
+        onboarding_primary_path: paths[0],
+      },
+    },
+  };
 }
