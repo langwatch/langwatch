@@ -247,6 +247,18 @@ jobs:
           timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
           echo "LangWatch server is ready"
 
+      - name: Create the staging and canary prompt tags
+        # Main's e2e organisation held these tags; the seeded one holds only "production".
+        env:
+          LANGWATCH_ENDPOINT: http://localhost:5560
+          LANGWATCH_API_KEY: sk-lw-local-development-key
+        run: |
+          for tag in staging canary; do
+            curl -fsS -X POST "$LANGWATCH_ENDPOINT/api/prompts/tags" \
+              -H "X-Auth-Token: $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
+              -d "{\"name\":\"$tag\"}"
+          done
+
       - name: Run e2e tests
         # Fork and Dependabot PRs don't receive repository secrets, so a
         # secret-backed run can only fail on a missing key. Skip it there;

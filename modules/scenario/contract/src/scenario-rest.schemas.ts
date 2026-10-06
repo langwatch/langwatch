@@ -200,3 +200,17 @@ export const scenarioRestIdVersionParamsSchema = z.object({
   version: z.coerce.number().int().min(1),
 });
 export const scenarioRestArchivedSchema = z.object({ id: z.string(), archived: z.boolean() });
+
+/** `POST /api/v1/agents/:id/test`'s path: the agent under test, as agent published it. */
+export const agentTestRestParamsSchema = z.object({
+  id: z.string().min(1).describe("The agent id."),
+});
+
+/** A test run takes no body: the agent travels in the path. */
+export const testAgentBodySchema = z.object({});
+
+export const agentTestRunResponseSchema = z.object({
+  scenarioRunId: z.string().describe("The run to follow; open it in the simulations run drawer."),
+  batchRunId: z.string().describe("The batch the run belongs to."),
+  setId: z.string().describe("The internal set that holds agent test runs."),
+});

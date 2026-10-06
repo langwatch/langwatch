@@ -10,8 +10,8 @@ Agents a project builds and runs: their workflow configurations, the connected a
 | -------------- | ---------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                                |
 | Subjects       | agent                                                                                          |
-| Halves         | [contract](contract) · [process](process) · [browser](browser)                                 |
-| Api token      | `AgentApi` = `moduleApi<AgentApi>()("agent")`, `contract/src/agent.api.ts:189` (45 operations) |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                       |
+| Api token      | `AgentApi` = `moduleApi<AgentApi>()("agent")`, `contract/src/agent.api.ts:172` (43 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                     |
 
 ## What agent owns
@@ -20,7 +20,7 @@ Agents a project builds and runs: their workflow configurations, the connected a
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | Postgres table  | `Agent`                                                                                                                          | `process/src/repositories/prisma/prisma.agent.repository.ts:69` |
 | Stores required | redis                                                                                                                            | `process/src/repositories/redis/redis.agent.repositories.ts:8`  |
-| Config          | `replicaCount` (LANGWATCH_APP_REPLICAS), `relayMaxPayloadMb` (LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB), `publicBaseUrl` (BASE_HOST) | `contract/src/agent.api.ts:197`                                 |
+| Config          | `replicaCount` (LANGWATCH_APP_REPLICAS), `relayMaxPayloadMb` (LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB), `publicBaseUrl` (BASE_HOST) | `contract/src/agent.api.ts:180`                                 |
 
 Anything else agent needs belongs to another module and is reached through its `*Api`.
 
@@ -32,7 +32,6 @@ Anything else agent needs belongs to another module and is reached through its `
 | `featureFlags` | `FeatureFlagApi` | [feature-flag](../feature-flag/README.md) |
 | `permissions`  | `AuthzApi`       | [authz](../authz/README.md)               |
 | `projects`     | `ProjectApi`     | [project](../project/README.md)           |
-| `scenarios`    | `ScenarioApi`    | [scenario](../scenario/README.md)         |
 | `secrets`      | `SecretApi`      | [secret](../secret/README.md)             |
 | `traces`       | `TraceApi`       | [trace](../trace/README.md)               |
 | `users`        | `UserApi`        | [user](../user/README.md)                 |

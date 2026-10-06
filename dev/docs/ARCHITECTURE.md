@@ -1511,6 +1511,12 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   apidiff's to catch, not a frozen copy's (Alex, 2026-09-29).
 - `/api/<x>` is the main path; `/v1` is optional; `/latest/` and `/<version>/` are supported but hidden from the
   published docs (Alex, 2026-09-25).
+- A REST path is served by its namespace's owner. For the migration only, another module may serve one
+  by declaring it on the route, `.withSharedPath({ owner, reason, deprecate })`, in a literal family (a
+  family claiming `/api/<x>` would run its middleware ahead of the owner's routes); every such route is
+  planned for deprecation and the route registry lists it (`RegisteredRoute.sharedPath`). A second
+  module mounting a family on a namespace another module claims is refused at mount (Alex, 2026-10-06,
+  R10; `packages/api/specs/shared-path.feature`).
 - A handler never sets a header to refuse: a `HandledError` carrying `meta.retryAfterMs` is rendered by
   the REST runtime with `Retry-After` (2026-09-23).
 - An action that takes no body declares an empty input schema from its contract; the runtime reads an

@@ -351,7 +351,7 @@ type MessageContentProps = ComponentProps<typeof MessageContent>;
 /** What every message in the transcript shares; the per-message gates are derived from it. */
 export type LangyMessageContext = Omit<
   MessageContentProps,
-  "message" | "isStreaming" | "interrupted" | "showFeedback" | "isFeedbackPinned"
+  "message" | "isStreaming" | "interrupted" | "isLatest" | "showFeedback" | "isFeedbackPinned"
 > & {
   /** A turn is streaming into the transcript's last assistant message. */
   displayBusy: boolean;
@@ -385,6 +385,7 @@ function LangyTranscriptMessage({
         message={message}
         isStreaming={displayBusy && lastAnswer}
         interrupted={interruptedHere && lastAnswer}
+        isLatest={isLast}
         showFeedback={feedbackAllowed && lastAnswer}
         isFeedbackPinned={pinnedFeedbackMessageId === message.id}
       />

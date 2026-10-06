@@ -56,7 +56,8 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[GetApiDatasetBySlugOrIdResponse200]:
-    """Get a dataset by its slug or id.
+    """Get a dataset by its slug or id, with every record inline. A dataset too large for one response is
+    refused: read it page by page from `GET /{slugOrId}/records`.
 
     Args:
         slug_or_id (str):
@@ -85,7 +86,8 @@ def sync(
     *,
     client: AuthenticatedClient,
 ) -> GetApiDatasetBySlugOrIdResponse200 | None:
-    """Get a dataset by its slug or id.
+    """Get a dataset by its slug or id, with every record inline. A dataset too large for one response is
+    refused: read it page by page from `GET /{slugOrId}/records`.
 
     Args:
         slug_or_id (str):
@@ -109,7 +111,8 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[GetApiDatasetBySlugOrIdResponse200]:
-    """Get a dataset by its slug or id.
+    """Get a dataset by its slug or id, with every record inline. A dataset too large for one response is
+    refused: read it page by page from `GET /{slugOrId}/records`.
 
     Args:
         slug_or_id (str):
@@ -136,7 +139,8 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
 ) -> GetApiDatasetBySlugOrIdResponse200 | None:
-    """Get a dataset by its slug or id.
+    """Get a dataset by its slug or id, with every record inline. A dataset too large for one response is
+    refused: read it page by page from `GET /{slugOrId}/records`.
 
     Args:
         slug_or_id (str):

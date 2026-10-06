@@ -58,7 +58,7 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostConnectedAgentFramesBody,
 ) -> Response[PostConnectedAgentFramesResponse200]:
     """Accept this instance's acknowledgements, results and deregistration
@@ -87,7 +87,7 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostConnectedAgentFramesBody,
 ) -> PostConnectedAgentFramesResponse200 | None:
     """Accept this instance's acknowledgements, results and deregistration
@@ -111,7 +111,7 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostConnectedAgentFramesBody,
 ) -> Response[PostConnectedAgentFramesResponse200]:
     """Accept this instance's acknowledgements, results and deregistration
@@ -138,7 +138,7 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostConnectedAgentFramesBody,
 ) -> PostConnectedAgentFramesResponse200 | None:
     """Accept this instance's acknowledgements, results and deregistration

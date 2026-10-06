@@ -1,0 +1,365 @@
+# @langwatch/annotation-process
+
+The server half of [annotation](../README.md). Annotations on traces: comments, scores and reviews, and the annotation queues reviewers work through.
+
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
+
+## Installation
+
+`defineProcessModule("annotation").withRepositories(annotationRepositories).withApi(AnnotationModule).withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport).withTasks(…)`, `src/annotation.module.ts:15`.
+
+Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
+
+## Module API (`AnnotationApi`)
+
+Flat operations peers may call after the annotation app is composed.
+
+Peers call these through the token, declared at `../contract/src/annotation.api.ts:65`; nothing else in this package is public.
+
+#### `create`
+
+```typescript
+create(input: CreateAnnotationInput): Promise<Annotation>;
+```
+
+#### `createUnattributed`
+
+```typescript
+createUnattributed(input: CreateUnattributedAnnotationInput): Promise<Annotation>;
+```
+
+#### `createReview`
+
+```typescript
+createReview(input: AnnotationReviewCreateInput): Promise<Annotation>;
+```
+
+#### `update`
+
+```typescript
+update(input: UpdateAnnotationInput): Promise<Annotation>;
+```
+
+#### `updateReview`
+
+```typescript
+updateReview(input: AnnotationReviewUpdateInput): Promise<Annotation>;
+```
+
+#### `delete`
+
+```typescript
+delete(input: DeleteAnnotationInput): Promise<Annotation>;
+```
+
+#### `deleteReview`
+
+```typescript
+deleteReview(input: AnnotationReviewDeleteInput): Promise<Annotation>;
+```
+
+#### `getById`
+
+```typescript
+getById(input: AnnotationByIdInput): Promise<Annotation>;
+```
+
+#### `list`
+
+```typescript
+list(input: ListAnnotationsInput): Promise<Annotation[]>;
+```
+
+#### `listWithFullUsers`
+
+```typescript
+listWithFullUsers(input: ListAnnotationsInput): Promise<AnnotationWithFullUser[]>;
+```
+
+#### `listWithUserSummaries`
+
+```typescript
+listWithUserSummaries(input: ListAnnotationsInput): Promise<AnnotationWithUserSummary[]>;
+```
+
+#### `listReviewQueueItems`
+
+```typescript
+listReviewQueueItems(input: AnnotationQueueCaller): Promise<AnnotationQueueItemWithTrace[]>;
+```
+
+#### `listOptimizedQueues`
+
+```typescript
+listOptimizedQueues(input: AnnotationReviewOptimizedQueuesInput): Promise<AnnotationOptimizedQueues>;
+```
+
+#### `getQueueWalkStep`
+
+```typescript
+getQueueWalkStep(input: AnnotationQueueWalkStepInput): Promise<AnnotationQueueWalkStep>;
+```
+
+#### `listForProjection`
+
+```typescript
+listForProjection(input: ListProjectionAnnotationsInput): Promise<ProjectionAnnotation[]>;
+```
+
+#### `listScoreNames`
+
+```typescript
+listScoreNames(input: ListAnnotationScoreNamesInput): Promise<AnnotationScoreName[]>;
+```
+
+#### `upsertScore`
+
+```typescript
+upsertScore(input: UpsertAnnotationScoreInput): Promise<AnnotationScore>;
+```
+
+#### `listScores`
+
+```typescript
+listScores(input: ListAnnotationScoresInput): Promise<AnnotationScore[]>;
+```
+
+#### `getScore`
+
+```typescript
+getScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore>;
+```
+
+#### `toggleScore`
+
+```typescript
+toggleScore(input: ToggleAnnotationScoreInput): Promise<AnnotationScore>;
+```
+
+#### `deleteScore`
+
+```typescript
+deleteScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore>;
+```
+
+#### `configure`
+
+```typescript
+configure(input: AnnotationQueueConfiguration): Promise<AnnotationQueueRecord>;
+```
+
+#### `listQueues`
+
+```typescript
+listQueues(input: AnnotationQueueScope & Readonly<{ reachableOnly?: boolean; userId?: string }>): Promise<AnnotationQueueListEntry[]>;
+```
+
+#### `getQueue`
+
+```typescript
+getQueue(input: AnnotationQueueScope & Readonly<{ slug?: string; queueId?: string }>): Promise<AnnotationQueueDetail>;
+```
+
+#### `listQueueItems`
+
+```typescript
+listQueueItems(input: AnnotationQueueScope): Promise<readonly AnnotationQueueListedItem[]>;
+```
+
+#### `countPendingItems`
+
+```typescript
+countPendingItems(input: AnnotationQueueCaller): Promise<number>;
+```
+
+#### `countAssignedItems`
+
+```typescript
+countAssignedItems(input: AnnotationQueueCaller): Promise<number>;
+```
+
+#### `listMemberQueuePendingCounts`
+
+```typescript
+listMemberQueuePendingCounts(input: AnnotationQueueCaller): Promise<AnnotationQueuePendingCount[]>;
+```
+
+#### `deleteQueueItems`
+
+```typescript
+deleteQueueItems(input: AnnotationQueueCaller & Readonly<{ queueItemIds: readonly string[] }>): Promise<number>;
+```
+
+#### `markQueueItemDone`
+
+```typescript
+markQueueItemDone(input: AnnotationQueueCaller & Readonly<{ queueItemId: string }>): Promise<AnnotationQueueItem>;
+```
+
+#### `queueTraces`
+
+```typescript
+queueTraces(input: QueueAnnotationTracesInput): Promise<Readonly<{ created: number; skipped: number }>>;
+```
+
+#### `countUsage`
+
+The usage report's figures for these projects.
+
+```typescript
+countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<AnnotationUsageCount>;
+```
+
+## REST transport
+
+### `annotationRest`
+
+|             |                                                |
+| ----------- | ---------------------------------------------- |
+| Declared at | `src/transport/annotation.rest.ts:20`          |
+| Base URL    | `/api/annotations`, twin `/api/v1/annotations` |
+| Addressing  | dated                                          |
+| Credential  | project                                        |
+| Versions    | `2026-08-07`                                   |
+
+#### `GET /` · `listAnnotations`
+
+List annotations in the caller’s project
+
+Permission `annotations:view`. Declared at `src/transport/annotation.rest.ts:24`.
+
+Answers at `/api/annotations`, `/api/v1/annotations`; also, undocumented, `/api/annotations/2026-08-07`, `/api/v1/annotations/2026-08-07`, `/api/annotations/latest`, `/api/v1/annotations/latest`.
+
+```typescript
+type Query = z.infer<typeof annotationRestQuerySchema>; // ../contract/src/annotation-rest.schemas.ts:8
+type Response = z.infer<typeof annotationRestListResponseSchema>; // ../contract/src/annotation-rest.schemas.ts:30
+```
+
+#### `GET /:id` · `getAnnotation`
+
+Get an annotation in the caller’s project
+
+Permission `annotations:view`. Declared at `src/transport/annotation.rest.ts:41`.
+
+Answers at `/api/annotations/:id`, `/api/v1/annotations/:id`; also, undocumented, `/api/annotations/2026-08-07/:id`, `/api/v1/annotations/2026-08-07/:id`, `/api/annotations/latest/:id`, `/api/v1/annotations/latest/:id`.
+
+```typescript
+type Params = z.infer<typeof annotationRestParamsSchema>; // ../contract/src/annotation-rest.schemas.ts:6
+type Response = z.infer<typeof annotationRestResponseSchema>; // ../contract/src/annotation-rest.schemas.ts:29
+```
+
+#### `PATCH /:id` · `updateAnnotation`
+
+Update an annotation in the caller’s project
+
+Permission `annotations:manage`. Declared at `src/transport/annotation.rest.ts:58`.
+
+Answers at `/api/annotations/:id`, `/api/v1/annotations/:id`; also, undocumented, `/api/annotations/2026-08-07/:id`, `/api/v1/annotations/2026-08-07/:id`, `/api/annotations/latest/:id`, `/api/v1/annotations/latest/:id`.
+
+```typescript
+type Params = z.infer<typeof annotationRestParamsSchema>; // ../contract/src/annotation-rest.schemas.ts:6
+type Body = z.infer<typeof annotationRestWriteSchema>; // ../contract/src/annotation-rest.schemas.ts:12
+type Response = z.infer<typeof annotationRestResponseSchema>; // ../contract/src/annotation-rest.schemas.ts:29
+```
+
+#### `DELETE /:id` · `deleteAnnotation`
+
+Delete an annotation in the caller’s project
+
+Permission `annotations:manage`. Declared at `src/transport/annotation.rest.ts:76`.
+
+Answers at `/api/annotations/:id`, `/api/v1/annotations/:id`; also, undocumented, `/api/annotations/2026-08-07/:id`, `/api/v1/annotations/2026-08-07/:id`, `/api/annotations/latest/:id`, `/api/v1/annotations/latest/:id`.
+
+```typescript
+type Params = z.infer<typeof annotationRestParamsSchema>; // ../contract/src/annotation-rest.schemas.ts:6
+type Response = z.infer<typeof annotationRestDeletedSchema>; // ../contract/src/annotation-rest.schemas.ts:35
+```
+
+#### `GET /trace/:id` · `listTraceAnnotations`
+
+List annotations on a trace in the caller’s project
+
+Permission `annotations:view`. Declared at `src/transport/annotation.rest.ts:90`.
+
+Answers at `/api/annotations/trace/:id`, `/api/v1/annotations/trace/:id`; also, undocumented, `/api/annotations/2026-08-07/trace/:id`, `/api/v1/annotations/2026-08-07/trace/:id`, `/api/annotations/latest/trace/:id`, `/api/v1/annotations/latest/trace/:id`.
+
+```typescript
+type Params = z.infer<typeof annotationRestParamsSchema>; // ../contract/src/annotation-rest.schemas.ts:6
+type Query = z.infer<typeof annotationRestQuerySchema>; // ../contract/src/annotation-rest.schemas.ts:8
+type Response = z.infer<typeof annotationRestListResponseSchema>; // ../contract/src/annotation-rest.schemas.ts:30
+```
+
+#### `POST /trace/:id` · `createTraceAnnotation`
+
+Create an unattributed annotation on a trace
+
+Permission `annotations:create`. Declared at `src/transport/annotation.rest.ts:109`.
+
+Answers at `/api/annotations/trace/:id`, `/api/v1/annotations/trace/:id`; also, undocumented, `/api/annotations/2026-08-07/trace/:id`, `/api/v1/annotations/2026-08-07/trace/:id`, `/api/annotations/latest/trace/:id`, `/api/v1/annotations/latest/trace/:id`.
+
+```typescript
+type Params = z.infer<typeof annotationRestParamsSchema>; // ../contract/src/annotation-rest.schemas.ts:6
+type Body = z.infer<typeof annotationRestWriteSchema>; // ../contract/src/annotation-rest.schemas.ts:12
+type Response = z.infer<typeof annotationRestResponseSchema>; // ../contract/src/annotation-rest.schemas.ts:29
+```
+
+## tRPC transport
+
+### `annotationScore`
+
+Contract `../contract/src/annotation-score.trpc.ts:43`, router `src/transport/annotation-score.trpc.ts:24`.
+
+| Procedure                      | Kind     | Gate                            | Input                              | Output                  |
+| ------------------------------ | -------- | ------------------------------- | ---------------------------------- | ----------------------- |
+| `annotationScore.upsert`       | mutation | Permission `annotations:manage` | `annotationScoreUpsertInputSchema` | `annotationScoreSchema` |
+| `annotationScore.getAll`       | query    | Permission `annotations:view`   | `annotationApiProjectScopeSchema`  | inline                  |
+| `annotationScore.getAllActive` | query    | Permission `annotations:view`   | `annotationApiProjectScopeSchema`  | inline                  |
+| `annotationScore.getById`      | query    | Permission `annotations:view`   | `annotationScoreScopeSchema`       | `annotationScoreSchema` |
+| `annotationScore.toggle`       | mutation | Permission `annotations:update` | `annotationScoreToggleInputSchema` | `annotationScoreSchema` |
+| `annotationScore.delete`       | mutation | Permission `annotations:delete` | `annotationScoreScopeSchema`       | `annotationScoreSchema` |
+
+### `annotation`
+
+Contract `../contract/src/annotation.trpc.ts:53`, router `src/transport/annotation.trpc.ts:10`.
+
+| Procedure                                 | Kind     | Gate                            | Input                                        | Output                              |
+| ----------------------------------------- | -------- | ------------------------------- | -------------------------------------------- | ----------------------------------- |
+| `annotation.create`                       | mutation | Permission `annotations:create` | `annotationApiCreateInputSchema`             | `annotationSchema`                  |
+| `annotation.updateByTraceId`              | mutation | Permission `annotations:update` | `annotationApiUpdateInputSchema`             | `annotationSchema`                  |
+| `annotation.getByTraceId`                 | query    | Permission `annotations:view`   | `annotationApiByTraceIdInputSchema`          | inline                              |
+| `annotation.getByTraceIds`                | query    | Permission `annotations:view`   | `annotationApiByTraceIdsInputSchema`         | inline                              |
+| `annotation.getById`                      | query    | Permission `annotations:view`   | `annotationApiAnnotationScopeSchema`         | `annotationSchema`                  |
+| `annotation.deleteById`                   | mutation | Permission `annotations:delete` | `annotationApiAnnotationScopeSchema`         | `annotationSchema`                  |
+| `annotation.getAll`                       | query    | Permission `annotations:view`   | `annotationApiListAllInputSchema`            | inline                              |
+| `annotation.createOrUpdateQueue`          | mutation | Permission `annotations:create` | `annotationApiQueueConfigurationInputSchema` | `annotationQueueRecordSchema`       |
+| `annotation.getQueues`                    | query    | Permission `annotations:view`   | `annotationApiQueueListInputSchema`          | inline                              |
+| `annotation.getQueueItems`                | query    | Permission `annotations:view`   | `annotationApiProjectScopeSchema`            | inline                              |
+| `annotation.getPendingItemsCount`         | query    | Permission `annotations:view`   | `annotationApiProjectScopeSchema`            | `annotationCountSchema`             |
+| `annotation.getAssignedItemsCount`        | query    | Permission `annotations:view`   | `annotationApiProjectScopeSchema`            | `annotationCountSchema`             |
+| `annotation.getQueueItemsCounts`          | query    | Permission `annotations:view`   | `annotationApiProjectScopeSchema`            | inline                              |
+| `annotation.createQueueItem`              | mutation | Permission `annotations:create` | `annotationApiCreateQueueItemInputSchema`    | `annotationQueuedTracesSchema`      |
+| `annotation.deleteQueueItems`             | mutation | Permission `annotations:update` | `annotationApiDeleteQueueItemsInputSchema`   | `annotationQueueItemsDeletedSchema` |
+| `annotation.markQueueItemDone`            | mutation | Permission `annotations:update` | `annotationApiMarkQueueItemDoneInputSchema`  | `annotationQueueItemSchema`         |
+| `annotation.getQueueBySlugOrId`           | query    | Permission `annotations:view`   | `annotationApiQueueBySlugOrIdInputSchema`    | `annotationQueueDetailSchema`       |
+| `annotation.getOptimizedAnnotationQueues` | query    | Permission `annotations:view`   | `annotationApiOptimizedQueuesInputSchema`    | `annotationOptimizedQueuesSchema`   |
+| `annotation.getQueueWalkStep`             | query    | Permission `annotations:view`   | `annotationApiQueueWalkStepInputSchema`      | `annotationQueueWalkStepSchema`     |
+
+## Sockets
+
+None: this module declares no websocket, rawsocket or rawhttp door.
+
+## Workers
+
+### Tasks
+
+Run by the tasks process, before serve.
+
+| Task                                 | Class                         | Declared at                                      |
+| ------------------------------------ | ----------------------------- | ------------------------------------------------ |
+| `backfill-annotations-to-clickhouse` | `AnnotationTraceBackfillTask` | `src/tasks/annotation-trace-backfill.task.ts:24` |
+
+## Configuration
+
+None: no `static secrets` or `static config` leaf.
+
+<!-- readme:generated:end -->

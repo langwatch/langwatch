@@ -266,7 +266,10 @@ const parseInto = async (params: {
  * `createDatasetFromUpload`: a column that held an inline picture is `"image"`,
  * every other one `"string"`.
  */
-const deriveColumnTypes = (headers: string[], pictureColumns: ReadonlySet<string>): DatasetColumns =>
+const deriveColumnTypes = (
+  headers: string[],
+  pictureColumns: ReadonlySet<string>,
+): DatasetColumns =>
   headers.map((name) => ({
     name,
     type: pictureColumns.has(name) ? ("image" as const) : ("string" as const),

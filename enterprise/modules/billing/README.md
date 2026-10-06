@@ -10,7 +10,7 @@ Billing: subscriptions, invoices and invoice billing for connected self-hosted c
 | -------------- | ------------------------------------------------------------------------------------------------------ |
 | Classification | enterprise (`modules/catalogue.json`)                                                                  |
 | Subjects       | billing                                                                                                |
-| Halves         | [contract](contract) · [process](process) · [browser](browser)                                         |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                               |
 | Api token      | `BillingApi` = `moduleApi<BillingApi>()("billing")`, `contract/src/billing.api.ts:103` (13 operations) |
 | Other token    | `BillingStripeWebhookApi`, `process/src/transport/billing-stripe-webhook.rest.ts:25`                   |
 | Other token    | `BillingCurrencyApi`, `process/src/transport/currency.trpc.ts:21`                                      |

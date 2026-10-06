@@ -346,4 +346,17 @@ export const scenarioTrpcTransport: TrpcRouterDeclaration<ScenarioApi, typeof sc
     .procedure("finishVoiceSession")
     .serviceAuthorized(voiceSessionAuthorization)
     .handle(({ app, input, actor }) => app.finishVoiceSession({ ...input, userId: actor.id }))
+
+    // -- "Test agent": main's agents.testTurn and agents.testRun -------------------
+    .procedure("testAgentTurn")
+    .withPermission("evaluations:manage")
+    .handle(({ app, input: { id, ...turn }, actor }) =>
+      app.testAgentTurn({ ...turn, agentId: id, actor: { id: actor.id, label: "user" } }),
+    )
+
+    .procedure("testAgentRun")
+    .withPermission("scenarios:create")
+    .handle(({ app, input, actor }) =>
+      app.testAgentRun({ ...input, actor: { id: actor.id, label: "user" } }),
+    )
     .build();

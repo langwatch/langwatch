@@ -10,7 +10,7 @@ Alpha keeps the items every gamma reads.
 | -------------- | ------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                             |
 | Subjects       | alpha, alpha-item                                                                           |
-| Halves         | [contract](contract) · [process](process) · [browser](browser)                              |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                    |
 | Api token      | `AlphaApi` = `moduleApi<AlphaApi>()("alpha")`, `contract/src/alpha.api.ts:12` (1 operation) |
 | Other token    | `AlphaReplayApi`, `contract/src/alpha-replay.api.ts:4`                                      |
 | Installed by   | api (process); ui (browser)                                                                 |

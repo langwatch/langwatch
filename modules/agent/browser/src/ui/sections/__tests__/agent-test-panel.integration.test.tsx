@@ -9,10 +9,10 @@ import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
 const turns: unknown[] = [];
 
-vi.mock("../../../behavior/agent-api.ts", () => ({
-  agentApi: {
-    agents: {
-      testTurn: {
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    scenarios: {
+      testAgentTurn: {
         useMutation: () => ({
           mutate: (input: unknown) => turns.push(input),
           data: undefined,

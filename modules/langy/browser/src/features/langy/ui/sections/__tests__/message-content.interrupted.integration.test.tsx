@@ -68,9 +68,11 @@ const partialAssistantMessage: UIMessage = {
 function renderMessage({
   interrupted,
   message = emptyAssistantMessage,
+  isLatest,
 }: {
   interrupted: boolean;
   message?: UIMessage;
+  isLatest?: boolean;
 }) {
   return render(
     <DesignSystemProvider forcedTheme="light">
@@ -82,6 +84,7 @@ function renderMessage({
         onApply={async () => {}}
         onDiscard={() => {}}
         interrupted={interrupted}
+        {...(isLatest === undefined ? {} : { isLatest })}
       />
     </DesignSystemProvider>,
   );
@@ -180,5 +183,15 @@ describe("the store's interruption record", () => {
 
       expect(useLangyStore.getState().interruptedConversationId).toBeNull();
     });
+  });
+});
+
+describe("given a settled empty reply with a later message after it", () => {
+  /** @scenario An empty reply with messages after it draws nothing */
+  it("draws no empty reply row for a message that is not the latest", () => {
+    renderMessage({ interrupted: false, isLatest: false });
+
+    expect(screen.queryByText("No content")).toBeNull();
+    expect(screen.queryByText("Interrupted")).toBeNull();
   });
 });

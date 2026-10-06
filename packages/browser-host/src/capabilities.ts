@@ -168,8 +168,8 @@ export abstract class UiSession {
   abstract hasPermission(permission: string): boolean;
 
   /**
-   * Whether the reader holds a permission in the active organization, apart
-   * from any project grant. Ports that cannot answer it fail by name.
+   * Whether the reader holds a permission in the active organization: the active
+   * scope's grant answers, as on main (scope knot Q2). Ports that cannot answer it fail by name.
    */
   hasOrganizationPermission(_permission: string): boolean {
     throw new UiCapabilityUnavailableError("session organization permission");

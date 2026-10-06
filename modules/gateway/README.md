@@ -10,7 +10,7 @@ The AI Gateway: virtual keys, gateway debits and the gateway's internal door, pl
 | -------------- | ------------------------------------------------------------------------------------------------------ |
 | Classification | core (`modules/catalogue.json`)                                                                        |
 | Subjects       | gateway, gateway-debit, virtual-key                                                                    |
-| Halves         | [contract](contract) · [process](process) · [browser](browser)                                         |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                               |
 | Api token      | `GatewayApi` = `moduleApi<GatewayApi>()("gateway")`, `contract/src/gateway.api.ts:914` (97 operations) |
 | Other token    | `GatewayInternalDoorApi`, `process/src/transport/gateway-internal.rest.ts:99`                          |
 | Other token    | `GatewaySpendApi`, `process/src/transport/gateway-spend.rest.ts:52`                                    |

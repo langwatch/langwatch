@@ -42,12 +42,16 @@ function* walk(node: unknown, seen: Set<string> = new Set()): Generator<Json> {
   }
 }
 
-/** The schemas of one family's 2xx answers: every path the family publishes, bare or `/api/v1`. */
-function successSchemas(family: string): unknown[] {
+/**
+ * The schemas of one family's 2xx answers: every path the family publishes, bare or `/api/v1`.
+ * `bornWith` names routes published with the field from their first day, so they may require it.
+ */
+function successSchemas(family: string, bornWith: string[] = []): unknown[] {
   const schemas: unknown[] = [];
   for (const [path, item] of Object.entries(document.paths as Json)) {
     const bare = path.replace(/^\/api\/v1\//, "/api/");
     if (bare !== family && !bare.startsWith(`${family}/`)) continue;
+    if (bornWith.some((route) => bare.startsWith(route))) continue;
     for (const operation of Object.values(item as Json)) {
       for (const [status, response] of Object.entries(
         ((operation as Json).responses ?? {}) as Json,
@@ -73,9 +77,9 @@ function publishes({ family, property }: { family: string; property: string }): 
 }
 
 /** The names the family's success answers list as required, anywhere in their shape. */
-function requiredNames(family: string): Set<string> {
+function requiredNames(family: string, bornWith: string[] = []): Set<string> {
   const names = new Set<string>();
-  for (const schema of successSchemas(family)) {
+  for (const schema of successSchemas(family, bornWith)) {
     for (const node of walk(schema)) {
       if (Array.isArray(node.required)) for (const name of node.required) names.add(String(name));
     }
@@ -111,7 +115,8 @@ describe("the generated OpenAPI document", () => {
     it("lists the model and turn fields as required in none of them", () => {
       for (const property of ["simulatorModel", "judgeModel", "maxTurns", "minTurns"]) {
         expect(publishes({ family: "/api/scenarios", property }), property).toBe(true);
-        expect(requiredNames("/api/scenarios").has(property), property).toBe(false);
+        const required = requiredNames("/api/scenarios", ["/api/scenarios/{id}/versions"]);
+        expect(required.has(property), property).toBe(false);
       }
     });
   });

@@ -43,6 +43,29 @@ describe("GovernanceCostSummaryService.summary", () => {
     });
   });
 
+  describe("given billed provider cells beside metered gateway spend", () => {
+    /** @scenario "A cost-only viewer sees provider costs inside the billed card" */
+    it("totals the billed card from its providers alone and leaves the gateway out of the bars", async () => {
+      const days = [
+        gatewayDay({ amountNanoUsd: 40_000_000_000, requestCount: 2, pricedRequestCount: 2 }),
+      ];
+      const { costRollup, read } = setup({ gatewayDays: async () => days });
+      costRollup.seed(cell({ amountNanoUsd: 2_000_000_000, amountNanoMinor: 2_000_000_000 }));
+      costRollup.seed(
+        cell({ provider: "anthropic", amountNanoUsd: 500_000_000, amountNanoMinor: 500_000_000 }),
+      );
+
+      const summary = await read();
+
+      expect(summary.providers.map((p) => [p.provider, p.amountUsd])).toEqual([
+        ["anthropic", 0.5],
+        ["openai", 2],
+      ]);
+      expect(summary.billed.amountUsd).toBe(2.5);
+      expect(summary.gateway.amountUsd).toBe(40);
+    });
+  });
+
   describe("given a lane mixing dollar usage with usage billed elsewhere", () => {
     /** @scenario "A lane with usage we cannot state in US dollars holds no total" */
     /** @scenario "A currency total is withheld when part of what it covers holds no amount" */

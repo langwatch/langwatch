@@ -10,7 +10,7 @@ Metrics: receiving OTLP metrics, canonicalising and recording their data points.
 | -------------- | ------------------------------------------------------------------------------------------------ |
 | Classification | core (`modules/catalogue.json`)                                                                  |
 | Subjects       | metric, metric-ingestion                                                                         |
-| Halves         | [contract](contract) · [process](process)                                                        |
+| Halves         | [contract](contract) · [process](process/README.md)                                              |
 | Api token      | `MetricApi` = `moduleApi<MetricApi>()("metric")`, `contract/src/metric.api.ts:68` (4 operations) |
 | Installed by   | api, worker, tasks (process)                                                                     |
 

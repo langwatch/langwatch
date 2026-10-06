@@ -10,7 +10,7 @@ Usage: the billable-events meter, the month's count and the limit decisions peer
 | -------------- | ----------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                                 |
 | Subjects       | usage                                                                                           |
-| Halves         | [contract](contract) · [process](process)                                                       |
+| Halves         | [contract](contract) · [process](process/README.md)                                             |
 | Api token      | `UsageApi` = `moduleApi<UsageApi>()("usage")`, `contract/src/usage.events.ts:59` (0 operations) |
 | Installed by   | api, worker, tasks (process)                                                                    |
 

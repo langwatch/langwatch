@@ -1,6 +1,7 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Alert, Button, Spacer } from "@langwatch/design-system/primitives";
+import { scenarioClient } from "@langwatch/scenario-client";
 import { toEpochMs } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -148,7 +149,7 @@ export function AgentManagementScreen() {
   const utils = agentApi.useUtils();
   const agents = host.agents();
 
-  const testRun = agentApi.agents.testRun.useMutation({
+  const testRun = scenarioClient.scenarios.testAgentRun.useMutation({
     onSuccess: (run) => host.openTestRun(run),
     onError: (error) => host.failed({ error, fallbackTitle: "Couldn't start the test run" }),
   });

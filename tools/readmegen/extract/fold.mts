@@ -94,7 +94,8 @@ function localDeclaration({
     const named =
       ts.isInterfaceDeclaration(statement) ||
       ts.isTypeAliasDeclaration(statement) ||
-      ts.isClassDeclaration(statement);
+      ts.isClassDeclaration(statement) ||
+      ts.isFunctionDeclaration(statement);
     if (named && statement.name?.text === name) return statement;
   }
 
@@ -129,7 +130,13 @@ export function definedObject(node: ts.Node): ts.ObjectLiteralExpression | undef
 }
 
 /** The initialiser of property `name` in the object `node` is or defines. */
-function memberOf({ node, name }: { node: ts.Node; name: string }): ts.Expression | undefined {
+export function memberOf({
+  node,
+  name,
+}: {
+  node: ts.Node;
+  name: string;
+}): ts.Expression | undefined {
   const literal = definedObject(node);
   const property = literal?.properties.find((item) => item.name?.getText() === name);
   if (property && ts.isPropertyAssignment(property)) return property.initializer;

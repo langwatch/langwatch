@@ -79,11 +79,4 @@ export const agentTrpcTransport: TrpcRouterDeclaration<AgentApi, typeof agentTrp
     .withPermission("evaluations:view")
     .handle(({ app, input }) => app.getHistory(input))
 
-    .procedure("testTurn")
-    .withPermission("evaluations:manage")
-    .handle(({ app, input, actor }) => app.testTurn({ ...input, actorId: actor.id }))
-
-    .procedure("testRun")
-    .withPermission("scenarios:create")
-    .handle(({ app, input, actor }) => app.testRun({ ...input, actorId: actor.id }))
     .build();

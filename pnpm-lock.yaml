@@ -4813,6 +4813,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/scenario-client':
+        specifier: workspace:*
+        version: link:../../scenario/client
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract

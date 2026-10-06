@@ -6,6 +6,7 @@ package readmegen
 type Manifest struct {
 	Modules  []ModuleFacts `json:"modules"`
 	Packages []PackageKind `json:"packages"`
+	Mounted  Mounted       `json:"mounted"`
 }
 
 // Location is a file, relative to the workspace root, and a 1-based line.
@@ -27,6 +28,7 @@ type ModuleFacts struct {
 	PrismaClaims     []Claim       `json:"prismaClaims"`
 	PrismaDelegates  []Delegate    `json:"prismaDelegates"`
 	ClickhouseWrites []TableWrite  `json:"clickhouseWrites"`
+	Process          ProcessFacts  `json:"process"`
 }
 
 // Token is one `moduleApi<Type>()("module")` call and the constant it names.
@@ -120,6 +122,7 @@ func unresolvedCounts(manifest Manifest) map[string]int {
 		for _, stores := range module.Stores {
 			counts["stores"] += unresolved(stores.Resolved)
 		}
+		processUnresolved(&module.Process, counts)
 	}
 	for kind, count := range counts {
 		if count == 0 {

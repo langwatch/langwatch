@@ -1668,7 +1668,8 @@ export const prismaModelFieldCatalogue = {
     "targetKind",
     "targetId",
     "before",
-    "after"
+    "after",
+    "idempotencyKey"
   ],
   "LlmPromptConfig": [
     "id",

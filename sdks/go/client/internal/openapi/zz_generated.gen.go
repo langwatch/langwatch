@@ -12456,6 +12456,21 @@ func (e PostApiDataset201JSONResponseBodyColumnTypesType) Valid() bool {
 	}
 }
 
+// Defines values for PostApiDatasetAttachmentsUploads201JSONResponseBodyMethod.
+const (
+	PostApiDatasetAttachmentsUploads201JSONResponseBodyMethodPUT PostApiDatasetAttachmentsUploads201JSONResponseBodyMethod = "PUT"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetAttachmentsUploads201JSONResponseBodyMethod enum.
+func (e PostApiDatasetAttachmentsUploads201JSONResponseBodyMethod) Valid() bool {
+	switch e {
+	case PostApiDatasetAttachmentsUploads201JSONResponseBodyMethodPUT:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiDatasetEvaluate200JSONResponseBody0Status.
 const (
 	PostApiDatasetEvaluate200JSONResponseBody0StatusProcessed PostApiDatasetEvaluate200JSONResponseBody0Status = "processed"
@@ -12576,6 +12591,57 @@ func (e PostApiDatasetUpload201JSONResponseBodyColumnTypesType) Valid() bool {
 	case PostApiDatasetUpload201JSONResponseBodyColumnTypesTypeSpans:
 		return true
 	case PostApiDatasetUpload201JSONResponseBodyColumnTypesTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType.
+const (
+	GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeAnnotations  GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType = "annotations"
+	GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeBoolean      GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType = "boolean"
+	GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeChatMessages GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType = "chat_messages"
+	GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeDate         GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType = "date"
+	GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeEvaluations  GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType = "evaluations"
+	GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeFile         GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType = "file"
+	GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeImage        GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType = "image"
+	GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeJson         GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType = "json"
+	GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeList         GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType = "list"
+	GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeNumber       GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType = "number"
+	GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeRagContexts  GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType = "rag_contexts"
+	GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeSpans        GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType = "spans"
+	GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeString       GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType = "string"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType enum.
+func (e GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeAnnotations:
+		return true
+	case GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeBoolean:
+		return true
+	case GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeChatMessages:
+		return true
+	case GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeDate:
+		return true
+	case GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeEvaluations:
+		return true
+	case GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeFile:
+		return true
+	case GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeImage:
+		return true
+	case GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeJson:
+		return true
+	case GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeList:
+		return true
+	case GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeNumber:
+		return true
+	case GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeRagContexts:
+		return true
+	case GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeSpans:
+		return true
+	case GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesTypeString:
 		return true
 	default:
 		return false
@@ -12759,6 +12825,57 @@ func (e PatchApiDatasetBySlugOrId200JSONResponseBodyColumnTypesType) Valid() boo
 	case PatchApiDatasetBySlugOrId200JSONResponseBodyColumnTypesTypeSpans:
 		return true
 	case PatchApiDatasetBySlugOrId200JSONResponseBodyColumnTypesTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType.
+const (
+	GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeAnnotations  GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType = "annotations"
+	GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeBoolean      GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType = "boolean"
+	GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeChatMessages GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType = "chat_messages"
+	GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeDate         GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType = "date"
+	GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeEvaluations  GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType = "evaluations"
+	GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeFile         GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType = "file"
+	GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeImage        GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType = "image"
+	GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeJson         GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType = "json"
+	GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeList         GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType = "list"
+	GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeNumber       GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType = "number"
+	GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeRagContexts  GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType = "rag_contexts"
+	GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeSpans        GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType = "spans"
+	GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeString       GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType = "string"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType enum.
+func (e GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeAnnotations:
+		return true
+	case GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeBoolean:
+		return true
+	case GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeChatMessages:
+		return true
+	case GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeDate:
+		return true
+	case GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeEvaluations:
+		return true
+	case GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeFile:
+		return true
+	case GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeImage:
+		return true
+	case GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeJson:
+		return true
+	case GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeList:
+		return true
+	case GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeNumber:
+		return true
+	case GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeRagContexts:
+		return true
+	case GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeSpans:
+		return true
+	case GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeString:
 		return true
 	default:
 		return false
@@ -26015,16 +26132,16 @@ func (e GetStoredObject200JSONResponseBodyCapabilityAudience) Valid() bool {
 
 // Defines values for GetStoredObject200JSONResponseBodyCapabilityMethods.
 const (
-	GetStoredObject200JSONResponseBodyCapabilityMethodsGET  GetStoredObject200JSONResponseBodyCapabilityMethods = "GET"
-	GetStoredObject200JSONResponseBodyCapabilityMethodsHEAD GetStoredObject200JSONResponseBodyCapabilityMethods = "HEAD"
+	GET  GetStoredObject200JSONResponseBodyCapabilityMethods = "GET"
+	HEAD GetStoredObject200JSONResponseBodyCapabilityMethods = "HEAD"
 )
 
 // Valid indicates whether the value is a known member of the GetStoredObject200JSONResponseBodyCapabilityMethods enum.
 func (e GetStoredObject200JSONResponseBodyCapabilityMethods) Valid() bool {
 	switch e {
-	case GetStoredObject200JSONResponseBodyCapabilityMethodsGET:
+	case GET:
 		return true
-	case GetStoredObject200JSONResponseBodyCapabilityMethodsHEAD:
+	case HEAD:
 		return true
 	default:
 		return false
@@ -39981,6 +40098,21 @@ type PostApiDatasetAttachmentsParams struct {
 	ProjectId string `form:"projectId" json:"projectId"`
 }
 
+// PostApiDatasetAttachmentsUploadsJSONBody defines parameters for PostApiDatasetAttachmentsUploads.
+type PostApiDatasetAttachmentsUploadsJSONBody struct {
+	// ByteLength The size of the file, in bytes.
+	ByteLength int `json:"byteLength"`
+
+	// Filename The file name the reference will carry.
+	Filename string `json:"filename"`
+
+	// MediaType The media type of the file.
+	MediaType string `json:"mediaType"`
+}
+
+// PostApiDatasetAttachmentsUploads201JSONResponseBodyMethod defines parameters for PostApiDatasetAttachmentsUploads.
+type PostApiDatasetAttachmentsUploads201JSONResponseBodyMethod string
+
 // PostApiDatasetEvaluateJSONBody defines parameters for PostApiDatasetEvaluate.
 type PostApiDatasetEvaluateJSONBody struct {
 	// BatchId Older name for experimentSlug, used when that is absent
@@ -40098,6 +40230,9 @@ type GetApiDatasetBySlugEntriesParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType defines parameters for GetApiDatasetBySlugEntries.
+type GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType string
+
 // PostApiDatasetBySlugEntries200JSONResponseBodySuccess defines parameters for PostApiDatasetBySlugEntries.
 type PostApiDatasetBySlugEntries200JSONResponseBodySuccess bool
 
@@ -40132,6 +40267,9 @@ type GetApiDatasetBySlugOrIdRecordsParams struct {
 	Page  *int `form:"page,omitempty" json:"page,omitempty"`
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
+
+// GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType defines parameters for GetApiDatasetBySlugOrIdRecords.
+type GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType string
 
 // PostApiDatasetBySlugOrIdRecordsJSONBody defines parameters for PostApiDatasetBySlugOrIdRecords.
 type PostApiDatasetBySlugOrIdRecordsJSONBody struct {
@@ -50172,6 +50310,9 @@ type PostApiDatasetJSONRequestBody PostApiDatasetJSONBody
 
 // PostApiDatasetAttachmentsMultipartRequestBody defines body for PostApiDatasetAttachments for multipart/form-data ContentType.
 type PostApiDatasetAttachmentsMultipartRequestBody PostApiDatasetAttachmentsMultipartBody
+
+// PostApiDatasetAttachmentsUploadsJSONRequestBody defines body for PostApiDatasetAttachmentsUploads for application/json ContentType.
+type PostApiDatasetAttachmentsUploadsJSONRequestBody PostApiDatasetAttachmentsUploadsJSONBody
 
 // PostApiDatasetEvaluateJSONRequestBody defines body for PostApiDatasetEvaluate for application/json ContentType.
 type PostApiDatasetEvaluateJSONRequestBody PostApiDatasetEvaluateJSONBody
@@ -110452,6 +110593,11 @@ type ClientInterface interface {
 	// PostApiDatasetAttachmentsWithBody request with any body
 	PostApiDatasetAttachmentsWithBody(ctx context.Context, params *PostApiDatasetAttachmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PostApiDatasetAttachmentsUploadsWithBody request with any body
+	PostApiDatasetAttachmentsUploadsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostApiDatasetAttachmentsUploads(ctx context.Context, body PostApiDatasetAttachmentsUploadsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PostApiDatasetEvaluateWithBody request with any body
 	PostApiDatasetEvaluateWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -113833,6 +113979,30 @@ func (c *Client) PostApiDataset(ctx context.Context, body PostApiDatasetJSONRequ
 
 func (c *Client) PostApiDatasetAttachmentsWithBody(ctx context.Context, params *PostApiDatasetAttachmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiDatasetAttachmentsRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiDatasetAttachmentsUploadsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiDatasetAttachmentsUploadsRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiDatasetAttachmentsUploads(ctx context.Context, body PostApiDatasetAttachmentsUploadsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiDatasetAttachmentsUploadsRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -124630,6 +124800,46 @@ func NewPostApiDatasetAttachmentsRequestWithBody(server string, params *PostApiD
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
 		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewPostApiDatasetAttachmentsUploadsRequest calls the generic PostApiDatasetAttachmentsUploads builder with application/json body
+func NewPostApiDatasetAttachmentsUploadsRequest(server string, body PostApiDatasetAttachmentsUploadsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostApiDatasetAttachmentsUploadsRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostApiDatasetAttachmentsUploadsRequestWithBody generates requests for PostApiDatasetAttachmentsUploads with any type of body
+func NewPostApiDatasetAttachmentsUploadsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dataset/attachments/uploads")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
@@ -136193,6 +136403,11 @@ type ClientWithResponsesInterface interface {
 	// PostApiDatasetAttachmentsWithBodyWithResponse request with any body
 	PostApiDatasetAttachmentsWithBodyWithResponse(ctx context.Context, params *PostApiDatasetAttachmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetAttachmentsResponse, error)
 
+	// PostApiDatasetAttachmentsUploadsWithBodyWithResponse request with any body
+	PostApiDatasetAttachmentsUploadsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetAttachmentsUploadsResponse, error)
+
+	PostApiDatasetAttachmentsUploadsWithResponse(ctx context.Context, body PostApiDatasetAttachmentsUploadsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiDatasetAttachmentsUploadsResponse, error)
+
 	// PostApiDatasetEvaluateWithBodyWithResponse request with any body
 	PostApiDatasetEvaluateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetEvaluateResponse, error)
 
@@ -146090,6 +146305,42 @@ func (r PostApiDatasetAttachmentsResponse) ContentType() string {
 	return ""
 }
 
+type PostApiDatasetAttachmentsUploadsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *struct {
+		ExpiresAt string                                                    `json:"expiresAt"`
+		Headers   *map[string]string                                        `json:"headers,omitempty"`
+		Method    PostApiDatasetAttachmentsUploads201JSONResponseBodyMethod `json:"method"`
+		ObjectId  string                                                    `json:"objectId"`
+		UploadUrl string                                                    `json:"uploadUrl"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiDatasetAttachmentsUploadsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiDatasetAttachmentsUploadsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiDatasetAttachmentsUploadsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type PostApiDatasetEvaluateResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -146241,6 +146492,18 @@ type GetApiDatasetBySlugEntriesResponse struct {
 			ProjectId string                 `json:"projectId"`
 			UpdatedAt time.Time              `json:"updatedAt"`
 		} `json:"data"`
+		Dataset *struct {
+			ColumnTypes []struct {
+				Name string                                                              `json:"name"`
+				Type GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType `json:"type"`
+			} `json:"columnTypes"`
+			CreatedAt   time.Time `json:"createdAt"`
+			Id          string    `json:"id"`
+			Name        string    `json:"name"`
+			PlatformUrl string    `json:"platformUrl"`
+			Slug        string    `json:"slug"`
+			UpdatedAt   time.Time `json:"updatedAt"`
+		} `json:"dataset,omitempty"`
 		Pagination struct {
 			Limit      int `json:"limit"`
 			Page       int `json:"page"`
@@ -146506,6 +146769,18 @@ type GetApiDatasetBySlugOrIdRecordsResponse struct {
 			ProjectId string                 `json:"projectId"`
 			UpdatedAt time.Time              `json:"updatedAt"`
 		} `json:"data"`
+		Dataset *struct {
+			ColumnTypes []struct {
+				Name string                                                                  `json:"name"`
+				Type GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType `json:"type"`
+			} `json:"columnTypes"`
+			CreatedAt   time.Time `json:"createdAt"`
+			Id          string    `json:"id"`
+			Name        string    `json:"name"`
+			PlatformUrl string    `json:"platformUrl"`
+			Slug        string    `json:"slug"`
+			UpdatedAt   time.Time `json:"updatedAt"`
+		} `json:"dataset,omitempty"`
 		Pagination struct {
 			Limit      int `json:"limit"`
 			Page       int `json:"page"`
@@ -161539,6 +161814,23 @@ func (c *ClientWithResponses) PostApiDatasetAttachmentsWithBodyWithResponse(ctx 
 	return ParsePostApiDatasetAttachmentsResponse(rsp)
 }
 
+// PostApiDatasetAttachmentsUploadsWithBodyWithResponse request with arbitrary body returning *PostApiDatasetAttachmentsUploadsResponse
+func (c *ClientWithResponses) PostApiDatasetAttachmentsUploadsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetAttachmentsUploadsResponse, error) {
+	rsp, err := c.PostApiDatasetAttachmentsUploadsWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiDatasetAttachmentsUploadsResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostApiDatasetAttachmentsUploadsWithResponse(ctx context.Context, body PostApiDatasetAttachmentsUploadsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiDatasetAttachmentsUploadsResponse, error) {
+	rsp, err := c.PostApiDatasetAttachmentsUploads(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiDatasetAttachmentsUploadsResponse(rsp)
+}
+
 // PostApiDatasetEvaluateWithBodyWithResponse request with arbitrary body returning *PostApiDatasetEvaluateResponse
 func (c *ClientWithResponses) PostApiDatasetEvaluateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetEvaluateResponse, error) {
 	rsp, err := c.PostApiDatasetEvaluateWithBody(ctx, contentType, body, reqEditors...)
@@ -174618,6 +174910,38 @@ func ParsePostApiDatasetAttachmentsResponse(rsp *http.Response) (*PostApiDataset
 	return response, nil
 }
 
+// ParsePostApiDatasetAttachmentsUploadsResponse parses an HTTP response from a PostApiDatasetAttachmentsUploadsWithResponse call
+func ParsePostApiDatasetAttachmentsUploadsResponse(rsp *http.Response) (*PostApiDatasetAttachmentsUploadsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiDatasetAttachmentsUploadsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			ExpiresAt string                                                    `json:"expiresAt"`
+			Headers   *map[string]string                                        `json:"headers,omitempty"`
+			Method    PostApiDatasetAttachmentsUploads201JSONResponseBodyMethod `json:"method"`
+			ObjectId  string                                                    `json:"objectId"`
+			UploadUrl string                                                    `json:"uploadUrl"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParsePostApiDatasetEvaluateResponse parses an HTTP response from a PostApiDatasetEvaluateWithResponse call
 func ParsePostApiDatasetEvaluateResponse(rsp *http.Response) (*PostApiDatasetEvaluateResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -174793,6 +175117,18 @@ func ParseGetApiDatasetBySlugEntriesResponse(rsp *http.Response) (*GetApiDataset
 				ProjectId string                 `json:"projectId"`
 				UpdatedAt time.Time              `json:"updatedAt"`
 			} `json:"data"`
+			Dataset *struct {
+				ColumnTypes []struct {
+					Name string                                                              `json:"name"`
+					Type GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType `json:"type"`
+				} `json:"columnTypes"`
+				CreatedAt   time.Time `json:"createdAt"`
+				Id          string    `json:"id"`
+				Name        string    `json:"name"`
+				PlatformUrl string    `json:"platformUrl"`
+				Slug        string    `json:"slug"`
+				UpdatedAt   time.Time `json:"updatedAt"`
+			} `json:"dataset,omitempty"`
 			Pagination struct {
 				Limit      int `json:"limit"`
 				Page       int `json:"page"`
@@ -175030,6 +175366,18 @@ func ParseGetApiDatasetBySlugOrIdRecordsResponse(rsp *http.Response) (*GetApiDat
 				ProjectId string                 `json:"projectId"`
 				UpdatedAt time.Time              `json:"updatedAt"`
 			} `json:"data"`
+			Dataset *struct {
+				ColumnTypes []struct {
+					Name string                                                                  `json:"name"`
+					Type GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType `json:"type"`
+				} `json:"columnTypes"`
+				CreatedAt   time.Time `json:"createdAt"`
+				Id          string    `json:"id"`
+				Name        string    `json:"name"`
+				PlatformUrl string    `json:"platformUrl"`
+				Slug        string    `json:"slug"`
+				UpdatedAt   time.Time `json:"updatedAt"`
+			} `json:"dataset,omitempty"`
 			Pagination struct {
 				Limit      int `json:"limit"`
 				Page       int `json:"page"`

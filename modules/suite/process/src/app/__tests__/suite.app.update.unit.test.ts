@@ -62,8 +62,6 @@ const agentApi = createApiFixture<AgentApi>({
   getReferenceStates: mockMethod(),
   getConnectedByNameAndEnvironment: mockMethod(),
   getConnectedByName: mockMethod(),
-  testTurn: mockMethod(),
-  testRun: mockMethod(),
 });
 
 const promptApi = createApiFixture<PromptApi>({

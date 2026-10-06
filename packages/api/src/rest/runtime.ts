@@ -46,7 +46,7 @@ import {
 } from "../errors.ts";
 import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
-import { registerRoutePolicy } from "../route-registry.ts";
+import { type RegisteredSharedPath, registerRoutePolicy } from "../route-registry.ts";
 import {
   addressesOf,
   basePathOf,
@@ -254,12 +254,38 @@ function mountFamilyRoutes<Api>({
             : CREDENTIAL_CLASS[routeCredential(route, credential)],
         credential: route.access?.kind === "public" ? "public" : routeCredential(route, credential),
         family: declaration.namespace,
+        ...(route.sharedPath
+          ? { sharedPath: { ...route.sharedPath, servedBy: declaration.api.name } }
+          : {}),
         served,
       });
     }
   }
 
   return served;
+}
+
+/**
+ * A shared path names an owner other than its server, and sits in a literal family:
+ * a family claiming a prefix would run its middleware ahead of the owner's routes (§8, R10).
+ */
+function assertSharedPaths<Api>(declaration: RestTransportDeclaration<Api>): void {
+  for (const route of declaration.routes) {
+    if (!route.sharedPath) continue;
+
+    const where = `REST ${route.method.toUpperCase()} ${route.path} of ${declaration.api.name}`;
+
+    if (route.sharedPath.owner === declaration.api.name) {
+      throw new Error(`${where} declares a shared path with its own module; drop withSharedPath`);
+    }
+
+    if (declaration.addressing !== "literal") {
+      throw new Error(
+        `${where} declares a shared path in the "${declaration.addressing}" family ` +
+          `"${declaration.namespace}"; serve it from a literal family, which claims no prefix`,
+      );
+    }
+  }
 }
 
 export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
@@ -272,6 +298,7 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
       const facts = factBindings({ declaration, options });
       const credential = mountCredential({ declaration, options });
 
+      assertSharedPaths(declaration);
       assertPortsBound({ declaration, ports });
 
       for (const middleware of [
@@ -2615,6 +2642,7 @@ function mountRoute({
   credentialClass,
   credential,
   family,
+  sharedPath,
   served,
 }: {
   app: Hono;
@@ -2627,6 +2655,7 @@ function mountRoute({
   credentialClass: CredentialClass;
   credential: Credential;
   family: string;
+  sharedPath?: RegisteredSharedPath;
   served: Map<string, Set<HttpMethod>>;
 }): void {
   // A literal family has no base to merge: its route path is the address.
@@ -2648,6 +2677,7 @@ function mountRoute({
       family,
       credentialClass,
       credential,
+      ...(sharedPath ? { sharedPath } : {}),
     });
   }
 

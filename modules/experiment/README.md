@@ -10,7 +10,7 @@ Experiments: saved definitions, their runs, and the pages that list them.
 | -------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Classification | core (`modules/catalogue.json`)                                                                                    |
 | Subjects       | experiment                                                                                                         |
-| Halves         | [contract](contract) · [process](process) · [browser](browser)                                                     |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                           |
 | Api token      | `ExperimentApi` = `moduleApi<ExperimentApi>()("experiment")`, `contract/src/experiment.api.ts:348` (62 operations) |
 | Other token    | `ExperimentV3RestApi`, `process/src/transport/experiment-v3.rest.ts:65`                                            |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                         |

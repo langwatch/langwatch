@@ -43,7 +43,6 @@ import {
   type DispatchAgent,
   type DispatchCall,
   type AgentWorkflowConfig,
-  type AgentTestRunResult,
   type HttpProxyResult,
   type AgentConnectRegisterAnswer,
   type AgentConnectPollAnswer,
@@ -52,7 +51,6 @@ import {
   type AgentPushToCopies,
   type AgentConnectRegisterOutput,
   type AgentCallResult,
-  type AgentTestTurnResult,
   type AgentHistoryEntry,
   type AgentCopy,
   type RelatedAgentEntities,
@@ -68,7 +66,6 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, ProjectNotFoundError } from "@langwatch/project-contract";
-import { ScenarioApi } from "@langwatch/scenario-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import type { Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -117,7 +114,6 @@ export class AgentModule implements AgentApi {
     featureFlags: FeatureFlagApi,
     permissions: AuthzApi,
     projects: ProjectApi,
-    scenarios: ScenarioApi,
     /** Where the token typed into an HTTP agent is stored, as a project secret. */
     secrets: SecretApi,
     traces: TraceApi,
@@ -135,7 +131,6 @@ export class AgentModule implements AgentApi {
   readonly #auditLog: AuditLogApi;
   readonly #permissions: AuthzApi;
   readonly #projects: ProjectApi;
-  readonly #scenarios: ScenarioApi;
   readonly #users: UserApi;
   readonly #workflows: WorkflowApi;
   readonly #publicBaseUrl: string;
@@ -159,7 +154,6 @@ export class AgentModule implements AgentApi {
     this.#auditLog = dependencies.auditLog;
     this.#permissions = dependencies.permissions;
     this.#projects = dependencies.projects;
-    this.#scenarios = dependencies.scenarios;
     this.#users = dependencies.users;
     this.#workflows = dependencies.workflows;
     this.#httpTesting = HttpAgentTestService.create({
@@ -422,40 +416,6 @@ export class AgentModule implements AgentApi {
     const users = userIds.length ? await this.#users.getProfiles({ userIds }) : [];
     const names = new Map(users.map((user) => [user.id, user.name]));
     return new Map(userIds.map((userId) => [userId, { userId, name: names.get(userId) ?? null }]));
-  }
-
-  async testTurn(
-    input: GetAgentInput & {
-      actorId: string;
-      message: string;
-      params?: Record<string, string | number | boolean>;
-    },
-  ): Promise<AgentTestTurnResult> {
-    const agent = await this.#withFields(await this.#agents.getById(input));
-    return this.#scenarios.testAgentTurn({
-      projectId: input.projectId,
-      agent,
-      message: input.message,
-      params: input.params,
-      actor: { id: input.actorId, label: "user" },
-    });
-  }
-
-  async testRun(
-    input: AgentReferenceInput & { actorId: string | null; callerApiKeyId?: string | null },
-  ): Promise<AgentTestRunResult> {
-    const agent = await this.#withFields(
-      await this.#agents.getById({ id: input.agentId, projectId: input.projectId }),
-    );
-    const { actorId, callerApiKeyId } = input;
-    return this.#scenarios.testAgentRun({
-      projectId: input.projectId,
-      agent,
-      actor:
-        actorId === null
-          ? undefined
-          : { id: actorId, label: "user", ...(callerApiKeyId ? { apiKeyId: callerApiKeyId } : {}) },
-    });
   }
 
   executeHttpTest(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult> {

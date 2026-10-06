@@ -10,16 +10,16 @@ API keys: creating and updating them, resolving a presented token to its caller,
 | -------------- | ---------------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                                      |
 | Subjects       | api-key                                                                                              |
-| Halves         | [contract](contract) · [process](process) · [browser](browser) · [client](client)                    |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)          |
 | Api token      | `ApiKeyApi` = `moduleApi<ApiKeyApi>()("api-key")`, `contract/src/api-key.api.ts:260` (50 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                           |
 
 ## What api-key owns
 
-| Kind            | Name                                                                                                     | Declared at                                                     |
-| --------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| Stores required | prisma, encryption, redis                                                                                | `process/src/repositories/live/live.api-key.repositories.ts:21` |
-| Secrets         | `pepper` (API_KEY_PEPPER), `pepperFallback` (CREDENTIALS_SECRET), `pepperLastFallback` (NEXTAUTH_SECRET) | `process/src/app/api-key.app.ts:146`                            |
+| Kind            | Name                                                                                                                                                     | Declared at                                                     |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Stores required | prisma, encryption, redis                                                                                                                                | `process/src/repositories/live/live.api-key.repositories.ts:21` |
+| Secrets         | `pepper` (API_KEY_PEPPER), `pepperFallback` (CREDENTIALS_SECRET), `pepperLastFallback` (NEXTAUTH_SECRET), `pepperPrevious` (CREDENTIALS_SECRET_PREVIOUS) | `process/src/app/api-key.app.ts:161`                            |
 
 Anything else api-key needs belongs to another module and is reached through its `*Api`.
 

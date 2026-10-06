@@ -10,7 +10,7 @@ A project's conversation topics, and what the last topic-clustering run did.
 | -------------- | -------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                              |
 | Subjects       | topic, topic-clustering                                                                      |
-| Halves         | [contract](contract) · [process](process) · [browser](browser)                               |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                     |
 | Api token      | `TopicApi` = `moduleApi<TopicApi>()("topic")`, `contract/src/topic.api.ts:24` (6 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                   |
 

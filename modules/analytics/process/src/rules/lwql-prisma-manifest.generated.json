@@ -14265,6 +14265,15 @@
           "isList": false,
           "isOptional": true,
           "documentation": ""
+        },
+        {
+          "name": "idempotencyKey",
+          "columnName": "idempotencyKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "A producer's outbox key: a redelivered audit intent finds its row here (Alex, audit R2)."
         }
       ]
     },

@@ -4,6 +4,12 @@
  * runs, their live stream, cancellation, Results and configuration history.
  */
 
+import {
+  agentApiAgentReferenceInputSchema,
+  agentApiTestTurnInputSchema,
+  agentTestRunResultSchema,
+  agentTestTurnResultSchema,
+} from "@langwatch/agent-contract";
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
@@ -471,4 +477,14 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
   .mutation("finishVoiceSession")
   .withInput(voiceSessionFinishInputSchema)
   .withOutput(voiceSessionFinishResultSchema)
+
+  /** Main's `agents.testTurn`: one turn to an agent from its Test panel. */
+  .mutation("testAgentTurn")
+  .withInput(agentApiTestTurnInputSchema)
+  .withOutput(agentTestTurnResultSchema)
+
+  /** Main's `agents.testRun`: a scripted test run of an agent, answering its run ids. */
+  .mutation("testAgentRun")
+  .withInput(agentApiAgentReferenceInputSchema)
+  .withOutput(agentTestRunResultSchema)
   .build();

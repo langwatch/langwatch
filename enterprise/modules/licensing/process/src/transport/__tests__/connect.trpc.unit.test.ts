@@ -61,6 +61,7 @@ async function setServiceAudited({ enabled }: { enabled: boolean }) {
     authz: createApiFixture<Authorize>({
       getDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),
       checkScopeLineage: async () => ({ kind: "consistent" }),
+      assertSecondFactor: async () => undefined,
     }),
     audit: { record },
   });

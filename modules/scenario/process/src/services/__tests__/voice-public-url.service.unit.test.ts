@@ -53,6 +53,7 @@ describe("VoicePublicUrlService", () => {
     });
 
     /** @scenario "A failed voice tunnel boot records its reason for the phone run error" */
+    /** @scenario "A worker's own voice boot failure does not take the worker down" */
     it("stays up without an origin when the tunnel fails, naming why", async () => {
       const tunnel = MemoryVoicePublicUrlTunnelChannel.create({
         failure: "spawn cloudflared ENOENT",

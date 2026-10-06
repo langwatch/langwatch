@@ -8,7 +8,7 @@
 | -------------- | ------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                             |
 | Subjects       | gamma                                                                                       |
-| Halves         | [process](process)                                                                          |
+| Halves         | [process](process/README.md)                                                                |
 | Api token      | `GammaApi` = `moduleApi<GammaApi>()("gamma")`, `contract/src/gamma.api.ts:2` (0 operations) |
 | Installed by   | api (process)                                                                               |
 
