@@ -114,6 +114,25 @@ describe("ModelProviderEvaluatorModelEnvService", () => {
     });
   });
 
+  describe("given an evaluator whose settings carry temperature 1, top_p 1 and max_tokens 64000", () => {
+    /** @scenario Configured generation parameters reach the evaluator engine */
+    it("carries the whitelisted parameters as configured and drops a key outside the whitelist", async () => {
+      const env = await service({ openai: provider({}) }).prepare({
+        ...base,
+        model: "openai/gpt-5-mini",
+        settings: { temperature: 1, top_p: 1, max_tokens: 64000, unlisted_param: "leak" },
+      });
+
+      expect(env).toMatchObject({
+        X_LITELLM_temperature: "1",
+        X_LITELLM_top_p: "1",
+        X_LITELLM_max_tokens: "64000",
+      });
+      expect(Object.keys(env)).not.toContain("X_LITELLM_unlisted_param");
+      expect(Object.values(env)).not.toContain("leak");
+    });
+  });
+
   describe("given an embeddings model", () => {
     it("prefixes with the embeddings namespace", async () => {
       const env = await service({ openai: provider({}) }).prepare({
