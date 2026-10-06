@@ -41,6 +41,8 @@ export const BILLABLE_EVENTS_EVENT_NAME = "langwatch_billable_events";
  */
 interface BillingMeter {
   readonly eventName: string;
+  /** Whether Stripe holds a meter under this name, so an event sent is aggregated. */
+  readonly isProvisioned: () => boolean;
   /** Whether the total is usage's month_counted snapshot, ordered by that event's id. */
   readonly followsCountedEvent: boolean;
   /** The most this month may report for a capped contract, or null for no cap. */
@@ -81,6 +83,12 @@ export interface ReportUsageForMonthCommandDeps {
   getUsageReportingService: () => UsageReportingService | undefined;
   /** The Instant Evals meter's total, read off the gateway spend ledger. */
   queryInstantEvalSpendTotal: InstantEvalSpendQueryService["queryInstantEvalSpendTotal"];
+  /**
+   * Whether Stripe holds the Instant Evals meter in this mode. Stripe drops an
+   * event for an unknown meter after accepting it, so reporting early would
+   * skip that usage for good; the first report after the mapping carries it.
+   */
+  isInstantEvalMeterProvisioned: () => boolean;
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
   /** Shared organization-read cache; see `billing-organization-cache.repository.ts`. */
   organizationCache: BillingOrganizationCacheRepository;
@@ -197,6 +205,8 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     this.meters = [
       {
         eventName: BILLABLE_EVENTS_EVENT_NAME,
+        // Every mode maps the events meter; the catalogue refuses to load without it.
+        isProvisioned: () => true,
         followsCountedEvent: true,
         ceiling: async () => null,
         // Usage's month_counted total; a command without one leaves this meter untouched.
@@ -209,6 +219,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       },
       {
         eventName: INSTANT_EVAL_USD_EVENT_NAME,
+        isProvisioned: deps.isInstantEvalMeterProvisioned,
         followsCountedEvent: false,
         ceiling: ({ contract, ...args }) =>
           contract === "connected" ? deps.connectedUsageCeiling(args) : Promise.resolve(null),
@@ -385,6 +396,14 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     billableEvents: number | undefined;
     countedEventId: string | undefined;
   }): Promise<boolean> {
+    if (!meter.isProvisioned()) {
+      // Nothing is read or written, so the first report after the mapping carries the month.
+      logger.debug(
+        { organizationId, billingMonth, meter: meter.eventName },
+        "Stripe meter is not mapped for this mode; leaving the month's usage unreported until it is",
+      );
+      return false;
+    }
     const checkpoint = await this.deps.billingCheckpoints.findCheckpoint({
       organizationId,
       billingMonth,

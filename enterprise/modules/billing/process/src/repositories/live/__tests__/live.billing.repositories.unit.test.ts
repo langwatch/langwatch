@@ -113,6 +113,7 @@ describe("LiveBillingRepositories", () => {
             reportUsageDelta: async () => [{ identifier: "sent", reported: true, valueSent: 5 }],
           }),
         queryInstantEvalSpendTotal: async () => ({ outcome: "unavailable" }),
+        isInstantEvalMeterProvisioned: () => true,
         selfDispatch: async () => {},
         errorReporter: BillingErrorReporterService.create(),
         connectedUsageCeiling: async () => null,

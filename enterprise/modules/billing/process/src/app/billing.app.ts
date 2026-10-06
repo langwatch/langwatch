@@ -398,6 +398,7 @@ export class BillingModule
         repositories,
         peers,
         facts,
+        nodeEnvironment,
         usageReporting: isSaas
           ? () =>
               StripeUsageReportingBuilder.create({
@@ -821,6 +822,7 @@ export class BillingModule
     peers,
     facts,
     usageReporting,
+    nodeEnvironment,
   }: {
     repositories: Pick<
       BillingRepositories,
@@ -829,6 +831,7 @@ export class BillingModule
     peers: Pick<ConnectedBillingPeers, "licensing" | "gateway">;
     facts: ConnectedCustomerFactsService;
     usageReporting: (() => UsageReportingService) | undefined;
+    nodeEnvironment: string | undefined;
   }): BillingReportingPipeline {
     const projects = {
       findProjectIds: (organizationId: string) => facts.findProjectIds(organizationId),
@@ -850,6 +853,9 @@ export class BillingModule
       billingCheckpoints: repositories.checkpoints,
       getUsageReportingService: () => (reporter ??= usageReporting?.()),
       queryInstantEvalSpendTotal: (input) => instantEvalSpend.queryInstantEvalSpendTotal(input),
+      isInstantEvalMeterProvisioned: () =>
+        BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment)).meters
+          .INSTANT_EVAL_USD !== undefined,
       organizationCache: repositories.organizationCache,
       errorReporter: BillingErrorReporterService.create(),
       connectedUsageCeiling: async (input) => {

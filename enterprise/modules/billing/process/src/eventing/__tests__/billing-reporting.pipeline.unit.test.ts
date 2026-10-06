@@ -35,6 +35,7 @@ function rollUp() {
     billingCheckpoints: repositories.checkpoints,
     getUsageReportingService: () => void 0,
     queryInstantEvalSpendTotal: async () => ({ outcome: "unavailable" }),
+    isInstantEvalMeterProvisioned: () => true,
     organizationCache: repositories.organizationCache,
     errorReporter: BillingErrorReporterService.create(),
     connectedUsageCeiling: async () => null,
