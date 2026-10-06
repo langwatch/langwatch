@@ -4377,9 +4377,9 @@ model ApiKey {
   // inside a transaction and this repo has no non-transactional setup, so it
   // could not be built CONCURRENTLY — and a plain CREATE INDEX takes a SHARE
   // lock that blocks WRITES on this table for the whole build. ApiKey is on
-  // the authorization hot path (`ApiKeyService.markUsed` fires a
-  // fire-and-forget `update({ lastUsedAt })` after every authorized request,
-  // including trace ingest, and `create` runs on every Langy session-key
+  // the authorization hot path (`ApiKeyService.markUsed` writes `lastUsedAt`
+  // at most once per key per minute per process, on requests including trace
+  // ingest, and `create` runs on every Langy session-key
   // mint), so that lock is a deploy-time stall on customer traffic. Paying it
   // to speed up an HOURLY background sweep is the wrong trade, and telling
   // each operator to pre-build the index by hand is not an upgrade-safe

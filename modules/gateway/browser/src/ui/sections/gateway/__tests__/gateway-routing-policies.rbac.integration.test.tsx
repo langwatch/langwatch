@@ -6,9 +6,14 @@
 import { cleanup, screen } from "@testing-library/react";
 import type React from "react";
 import "@testing-library/jest-dom/vitest";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGatewayHost, renderWithGatewayHost } from "../../../../testing.tsx";
+
+const harness = vi.hoisted(() => ({
+  /** What the policy list answers with instead of rows, when set. */
+  listError: null as unknown,
+}));
 
 vi.mock("../../../../ui/sections/gateway-layout.tsx", () => ({
   default: ({ children }: { children: React.ReactNode }) => children,
@@ -51,7 +56,10 @@ vi.mock("../../../../behavior/gateway-api.ts", () => {
           if (typeof property !== "string") return undefined;
           if (property === "useQuery") {
             const key = path.join(".");
-            return () => queryResult(key === "routingPolicy.list" ? POLICIES : undefined);
+            return () =>
+              key === "routingPolicy.list" && harness.listError
+                ? { ...queryResult(undefined), isError: true, error: harness.listError }
+                : queryResult(key === "routingPolicy.list" ? POLICIES : undefined);
           }
           if (property === "useMutation") return mutationResult;
           if (property === "invalidate") return vi.fn();
@@ -76,9 +84,37 @@ function renderPage(permissions: readonly string[]) {
   });
 }
 
+beforeEach(() => {
+  harness.listError = null;
+});
+
 afterEach(() => cleanup());
 
 describe("routing policies page access", () => {
+  describe("when the server refuses the policy list for a missing grant", () => {
+    /** @scenario "A refused policy list reads as no access, not as a failed load" */
+    it("names the grant and shows neither a load error nor the table", () => {
+      // The page guard passes; the refusal is the server's answer to the list.
+      harness.listError = {
+        data: {
+          code: "FORBIDDEN",
+          error: {
+            code: "permission_denied",
+            httpStatus: 403,
+            meta: { permission: "routingPolicies:view" },
+          },
+        },
+      };
+      renderPage(["organization:view", "routingPolicies:view"]);
+
+      expect(screen.getByText("You don't have permission to do this")).toBeInTheDocument();
+      expect(screen.getByText(/grant you "routingPolicies:view"/)).toBeInTheDocument();
+      expect(screen.queryByText("Couldn't load routing policies")).not.toBeInTheDocument();
+      expect(screen.queryByText("House default")).not.toBeInTheDocument();
+      expect(screen.queryByText(/You can read the policies/)).not.toBeInTheDocument();
+    });
+  });
+
   describe("when the viewer holds routingPolicies:view only", () => {
     /** @scenario "Routing policies opens on the grant its router asks for" */
     it("opens the page, lists the policies, and offers no authoring controls", () => {
