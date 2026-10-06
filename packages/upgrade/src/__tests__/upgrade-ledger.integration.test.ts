@@ -608,10 +608,11 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
 
       expect(live.map((row) => row.processId)).toEqual(["recent"]);
     });
+
   });
 
   describe("when declared steps are registered", () => {
-    const declared = (id: string, owner: string, description: string) => ({
+    const declaredStep = (id: string, owner: string, description: string) => ({
       id,
       kind: "data" as const,
       mode: "background" as const,
@@ -626,8 +627,8 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
 
       await ledger.registerDeclaredSteps({
         steps: [
-          declared("trace:fold-backfill", "trace", "Backfill the trace fold"),
-          declared("usage:meter-rebuild", "usage", "Rebuild the usage meter"),
+          declaredStep("trace:fold-backfill", "trace", "Backfill the trace fold"),
+          declaredStep("usage:meter-rebuild", "usage", "Rebuild the usage meter"),
         ],
       });
 
@@ -651,13 +652,15 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
     it("keeps a done step done and refreshes only its owner and description", async () => {
       const ledger = ledgerOf(scratch);
       await ledger.createTables();
-      await ledger.registerDeclaredSteps({ steps: [declared("trace:fold", "trace", "Old text")] });
+      await ledger.registerDeclaredSteps({
+        steps: [declaredStep("trace:fold", "trace", "Old text")],
+      });
       await scratch.postgres.query(
         `UPDATE "_langwatch_upgrade_step" SET "status" = 'done', "attempt" = 2 WHERE "id" = 'trace:fold'`,
       );
 
       const registered = await ledger.registerDeclaredSteps({
-        steps: [declared("trace:fold", "trace", "New text")],
+        steps: [declaredStep("trace:fold", "trace", "New text")],
       });
 
       expect(registered).toEqual([
