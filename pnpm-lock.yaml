@@ -9385,6 +9385,9 @@ importers:
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
+      '@trpc/server':
+        specifier: 'catalog:'
+        version: 11.18.0(typescript@7.0.2)
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0

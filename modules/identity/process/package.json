@@ -59,6 +59,7 @@
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
+    "@trpc/server": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
