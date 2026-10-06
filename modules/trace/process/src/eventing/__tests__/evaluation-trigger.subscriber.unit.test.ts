@@ -735,6 +735,22 @@ describe("createEvaluationTriggerSubscriber — the deferred-origin loop guard",
     expect(metrics.blocked).toEqual(["depth_fold"]);
   });
 
+  /** @scenario "A manual evaluation run marks the customer trace it ran against" */
+  it("skips a customer-origin trace once the evaluator's own spans folded a depth into it", async () => {
+    const { built, dispatch, metrics } = subscriber({});
+    const state = foldState({
+      attributes: {
+        "langwatch.origin": "application",
+        "langwatch.reserved.causality_depth": "1",
+      },
+    });
+
+    await run(built, originResolvedEvent(), state);
+
+    expect(dispatch.sent).toEqual([]);
+    expect(metrics.blocked).toEqual(["depth_fold"]);
+  });
+
   /** @scenario "An ordinary trace still starts its evaluations when its origin settles late" */
   it("dispatches on origin_resolved when the fold carries no causality depth", async () => {
     const { built, dispatch } = subscriber({});

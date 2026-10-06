@@ -49,6 +49,7 @@ function request(overrides: Partial<WebhookDispatchRequest> = {}): WebhookDispat
 /** A fake queue channel that records what it was asked to send. */
 function fakeQueue(behavior?: { rejectWith?: unknown }) {
   const sent: Record<string, unknown>[] = [];
+  const invalidate = vi.fn();
   const channel: SqsWebhookSender = {
     send: vi.fn(
       async (message: { config: SqsDestinationConfig; body: string; attributes: unknown }) => {
@@ -61,9 +62,9 @@ function fakeQueue(behavior?: { rejectWith?: unknown }) {
         return "msg-abc-123";
       },
     ),
-    invalidate: vi.fn(),
+    invalidate,
   };
-  return { sent, channel };
+  return { sent, channel, invalidate };
 }
 
 describe("SqsWebhookDestinationService", () => {
@@ -302,6 +303,32 @@ describe("SqsWebhookDestinationService", () => {
       expect(
         SqsWebhookDestinationService.classifyFailure({ name: "SomethingNewFromAws" }).verdict,
       ).toBe("retryable");
+    });
+
+    /** @scenario A repaired credential takes effect without a restart */
+    it("drops the cached identity when the queue refuses it, and keeps it for any other failure", async () => {
+      const refused = fakeQueue({
+        rejectWith: Object.assign(new Error("denied"), { name: "AccessDenied" }),
+      });
+      const throttled = fakeQueue({
+        rejectWith: Object.assign(new Error("slow down"), { name: "ThrottlingException" }),
+      });
+      const via = (channel: SqsWebhookSender) =>
+        SqsWebhookDestinationService.create({
+          config: {
+            channel,
+            caps,
+            queueUrl: QUEUE_URL,
+            accessKeyId: "AKIA1",
+            secretAccessKey: "s3cr3t",
+          },
+        });
+
+      await via(refused.channel).send(request());
+      await via(throttled.channel).send(request());
+
+      expect(refused.invalidate).toHaveBeenCalledExactlyOnceWith(QUEUE_URL);
+      expect(throttled.invalidate).not.toHaveBeenCalled();
     });
 
     it("returns the classified verdict rather than throwing", async () => {

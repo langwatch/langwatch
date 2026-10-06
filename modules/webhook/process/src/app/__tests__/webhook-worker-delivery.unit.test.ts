@@ -72,6 +72,7 @@ function worker() {
 describe("given a memory-tier worker with one active HTTP endpoint", () => {
   describe("when gateway hands over a request's admitted and confirmed spend steps", () => {
     /** @scenario "A memory-tier worker delivers a completed gateway request to its endpoint" */
+    /** @scenario "A process builds the webhook transport from its own configuration" */
     it("records one delivery attempt for the endpoint", async () => {
       const runtime = await worker().boot();
 

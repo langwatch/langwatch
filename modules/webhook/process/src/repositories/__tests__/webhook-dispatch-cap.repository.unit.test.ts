@@ -32,6 +32,7 @@ class FakeCounter implements WebhookDispatchCounter {
 
 describe("RedisWebhookDispatchCapRepository", () => {
   /** @scenario "The cap counts one attempt per dispatch under the key the tenant is billed by" */
+  /** @scenario "The dispatch cap is counted where the whole fleet can see it" */
   it("counts under main's key, opening the window once", async () => {
     const counter = new FakeCounter();
     const repository = RedisWebhookDispatchCapRepository.create({ connection: counter });

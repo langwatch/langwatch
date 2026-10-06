@@ -28,7 +28,7 @@ const entitledPlan: Plan = {
   prices: { USD: 0, EUR: 0 },
 };
 
-function process(role: "api" | "worker") {
+function process(role: "api" | "worker", plan: Plan = entitledPlan) {
   return createApp({ role })
     .withModules([webhookProcessModule])
     .withConfig({
@@ -49,7 +49,7 @@ function process(role: "api" | "worker") {
     .withStores(memoryStores())
     .provide({
       entitlement: createApiFixture<EntitlementApi>({
-        getActivePlan: async () => entitledPlan,
+        getActivePlan: async () => plan,
         requestBound: async () => 10,
       }),
       project: createApiFixture<ProjectApi>({ listIdsByOrganization: async () => [] }),
@@ -77,6 +77,31 @@ describe("webhook app installation", () => {
           { id: endpoint.id },
         ]);
         await expect(app.getAll({ organizationId: "other-organization" })).resolves.toEqual([]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("given an organization whose plan lacks webhook endpoints", () => {
+    /** @scenario The plan gate answers on a deployment with no Enterprise governance application */
+    it("refuses the gate as forbidden, naming the plan, with only entitlement composed", async () => {
+      const runtime = await process("api", {
+        ...entitledPlan,
+        webhookEndpointsEnabled: false,
+      }).boot();
+
+      try {
+        const error = await runtime
+          .service(WebhookApi)
+          .assertEndpointsEntitled(ORGANIZATION_ID)
+          .catch((caught: unknown) => caught);
+
+        expect(error).toMatchObject({
+          code: "webhook_endpoints_not_entitled",
+          httpStatus: 403,
+          message: expect.stringContaining("plan"),
+        });
       } finally {
         await runtime.stop();
       }

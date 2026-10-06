@@ -65,6 +65,7 @@ describe("TraceAttributeAccumulationService", () => {
 
   describe("given spans mixing application and evaluator-emitted causality depths", () => {
     /** @scenario "A trace keeps the highest evaluator depth any of its spans carried" */
+    /** @scenario "A manual evaluation run marks the customer trace it ran against" */
     it("keeps the highest depth regardless of which span folds first", () => {
       const service = TraceAttributeAccumulationService.create(TraceOriginService.create());
       const state = createInitState();

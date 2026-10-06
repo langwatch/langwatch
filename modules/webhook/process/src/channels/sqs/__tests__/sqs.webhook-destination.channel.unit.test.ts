@@ -52,6 +52,7 @@ function channel(factory: SqsClientFactory): SqsWebhookDestinationChannel {
 }
 
 describe("SqsWebhookDestinationChannel", () => {
+  /** @scenario A repaired credential takes effect without a restart */
   it("reuses a client for the same queue and credentials", async () => {
     const { factory, clients } = clientFactory();
     const subject = channel(factory);
@@ -112,6 +113,7 @@ describe("SqsWebhookDestinationChannel", () => {
     subject.close();
   });
 
+  /** @scenario A repaired credential takes effect without a restart */
   it("invalidates every cached identity for a queue", async () => {
     const { factory, clients } = clientFactory();
     const subject = channel(factory);
