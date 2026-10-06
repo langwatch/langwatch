@@ -52,55 +52,103 @@ func checkCommand(ctx context.Context, args []string, streams Streams) int {
 		}
 		return ExitClean
 	}
-	config, done, err := checkConfig(parsed)
+	run := &checkRun{parsed: parsed, streams: streams, began: began}
+	return run.execute(ctx)
+}
+
+// checkRun is one `visualdiff check` after its flags are read: what it was
+// asked, where it writes, and the time its stack and seed took.
+type checkRun struct {
+	parsed  checkFlags
+	streams Streams
+	began   time.Time
+	times   checkTimes
+	config  *Config
+	done    []string
+	held    map[string]bool
+}
+
+// execute checks every selected flow and answers the process exit code.
+func (run *checkRun) execute(ctx context.Context) int {
+	config, done, err := checkConfig(run.parsed)
 	if err != nil {
-		fmt.Fprintln(streams.Err, "visualdiff check:", err)
+		fmt.Fprintln(run.streams.Err, "visualdiff check:", err)
 		return ExitOperational
 	}
-	if err := RunnerPreflight(ctx, parsed.root); err != nil {
-		fmt.Fprintln(streams.Err, "visualdiff:", diffkit.SetupFailed(err))
+	run.config, run.done = config, done
+	if err := RunnerPreflight(ctx, run.parsed.root); err != nil {
+		fmt.Fprintln(run.streams.Err, "visualdiff:", diffkit.SetupFailed(err))
 		return ExitOperational
 	}
-	times := checkTimes{}
-	side, err := checkSide(ctx, parsed, &times, streams.Err)
+	plan, err := run.prepare(ctx)
 	if err != nil {
-		fmt.Fprintln(streams.Err, "visualdiff:", diffkit.SetupFailed(err))
+		fmt.Fprintln(run.streams.Err, "visualdiff:", diffkit.SetupFailed(err))
 		return ExitOperational
+	}
+	return run.capture(ctx, plan)
+}
+
+// prepare readies the app under check, runs the flows' setups on it and
+// plans the run, with main's live stack or a cached baseline as its base.
+func (run *checkRun) prepare(ctx context.Context) (RunnerPlan, error) {
+	parsed, config, stderr := run.parsed, run.config, run.streams.Err
+	side, err := run.side(ctx)
+	if err != nil {
+		return RunnerPlan{}, err
 	}
 	setupStarted := time.Now()
 	setups, warnings := runFlowSetups(ctx, setupRequest{apiURL: side.BaseURL, key: DefaultProjectKey, fixtures: side.Fixtures, flows: config.Flows,
-		scimToken: stackScimToken(ctx, execRunner, os.Environ, checkedStack(parsed), config.Flows)})
+		scimToken: stackScimToken(ctx, scimTokenRequest{run: execRunner, environ: os.Environ, stack: checkedStack(parsed), flows: config.Flows})})
 	for _, warning := range warnings {
-		fmt.Fprintln(streams.Err, "check:", warning)
+		fmt.Fprintln(stderr, "check:", warning)
 	}
 	side.Fixtures = mergeFixtures(side.Fixtures, setups)
-	times.seed += time.Since(setupStarted)
-	times.seedParts = append(times.seedParts, SeedTiming{Part: "setups", Took: time.Since(setupStarted)})
+	run.times.seed += time.Since(setupStarted)
+	run.times.seedParts = append(run.times.seedParts, SeedTiming{Part: "setups", Took: time.Since(setupStarted)})
 	if parsed.pages <= 0 {
-		parsed.pages = CheckPages(runtime.NumCPU(), readFreeMemory(ctx))
+		run.parsed.pages = CheckPages(runtime.NumCPU(), readFreeMemory(ctx))
 	}
-	plan := checkPlan(parsed, side, config)
-	// A fast check's lean pixels would differ from main's baseline everywhere, so it compares none.
-	baseline, held := "", map[string]bool(nil)
+	plan := checkPlan(run.parsed, side, config)
+	if err := run.addBase(ctx, &plan); err != nil {
+		return RunnerPlan{}, err
+	}
+	fmt.Fprintf(stderr, "check: %d flows against %s, %d at a time\n", len(plan.Flows), side.BaseURL, plan.Concurrency.Flows)
+	return plan, nil
+}
+
+// addBase puts the side the screenshots are compared with first in plan:
+// main's live stack under -base-url, else the pinned baseline holding the
+// most flows. A fast check's lean pixels would differ from main's baseline
+// everywhere, so it compares none.
+func (run *checkRun) addBase(ctx context.Context, plan *RunnerPlan) error {
+	parsed, config, stderr := run.parsed, run.config, run.streams.Err
 	if parsed.baseURL != "" {
-		base, err := liveBase(ctx, parsed.baseURL, config.Flows, streams.Err)
+		base, err := run.liveBase(ctx, config.Flows)
 		if err != nil {
-			fmt.Fprintln(streams.Err, "visualdiff:", diffkit.SetupFailed(err))
-			return ExitOperational
+			return err
 		}
-		plan.Sides, held = append([]RunnerSide{base}, plan.Sides...), map[string]bool{}
+		plan.Sides, run.held = append([]RunnerSide{base}, plan.Sides...), map[string]bool{}
 		for _, id := range flowIDs(config) {
-			held[id] = true
+			run.held[id] = true
 		}
-		fmt.Fprintf(streams.Err, "check: screenshots compared with main at %s\n", parsed.baseURL)
-	} else if !parsed.fast {
-		baseline, held = checkBaseline(parsed.root, config.Flows)
+		fmt.Fprintf(stderr, "check: screenshots compared with main at %s\n", parsed.baseURL)
+		return nil
 	}
+	if parsed.fast {
+		return nil
+	}
+	baseline, held := checkBaseline(parsed.root, config.Flows)
+	run.held = held
 	if baseline != "" {
 		plan.Sides = append([]RunnerSide{{Name: "base", Replay: filepath.Join(baseline, BaselineCaptures)}}, plan.Sides...)
-		fmt.Fprintf(streams.Err, "check: screenshots compared with %s (%d of %d flows)\n", baseline, len(held), len(config.Flows))
+		fmt.Fprintf(stderr, "check: screenshots compared with %s (%d of %d flows)\n", baseline, len(held), len(config.Flows))
 	}
-	fmt.Fprintf(streams.Err, "check: %d flows against %s, %d at a time\n", len(plan.Flows), side.BaseURL, plan.Concurrency.Flows)
+	return nil
+}
+
+// capture drives the flows, reports the outcome and answers the exit code.
+func (run *checkRun) capture(ctx context.Context, plan RunnerPlan) int {
+	parsed, streams := run.parsed, run.streams
 	results := newFlowResults()
 	started := time.Now()
 	progress := &checkProgress{results: results, total: len(plan.Flows), started: started, out: streams.Err}
@@ -120,25 +168,35 @@ func checkCommand(ctx context.Context, args []string, streams Streams) int {
 		_ = os.WriteFile(filepath.Join(plan.OutDir, "check-report.md"), []byte("# visualdiff check\n\nRUNNER FAILED: "+failure+"\n"), 0o600)
 		return ExitOperational
 	}
-	outcome := results.outcome(checkOutcomeInputs{flows: config.Flows, done: done, diffs: stream.Diffs, held: held, took: time.Since(started)})
+	outcome := results.outcome(checkOutcomeInputs{flows: run.config.Flows, done: run.done, diffs: stream.Diffs, held: run.held, took: time.Since(started)})
 	if len(plan.Routes) > 0 {
 		outcome = withRoutes(outcome, plan, stream)
 	}
-	outcome.text += timingBlock(times, stream.Phases, time.Since(began))
-	fmt.Fprint(streams.Out, outcome.text)
-	if err := os.WriteFile(filepath.Join(plan.OutDir, "check-report.md"), []byte("# visualdiff check\n\n```\n"+outcome.text+"```\n"), 0o600); err != nil {
-		fmt.Fprintln(streams.Err, "visualdiff check:", err)
-	}
+	outcome.text += timingBlock(run.times, stream.Phases, time.Since(run.began))
+	run.report(plan, outcome)
 	if parsed.mark {
-		markPassed(parsed.root, outcome.passed, BuildRows(stream.Captures, stream.Diffs), streams.Out)
+		run.markPassed(outcome.passed, BuildRows(stream.Captures, stream.Diffs))
 	}
+	return run.exitCode(runErr, outcome)
+}
+
+// report prints the outcome and writes it as check-report.md.
+func (run *checkRun) report(plan RunnerPlan, outcome checkOutcome) {
+	fmt.Fprint(run.streams.Out, outcome.text)
+	if err := os.WriteFile(filepath.Join(plan.OutDir, "check-report.md"), []byte("# visualdiff check\n\n```\n"+outcome.text+"```\n"), 0o600); err != nil {
+		fmt.Fprintln(run.streams.Err, "visualdiff check:", err)
+	}
+}
+
+// exitCode is stopped, operational, findings or clean, in that order.
+func (run *checkRun) exitCode(runErr error, outcome checkOutcome) int {
 	var stopped *diffkit.Stopped
 	if errors.As(runErr, &stopped) {
-		fmt.Fprintln(streams.Err, "visualdiff:", stopped)
+		fmt.Fprintln(run.streams.Err, "visualdiff:", stopped)
 		return diffkit.ExitStopped
 	}
 	if runErr != nil {
-		fmt.Fprintln(streams.Err, "visualdiff check:", runErr)
+		fmt.Fprintln(run.streams.Err, "visualdiff check:", runErr)
 		return ExitOperational
 	}
 	if outcome.failed > 0 {
@@ -205,25 +263,17 @@ func checkConfig(parsed checkFlags) (*Config, []string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	skipped := splitList(parsed.skip)
-	wanted := splitList(parsed.only)
-	var ids []string
-	for index := range config.Flows {
-		id := config.Flows[index].ID
-		if (len(wanted) == 0 || slices.Contains(wanted, id)) && !slices.Contains(skipped, id) {
-			ids = append(ids, id)
-		}
-	}
 	routes := config.Routes
-	selected, err := config.Select([]string{}, ids)
-	if err == nil {
-		selected.Routes = nil
-		if parsed.routes {
-			selected.Routes = routes
-		}
-	}
-	if err != nil || parsed.all {
+	selected, err := config.Select([]string{}, wantedFlowIDs(config, parsed))
+	if err != nil {
 		return selected, nil, err
+	}
+	selected.Routes = nil
+	if parsed.routes {
+		selected.Routes = routes
+	}
+	if parsed.all {
+		return selected, nil, nil
 	}
 	ledger, err := LoadDoneLedger(parsed.root)
 	if err != nil {
@@ -237,10 +287,26 @@ func checkConfig(parsed checkFlags) (*Config, []string, error) {
 	return scoped, done, nil
 }
 
-// checkSide is the app under check: check's own stack, or -url as given, unseeded.
-func checkSide(ctx context.Context, parsed checkFlags, times *checkTimes, stderr io.Writer) (RunnerSide, error) {
+// wantedFlowIDs is every configured flow named by -only (all when unset),
+// less those named by -skip.
+func wantedFlowIDs(config *Config, parsed checkFlags) []string {
+	skipped := splitList(parsed.skip)
+	wanted := splitList(parsed.only)
+	var ids []string
+	for index := range config.Flows {
+		id := config.Flows[index].ID
+		if (len(wanted) == 0 || slices.Contains(wanted, id)) && !slices.Contains(skipped, id) {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+// side is the app under check: check's own stack, or -url as given, unseeded.
+func (run *checkRun) side(ctx context.Context) (RunnerSide, error) {
+	parsed := run.parsed
 	if parsed.url == "" {
-		return checkStack(ctx, checkStackRequest{root: parsed.root, slug: parsed.stack, devUI: parsed.devUI, shared: parsed.shared, adoptOnly: parsed.adoptOnly, stderr: stderr}, times)
+		return checkStack(ctx, checkStackRequest{root: parsed.root, slug: parsed.stack, devUI: parsed.devUI, shared: parsed.shared, adoptOnly: parsed.adoptOnly, stderr: run.streams.Err}, &run.times)
 	}
 	app := Stack{HavenURL: parsed.url}
 	return RunnerSide{Name: "candidate", BaseURL: app.URL(), MailURL: app.MailURL(), Fixtures: map[string]string{}}, nil
@@ -271,8 +337,9 @@ func checkedStack(parsed checkFlags) Stack {
 }
 
 // liveBase seeds a running main as run seeds its base, and answers it as the runner's base side.
-func liveBase(ctx context.Context, url string, flows []Flow, stderr io.Writer) (RunnerSide, error) {
-	stack := Stack{HavenURL: url}
+func (run *checkRun) liveBase(ctx context.Context, flows []Flow) (RunnerSide, error) {
+	stderr := run.streams.Err
+	stack := Stack{HavenURL: run.parsed.baseURL}
 	seeded, err := Seed(ctx, SeedRequest{APIURL: stack.APIURL(), Identity: SeedIdentity{}.withSeededDefaults(), TraceCount: 6})
 	if err != nil {
 		return RunnerSide{}, fmt.Errorf("seed main: %w", err)
@@ -462,17 +529,23 @@ func checkBaseline(root string, flows []Flow) (string, map[string]bool) {
 			continue
 		}
 		meta := readBaselineMeta(dir)
-		held := map[string]bool{}
-		for id, steps := range wanted {
-			if meta.Flows[id] == steps {
-				held[id] = true
-			}
-		}
+		held := heldFlows(meta, wanted)
 		if len(held) > len(bestHeld) || (len(held) == len(bestHeld) && len(held) > 0 && meta.CreatedAt.After(bestAt)) {
 			best, bestHeld, bestAt = dir, held, meta.CreatedAt
 		}
 	}
 	return best, bestHeld
+}
+
+// heldFlows is the flows whose steps a baseline captured unchanged.
+func heldFlows(meta BaselineMeta, wanted map[string]string) map[string]bool {
+	held := map[string]bool{}
+	for id, steps := range wanted {
+		if meta.Flows[id] == steps {
+			held[id] = true
+		}
+	}
+	return held
 }
 
 // flowResults keeps each flow's first failure and its held expects as captures stream in.
@@ -636,7 +709,8 @@ func looksLikeMain(id string, held bool, diffs []Diff) string {
 }
 
 // markPassed writes a done-ledger entry for each flow that passed, its screens as proof.
-func markPassed(root string, passed map[string][]string, rows []Row, out io.Writer) {
+func (run *checkRun) markPassed(passed map[string][]string, rows []Row) {
+	root, out := run.parsed.root, run.streams.Out
 	now := time.Now().UTC()
 	for id, proof := range passed {
 		flowRows := sectionRows(rows, "flow", id)

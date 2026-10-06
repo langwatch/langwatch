@@ -76,6 +76,23 @@ func (watch *bootWatch) logFiles() []string {
 
 // check reads what the logs gained since the last check and judges the boot.
 func (watch *bootWatch) check(now time.Time, raw []byte) error {
+	if err := watch.readLogs(now); err != nil {
+		return err
+	}
+	stack, found := stackEntry(raw, watch.slug)
+	if phase := fmt.Sprint(stack.Live, stack.Lanes); found && phase != watch.lastPhase {
+		watch.lastPhase, watch.lastMove = phase, now
+	}
+	if raw != nil && watch.wasLive && !stack.Live {
+		return fmt.Errorf("stack-broken: %s: haven's launcher exited before the stack was ready\nlast lines:\n%s", watch.slug, watch.tail)
+	}
+	watch.wasLive = watch.wasLive || stack.Live
+	return watch.stalled(now, stack)
+}
+
+// readLogs reads what each log gained since the last check, and fails on a
+// fatal line.
+func (watch *bootWatch) readLogs(now time.Time) error {
 	for _, path := range watch.logFiles() {
 		content, err := readFrom(path, watch.offsets[path])
 		if err != nil || content == "" {
@@ -88,14 +105,12 @@ func (watch *bootWatch) check(now time.Time, raw []byte) error {
 			return fmt.Errorf("stack-broken: %s: fatal line in %s: %s\nlast lines:\n%s", watch.slug, path, line, watch.tail)
 		}
 	}
-	stack, found := stackEntry(raw, watch.slug)
-	if phase := fmt.Sprint(stack.Live, stack.Lanes); found && phase != watch.lastPhase {
-		watch.lastPhase, watch.lastMove = phase, now
-	}
-	if raw != nil && watch.wasLive && !stack.Live {
-		return fmt.Errorf("stack-broken: %s: haven's launcher exited before the stack was ready\nlast lines:\n%s", watch.slug, watch.tail)
-	}
-	watch.wasLive = watch.wasLive || stack.Live
+	return nil
+}
+
+// stalled fails a stack that moved neither its logs, its lanes nor its
+// process tree for the stall window.
+func (watch *bootWatch) stalled(now time.Time, stack watchedStack) error {
 	if watch.stall > 0 && now.Sub(watch.lastMove) > watch.stall {
 		// A quiet stack that still starts, ends or runs processes is working, not stalled.
 		tree, cpu := treeActivity(stack.LauncherPid)

@@ -131,17 +131,9 @@ func ParseLoad(text string) float64 {
 // liveOtherStacks are the up haven stacks of runs gc would leave: live or kept
 // ones other than this. A dead run's stacks are gc's to destroy, not a refusal.
 func liveOtherStacks(ctx context.Context, options Options) []string {
-	states, err := ScanRuns(options.Root, ProcessAlive)
+	owned, err := slugsOfOtherRuns(options)
 	if err != nil {
 		return nil
-	}
-	owned := map[string]bool{}
-	for _, state := range states {
-		if (state.Alive || state.Kept) && filepath.Clean(state.Dir) != filepath.Clean(options.RunDir) {
-			for _, slug := range state.Slugs() {
-				owned[slug] = true
-			}
-		}
 	}
 	var out bytes.Buffer
 	spec := commandSpec{name: havenrun.Command, args: havenrun.StatusArgs(), dir: options.Root, env: os.Environ()}
@@ -159,4 +151,22 @@ func liveOtherStacks(ctx context.Context, options Options) []string {
 		}
 	}
 	return live
+}
+
+// slugsOfOtherRuns is every stack slug a live or kept run other than this one owns.
+func slugsOfOtherRuns(options Options) (map[string]bool, error) {
+	states, err := ScanRuns(options.Root, ProcessAlive)
+	if err != nil {
+		return nil, err
+	}
+	owned := map[string]bool{}
+	for _, state := range states {
+		if !(state.Alive || state.Kept) || filepath.Clean(state.Dir) == filepath.Clean(options.RunDir) {
+			continue
+		}
+		for _, slug := range state.Slugs() {
+			owned[slug] = true
+		}
+	}
+	return owned, nil
 }

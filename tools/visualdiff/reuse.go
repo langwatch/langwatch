@@ -36,11 +36,18 @@ var codeServices = []string{"services/langevals/ts-integration", "services/langy
 // lock a killed build left makes every later prepare wait 180s per target.
 var ensureBuiltTargets = []string{"sdks/typescript", "mcp/typescript", "packages/ksuid", "packages/mail"}
 
+// gitTree is a worktree's git, asked through run.
+type gitTree struct {
+	run runner
+	dir string
+}
+
 // treeEntries lists `git ls-tree HEAD [paths]` in dir as "sha path" lines.
-func treeEntries(ctx context.Context, run runner, dir string, paths ...string) ([]string, error) {
+func treeEntries(ctx context.Context, tree gitTree, paths ...string) ([]string, error) {
+	dir := tree.dir
 	var out bytes.Buffer
 	args := append([]string{"ls-tree", "HEAD", "--"}, paths...)
-	if err := run(ctx, commandSpec{name: "git", args: args, dir: dir}, &out); err != nil {
+	if err := tree.run(ctx, commandSpec{name: "git", args: args, dir: dir}, &out); err != nil {
 		return nil, err
 	}
 	var entries []string
@@ -72,17 +79,17 @@ func CodeEntries(top, services []string) []string {
 
 // codeKey names a worktree's code inputs, or "" when they cannot be read.
 func codeKey(ctx context.Context, run runner, dir string) string {
-	top, err := treeEntries(ctx, run, dir)
+	top, err := treeEntries(ctx, gitTree{run: run, dir: dir})
 	if err != nil {
 		return ""
 	}
-	services, _ := treeEntries(ctx, run, dir, codeServices...)
+	services, _ := treeEntries(ctx, gitTree{run: run, dir: dir}, codeServices...)
 	return digestLines(CodeEntries(top, services))
 }
 
 // lockKey names a worktree's install inputs, or "" when they cannot be read.
 func lockKey(ctx context.Context, run runner, dir string) string {
-	entries, err := treeEntries(ctx, run, dir, lockInputs...)
+	entries, err := treeEntries(ctx, gitTree{run: run, dir: dir}, lockInputs...)
 	if err != nil {
 		return ""
 	}
@@ -97,7 +104,8 @@ func digestLines(lines []string) string {
 // stepKey is what one prepare step's output depends on, or "" to always run
 // it: an install on the lockfile, ensure-built never (it checks itself), any
 // other step on the code.
-func stepKey(ctx context.Context, run runner, stack Stack, spec commandSpec) string {
+func stepKey(ctx context.Context, run runner, step prepareStep) string {
+	stack, spec := step.stack, step.spec
 	switch {
 	case !stack.Persistent || isEnsureBuilt(spec):
 		return ""
@@ -108,10 +116,18 @@ func stepKey(ctx context.Context, run runner, stack Stack, spec commandSpec) str
 	}
 }
 
+// prepareStep is one prepare command, numbered in its stack's prepare list.
+type prepareStep struct {
+	stack Stack
+	index int
+	spec  commandSpec
+}
+
 // prepared reports a step this worktree last finished with this key, whose
 // output is still there.
-func prepared(stack Stack, index int, spec commandSpec, key string) bool {
-	if key == "" || readStepKey(stack.Dir, index) != key {
+func prepared(step prepareStep, key string) bool {
+	stack := step.stack
+	if key == "" || readStepKey(stack.Dir, step.index) != key {
 		return false
 	}
 	return havenrun.PreparedOutputsExist(stack.Dir, havenrun.Layout(stack.Layout))

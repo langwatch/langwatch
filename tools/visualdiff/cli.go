@@ -138,7 +138,7 @@ func Run(ctx context.Context, args []string, streams Streams) int {
 	case "done":
 		return doneCommand(args[1:], streams)
 	case "flow", "route":
-		return loopCommand(ctx, args[0], args[1:], streams)
+		return loopCommand(ctx, args, streams)
 	case "down":
 		return downCommand(ctx, args[1:], streams)
 	case "-h", "--help", "help":
@@ -214,82 +214,100 @@ var errFlagsReported = errors.New("flags rejected")
 func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	flags := flag.NewFlagSet("run", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	baseRef := flags.String("base", "origin/main", "ref to compare against")
-	candidateRef := flags.String("candidate", "HEAD", "ref under test")
-	root := flags.String("root", ".", "repository root")
-	configPath := flags.String("config", "", "configuration file (default <root>/"+ConfigFile+")")
-	viewport := flags.String("viewport", "1440x900", "browser viewport, WIDTHxHEIGHT")
-	colorScheme := flags.String("color-scheme", "light", "colour scheme to capture: light, dark or both (both keys the dark pass \"<key>@dark\")")
-	routesOnly := flags.Bool("routes-only", false, "capture the route list and skip the flows")
-	flowList := flags.String("flows", "", "comma-separated flow ids to run; naming any route or flow runs only those")
-	routeList := flags.String("routes", "", "comma-separated routes to run, as configured; naming any route or flow runs only those")
-	basePort := flags.Int("base-port", DefaultBasePort, "first port of the base stack")
-	runDir := flags.String("run-dir", "", "directory for worktrees, logs, screenshots and the report")
-	bootTimeout := flags.Duration("boot-timeout", 20*time.Minute, "how long a stack gets to answer (last resort)")
-	stall := flags.Duration("stall", 90*time.Second, "fail a booting stack whose logs and lanes do not move for this long; 0 disables")
-	smokeTimeout := flags.Duration("smoke-timeout", 30*time.Second, "how long each app entrypoint gets to load its import graph before haven up; 0 skips the smoke")
-	dryRun := flags.Bool("dry-run", false, "print the plan and start nothing")
-	keep := flags.Bool("keep", false, "leave both stacks and both worktrees up after the run")
-	agent := flags.Bool("agent", false, "plain, token-free output for an agent")
-	noHaven := flags.Bool("no-haven", false, "do not boot the stacks as haven stacks; use -base-port and share this machine's own databases instead")
-	projectKey := flags.String("project-key", DefaultProjectKey, "project key the fixtures are posted with")
-	slug := flags.String("slug", "", "project slug the routes are rendered for")
-	email := flags.String("email", "", "email the runner signs in with")
-	password := flags.String("password", "", "password the runner signs in with")
-	editionList := flags.String("editions", "", "comma-separated editions to capture: enterprise, free (default both; enterprise with -no-haven)")
-	noBaseline := flags.Bool("no-baseline", false, "render the base every time and cache nothing")
-	refreshBaseline := flags.Bool("refresh-baseline", false, "render the base and replace its cached baseline")
-	noFailFast := flags.Bool("no-fail-fast", false, "keep capturing even when the candidate's shell does not render")
-	fast := flags.Bool("fast", false, "render on a lean Chromium for a quick look; never caches a baseline or publishes to the pull request")
-	resume := flags.String("resume", "", "continue a -keep run by id: reuse its worktrees and running stacks")
-	noPublish, devUI, includeDone := flags.Bool("no-publish", false, "do not show the run's screens on the branch's pull request"),
-		flags.Bool("dev-ui", false, "capture both sides from their Vite dev servers instead of a production build of each UI"),
-		flags.Bool("include-done", false, "capture the sections the done ledger holds too")
-	rebaseMain := flags.Bool("rebase-main", false, "move the base's pin to -base as it is now, whatever it changed")
-	force := flags.Bool("force", false, "run on battery, under load or beside another visualdiff stack")
-	maxLoad := flags.Float64("max-load", DefaultMaxLoad, "refuse to start above this 1-minute load average")
-	pages := flags.Int("pages", 0, "pages each side captures on at once (default half the CPUs, fewer under load)")
-	maxErrors := flags.Int("max-consecutive-errors", DefaultMaxConsecutiveErrors, "stop after this many captures in a row that are harness or stack errors on one side (0 never stops)")
-	batchSize := flags.Int("batch-size", DefaultBatchSize, "seal a review batch every this many routes or flows (0 never does)")
+	values := &runFlagValues{}
+	values.declareStacks(flags)
+	values.declareCapture(flags)
 	if err := flags.Parse(args); err != nil {
 		return nil, errFlagsReported
 	}
+	return values.resolve(flags)
+}
 
-	absoluteRoot, err := filepath.Abs(*root)
-	if err != nil {
-		return nil, err
-	}
-	config, parsedViewport, err := loadRunConfig(flags, runConfigInputs{root: absoluteRoot, configPath: *configPath, routeList: *routeList, flowList: *flowList, viewport: *viewport})
-	if err != nil {
-		return nil, err
-	}
+// runFlagValues is what run's flags hold before they are resolved: the
+// options a flag sets as given, and the raw values the rest derive from.
+type runFlagValues struct {
+	options                                    Options
+	root, configPath, viewport, colorScheme    string
+	flowList, routeList, editionList, resume   string
+	noHaven, noBaseline, noFailFast, noPublish bool
+	includeDone                                bool
+}
 
-	editions, err := runEditions(*editionList, *noHaven)
+// declareStacks declares the refs, the stacks and how they boot.
+func (values *runFlagValues) declareStacks(flags *flag.FlagSet) {
+	options := &values.options
+	flags.StringVar(&options.BaseRef, "base", "origin/main", "ref to compare against")
+	flags.StringVar(&options.CandidateRef, "candidate", "HEAD", "ref under test")
+	flags.StringVar(&values.root, "root", ".", "repository root")
+	flags.StringVar(&values.configPath, "config", "", "configuration file (default <root>/"+ConfigFile+")")
+	flags.IntVar(&options.BasePort, "base-port", DefaultBasePort, "first port of the base stack")
+	flags.StringVar(&options.RunDir, "run-dir", "", "directory for worktrees, logs, screenshots and the report")
+	flags.DurationVar(&options.BootTimeout, "boot-timeout", 20*time.Minute, "how long a stack gets to answer (last resort)")
+	flags.DurationVar(&options.Stall, "stall", 90*time.Second, "fail a booting stack whose logs and lanes do not move for this long; 0 disables")
+	flags.DurationVar(&options.SmokeTimeout, "smoke-timeout", 30*time.Second, "how long each app entrypoint gets to load its import graph before haven up; 0 skips the smoke")
+	flags.BoolVar(&options.DryRun, "dry-run", false, "print the plan and start nothing")
+	flags.BoolVar(&options.Keep, "keep", false, "leave both stacks and both worktrees up after the run")
+	flags.BoolVar(&options.Agent, "agent", false, "plain, token-free output for an agent")
+	flags.BoolVar(&values.noHaven, "no-haven", false, "do not boot the stacks as haven stacks; use -base-port and share this machine's own databases instead")
+	flags.StringVar(&options.Identity.ProjectKey, "project-key", DefaultProjectKey, "project key the fixtures are posted with")
+	flags.StringVar(&options.Identity.Slug, "slug", "", "project slug the routes are rendered for")
+	flags.StringVar(&options.Identity.Email, "email", "", "email the runner signs in with")
+	flags.StringVar(&options.Identity.Password, "password", "", "password the runner signs in with")
+	flags.StringVar(&values.resume, "resume", "", "continue a -keep run by id: reuse its worktrees and running stacks")
+	flags.BoolVar(&options.RebaseMain, "rebase-main", false, "move the base's pin to -base as it is now, whatever it changed")
+	flags.BoolVar(&options.Force, "force", false, "run on battery, under load or beside another visualdiff stack")
+	flags.Float64Var(&options.MaxLoad, "max-load", DefaultMaxLoad, "refuse to start above this 1-minute load average")
+}
+
+// declareCapture declares what is captured, how, and where it is published.
+func (values *runFlagValues) declareCapture(flags *flag.FlagSet) {
+	options := &values.options
+	flags.StringVar(&values.viewport, "viewport", "1440x900", "browser viewport, WIDTHxHEIGHT")
+	flags.StringVar(&values.colorScheme, "color-scheme", "light", "colour scheme to capture: light, dark or both (both keys the dark pass \"<key>@dark\")")
+	flags.BoolVar(&options.RoutesOnly, "routes-only", false, "capture the route list and skip the flows")
+	flags.StringVar(&values.flowList, "flows", "", "comma-separated flow ids to run; naming any route or flow runs only those")
+	flags.StringVar(&values.routeList, "routes", "", "comma-separated routes to run, as configured; naming any route or flow runs only those")
+	flags.StringVar(&values.editionList, "editions", "", "comma-separated editions to capture: enterprise, free (default both; enterprise with -no-haven)")
+	flags.BoolVar(&values.noBaseline, "no-baseline", false, "render the base every time and cache nothing")
+	flags.BoolVar(&options.RefreshBaseline, "refresh-baseline", false, "render the base and replace its cached baseline")
+	flags.BoolVar(&values.noFailFast, "no-fail-fast", false, "keep capturing even when the candidate's shell does not render")
+	flags.BoolVar(&options.Fast, "fast", false, "render on a lean Chromium for a quick look; never caches a baseline or publishes to the pull request")
+	flags.BoolVar(&values.noPublish, "no-publish", false, "do not show the run's screens on the branch's pull request")
+	flags.BoolVar(&options.DevUI, "dev-ui", false, "capture both sides from their Vite dev servers instead of a production build of each UI")
+	flags.BoolVar(&values.includeDone, "include-done", false, "capture the sections the done ledger holds too")
+	flags.IntVar(&options.Pages, "pages", 0, "pages each side captures on at once (default half the CPUs, fewer under load)")
+	flags.IntVar(&options.MaxConsecutiveErrors, "max-consecutive-errors", DefaultMaxConsecutiveErrors, "stop after this many captures in a row that are harness or stack errors on one side (0 never stops)")
+	flags.IntVar(&options.BatchSize, "batch-size", DefaultBatchSize, "seal a review batch every this many routes or flows (0 never does)")
+}
+
+// resolve turns the parsed values into the run's options and configuration.
+func (values *runFlagValues) resolve(flags *flag.FlagSet) (*runFlags, error) {
+	absoluteRoot, err := filepath.Abs(values.root)
 	if err != nil {
 		return nil, err
 	}
-	scheme, err := ParseColorScheme(*colorScheme)
+	config, parsedViewport, err := loadRunConfig(flags, runConfigInputs{root: absoluteRoot, configPath: values.configPath, routeList: values.routeList, flowList: values.flowList, viewport: values.viewport})
 	if err != nil {
 		return nil, err
 	}
-	options := Options{
-		ColorScheme: scheme,
-		Root:        absoluteRoot, BaseRef: *baseRef, CandidateRef: *candidateRef, RunDir: *runDir,
-		BasePort: *basePort, Viewport: parsedViewport, RoutesOnly: *routesOnly,
-		Agent: *agent, DryRun: *dryRun, Keep: *keep,
-		BootTimeout: *bootTimeout, Stall: *stall, SmokeTimeout: *smokeTimeout,
-		UseHaven: havenSelected(havenOnPath(), *noHaven),
-		Identity: SeedIdentity{
-			ProjectKey: *projectKey, Slug: *slug, Email: *email, Password: *password,
-		},
-		Editions: editions, Baseline: !*noBaseline && !*fast, RefreshBaseline: *refreshBaseline,
-		FailFast: !*noFailFast, Fast: *fast, NoPublish: *noPublish || *fast, DevUI: *devUI,
-		PinMain: !isFlagSet(flags, "base"), RebaseMain: *rebaseMain, Force: *force, MaxLoad: *maxLoad, Pages: *pages,
-		MaxConsecutiveErrors: *maxErrors, BatchSize: *batchSize,
-		SkipWorks: !*includeDone && *routeList == "" && *flowList == "",
+	editions, err := runEditions(values.editionList, values.noHaven)
+	if err != nil {
+		return nil, err
 	}
-	resumeRun(&options, *resume)
-	return &runFlags{options: options, config: config, includeDone: *includeDone}, nil
+	scheme, err := ParseColorScheme(values.colorScheme)
+	if err != nil {
+		return nil, err
+	}
+	options := values.options
+	options.ColorScheme, options.Root, options.Viewport, options.Editions = scheme, absoluteRoot, parsedViewport, editions
+	options.UseHaven = havenSelected(havenOnPath(), values.noHaven)
+	options.Baseline = !values.noBaseline && !options.Fast
+	options.FailFast = !values.noFailFast
+	options.NoPublish = values.noPublish || options.Fast
+	options.PinMain = !isFlagSet(flags, "base")
+	options.SkipWorks = !values.includeDone && values.routeList == "" && values.flowList == ""
+	resumeRun(&options, values.resume)
+	return &runFlags{options: options, config: config, includeDone: values.includeDone}, nil
 }
 
 // resumeRun points a run at the -keep run it continues, when one is named.

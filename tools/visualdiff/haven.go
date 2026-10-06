@@ -73,6 +73,23 @@ func havenEnv(inherit []string, slug string) []string {
 // cost, webhook automations and self-serve SSO. It is the product's own local override.
 const FeatureFlagsOn = "FEATURE_FLAG_FORCE_ENABLE=release_ui_agent_testing_v2_enabled,release_custom_chart_playground,release_langy_enabled,release_voice_agents_enabled,release_ui_governance_billed_cost_enabled,release_webhook_automations,self_serve_sso"
 
+// startStack prepares one stack, smoke-tests its import graph, starts it
+// under haven and builds its UI.
+func (run *session) startStack(ctx context.Context, stack *Stack) error {
+	running, err := run.prepareStack(ctx, stack)
+	if err != nil {
+		return err
+	}
+	if err := run.importSmoke(ctx, *stack, running); err != nil {
+		return err
+	}
+	if err := run.startHaven(ctx, *stack, running); err != nil {
+		return err
+	}
+	run.buildUI(ctx, *stack)
+	return nil
+}
+
 // bringUpHaven checks out each ref and brings it up as a haven stack the
 // moment it is prepared: `up --detach` returns as soon as the stack is
 // backgrounded, so the base, the slower boot, migrates and seeds while its UI
@@ -80,17 +97,9 @@ const FeatureFlagsOn = "FEATURE_FLAG_FORCE_ENABLE=release_ui_agent_testing_v2_en
 func (run *session) bringUpHaven(ctx context.Context) error {
 	stacks := run.liveStacks()
 	for _, stack := range stacks {
-		running, err := run.prepareStack(ctx, stack)
-		if err != nil {
+		if err := run.startStack(ctx, stack); err != nil {
 			return err
 		}
-		if err := run.importSmoke(ctx, *stack, running); err != nil {
-			return err
-		}
-		if err := run.startHaven(ctx, *stack, running); err != nil {
-			return err
-		}
-		run.buildUI(ctx, *stack)
 	}
 	if run.stagger && len(stacks) == 2 {
 		arrival := make(chan baseArrival, 1)
@@ -137,7 +146,7 @@ func (run *session) awaitBase(ctx context.Context, stack Stack) baseArrival {
 	options := run.request.Options
 	result, err := run.request.Deps.Seed(ctx, SeedRequest{
 		APIURL: stack.APIURL(), Identity: options.Identity, TraceCount: options.TraceCount, Flows: run.request.Config.Flows,
-		ScimToken: stackScimToken(ctx, run.request.Deps.Run, run.request.Deps.Environ, stack, run.request.Config.Flows),
+		ScimToken: stackScimToken(ctx, scimTokenRequest{run: run.request.Deps.Run, environ: run.request.Deps.Environ, stack: stack, flows: run.request.Config.Flows}),
 	})
 	if err != nil {
 		return baseArrival{stack: stack, err: fmt.Errorf("seed %s: %w", stack.Name, err)}
@@ -379,8 +388,9 @@ func (run *session) runPrepare(ctx context.Context, stack Stack, commands []comm
 	for index, spec := range commands {
 		spec.dir = stack.Dir
 		line := spec.name + " " + strings.Join(spec.args, " ")
-		key := stepKey(ctx, run.request.Deps.Run, stack, spec)
-		if prepared(stack, index, spec, key) {
+		step := prepareStep{stack: stack, index: index, spec: spec}
+		key := stepKey(ctx, run.request.Deps.Run, step)
+		if prepared(step, key) {
 			fmt.Fprintf(run.streams.Err, "%s: prepare: %s cached, its inputs are unchanged\n", stack.Name, line)
 			continue
 		}

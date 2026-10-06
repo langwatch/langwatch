@@ -117,13 +117,21 @@ func SelectGarbage(states []RunState, selection GCSelection) GCPlan {
 			newer++
 		}
 	}
-	for _, slug := range selection.Registered {
+	plan.OrphanSlugs = orphanSlugs(selection.Registered, owned)
+	return plan
+}
+
+// orphanSlugs is the registered visualdiff stacks no run owns, sorted; check's
+// own stack is never one.
+func orphanSlugs(registered []string, owned map[string]bool) []string {
+	var orphans []string
+	for _, slug := range registered {
 		if strings.HasPrefix(slug, havenSlugPrefix+"-") && !owned[slug] && slug != CheckSlug {
-			plan.OrphanSlugs = append(plan.OrphanSlugs, slug)
+			orphans = append(orphans, slug)
 		}
 	}
-	sort.Strings(plan.OrphanSlugs)
-	return plan
+	sort.Strings(orphans)
+	return orphans
 }
 
 // protects reports a run gc must leave: the current one, a live one, a kept one.

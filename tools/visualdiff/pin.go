@@ -86,7 +86,7 @@ func DecidePin(ctx context.Context, request pinRequest, pin MainPin) (PinDecisio
 	case pin.Commit == head:
 		return PinDecision{Commit: pin.Commit, Why: request.ref + " has not moved since the pin"}, nil
 	}
-	lines, err := changedLines(ctx, request, pin.Commit, head)
+	lines, err := changedLines(ctx, request, revRange{from: pin.Commit, to: head})
 	if err != nil {
 		return move("the pinned commit is gone")
 	}
@@ -96,10 +96,15 @@ func DecidePin(ctx context.Context, request pinRequest, pin MainPin) (PinDecisio
 	return PinDecision{Commit: pin.Commit, Why: fmt.Sprintf("%s changed %d lines since the pin, under %d", request.ref, lines, PinMoveLines)}, nil
 }
 
+// revRange is two commits a diff runs between.
+type revRange struct {
+	from, to string
+}
+
 // changedLines is `git diff --shortstat from to`'s insertions plus deletions.
-func changedLines(ctx context.Context, request pinRequest, from, to string) (int, error) {
+func changedLines(ctx context.Context, request pinRequest, revs revRange) (int, error) {
 	var out bytes.Buffer
-	spec := commandSpec{name: "git", args: []string{"diff", "--shortstat", from, to}, dir: request.root}
+	spec := commandSpec{name: "git", args: []string{"diff", "--shortstat", revs.from, revs.to}, dir: request.root}
 	if err := request.run(ctx, spec, &out); err != nil {
 		return 0, err
 	}

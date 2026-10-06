@@ -73,6 +73,32 @@ func readEnvValue(body, key string) string {
 	return value
 }
 
+// unusableSecretKeys is the gateway secret keys body leaves unset or too short, sorted.
+func unusableSecretKeys(body string) []string {
+	substituted := []string{}
+	for _, key := range GatewaySecretKeys {
+		if !usableSecret(readEnvValue(body, key)) {
+			substituted = append(substituted, key)
+		}
+	}
+	sort.Strings(substituted)
+	return substituted
+}
+
+// commentOutAssignments comments the assignments of keys out rather than
+// deleting them, so the worktree still shows what the developer's own file said.
+func commentOutAssignments(lines, keys []string) []string {
+	for index, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		for _, key := range keys {
+			if strings.HasPrefix(trimmed, key+"=") {
+				lines[index] = "# visualdiff replaced this placeholder: " + line
+			}
+		}
+	}
+	return lines
+}
+
 // EnsureGatewaySecrets gives one worktree's .env a usable gateway trio, and
 // reports the keys it had to substitute — empty when the developer's own values
 // already pass. Writes nothing when there is nothing to fix, and never touches a
@@ -88,28 +114,11 @@ func EnsureGatewaySecrets(dir, seed string) ([]string, error) {
 	}
 
 	body := string(raw)
-	substituted := []string{}
-	for _, key := range GatewaySecretKeys {
-		if !usableSecret(readEnvValue(body, key)) {
-			substituted = append(substituted, key)
-		}
-	}
+	substituted := unusableSecretKeys(body)
 	if len(substituted) == 0 {
 		return nil, nil
 	}
-	sort.Strings(substituted)
-
-	// Comment the unusable assignments out rather than deleting them, so the
-	// worktree still shows what the developer's own file said.
-	lines := strings.Split(body, "\n")
-	for index, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		for _, key := range substituted {
-			if strings.HasPrefix(trimmed, key+"=") {
-				lines[index] = "# visualdiff replaced this placeholder: " + line
-			}
-		}
-	}
+	lines := commentOutAssignments(strings.Split(body, "\n"), substituted)
 
 	appended := []string{"", "# Added by visualdiff: the gateway's all-or-none check needs " +
 		fmt.Sprintf("%d+ characters, and this worktree's .env carried none usable.", MinGatewaySecretLength),

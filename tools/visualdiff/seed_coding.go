@@ -57,27 +57,27 @@ func seedCodingSessions(ctx context.Context, request flowSeedRequest) (map[strin
 func codingSessionLogs(now int64) []map[string]any {
 	minute := int64(60_000)
 	alpha := []map[string]any{
-		logRecord(now-9*minute, sessionContextEvent, CodingSessionAlpha, map[string]any{
+		logRecord(logEvent{atMs: now - 9*minute, event: sessionContextEvent, sessionID: CodingSessionAlpha}, map[string]any{
 			"coding_agent.name": "claude_code", "vcs.repository.host": "github.com",
 			"vcs.repository.owner": CodingRepoOwner, "vcs.repository.name": CodingRepoName,
 			"vcs.ref.head.name": CodingAlphaBranch, "langwatch.session.name": CodingAlphaTitle,
 		}),
-		inTrace(logRecord(now-8*minute, "claude_code.user_prompt", CodingSessionAlpha, map[string]any{
+		inTrace(logRecord(logEvent{atMs: now - 8*minute, event: "claude_code.user_prompt", sessionID: CodingSessionAlpha}, map[string]any{
 			"prompt": "Make the visual diff seed deterministic", "prompt_length": 39, "prompt.id": "vd-prompt-1",
 		}), codingAlphaTraceID),
-		logRecord(now-7*minute, "claude_code.api_request", CodingSessionAlpha, map[string]any{
+		logRecord(logEvent{atMs: now - 7*minute, event: "claude_code.api_request", sessionID: CodingSessionAlpha}, map[string]any{
 			"model": "claude-sonnet-4-20250514", "input_tokens": 1200, "output_tokens": 340,
 			"cache_read_tokens": 800, "cache_creation_tokens": 100, "cost_usd": 0.012,
 			"duration_ms": 2100, "prompt.id": "vd-prompt-1",
 		}),
 	}
 	beta := []map[string]any{
-		logRecord(now-6*minute, sessionContextEvent, CodingSessionBeta, map[string]any{
+		logRecord(logEvent{atMs: now - 6*minute, event: sessionContextEvent, sessionID: CodingSessionBeta}, map[string]any{
 			"coding_agent.name": "codex", "vcs.repository.host": "github.com",
 			"vcs.repository.owner": CodingRepoOwner, "vcs.repository.name": CodingRepoName,
 			"vcs.ref.head.name": CodingBetaFirstRef, "langwatch.session.name": CodingBetaTitle,
 		}),
-		logRecord(now-3*minute, sessionContextEvent, CodingSessionBeta, map[string]any{
+		logRecord(logEvent{atMs: now - 3*minute, event: sessionContextEvent, sessionID: CodingSessionBeta}, map[string]any{
 			"coding_agent.name": "codex", "vcs.repository.host": "github.com",
 			"vcs.repository.owner": CodingRepoOwner, "vcs.repository.name": CodingRepoName,
 			"vcs.ref.head.name": CodingBetaBranch, "langwatch.session.name": CodingBetaTitle,
@@ -125,9 +125,17 @@ func codingSessionSpans(now int64) []map[string]any {
 	}}
 }
 
+// logEvent is when a log record happened, its event name and its session.
+type logEvent struct {
+	atMs      int64
+	event     string
+	sessionID string
+}
+
 // logRecord is one OTLP log record: event.name and session.id ride as attributes,
 // the way both agents and the hook send them.
-func logRecord(atMs int64, event, sessionID string, attributes map[string]any) map[string]any {
+func logRecord(at logEvent, attributes map[string]any) map[string]any {
+	atMs, event, sessionID := at.atMs, at.event, at.sessionID
 	list := []map[string]any{otlpAttribute("event.name", event), otlpAttribute("session.id", sessionID)}
 	for key, value := range attributes {
 		list = append(list, otlpAttribute(key, value))
