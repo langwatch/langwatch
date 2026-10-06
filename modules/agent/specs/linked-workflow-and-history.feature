@@ -58,7 +58,7 @@ Feature: Agent coordinates linked workflows and history through their owners
     And the Agent repository refuses a mismatched association
     And Workflow imports no Agent repository or generated Agent delegate
 
-  @architecture @composition
+  @unit @architecture @composition
   Scenario: Missing peer implementations fail boot
     Given Agent declares WorkflowApi and AuditLogApi as dependencies
     When a process boots without either implementation

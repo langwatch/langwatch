@@ -21,6 +21,7 @@ Feature: Canonical OTLP metric processing
     And invalid points are counted as permanent rejections
     And the response preserves the existing partial-success error mapping
 
+  @integration
   Scenario: Metric projections preserve the four existing tables and rollup width
     Given a canonical metric data point for a known series
     When the metric event projections process it

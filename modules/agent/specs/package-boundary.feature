@@ -125,7 +125,7 @@ Feature: Agents package boundary
     And named root entries expose controlled management and editor composition
     And the package has no nested private feature buckets or forwarding classes
 
-  @architecture @web
+  @unit @architecture @web
   Scenario: Agent owns reusable editor presentation
     Given the Agent Management screen, history drawer, type selector, and editors are package-owned
     Then the browser application composes their project, route, transport, replication targets, and notices
@@ -187,7 +187,7 @@ Feature: Agents package boundary
     When the persisted mapping set is empty
     Then the app-supplied default mappings are shown instead
 
-  @web @http-agent
+  @unit @web @http-agent
   Scenario: HTTP request testing preserves the compatibility result
     Given an HTTP agent editor has a configured endpoint and headers
     When the user tests the request

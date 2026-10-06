@@ -65,7 +65,7 @@ Feature: Provider-neutral entitlement resolution
     Then the operator's address is read from the user directory before any source sees it
     And a request with no operator acting as the caller resolves the organization's own limitations
 
-  @architecture @typecheck
+  @unit @architecture @typecheck
   Scenario: Provider details do not cross the contract
     Given Billing or Licensing supplies a plan
     Then the resulting value contains only Entitlements contract fields

@@ -32,6 +32,7 @@ Feature: Experiment service boundary
     Then the Experiment service validates the Zod 4 value
     And uses its private ClickHouse repository
 
+  @integration
   Scenario: Batch-result presentation remains controlled and portable
     Given app transport has loaded experiment run values
     When it renders batch results
