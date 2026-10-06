@@ -3,7 +3,7 @@
   "findings": {
     "`*-composition.build.ts` files": 2,
     "`*.members.ts` files": 2,
-    "`reads(...)` statics and `static readonly reads`": 38,
+    "`reads(...)` statics and `static readonly reads`": 35,
     "`refusing*` twins": 9,
     "<UiSlot>": 8,
     "absence classes (`Logged*Absence`, `Absent*`)": 4,
@@ -17,7 +17,7 @@
     "MemberName": 16,
     "membersFrom": 4,
     "MemberSource": 21,
-    "MembersRead": 22,
+    "MembersRead": 15,
     "MissingSupply": 9,
     "noMembers": 4,
     "per-module `use-feature-flag.ts` copies": 2,
