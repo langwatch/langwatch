@@ -5,6 +5,7 @@
 import { EventEmitter } from "node:events";
 
 import { type AgentApi, AgentNotFoundError } from "@langwatch/agent-contract";
+import { RawSocketProtocol } from "@langwatch/api";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -171,6 +172,40 @@ describe("given the scenario module installed on the worker role", () => {
     const { unrun } = await installedOn("worker");
 
     expect(unrun).toEqual([]);
+  });
+});
+
+describe("given the scenario module installed with a raw-socket host open", () => {
+  /** @scenario "A worker's boot plan always includes the voice media listener" */
+  it("mounts the voice media listener on the worker, whatever else its environment holds", async () => {
+    const doors: object[] = [];
+
+    const runtime = await process("worker", new EventEmitter())
+      .withEventing(eventingFor("worker"))
+      .expose(() => ({
+        hosts: { rawsocket: { mount: (declaration) => doors.push(declaration) } },
+        serve: () => undefined,
+      }))
+      .boot();
+    await runtime.stop();
+
+    expect(doors).toHaveLength(1);
+    expect(doors[0]).toBeInstanceOf(RawSocketProtocol);
+  });
+
+  it("leaves the voice media listener off the api role", async () => {
+    const doors: object[] = [];
+
+    const runtime = await process("api", new EventEmitter())
+      .withEventing(eventingFor("api"))
+      .expose(() => ({
+        hosts: { rawsocket: { mount: (declaration) => doors.push(declaration) } },
+        serve: () => undefined,
+      }))
+      .boot();
+    await runtime.stop();
+
+    expect(doors).toEqual([]);
   });
 });
 
