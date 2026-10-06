@@ -32,6 +32,23 @@ Feature: Shared Dashboard service
     Then the graph spans half the grid's width and three rows
 
   @unit
+  Scenario: A graph created over tRPC without a size keeps the grid's default of four by three
+    When a client creates a graph through the graphs tRPC namespace without a size
+    Then the graph spans four columns and three rows
+
+  @unit
+  Scenario: A graph created over REST without a size is 1 by 1, as on main
+    When a client posts a graph to /api/graphs without colSpan or rowSpan
+    Then the response gives colSpan 1 and rowSpan 1
+    And a size the caller sent is kept
+
+  @unit
+  Scenario: A graph created over REST without a size reads back, lists and renames at 1 by 1
+    Given a graph posted to /api/graphs without colSpan or rowSpan
+    When the graph is read by id, listed and patched with a new name
+    Then each response gives colSpan 1 and rowSpan 1
+
+  @unit
   Scenario: A graph can be resized across the whole eight-column grid
     Given a graph on a dashboard
     When the grid resizes it to span all eight columns
