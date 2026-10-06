@@ -9,7 +9,7 @@ import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { WithTestAuthHost } from "../../../testing.tsx";
-import { FEDERATED_LOGOUT_PATH, SignInError } from "../sign-in-error-screen.tsx";
+import ErrorScreen, { FEDERATED_LOGOUT_PATH, SignInError } from "../sign-in-error-screen.tsx";
 
 function renderError(error: string, extra: Record<string, string> = {}) {
   return render(
@@ -184,5 +184,28 @@ describe("given one of the assertion refusals the boundary admits", () => {
     renderError("validation_error");
 
     expect(screen.getAllByText(/Something went wrong signing you in/i).length).toBeGreaterThan(0);
+  });
+});
+
+describe("given a sign-in fails for a reason the person has to act on", () => {
+  /** @scenario "The sign-in error screen is the same card as the door it came from" */
+  it("draws the refusal on the auth card over the front door's ground, with no code shown", () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/auth/error?error=OAuthAccountNotLinked"]}>
+        <DesignSystemProvider forcedTheme="light">
+          <WithTestAuthHost
+            route={{ pathname: "/auth/error", query: { error: "OAuthAccountNotLinked" } }}
+          >
+            <ErrorScreen />
+          </WithTestAuthHost>
+        </DesignSystemProvider>
+      </MemoryRouter>,
+    );
+
+    expect(container.querySelector("[data-auth-card]")).toBeTruthy();
+    expect(screen.getByTestId("front-door-ambient")).toBeTruthy();
+    expect(screen.getByText("Account already exists")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /sign out.*try again/i })).toBeTruthy();
+    expect(document.body.textContent).not.toContain("OAuthAccountNotLinked");
   });
 });
