@@ -82,3 +82,18 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Gate hook (D5): KEEP the withUpgradeGate preamble step in packages/process for api and worker.
 - Stripe channel (Q69): PER-SUBJECT channels (customers, subscriptions, invoices, prices, webhooks), each with a memory twin, over one client billing builds once; about four lanes (handoff a-billing-governance §11).
 - Inline evals (instant-eval-billing :210): CHECK first whether a synchronous SELECT eval(...) returns verdicts on this branch; if not, it is a wider regression and returns to Alex with options.
+
+## Round 12 (C, D6, D7, D8, D9)
+
+- Lock guard (D6): KEEP the guard (refuse lock-heavy shapes; lock_timeout)
+- CI gates (D7): KEEP all four gates
+- Cloud floor (D8): WAIT on cloud too
+- Manifests (D9): KEEP manifests in packages/upgrade
+
+## Round 13 (C, D10, D11, Q-U5, Q-U10)
+
+- First floor (D10): NEWEST release at merge (3.20.1 today)
+- Collisions (D11): KEYS and the migration-order check; no checksum file
+- Floor rules (Q-U5): BOTH rules (floor refusal and background re-run)
+- Org admins (Q-U10): NO org surface; platform operators only
+- Inline eval (regression found 2026-10-06 late; instant-eval-billing :210, eval-functions.feature): RESTORE synchronous judging as main had it. Analytics calls an InstantEvalApi judge operation from the query path, holds queryTokenBudget around it and records spend; main's 15 removed eval-functions scenarios and its instantEvalQueries tests come back; the sync path also hydrates extraction (conversation()). The branch's "a query never judges" spec rewrite (0e1bd32357) had no ruling and is reverted.
