@@ -443,7 +443,7 @@ export function composeApiApplication(
 
   // An address under this prefix that nothing serves is the API's own 404,
   // never a page the browser application would try to route.
-  root.all("*", (context) => context.json({ error: "not_found" }, 404));
+  root.all("*", (context) => context.json({ error: "Not Found" }, 404));
 
   return root;
 }
