@@ -131,6 +131,7 @@ import {
   LangyGithubPrQuotaService,
 } from "../services/langy-github-pr-quota.service.ts";
 import { LangyGithubTurnTokenService } from "../services/langy-github-turn-token.service.ts";
+import { LangyGuidedKickoffService } from "../services/langy-guided-kickoff.service.ts";
 import { LangyGuidedOnboardingService } from "../services/langy-guided-onboarding.service.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
 import { LocalControlConnectionService } from "../services/langy-local-control-connection.service.ts";
@@ -529,6 +530,7 @@ export class LangyModule implements LangyApiContract {
         context: { render: renderLangyTurnContext },
         uiActionSurface: LangyUiActionSurfaceService.create(dependencies.featureFlags),
         skillGates: LangySkillGatesService.create(dependencies.featureFlags),
+        guidedKickoff: LangyGuidedKickoffService.create({ onboarding: dependencies.onboarding }),
         metrics: { count: () => undefined },
         accessStore: repositories.turnAccess,
         handoffStore: repositories.turnHandoff,

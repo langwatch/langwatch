@@ -1,22 +1,22 @@
-/**
- * The kickoff message the tour hands to Langy: the typed part the panel
- * renders, the brief the model reads, and what the panel does with each.
- *
- * @see specs/langy/langy-guided-onboarding.feature
- */
-import { GUIDED_ONBOARDING_KICKOFF_PART_TYPE } from "@langwatch/onboarding-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   buildGuidedKickoffBrief,
   buildGuidedKickoffParts,
   type GuidedKickoffInput,
-  guidedKickoffPartOf,
+  findGuidedKickoffParts,
   guidedKickoffStateFactsOf,
   guidedTourCardRows,
   planGuidedKickoffSend,
   settleGuidedKickoffParts,
-} from "../kickoff.ts";
+} from "../onboarding-guided-kickoff.ts";
+/**
+ * The kickoff message the tour hands to Langy: the typed part the panel
+ * renders, the brief the model reads, and what the panel does with each.
+ *
+ * @see specs/langy/langy-guided-onboarding.feature
+ */
+import { GUIDED_ONBOARDING_KICKOFF_PART_TYPE } from "../onboarding-guided-paths.ts";
 
 const KICKOFF: GuidedKickoffInput = {
   path: "llmops",
@@ -37,7 +37,7 @@ describe("the guided onboarding kickoff", () => {
       expect(part).toEqual({ type: GUIDED_ONBOARDING_KICKOFF_PART_TYPE, ...KICKOFF });
       expect(text.type).toBe("text");
       expect(text.text).toBe(buildGuidedKickoffBrief({ input: KICKOFF }));
-      expect(guidedKickoffPartOf([part, text])).toEqual(part);
+      expect(findGuidedKickoffParts([part, text])).toEqual([part]);
     });
 
     /** @scenario "The brief tells the model everything the takeover collected" */
@@ -137,8 +137,7 @@ describe("the guided onboarding kickoff", () => {
       const [typed, brief] = buildGuidedKickoffParts({ input: KICKOFF });
       const facts = guidedKickoffStateFactsOf({ provider: "Anthropic", providerModel: "claude" });
       const settled = settleGuidedKickoffParts({ parts: [typed, brief], facts });
-      expect(settled).not.toBeNull();
-      const settledPart = guidedKickoffPartOf(settled!);
+      const [settledPart] = findGuidedKickoffParts(settled);
       expect(settledPart?.provider).toBe("Anthropic");
       expect(settledPart?.providerModel).toBe("claude");
     });
@@ -146,7 +145,7 @@ describe("the guided onboarding kickoff", () => {
     /** @scenario "The settled Virtual key line tells Langy what to do with the reveal" */
     it("settles the Virtual key line from the stored key, or to none minted", () => {
       const parts = buildGuidedKickoffParts({ input: KICKOFF });
-      const textOf = (settled: unknown[] | null) => JSON.stringify(settled);
+      const textOf = (settled: unknown[]) => JSON.stringify(settled);
       const withKey = textOf(
         settleGuidedKickoffParts({
           parts,
@@ -168,10 +167,9 @@ describe("the guided onboarding kickoff", () => {
       expect(withoutKey).not.toContain("secret_snippet");
     });
 
-    it("returns null when the parts carry no kickoff", () => {
-      expect(
-        settleGuidedKickoffParts({ parts: [{ type: "text", text: "hi" }], facts: { paths: [] } }),
-      ).toBeNull();
+    it("returns the parts as they were when they carry no kickoff", () => {
+      const parts = [{ type: "text", text: "hi" }];
+      expect(settleGuidedKickoffParts({ parts, facts: { paths: [] } })).toEqual(parts);
     });
   });
 

@@ -3,13 +3,14 @@
  * tour ends: a typed part the panel renders as the tour card, plus a text
  * brief the model reads. @see specs/langy/langy-guided-onboarding.feature
  */
+import { z } from "zod";
+
 import {
   GUIDED_ONBOARDING_KICKOFF_PART_TYPE,
   GUIDED_PATH_TITLES,
   type GuidedPath,
   guidedPathSchema,
-} from "@langwatch/onboarding-contract";
-import { z } from "zod";
+} from "./onboarding-guided-paths.ts";
 
 export const GUIDED_ONBOARDING_SKILL_NAME = "guided-onboarding";
 
@@ -86,15 +87,14 @@ export function parseGuidedKickoffPart(part: unknown): GuidedKickoffPart | null 
   return parsed.success ? parsed.data : null;
 }
 
-/** The kickoff part a message carries, or null when it is not a kickoff. */
-export function guidedKickoffPartOf(
-  parts: readonly unknown[] | undefined,
-): GuidedKickoffPart | null {
+/** The kickoff parts a message carries: none when it is not a kickoff. */
+export function findGuidedKickoffParts(parts: readonly unknown[] | undefined): GuidedKickoffPart[] {
+  const kickoffs: GuidedKickoffPart[] = [];
   for (const part of parts ?? []) {
     const kickoff = parseGuidedKickoffPart(part);
-    if (kickoff) return kickoff;
+    if (kickoff) kickoffs.push(kickoff);
   }
-  return null;
+  return kickoffs;
 }
 
 /** "Let's set up Gateway then." */
@@ -160,6 +160,9 @@ export function buildGuidedKickoffBrief({
   return lines.join("\n");
 }
 
+/** The typed part first, the text brief second. */
+export type GuidedKickoffParts = [GuidedKickoffPart, { type: "text"; text: string }];
+
 /**
  * The message parts, in the order they are sent: the typed part first so the
  * panel finds it, the brief second so the model reads it.
@@ -170,7 +173,7 @@ export function buildGuidedKickoffParts({
 }: {
   input: GuidedKickoffInput;
   continuing?: boolean;
-}): [GuidedKickoffPart, { type: "text"; text: string }] {
+}): GuidedKickoffParts {
   return [
     { type: GUIDED_ONBOARDING_KICKOFF_PART_TYPE, ...input },
     { type: "text", text: buildGuidedKickoffBrief({ input, continuing }) },
@@ -200,7 +203,7 @@ function settleInput({
 /**
  * The kickoff parts with their state lines settled from `facts`: the typed
  * part carries the settled fields and the brief is rebuilt from them, so the
- * card and the model agree. Null when the parts carry no kickoff.
+ * card and the model agree. Parts that carry no kickoff come back as they were.
  */
 export function settleGuidedKickoffParts({
   parts,
@@ -208,9 +211,9 @@ export function settleGuidedKickoffParts({
 }: {
   parts: readonly unknown[];
   facts: GuidedKickoffStateFacts;
-}): unknown[] | null {
-  const kickoff = guidedKickoffPartOf(parts);
-  if (!kickoff) return null;
+}): unknown[] {
+  const [kickoff] = findGuidedKickoffParts(parts);
+  if (!kickoff) return [...parts];
   const { type: _type, ...sent } = kickoff;
   const continuation = guidedPathContinuationLine(kickoff.path);
   const continuing = parts.some(
@@ -238,7 +241,7 @@ export function planGuidedKickoffSend({
   organizationId: string | null;
 }): {
   continuing: boolean;
-  parts: ReturnType<typeof buildGuidedKickoffParts>;
+  parts: GuidedKickoffParts;
   brief: string;
   attachToOrganizationId: string | null;
 } {

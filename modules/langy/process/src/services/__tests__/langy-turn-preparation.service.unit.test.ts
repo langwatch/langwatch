@@ -6,6 +6,13 @@ import {
   langyWorkerCredentialsSchema,
   renderLangyTurnContext,
 } from "@langwatch/langy-contract";
+import {
+  buildGuidedKickoffParts,
+  findGuidedKickoffParts,
+  type GuidedKickoffInput,
+  type OnboardingApi,
+} from "@langwatch/onboarding-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -19,6 +26,8 @@ import type {
   LangyWorkerDispatchInput,
   LangyWorkerProbeInput,
 } from "../../channels/langy-worker.channel.ts";
+import type { LangyConversationService } from "../langy-conversation.service.ts";
+import { LangyGuidedKickoffService } from "../langy-guided-kickoff.service.ts";
 import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
 
 /**
@@ -30,7 +39,9 @@ function makeFixture(over: LangyTurnDepsOverrides = {}) {
   );
   const findPendingHandoff = vi.fn(async () => null);
   const dispatch = vi.fn<LangyWorker["dispatch"]>(async () => "accepted");
-  const acceptTurn = vi.fn(async () => ({ turnId: "turn-1" }));
+  const acceptTurn = vi.fn(
+    async (_input: Parameters<LangyConversationService["acceptTurn"]>[0]) => ({ turnId: "turn-1" }),
+  );
 
   const deps = langyTurnDeps({
     conversations: {
@@ -780,5 +791,100 @@ describe("when the conversation's runToken cannot be resolved", () => {
     ).rejects.toBeInstanceOf(LangyAgentUnavailableError);
 
     expect(fixture.dispatch).not.toHaveBeenCalled();
+  });
+
+  describe("given the panel composed the kickoff before the tour's key was recorded", () => {
+    const snapshot: GuidedKickoffInput = {
+      path: "gateway",
+      paths: ["gateway"],
+      orgName: "Acme",
+      firstName: "Ada",
+      tourStatus: "completed",
+    };
+    const stored = {
+      paths: ["gateway" as const, "llmops" as const],
+      donePaths: [],
+      provider: "OpenAI",
+      providerModel: "gpt-5",
+      gatewayUrl: "https://gateway.example/v1",
+      virtualKeyName: "production-app",
+      virtualKeyPreview: "vk-lw-abc",
+      virtualKeyRevealId: "reveal-1",
+      variant: "guided" as const,
+    };
+    const kickoffInput = () => ({
+      ...input,
+      messages: [
+        { role: "user" as const, parts: [...buildGuidedKickoffParts({ input: snapshot })] },
+      ],
+    });
+    const start = async (getGuidedState: OnboardingApi["getGuidedState"]) => {
+      const kickoff = LangyGuidedKickoffService.create({
+        onboarding: createApiFixture<OnboardingApi>({ getGuidedState }, "onboarding"),
+      });
+      const fixture = makeFixture({ guidedKickoff: { settle: (args) => kickoff.settle(args) } });
+      await LangyTurnService.create(fixture.deps).startConversationTurn(kickoffInput());
+      const accepted = fixture.acceptTurn.mock.calls[0]?.[0];
+      return { fixture, parts: accepted?.userMessage?.parts ?? [] };
+    };
+
+    /** @scenario "The brief's state lines are settled on the server from the stored guided state" */
+    it("records the kickoff with the stored key, picks, provider and gateway, keeping the panel's own facts", async () => {
+      const getGuidedState = vi.fn(async () => stored);
+
+      const { parts } = await start(getGuidedState);
+
+      expect(getGuidedState).toHaveBeenCalledWith({
+        organizationId: "organization-1",
+        userId: "user-1",
+      });
+      const [recorded] = findGuidedKickoffParts(parts);
+      expect(recorded).toMatchObject({
+        virtualKeyName: "production-app",
+        virtualKeyPreview: "vk-lw-abc",
+        virtualKeyRevealId: "reveal-1",
+        paths: ["gateway", "llmops"],
+        provider: "OpenAI",
+        providerModel: "gpt-5",
+        gatewayUrl: "https://gateway.example/v1",
+        orgName: "Acme",
+        firstName: "Ada",
+        tourStatus: "completed",
+      });
+      expect(JSON.stringify(parts)).toContain("reveal id reveal-1");
+    });
+
+    /** @scenario "The prompt the model reads is the settled brief, not the panel's snapshot" */
+    it("hands the worker a prompt with the settled Virtual key line and never none minted", async () => {
+      const { fixture } = await start(vi.fn(async () => stored));
+
+      const prompt = fixture.dispatch.mock.calls[0]?.[0].prompt;
+      expect(prompt).toContain(
+        "Virtual key: production-app is live (preview vk-lw-abc, reveal id reveal-1)",
+      );
+      expect(prompt).not.toContain("none minted");
+    });
+
+    /** @scenario "The turn text of the kickoff message is the brief alone" */
+    it("reads the brief as the turn text and nothing of the typed part", async () => {
+      const { fixture, parts } = await start(vi.fn(async () => stored));
+
+      const brief = (parts[1] as { text: string }).text;
+      const prompt = fixture.dispatch.mock.calls[0]?.[0].prompt ?? "";
+      expect(prompt.endsWith(brief)).toBe(true);
+      expect(prompt).not.toContain("guided-onboarding-kickoff");
+    });
+
+    /** @scenario "A kickoff the guided state cannot be read for goes out as the panel composed it" */
+    it("sends the kickoff as composed when the guided state cannot be read", async () => {
+      const { fixture, parts } = await start(
+        vi.fn(async () => {
+          throw new Error("guided state unavailable");
+        }),
+      );
+
+      expect(fixture.dispatch).toHaveBeenCalledOnce();
+      expect(parts).toEqual(buildGuidedKickoffParts({ input: snapshot }));
+    });
   });
 });

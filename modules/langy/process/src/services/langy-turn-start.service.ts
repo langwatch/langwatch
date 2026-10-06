@@ -179,6 +179,37 @@ export class LangyTurnStartService {
     };
   }
 
+  /**
+   * The last user message with a guided kickoff's state lines settled from the stored guided
+   * state, so the recorded message and the prompt agree. Other turns pass through untouched.
+   */
+  private async settleKickoff({
+    input,
+    request,
+    organizationId,
+  }: {
+    input: StartConversationTurnInput;
+    request: ReturnType<LangyTurnStartService["prepareRequest"]>;
+    organizationId: string;
+  }) {
+    const { lastUserMessage } = request;
+    if (!this.deps.guidedKickoff || lastUserMessage?.role !== "user") {
+      return { messages: input.messages, lastUserMessage, userText: request.userText };
+    }
+    const parts = await this.deps.guidedKickoff.settle({
+      parts: lastUserMessage.parts,
+      organizationId,
+      userId: request.userId,
+    });
+    const settledMessage = { ...lastUserMessage, parts };
+
+    return {
+      messages: [...input.messages.slice(0, -1), settledMessage],
+      lastUserMessage: settledMessage,
+      userText: extractLangyTextFromParts(parts),
+    };
+  }
+
   private async runClaimedTurn({
     input,
     request,
@@ -206,13 +237,18 @@ export class LangyTurnStartService {
       this.deps,
     );
     try {
+      const settled = await this.settleKickoff({
+        input,
+        request,
+        organizationId: credentials.organizationId,
+      });
       return await this.preparation.prepareAndDispatch({
         projectId: input.projectId,
         userId: request.userId,
         session: input.session,
-        messages: input.messages,
-        lastUserMessage: request.lastUserMessage,
-        userText: request.userText,
+        messages: settled.messages,
+        lastUserMessage: settled.lastUserMessage,
+        userText: settled.userText,
         identity: request.identity,
         isRetry: input.isRetry,
         turnContext: input.turnContext,

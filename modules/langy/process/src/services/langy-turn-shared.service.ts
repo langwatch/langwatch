@@ -18,6 +18,7 @@ import type { LangyTurnAdmissionRepository } from "../repositories/langy-turn-ad
 import type { LangyConversationService } from "./langy-conversation.service.ts";
 import type { LangyCredentialService } from "./langy-credential.service.ts";
 import type { LangyFinalPartsService } from "./langy-final-parts.service.ts";
+import type { LangyGuidedKickoffService } from "./langy-guided-kickoff.service.ts";
 import type { LangyModel } from "./langy-model.service.ts";
 import type { LangyPrompt } from "./langy-prompt-registry.service.ts";
 import type { LangySessionKey } from "./langy-session-key.service.ts";
@@ -82,6 +83,7 @@ export interface StartConversationTurnInput {
 
 export interface LangyTurnServiceDeps {
   finalParts?: LangyFinalPartsService;
+  guidedKickoff?: LangyGuidedKickoffService;
   conversations: LangyConversationService;
   credentials: LangyCredentialService;
   prompts?: LangyPrompt;
@@ -109,6 +111,7 @@ export type LangyTurnServiceDependencies = LangyTurnServiceDeps & {
 
 export type LangyTurnTechnicalMembers = {
   finalParts?: LangyFinalPartsService;
+  guidedKickoff?: LangyGuidedKickoffService;
   prompts?: LangyPrompt;
   promptProjectId?: string;
   models: LangyModel;

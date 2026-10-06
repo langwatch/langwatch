@@ -31,6 +31,7 @@ export function langyTurnDeps(over: LangyTurnDepsOverrides = {}): LangyTurnServi
   const rows = MemoryLangyRepositories.create();
   return {
     finalParts: optional(over.finalParts, "finalParts"),
+    guidedKickoff: optional(over.guidedKickoff, "guidedKickoff"),
     conversations: createApiFixture(over.conversations, "conversations"),
     credentials: createApiFixture(over.credentials, "credentials"),
     prompts: optional(over.prompts, "prompts"),

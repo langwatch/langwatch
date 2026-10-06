@@ -11,6 +11,7 @@ import {
   deriveLangyChoicesLockState,
   githubProgressFromToolParts,
 } from "@langwatch/langy-contract";
+import { findGuidedKickoffParts } from "@langwatch/onboarding-contract";
 import type { UIMessage } from "ai";
 import { Fragment, memo, type ReactNode, useMemo } from "react";
 
@@ -65,7 +66,6 @@ import {
   type GuidedPullRequest,
   guidedPathCompletedIn,
 } from "../../../guided-onboarding/model/guided-conversation.ts";
-import { guidedKickoffPartOf } from "../../../guided-onboarding/model/kickoff.ts";
 import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
 import { GuidedTourCard } from "./derived-cards/guided-tour-card.tsx";
 import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards.tsx";
@@ -186,7 +186,7 @@ function PlainMessage({
 }) {
   // The guided onboarding kickoff is a user message on the wire and the tour card on screen:
   // the brief it carries is for the model, never a bubble.
-  const kickoff = message.role === "user" ? guidedKickoffPartOf(message.parts) : null;
+  const [kickoff] = message.role === "user" ? findGuidedKickoffParts(message.parts) : [];
   if (kickoff) return <GuidedTourCard kickoff={kickoff} organizationId={organizationId} />;
   const text = messageText(message);
   if (!text && extractProposals(message).length === 0) return null;

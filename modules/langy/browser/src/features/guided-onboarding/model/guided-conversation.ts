@@ -5,9 +5,8 @@
  * @see specs/langy/langy-guided-onboarding.feature
  */
 import { githubStepsOf, parseLangwatchCommand, pullRequestUrlsIn } from "@langwatch/langy-contract";
+import { findGuidedKickoffParts } from "@langwatch/onboarding-contract";
 import { z } from "zod";
-
-import { guidedKickoffPartOf } from "./kickoff.ts";
 
 const messageSchema = z.object({
   role: z.string(),
@@ -40,7 +39,7 @@ function commandOf(part: ToolPart): string | undefined {
 }
 
 function kickoffMessage(message: MessageLike): boolean {
-  return message.role === "user" && guidedKickoffPartOf(message.parts) !== null;
+  return message.role === "user" && findGuidedKickoffParts(message.parts).length > 0;
 }
 
 /** Does this conversation run a guided path: a kickoff part in a user message? */
