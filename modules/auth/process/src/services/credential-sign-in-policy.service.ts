@@ -1,23 +1,23 @@
 import type { RoutingDecision } from "@langwatch/identity-contract";
 
 /** Where the proved address signs in, asked of the same router the front door asks. */
-export interface CredentialSignInRouting {
+interface CredentialSignInRouting {
   route(input: { identifier: string | null; breakGlass: boolean }): Promise<RoutingDecision>;
 }
 
 /** The connection's tenant, from the module that registered the connection. */
-export interface CredentialSignInConnections {
+interface CredentialSignInConnections {
   getOrganization(args: { connectionId: string }): Promise<{ organizationId: string }>;
 }
 
 /** Who still holds a way back in for an organization whose provider governs it. */
-export interface CredentialSignInRecoveryGrants {
+interface CredentialSignInRecoveryGrants {
   findGrants(args: {
     organizationId: string;
   }): Promise<readonly { userId: string; live: boolean }[]>;
 }
 
-export interface CredentialSignInPolicyDeps {
+interface CredentialSignInPolicyDeps {
   /** `null` where this process composed no sign-in routing directory: with
    *  nothing to route on, no organization connection can govern an address. */
   routing: CredentialSignInRouting | null;

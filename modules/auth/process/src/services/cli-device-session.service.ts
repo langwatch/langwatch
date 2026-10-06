@@ -29,26 +29,26 @@ export const DEVICE_CODE_TTL_SECONDS = 600; // 10 min
 /** Minimum poll interval the CLI should respect. */
 export const MIN_POLL_INTERVAL_SECONDS = 5;
 /** Access token lifetime. Short; refresh is the rotation path. */
-export const ACCESS_TOKEN_TTL_SECONDS = 60 * 60; // 1h
+const ACCESS_TOKEN_TTL_SECONDS = 60 * 60; // 1h
 /** Min seconds between successive `/exchange` polls per device_code. */
-export const POLL_RATE_LIMIT_SECONDS = 4;
+const POLL_RATE_LIMIT_SECONDS = 4;
 /**
  * How long one `/exchange` holds the exclusive redemption claim — longer than
  * the poll window, which only paces polls rather than fencing a slower
  * redemption, but short enough to free the code early if release is skipped.
  */
-export const EXCHANGE_CLAIM_SECONDS = 30;
+const EXCHANGE_CLAIM_SECONDS = 30;
 /**
  * Default refresh-token lifetime.
  */
 export const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 90; // 90d
 
-export type CliDeviceCodeStatus = "pending" | "approved" | "denied" | "expired";
+type CliDeviceCodeStatus = "pending" | "approved" | "denied" | "expired";
 
 /**
  * What the CLI is asking the browser to mint on approval.
  */
-export type CliCredentialType = "device_session" | "project_api_key";
+type CliCredentialType = "device_session" | "project_api_key";
 
 /**
  * Device metadata captured at `/exchange` so a person can recognise "Bob's MacBook Pro" in
@@ -133,7 +133,7 @@ export interface CliRefreshTokenRecord {
   parent_family_id?: string;
 }
 
-export interface CliAccessTokenRecord {
+interface CliAccessTokenRecord {
   user_id: string;
   organization_id: string;
   /** Mirror of the refresh record's field; see there. */

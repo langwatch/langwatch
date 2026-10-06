@@ -75,7 +75,7 @@ export type BetterAuthDeploymentIdentity = Readonly<{
 /** Better Auth's storage engine: the stock Prisma adapter over the module's
  *  own client, with the engine's sealed dialing documents opened on the way
  *  out — this is the one seam that dials with them (D09). */
-export class PrismaBetterAuthStorage extends BetterAuthStorage {
+class PrismaBetterAuthStorage extends BetterAuthStorage {
   static create(
     database: ProcessMembers["prisma"],
     encryption: ProcessMembers["encryption"],
@@ -158,7 +158,7 @@ export class ModuleBetterAuthFederation extends BetterAuthFederation {
 }
 
 /** Identity ceremonies over identity's `*Api`: a user delete erases, an account write attaches. */
-export class IdentityBetterAuthCeremonies extends BetterAuthIdentityCeremonies {
+class IdentityBetterAuthCeremonies extends BetterAuthIdentityCeremonies {
   static create(identity: Pick<IdentityApi, "ceremonies">): IdentityBetterAuthCeremonies {
     return new IdentityBetterAuthCeremonies(identity);
   }
@@ -235,7 +235,7 @@ export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
  * returns before the comparison reads, computes or logs anything, so this
  * absence costs exactly what the flag being off costs.
  */
-export class OffSignInRouterShadow extends SignInRouterShadow {
+class OffSignInRouterShadow extends SignInRouterShadow {
   static create(): OffSignInRouterShadow {
     return new OffSignInRouterShadow();
   }
@@ -261,7 +261,7 @@ export class OffSignInRouterShadow extends SignInRouterShadow {
  * Sign-up's address proofs, absent: no proof is live, so passkey sign-up refuses and no
  * confirmation link can be spent, answered as a dead link.
  */
-export class AbsentSignUpVerification implements SignUpVerification, SignUpAddressConfirmation {
+class AbsentSignUpVerification implements SignUpVerification, SignUpAddressConfirmation {
   static create(logger: Logger): AbsentSignUpVerification {
     return new AbsentSignUpVerification(logger);
   }
@@ -317,7 +317,7 @@ export function passwordResetSender(input: {
  * The arrival door, asked of the identity module per sign-in rather than
  * resolved once: the service reads the connection each time it decides.
  */
-export class IdentitySsoArrivals implements SsoArrivalApi {
+class IdentitySsoArrivals implements SsoArrivalApi {
   static create(identity: IdentityApi): IdentitySsoArrivals {
     return new IdentitySsoArrivals(identity);
   }
@@ -329,7 +329,7 @@ export class IdentitySsoArrivals implements SsoArrivalApi {
   }
 }
 
-export type BuildBetterAuthOptions = Readonly<{
+type BuildBetterAuthOptions = Readonly<{
   /** The deployment's browser-session identity; without it, no instance. */
   identity: BetterAuthDeploymentIdentity;
   /** Shared with the sign-in door, which names an ID token refused for its issuer. */

@@ -9,7 +9,7 @@ const SESSION_TOKEN_COOKIE = /(?:^|;\s*)([^=;\s]*session_token)=/g;
 type BrowserSessionOperations = Pick<AuthApi, "verifyBrowserSession" | "resolveBrowserSession">;
 
 /** Who a browser request's session cookie names: a caller, or nobody at all. */
-export type BrowserSessionCaller =
+type BrowserSessionCaller =
   | Readonly<{ kind: "caller"; caller: SessionCaller }>
   | Readonly<{ kind: "anonymous" }>;
 

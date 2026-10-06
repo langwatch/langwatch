@@ -50,4 +50,3 @@ export const signedUpEventSchema = event(SIGNED_UP_EVENT_TYPE, recordSignedUpCom
 export type SessionStartedEvent = z.infer<typeof sessionStartedEventSchema>;
 export type SsoAutoAddedEvent = z.infer<typeof ssoAutoAddedEventSchema>;
 export type SignedUpEvent = z.infer<typeof signedUpEventSchema>;
-export type AuthLifecycleEvent = SessionStartedEvent | SsoAutoAddedEvent | SignedUpEvent;

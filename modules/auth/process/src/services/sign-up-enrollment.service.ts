@@ -8,7 +8,7 @@ import {
 } from "@langwatch/identity-contract";
 import { type OrganizationApi, SignUpRestrictedError } from "@langwatch/organization-contract";
 
-export interface SignUpEnrollmentServiceDeps {
+interface SignUpEnrollmentServiceDeps {
   validateAddressProof(input: { token: string; email: string }): Promise<boolean>;
   /** An unconfirmed proof, live only while the installation cannot send email. */
   validateUnconfirmedAddressProof(input: { token: string; email: string }): Promise<boolean>;

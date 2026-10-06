@@ -30,7 +30,7 @@ export function signInFailureLocation({
 }
 
 /** What the boundary does with one redirect Better Auth answered. */
-export type SignInErrorRedirect =
+type SignInErrorRedirect =
   | { kind: "pass" }
   | { kind: "withhold"; code: string; description: string; location: string };
 

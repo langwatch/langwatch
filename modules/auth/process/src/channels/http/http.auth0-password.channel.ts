@@ -17,7 +17,7 @@ const logger = createLogger("langwatch:auth0:password");
  */
 const AUTH0_DB_CONNECTION = "Username-Password-Authentication";
 
-export type Auth0ErrorCode =
+type Auth0ErrorCode =
   | "insufficient_scope"
   | "not_configured"
   | "password_grant_not_enabled"
@@ -41,7 +41,7 @@ export class Auth0ApiError extends Error {
 /**
  * The Auth0 tenant this deployment manages passwords in, as its environment spells it.
  */
-export type Auth0ManagementCredentials = Readonly<{
+type Auth0ManagementCredentials = Readonly<{
   issuer: string | undefined;
   /**
    * Client ID for the Management API `client_credentials` grant.

@@ -3,7 +3,7 @@ import type { BrowserSession, BrowserSessionResolution } from "@langwatch/auth-c
 import type { QueryCacheKeyOwner } from "./query-cache-key.rules.ts";
 
 /** The session `GET /api/auth/session` publishes, field for field. */
-export type AuthSessionPollDocument = Readonly<{
+type AuthSessionPollDocument = Readonly<{
   session: Readonly<{ expiresAt: string }>;
   user: BrowserSession["user"];
   /** The keys this session's browser seals its mirrored reads under, this epoch's and the last. */

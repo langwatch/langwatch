@@ -56,7 +56,7 @@ const CLI_LOGIN_UNKNOWN_DEVICE_LABEL = "unknown-device";
 const GOVERNANCE_RELEASE_FLAG: FeatureFlagKey = "release_ui_ai_governance_enabled";
 
 /** The personal workspace a device session names. */
-export type CliPersonalWorkspace = Readonly<{
+type CliPersonalWorkspace = Readonly<{
   team: Readonly<{ id: string }>;
   project: Readonly<{ id: string; slug: string; name: string }>;
 }>;

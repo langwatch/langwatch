@@ -19,7 +19,7 @@ import type { SignInSecuritySettingsRepository } from "../repositories/sign-in-s
  */
 
 /** Who an address belongs to, if anybody. */
-export interface SignInLockoutDirectory {
+interface SignInLockoutDirectory {
   findUserIdFor(input: { identifier: string }): Promise<string | null>;
 }
 
@@ -36,7 +36,7 @@ export interface SignInLockoutEvidence {
   escalated(input: { userId: string | null; consecutiveLockouts: number }): Promise<void>;
 }
 
-export interface SignInLockoutDeps {
+interface SignInLockoutDeps {
   locks: SignInAttemptLockRepository;
   settings: SignInSecuritySettingsRepository;
   directory: SignInLockoutDirectory;

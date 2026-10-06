@@ -49,9 +49,7 @@ export type PasskeyCeremonyCaller =
   | { signedIn: true; user: { id: string; email: string } }
   | { signedIn: false };
 
-export type PasskeyCeremonySession = (
-  ctx: GenericEndpointContext,
-) => Promise<PasskeyCeremonyCaller>;
+type PasskeyCeremonySession = (ctx: GenericEndpointContext) => Promise<PasskeyCeremonyCaller>;
 
 /** What the sign-up screen bakes into the registration challenge. */
 const signUpContextSchema = z.object({

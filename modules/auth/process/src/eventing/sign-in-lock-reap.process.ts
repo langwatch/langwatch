@@ -11,13 +11,13 @@ export const signInLockReapSchema = z.object({
 export const signInLockReapStateSchema = z.object({
   lastReapAt: z.number().nullable(),
 });
-export type SignInLockReapState = z.infer<typeof signInLockReapStateSchema>;
+type SignInLockReapState = z.infer<typeof signInLockReapStateSchema>;
 
 export const SIGN_IN_LOCK_REAP_INITIAL_STATE: SignInLockReapState = {
   lastReapAt: null,
 };
 
-export type SignInLockReapIntents = {
+type SignInLockReapIntents = {
   reap: IntentSpec<typeof signInLockReapSchema>;
 };
 

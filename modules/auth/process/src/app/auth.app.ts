@@ -154,10 +154,10 @@ import {
  * The invitation a landing page reads, and the reissue request behind it. Both
  * run over the organization module's rows, so both arrive from the process.
  */
-export interface AuthInviteDirectory {
+type AuthInviteDirectory = {
   readLanding(input: Readonly<{ inviteCode: string }>): Promise<InviteLanding>;
   requestFresh(input: Readonly<{ inviteCode: string }>): Promise<void>;
-}
+};
 
 const logger = createLogger("langwatch:auth");
 
@@ -168,7 +168,7 @@ const AUTH_CLOSED_READS = ["encryption", "prisma", "redis"] as const;
  * Process-supplied infrastructure. Declared members required at boot;
  * front-door features need identity, organization, and notification peers.
  */
-export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
+type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
   Readonly<{
     /** The address the identifier ledger holds for a person, where it holds
      * one. `undefined` until the front-door wiring lane supplies identity's

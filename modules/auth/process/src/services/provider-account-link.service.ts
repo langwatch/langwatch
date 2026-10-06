@@ -14,7 +14,7 @@ export interface ProviderAccountWriter {
   createAccount(row: ProviderAccountRow): Promise<void>;
 }
 
-export interface ProviderAccountLinkServiceDeps {
+interface ProviderAccountLinkServiceDeps {
   issuers: Pick<SsoIssuerDirectory, "findIssuersForConnection">;
   accounts: ProviderAccountWriter;
 }

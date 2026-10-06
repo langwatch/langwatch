@@ -20,7 +20,7 @@ export interface LegacySsoAccessConnections {
   }): Promise<{ providerId: string }>;
 }
 
-export interface LegacySsoAccessServiceDeps {
+interface LegacySsoAccessServiceDeps {
   accounts: BetterAuthHooksRepository;
   memberships: LegacySsoAccessMemberships;
   connections: LegacySsoAccessConnections;

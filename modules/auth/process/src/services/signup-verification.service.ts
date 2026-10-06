@@ -24,7 +24,7 @@ import type { SignUpVerificationTokenRepository } from "../repositories/signup-v
  */
 
 /** What an address already is to us: no account, an unconfirmed one, or a confirmed one. */
-export type SignUpAddressState = "unknown" | "awaiting_confirmation" | "confirmed";
+type SignUpAddressState = "unknown" | "awaiting_confirmation" | "confirmed";
 
 export interface SignUpVerificationDeps {
   tokens: SignUpVerificationTokenRepository;

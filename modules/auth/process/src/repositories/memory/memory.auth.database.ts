@@ -17,7 +17,7 @@ export type MemoryStoredSession = Omit<
   };
 
 /** One confirmation token, exactly as the row holds it. */
-export type StoredVerificationToken = {
+type StoredVerificationToken = {
   identifier: string;
   token: string;
   expires: Instant;

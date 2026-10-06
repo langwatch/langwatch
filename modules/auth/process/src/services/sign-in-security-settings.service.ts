@@ -33,11 +33,11 @@ export interface SignInSecurityReleaseEvidence {
 }
 
 /** Ends the sessions already past a window just saved. */
-export interface SignInSecuritySessionSweep {
+interface SignInSecuritySessionSweep {
   endSessionsPastWindow(input: { userIds: readonly string[] }): Promise<number>;
 }
 
-export interface SignInSecuritySettingsDeps {
+interface SignInSecuritySettingsDeps {
   settings: SignInSecuritySettingsRepository;
   locks: SignInAttemptLockRepository;
   members: SignInSecurityMembers;

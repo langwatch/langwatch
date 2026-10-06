@@ -6,7 +6,7 @@ import type {
 import type { Auth0PasswordChannel } from "../channels/auth0-password.channel.ts";
 import type { BetterAuthHooksRepository } from "../repositories/better-auth-hooks.repository.ts";
 
-export interface FederatedPasswordServiceDeps {
+interface FederatedPasswordServiceDeps {
   accounts: Pick<BetterAuthHooksRepository, "findFederatedAccountsForUser">;
   auth0: Auth0PasswordChannel;
 }

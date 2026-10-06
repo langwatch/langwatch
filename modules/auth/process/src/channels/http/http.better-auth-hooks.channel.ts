@@ -742,7 +742,7 @@ export function createBeforeSessionCreateHook({
  * (D06). A federated callback records nothing here: its factors count only from a verified
  * token. specs/identity/mfa-and-session-shape.feature
  */
-export function localSignInAmr({ path }: { path: string | undefined }): readonly string[] {
+function localSignInAmr({ path }: { path: string | undefined }): readonly string[] {
   if (!path) return [];
   const reading = signInProviderForPath({ path });
   if (!reading.recognized) return [];
