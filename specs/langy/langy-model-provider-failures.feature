@@ -122,6 +122,47 @@ Feature: A turn that the model provider refused says so
       When the customer reads the card
       Then it says the model has no provider connected in this project
 
+  Rule: A provider that is not set up says which setting is missing
+
+    A third case, apart from a refusal and from having no provider: the
+    provider exists and is switched on, and it is missing something it needs to
+    make any call. The usual one is an API key that never got stored. The
+    gateway stops the call before it leaves, so no provider refused anything
+    and the same turn fails the same way until the setting is added.
+
+    The card says which setting is missing and links to the model provider
+    settings.
+    Only two things are read off the gateway's answer: which problem it named,
+    from a fixed set, and the model id. Its sentence is never shown.
+
+    @integration
+    Scenario: A provider with no API key saved reads as a key to add
+      Given a turn that failed because the provider for the chosen model has no API key saved
+      When the customer reads the card
+      Then it says the provider is enabled with no API key saved
+      And it links to the model provider settings
+      And it does not offer to try again
+
+    @integration
+    Scenario: Each missing provider setting has its own sentence
+      Given a turn that failed because the provider has no endpoint, or no deployment for the model
+      When the customer reads the card
+      Then it names the endpoint, or the deployment and the model, as the thing to add
+
+    @integration
+    Scenario: A provider setup failure with no named problem still points at the settings
+      Given a turn that failed with the gateway's provider setup code and no problem named
+      When the customer reads the card
+      Then it says no provider is configured for the model
+      And it links to the model provider settings
+
+    @integration
+    Scenario: The card never repeats what the gateway or the provider wrote
+      Given a turn that failed with the gateway's provider setup code
+      And the answer carries a message, and a problem this client does not know
+      When the customer reads the card
+      Then neither is shown
+
   Rule: A more specific failure keeps its own card
 
     An expired sign-in and a spent plan allowance are refusals too, but each

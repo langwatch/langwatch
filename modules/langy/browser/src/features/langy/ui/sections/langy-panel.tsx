@@ -503,6 +503,7 @@ function LangyPanel({
   const navigation = useLangyConversationNavigation({
     projectId,
     isBusy,
+    modelReady: model.modelQueriesSettled && !model.langyNeedsModel,
     send,
     resetEngine: engine.resetEngine,
     resetRecovery: failure.recovery.reset,

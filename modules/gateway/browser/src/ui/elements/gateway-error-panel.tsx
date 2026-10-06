@@ -1,6 +1,8 @@
 import { Box, Button, EmptyState, Text, VStack } from "@langwatch/design-system/primitives";
 import { AlertTriangle } from "lucide-react";
 
+import { isPermissionRefusal, PermissionRefusedNotice } from "./permission-required-notice.tsx";
+
 export type GatewayErrorPanelProps = {
   title?: string;
   error?: { message?: string } | null;
@@ -8,15 +10,22 @@ export type GatewayErrorPanelProps = {
 };
 
 /**
- * A consistent error surface for gateway list pages when the tRPC query
- * fails. Replaces the silent infinite-spinner anti-pattern where a page
- * branches on isLoading and never surfaces isError to the operator.
+ * A consistent error surface for gateway list pages when the tRPC query fails. A refusal for a
+ * grant the viewer does not hold is not a failed load: retrying cannot change it, so it renders
+ * as a no-access notice naming the grant, with no retry.
  */
 export function GatewayErrorPanel({
   title = "Failed to load data",
   error,
   onRetry,
 }: GatewayErrorPanelProps) {
+  if (isPermissionRefusal(error)) {
+    return (
+      <Box paddingY={6}>
+        <PermissionRefusedNotice error={error} />
+      </Box>
+    );
+  }
   const message =
     error?.message?.trim() ||
     "The request failed unexpectedly. Please try again or check the server logs.";

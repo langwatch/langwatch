@@ -13,6 +13,7 @@ import type { LangyPanelSend } from "./use-langy-panel-send.ts";
 export function useLangyConversationNavigation({
   projectId,
   isBusy,
+  modelReady,
   send,
   resetEngine,
   resetRecovery,
@@ -21,6 +22,8 @@ export function useLangyConversationNavigation({
 }: {
   projectId: string | undefined;
   isBusy: boolean;
+  /** Whether a model resolves for the project: a queued question waits until one does. */
+  modelReady: boolean;
   send: LangyPanelSend;
   resetEngine: (options: { clearMessages: boolean }) => void;
   resetRecovery: () => void;
@@ -53,9 +56,11 @@ export function useLangyConversationNavigation({
     resetChatEngine({ clearMessages: true });
     void send(prompt);
   });
+  // Sent with no model, the server refuses the turn and the question is lost, so it stays queued
+  // behind the setup card until a model resolves.
   useEffect(() => {
-    if (pendingPrompt && projectId && !isBusy) askQueuedPrompt(pendingPrompt);
-  }, [pendingPrompt, projectId, isBusy]);
+    if (pendingPrompt && projectId && !isBusy && modelReady) askQueuedPrompt(pendingPrompt);
+  }, [pendingPrompt, projectId, isBusy, modelReady]);
 
   // Messages are replaced by the selected history, so they are not blanked
   // here; picking one IS leaving the list.

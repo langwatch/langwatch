@@ -153,6 +153,44 @@ function buildModelsEndpointUrl(baseUrl: string, defaultBaseUrl: string): string
   return normalized.endsWith("/models") ? normalized : `${normalized}/models`;
 }
 
+/**
+ * Providers whose base URL the gateway rewrites before calling it: a trailing "/v1" and trailing
+ * slashes are dropped and the full "/v1/..." path appended (normalizeOpenAICompatBaseURL in
+ * services/aigateway/adapters/providers/bifrost.go).
+ */
+const GATEWAY_NORMALISED_BASE_URL_PROVIDERS: ReadonlySet<string> = new Set([
+  "openai",
+  "custom",
+  "anthropic",
+]);
+
+/** The models route the gateway's own normalisation of this base URL leads to. */
+function gatewayModelsEndpointUrl(baseUrl: string): string {
+  const root = baseUrl.replace(/\/+$/, "").replace(/\/v1$/, "").replace(/\/+$/, "");
+  return `${root}/v1/models`;
+}
+
+/**
+ * Every models URL worth asking for one credential: the one the gateway will use first, the
+ * as-typed one second for an endpoint whose models route sits outside the "/v1" convention.
+ */
+function modelsEndpointUrls({
+  provider,
+  baseUrl,
+  defaultBaseUrl,
+}: {
+  provider: string;
+  baseUrl: string;
+  defaultBaseUrl: string;
+}): string[] {
+  const asTyped = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
+  if (!baseUrl || !GATEWAY_NORMALISED_BASE_URL_PROVIDERS.has(provider)) {
+    return [asTyped];
+  }
+  const asDispatched = gatewayModelsEndpointUrl(baseUrl);
+  return asDispatched === asTyped ? [asTyped] : [asDispatched, asTyped];
+}
+
 const logger = createLogger("langwatch:api:providerValidation");
 
 /** Longest upstream explanation we keep for the server-side log line. */
@@ -423,6 +461,7 @@ type ProbeRequest = {
  * Every way a provider's credential can legitimately prove itself.
  */
 function buildProbeCandidates({
+  provider,
   strategy,
   apiKey,
   baseUrl,
@@ -430,6 +469,8 @@ function buildProbeCandidates({
   apiRoot,
   agentPlatform,
 }: {
+  /** The registry key, which decides how the gateway reads the base URL. */
+  provider: string;
   strategy: AuthStrategy;
   apiKey: string;
   baseUrl: string;
@@ -440,22 +481,21 @@ function buildProbeCandidates({
   agentPlatform?: { project: string; location: string };
 }): ProbeRequest[] {
   const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
+  const urls = modelsEndpointUrls({ provider, baseUrl, defaultBaseUrl });
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
 
   switch (strategy) {
     case "anthropic":
-      return [
-        {
-          url,
-          headers: {
-            ...headers,
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-          },
+      return urls.map((candidateUrl) => ({
+        url: candidateUrl,
+        headers: {
+          ...headers,
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
         },
-      ];
+      }));
     case "elevenlabs":
       return [{ url, headers: { ...headers, "xi-api-key": apiKey } }];
     case "gemini": {
@@ -510,12 +550,10 @@ function buildProbeCandidates({
     }
     case "bearer":
     default:
-      return [
-        {
-          url,
-          headers: { ...headers, Authorization: `Bearer ${apiKey}` },
-        },
-      ];
+      return urls.map((candidateUrl) => ({
+        url: candidateUrl,
+        headers: { ...headers, Authorization: `Bearer ${apiKey}` },
+      }));
   }
 }
 
@@ -931,6 +969,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
 
     return runProbeChain({
       candidates: buildProbeCandidates({
+        provider,
         strategy: authStrategy,
         apiKey,
         baseUrl,

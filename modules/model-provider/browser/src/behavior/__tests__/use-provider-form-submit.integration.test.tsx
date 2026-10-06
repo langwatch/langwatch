@@ -687,4 +687,92 @@ describe("useProviderFormSubmit()", () => {
       expect(payload).not.toHaveProperty("providerConfig");
     });
   });
+
+  // specs/model-providers/onboarding-flow.feature, "One write per save".
+  describe("given a first OpenAI provider with an API key and a base URL typed in", () => {
+    const openAiKeysSchema = z
+      .object({
+        OPENAI_API_KEY: z.string().nullable().optional(),
+        OPENAI_BASE_URL: z.string().nullable().optional(),
+      })
+      .passthrough();
+    const typedKeys = {
+      OPENAI_API_KEY: "sk-test-key",
+      OPENAI_BASE_URL: "https://llm.acme.test/v1",
+    };
+    const scopes = [{ scopeType: "ORGANIZATION" as const, scopeId: "org_test" }];
+
+    async function saveFirstProvider() {
+      const writesAtCompletion: number[] = [];
+      const snapshot = buildSnapshot({
+        provider: {
+          ...buildAzureProvider(),
+          provider: "openai",
+          enabled: false,
+          customKeys: null,
+          models: null,
+        },
+        name: "OpenAI",
+        isUsingEnvVars: false,
+        useAsDefaultProvider: false,
+        providerKeysSchema: openAiKeysSchema,
+        customKeys: typedKeys,
+        initialKeys: {},
+        scopes,
+      });
+      const { result } = renderHook(() =>
+        useProviderFormSubmit({
+          getFormSnapshot: () => snapshot,
+          onSuccess: () => {
+            writesAtCompletion.push(mockUpdateMutateAsync.mock.calls.length);
+          },
+        }),
+      );
+      await act(async () => {
+        await result.current.submit();
+      });
+      return { writesAtCompletion };
+    }
+
+    /** @scenario The first save stores the credentials that were entered */
+    it("creates the provider in one write that carries the credentials", async () => {
+      await saveFirstProvider();
+
+      expect(mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
+      expect(mockUpdateMutateAsync.mock.calls[0]?.[0]).toMatchObject({
+        provider: "openai",
+        enabled: true,
+        customKeys: typedKeys,
+        scopes,
+      });
+    });
+
+    /** @scenario No enabled provider is ever stored without its credentials */
+    it("never writes an enabled provider that has no credentials", async () => {
+      await saveFirstProvider();
+
+      const keyless = mockUpdateMutateAsync.mock.calls
+        .map(([write]) => write as { enabled?: boolean; customKeys?: unknown })
+        .filter((write) => write.enabled === true && !write.customKeys);
+      expect(keyless).toEqual([]);
+    });
+
+    /** @scenario The step completes only after the credentials are stored */
+    it("reports completion once, after the write that carries the credentials", async () => {
+      const { writesAtCompletion } = await saveFirstProvider();
+
+      expect(writesAtCompletion).toEqual([1]);
+    });
+
+    it("offers no action that enables a provider without saving its credentials", () => {
+      const { result } = renderSubmitHook({ snapshot: buildSnapshot() });
+
+      expect(Object.keys(result.current).toSorted()).toEqual([
+        "errors",
+        "isSaving",
+        "reset",
+        "submit",
+      ]);
+    });
+  });
 });

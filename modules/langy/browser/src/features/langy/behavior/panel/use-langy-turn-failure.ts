@@ -1,3 +1,4 @@
+import { useRouter } from "@langwatch/browser-host/use-router";
 import type { UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -5,6 +6,7 @@ import { api } from "../../../../behavior/langy-api.ts";
 import {
   explainLangyError,
   type LangyErrorPresentation,
+  MODEL_PROVIDERS_SETTINGS_HREF,
   readLangyStreamError,
   resolveLiveTurnError,
 } from "../logic/langy-error-explainer.ts";
@@ -72,10 +74,15 @@ export function useLangyTurnFailure({
   }, [retryEngineTurn, messageCount]);
 
   const [reconnectCodex, setReconnectCodex] = useState(false);
+  const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const onErrorAction = useCallback(
     (kind: ErrorActionKind) => {
       if (kind === "reconnect-codex") setReconnectCodex(true);
       else if (kind === "retry") retryTurn();
+      else if (kind === "configure-model")
+        void routerRef.current.push(MODEL_PROVIDERS_SETTINGS_HREF);
     },
     [retryTurn],
   );

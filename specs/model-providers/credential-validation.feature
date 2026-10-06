@@ -613,3 +613,42 @@ Feature: Credential Validation
     Given a credential whose check did not run
     When it is saved
     Then the save proceeds exactly as it did before
+
+  # ============================================================================
+  # The check asks the address the gateway will call
+  # ============================================================================
+  #
+  # For the providers whose base URL the gateway normalises (openai, custom,
+  # anthropic) a trailing "/v1" is optional at runtime: the gateway drops it
+  # and appends the full "/v1/..." path. The check appended "/models" to the
+  # URL exactly as typed, so "https://api.openai.com" was refused with a 404
+  # here and then worked. The gateway's address is asked first, and the URL as
+  # typed second.
+  #
+  # Bindings: platform/app/src/server/modelProviders/__tests__/providerValidation.unit.test.ts
+
+  @unit
+  Scenario Outline: A base URL is checked at the address the gateway will call
+    Given an "openai" provider with OPENAI_BASE_URL set to "<base URL>"
+    When the API key is validated
+    Then the first request goes to "<models URL>"
+
+    Examples:
+      | base URL                          | models URL                               |
+      | https://api.openai.com            | https://api.openai.com/v1/models         |
+      | https://api.openai.com/           | https://api.openai.com/v1/models         |
+      | https://api.openai.com/v1/        | https://api.openai.com/v1/models         |
+      | https://proxy.acme.test/openai/v1 | https://proxy.acme.test/openai/v1/models |
+
+  @unit
+  Scenario: An endpoint with its own models route still passes the check
+    Given an "openai" provider whose endpoint lists models at "<base URL>/models" only
+    When the API key is validated
+    Then the gateway's address is asked first and answers 404
+    And the base URL as typed is asked next and the key is accepted
+
+  @unit
+  Scenario: A key refused at every address is still refused
+    Given an "openai" provider whose key every address refuses
+    When the API key is validated
+    Then the key is reported as invalid

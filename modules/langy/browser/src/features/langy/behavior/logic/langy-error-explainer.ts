@@ -1,5 +1,6 @@
 import {
   explainHandledError,
+  PROVIDER_CONFIG_PROBLEMS,
   PROVIDER_CREDENTIAL_REASONS,
   PROVIDER_INVALID_REQUEST_REASONS,
   PROVIDER_MODEL_MISSING_REASONS,
@@ -75,6 +76,9 @@ export interface LangyDomainError extends Omit<
 /**
  * The exact set of Langy-emittable handled `kind`s.
  */
+/** Where a provider's key, endpoint, deployments and default models are edited. */
+export const MODEL_PROVIDERS_SETTINGS_HREF = "/settings/model-providers";
+
 export const KNOWN_LANGY_ERROR_KINDS = [
   "langy_conversation_not_found",
   "langy_conversation_not_owned",
@@ -216,6 +220,50 @@ export function promoteModelUnavailableError(domain: LangyDomainError): LangyDom
   return hasReasonKind(domain.reasons, MODEL_UNAVAILABLE_REASONS)
     ? { ...domain, code: "langy_model_unavailable" }
     : domain;
+}
+
+/**
+ * The gateway's code for a provider slot that cannot serve the request as it
+ * is set up: no API key saved, no endpoint, no deployment for the model.
+ */
+const PROVIDER_CONFIG_REASON = "provider_config_invalid";
+
+/** A model id as a menu offers it: short, and made of identifier characters. */
+const MODEL_ID_PATTERN = /^[\w./:@-]{1,120}$/;
+
+/**
+ * Re-keys a turn the gateway stopped over an incomplete provider setup to the gateway's own code.
+ * Only two fields leave the reason: `problem` when it is an enumerated value and `model` when it
+ * reads as a model id. The reason's `message` is never read.
+ */
+export function promoteProviderConfigError(domain: LangyDomainError): LangyDomainError {
+  if (domain.code !== "langy_agent_errored") return domain;
+  const reason = findReason(domain.reasons, PROVIDER_CONFIG_REASON);
+  if (!reason) return domain;
+
+  const meta: Record<string, unknown> = {};
+  const problem = reason.meta?.problem;
+  if (typeof problem === "string" && PROVIDER_CONFIG_PROBLEMS.has(problem)) {
+    meta.problem = problem;
+  }
+  const model = reason.meta?.model;
+  if (typeof model === "string" && MODEL_ID_PATTERN.test(model)) {
+    meta.model = model;
+  }
+  return { ...domain, code: PROVIDER_CONFIG_REASON, meta };
+}
+
+/** The first reason in the chain, at any depth, of this kind. */
+function findReason(
+  reasons: LangySerializedReason[] | undefined,
+  kind: string,
+): LangySerializedReason | undefined {
+  for (const reason of reasons ?? []) {
+    if (reason.kind === kind) return reason;
+    const nested = findReason(reason.reasons, kind);
+    if (nested) return nested;
+  }
+  return undefined;
 }
 
 /** Does any reason in the chain, at any depth, carry one of these kinds? */
@@ -434,7 +482,7 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
   // also carries an upstream status keeps its own card. "Not reachable at all"
   // is checked before "reached and refused" for the same reason.
   const domain = promoteUpstreamProviderError(
-    promoteModelUnavailableError(promoteCodexAgentError(received)),
+    promoteProviderConfigError(promoteModelUnavailableError(promoteCodexAgentError(received))),
   );
   // Always carried through for debugging, regardless of the matched case.
   const debug = {
@@ -535,6 +583,18 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
         ...copy,
         render: "card",
         action: { label: "Configure model", kind: "configure-model" },
+        ...debug,
+      };
+
+    case "provider_config_invalid":
+      // The provider behind the chosen model is missing a setting, and the
+      // gateway stopped the call before it left. Deterministic, so no retry:
+      // the card opens the provider settings, where the fix is.
+      return {
+        ...copy,
+        render: "card",
+        action: { label: "Open model providers", kind: "configure-model" },
+        traceId: domain.traceId,
         ...debug,
       };
 

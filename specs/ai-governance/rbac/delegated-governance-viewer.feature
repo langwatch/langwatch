@@ -121,3 +121,13 @@ Feature: Delegated governance viewer reaches the Governance pages
     Then the page renders the policy list
     And there is no control to add or edit a policy
     And the page names `routingPolicies:manage` as the grant those need
+
+  @regression @rbac
+  Scenario: A refused policy list reads as no access, not as a failed load
+    # The page opens on a grant held on a team or project, while the list is
+    # read at the organization. A member holding it only lower down is refused
+    # the list.
+    Given dana holds `routingPolicies:view` on a project of "acme" and not on the organization
+    When dana opens the routing policies page
+    Then the page says dana does not have permission and names `routingPolicies:view`
+    And no load error and no policy table are shown

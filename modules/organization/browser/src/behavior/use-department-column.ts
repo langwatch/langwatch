@@ -1,4 +1,5 @@
 import { api, type RouterOutputs } from "./organization-api.ts";
+import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
 
 export type DepartmentOption = RouterOutputs["departments"]["list"][number];
 
@@ -17,7 +18,10 @@ export function useDepartmentColumn(
 ) {
   const ffOn = governanceEnabled;
 
-  const enabled = !!organizationId && ffOn;
+  // The control also renders on pages every member can open, and the lists behind it need
+  // `governance:view`. Without the grant there is nothing to read, so nothing is asked.
+  const { hasPermission } = useOrganizationTeamProject();
+  const enabled = !!organizationId && ffOn && hasPermission("governance:view");
 
   const listQuery = api.departments.list.useQuery(
     { organizationId },
