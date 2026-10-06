@@ -9,9 +9,10 @@ import {
 } from "@langwatch/log-contract";
 import { describe, expect, it } from "vitest";
 
-import type { LogPreparationInput, LogRedaction } from "../../app/log.members.ts";
 import { CanonicalLogStorageMapProjection } from "../../eventing/canonical-log-storage.projection.ts";
+import type { LogRedaction } from "../canonical-log.service.ts";
 import { CanonicalLogService } from "../canonical-log.service.ts";
+import type { LogPreparationInput } from "../log.service.ts";
 
 const noRedaction: LogRedaction = {
   redactLog: async () => undefined,

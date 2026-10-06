@@ -3,7 +3,17 @@ import type {
   MetricPiiRedactionLevel,
 } from "@langwatch/metric-contract";
 
-import type { MetricPreparation } from "../app/metric.members.ts";
+export type MetricPreparationInput = {
+  tenantId: string;
+  organizationId: string;
+  request: unknown;
+  piiRedactionLevel: MetricPiiRedactionLevel;
+  acceptedAt?: number;
+};
+
+export interface MetricPreparation {
+  prepare(input: MetricPreparationInput): Promise<MetricDataPointPreparation>;
+}
 
 /** Canonical preparation for one OTLP metric export request. */
 export class MetricService {

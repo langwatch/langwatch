@@ -6,18 +6,14 @@ import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import {
-  type MetricPreparation,
-  type MetricPreparationInput,
-  type MetricRedaction,
-} from "../app/metric.members.ts";
-import {
   METRIC_KIND_DATA_KEY,
   candidatePointCount,
   classifyMetricKind,
 } from "../rules/metric-kinds.rules.ts";
 import { buildPoint } from "../rules/metric-point.rules.ts";
 import { isRecord, type UnknownRecord } from "../rules/metric-serialization.rules.ts";
-import { MetricRedactionService } from "./metric-redaction.service.ts";
+import { MetricRedactionService, type MetricRedaction } from "./metric-redaction.service.ts";
+import type { MetricPreparation, MetricPreparationInput } from "./metric.service.ts";
 
 const unknownRecordSchema = z.record(z.string(), z.unknown());
 const exportMetricsRequestSchema = z

@@ -178,6 +178,5 @@ export function createFeatureFlagTestApp(
     config: input.config ?? resolveTestFeatureFlagServerConfig(),
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
-    members: {},
   });
 }

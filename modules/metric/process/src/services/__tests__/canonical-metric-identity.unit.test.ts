@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { MetricRedaction } from "../../app/metric.members.ts";
 import { prepareMetricDataPoints } from "../canonical-metric.service.ts";
+import type { MetricRedaction } from "../metric-redaction.service.ts";
 import { prepare, requestForMetric } from "./canonical-metric.fixture.ts";
 
 const a = { key: "a", value: { stringValue: "one" } };

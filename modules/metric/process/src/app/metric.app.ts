@@ -1,4 +1,3 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EventingCommands } from "@langwatch/eventing";
@@ -23,24 +22,19 @@ import {
   buildMetricProcessingPipeline,
   type MetricProcessingPipeline,
 } from "../eventing/metric.pipeline.ts";
-import { ClickHouseMetricDataPointAppendRepository } from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
+import type { MetricRepositories } from "../repositories/metric.repositories.ts";
 import { resolveMetricCommandShardCount } from "../rules/metric-command-lanes.rules.ts";
 import { CanonicalMetricService } from "../services/canonical-metric.service.ts";
 import { MetricRequestCollectionService } from "../services/metric-request-collection.service.ts";
 import { MetricService } from "../services/metric.service.ts";
 import { OtlpMetricReceiverService } from "../services/otlp-metric-receiver.service.ts";
 
-export type MetricInfrastructure = Readonly<{
-  /** The process's one ClickHouse client, which routes each statement itself. */
-  clickhouse: ClickHouseQueryClient;
-}>;
-
 type MetricDependencies = Readonly<{
   dataPrivacy: typeof DataPrivacyApi;
   traces: typeof TraceApi;
   retention: typeof DataRetentionApi;
 }>;
-type MetricSetup = FeatureSetup<MetricDependencies, MetricInfrastructure, MetricServerConfig>;
+type MetricSetup = FeatureSetup<MetricDependencies, never, MetricServerConfig, MetricRepositories>;
 
 /** The process-owned metric preparation capability, and its durable processing pipeline. */
 export class MetricModule implements MetricApiContract {
@@ -52,8 +46,6 @@ export class MetricModule implements MetricApiContract {
     /** Each tenant's retention, which the metric rows are stamped with. */
     retention: DataRetentionApi,
   };
-  /** The run this module's durable processing needs, over ClickHouse only. */
-  static readonly reads = ["clickhouse"] as const;
 
   readonly #service: MetricService;
   readonly #pipeline: MetricProcessingPipeline;
@@ -73,13 +65,10 @@ export class MetricModule implements MetricApiContract {
     this.#collection = parts.collection;
   }
 
-  static create({ dependencies, members, config }: MetricSetup): MetricModule {
+  static create({ dependencies, repositories, config }: MetricSetup): MetricModule {
     const preparation = CanonicalMetricService.create({ redaction: dependencies.dataPrivacy });
     const pipeline = buildMetricProcessingPipeline({
-      repository: ClickHouseMetricDataPointAppendRepository.create({
-        resolveClient: ClickHouseMetricDataPointAppendRepository.resolverOver(members.clickhouse),
-        defaultRetentionDays: METRIC_DEFAULT_RETENTION_DAYS,
-      }),
+      repository: repositories.dataPoints,
       defaultRetentionDays: METRIC_DEFAULT_RETENTION_DAYS,
       metricCommandShardCount: resolveMetricCommandShardCount(config.processingShards),
       retention: {

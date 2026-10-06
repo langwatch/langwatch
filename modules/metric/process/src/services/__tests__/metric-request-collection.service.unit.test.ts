@@ -6,8 +6,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { RecordMetricCorrelationCommandData, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { MetricRedaction } from "../../app/metric.members.ts";
 import { CanonicalMetricService } from "../canonical-metric.service.ts";
+import type { MetricRedaction } from "../metric-redaction.service.ts";
 import { MetricRequestCollectionService } from "../metric-request-collection.service.ts";
 import { MetricService } from "../metric.service.ts";
 

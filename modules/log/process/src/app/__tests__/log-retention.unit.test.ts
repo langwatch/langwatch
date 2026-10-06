@@ -1,9 +1,9 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { LOG_PROCESSING_PIPELINE_NAME } from "@langwatch/log-contract";
 import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 /**
  * @vitest-environment node
  * log_processing declares each tenant's retention from data retention (ARCHITECTURE §9).
@@ -27,7 +27,7 @@ describe("log app installation", () => {
       });
       const runtime = await createApp({ role: "worker" })
         .withModules([logProcessModule])
-        .withAnalytical(createApiFixture<ClickHouseQueryClient>())
+        .withStores(memoryStores())
         .withConfig({ log: { processingShards: void 0 } })
         .withEventing(eventing)
         .provide({

@@ -28,7 +28,6 @@ import {
 } from "@langwatch/feature-flag-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -63,7 +62,7 @@ export interface FeatureFlagCache {
 
 type FeatureFlagSetup = FeatureSetup<
   typeof FeatureFlagModule.dependencies,
-  MembersRead<typeof FeatureFlagModule.reads>,
+  never,
   FeatureFlagServerConfig,
   FeatureFlagRepositories
 >;
@@ -76,12 +75,6 @@ export class FeatureFlagModule implements FeatureFlagApiContract {
     organizations: OrganizationApi,
   };
   static readonly config = featureFlagConfig;
-  /**
-   * No process member: the cache tier `installApiFeatureFlag` used to read
-   * was always an uncached stub in every deployment, so `create` builds
-   * that same no-op itself rather than reading a member nothing populated.
-   */
-  static readonly reads = [] as const;
 
   readonly #flags: FeatureFlagService;
   readonly #permissions: AuthzApi;

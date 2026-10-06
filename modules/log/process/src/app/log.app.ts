@@ -1,10 +1,8 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import {
   LogApi,
-  LOG_DEFAULT_READ_LIMIT,
   LOG_DEFAULT_RETENTION_DAYS,
   logConfig,
   type CanonicalLogRecord,
@@ -22,24 +20,18 @@ import type { FeatureSetup } from "@langwatch/process";
 import { TraceApi } from "@langwatch/trace-contract";
 
 import { LogProcessingAdapter, type LogProcessingPipeline } from "../eventing/log.pipeline.ts";
-import { ClickHouseCanonicalLogRecordAppendRepository } from "../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
-import { ClickHouseCanonicalLogRecordRepository } from "../repositories/clickhouse/clickhouse.canonical-log-record.repository.ts";
+import type { LogRepositories } from "../repositories/log.repositories.ts";
 import { CanonicalLogService } from "../services/canonical-log.service.ts";
 import { LogRequestCollectionService } from "../services/log-request-collection.service.ts";
 import { LogService } from "../services/log.service.ts";
 import { OtlpLogReceiverService } from "../services/otlp-log-receiver.service.ts";
-
-export type LogInfrastructure = Readonly<{
-  /** The process's one ClickHouse client, which routes each statement itself. */
-  clickhouse: ClickHouseQueryClient;
-}>;
 
 type LogDependencies = Readonly<{
   dataPrivacy: typeof DataPrivacyApi;
   traces: typeof TraceApi;
   retention: typeof DataRetentionApi;
 }>;
-type LogSetup = FeatureSetup<LogDependencies, LogInfrastructure, LogServerConfig>;
+type LogSetup = FeatureSetup<LogDependencies, never, LogServerConfig, LogRepositories>;
 
 /** The process-owned Log capability over private preparation, persistence and its pipeline. */
 export class LogModule implements LogApiContract {
@@ -51,8 +43,6 @@ export class LogModule implements LogApiContract {
     /** Each tenant's retention, which the log rows are stamped with. */
     retention: DataRetentionApi,
   };
-  /** The run this module's durable processing needs, over ClickHouse only. */
-  static readonly reads = ["clickhouse"] as const;
 
   readonly #service: LogService;
   readonly #pipeline: LogProcessingPipeline;
@@ -72,12 +62,8 @@ export class LogModule implements LogApiContract {
     this.#collection = parts.collection;
   }
 
-  static create({ dependencies, members, config }: LogSetup): LogModule {
-    const repository = ClickHouseCanonicalLogRecordRepository.create({
-      resolveClient: ClickHouseCanonicalLogRecordAppendRepository.resolverOver(members.clickhouse),
-      defaultRetentionDays: LOG_DEFAULT_RETENTION_DAYS,
-      defaultReadLimit: LOG_DEFAULT_READ_LIMIT,
-    });
+  static create({ dependencies, repositories, config }: LogSetup): LogModule {
+    const repository = repositories.logRecords;
     const service = LogService.create({
       preparation: CanonicalLogService.create({ redaction: dependencies.dataPrivacy }),
       repository,
