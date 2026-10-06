@@ -205,19 +205,14 @@ function buildLanes({
     };
   }
 
-  // Split across two lane queues, so each holds HALF the single-queue depth and
-  // the two together equal the old shared bound rather than doubling it. The
-  // total keeps its own queue, but a statement reaches it only from inside a
-  // lane cap, so that queue can hold at most `2 * laneCap - maxConcurrent`
-  // statements — the lane slots in excess of the total. The combined wait depth
-  // is therefore the old bound plus that small remainder, not twice the lane
-  // depth.
-  const laneMaxQueued =
-    maxQueuedOverride ??
-    Math.max(
-      MIN_QUEUE_DEPTH,
-      Math.floor((maxConcurrent * QUEUE_DEPTH_PER_SLOT) / 2),
-    );
+  // Split across two lane queues: each lane queue holds half the old single-queue
+  // bound, floor included, so the two together equal that bound at every budget
+  // (also below 16 slots, where the MIN_QUEUE_DEPTH floor applies). The total
+  // keeps its own queue, but a statement reaches it only from inside a lane cap,
+  // so that queue can hold at most `2 * laneCap - maxConcurrent` statements —
+  // the lane slots in excess of the total. The combined wait depth is therefore
+  // the old bound plus that small remainder, not twice the lane depth.
+  const laneMaxQueued = maxQueuedOverride ?? Math.floor(totalMaxQueued / 2);
   const insert = buildLane({
     lane: "insert",
     capMax: caps.laneCap,
