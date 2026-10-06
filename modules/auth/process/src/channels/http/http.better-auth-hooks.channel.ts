@@ -708,7 +708,8 @@ export function createBeforeSessionCreateHook({
   >["before"]
 > {
   return async (session, context) => {
-    const path = context?.path;
+    const path =
+      context?.path === undefined ? undefined : toConcretePath(context.path, context.params);
     const user = await repo
       .getUserForHooks({ userId: session.userId })
       .catch(skipOn("user_not_found"));
@@ -758,6 +759,11 @@ export type SessionMintClaims = Readonly<{
   identity: Pick<IdentityApi, "claimsForMint">;
   evidence: Pick<SessionCallbackEvidenceChannel, "findAcceptedAccounts">;
 }>;
+
+/** Better Auth hands the route pattern (`.../acs/:providerId`); readers need the real path. */
+function toConcretePath(path: string, params: Record<string, string | undefined> = {}): string {
+  return path.replace(/:([A-Za-z]+)/g, (whole, name: string) => params[name] ?? whole);
+}
 
 type SessionMintContext = Parameters<ReturnType<typeof createBeforeSessionCreateHook>>[1];
 
