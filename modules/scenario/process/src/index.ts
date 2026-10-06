@@ -10,7 +10,7 @@ export {
   type RecordEvaluationsDeps,
   evaluationsFingerprint,
 } from "./eventing/record-evaluations.commands.ts";
-export * from "./channels/redis/redis.scenario-cancellation.channel.ts";
+export * from "./repositories/redis/redis.scenario-cancellation.repository.ts";
 export type { SimulationStalledRun } from "./eventing/simulation-eventing.store.ts";
 export * from "./eventing/simulation-processing.commands.ts";
 export {
@@ -18,11 +18,7 @@ export {
   type SimulationProcessingPipelineDeps,
 } from "./eventing/simulation-processing.pipeline.ts";
 export { SimulationProcessingProducerPipeline } from "./eventing/simulation-processing-producer.pipeline.ts";
-export type { ScenarioAppDependencies, ScenarioAppInfrastructure } from "./app/scenario.app.ts";
-// CancellationPublisher/CancellationSubscriber are not re-exported here: the
-// redis adapter above already exports its own same-named types (a different
-// shape, the raw client boundary), so the folded interfaces stay reachable
-// only through ScenarioAppInfrastructure to avoid a duplicate barrel export.
+export type { ScenarioAppDependencies } from "./app/scenario.app.ts";
 export type { CancellationMessage } from "./app/scenario.app.ts";
 export type {
   ScenarioChildEnvironment,

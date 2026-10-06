@@ -142,14 +142,6 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
-import { MemoryScenarioCancellationChannel } from "../channels/memory/memory.scenario-cancellation.channel.ts";
-import {
-  DuplicatedCancellationConnection,
-  RedisScenarioCancellationPublisherChannel,
-  RedisScenarioCancellationSubscriberChannel,
-  type CancellationPublisherClient,
-  type CancellationSubscriberClient,
-} from "../channels/redis/redis.scenario-cancellation.channel.ts";
 import { voiceRecordingChannels } from "../channels/voice-recording-channels.registry.ts";
 import {
   buildScenarioLifecyclePipeline,
@@ -160,11 +152,6 @@ import {
   type SimulationPipelineSetup,
 } from "../eventing/simulation-processing-runtime.pipeline.ts";
 import type { SimulationProcessingPipelineDefinition } from "../eventing/simulation-processing.pipeline.ts";
-import {
-  ClickHouseScenarioSession,
-  type ScenarioReadOnlyClickHouse,
-} from "../repositories/clickhouse/clickhouse.scenario-session.store.ts";
-import { SimulationClickHouseRepository } from "../repositories/clickhouse/simulation-clickhouse.repository.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
 import { AgentTestTurnChildService } from "../services/agent-test-turn-child.service.ts";
 import { AgentTestService } from "../services/agent-test.service.ts";
@@ -236,19 +223,6 @@ export interface ScenarioAppDependencies {
   voiceMedia: VoiceMediaDoorService;
 }
 
-/**
- * Technical collaborators assembled outside the repository seam: private
- * services (agent testing, executor, buffer, reads) and four small ports.
- */
-export interface ScenarioAppInfrastructure {
-  simulations: SimulationServiceContract;
-  scenarioTabs: ScenarioTabRegistry;
-  ids: ScenarioId;
-  testSuiteIds: ScenarioTestSuiteId;
-  clock: ScenarioClock;
-  secretCipher: ScenarioSecretCipher;
-}
-
 /** The peer APIs this feature reads directly. */
 export const scenarioAppDependencyTokens = {
   agents: AgentApi,
@@ -281,52 +255,17 @@ export const scenarioAppDependencyTokens = {
   apiKeys: ApiKeyApi,
 };
 
-export type { ScenarioReadOnlyClickHouse };
-
-/** The process's Redis as scenario reaches it: cancel publishes and a duplicable subscriber. */
-export type ScenarioRedis = CancellationPublisherClient & {
-  duplicate(): CancellationSubscriberClient;
-};
-
-type ScenarioProcessMembers = Readonly<{
-  clickhouse: ScenarioReadOnlyClickHouse;
-  encryption: Readonly<{ encrypt(plaintext: string): string; decrypt(ciphertext: string): string }>;
-  rateLimiter: Readonly<{
-    check(
-      key: string,
-      limit?: { requests: number; seconds: number },
-    ): Promise<Readonly<{ allowed: boolean; retryAfterSeconds?: number }>>;
-  }>;
-  /** Cancel signals across the fleet; absent in a memory process. */
-  redis: ScenarioRedis | null;
+/** The one process fact scenario still reads off the process, until it is a shared leaf. */
+type ScenarioAppMembers = Readonly<{
   /** The raw-socket door's port, which the worker's quick tunnel points at. */
   rawSocketPort: number;
-  nodeEnvironment: string | undefined;
 }>;
-
-/**
- * What `ScenarioModule.create` is handed as `setup.members`: the platform
- * members read directly, plus the collaborators still handed over whole from
- * the deleted `scenario.composition.ts` (scenario-composition-green handover).
- */
-type ScenarioAppMembers = ScenarioProcessMembers &
-  Omit<
-    ScenarioAppInfrastructure,
-    "ids" | "testSuiteIds" | "clock" | "secretCipher" | "scenarioTabs"
-  >;
 
 export class ScenarioModule implements ScenarioApi {
   static readonly contract = ScenarioApi;
   static readonly dependencies = scenarioAppDependencyTokens;
   /** Every name is from the process's vocabulary; boot refuses by name. */
-  static readonly reads = [
-    "clickhouse",
-    "encryption",
-    "rateLimiter",
-    "redis",
-    "rawSocketPort",
-    "nodeEnvironment",
-  ] as const;
+  static readonly reads = ["rawSocketPort"] as const;
   static readonly config = scenarioConfig;
   /** Main's voice-session signing key: CREDENTIALS_SECRET, else NEXTAUTH_SECRET. */
   static readonly secrets = {
@@ -344,9 +283,8 @@ export class ScenarioModule implements ScenarioApi {
       ScenarioRepositories
     >,
   ): Promise<ScenarioModule> {
-    const { secrets } = setup;
-    const { redis, nodeEnvironment } = setup.members;
-    const { publicBaseUrl, nlpServiceUrl } = setup.config;
+    const { secrets, repositories } = setup;
+    const { publicBaseUrl, nlpServiceUrl, nodeEnvironment } = setup.config;
     const signingSecret = await secrets.into(
       ScenarioModule.secrets.voiceSessionSigning,
       (credentials) =>
@@ -360,7 +298,7 @@ export class ScenarioModule implements ScenarioApi {
     const voice = await VoicePublicUrlService.create().resolveForRole({
       role: setup.role,
       configuredUrl: setup.config.voicePublicBaseUrl,
-      tunnelEnabled: isVoiceTunnelEnabled({ ...setup.config, nodeEnvironment }),
+      tunnelEnabled: isVoiceTunnelEnabled(setup.config),
       workerOnly: setup.config.voiceWorkerOnly,
       port: setup.members.rawSocketPort,
     });
@@ -371,39 +309,27 @@ export class ScenarioModule implements ScenarioApi {
     const ids = { next: () => generate(SCENARIO_KSUID_RESOURCE).toString() };
     const testSuiteIds = { next: () => generate(SCENARIO_TEST_SUITE_KSUID_RESOURCE).toString() };
     const clock = { now: nowInstant };
-    const secretCipher = setup.members.encryption;
-    // A process that composes its own whole simulation service still wins;
-    // otherwise the module builds the reads its own ClickHouse member derives.
-    const { clickhouse } = setup.members;
-    const simulations =
-      setup.members.simulations ??
-      (clickhouse
-        ? SimulationService.create(
-            SimulationClickHouseRepository.create(
-              ClickHouseScenarioSession.resolverOver(clickhouse),
-            ),
-            simulationCommands,
-          )
-        : undefined);
+    // The live repository seals and opens run secrets; the memory twin holds them in plaintext.
+    const runSecretSeal = repositories.scenarios;
+    const simulations = SimulationService.create(repositories.simulations, simulationCommands);
     const scenarios = ScenarioService.create({
-      repository: setup.repositories.scenarios,
+      repository: repositories.scenarios,
       simulations,
       ids,
       testSuiteIds,
       clock,
-      secretCipher,
     });
     const generateBounds = ScenarioGenerateBoundsService.create({
       entitlement: setup.dependencies.plans,
       projects: setup.dependencies.projects,
-      rateLimiter: setup.members.rateLimiter,
+      rateLimiter: repositories.rateLimits,
     });
     const exports = ScenarioRunExportService.create(simulations);
     const scenarioTabs = ScenarioTabRegistryService.create({
       store: setup.repositories.tabs,
       clock,
     });
-    const { dependencies: peers, repositories, config } = setup;
+    const { dependencies: peers, config } = setup;
     const prefetchConfig = {
       langwatchEndpoint: config.langwatchEndpoint ?? "",
       nlpServiceUrl: nlpServiceUrl ?? "",
@@ -412,15 +338,7 @@ export class ScenarioModule implements ScenarioApi {
     };
     const broadcast = setup.dependencies.presence;
     const voiceNonces = VoiceNonceRegistryService.create({ nonces: repositories.voiceNonces });
-    const memoryCancellations = MemoryScenarioCancellationChannel.create();
-    const cancellations = redis
-      ? RedisScenarioCancellationPublisherChannel.create(redis)
-      : memoryCancellations;
-    const cancellationSubscriptions = redis
-      ? RedisScenarioCancellationSubscriberChannel.create(
-          DuplicatedCancellationConnection.over(redis),
-        )
-      : memoryCancellations;
+    const cancellations = repositories.cancellations;
     const platformLinks = ScenarioPlatformLinkService.create({
       featureFlags: setup.dependencies.featureFlags,
       projects: setup.dependencies.projects,
@@ -461,7 +379,7 @@ export class ScenarioModule implements ScenarioApi {
       scenarios,
       simulations,
       prefetcher: ScenarioExecutionPrefetcherService.create({
-        secretCipher,
+        runSecretSeal,
         config: prefetchConfig,
         scenarios,
         suites: peers.suites,
@@ -562,9 +480,9 @@ export class ScenarioModule implements ScenarioApi {
           peers: setup.dependencies,
           scenarios,
           simulations,
-          secretCipher,
+          runSecretSeal,
           cancellations,
-          cancellationSubscriptions,
+          cancellationSubscriptions: cancellations,
           config: setup.config,
           host: childHost,
         }),

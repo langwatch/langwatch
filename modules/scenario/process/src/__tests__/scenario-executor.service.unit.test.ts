@@ -7,9 +7,9 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import type { ScenarioSecretCipher } from "../app/scenario.app.ts";
-import { MemoryScenarioCancellationChannel } from "../channels/memory/memory.scenario-cancellation.channel.ts";
+import { MemoryScenarioCancellationRepository } from "../repositories/memory/memory.scenario-cancellation.repository.ts";
 import { MemoryVoiceNonceRepository } from "../repositories/memory/memory.voice-nonce.repository.ts";
+import type { ScenarioRunSecretSeal } from "../repositories/scenario.repository.ts";
 import { ScenarioExecutionPoolService } from "../services/scenario-execution-pool.service.ts";
 import { ScenarioExecutorService } from "../services/scenario-executor.service.ts";
 import type { ScenarioService } from "../services/scenario.service.ts";
@@ -21,7 +21,7 @@ import {
 } from "./support/scenario-app-setup.fixture.ts";
 
 function harness({ langwatchEndpoint }: { langwatchEndpoint: string | undefined }) {
-  const channel = MemoryScenarioCancellationChannel.create();
+  const channel = MemoryScenarioCancellationRepository.create();
   const owned: string[] = [];
   const executor = ScenarioExecutorService.create({
     voiceNonces: VoiceNonceRegistryService.create({ nonces: MemoryVoiceNonceRepository.create() }),
@@ -35,7 +35,7 @@ function harness({ langwatchEndpoint }: { langwatchEndpoint: string | undefined 
     },
     scenarios: createApiFixture<ScenarioService>(),
     simulations: createApiFixture<SimulationService>(),
-    secretCipher: createApiFixture<ScenarioSecretCipher>(),
+    runSecretSeal: createApiFixture<ScenarioRunSecretSeal>(),
     cancellations: channel,
     cancellationSubscriptions: channel,
     config: { ...scenarioTestConfig, langwatchEndpoint },
@@ -44,6 +44,7 @@ function harness({ langwatchEndpoint }: { langwatchEndpoint: string | undefined 
       nlpServiceUrl: "http://nlp.test",
       nlpInternalSecret: void 0,
       isSaas: false,
+      nodeEnvironment: "test",
       publicBaseUrl: void 0,
     },
   });

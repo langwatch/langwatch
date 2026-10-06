@@ -9,23 +9,9 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type {
-  ScenarioTestSuiteId,
-  ScenarioId,
-  ScenarioSecretCipher,
-} from "../../app/scenario.app.ts";
+import type { ScenarioTestSuiteId, ScenarioId } from "../../app/scenario.app.ts";
 import { MemoryScenarioRepository } from "../../repositories/memory/memory.scenario.repository.ts";
 import { ScenarioService } from "../scenario.service.ts";
-
-class CancellationTestSecretCipher implements ScenarioSecretCipher {
-  encrypt(value: string): string {
-    return value;
-  }
-
-  decrypt(value: string): string {
-    return value;
-  }
-}
 
 class CancellationTestId implements ScenarioId {
   next(): string {
@@ -85,7 +71,6 @@ function createService(simulations: SimulationService): ScenarioService {
     ids: new CancellationTestId(),
     testSuiteIds: new CancellationTestTestSuiteId(),
     clock: frozenAt("1970-01-01T00:00:00.000Z"),
-    secretCipher: new CancellationTestSecretCipher(),
   });
 }
 

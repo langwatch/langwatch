@@ -44,6 +44,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { fromDate, type Instant, toDate } from "@langwatch/time";
 
+import type { ScenarioSecretCipher } from "../../app/scenario.app.ts";
 import {
   DEFAULT_SUITE_NAME,
   DEFAULT_SUITE_SLUG,
@@ -93,12 +94,24 @@ function scenarioWhere(
 }
 
 export class PrismaScenarioRepository extends ScenarioRepository {
-  static create(database: PrismaClient): PrismaScenarioRepository {
-    return new PrismaScenarioRepository(database);
+  static create(database: PrismaClient, cipher: ScenarioSecretCipher): PrismaScenarioRepository {
+    return new PrismaScenarioRepository(database, cipher);
   }
 
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(
+    private readonly database: PrismaClient,
+    private readonly cipher: ScenarioSecretCipher,
+  ) {
     super();
+  }
+
+  /** A process without the key holds a refusing cipher, so only a secret's use refuses. */
+  sealRunSecret({ plain }: { plain: string }): string {
+    return this.cipher.encrypt(plain);
+  }
+
+  openRunSecret({ sealed }: { sealed: string }): string {
+    return this.cipher.decrypt(sealed);
   }
 
   async create(

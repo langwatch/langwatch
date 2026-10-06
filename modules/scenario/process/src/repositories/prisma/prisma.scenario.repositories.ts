@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import type { ScenarioSecretCipher } from "../../app/scenario.app.ts";
 import type { ScenarioRepositories } from "../scenario.repositories.ts";
 import { PrismaScenarioRepository } from "./scenario.repository.ts";
 
@@ -9,9 +10,16 @@ import { PrismaScenarioRepository } from "./scenario.repository.ts";
  * this bundle only selects the backend.
  */
 export class PostgresScenarioRepositories {
-  static readonly requires = ["prisma"] as const;
+  static readonly requires = ["prisma", "encryption"] as const;
 
-  static create({ prisma }: { prisma: PrismaClient }): Pick<ScenarioRepositories, "scenarios"> {
-    return { scenarios: PrismaScenarioRepository.create(prisma) };
+  /** The live repository seals and opens a run's secret parameters with the deployment's cipher. */
+  static create({
+    prisma,
+    encryption,
+  }: {
+    prisma: PrismaClient;
+    encryption: ScenarioSecretCipher;
+  }): Pick<ScenarioRepositories, "scenarios"> {
+    return { scenarios: PrismaScenarioRepository.create(prisma, encryption) };
   }
 }

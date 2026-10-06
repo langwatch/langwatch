@@ -1,10 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 
-import {
-  type CancellationPublisher as CancellationPublisherPort,
-  type CancellationSubscriber as CancellationSubscriberPort,
-  type CancellationMessage,
-} from "../../app/scenario.app.ts";
+import type { CancellationMessage } from "../../app/scenario.app.ts";
+import { ScenarioCancellationRepository } from "../scenario-cancellation.repository.ts";
 
 export const CANCELLATION_CHANNEL = "scenario:cancel";
 
@@ -18,14 +15,61 @@ export type CancellationSubscriberClient = {
   quit: () => Promise<unknown>;
 };
 
-const logger = createLogger("langwatch:scenarios:cancellation-channel");
+/** The process's Redis as cancellation reaches it: publishes, and a duplicable subscriber. */
+export type ScenarioCancellationRedis = CancellationPublisherClient & {
+  duplicate(): CancellationSubscriberClient;
+};
 
-export class RedisScenarioCancellationPublisherChannel implements CancellationPublisherPort {
-  static create(publisher: CancellationPublisherClient): RedisScenarioCancellationPublisherChannel {
-    return new RedisScenarioCancellationPublisherChannel(publisher);
+const logger = createLogger("langwatch:scenario:cancellation");
+
+/**
+ * A dedicated connection, opened on first subscribe: a client in subscribe mode
+ * can issue nothing else, and a process that never consumes never opens one.
+ */
+class DuplicatedCancellationConnection implements CancellationSubscriberClient {
+  #connection: CancellationSubscriberClient | undefined;
+
+  private constructor(private readonly source: { duplicate(): CancellationSubscriberClient }) {}
+
+  static over(source: {
+    duplicate(): CancellationSubscriberClient;
+  }): DuplicatedCancellationConnection {
+    return new DuplicatedCancellationConnection(source);
   }
 
-  private constructor(private readonly publisher: CancellationPublisherClient) {}
+  subscribe(channel: string): Promise<unknown> {
+    return this.#opened().subscribe(channel);
+  }
+
+  on(event: "message", handler: (channel: string, message: string) => void): void {
+    this.#opened().on(event, handler);
+  }
+
+  async quit(): Promise<unknown> {
+    return this.#connection?.quit();
+  }
+
+  #opened(): CancellationSubscriberClient {
+    this.#connection ??= this.source.duplicate();
+    return this.#connection;
+  }
+}
+
+/** Redis pub/sub on `scenario:cancel`: every replica subscribed hears each published cancel. */
+export class RedisScenarioCancellationRepository extends ScenarioCancellationRepository {
+  static create(redis: ScenarioCancellationRedis): RedisScenarioCancellationRepository {
+    return new RedisScenarioCancellationRepository(
+      redis,
+      DuplicatedCancellationConnection.over(redis),
+    );
+  }
+
+  private constructor(
+    private readonly publisher: CancellationPublisherClient,
+    private readonly subscriber: CancellationSubscriberClient,
+  ) {
+    super();
+  }
 
   async publish(message: CancellationMessage): Promise<void> {
     await this.publisher.publish(CANCELLATION_CHANNEL, JSON.stringify(message));
@@ -34,16 +78,6 @@ export class RedisScenarioCancellationPublisherChannel implements CancellationPu
       "Cancellation published",
     );
   }
-}
-
-export class RedisScenarioCancellationSubscriberChannel implements CancellationSubscriberPort {
-  static create(
-    subscriber: CancellationSubscriberClient,
-  ): RedisScenarioCancellationSubscriberChannel {
-    return new RedisScenarioCancellationSubscriberChannel(subscriber);
-  }
-
-  private constructor(private readonly subscriber: CancellationSubscriberClient) {}
 
   async subscribe(
     onCancellation: (message: CancellationMessage) => void,
@@ -85,38 +119,5 @@ export class RedisScenarioCancellationSubscriberChannel implements CancellationS
         record.batchRunId === undefined ||
         typeof record.batchRunId === "string")
     );
-  }
-}
-
-/**
- * A dedicated connection, opened on first subscribe: a client in subscribe mode
- * can issue nothing else, and a process that never consumes never opens one.
- */
-export class DuplicatedCancellationConnection implements CancellationSubscriberClient {
-  #connection: CancellationSubscriberClient | undefined;
-
-  private constructor(private readonly source: { duplicate(): CancellationSubscriberClient }) {}
-
-  static over(source: {
-    duplicate(): CancellationSubscriberClient;
-  }): DuplicatedCancellationConnection {
-    return new DuplicatedCancellationConnection(source);
-  }
-
-  subscribe(channel: string): Promise<unknown> {
-    return this.#opened().subscribe(channel);
-  }
-
-  on(event: "message", handler: (channel: string, message: string) => void): void {
-    this.#opened().on(event, handler);
-  }
-
-  async quit(): Promise<unknown> {
-    return this.#connection?.quit();
-  }
-
-  #opened(): CancellationSubscriberClient {
-    this.#connection ??= this.source.duplicate();
-    return this.#connection;
   }
 }

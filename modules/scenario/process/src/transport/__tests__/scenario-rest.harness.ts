@@ -16,7 +16,6 @@ import { HandledError } from "@langwatch/handled-error";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ResourceOwnership } from "@langwatch/process";
-import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { type SimulationService } from "@langwatch/scenario-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
@@ -34,11 +33,10 @@ import {
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import {
-  ScenarioModule,
-  type ScenarioReadOnlyClickHouse,
-  type ScenarioRedis,
-  type ScenarioTabStore,
-} from "../../app/scenario.app.ts";
+  simulationRepositoryOver,
+  simulationSendersOver,
+} from "../../__tests__/support/simulation-service-fake.fixture.ts";
+import { ScenarioModule, type ScenarioTabStore } from "../../app/scenario.app.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 
 export const PROJECT_ID = "project_scenario_rest";
@@ -49,7 +47,6 @@ export async function createScenarioRestTestApp(
   options: {
     simulations?: Partial<SimulationService>;
     tabs?: Partial<ScenarioTabStore>;
-    redis?: Partial<ScenarioRedis>;
     presence?: Partial<PresenceApi>;
     traces?: Partial<TraceApi>;
     plans?: Partial<EntitlementApi>;
@@ -57,15 +54,12 @@ export async function createScenarioRestTestApp(
     projects?: Partial<ProjectApi>;
   } = {},
 ) {
-  const simulations = createApiFixture<SimulationService>(
-    options.simulations ?? {},
-    "Simulation service",
-  );
-  const redis = createApiFixture<ScenarioRedis>(options.redis ?? {}, "Redis");
+  const simulations = options.simulations ?? {};
 
   const app = await ScenarioModule.create({
     repositories: {
       ...MemoryScenarioRepositories.create(),
+      simulations: simulationRepositoryOver(simulations),
       ...(options.tabs
         ? { tabs: createApiFixture<ScenarioTabStore>(options.tabs, "Tab store") }
         : {}),
@@ -99,20 +93,15 @@ export async function createScenarioRestTestApp(
         "Feature flag API",
       ),
     },
-    members: {
-      ...scenarioHostMembers,
-      clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),
-      redis,
-      simulations,
-      encryption: createApiFixture<Encryption>(),
-      rateLimiter: { check: async () => ({ allowed: true }) },
-    },
+    members: scenarioHostMembers,
     resources: createApiFixture<ResourceOwnership>(),
     config: { ...scenarioTestConfig, publicBaseUrl: "https://app.langwatch.test" },
     secrets: scenarioTestSecrets,
   });
 
-  return { app, simulations, redis };
+  app.connectSimulationCommands(simulationSendersOver(simulations));
+
+  return { app };
 }
 
 export function createScenarioRestTestRuntime(

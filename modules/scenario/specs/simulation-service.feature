@@ -50,13 +50,12 @@ Feature: Simulation service
     And the run's own dispatcher receives the payload the job replays
 
   # Measured against main on 2026-09-21: every /api/simulation-runs read
-  # answered an unattributed 503 on this branch and 200 on main, because
-  # `members.simulations` is supplied by no process at all. The reads are
-  # derivable from the deployment's own ClickHouse, so the module builds
-  # them rather than waiting for a member nobody sets.
+  # answered an unattributed 503 on this branch and 200 on main, because the
+  # reads waited on a collaborator no process supplied. They are derived from
+  # the deployment's own ClickHouse, through scenario's live registry.
   @unit
   Scenario: Simulation reads are derived from the deployment's own ClickHouse
-    Given a process that supplies no simulations member but does read ClickHouse
+    Given a live process whose scenario registry reads ClickHouse
     When a caller reads the runs across all suites
     Then the read is served from ClickHouse against the caller's own tenant
     And the deployment does not refuse it as uncomposed

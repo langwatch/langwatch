@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * The scenario feature booted on a deployment that configured no encryption key.
+ * The scenario feature on a deployment that configured no encryption key: it boots over memory
+ * stores, and the live scenario repository refuses each secret use by name.
  */
 import { EventEmitter } from "node:events";
 
@@ -15,17 +16,18 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp } from "@langwatch/process";
 import { memoryStores, openStores, PipelineParticipation } from "@langwatch/process-stores";
 import { storesOwner, type StoresConfig } from "@langwatch/process-stores/config";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { ScenarioApi } from "@langwatch/scenario-contract";
+import { ScenarioApi, type SimulationService } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -35,8 +37,10 @@ import {
   scenarioInstallationSecrets,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
+import { PrismaScenarioRepository } from "../../repositories/prisma/scenario.repository.ts";
 import { scenarioProcessModule } from "../../scenario.module.ts";
-import type { ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
+import { ScenarioRunSecretsService } from "../../services/scenario-run-secrets.service.ts";
+import { ScenarioService } from "../../services/scenario.service.ts";
 
 const projectId = "project-1";
 
@@ -86,18 +90,18 @@ const encryption = await keylessEncryption();
 
 const unconfiguredEncryption = { name: "MemberNotConfiguredError", member: "encryption" };
 
+/** The live registry's scenario repository, holding the cipher a keyless process holds. */
+function liveScenarioRepository() {
+  return PrismaScenarioRepository.create(createApiFixture<PrismaClient>(), encryption);
+}
+
 function process(role: "api" | "worker", emitter: EventEmitter) {
   return createApp({ role, secrets: scenarioInstallationSecrets() })
-    .withModules([withMemoryRepositories(scenarioProcessModule)])
+    .withModules([scenarioProcessModule])
     .withConfig({
       scenario: { ...scenarioTestConfig, publicBaseUrl: "https://app.langwatch.test" },
     })
     .withStores(memoryStores())
-    .withAnalytical(createApiFixture<ScenarioReadOnlyClickHouse>())
-    .withKeyvalue(memoryRedisDouble())
-    .withMember("encryption", encryption)
-    .withMember("rateLimiter", { check: async () => ({ allowed: true }) })
-    .withMember("nodeEnvironment", "test")
     .withMember("rawSocketPort", 0)
     .provide({
       agent: createApiFixture<AgentApi>({
@@ -162,51 +166,35 @@ describe("given a deployment that configured no stored-secret encryption key", (
    * @scenario "The missing key refuses each secret use, never the boot"
    */
   it("refuses saving a stored secret as the unconfigured encryption member", async () => {
-    const runtime = await process("api", new EventEmitter()).boot();
+    const scenarios = ScenarioService.create({
+      repository: liveScenarioRepository(),
+      simulations: createApiFixture<SimulationService>(),
+      ids: { next: () => "scenario-1" },
+      testSuiteIds: { next: () => "suite-1" },
+      clock: { now: nowInstant },
+    });
 
-    try {
-      await expect(
-        runtime.service(ScenarioApi).resolveRunParametersForScenarios({
-          scenarios: [
-            {
-              id: "scenario-1",
-              name: "Refund flow",
-              version: 1,
-              situation: "A customer asks for help",
-              criteria: [],
-              parameters: [{ name: "api_token", secret: true }],
-            },
-          ],
-          values: { api_token: "token-live" },
-        }),
-      ).rejects.toMatchObject(unconfiguredEncryption);
-    } finally {
-      await runtime.stop();
-    }
+    await expect(
+      scenarios.resolveRunParametersForScenarios({
+        scenarios: [
+          {
+            id: "scenario-1",
+            name: "Refund flow",
+            version: 1,
+            situation: "A customer asks for help",
+            criteria: [],
+            parameters: [{ name: "api_token", secret: true }],
+          },
+        ],
+        values: { api_token: "token-live" },
+      }),
+    ).rejects.toMatchObject(unconfiguredEncryption);
   });
 
   /** @scenario "The missing key refuses each secret use, never the boot" */
-  it("refuses reading a stored secret back for a run", async () => {
-    const runtime = await process("api", new EventEmitter()).boot();
+  it("refuses reading a stored secret back for a run, naming the parameter", () => {
+    const runSecrets = ScenarioRunSecretsService.create(liveScenarioRepository());
 
-    try {
-      const prefetched = await runtime.service(ScenarioApi).prefetchExecution({
-        context: {
-          projectId,
-          scenarioId: "scenario-1",
-          setId: "set-1",
-          batchRunId: "batch-1",
-          secretParameters: { api_token: "iv:body:tag" },
-        },
-        target: { type: "http", referenceId: "agent-2" },
-      });
-
-      expect(prefetched).toMatchObject({
-        success: false,
-        error: expect.stringContaining('"api_token"'),
-      });
-    } finally {
-      await runtime.stop();
-    }
+    expect(() => runSecrets.decrypt({ api_token: "iv:body:tag" })).toThrow('"api_token"');
   });
 });

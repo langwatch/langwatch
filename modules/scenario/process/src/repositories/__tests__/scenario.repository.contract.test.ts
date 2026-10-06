@@ -1,8 +1,3 @@
-/**
- * @vitest-environment node
- * The Scenario aggregate's contract, stated once and run against the memory
- * twin always, the Postgres one when `LANGWATCH_TEST_DATABASE_URL` is named.
- */
 import { randomUUID } from "node:crypto";
 
 import { createLogger } from "@langwatch/observability";
@@ -12,10 +7,17 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+/**
+ * @vitest-environment node
+ * The Scenario aggregate's contract, stated once and run against the memory
+ * twin always, the Postgres one when `LANGWATCH_TEST_DATABASE_URL` is named.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nowInstant, toDate } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import type { ScenarioSecretCipher } from "../../app/scenario.app.ts";
 import { MemoryScenarioRepository } from "../memory/memory.scenario.repository.ts";
 import { PrismaScenarioRepository } from "../prisma/scenario.repository.ts";
 import type { ScenarioRepository } from "../scenario.repository.ts";
@@ -230,5 +232,8 @@ describe.skipIf(!databaseUrl)("given the Postgres Scenario repository", () => {
     await connection?.closeOnce();
   });
 
-  contractCases({ repository: () => PrismaScenarioRepository.create(database()) });
+  contractCases({
+    repository: () =>
+      PrismaScenarioRepository.create(database(), createApiFixture<ScenarioSecretCipher>()),
+  });
 });

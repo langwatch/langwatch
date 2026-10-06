@@ -437,7 +437,10 @@ export function createTestScenarioExecutionPrefetcherService(
   },
 ): ScenarioExecutionPrefetcherService {
   return ScenarioExecutionPrefetcherService.create({
-    secretCipher: cipher,
+    runSecretSeal: {
+      sealRunSecret: ({ plain }) => cipher.encrypt(plain),
+      openRunSecret: ({ sealed }) => cipher.decrypt(sealed),
+    },
     config,
     scenarios: scenarioService(deps),
     suites: suiteService(deps),

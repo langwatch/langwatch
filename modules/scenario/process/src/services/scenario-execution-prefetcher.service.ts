@@ -15,6 +15,7 @@ import type { SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
+import type { ScenarioRunSecretSeal } from "../repositories/scenario.repository.ts";
 import { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service.ts";
 import { ScenarioModelParametersService } from "./scenario-model-parameters.service.ts";
 import {
@@ -27,7 +28,6 @@ import {
 } from "./scenario-target-prefetch.service.ts";
 import type { ScenarioService } from "./scenario.service.ts";
 export type { VoiceTargetReader } from "./scenario-target-prefetch.service.ts";
-import type { ScenarioSecretCipher } from "../app/scenario.app.ts";
 import { ScenarioRunKeyService } from "./scenario-run-key.service.ts";
 import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
 import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
@@ -49,7 +49,8 @@ export interface ScenarioExecutionPrefetchConfig {
 }
 
 type ScenarioExecutionPrefetcherServiceOptions = {
-  secretCipher: ScenarioSecretCipher;
+  /** Opens a run's secret parameters: the scenario repository's own operation. */
+  runSecretSeal: ScenarioRunSecretSeal;
   config: ScenarioExecutionPrefetchConfig;
   scenarios: ScenarioService;
   suites: SuiteApi;
@@ -100,7 +101,7 @@ export class ScenarioExecutionPrefetcherService {
       runKeys,
       workflows: options.workflows,
     });
-    const runSecrets = ScenarioRunSecretsService.create(options.secretCipher);
+    const runSecrets = ScenarioRunSecretsService.create(options.runSecretSeal);
 
     return new ScenarioExecutionPrefetcherService({
       options,

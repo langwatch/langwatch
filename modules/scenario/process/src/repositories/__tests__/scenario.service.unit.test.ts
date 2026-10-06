@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SimulationService } from "@langwatch/scenario-contract";
 import { ScenarioNotFoundError } from "@langwatch/scenario-contract";
 import { frozenAt } from "@langwatch/test-harness";
@@ -12,6 +13,7 @@ import type {
 } from "../../app/scenario.app.ts";
 import { ScenarioService } from "../../services/scenario.service.ts";
 import { MemoryScenarioRepository } from "../memory/memory.scenario.repository.ts";
+import { PrismaScenarioRepository } from "../prisma/scenario.repository.ts";
 import type { ScenarioRepository } from "../scenario.repository.ts";
 
 const simulations = createApiFixture<SimulationService>();
@@ -52,7 +54,6 @@ function serviceOptions(
     ids: new TestScenarioId(id),
     testSuiteIds: new TestScenarioTestSuiteId(`test_suite_${id}`),
     clock,
-    secretCipher: new TestScenarioSecretCipher(),
   };
 }
 
@@ -303,7 +304,13 @@ describe("ScenarioService", () => {
 
   it("resolves a suite's scenarios together and encrypts secret values", async () => {
     const service = ScenarioService.create(
-      serviceOptions(MemoryScenarioRepository.create(), "scenario_1"),
+      serviceOptions(
+        PrismaScenarioRepository.create(
+          createApiFixture<PrismaClient>(),
+          new TestScenarioSecretCipher(),
+        ),
+        "scenario_1",
+      ),
     );
 
     await expect(
@@ -353,10 +360,15 @@ describe("ScenarioService", () => {
 
     /** @scenario "Writing a scenario secret refuses by name" */
     it("refuses saving a stored secret, naming the missing encryption key", async () => {
-      const service = ScenarioService.create({
-        ...serviceOptions(MemoryScenarioRepository.create(), "scenario_1"),
-        secretCipher: new RefusingScenarioSecretCipher(),
-      });
+      const service = ScenarioService.create(
+        serviceOptions(
+          PrismaScenarioRepository.create(
+            createApiFixture<PrismaClient>(),
+            new RefusingScenarioSecretCipher(),
+          ),
+          "scenario_1",
+        ),
+      );
 
       await expect(
         service.resolveRunParametersForScenarios({

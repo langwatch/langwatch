@@ -14,9 +14,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ResourceOwnership } from "@langwatch/process";
-import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { type SimulationService } from "@langwatch/scenario-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -31,7 +29,7 @@ import {
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
-import { ScenarioModule, type ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
+import { ScenarioModule } from "../scenario.app.ts";
 
 async function buildProductionApp(publicBaseUrl: string | undefined, emitter = new EventEmitter()) {
   return ScenarioModule.create({
@@ -58,17 +56,7 @@ async function buildProductionApp(publicBaseUrl: string | undefined, emitter = n
     config: { ...scenarioTestConfig, publicBaseUrl },
     resources: createApiFixture<ResourceOwnership>(),
     secrets: scenarioTestSecrets,
-    members: {
-      ...scenarioHostMembers,
-      redis: null,
-      encryption: createApiFixture<Encryption>({
-        encrypt: (value: string) => value,
-        decrypt: (value: string) => value,
-      }),
-      clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),
-      simulations: createApiFixture<SimulationService>(),
-      rateLimiter: { check: async () => ({ allowed: true }) },
-    },
+    members: scenarioHostMembers,
   });
 }
 

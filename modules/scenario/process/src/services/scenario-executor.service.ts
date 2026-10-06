@@ -14,11 +14,8 @@ import type { SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
-import type {
-  CancellationPublisher,
-  CancellationSubscriber,
-  ScenarioSecretCipher,
-} from "../app/scenario.app.ts";
+import type { CancellationPublisher, CancellationSubscriber } from "../app/scenario.app.ts";
+import type { ScenarioRunSecretSeal } from "../repositories/scenario.repository.ts";
 import {
   NodeScenarioChildService,
   type ScenarioChildProcessConfig,
@@ -71,7 +68,7 @@ type ScenarioExecutorInput = Readonly<{
   peers: ScenarioExecutorPeers;
   scenarios: ScenarioService;
   simulations: SimulationService;
-  secretCipher: ScenarioSecretCipher;
+  runSecretSeal: ScenarioRunSecretSeal;
   cancellations: CancellationPublisher;
   cancellationSubscriptions: CancellationSubscriber;
   config: ScenarioServerConfig;
@@ -125,7 +122,7 @@ export class ScenarioExecutorService {
   }): ScenarioProcessorService {
     const { peers, config, simulations } = this.input;
     const prefetcher = ScenarioExecutionPrefetcherService.create({
-      secretCipher: this.input.secretCipher,
+      runSecretSeal: this.input.runSecretSeal,
       config: {
         langwatchEndpoint,
         nlpServiceUrl,

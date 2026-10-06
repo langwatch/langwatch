@@ -1,9 +1,11 @@
 /**
  * @see specs/suites/test-suite-membership-invariant.feature
  */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ScenarioSecretCipher } from "../../../app/scenario.app.ts";
 import { PrismaScenarioRepository } from "../scenario.repository.ts";
 
 const NOW = new Date("2026-01-01T00:00:00.000Z");
@@ -71,7 +73,10 @@ describe("given a test suite whose scenarios include archived ones", () => {
     it("holds only the active scenarios on the test suite", async () => {
       const world = transactionDouble([{ id: "scenario_1" }, { id: "scenario_2" }]);
 
-      await PrismaScenarioRepository.create(world.database).create({
+      await PrismaScenarioRepository.create(
+        world.database,
+        createApiFixture<ScenarioSecretCipher>(),
+      ).create({
         id: "scenario_new",
         projectId: "project_1",
         name: "Refund flow",

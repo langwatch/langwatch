@@ -114,12 +114,11 @@ describe.skipIf(!databaseUrl)("Moving a scenario between test suites", () => {
     otherProjectId = otherProject.id;
 
     const options = {
-      repository: PrismaScenarioRepository.create(db),
+      repository: PrismaScenarioRepository.create(db, new TestSecretCipher()),
       simulations: createApiFixture<SimulationService>(),
       ids: new ScenarioIds(),
       testSuiteIds: new TestSuiteIds(),
       clock: new TestClock(),
-      secretCipher: new TestSecretCipher(),
     };
     scenarios = ScenarioService.create(options);
     otherScenarios = ScenarioService.create(options);

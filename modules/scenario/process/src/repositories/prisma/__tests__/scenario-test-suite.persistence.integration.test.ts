@@ -121,12 +121,11 @@ function service(clock = new TestClock()): ScenarioServiceContract {
   } satisfies SimulationService;
 
   return ScenarioServiceContract.create({
-    repository: PrismaScenarioRepository.create(database()),
+    repository: PrismaScenarioRepository.create(database(), new TestSecretCipher()),
     simulations,
     ids: new ScenarioIds(),
     testSuiteIds: new TestSuiteIds(),
     clock,
-    secretCipher: new TestSecretCipher(),
   });
 }
 

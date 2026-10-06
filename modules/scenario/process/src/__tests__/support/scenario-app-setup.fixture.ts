@@ -14,6 +14,7 @@ export const scenarioTestConfig: ScenarioServerConfig = {
   voicePublicBaseUrl: void 0,
   voiceTunnel: false,
   isSaas: false,
+  nodeEnvironment: "test",
   nlpCodeBlockTimeoutSeconds: void 0,
   voiceWorkerOnly: false,
   consumedResourceClasses: ["light", "voice"],
@@ -55,7 +56,6 @@ export function scenarioExecutorPeers() {
 export const scenarioHostMembers = {
   rawSocketPort: 0,
   voicePublicUrl: { unavailable: "no media door in a test process" },
-  nodeEnvironment: "test",
 };
 
 /** The voice doors' peers, each throwing by name if a test reaches it. */

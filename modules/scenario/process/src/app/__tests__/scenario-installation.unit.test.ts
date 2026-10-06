@@ -15,7 +15,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
@@ -23,7 +23,6 @@ import { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -34,7 +33,6 @@ import {
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import { scenarioProcessModule } from "../../scenario.module.ts";
-import type { ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
 
 const projectId = "project-1";
 
@@ -56,19 +54,11 @@ const signatureAgent: AgentWithFields = {
 
 function process(role: "api" | "worker", emitter: EventEmitter) {
   return createApp({ role, secrets: scenarioInstallationSecrets() })
-    .withModules([withMemoryRepositories(scenarioProcessModule)])
+    .withModules([scenarioProcessModule])
     .withConfig({
       scenario: { ...scenarioTestConfig, publicBaseUrl: "https://app.langwatch.test" },
     })
     .withStores(memoryStores())
-    .withAnalytical(createApiFixture<ScenarioReadOnlyClickHouse>())
-    .withKeyvalue(memoryRedisDouble())
-    .withMember("encryption", {
-      encrypt: (value: string) => value,
-      decrypt: (value: string) => value,
-    })
-    .withMember("rateLimiter", { check: async () => ({ allowed: true }) })
-    .withMember("nodeEnvironment", "test")
     .withMember("rawSocketPort", 0)
     .provide({
       agent: createApiFixture<AgentApi>({

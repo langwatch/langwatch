@@ -1,20 +1,17 @@
-import type {
-  CancellationMessage,
-  CancellationPublisher,
-  CancellationSubscriber,
-} from "../../app/scenario.app.ts";
+import type { CancellationMessage } from "../../app/scenario.app.ts";
+import { ScenarioCancellationRepository } from "../scenario-cancellation.repository.ts";
 
 /** Cancellations published in one process, kept in order and handed to its subscribers. */
-export class MemoryScenarioCancellationChannel
-  implements CancellationPublisher, CancellationSubscriber
-{
+export class MemoryScenarioCancellationRepository extends ScenarioCancellationRepository {
   readonly published: CancellationMessage[] = [];
   readonly #listeners = new Set<(message: CancellationMessage) => void>();
 
-  private constructor() {}
+  private constructor() {
+    super();
+  }
 
-  static create(): MemoryScenarioCancellationChannel {
-    return new MemoryScenarioCancellationChannel();
+  static create(): MemoryScenarioCancellationRepository {
+    return new MemoryScenarioCancellationRepository();
   }
 
   async publish(message: CancellationMessage): Promise<void> {

@@ -7,6 +7,7 @@ import {
   langwatchDefaultModel,
   nlpCodeBlockTimeoutSeconds,
   nlpServiceUrl,
+  nodeEnvironment,
   publicBaseUrl,
   type ConfigOf,
 } from "@langwatch/config";
@@ -87,6 +88,8 @@ export const scenarioConfig = Config.define((c) => ({
   voiceTunnel: c.env("VOICE_TUNNEL", explicitSwitch),
   /** The tunnel defaults on for the hosted product, a self-hosted production install off. */
   isSaas,
+  /** The deployment's environment name (the shared leaf); a child is started under it too. */
+  nodeEnvironment,
   /** A voice-only worker refuses to boot without a public https origin. */
   voiceWorkerOnly: c.env("VOICE_WORKER_ONLY", offUnlessTrue),
   /** The runtime classes this worker admits; a refused job retries on a worker that consumes it. */

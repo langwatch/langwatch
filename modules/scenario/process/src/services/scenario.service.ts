@@ -45,12 +45,7 @@ import {
   type SimulationService,
 } from "@langwatch/scenario-contract";
 
-import type {
-  ScenarioClock,
-  ScenarioTestSuiteId,
-  ScenarioId,
-  ScenarioSecretCipher,
-} from "../app/scenario.app.ts";
+import type { ScenarioClock, ScenarioTestSuiteId, ScenarioId } from "../app/scenario.app.ts";
 import type { ScenarioRepository } from "../repositories/scenario.repository.ts";
 import { ScenarioRunCancellationService } from "./scenario-run-cancellation.service.ts";
 import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
@@ -74,7 +69,6 @@ export type ScenarioServiceOptions = {
   ids: ScenarioId;
   testSuiteIds: ScenarioTestSuiteId;
   clock: ScenarioClock;
-  secretCipher: ScenarioSecretCipher;
 };
 
 /**
@@ -91,7 +85,7 @@ export class ScenarioService {
   private readonly cancellation: ScenarioRunCancellationService;
 
   private constructor(private readonly options: ScenarioServiceOptions) {
-    this.runSecrets = ScenarioRunSecretsService.create(options.secretCipher);
+    this.runSecrets = ScenarioRunSecretsService.create(options.repository);
     this.cancellation = ScenarioRunCancellationService.create(options);
   }
 
