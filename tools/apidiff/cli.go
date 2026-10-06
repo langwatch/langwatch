@@ -250,8 +250,13 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 
 	probe.adoptBooted(booted, boot, out.stderr)
 	probe.onOperationDone = findingsHook(findings, boot.BranchDir, out.stderr)
-	code = probePipeline(bootCtx, probe, out)
-	if dead := workerDeath(bootCtx); dead != nil {
+	return probeUnlessWorkerDied(bootCtx, probe, out)
+}
+
+// probeUnlessWorkerDied runs the probe, failing the run when a worker death canceled it.
+func probeUnlessWorkerDied(ctx context.Context, probe *probeFlags, out streams) int {
+	code := probePipeline(ctx, probe, out)
+	if dead := workerDeath(ctx); dead != nil {
 		fmt.Fprintln(out.stderr, "apidiff:", dead)
 		return exitError
 	}
@@ -415,13 +420,8 @@ func writeDryRunPlanOrError(boot BootConfig, out streams) int {
 // probePipeline is the shared compare flow: fetch both specs, diff them,
 // probe the operation union in lockstep, then report.
 func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
-	if probe.method != "" && !openapidiff.IsHTTPMethod(probe.method) {
-		fmt.Fprintf(out.stderr, "invalid HTTP method %q\n", probe.method)
-		return exitError
-	}
-	baseline, err := loadBaseline(probe.ledgerBaseline)
-	if err != nil {
-		fmt.Fprintln(out.stderr, err)
+	baseline, ok := probe.preflight(out.stderr)
+	if !ok {
 		return exitError
 	}
 
@@ -465,6 +465,20 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 		return code
 	}
 	return max(verdict.exitCode(out), probe.runScenarioAfterMainPass(ctx, out))
+}
+
+// preflight checks the method filter and loads the ledger baseline; false ends the run.
+func (probe *probeFlags) preflight(stderr io.Writer) (map[string]bool, bool) {
+	if probe.method != "" && !openapidiff.IsHTTPMethod(probe.method) {
+		fmt.Fprintf(stderr, "invalid HTTP method %q\n", probe.method)
+		return nil, false
+	}
+	baseline, err := loadBaseline(probe.ledgerBaseline)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return nil, false
+	}
+	return baseline, true
 }
 
 // probeOptions are the probe flags as ProbeAll takes them.
