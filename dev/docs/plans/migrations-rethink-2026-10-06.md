@@ -585,3 +585,12 @@ only where the step declares the source cannot be copied.
   owner, copying its rows), and the runner reads both until the last owner has moved.
 - Tenant passes off the boot finalize tenants later after a deploy; the legacy path stays correct
   meanwhile (`system-migrations-runner.feature:220-226`).
+
+## 11. The upgrade UI
+
+The surfaces over this mechanism (the ops page, the fleet view, the CLI and the checkup rows) are
+planned in `dev/docs/plans/upgrade-ui-2026-10-06.md` (Alex, 2026-10-06 afternoon, item 4). It merges
+today's migrations, enrolment, backfill, replay-for-a-release and storage-move notions into steps of
+one upgrade, adds UI slices U1 to U9 after S2, and raises two gaps this plan does not cover:
+ClickHouse schema is applied per dataplane (its Q-U1) and serving processes refusing below the
+ledger's floor after a rollback (its Q-U5).
