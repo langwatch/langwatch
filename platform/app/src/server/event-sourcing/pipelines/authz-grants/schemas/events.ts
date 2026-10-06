@@ -1,3 +1,4 @@
+import { PROJECT_READER_ROLE_KEY } from "@langwatch/authz";
 import {
   GRANT_CONDITION_TYPES,
   GRANT_EVENT_SOURCES,
@@ -160,8 +161,6 @@ export type GrantConditionWire = z.infer<typeof grantConditionSchema>;
  * if it narrowed anything. Same-organisation placement is a question for
  * storage, asked by the writer, not the wire.
  */
-export const SHARED_PROJECT_READ_ROLE_KEY = "project-reader";
-
 export const grantShapeRefinement = {
   check: (grant: {
     principal: { type: string; id: string | null };
@@ -180,7 +179,7 @@ export const grantShapeRefinement = {
       grant.principal.type === "project" &&
       grant.scope.type === "PROJECT" &&
       grant.principal.id !== grant.scope.id &&
-      grant.roleKey === SHARED_PROJECT_READ_ROLE_KEY &&
+      grant.roleKey === PROJECT_READER_ROLE_KEY &&
       grant.condition !== undefined &&
       (grant.condition.where === undefined || grant.condition.where === "");
     if (
@@ -194,10 +193,7 @@ export const grantShapeRefinement = {
     if ((grant.condition !== undefined) !== isSharedProjectRead) {
       return false;
     }
-    if (
-      (grant.roleKey === SHARED_PROJECT_READ_ROLE_KEY) !==
-      isSharedProjectRead
-    ) {
+    if ((grant.roleKey === PROJECT_READER_ROLE_KEY) !== isSharedProjectRead) {
       return false;
     }
     return (

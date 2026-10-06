@@ -12,7 +12,7 @@ import {
   bindingScopeCanGrantPermission,
   permissionSatisfiedBy,
 } from "./registry";
-import { builtinRoleGrants } from "./roles";
+import { builtinRoleGrants, PROJECT_READER_ROLE_KEY } from "./roles";
 import { audienceMatches } from "./scope";
 import type {
   AuthzScopeRef,
@@ -70,10 +70,10 @@ export function bindingGrants({
   // PROJECT scope and nowhere else, and nothing widens or narrows it - not
   // an organization role, not the EXTERNAL cap - because the principal is a
   // project, which has neither.
-  if (roleKey === "project-reader") {
+  if (roleKey === PROJECT_READER_ROLE_KEY) {
     return (
       binding.scopeType === "PROJECT" &&
-      builtinRoleGrants({ role: "project-reader", permission })
+      builtinRoleGrants({ role: PROJECT_READER_ROLE_KEY, permission })
     );
   }
 

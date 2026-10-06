@@ -10,8 +10,10 @@ import type {
 } from "@langwatch/authz";
 
 import { BindingMissingError } from "../authz-grants.repository";
+import { GRANT_CONDITION_TYPES } from "./facts";
 import type {
   GrantCondition,
+  GrantConditionType,
   GrantEventSource,
   GrantFact,
   LedgerPrincipalType,
@@ -99,14 +101,16 @@ export function grantConditionFromDb(
     return undefined;
   }
   const { type, where, from, until } = value as Record<string, unknown>;
-  if (type !== "trace" && type !== "span" && type !== "log") return undefined;
+  if (!(GRANT_CONDITION_TYPES as readonly unknown[]).includes(type)) {
+    return undefined;
+  }
   const optionalString = (field: unknown): field is string | undefined =>
     field === undefined || typeof field === "string";
   if (!optionalString(where) || !optionalString(from) || !optionalString(until)) {
     return undefined;
   }
   return {
-    type,
+    type: type as GrantConditionType,
     ...(where !== undefined ? { where } : {}),
     ...(from !== undefined ? { from } : {}),
     ...(until !== undefined ? { until } : {}),
