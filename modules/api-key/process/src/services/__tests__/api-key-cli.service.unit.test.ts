@@ -132,6 +132,7 @@ describe("given a CLI login key mint", () => {
 
   describe("when two logins for one device label race", () => {
     /** @scenario "two logins racing on one device leave the newer key alive" */
+    /** @scenario "A CLI device login replaces only older keys for that device" */
     it("revokes only the keys created before its own mint", async () => {
       const staleKey = loginKey({
         id: "apikey-stale",
@@ -229,8 +230,8 @@ describe("given a CLI login key mint", () => {
   });
 
   describe("when the user logs in again from the same device", () => {
-    /** @scenario A re-login names rotation as the cause of the login key it replaces */
-    /** @scenario A second CLI login from the same device replaces the first key */
+    /** @scenario "A re-login names rotation as the cause of the login key it replaces" */
+    /** @scenario "A second CLI login from the same device replaces the first key" */
     it("revokes the previous key with cause rotation, not a person's own decision", async () => {
       const { service, revoke } = serviceWith({
         findForUser: () => Promise.resolve([OLD_KEY]),
@@ -250,7 +251,7 @@ describe("given a CLI login key mint", () => {
   });
 
   describe("when the same user has a login key on another device", () => {
-    /** @scenario A second CLI login from the same device replaces the first key */
+    /** @scenario "A second CLI login from the same device replaces the first key" */
     it("leaves a key for another device untouched", async () => {
       const otherDeviceKey = {
         ...loginKey({ id: "apikey-desktop", createdAt: new Date("2026-01-01T00:00:00Z") }),
@@ -326,7 +327,7 @@ describe("given a CLI login key mint", () => {
       );
     });
 
-    /** @scenario A refresh extends the login key's expiry with the session */
+    /** @scenario "A refresh extends the login key's expiry with the session" */
     it("moves the expiry to the new refresh window when the session ceiling is further off", async () => {
       const { service, extendLoginKeyExpiry } = serviceWith({});
       const before = Date.now();
@@ -347,7 +348,7 @@ describe("given a CLI login key mint", () => {
       expect(expiresAt.epochMilliseconds).toBeLessThanOrEqual(Date.now() + 60_000);
     });
 
-    /** @scenario A refresh extends the login key's expiry with the session */
+    /** @scenario "A refresh extends the login key's expiry with the session" */
     it("never moves it past the organization's max session duration from the session start", async () => {
       const { service, extendLoginKeyExpiry } = serviceWith({});
       const dayMs = 24 * 60 * 60 * 1000;

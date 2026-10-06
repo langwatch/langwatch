@@ -38,6 +38,7 @@ const OWN_KEYS = {
     "personal API keys are the caller's own; the application proves organization membership and ownership itself",
 };
 
+/** @scenario "The API-key transport moves without changing who may call it" */
 it("binds every declared procedure once and preserves its access declaration", () => {
   const declarations = accessDeclaredBy(apiKeyTrpcTransport);
 
