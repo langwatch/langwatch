@@ -74,20 +74,7 @@ func BuildReport(changes []openapidiff.Change, result ProbeResult) Report {
 		CredentialChecks: result.CredentialChecks,
 		Effects:          result.Effects,
 	}
-	for index := range report.SpecChanges {
-		if report.SpecChanges[index].Ruling == "" {
-			report.Differences++
-		}
-	}
-	for _, finding := range result.Findings {
-		// Skips are harness notes, unverified_shape is a coverage gap, and an
-		// improved-error finding is drift the tool grants on sight — see
-		// improved-error.go and the README's "Improved-error acceptance": none
-		// of the three is a behavioral regression to fail the run over.
-		if finding.Kind != FindingSkipped && finding.Kind != FindingUnverifiedShape && finding.Kind != FindingErrorImproved && finding.Kind != FindingRuled {
-			report.Differences++
-		}
-	}
+	report.Differences = countDifferences(report.SpecChanges, result.Findings)
 	if report.Findings == nil {
 		report.Findings = []Finding{}
 	}
@@ -101,6 +88,30 @@ func BuildReport(changes []openapidiff.Change, result ProbeResult) Report {
 		report.Effects = []Effect{}
 	}
 	return report
+}
+
+// countDifferences counts the unruled spec changes and the findings that are
+// behavioral regressions.
+func countDifferences(specChanges []SpecChange, findings []Finding) int {
+	differences := 0
+	for index := range specChanges {
+		if specChanges[index].Ruling == "" {
+			differences++
+		}
+	}
+	for _, finding := range findings {
+		if isBehavioralFinding(finding.Kind) {
+			differences++
+		}
+	}
+	return differences
+}
+
+// isBehavioralFinding: skips are harness notes, unverified_shape is a coverage
+// gap, an improved-error finding is drift granted on sight (improved-error.go)
+// and a ruled finding is triaged; none of them fails the run.
+func isBehavioralFinding(kind string) bool {
+	return kind != FindingSkipped && kind != FindingUnverifiedShape && kind != FindingErrorImproved && kind != FindingRuled
 }
 
 // findingKindOrder fixes the section order of the human summary.
