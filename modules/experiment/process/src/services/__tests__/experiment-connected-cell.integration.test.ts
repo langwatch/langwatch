@@ -25,9 +25,9 @@ import type { Agent as TypedAgent, CallOutcome } from "@langwatch/agent-contract
 import { AgentBusyError, AgentOfflineError, AgentOwnerOnlyError } from "@langwatch/agent-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
 
-import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment-run-abort.repository.ts";
 import { MemoryExperimentRunEventStreamRepository } from "../../repositories/memory/memory.experiment-run-event-stream.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
+import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment.repositories.ts";
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
 import { ExperimentCellExecutionService } from "../experiment-cell-execution.service.ts";
 import {

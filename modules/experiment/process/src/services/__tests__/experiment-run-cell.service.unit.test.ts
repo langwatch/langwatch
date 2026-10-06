@@ -17,9 +17,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import type { ExperimentRunStreamMessage } from "../../repositories/experiment-run-event-stream.repository.ts";
 import type { ExperimentRunProgressState } from "../../repositories/experiment-run-fold.repository.ts";
-import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment-run-abort.repository.ts";
 import { MemoryExperimentRunEventStreamRepository } from "../../repositories/memory/memory.experiment-run-event-stream.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
+import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment.repositories.ts";
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
 import { foldEvaluatorsOf } from "../../rules/experiment-run-plan.rules.ts";
 import { markFinished } from "../../rules/experiment-run-window.rules.ts";

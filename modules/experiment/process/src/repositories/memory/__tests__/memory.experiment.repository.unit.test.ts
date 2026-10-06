@@ -3,9 +3,11 @@ import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { ArchivedExperimentWriteError } from "../../experiment.repository.ts";
-import { MemoryExperimentPeopleRepository } from "../memory.experiment-people.repository.ts";
-import { MemoryExperimentRunAbortRepository } from "../memory.experiment-run-abort.repository.ts";
-import { MemoryExperimentWorkflowVersionRepository } from "../memory.experiment-workflow-version.repository.ts";
+import {
+  MemoryExperimentPeopleRepository,
+  MemoryExperimentRunAbortRepository,
+  MemoryExperimentWorkflowVersionRepository,
+} from "../memory.experiment.repositories.ts";
 import { MemoryExperimentRepository } from "../memory.experiment.repository.ts";
 
 const projectId = "project-1";
