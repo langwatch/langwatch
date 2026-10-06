@@ -7,6 +7,8 @@ import {
 import Stripe from "stripe";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
+import { MemoryStripeCustomersChannel } from "../channels/memory/memory.stripe-customers.channel.ts";
+import { MemoryStripeSubscriptionsChannel } from "../channels/memory/memory.stripe-subscriptions.channel.ts";
 import type { SeatEventSubscriptionRepository } from "../repositories/seat-event-subscription.repository.ts";
 import {
   type SeatCheckoutInvites,
@@ -28,29 +30,11 @@ const prices = {
 
 // ── Mock factories ──────────────────────────────────────────────────────────
 
-const createMockStripe = () => ({
-  customers: {
-    // New customers have no fixed currency until their first subscription
-    retrieve: vi.fn().mockResolvedValue({ id: "cus_1", currency: null }),
-  },
-  subscriptions: {
-    retrieve: vi.fn(),
-    update: vi.fn(),
-  },
-  checkout: {
-    sessions: {
-      create: vi.fn(),
-    },
-  },
-  invoices: {
-    createPreview: vi.fn(),
-  },
-  billingPortal: {
-    sessions: {
-      create: vi.fn(),
-    },
-  },
-});
+/** A subscription as the provider holds it, with only the fields these paths read. */
+const subscriptionOf = (fields: object) => fields as Stripe.Subscription;
+
+/** An invoice preview as the provider computes it, with only the fields a quote reads. */
+const previewOf = (fields: object) => fields as Stripe.Invoice;
 
 const createMockSubscriptions = (): {
   [K in keyof SeatEventSubscriptionRepository]: Mock<SeatEventSubscriptionRepository[K]>;
@@ -72,22 +56,29 @@ const createMockInvites = (): {
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe("seatEventSubscription", () => {
-  let stripe: ReturnType<typeof createMockStripe>;
+  let stripeSubscriptions: MemoryStripeSubscriptionsChannel;
+  let customers: MemoryStripeCustomersChannel;
   let subscriptions: ReturnType<typeof createMockSubscriptions>;
   let invites: ReturnType<typeof createMockInvites>;
   let service: SeatEventSubscriptionService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    stripe = createMockStripe();
+    stripeSubscriptions = MemoryStripeSubscriptionsChannel.create();
+    customers = MemoryStripeCustomersChannel.create();
+    // New customers have no fixed currency until their first subscription.
+    customers.seed({ id: "cus_1", currency: null });
     subscriptions = createMockSubscriptions();
     invites = createMockInvites();
     service = SeatEventSubscriptionService.create({
-      stripe: stripe as any,
+      stripeSubscriptions,
       subscriptions,
       invites,
       prices,
-      customerCurrency: StripeCustomerCurrencyService.create(StripeErrorTranslatorService.create()),
+      customerCurrency: StripeCustomerCurrencyService.create({
+        customers,
+        stripeErrors: StripeErrorTranslatorService.create(),
+      }),
     });
   });
 
@@ -101,45 +92,51 @@ describe("seatEventSubscription", () => {
   };
 
   const seatSubscription = ({
+    id = "sub_stripe_1",
     canceledAt = null,
     interval = "month",
     unitAmount = 2500,
     priceId = "price_seat_usd_monthly",
   }: {
+    id?: string;
     canceledAt?: number | null;
     interval?: string;
     unitAmount?: number | null;
     priceId?: string;
-  } = {}) => ({
-    status: "active",
-    canceled_at: canceledAt,
-    items: {
-      data: [
-        {
-          id: "si_seat",
-          price: {
-            id: priceId,
-            unit_amount: unitAmount,
-            recurring: { interval },
+  } = {}) =>
+    subscriptionOf({
+      id,
+      status: "active",
+      canceled_at: canceledAt,
+      items: {
+        data: [
+          {
+            id: "si_seat",
+            price: {
+              id: priceId,
+              unit_amount: unitAmount,
+              recurring: { interval },
+            },
           },
-        },
-      ],
-    },
-  });
+        ],
+      },
+    });
 
   describe("previewProration()", () => {
     describe("when active subscription exists with a seat item", () => {
       beforeEach(() => {
         subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
-        stripe.subscriptions.retrieve.mockResolvedValue(seatSubscription());
+        stripeSubscriptions.seed({ subscription: seatSubscription() });
       });
 
       it("returns formatted proration amount and recurring total for USD", async () => {
-        stripe.invoices.createPreview.mockResolvedValue({
-          currency: "usd",
-          total: 1500,
-          // Clean account: nothing to draw down, so the card is charged the total.
-          amount_due: 1500,
+        stripeSubscriptions.seedPreview({
+          invoice: previewOf({
+            currency: "usd",
+            total: 1500,
+            // Clean account: nothing to draw down, so the card is charged the total.
+            amount_due: 1500,
+          }),
         });
 
         const result = await service.previewProration({
@@ -156,18 +153,20 @@ describe("seatEventSubscription", () => {
       });
 
       it("returns formatted proration amount and recurring total for EUR", async () => {
-        stripe.subscriptions.retrieve.mockResolvedValue(
-          seatSubscription({
+        stripeSubscriptions.seed({
+          subscription: seatSubscription({
             priceId: "price_seat_eur_monthly",
             unitAmount: 2000,
           }),
-        );
+        });
 
-        stripe.invoices.createPreview.mockResolvedValue({
-          currency: "eur",
-          total: 2000,
-          // Clean account: nothing to draw down, so the card is charged the total.
-          amount_due: 2000,
+        stripeSubscriptions.seedPreview({
+          invoice: previewOf({
+            currency: "eur",
+            total: 2000,
+            // Clean account: nothing to draw down, so the card is charged the total.
+            amount_due: 2000,
+          }),
         });
 
         const result = await service.previewProration({
@@ -181,11 +180,13 @@ describe("seatEventSubscription", () => {
       });
 
       it("formats whole amounts without decimals", async () => {
-        stripe.invoices.createPreview.mockResolvedValue({
-          currency: "usd",
-          total: 5000,
-          // Clean account: nothing to draw down, so the card is charged the total.
-          amount_due: 5000,
+        stripeSubscriptions.seedPreview({
+          invoice: previewOf({
+            currency: "usd",
+            total: 5000,
+            // Clean account: nothing to draw down, so the card is charged the total.
+            amount_due: 5000,
+          }),
         });
 
         const result = await service.previewProration({
@@ -199,11 +200,13 @@ describe("seatEventSubscription", () => {
       });
 
       it("formats fractional amounts with two decimal places", async () => {
-        stripe.invoices.createPreview.mockResolvedValue({
-          currency: "usd",
-          total: 1450,
-          // Clean account: nothing to draw down, so the card is charged the total.
-          amount_due: 1450,
+        stripeSubscriptions.seedPreview({
+          invoice: previewOf({
+            currency: "usd",
+            total: 1450,
+            // Clean account: nothing to draw down, so the card is charged the total.
+            amount_due: 1450,
+          }),
         });
 
         const result = await service.previewProration({
@@ -220,17 +223,19 @@ describe("seatEventSubscription", () => {
         // subscription. `always_invoice` charges them alongside the seat
         // change, so anything less than the invoice total under-quotes what
         // the card is debited.
-        stripe.invoices.createPreview.mockResolvedValue({
-          currency: "usd",
-          total: 4000,
-          // Clean account: nothing to draw down, so the card is charged the total.
-          amount_due: 4000,
-          lines: {
-            data: [
-              { proration: true, amount: 3000 },
-              { proration: true, amount: 1000 },
-            ],
-          },
+        stripeSubscriptions.seedPreview({
+          invoice: previewOf({
+            currency: "usd",
+            total: 4000,
+            // Clean account: nothing to draw down, so the card is charged the total.
+            amount_due: 4000,
+            lines: {
+              data: [
+                { proration: true, amount: 3000 },
+                { proration: true, amount: 1000 },
+              ],
+            },
+          }),
         });
 
         const result = await service.previewProration({
@@ -245,19 +250,21 @@ describe("seatEventSubscription", () => {
       it("quotes the taxed total, not the pre-tax line amounts", async () => {
         // Line amounts are pre-tax. Where tax is exclusive (USD here), summing
         // them quoted a fifth under what the card is debited.
-        stripe.invoices.createPreview.mockResolvedValue({
-          currency: "usd",
-          subtotal: 2458,
-          tax: 516,
-          total: 2974,
-          // Clean account: nothing to draw down, so the card is charged the total.
-          amount_due: 2974,
-          lines: {
-            data: [
-              { proration: true, amount: -4917 },
-              { proration: true, amount: 7375 },
-            ],
-          },
+        stripeSubscriptions.seedPreview({
+          invoice: previewOf({
+            currency: "usd",
+            subtotal: 2458,
+            tax: 516,
+            total: 2974,
+            // Clean account: nothing to draw down, so the card is charged the total.
+            amount_due: 2974,
+            lines: {
+              data: [
+                { proration: true, amount: -4917 },
+                { proration: true, amount: 7375 },
+              ],
+            },
+          }),
         });
 
         const result = await service.previewProration({
@@ -273,15 +280,17 @@ describe("seatEventSubscription", () => {
       it("quotes the whole invoice even when its lines are paginated", async () => {
         // `lines` is a paginated sublist, so a subscription carrying enough
         // pending prorations silently dropped everything past the first page.
-        stripe.invoices.createPreview.mockResolvedValue({
-          currency: "usd",
-          total: 140000,
-          // Clean account: nothing to draw down, so the card is charged the total.
-          amount_due: 140000,
-          lines: {
-            has_more: true,
-            data: [{ proration: true, amount: 10000 }],
-          },
+        stripeSubscriptions.seedPreview({
+          invoice: previewOf({
+            currency: "usd",
+            total: 140000,
+            // Clean account: nothing to draw down, so the card is charged the total.
+            amount_due: 140000,
+            lines: {
+              has_more: true,
+              data: [{ proration: true, amount: 10000 }],
+            },
+          }),
         });
 
         const result = await service.previewProration({
@@ -294,12 +303,14 @@ describe("seatEventSubscription", () => {
 
       /** @scenario "Reducing seats previews a credit rather than an amount owed" */
       it("reports a seat reduction as a signed credit", async () => {
-        stripe.invoices.createPreview.mockResolvedValue({
-          currency: "usd",
-          total: -2500,
-          // Stripe clamps a negative invoice here, which is exactly why the
-          // credit case cannot read this field.
-          amount_due: 0,
+        stripeSubscriptions.seedPreview({
+          invoice: previewOf({
+            currency: "usd",
+            total: -2500,
+            // Stripe clamps a negative invoice here, which is exactly why the
+            // credit case cannot read this field.
+            amount_due: 0,
+          }),
         });
 
         const result = await service.previewProration({
@@ -316,10 +327,12 @@ describe("seatEventSubscription", () => {
         // Measured against the provider on one purchase, two accounts: the
         // invoice is 293.70 either way, but an account holding 200.00 of
         // credit is charged 93.70.
-        stripe.invoices.createPreview.mockResolvedValue({
-          currency: "eur",
-          total: 29370,
-          amount_due: 9370,
+        stripeSubscriptions.seedPreview({
+          invoice: previewOf({
+            currency: "eur",
+            total: 29370,
+            amount_due: 9370,
+          }),
         });
 
         const result = await service.previewProration({
@@ -333,11 +346,13 @@ describe("seatEventSubscription", () => {
 
       /** @scenario "Preview works for subscriptions on flexible billing" */
       it("previews the seat change through the Create Preview Invoice API, in one call", async () => {
-        stripe.invoices.createPreview.mockResolvedValue({
-          currency: "usd",
-          total: 0,
-          // Clean account: nothing to draw down, so the card is charged the total.
-          amount_due: 0,
+        stripeSubscriptions.seedPreview({
+          invoice: previewOf({
+            currency: "usd",
+            total: 0,
+            // Clean account: nothing to draw down, so the card is charged the total.
+            amount_due: 0,
+          }),
         });
 
         await service.previewProration({
@@ -347,15 +362,17 @@ describe("seatEventSubscription", () => {
 
         // The Upcoming Invoice API rejects flexible-billing subscriptions
         // outright, so the preview must go through create_preview.
-        expect(stripe.invoices.createPreview).toHaveBeenCalledTimes(1);
-        expect(stripe.invoices.createPreview).toHaveBeenCalledWith({
-          subscription: "sub_stripe_1",
-          subscription_details: {
-            items: [{ id: "si_seat", quantity: 7 }],
-            proration_behavior: "always_invoice",
-            proration_date: expect.any(Number),
+        expect(stripeSubscriptions.previews).toHaveLength(1);
+        expect(stripeSubscriptions.previews).toEqual([
+          {
+            subscription: "sub_stripe_1",
+            subscription_details: {
+              items: [{ id: "si_seat", quantity: 7 }],
+              proration_behavior: "always_invoice",
+              proration_date: expect.any(Number),
+            },
           },
-        });
+        ]);
       });
     });
 
@@ -365,12 +382,14 @@ describe("seatEventSubscription", () => {
         // Falling back to zero rendered "$0" as the new billing amount beside a
         // button that charges the card.
         subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
-        stripe.subscriptions.retrieve.mockResolvedValue(seatSubscription({ unitAmount: null }));
-        stripe.invoices.createPreview.mockResolvedValue({
-          currency: "usd",
-          total: 1500,
-          // Clean account: nothing to draw down, so the card is charged the total.
-          amount_due: 1500,
+        stripeSubscriptions.seed({ subscription: seatSubscription({ unitAmount: null }) });
+        stripeSubscriptions.seedPreview({
+          invoice: previewOf({
+            currency: "usd",
+            total: 1500,
+            // Clean account: nothing to draw down, so the card is charged the total.
+            amount_due: 1500,
+          }),
         });
 
         await expect(
@@ -385,16 +404,17 @@ describe("seatEventSubscription", () => {
     describe("when the subscription is scheduled for cancellation", () => {
       beforeEach(() => {
         subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
-        stripe.subscriptions.retrieve.mockResolvedValue(
-          seatSubscription({ canceledAt: 1700000000, interval: "year" }),
-        );
-        stripe.invoices.createPreview.mockResolvedValue({
-          currency: "eur",
-          total: 63991,
-          // Clean account: nothing to draw down, so the card is charged the total.
-          amount_due: 63991,
+        stripeSubscriptions.seed({
+          subscription: seatSubscription({ canceledAt: 1700000000, interval: "year" }),
         });
-        stripe.subscriptions.update.mockResolvedValue({});
+        stripeSubscriptions.seedPreview({
+          invoice: previewOf({
+            currency: "eur",
+            total: 63991,
+            // Clean account: nothing to draw down, so the card is charged the total.
+            amount_due: 63991,
+          }),
+        });
       });
 
       it("previews the reactivation the update performs, not the cancellation", async () => {
@@ -406,15 +426,17 @@ describe("seatEventSubscription", () => {
         // Without this, an annual plan billed next to a monthly meter is
         // quoted against a seat line truncated to the monthly boundary — the
         // same change quoted 54.25 and charged 639.91.
-        expect(stripe.invoices.createPreview).toHaveBeenCalledWith({
-          subscription: "sub_stripe_1",
-          subscription_details: {
-            cancel_at_period_end: false,
-            items: [{ id: "si_seat", quantity: 8 }],
-            proration_behavior: "always_invoice",
-            proration_date: expect.any(Number),
+        expect(stripeSubscriptions.previews).toEqual([
+          {
+            subscription: "sub_stripe_1",
+            subscription_details: {
+              cancel_at_period_end: false,
+              items: [{ id: "si_seat", quantity: 8 }],
+              proration_behavior: "always_invoice",
+              proration_date: expect.any(Number),
+            },
           },
-        });
+        ]);
       });
 
       /** @scenario "Preview quotes the same change the confirmation applies" */
@@ -428,8 +450,8 @@ describe("seatEventSubscription", () => {
           totalMembers: 8,
         });
 
-        const previewed = stripe.invoices.createPreview.mock.calls[0]![0].subscription_details;
-        const applied = stripe.subscriptions.update.mock.calls[0]![1];
+        const previewed = stripeSubscriptions.previews[0]!.subscription_details;
+        const applied = stripeSubscriptions.updates[0]!.params;
 
         expect(previewed).toEqual(applied);
       });
@@ -461,7 +483,7 @@ describe("seatEventSubscription", () => {
             newTotalSeats: 3,
           }),
         ).rejects.toMatchObject({ code: "subscription_not_linked" });
-        expect(stripe.subscriptions.retrieve).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.reads).toEqual([]);
       });
 
       /** @scenario "A cancelled subscription does not mask an unlinked active one" */
@@ -484,7 +506,7 @@ describe("seatEventSubscription", () => {
             newTotalSeats: 3,
           }),
         ).rejects.toMatchObject({ code: "subscription_not_linked" });
-        expect(stripe.subscriptions.retrieve).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.reads).toEqual([]);
       });
     });
 
@@ -510,7 +532,7 @@ describe("seatEventSubscription", () => {
             newTotalSeats: 3,
           }),
         ).rejects.toMatchObject({ code: "subscription_ambiguous" });
-        expect(stripe.subscriptions.retrieve).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.reads).toEqual([]);
       });
 
       /** @scenario "Two active subscriptions refuse a seat change rather than picking one" */
@@ -534,7 +556,7 @@ describe("seatEventSubscription", () => {
             totalMembers: 3,
           }),
         ).rejects.toMatchObject({ code: "subscription_ambiguous" });
-        expect(stripe.subscriptions.update).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.updates).toEqual([]);
         expect(subscriptions.reactivateWithSeats).not.toHaveBeenCalled();
       });
     });
@@ -554,12 +576,14 @@ describe("seatEventSubscription", () => {
             status: "ACTIVE",
           },
         ]);
-        stripe.subscriptions.retrieve.mockResolvedValue(seatSubscription());
-        stripe.invoices.createPreview.mockResolvedValue({
-          currency: "usd",
-          total: 0,
-          // Clean account: nothing to draw down, so the card is charged the total.
-          amount_due: 0,
+        stripeSubscriptions.seed({ subscription: seatSubscription({ id: "sub_stripe_live" }) });
+        stripeSubscriptions.seedPreview({
+          invoice: previewOf({
+            currency: "usd",
+            total: 0,
+            // Clean account: nothing to draw down, so the card is charged the total.
+            amount_due: 0,
+          }),
         });
 
         await service.previewProration({
@@ -567,7 +591,7 @@ describe("seatEventSubscription", () => {
           newTotalSeats: 3,
         });
 
-        expect(stripe.subscriptions.retrieve).toHaveBeenCalledWith("sub_stripe_live");
+        expect(stripeSubscriptions.reads).toEqual(["sub_stripe_live"]);
       });
     });
 
@@ -581,12 +605,14 @@ describe("seatEventSubscription", () => {
             status: "CANCELLED",
           },
         ]);
-        stripe.subscriptions.retrieve.mockResolvedValue(seatSubscription());
-        stripe.invoices.createPreview.mockResolvedValue({
-          currency: "usd",
-          total: 0,
-          // Clean account: nothing to draw down, so the card is charged the total.
-          amount_due: 0,
+        stripeSubscriptions.seed({ subscription: seatSubscription() });
+        stripeSubscriptions.seedPreview({
+          invoice: previewOf({
+            currency: "usd",
+            total: 0,
+            // Clean account: nothing to draw down, so the card is charged the total.
+            amount_due: 0,
+          }),
         });
 
         await service.previewProration({
@@ -594,16 +620,19 @@ describe("seatEventSubscription", () => {
           newTotalSeats: 3,
         });
 
-        expect(stripe.subscriptions.retrieve).toHaveBeenCalledWith("sub_stripe_1");
+        expect(stripeSubscriptions.reads).toEqual(["sub_stripe_1"]);
       });
     });
 
     describe("when Stripe subscription is not active", () => {
       it("raises subscription_sync_failed", async () => {
         subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
-        stripe.subscriptions.retrieve.mockResolvedValue({
-          status: "canceled",
-          items: { data: [] },
+        stripeSubscriptions.seed({
+          subscription: subscriptionOf({
+            id: "sub_stripe_1",
+            status: "canceled",
+            items: { data: [] },
+          }),
         });
 
         await expect(
@@ -618,11 +647,14 @@ describe("seatEventSubscription", () => {
     describe("when no seat item found on subscription", () => {
       it("raises subscription_sync_failed for a missing seat item", async () => {
         subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
-        stripe.subscriptions.retrieve.mockResolvedValue({
-          status: "active",
-          items: {
-            data: [{ id: "si_events", price: { id: "price_events_usd_monthly" } }],
-          },
+        stripeSubscriptions.seed({
+          subscription: subscriptionOf({
+            id: "sub_stripe_1",
+            status: "active",
+            items: {
+              data: [{ id: "si_events", price: { id: "price_events_usd_monthly" } }],
+            },
+          }),
         });
 
         await expect(
@@ -641,8 +673,7 @@ describe("seatEventSubscription", () => {
     describe("when active subscription exists with a seat item", () => {
       beforeEach(() => {
         subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
-        stripe.subscriptions.retrieve.mockResolvedValue(seatSubscription());
-        stripe.subscriptions.update.mockResolvedValue({});
+        stripeSubscriptions.seed({ subscription: seatSubscription() });
       });
 
       it("updates Stripe subscription seat quantity", async () => {
@@ -652,11 +683,16 @@ describe("seatEventSubscription", () => {
         });
 
         expect(result).toEqual({ success: true });
-        expect(stripe.subscriptions.update).toHaveBeenCalledWith("sub_stripe_1", {
-          items: [{ id: "si_seat", quantity: 10 }],
-          proration_behavior: "always_invoice",
-          proration_date: expect.any(Number),
-        });
+        expect(stripeSubscriptions.updates).toEqual([
+          {
+            subscriptionId: "sub_stripe_1",
+            params: {
+              items: [{ id: "si_seat", quantity: 10 }],
+              proration_behavior: "always_invoice",
+              proration_date: expect.any(Number),
+            },
+          },
+        ]);
       });
 
       /** @scenario "The charge prices the same instant the quote did" */
@@ -669,10 +705,12 @@ describe("seatEventSubscription", () => {
           quotedAt,
         });
 
-        expect(stripe.subscriptions.update).toHaveBeenCalledWith(
-          "sub_stripe_1",
-          expect.objectContaining({ proration_date: quotedAt }),
-        );
+        expect(stripeSubscriptions.updates).toEqual([
+          {
+            subscriptionId: "sub_stripe_1",
+            params: expect.objectContaining({ proration_date: quotedAt }),
+          },
+        ]);
       });
 
       /** @scenario "A quote too old to honour is refused rather than repriced" */
@@ -684,7 +722,7 @@ describe("seatEventSubscription", () => {
             quotedAt: Math.floor(Date.now() / 1000) - 16 * 60,
           }),
         ).rejects.toMatchObject({ code: "billing_quote_expired" });
-        expect(stripe.subscriptions.update).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.updates).toEqual([]);
         expect(subscriptions.reactivateWithSeats).not.toHaveBeenCalled();
       });
 
@@ -697,7 +735,7 @@ describe("seatEventSubscription", () => {
             quotedAt: Math.floor(Date.now() / 1000) + 300,
           }),
         ).rejects.toMatchObject({ code: "billing_quote_expired" });
-        expect(stripe.subscriptions.update).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.updates).toEqual([]);
       });
 
       it("prices at now when no quote was shown", async () => {
@@ -708,7 +746,7 @@ describe("seatEventSubscription", () => {
           totalMembers: 10,
         });
 
-        const params = stripe.subscriptions.update.mock.calls[0]![1];
+        const params = stripeSubscriptions.updates[0]!.params;
         expect(params.proration_date).toBeGreaterThanOrEqual(before);
       });
 
@@ -728,22 +766,24 @@ describe("seatEventSubscription", () => {
     describe("when subscription is scheduled for cancellation", () => {
       it("reactivates by setting cancel_at_period_end to false", async () => {
         subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
-        stripe.subscriptions.retrieve.mockResolvedValue(
-          seatSubscription({ canceledAt: 1700000000 }),
-        );
-        stripe.subscriptions.update.mockResolvedValue({});
+        stripeSubscriptions.seed({ subscription: seatSubscription({ canceledAt: 1700000000 }) });
 
         await service.updateSeatEventItems({
           organizationId: "org_1",
           totalMembers: 5,
         });
 
-        expect(stripe.subscriptions.update).toHaveBeenCalledWith("sub_stripe_1", {
-          cancel_at_period_end: false,
-          items: [{ id: "si_seat", quantity: 5 }],
-          proration_behavior: "always_invoice",
-          proration_date: expect.any(Number),
-        });
+        expect(stripeSubscriptions.updates).toEqual([
+          {
+            subscriptionId: "sub_stripe_1",
+            params: {
+              cancel_at_period_end: false,
+              items: [{ id: "si_seat", quantity: 5 }],
+              proration_behavior: "always_invoice",
+              proration_date: expect.any(Number),
+            },
+          },
+        ]);
       });
     });
 
@@ -758,7 +798,7 @@ describe("seatEventSubscription", () => {
             totalMembers: 5,
           }),
         ).rejects.toMatchObject({ code: "subscription_sync_failed" });
-        expect(stripe.subscriptions.retrieve).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.reads).toEqual([]);
       });
     });
 
@@ -775,7 +815,7 @@ describe("seatEventSubscription", () => {
             totalMembers: 5,
           }),
         ).rejects.toMatchObject({ code: "subscription_not_linked" });
-        expect(stripe.subscriptions.retrieve).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.reads).toEqual([]);
         expect(subscriptions.reactivateWithSeats).not.toHaveBeenCalled();
       });
     });
@@ -783,9 +823,12 @@ describe("seatEventSubscription", () => {
     describe("when Stripe subscription status is not active", () => {
       it("raises subscription_sync_failed", async () => {
         subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
-        stripe.subscriptions.retrieve.mockResolvedValue({
-          status: "canceled",
-          items: { data: [] },
+        stripeSubscriptions.seed({
+          subscription: subscriptionOf({
+            id: "sub_stripe_1",
+            status: "canceled",
+            items: { data: [] },
+          }),
         });
 
         await expect(
@@ -794,18 +837,21 @@ describe("seatEventSubscription", () => {
             totalMembers: 5,
           }),
         ).rejects.toMatchObject({ code: "subscription_sync_failed" });
-        expect(stripe.subscriptions.update).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.updates).toEqual([]);
       });
     });
 
     describe("when no seat item found on Stripe subscription", () => {
       it("raises subscription_sync_failed for the missing seat item", async () => {
         subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
-        stripe.subscriptions.retrieve.mockResolvedValue({
-          status: "active",
-          items: {
-            data: [{ id: "si_events", price: { id: "price_events_usd_monthly" } }],
-          },
+        stripeSubscriptions.seed({
+          subscription: subscriptionOf({
+            id: "sub_stripe_1",
+            status: "active",
+            items: {
+              data: [{ id: "si_events", price: { id: "price_events_usd_monthly" } }],
+            },
+          }),
         });
 
         await expect(
@@ -814,7 +860,7 @@ describe("seatEventSubscription", () => {
             totalMembers: 5,
           }),
         ).rejects.toMatchObject({ code: "subscription_sync_failed" });
-        expect(stripe.subscriptions.update).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.updates).toEqual([]);
       });
     });
   });
@@ -825,10 +871,6 @@ describe("seatEventSubscription", () => {
     describe("when stale PENDING subscriptions exist", () => {
       beforeEach(() => {
         subscriptions.cancelPendingSeatCheckouts.mockResolvedValue(["stale_sub_1", "stale_sub_2"]);
-
-        stripe.checkout.sessions.create.mockResolvedValue({
-          url: "https://checkout.stripe.com/session",
-        });
       });
 
       it("cancels stale PENDING subscriptions", async () => {
@@ -864,11 +906,7 @@ describe("seatEventSubscription", () => {
     });
 
     describe("when the checkout carries invitations", () => {
-      beforeEach(() => {
-        stripe.checkout.sessions.create.mockResolvedValue({
-          url: "https://checkout.stripe.com/session",
-        });
-      });
+      beforeEach(() => {});
 
       /** @scenario Inviting through a seat checkout is bounded by the inviter */
       it("holds them as the person who invited, so organization bounds them by that person", async () => {
@@ -928,17 +966,13 @@ describe("seatEventSubscription", () => {
         expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
         expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
         expect(invites.createPaymentPendingInvites).not.toHaveBeenCalled();
-        expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.checkoutSessions).toEqual([]);
       });
     });
 
     describe("when no stale subscriptions exist", () => {
       beforeEach(() => {
         subscriptions.findSeatCandidates.mockResolvedValue([]);
-
-        stripe.checkout.sessions.create.mockResolvedValue({
-          url: "https://checkout.stripe.com/session",
-        });
       });
 
       it("skips invite cleanup", async () => {
@@ -958,10 +992,6 @@ describe("seatEventSubscription", () => {
     describe("when creating checkout session", () => {
       beforeEach(() => {
         subscriptions.findSeatCandidates.mockResolvedValue([]);
-
-        stripe.checkout.sessions.create.mockResolvedValue({
-          url: "https://checkout.stripe.com/session_abc",
-        });
       });
 
       it("returns the checkout session URL", async () => {
@@ -975,7 +1005,7 @@ describe("seatEventSubscription", () => {
         });
 
         expect(result).toEqual({
-          url: "https://checkout.stripe.com/session_abc",
+          url: "https://checkout.memory.test/cs_memory_1",
         });
       });
 
@@ -989,7 +1019,7 @@ describe("seatEventSubscription", () => {
           membersToAdd: 3,
         });
 
-        expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+        expect(stripeSubscriptions.checkoutSessions[0]?.params).toEqual(
           expect.objectContaining({
             mode: "subscription",
             customer: "cus_1",
@@ -1017,7 +1047,7 @@ describe("seatEventSubscription", () => {
           membersToAdd: 3,
         });
 
-        const callArgs = stripe.checkout.sessions.create.mock.calls[0]![0];
+        const callArgs = stripeSubscriptions.checkoutSessions[0]!.params;
         expect(callArgs.success_url).toBe("https://app.test/settings/subscription?success");
       });
 
@@ -1032,7 +1062,7 @@ describe("seatEventSubscription", () => {
           isUpgradeFromTiered: true,
         });
 
-        const callArgs = stripe.checkout.sessions.create.mock.calls[0]![0];
+        const callArgs = stripeSubscriptions.checkoutSessions[0]!.params;
         expect(callArgs.success_url).toBe(
           "https://app.test/settings/subscription?success&upgraded_from=tiered",
         );
@@ -1048,8 +1078,8 @@ describe("seatEventSubscription", () => {
           membersToAdd: 3,
         });
 
-        const callArgs = stripe.checkout.sessions.create.mock.calls[0]![0];
-        const anchor = callArgs.subscription_data.billing_cycle_anchor as number;
+        const callArgs = stripeSubscriptions.checkoutSessions[0]!.params;
+        const anchor = callArgs.subscription_data?.billing_cycle_anchor as number;
 
         // Anchor should be a Unix timestamp for the 1st of next month
         const anchorDate = new Date(anchor * 1000);
@@ -1060,12 +1090,9 @@ describe("seatEventSubscription", () => {
     describe("when the Stripe customer already has a fixed currency", () => {
       beforeEach(() => {
         subscriptions.findSeatCandidates.mockResolvedValue([]);
-        stripe.customers.retrieve.mockResolvedValue({
+        customers.seed({
           id: "cus_1",
           currency: "eur",
-        });
-        stripe.checkout.sessions.create.mockResolvedValue({
-          url: "https://checkout.stripe.com/session",
         });
       });
 
@@ -1079,7 +1106,7 @@ describe("seatEventSubscription", () => {
           membersToAdd: 3,
         });
 
-        expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+        expect(stripeSubscriptions.checkoutSessions[0]?.params).toEqual(
           expect.objectContaining({
             currency: "eur",
             line_items: [
@@ -1104,7 +1131,7 @@ describe("seatEventSubscription", () => {
           membersToAdd: 2,
         });
 
-        expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+        expect(stripeSubscriptions.checkoutSessions[0]?.params).toEqual(
           expect.objectContaining({ currency: "eur" }),
         );
       });
@@ -1113,14 +1140,12 @@ describe("seatEventSubscription", () => {
     describe("when the provider rate-limits the currency lookup", () => {
       beforeEach(() => {
         subscriptions.findSeatCandidates.mockResolvedValue([]);
-        stripe.customers.retrieve.mockRejectedValue(
-          new Stripe.errors.StripeRateLimitError({
+        customers.refuse({
+          operation: "getCustomer",
+          error: new Stripe.errors.StripeRateLimitError({
             message: "slow down",
             type: "rate_limit_error",
           }),
-        );
-        stripe.checkout.sessions.create.mockResolvedValue({
-          url: "https://checkout.stripe.com/session",
         });
       });
 
@@ -1149,7 +1174,7 @@ describe("seatEventSubscription", () => {
           })
           .catch(() => undefined);
 
-        expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.checkoutSessions).toEqual([]);
         expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
         expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
         expect(invites.cancelPaymentPendingInvites).not.toHaveBeenCalled();
@@ -1159,14 +1184,12 @@ describe("seatEventSubscription", () => {
     describe("when the provider is unreachable during the currency lookup", () => {
       beforeEach(() => {
         subscriptions.findSeatCandidates.mockResolvedValue([]);
-        stripe.customers.retrieve.mockRejectedValue(
-          new Stripe.errors.StripeConnectionError({
+        customers.refuse({
+          operation: "getCustomer",
+          error: new Stripe.errors.StripeConnectionError({
             message: "network down",
             type: "api_error",
           }),
-        );
-        stripe.checkout.sessions.create.mockResolvedValue({
-          url: "https://checkout.stripe.com/session",
         });
       });
 
@@ -1189,10 +1212,7 @@ describe("seatEventSubscription", () => {
 
       beforeEach(() => {
         subscriptions.findSeatCandidates.mockResolvedValue([]);
-        stripe.customers.retrieve.mockRejectedValue(lookupError);
-        stripe.checkout.sessions.create.mockResolvedValue({
-          url: "https://checkout.stripe.com/session",
-        });
+        customers.refuse({ operation: "getCustomer", error: lookupError });
       });
 
       it("lets the original error through instead of dressing it as handled", async () => {
@@ -1225,7 +1245,7 @@ describe("seatEventSubscription", () => {
           })
           .catch(() => undefined);
 
-        expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.checkoutSessions).toEqual([]);
         expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
         expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
         expect(invites.cancelPaymentPendingInvites).not.toHaveBeenCalled();
@@ -1235,12 +1255,9 @@ describe("seatEventSubscription", () => {
     describe("when the Stripe customer is fixed to a currency we do not sell in", () => {
       beforeEach(() => {
         subscriptions.findSeatCandidates.mockResolvedValue([]);
-        stripe.customers.retrieve.mockResolvedValue({
+        customers.seed({
           id: "cus_1",
           currency: "gbp",
-        });
-        stripe.checkout.sessions.create.mockResolvedValue({
-          url: "https://checkout.stripe.com/session",
         });
       });
 
@@ -1269,7 +1286,7 @@ describe("seatEventSubscription", () => {
           })
           .catch(() => undefined);
 
-        expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.checkoutSessions).toEqual([]);
         expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
         expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
         expect(invites.cancelPaymentPendingInvites).not.toHaveBeenCalled();
@@ -1279,12 +1296,9 @@ describe("seatEventSubscription", () => {
     describe("when the Stripe customer has been deleted", () => {
       beforeEach(() => {
         subscriptions.findSeatCandidates.mockResolvedValue([]);
-        stripe.customers.retrieve.mockResolvedValue({
+        customers.seed({
           id: "cus_1",
           deleted: true,
-        });
-        stripe.checkout.sessions.create.mockResolvedValue({
-          url: "https://checkout.stripe.com/session",
         });
       });
 
@@ -1313,7 +1327,7 @@ describe("seatEventSubscription", () => {
           })
           .catch(() => undefined);
 
-        expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.checkoutSessions).toEqual([]);
         expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
         expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
         expect(invites.cancelPaymentPendingInvites).not.toHaveBeenCalled();
@@ -1323,12 +1337,9 @@ describe("seatEventSubscription", () => {
     describe("when the Stripe customer has no currency yet", () => {
       it("uses the requested currency, since nothing is fixed", async () => {
         subscriptions.findSeatCandidates.mockResolvedValue([]);
-        stripe.customers.retrieve.mockResolvedValue({
+        customers.seed({
           id: "cus_1",
           currency: null,
-        });
-        stripe.checkout.sessions.create.mockResolvedValue({
-          url: "https://checkout.stripe.com/session",
         });
 
         await service.createSeatEventCheckout({
@@ -1340,7 +1351,7 @@ describe("seatEventSubscription", () => {
           membersToAdd: 2,
         });
 
-        expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+        expect(stripeSubscriptions.checkoutSessions[0]?.params).toEqual(
           expect.objectContaining({ currency: "usd" }),
         );
       });
@@ -1351,20 +1362,19 @@ describe("seatEventSubscription", () => {
 
   describe("seatEventBillingPortalUrl()", () => {
     it("creates portal session and returns URL", async () => {
-      stripe.billingPortal.sessions.create.mockResolvedValue({
-        url: "https://billing.stripe.com/portal",
-      });
-
       const result = await service.seatEventBillingPortalUrl({
         customerId: "cus_1",
         baseUrl: "https://app.test",
       });
 
-      expect(result).toEqual({ url: "https://billing.stripe.com/portal" });
-      expect(stripe.billingPortal.sessions.create).toHaveBeenCalledWith({
-        customer: "cus_1",
-        return_url: "https://app.test/settings/subscription",
-      });
+      expect(result).toEqual({ url: "https://billing.memory.test/bps_memory_1" });
+      expect(stripeSubscriptions.portalSessions).toEqual([
+        {
+          customerId: "cus_1",
+          returnUrl: "https://app.test/settings/subscription",
+          url: "https://billing.memory.test/bps_memory_1",
+        },
+      ]);
     });
   });
 });

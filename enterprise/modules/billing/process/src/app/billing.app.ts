@@ -59,6 +59,8 @@ import { connectedInvoicingChannels } from "../channels/connected-invoicing-chan
 import { connectedStatementMailChannels } from "../channels/connected-statement-mail-channels.registry.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
 import { licenseEmailChannels } from "../channels/license-email-channels.registry.ts";
+import { stripeCustomersChannels } from "../channels/stripe-customers-channels.registry.ts";
+import { stripeSubscriptionsChannels } from "../channels/stripe-subscriptions-channels.registry.ts";
 import { stripeWebhooksChannels } from "../channels/stripe-webhooks-channels.registry.ts";
 import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
 import type { BillingLifecyclePipeline } from "../eventing/billing-lifecycle.pipeline.ts";
@@ -155,7 +157,7 @@ const STRIPE_API_VERSION = "2024-04-10";
 /** Billing's Stripe, built once per deployment that holds the key. */
 type BillingStripe = Readonly<{
   channels: BillingStripeChannels;
-  /** The one SDK client, for the services not yet on a subject channel (Q69-2 to Q69-4). */
+  /** The one SDK client, for the services not yet on a subject channel (Q69-3 and Q69-4). */
   client: Stripe;
 }>;
 
@@ -297,7 +299,15 @@ export class BillingModule
         BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment)).prices
           .CONNECTED_HOSTED_USAGE_QUARTERLY,
     });
-    return { client, channels: { webhooks, connectedInvoicing } };
+    return {
+      client,
+      channels: {
+        webhooks,
+        customers: stripeCustomersChannels.http.create({ stripe: client }),
+        subscriptions: stripeSubscriptionsChannels.http.create({ stripe: client }),
+        connectedInvoicing,
+      },
+    };
   }
 
   /** Main's Slack, HubSpot and usage-limit mail notices; each Slack webhook is a secret. */
@@ -506,7 +516,7 @@ export class BillingModule
         subscription && isSaas
           ? BillingModule.#composeSubscriptions({
               subscription,
-              stripe: stripe.client,
+              stripe,
               nodeEnvironment,
               repositories,
             })
@@ -550,7 +560,7 @@ export class BillingModule
     repositories,
   }: {
     subscription: SubscriptionComposition;
-    stripe: Stripe;
+    stripe: BillingStripe;
     nodeEnvironment: string | undefined;
     repositories: Pick<
       BillingRepositories,
@@ -561,19 +571,21 @@ export class BillingModule
       getStripeEnvironmentFromNodeEnv(nodeEnvironment),
     ).prices;
     const stripeErrors = StripeErrorTranslatorService.create();
+    const { customers, subscriptions: stripeSubscriptions } = stripe.channels;
     return {
-      customers: CustomerService.create({ stripe, organizations: subscription.organizations }),
+      customers: CustomerService.create({ customers, organizations: subscription.organizations }),
       subscriptions: BillingSubscriptionService.create({
         repository: repositories.subscriptions,
         organizationRepository: repositories.organizations,
-        stripe,
+        stripeSubscriptions,
+        stripe: stripe.client,
         itemCalculator: SubscriptionItemCalculatorService.create(prices),
         seatEventService: SeatEventSubscriptionService.create({
-          stripe,
+          stripeSubscriptions,
           subscriptions: repositories.seatEventSubscriptions,
           invites: subscription.organizations,
           prices,
-          customerCurrency: StripeCustomerCurrencyService.create(stripeErrors),
+          customerCurrency: StripeCustomerCurrencyService.create({ customers, stripeErrors }),
         }),
         notifier: subscription.notifier,
         stripeErrors,

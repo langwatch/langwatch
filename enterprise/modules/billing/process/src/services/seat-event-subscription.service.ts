@@ -17,6 +17,7 @@ import type { OrganizationApi, OrganizationCaller } from "@langwatch/organizatio
 import { nowInstant, Temporal } from "@langwatch/time";
 import type Stripe from "stripe";
 
+import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { SeatEventSubscriptionRepository } from "../repositories/seat-event-subscription.repository.ts";
 import {
   type InviteInput,
@@ -42,26 +43,26 @@ type SeatCheckoutInvitations = Readonly<{
 const logger = createLogger("langwatch:billing:seatEventSubscription");
 
 export class SeatEventSubscriptionService {
-  private readonly stripe: Stripe;
+  private readonly stripeSubscriptions: StripeSubscriptionsChannel;
   private readonly subscriptions: SeatEventSubscriptionRepository;
   private readonly invites: SeatCheckoutInvites;
   private readonly prices: StripePriceMap;
   private readonly customerCurrency: StripeCustomerCurrencyService;
 
   private constructor({
-    stripe,
+    stripeSubscriptions,
     subscriptions,
     invites,
     prices,
     customerCurrency,
   }: {
-    stripe: Stripe;
+    stripeSubscriptions: StripeSubscriptionsChannel;
     subscriptions: SeatEventSubscriptionRepository;
     invites: SeatCheckoutInvites;
     prices: StripePriceMap;
     customerCurrency: StripeCustomerCurrencyService;
   }) {
-    this.stripe = stripe;
+    this.stripeSubscriptions = stripeSubscriptions;
     this.subscriptions = subscriptions;
     this.invites = invites;
     this.prices = prices;
@@ -69,7 +70,7 @@ export class SeatEventSubscriptionService {
   }
 
   static create(options: {
-    stripe: Stripe;
+    stripeSubscriptions: StripeSubscriptionsChannel;
     subscriptions: SeatEventSubscriptionRepository;
     invites: SeatCheckoutInvites;
     prices: StripePriceMap;
@@ -150,9 +151,9 @@ export class SeatEventSubscriptionService {
   private async loadSeatChangeTarget(organizationId: string) {
     const subscription = await this.findSeatSubscription(organizationId);
 
-    const stripeSubscription = await this.stripe.subscriptions.retrieve(
-      subscription.stripeSubscriptionId,
-    );
+    const stripeSubscription = await this.stripeSubscriptions.getSubscription({
+      subscriptionId: subscription.stripeSubscriptionId,
+    });
 
     // Must still be live at the provider, even if scheduled for cancellation.
     if (stripeSubscription.status !== "active") {
@@ -199,7 +200,6 @@ export class SeatEventSubscriptionService {
     // write below this point would have to be cleaned up afterwards.
     const checkoutCurrency = this.customerCurrency.getCurrency(
       await this.customerCurrency.resolve({
-        stripe: this.stripe,
         customerId,
         organizationId,
         requestedCurrency: currency,
@@ -286,7 +286,7 @@ export class SeatEventSubscriptionService {
         "create_prorations" as Stripe.Checkout.SessionCreateParams.SubscriptionData.ProrationBehavior,
     };
 
-    const session = await this.stripe.checkout.sessions.create({
+    const session = await this.stripeSubscriptions.createCheckoutSession({
       mode: "subscription",
       currency: checkoutCurrency.toLowerCase(),
       ...({ adaptive_pricing: { enabled: false } } as Record<string, unknown>),
@@ -378,15 +378,15 @@ export class SeatEventSubscriptionService {
     // Charges the proration immediately, and reactivates the subscription if
     // it was scheduled for cancellation — the customer buying a seat is
     // choosing to keep it.
-    await this.stripe.subscriptions.update(
-      subscription.stripeSubscriptionId,
-      seatChangeParams({
+    await this.stripeSubscriptions.updateSubscription({
+      subscriptionId: subscription.stripeSubscriptionId,
+      params: seatChangeParams({
         stripeSubscription,
         seatItem,
         quantity: totalMembers,
         prorationDate,
       }),
-    );
+    });
 
     // Restore DB record to ACTIVE with updated seat count
     await this.subscriptions.reactivateWithSeats({ id: subscription.id, maxMembers: totalMembers });
@@ -415,7 +415,7 @@ export class SeatEventSubscriptionService {
     // rejects `retrieveUpcoming` for subscriptions on flexible billing mode on
     // every API version, and subscriptions migrated to flexible billing are
     // live customer state.
-    const preview = await this.stripe.invoices.createPreview({
+    const preview = await this.stripeSubscriptions.previewInvoice({
       subscription: subscription.stripeSubscriptionId,
       subscription_details: seatChangeParams({
         stripeSubscription,
@@ -472,11 +472,9 @@ export class SeatEventSubscriptionService {
     customerId: string;
     baseUrl: string;
   }): Promise<{ url: string }> {
-    const session = await this.stripe.billingPortal.sessions.create({
-      customer: customerId,
-      return_url: `${baseUrl}/settings/subscription`,
+    return this.stripeSubscriptions.createBillingPortalSession({
+      customerId,
+      returnUrl: `${baseUrl}/settings/subscription`,
     });
-
-    return { url: session.url };
   }
 }

@@ -1,13 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MemoryStripeCustomersChannel } from "../channels/memory/memory.stripe-customers.channel.ts";
 import { CustomerService } from "../services/customer.service.ts";
-
-const createMockStripe = () => ({
-  customers: {
-    create: vi.fn(),
-    del: vi.fn(),
-  },
-});
 
 const createMockOrganizations = () => ({
   getBillingProfile: vi.fn(),
@@ -15,17 +9,14 @@ const createMockOrganizations = () => ({
 });
 
 describe("customerService", () => {
-  let stripe: ReturnType<typeof createMockStripe>;
+  let customers: MemoryStripeCustomersChannel;
   let organizations: ReturnType<typeof createMockOrganizations>;
   let service: CustomerService;
 
   beforeEach(() => {
-    stripe = createMockStripe();
+    customers = MemoryStripeCustomersChannel.create();
     organizations = createMockOrganizations();
-    service = CustomerService.create({
-      stripe: stripe as any,
-      organizations,
-    });
+    service = CustomerService.create({ customers, organizations });
   });
 
   describe("getOrCreateCustomerId()", () => {
@@ -60,7 +51,7 @@ describe("customerService", () => {
         });
 
         expect(result).toBe("cus_existing");
-        expect(stripe.customers.create).not.toHaveBeenCalled();
+        expect(customers.created).toEqual([]);
       });
     });
 
@@ -88,7 +79,6 @@ describe("customerService", () => {
           name: "Acme",
           billingCustomerId: null,
         });
-        stripe.customers.create.mockResolvedValue({ id: "cus_new" });
         organizations.claimBillingCustomerId.mockResolvedValue(true);
 
         const result = await service.getOrCreateCustomerId({
@@ -96,15 +86,13 @@ describe("customerService", () => {
           organizationId: "org_123",
         });
 
-        expect(result).toBe("cus_new");
-        expect(stripe.customers.create).toHaveBeenCalledWith({
-          email: "test@example.com",
-          name: "Acme",
-        });
+        expect(result).toBe("cus_memory_1");
+        expect(customers.created).toEqual([{ email: "test@example.com", name: "Acme" }]);
         expect(organizations.claimBillingCustomerId).toHaveBeenCalledWith({
           organizationId: "org_123",
-          billingCustomerId: "cus_new",
+          billingCustomerId: "cus_memory_1",
         });
+        expect(customers.deleted).toEqual([]);
       });
     });
 
@@ -121,9 +109,7 @@ describe("customerService", () => {
             name: "Acme",
             billingCustomerId: "cus_winner",
           });
-        stripe.customers.create.mockResolvedValue({ id: "cus_orphan" });
         organizations.claimBillingCustomerId.mockResolvedValue(false);
-        stripe.customers.del.mockResolvedValue({ deleted: true });
 
         const result = await service.getOrCreateCustomerId({
           user: { email: "test@example.com" },
@@ -131,7 +117,10 @@ describe("customerService", () => {
         });
 
         expect(result).toBe("cus_winner");
-        expect(stripe.customers.del).toHaveBeenCalledWith("cus_orphan");
+        expect(customers.deleted).toEqual(["cus_memory_1"]);
+        await expect(customers.getCustomer({ customerId: "cus_memory_1" })).resolves.toMatchObject({
+          deleted: true,
+        });
       });
 
       it("handles orphan cleanup failure gracefully", async () => {
@@ -146,9 +135,8 @@ describe("customerService", () => {
             name: "Acme",
             billingCustomerId: "cus_winner",
           });
-        stripe.customers.create.mockResolvedValue({ id: "cus_orphan" });
         organizations.claimBillingCustomerId.mockResolvedValue(false);
-        stripe.customers.del.mockRejectedValue(new Error("Stripe API error"));
+        customers.refuse({ operation: "deleteCustomer", error: new Error("Stripe API error") });
 
         const result = await service.getOrCreateCustomerId({
           user: { email: "test@example.com" },
@@ -164,9 +152,7 @@ describe("customerService", () => {
           name: "Acme",
           billingCustomerId: null,
         });
-        stripe.customers.create.mockResolvedValue({ id: "cus_orphan" });
         organizations.claimBillingCustomerId.mockResolvedValue(false);
-        stripe.customers.del.mockResolvedValue({ deleted: true });
 
         await expect(
           service.getOrCreateCustomerId({

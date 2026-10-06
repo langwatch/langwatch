@@ -4,7 +4,8 @@ import {
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type Stripe from "stripe";
+
+import type { StripeCustomersChannel } from "../channels/stripe-customers.channel.ts";
 
 const logger = createLogger("langwatch:billing:customerService");
 
@@ -20,12 +21,15 @@ type BillingProfileSource = Pick<
 
 export class CustomerService {
   private constructor(
-    private readonly stripe: Stripe,
+    private readonly customers: StripeCustomersChannel,
     private readonly organizations: BillingProfileSource,
   ) {}
 
-  static create(options: { stripe: Stripe; organizations: BillingProfileSource }): CustomerService {
-    return new CustomerService(options.stripe, options.organizations);
+  static create(options: {
+    customers: StripeCustomersChannel;
+    organizations: BillingProfileSource;
+  }): CustomerService {
+    return new CustomerService(options.customers, options.organizations);
   }
 
   async getOrCreateCustomerId(params: {
@@ -45,7 +49,7 @@ export class CustomerService {
       throw new UserEmailRequiredError();
     }
 
-    const customer = await this.stripe.customers.create({
+    const customer = await this.customers.createCustomer({
       email: user.email,
       name: organization.name,
     });
@@ -65,7 +69,7 @@ export class CustomerService {
         "[billing] Stripe customer race detected, cleaning up orphan",
       );
       try {
-        await this.stripe.customers.del(customer.id);
+        await this.customers.deleteCustomer({ customerId: customer.id });
       } catch (error) {
         logger.warn(
           {

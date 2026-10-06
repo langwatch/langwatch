@@ -21,6 +21,7 @@ import type { OrganizationCaller } from "@langwatch/organization-contract";
 import type Stripe from "stripe";
 
 import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
+import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 import type {
   BillingSubscriptionRecord,
@@ -44,7 +45,7 @@ const logger = createLogger("langwatch:billing:subscriptionService");
 export class BillingSubscriptionService {
   private readonly repository: BillingSubscriptionRepository;
   private readonly organizationRepository: BillingAccountFactsRepository;
-  private readonly stripe: Stripe;
+  private readonly stripeSubscriptions: StripeSubscriptionsChannel;
   private readonly itemCalculator: SubscriptionItemCalculatorService;
   private readonly seatEventService: SeatEventSubscriptionService | undefined;
   private readonly notifier: BillingSubscriptionNotifier;
@@ -54,6 +55,7 @@ export class BillingSubscriptionService {
   private constructor({
     repository,
     organizationRepository,
+    stripeSubscriptions,
     stripe,
     itemCalculator,
     seatEventService,
@@ -62,6 +64,7 @@ export class BillingSubscriptionService {
   }: {
     repository: BillingSubscriptionRepository;
     organizationRepository: BillingAccountFactsRepository;
+    stripeSubscriptions: StripeSubscriptionsChannel;
     stripe: Stripe;
     itemCalculator: SubscriptionItemCalculatorService;
     seatEventService: SeatEventSubscriptionService | undefined;
@@ -70,7 +73,7 @@ export class BillingSubscriptionService {
   }) {
     this.repository = repository;
     this.organizationRepository = organizationRepository;
-    this.stripe = stripe;
+    this.stripeSubscriptions = stripeSubscriptions;
     this.itemCalculator = itemCalculator;
     this.seatEventService = seatEventService;
     this.notifier = notifier;
@@ -81,6 +84,8 @@ export class BillingSubscriptionService {
   static create(options: {
     repository: BillingSubscriptionRepository;
     organizationRepository: BillingAccountFactsRepository;
+    stripeSubscriptions: StripeSubscriptionsChannel;
+    /** Only `invoices.list`, until the invoices subject is a channel (Q69-3). */
     stripe: Stripe;
     itemCalculator: SubscriptionItemCalculatorService;
     seatEventService?: SeatEventSubscriptionService;
@@ -91,6 +96,7 @@ export class BillingSubscriptionService {
     return new BillingSubscriptionService({
       repository: options.repository,
       organizationRepository: options.organizationRepository,
+      stripeSubscriptions: options.stripeSubscriptions,
       stripe: options.stripe,
       itemCalculator: options.itemCalculator,
       seatEventService: options.seatEventService,
@@ -142,17 +148,18 @@ export class BillingSubscriptionService {
       lastSubscription?.stripeSubscriptionId &&
       lastSubscription.status !== SubscriptionStatus.PENDING
     ) {
-      const subscription = await this.stripe.subscriptions.retrieve(
-        lastSubscription.stripeSubscriptionId,
-      );
+      const subscription = await this.stripeSubscriptions.getSubscription({
+        subscriptionId: lastSubscription.stripeSubscriptionId,
+      });
       const itemsToUpdate = this.itemCalculator.getItemsToUpdate({
         currentItems: subscription.items.data,
         plan,
         tracesToAdd: effectiveTraces,
         membersToAdd: effectiveMembers,
       });
-      await this.stripe.subscriptions.update(lastSubscription.stripeSubscriptionId, {
-        items: itemsToUpdate,
+      await this.stripeSubscriptions.updateSubscription({
+        subscriptionId: lastSubscription.stripeSubscriptionId,
+        params: { items: itemsToUpdate },
       });
 
       return { success: true };
@@ -250,12 +257,10 @@ export class BillingSubscriptionService {
       }
     }
 
-    const session = await this.stripe.billingPortal.sessions.create({
-      customer: customerId,
-      return_url: `${baseUrl}/settings/subscription`,
+    return this.stripeSubscriptions.createBillingPortalSession({
+      customerId,
+      returnUrl: `${baseUrl}/settings/subscription`,
     });
-
-    return { url: session.url };
   }
 
   async previewProration({
@@ -377,7 +382,9 @@ export class BillingSubscriptionService {
     subscriptionId: string;
     baseUrl: string;
   }): Promise<{ url: string | null }> {
-    const response = await this.stripe.subscriptions.cancel(stripeSubscriptionId);
+    const response = await this.stripeSubscriptions.cancelSubscription({
+      subscriptionId: stripeSubscriptionId,
+    });
     if (response.status === "canceled") {
       await this.repository.updateStatus({
         id: subscriptionId,
@@ -403,15 +410,18 @@ export class BillingSubscriptionService {
     membersToAdd: number;
     baseUrl: string;
   }): Promise<{ url: string | null }> {
-    const current = await this.stripe.subscriptions.retrieve(stripeSubscriptionId);
+    const current = await this.stripeSubscriptions.getSubscription({
+      subscriptionId: stripeSubscriptionId,
+    });
     const itemsToUpdate = this.itemCalculator.getItemsToUpdate({
       currentItems: current.items.data,
       plan,
       tracesToAdd,
       membersToAdd,
     });
-    const response = await this.stripe.subscriptions.update(stripeSubscriptionId, {
-      items: itemsToUpdate,
+    const response = await this.stripeSubscriptions.updateSubscription({
+      subscriptionId: stripeSubscriptionId,
+      params: { items: itemsToUpdate },
     });
     if (response.status === "active") {
       await this.repository.updatePlan({ id: subscriptionId, plan });
@@ -466,7 +476,7 @@ export class BillingSubscriptionService {
       ? stripePricesFile.prices[basePriceId]?.currency?.toLowerCase()
       : undefined;
     const checkoutCurrency = rawCurrency === "usd" || rawCurrency === "eur" ? rawCurrency : "usd";
-    const session = await this.stripe.checkout.sessions.create({
+    const session = await this.stripeSubscriptions.createCheckoutSession({
       mode: "subscription",
       currency: checkoutCurrency,
       ...({ adaptive_pricing: { enabled: false } } as Record<string, unknown>),

@@ -117,3 +117,19 @@ Feature: Enterprise billing compatibility
     When they read a customer's connected-billing overview
     Then the overview answers
     And onboard, add commit, renew, complete renewal and mark paid out of band are each refused with permission_denied
+
+  @unit
+  Scenario: A Stripe customer reads alike over the provider and its memory twin
+    Given the Stripe customers channel over the provider and over its memory twin
+    When a customer is created, read back, deleted and read again
+    Then each tier answers the created customer with no fixed currency, then answers it deleted
+    And each tier answers a customer whose currency is fixed with that currency
+    And each tier refuses a read of a customer it never held with resource_missing
+
+  @unit
+  Scenario: A Stripe subscription changes alike over the provider and its memory twin
+    Given the Stripe subscriptions channel over the provider and over its memory twin, each holding an active subscription
+    When the subscription is read, updated and cancelled, an invoice preview is asked for, and a checkout and a billing portal session are opened
+    Then each tier answers the subscription with its items, then answers it cancelled
+    And each tier answers the preview and each session with a url
+    And each tier refuses a read of a subscription it never held with resource_missing

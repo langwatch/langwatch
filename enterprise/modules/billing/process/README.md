@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`BillingApi`)
 
-What the billing module answers other modules: invoice billing for a connected self-hosted customer (ADR-156 section 7). Every operation refuses off LangWatch Cloud, and where no payment provider is configured. The backoffice operations answer anyone without the platform-operator grant not found.
+What the billing module answers other modules: invoice billing for a connected self-hosted customer (ADR-156 section 7). Every operation refuses off LangWatch Cloud, and where no payment provider is configured. The backoffice operations trust the platform door (Q43): staff only, writes need ops:manage.
 
 Peers call these through the token, declared at `../contract/src/billing.api.ts:36`; nothing else in this package is public.
 
@@ -21,7 +21,7 @@ Peers call these through the token, declared at `../contract/src/billing.api.ts:
 The commercial state of one connected customer.
 
 ```typescript
-getConnectedBillingOverview(input: { organizationId: string }, by: BillingStaff | null): Promise<ConnectedBillingOverview>;
+getConnectedBillingOverview(input: { organizationId: string }, staff: BillingStaff): Promise<ConnectedBillingOverview>;
 ```
 
 #### `onboardConnectedCustomer`
@@ -29,7 +29,7 @@ getConnectedBillingOverview(input: { organizationId: string }, by: BillingStaff 
 Onboards a customer, or completes an onboarding that stopped halfway.
 
 ```typescript
-onboardConnectedCustomer(input: ConnectedOnboardRequest, by: BillingStaff | null): Promise<ConnectedBillingAccountView>;
+onboardConnectedCustomer(input: ConnectedOnboardRequest, staff: BillingStaff): Promise<ConnectedBillingAccountView>;
 ```
 
 #### `addConnectedCommit`
@@ -37,19 +37,19 @@ onboardConnectedCustomer(input: ConnectedOnboardRequest, by: BillingStaff | null
 Raises the commit mid-term: a second paid credit, and the budget with it.
 
 ```typescript
-addConnectedCommit(input: ConnectedAddCommitRequest, by: BillingStaff | null): Promise<ConnectedCreditGrantView>;
+addConnectedCommit(input: ConnectedAddCommitRequest, staff: BillingStaff): Promise<ConnectedCreditGrantView>;
 ```
 
 #### `renewConnectedTerm`
 
 ```typescript
-renewConnectedTerm(input: ConnectedRenewRequest, by: BillingStaff | null): Promise<ConnectedBillingAccountView>;
+renewConnectedTerm(input: ConnectedRenewRequest, staff: BillingStaff): Promise<ConnectedBillingAccountView>;
 ```
 
 #### `completeConnectedRenewalIfDue`
 
 ```typescript
-completeConnectedRenewalIfDue(input: { organizationId: string }, by: BillingStaff | null): Promise<RenewalCompletion>;
+completeConnectedRenewalIfDue(input: { organizationId: string }, staff: BillingStaff): Promise<RenewalCompletion>;
 ```
 
 #### `markConnectedInvoicePaidOutOfBand`
@@ -57,7 +57,7 @@ completeConnectedRenewalIfDue(input: { organizationId: string }, by: BillingStaf
 Finance received the money outside the payment provider.
 
 ```typescript
-markConnectedInvoicePaidOutOfBand(input: { stripeInvoiceId: string }, by: BillingStaff | null): Promise<void>;
+markConnectedInvoicePaidOutOfBand(input: { stripeInvoiceId: string }, staff: BillingStaff): Promise<void>;
 ```
 
 #### `invoicePendingSeatChanges`
@@ -225,12 +225,12 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                | Environment variable                           | Declared at                            |
 | ------ | ----------------------------------- | ---------------------------------------------- | -------------------------------------- |
-| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:214`           |
-| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:215`           |
-| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:216`           |
-| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:217`           |
-| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:218`           |
-| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:219`           |
+| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:220`           |
+| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:221`           |
+| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:222`           |
+| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:223`           |
+| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:224`           |
+| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:225`           |
 | config | `licensePaymentLinkId`              | `STRIPE_LICENSE_PAYMENT_LINK_ID`               | `../contract/src/billing.config.ts:12` |
 | config | `licensePaymentUrl`                 | `STRIPE_LICENSE_PAYMENT_LINK_URL`              | `../contract/src/billing.config.ts:14` |
 | config | `hubspotPortalId`                   | `HUBSPOT_PORTAL_ID`                            | `../contract/src/billing.config.ts:22` |

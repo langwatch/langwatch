@@ -8,6 +8,8 @@ import { describe, expect, it } from "vitest";
 import { billingProcessModule } from "../../billing.module.ts";
 import { MemoryBillingWebhookHostChannel } from "../../channels/memory/memory.billing-webhook-host.channel.ts";
 import { MemoryConnectedInvoicingChannel } from "../../channels/memory/memory.connected-invoicing.channel.ts";
+import { MemoryStripeCustomersChannel } from "../../channels/memory/memory.stripe-customers.channel.ts";
+import { MemoryStripeSubscriptionsChannel } from "../../channels/memory/memory.stripe-subscriptions.channel.ts";
 import { MemoryStripeWebhooksChannel } from "../../channels/memory/memory.stripe-webhooks.channel.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
 import type { SeatRetentionRules } from "../../services/billing-subscription-lifecycle.service.ts";
@@ -82,6 +84,8 @@ function licensedAt(commitUsdCents: number) {
 function stripeTwins({ webhookSecret }: { webhookSecret: string | undefined }) {
   const channels = {
     webhooks: MemoryStripeWebhooksChannel.create({ signingSecret: webhookSecret }),
+    customers: MemoryStripeCustomersChannel.create(),
+    subscriptions: MemoryStripeSubscriptionsChannel.create(),
     connectedInvoicing: MemoryConnectedInvoicingChannel.create(),
   };
   return { channels, client: createApiFixture<Stripe>({}, "Stripe SDK") };
