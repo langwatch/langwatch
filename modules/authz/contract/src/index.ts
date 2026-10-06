@@ -17,7 +17,6 @@ export * from "./authz.api.ts";
 export * from "./authz-rest.schemas.ts";
 export * from "./authz-grants-rest.schemas.ts";
 export * from "./bitset.ts";
-export * from "./credential-claims.ts";
 export * from "./engine.ts";
 export * from "./roles.ts";
 export * from "./scope.ts";
