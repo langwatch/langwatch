@@ -214,3 +214,20 @@ Feature: tRPC framework boundary
     And a caller lacking it is refused FORBIDDEN permission_denied, and a hidden procedure answers NOT_FOUND not_found to a caller lacking it and to an anonymous one
     And a non-platform permission asked at the platform is refused by the compiler and where it is written
     And a process that cannot answer the platform question refuses the call, and the handler never runs
+
+  @unit
+  Scenario: A staff procedure hides from non-staff and refuses staff by name
+    Given a procedure asks a write permission at the platform and hides from callers lacking a staff permission (Alex, 2026-10-06, Q42)
+    When an anonymous caller, a caller lacking the staff permission and a staff caller lacking the write permission call it
+    Then they are refused UNAUTHORIZED, NOT_FOUND not_found and FORBIDDEN permission_denied naming the write permission
+    And a caller holding both runs the handler
+
+  @unit
+  Scenario: A procedure tells its module about a caller its door refused
+    Given a procedure declares what its module does when the door refuses a caller (Alex, 2026-10-06, Q51)
+    When the door refuses a caller
+    Then the module is handed the parsed input and the refused caller before the refusal is answered
+    And the caller is answered the door's refusal unchanged, and the handler never runs
+    And a hook that fails fails the call, so a refusal is never answered unrecorded
+    And a caller the door admits never reaches the hook
+    And a hook on a procedure whose door refuses nobody is refused where it is written
