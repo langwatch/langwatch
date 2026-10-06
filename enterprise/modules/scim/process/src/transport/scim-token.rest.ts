@@ -46,6 +46,7 @@ export const scimTokenRest = defineRestRouter(ScimApi)
 
   .get("/", "listScimTokens")
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "SCIM" })
   .withOutput(z.object({ tokens: z.array(scimTokenRestSummarySchema) }))
   .withDocs({
     tags: ["SCIM Tokens"],
@@ -59,6 +60,7 @@ export const scimTokenRest = defineRestRouter(ScimApi)
   .post("/", "createScimToken")
   .withInput(scimTokenCreateRestInputSchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "SCIM" })
   .withOutput(
     z.object({
       id: z.string(),
@@ -110,6 +112,7 @@ export const scimTokenRest = defineRestRouter(ScimApi)
   .delete("/:id", "revokeScimToken")
   .withParams(scimTokenIdParamsSchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "SCIM" })
   .withOutput(z.object({ success: z.literal(true) }))
   .withDocs({
     tags: ["SCIM Tokens"],

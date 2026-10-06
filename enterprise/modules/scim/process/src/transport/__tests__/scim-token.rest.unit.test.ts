@@ -60,6 +60,7 @@ function mount(
       }),
       authorize: () => ({ permitted: true, organizationRole: null }),
     },
+    entitlements: { holds: async () => true },
   });
   const hono = runtime.mount(scimTokenRest.router(), {
     app: () => app,

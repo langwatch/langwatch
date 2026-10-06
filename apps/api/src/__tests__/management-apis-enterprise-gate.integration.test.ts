@@ -158,8 +158,25 @@ describe.skipIf(!stores)("given the management APIs on the live api", () => {
     return seeded;
   }
 
-  async function ask({ path, token }: { path: string; token: string }) {
-    const response = await api.fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+  async function ask({
+    path,
+    token,
+    method = "GET",
+    body,
+  }: {
+    path: string;
+    token: string;
+    method?: string;
+    body?: unknown;
+  }) {
+    const response = await api.fetch(path, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
     const text = await response.text();
 
     return { status: response.status, text, body: wireBody.parse(JSON.parse(text)) };
@@ -203,6 +220,28 @@ describe.skipIf(!stores)("given the management APIs on the live api", () => {
       expect(refused.status).toBe(402);
       expect(refused.body.code).toBe("enterprise_plan_required");
       expect(refused.body.meta?.feature).toBe("MANAGEMENT_API");
+    });
+
+    /** @scenario "The SCIM tokens API requires an Enterprise plan" */
+    it("refuses the SCIM token list, create and revoke with the SCIM feature", async () => {
+      const listed = await ask({ path: MANAGEMENT_PATHS.scimTokens, token: unlicensed.key });
+      const created = await ask({
+        path: MANAGEMENT_PATHS.scimTokens,
+        token: unlicensed.key,
+        method: "POST",
+        body: { description: `Okta ${ns}`, connectionId: `connection-${ns}` },
+      });
+      const revoked = await ask({
+        path: `${MANAGEMENT_PATHS.scimTokens}/token-${ns}`,
+        token: unlicensed.key,
+        method: "DELETE",
+      });
+
+      for (const refused of [listed, created, revoked]) {
+        expect(refused.status).toBe(402);
+        expect(refused.body.code).toBe("enterprise_plan_required");
+        expect(refused.body.meta?.feature).toBe("SCIM");
+      }
     });
 
     /** @scenario "Group endpoints require an Enterprise plan" */
