@@ -143,6 +143,10 @@ recommendation, and "default taken" if a lane proceeded on it.
 - Up to 79 ids in `.claude/coordinator/questions-2026-10-06.md` that no ruling cites (Q11 to Q13, Q29 to Q39, Q43 to Q78, Q86 to Q152, Q155 to Q220); an upper bound, several are coordinator defaults for review.
 - Bind round 2 rows (91 as written; identity 33, product 30, Langy and agents 15, platform 9, access 4), in the bind handoffs; re-count before asking.
 
+### oversized-operator-surface
+
+- The confirmation variable is named `OBJECT_RETENTION_CONFIRMED` (chart `app.dataplane.objectRetentionConfirmed`); the framework's one-env-per-leaf rule forces a second leaf `legacySpoolRetentionConfirmed` for the old variable, combined by `isObjectRetentionConfirmed`; default taken, held for Alex.
+
 ## Answered (moved to `.claude/coordinator/rulings-2026-10-05.md` when ruled)
 
 - Q1-upcast: ruled 2026-10-06 night, option (a), a framework upcaster, accessible in ops and the migrations ledger.

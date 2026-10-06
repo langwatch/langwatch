@@ -62667,6 +62667,8 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 | `AZURE_BLOB_TOKEN_AUDIENCE` | Token audience override. Sovereign clouds only | `https://storage.azure.com` |
 | `AZURE_BLOB_CONTAINER` | Azure Blob container name | - |
 | `AZURE_BLOB_ENDPOINT` | Blob endpoint base URL. Optional on the Azure public cloud; required for sovereign clouds (`*.usgovcloudapi.net`, `*.chinacloudapi.cn`), private endpoints, and the Azurite emulator | `https://{accountName}.blob.core.windows.net` |
+| `OBJECT_RETENTION_CONFIRMED` | Set to `true` to confirm that the container has a lifecycle rule for every prefix in the [lifecycle table](/self-hosting/configuration/object-storage-lifecycle). Azure refuses oversized writes until it is set; the local filesystem always refuses them | `false` |
+| `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED` | Earlier, spool-only spelling of `OBJECT_RETENTION_CONFIRMED`. Still confirms when `OBJECT_RETENTION_CONFIRMED` is unset | `false` |
 
 <Warning>
 When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must be absent (see below).
@@ -62913,6 +62915,8 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `global.serviceAccount.create` / `.name` / `.annotations` | ServiceAccount the cloud identity binds to (also enables AWS IRSA) |
 | `app.dataplane.providers.azureBlob.container.value` | `AZURE_BLOB_CONTAINER` |
 | `app.dataplane.providers.azureBlob.endpoint.value` | `AZURE_BLOB_ENDPOINT` (sovereign clouds, private endpoints, emulator) |
+| `app.dataplane.objectRetentionConfirmed` | `OBJECT_RETENTION_CONFIRMED`. Confirms the lifecycle rules in the [lifecycle table](/self-hosting/configuration/object-storage-lifecycle) |
+| `app.dataplane.providers.azureBlob.spoolRetentionConfirmed` | Earlier spelling; either value sets `OBJECT_RETENTION_CONFIRMED=true` |
 | `app.dataplane.providers.azureBlob.authorityHost.value` | `AZURE_BLOB_AUTHORITY_HOST`. Required alongside a sovereign endpoint in a token-based mode |
 | `app.dataplane.providers.azureBlob.tokenAudience.value` | `AZURE_BLOB_TOKEN_AUDIENCE`. Sovereign storage audience override |
 | `app.dataplane.legacyS3ReadBucket` | Keeps persisted `s3://` stored-object URIs and true legacy bucket/key consumers readable after moving writes to Azure. It does not route provider-derived dataset chunks or GroupQueue durable payloads; run the migration and drain GroupQueue before switching |
@@ -62934,6 +62938,48 @@ app:
 ```
 
 </Tip>
+
+---
+
+# FILE: ./self-hosting/configuration/object-storage-lifecycle.mdx
+
+---
+title: Object Storage Lifecycle
+description: "The lifecycle rules to create on your bucket or container, and the one setting that confirms them"
+---
+
+LangWatch writes some payloads to object storage only for a short time, or only because they are too large to travel inline through a queue or an event. It deletes what it can straight away. A crash, or an object that is never read again, leaves the rest behind, and the only thing that removes it is a lifecycle rule on the bucket or container. LangWatch cannot create that rule for you.
+
+## Lifecycle table
+
+Create one rule per row. Each rule matches the prefix and expires objects after the stated period. Do not set a period shorter than the one shown, and do not leave a row without a rule.
+
+| Prefix | Written by | Eager delete | Lifecycle rule |
+| --- | --- | --- | --- |
+| `trace-blobs/spool/` | Trace spool (ADR-022) | Yes | Expire after 3 days |
+| `langevals-staging/` | Evaluation, oversized langevals request bodies | Yes | Expire after 3 days |
+| `studio-staging/` | Workflow studio payloads | Yes | Expire after 3 days |
+| `group-queue/` | Group-queue S3 tier | No | Expire after 7 days |
+| `evaluation-inputs/r<days>/` | Evaluation inputs | No | One rule per retention class: `r90` after 90 days, `r180` after 180, `r365` after 365, `r730` after 730 |
+| `evaluation-inputs/r-indefinite/` | Evaluation inputs | No | None. Kept for ever |
+
+Prefixes are matched from the start of the key, so each one is the first segment of the object key. Existing prefixes are unchanged: if you already hold rules for the three older ones, they keep working.
+
+## Which destinations accept oversized writes
+
+- **S3 and compatible stores** accept oversized writes.
+- **Azure Blob** refuses oversized writes until you confirm the rules exist. LangWatch holds a data-plane key and cannot read a management-plane lifecycle policy back, so the confirmation is your statement, not a check.
+- **The local filesystem** always refuses oversized writes. A filesystem cannot expire objects.
+
+A refused payload stays bounded: the trace keeps its payload inline and an evaluation keeps its preview. Nothing is lost, and nothing is left behind.
+
+## Confirming the rules on Azure
+
+Set `OBJECT_RETENTION_CONFIRMED=true` once every row above has a rule on the container. With Helm, set `app.dataplane.objectRetentionConfirmed: true`.
+
+`AZURE_BLOB_SPOOL_RETENTION_CONFIRMED` (Helm `app.dataplane.providers.azureBlob.spoolRetentionConfirmed`) was the earlier setting, which covered only the trace spool. It still confirms when `OBJECT_RETENTION_CONFIRMED` is unset, so an installation that set it keeps working. A value of `false` on `OBJECT_RETENTION_CONFIRMED` takes precedence over it. Move to the new name when convenient; the old one will be retired in a later release.
+
+See [Environment Variables](/self-hosting/configuration/environment-variables) for the Azure Blob settings.
 
 ---
 

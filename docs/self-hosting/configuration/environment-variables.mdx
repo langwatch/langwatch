@@ -157,6 +157,8 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 | `AZURE_BLOB_TOKEN_AUDIENCE` | Token audience override. Sovereign clouds only | `https://storage.azure.com` |
 | `AZURE_BLOB_CONTAINER` | Azure Blob container name | - |
 | `AZURE_BLOB_ENDPOINT` | Blob endpoint base URL. Optional on the Azure public cloud; required for sovereign clouds (`*.usgovcloudapi.net`, `*.chinacloudapi.cn`), private endpoints, and the Azurite emulator | `https://{accountName}.blob.core.windows.net` |
+| `OBJECT_RETENTION_CONFIRMED` | Set to `true` to confirm that the container has a lifecycle rule for every prefix in the [lifecycle table](/self-hosting/configuration/object-storage-lifecycle). Azure refuses oversized writes until it is set; the local filesystem always refuses them | `false` |
+| `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED` | Earlier, spool-only spelling of `OBJECT_RETENTION_CONFIRMED`. Still confirms when `OBJECT_RETENTION_CONFIRMED` is unset | `false` |
 
 <Warning>
 When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must be absent (see below).
@@ -403,6 +405,8 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `global.serviceAccount.create` / `.name` / `.annotations` | ServiceAccount the cloud identity binds to (also enables AWS IRSA) |
 | `app.dataplane.providers.azureBlob.container.value` | `AZURE_BLOB_CONTAINER` |
 | `app.dataplane.providers.azureBlob.endpoint.value` | `AZURE_BLOB_ENDPOINT` (sovereign clouds, private endpoints, emulator) |
+| `app.dataplane.objectRetentionConfirmed` | `OBJECT_RETENTION_CONFIRMED`. Confirms the lifecycle rules in the [lifecycle table](/self-hosting/configuration/object-storage-lifecycle) |
+| `app.dataplane.providers.azureBlob.spoolRetentionConfirmed` | Earlier spelling; either value sets `OBJECT_RETENTION_CONFIRMED=true` |
 | `app.dataplane.providers.azureBlob.authorityHost.value` | `AZURE_BLOB_AUTHORITY_HOST`. Required alongside a sovereign endpoint in a token-based mode |
 | `app.dataplane.providers.azureBlob.tokenAudience.value` | `AZURE_BLOB_TOKEN_AUDIENCE`. Sovereign storage audience override |
 | `app.dataplane.legacyS3ReadBucket` | Keeps persisted `s3://` stored-object URIs and true legacy bucket/key consumers readable after moving writes to Azure. It does not route provider-derived dataset chunks or GroupQueue durable payloads; run the migration and drain GroupQueue before switching |

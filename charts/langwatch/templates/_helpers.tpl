@@ -1085,16 +1085,15 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # why the connection settings below can outlive it (see legacyAzureRead).
 - name: STORED_OBJECTS_BACKEND
   value: "azure"
-{{- if .Values.app.dataplane.providers.azureBlob.spoolRetentionConfirmed }}
-# The ADR-022 trace spool stays off on Azure until the operator states that the
-# container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3
-# days. That policy is management-plane; the app holds a data-plane key and
-# cannot read it back, so this is an assertion, not a check. Left unset, an
-# oversized span keeps its payload inline instead of leaving an object behind
-# that nothing reaps. Emitted here, beside the write toggle rather than with
-# the connection settings below, because it gates only the spool WRITE path —
-# a legacyAzureRead migration reads existing spool objects without it.
-- name: AZURE_BLOB_SPOOL_RETENTION_CONFIRMED
+{{- if or .Values.app.dataplane.objectRetentionConfirmed .Values.app.dataplane.providers.azureBlob.spoolRetentionConfirmed }}
+# Azure refuses oversized writes (trace spool, staging, group-queue, evaluation
+# inputs) until the operator states that the container has a lifecycle rule for
+# every prefix in the values.yaml table. That policy is management-plane; the
+# app holds a data-plane key and cannot read it back, so this is an assertion,
+# not a check. The earlier spool-only value still sets it (expand; retired at
+# the LTS floor). It gates only the WRITE path, so a legacyAzureRead migration
+# reads existing objects without it.
+- name: OBJECT_RETENTION_CONFIRMED
   value: "true"
 {{- end }}
 {{- else }}
