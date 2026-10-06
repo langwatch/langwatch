@@ -15,6 +15,7 @@ import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import {
   getAllForProjectInput,
+  MAX_TRACE_LIST_PAGE_SIZE,
   publicTraceSearchPageSizeInput,
 } from "~/server/api/routers/traces.schemas";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
@@ -274,7 +275,10 @@ secured.access(tracesViewAuth).post("/trace/search", async (c) => {
   c.header("Deprecation", "true");
   c.header("Link", `</api/traces/search>; rel="successor-version"`);
 
-  const pageSize = Math.min(params.pageSize ?? 1000, 1000);
+  const pageSize = Math.min(
+    params.pageSize ?? MAX_TRACE_LIST_PAGE_SIZE,
+    MAX_TRACE_LIST_PAGE_SIZE,
+  );
   const protections = await getProtectionsForProject(prisma, {
     projectId: project.id,
   });

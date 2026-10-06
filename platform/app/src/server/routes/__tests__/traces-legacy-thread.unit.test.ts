@@ -80,6 +80,7 @@ vi.mock("~/server/app-layer/app", () => ({
 
 vi.mock("~/server/api/routers/traces.schemas", () => ({
   publicTraceSearchPageSizeInput: z.number().optional(),
+  MAX_TRACE_LIST_PAGE_SIZE: 1000,
   getAllForProjectInput: z.object({
     projectId: z.string(),
     startDate: z.number(),

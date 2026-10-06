@@ -1,5 +1,5 @@
 import { Flex } from "@chakra-ui/react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import {
@@ -13,6 +13,7 @@ import type { Annotation } from "~/generated/prisma/client";
 import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useTraceIdsAcrossPages } from "~/hooks/useTraceIdsAcrossPages";
 import { MAX_TRACE_LIST_PAGE_SIZE } from "~/server/api/routers/traces.schemas";
 import type { Trace } from "~/server/tracer/types";
 import { api } from "~/utils/api";
@@ -44,48 +45,16 @@ export default function Annotations() {
     sortBy: getSingleQueryParam(router.query.sortBy),
     sortDirection: getSingleQueryParam(router.query.orderBy),
   };
-  const traceQueryKey = JSON.stringify(traceQueryInput);
-
-  // One page per scrollId: the server only returns a scrollId when the page was
-  // full, so paging at the cap walks the whole result set (#8479).
-  const [scrollIds, setScrollIds] = useState<(string | null)[]>([null]);
-  useEffect(() => {
-    setScrollIds([null]);
-  }, [traceQueryKey]);
-
-  const tracePages = api.useQueries((t) =>
-    scrollIds.map((scrollId) =>
-      t.traces.getAllForProject({ ...traceQueryInput, scrollId }, queryOpts),
-    ),
-  );
-
-  const nextScrollId = tracePages[tracePages.length - 1]?.data?.scrollId;
-  useEffect(() => {
-    if (
-      nextScrollId &&
-      !scrollIds.includes(nextScrollId) &&
-      scrollIds.length < MAX_ANNOTATION_TRACE_PAGES
-    ) {
-      setScrollIds((ids) => [...ids, nextScrollId]);
-    }
-  }, [nextScrollId, scrollIds]);
-
-  const tracePagesLoading = tracePages.some((page) => page.isLoading);
+  const { traceIds: filteredTraceIds, isLoading: tracePagesLoading } =
+    useTraceIdsAcrossPages({
+      input: traceQueryInput,
+      queryOpts,
+      maxPages: MAX_ANNOTATION_TRACE_PAGES,
+    });
 
   const {
     period: { startDate, endDate },
   } = usePeriodSelector();
-
-  // Both queries are declared unconditionally (rules of hooks) and gated
-  // via `enabled` on the active mode. `getByTraceIds` is chunked so a
-  // fully-filtered project with thousands of matching traces doesn't blow
-  // past the GET URL ceiling tRPC batches into.
-  const filteredTraceIds = tracePages.flatMap(
-    (page) =>
-      page.data?.groups.flatMap((group) =>
-        group.map((trace) => trace.trace_id),
-      ) ?? [],
-  );
 
   // Everything said about these traces, anchored comments included: this page
   // lists the annotations themselves rather than answering a question about each
@@ -103,7 +72,7 @@ export default function Annotations() {
   );
 
   const annotations = hasAnyFilters ? filteredAnnotations : allAnnotations;
-  // In filtered mode the ids come from `tracePages`, so its load must count
+  // In filtered mode the ids come from the trace pages, so their load must count
   // toward the table's loading state — otherwise the table flashes an empty
   // state before the ids (and then the annotations) arrive.
   const annotationsLoading = hasAnyFilters
