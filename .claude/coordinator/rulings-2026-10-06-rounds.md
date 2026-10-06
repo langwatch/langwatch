@@ -52,3 +52,10 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Graph JSON (Q39): a FRAMEWORK helper, a JSON-text field in packages/api; the browser's inferred types stay stable.
 - SQL owners (D3): ATTRIBUTE only; SQL stays central, each migration is attributed to its table's owner, and a check refuses one touching two owners.
 - Round 7b, lend edges (Q202, Q204, Q206): TOKENS move to each owner's <name>-client package; readers' browser packages import it; React-typed props are allowed there. This SUPERSEDES round 6b (tokens in the contract, data-only props) and changes the record's §10.1 "a token lives in its owner's contract".
+
+## Round 8 (D, span facts and the Upgrades page)
+
+- Span canon (T1-D2-canon): ADD TraceApi.canonicalizeSpanAttributes, the twin of canonicalizeLogRecord (supersedes the "no new TraceApi operation" wording for this one).
+- Decoder deps (T1-D2-deps-extra): INLINE the ESpanKind enum and the tenant check in trace-contract; no new contract dependency.
+- Upgrade API (U2-API): SIX OpsApi reads (status, releases, steps, step, runs, run) backed by an ops service over UpgradeReader.
+- Live status (U2-LIVE): the upgrade RUNNER raises a read hint the api relays; the page refreshes on it, no polling.

@@ -7,6 +7,7 @@ import {
   retryPasskeyCeremony,
 } from "../../behavior/passkey-ceremony.store.ts";
 import { SHAPE } from "../../model/front-door-theme.ts";
+import { FrontDoorPrimaryButton } from "../elements/front-door-primary-button.tsx";
 
 import "../elements/auth-front-door.css";
 
@@ -65,28 +66,16 @@ export function PasskeyCeremonyPanel({ ceremony }: { ceremony: PasskeyCeremonySt
 
       <VStack width="full" align="stretch" gap="9px">
         {unanswered ? (
-          <Button
-            className="lw-front-door-primary"
-            width="full"
-            minHeight="44px"
-            fontSize="14px"
-            fontWeight={600}
-            borderRadius={SHAPE.action}
-            backgroundColor="frontDoor.action"
-            color="frontDoor.onAction"
-            _hover={{ backgroundColor: "frontDoor.actionHover" }}
-            onClick={retryPasskeyCeremony}
-            data-testid="passkey-ceremony-retry"
-          >
+          <FrontDoorPrimaryButton onClick={retryPasskeyCeremony} testId="passkey-ceremony-retry">
             Try again
-          </Button>
+          </FrontDoorPrimaryButton>
         ) : null}
         <Button
           variant="outline"
           width="full"
           minHeight="44px"
           fontSize="14px"
-          borderRadius={SHAPE.action}
+          borderRadius={SHAPE.control}
           borderColor="frontDoor.fieldBorder"
           onClick={cancelPasskeyCeremony}
           data-testid="passkey-ceremony-cancel"

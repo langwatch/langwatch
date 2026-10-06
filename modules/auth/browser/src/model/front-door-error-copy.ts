@@ -159,6 +159,12 @@ export const FRONT_DOOR_ERROR_COPY: Readonly<Record<string, FrontDoorErrorEntry>
       "You can't turn it off while you're a member. Ask an administrator to lift the requirement, or leave the organization first.",
   },
 
+  identity_passkey_already_registered: {
+    title: "That passkey is already on your account",
+    describe: () =>
+      "You can sign in with it now. To add a different one, use another device or security key.",
+  },
+
   identity_passkey_ceremony_failed: {
     title: "That passkey attempt didn't finish",
     describe: () =>

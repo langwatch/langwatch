@@ -9,6 +9,8 @@ import { createAuthClient } from "better-auth/react";
 import { type ReactElement, type ReactNode, useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 
+import { promotePendingMethod } from "../model/last-used-method.ts";
+
 /**
  * The passkey plugin is declared unconditionally, and the METHOD SET decides whether anyone is
  * offered one: the server registers its half only when `PASSKEYS_ENABLED` is on, and the
@@ -114,6 +116,9 @@ async function _fetchSessionShared(): Promise<CompatSession | null> {
       const json = await res.json();
       const session = adaptSession(json);
       _cachedSession = session;
+      // Every landing passes through here, wherever a provider's callback put the browser, so
+      // this is where a parked social method becomes the badge. A no-op when nothing is parked.
+      if (session) promotePendingMethod();
       return session;
     } catch {
       return _cachedSession;

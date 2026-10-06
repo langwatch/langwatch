@@ -32,7 +32,7 @@ export function CheckYourEmail({
   const [inbox] = findInboxProvider({ email });
 
   return (
-    <AuthCard title="Check your email">
+    <AuthCard title="Check your email" solid>
       <VStack width="full" align="stretch" gap="14px">
         {/* Centred under a centred title, because there is nothing to do on
             this card. Every other screen left-aligns its words against a form

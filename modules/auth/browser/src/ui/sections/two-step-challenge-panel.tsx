@@ -1,4 +1,4 @@
-import { Box, Button, Input, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import type { FormEvent, ReactNode, RefObject } from "react";
 import { useState } from "react";
 
@@ -13,6 +13,7 @@ import {
   type TwoStepFactor,
 } from "../../model/two-step-challenge.ts";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../elements/front-door-field.tsx";
+import { FrontDoorPrimaryButton } from "../elements/front-door-primary-button.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 
 /** How long an authenticator code is, everywhere it is asked for. */
@@ -99,9 +100,9 @@ export function TwoStepChallengePanel({
             }}
           />
           <VStack width="full" align="stretch" gap="14px" paddingTop="2px">
-            <Button type="submit" colorPalette="orange" loading={isSubmitting}>
+            <FrontDoorPrimaryButton type="submit" isBusy={isSubmitting}>
               Continue
-            </Button>
+            </FrontDoorPrimaryButton>
             <QuietAction
               testId="two-step-swap-factor"
               onClick={() => {

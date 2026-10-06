@@ -17,6 +17,10 @@ import { AuthCard } from "../../ui/elements/auth-card.tsx";
 import { FrontDoorField } from "../../ui/elements/front-door-field.tsx";
 import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
 import { PasswordInput } from "../../ui/elements/password-input.tsx";
+import {
+  FRONT_DOOR_PRIMARY_STYLE,
+  FrontDoorPrimaryButton,
+} from "../elements/front-door-primary-button.tsx";
 import { FrontDoorShell } from "./front-door-shell.tsx";
 
 // The one password policy, from the module that owns it, so reset cannot accept
@@ -202,7 +206,7 @@ function PasswordUpdatedCard() {
         fallbackTitle="That passkey wasn't created"
         className="lw-front-door-alert"
       />
-      <Button {...PRIMARY_STYLE} asChild>
+      <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
         <Link href="/" data-testid="reset-sign-in">
           Continue
         </Link>
@@ -291,17 +295,6 @@ function PostResetPasskeyOffer({
   );
 }
 
-const PRIMARY_STYLE = {
-  className: "lw-front-door-primary",
-  width: "full",
-  minHeight: "44px",
-  fontSize: "14px",
-  fontWeight: 600,
-  backgroundColor: "frontDoor.action",
-  color: "frontDoor.onAction",
-  _hover: { backgroundColor: "frontDoor.actionHover" },
-} as const;
-
 function PrimaryButton({
   type,
   loading,
@@ -312,9 +305,9 @@ function PrimaryButton({
   children: string;
 }) {
   return (
-    <Button {...PRIMARY_STYLE} type={type} loading={loading}>
+    <FrontDoorPrimaryButton type={type} isBusy={loading}>
       {children}
-    </Button>
+    </FrontDoorPrimaryButton>
   );
 }
 

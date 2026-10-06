@@ -10,10 +10,21 @@ import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
 import { acceptInviteResultSchema } from "../../model/accept-invite-result.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
+import {
+  FRONT_DOOR_PRIMARY_STYLE,
+  FrontDoorPrimaryButton,
+} from "../elements/front-door-primary-button.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 import { SecondaryActionLink } from "../elements/secondary-action-link.tsx";
 import { PasskeyCeremonyPanel, passkeyCeremonyTitle } from "./passkey-ceremony-panel.tsx";
 import { SignInMethodPicker } from "./sign-in-method-picker.tsx";
+
+/** The landing's primary in a row rather than a column: the one definition, sized to its words. */
+const ROW_PRIMARY_STYLE = {
+  ...FRONT_DOOR_PRIMARY_STYLE,
+  width: "auto",
+  minHeight: "40px",
+} as const;
 
 /** Invitation landing: handles signed-out, signed-in, and expired cases. */
 export function InviteLanding({ inviteCode }: { inviteCode: string }) {
@@ -100,15 +111,13 @@ function ExpiredInvite({ error, inviteCode }: { error: unknown; inviteCode: stri
                 fallbackTitle="Couldn't ask for a new invitation"
               />
             ) : null}
-            <Button
-              colorPalette="orange"
-              width="full"
-              loading={ask.isPending}
-              data-testid="invite-ask-again"
+            <FrontDoorPrimaryButton
+              isBusy={ask.isPending}
+              testId="invite-ask-again"
               onClick={() => ask.mutate({ inviteCode })}
             >
               Ask for a new invitation
-            </Button>
+            </FrontDoorPrimaryButton>
           </>
         )}
       </VStack>
@@ -209,7 +218,7 @@ function SignedOutInvite({
         // form here, so this button is its own retry control.
         <HStack>
           <Button
-            colorPalette="orange"
+            {...ROW_PRIMARY_STYLE}
             data-testid="invite-routing-retry"
             loading={routing.isDeciding}
             onClick={() => void decide({ identifier: null })}
@@ -294,7 +303,7 @@ function ConfirmAndJoin({
         <HStack justify="center">
           {wrongAccount ? (
             <Button
-              colorPalette="orange"
+              {...ROW_PRIMARY_STYLE}
               data-testid="invite-switch-account"
               onClick={signOutAndReturn}
             >
@@ -302,7 +311,7 @@ function ConfirmAndJoin({
             </Button>
           ) : (
             <Button
-              colorPalette="orange"
+              {...ROW_PRIMARY_STYLE}
               loading={accept.isPending}
               onClick={() => accept.mutate({ inviteCode })}
             >
