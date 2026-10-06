@@ -118,6 +118,7 @@ describe("given an impersonating operator in the Back office", () => {
   );
 
   /** @scenario "An impersonating operator cannot deactivate or reactivate an account from the back office" */
+  /** @scenario "An impersonating admin stays the acting person" */
   it("still lets the impersonating operator update a user's other fields", async () => {
     backOfficeCalls.length = 0;
     await expect(run("update", { name: "Renamed" })).resolves.toEqual({

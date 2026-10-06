@@ -11,6 +11,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
+import { createOpsTestApp, platformOperatorAuthz } from "../../app/__tests__/ops.fixture.ts";
 import { adminAuditRequest, adminAuthSession, adminRest } from "../admin.rest.ts";
 
 const SAME_SITE = { "content-type": "application/json", "sec-fetch-site": "same-origin" };
@@ -127,6 +128,39 @@ describe("the admin REST declaration", () => {
         session: { id: "session_1" },
         req: { headers: { "user-agent": "test" } },
       });
+    });
+  });
+
+  describe("given a member of instance staff reading what the console lists", () => {
+    const RESOURCES = ["user", "organization", "project", "subscription"] as const;
+    const { app: operatorApp } = createOpsTestApp({
+      authz: platformOperatorAuthz({ holders: { viewer_1: ["ops:view"] } }),
+      capability: {
+        adminOperation: async (input) => ({
+          data: [{ id: `${input.resource}_1` }],
+          total: 1,
+        }),
+      },
+    });
+
+    /** @scenario "Every back-office resource the console lists answers" */
+    it.each(
+      RESOURCES.flatMap((resource) => [
+        [resource, `/api/admin/${resource}`],
+        [resource, `/api/v1/admin/${resource}`],
+      ]),
+    )("answers the %s list at %s", async (resource, path) => {
+      const { init } = request(
+        "viewer",
+        "POST",
+        path,
+        JSON.stringify({ method: "getList", params: {} }),
+      );
+
+      const response = await mount(operatorApp).request(path, init);
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ data: [{ id: `${resource}_1` }], total: 1 });
     });
   });
 
