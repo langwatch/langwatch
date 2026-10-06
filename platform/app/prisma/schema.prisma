@@ -1780,8 +1780,8 @@ model Project {
   /// Stored as a free-form string (matching IngestionSource.sourceType
   /// pattern) so future routing kinds can ship without schema migrations.
   kind                String                    @default("application")
-  /// ADR-144: the scope rule an aggregate project materialises into grants.
-  /// Null on every other kind. Shapes: { kind: "all-personal" } |
+  /// The scope rule an aggregate project materialises into grants. Null on
+  /// every other kind; decided in ADR-144. Shapes: { kind: "all-personal" } |
   /// { kind: "personal-by-department", departmentId } |
   /// { kind: "explicit", projectIds: string[] }.
   aggregateRule       Json?

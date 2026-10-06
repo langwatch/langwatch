@@ -6015,7 +6015,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "ADR-144: the scope rule an aggregate project materialises into grants.\nNull on every other kind. Shapes: { kind: \"all-personal\" } |\n{ kind: \"personal-by-department\", departmentId } |\n{ kind: \"explicit\", projectIds: string[] }."
+          "documentation": "The scope rule an aggregate project materialises into grants. Null on\nevery other kind; decided in ADR-144. Shapes: { kind: \"all-personal\" } |\n{ kind: \"personal-by-department\", departmentId } |\n{ kind: \"explicit\", projectIds: string[] }."
         },
         {
           "name": "firstMessage",
