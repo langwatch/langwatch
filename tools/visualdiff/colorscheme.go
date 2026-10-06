@@ -7,6 +7,7 @@ import "fmt"
 // share a baseline slot or a screenshot file.
 type ColorScheme string
 
+// The colour schemes a run can render in; SchemeBoth captures each screen twice.
 const (
 	SchemeLight ColorScheme = "light"
 	SchemeDark  ColorScheme = "dark"

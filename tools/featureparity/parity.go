@@ -22,11 +22,14 @@ var (
 	pyTestFile    = regexp.MustCompile(`^test_[^\n\r\x{2028}\x{2029}]+\.py$`)
 )
 
+// AnnotatedScenario is an enforced scenario with the tests that bind it.
 type AnnotatedScenario struct {
 	Scenario
 	Bindings []BindingRef
 }
 
+// Report is one feature file's binding result: its enforced scenarios and the
+// ones no test binds.
 type Report struct {
 	Feature                string
 	Scenarios              []AnnotatedScenario
@@ -36,12 +39,14 @@ type Report struct {
 	UntaggedScenarios      int
 }
 
+// InertReport is a feature file with scenarios but none enforced.
 type InertReport struct {
 	Feature        string
 	TotalScenarios int
 	Unimplemented  int
 }
 
+// PartialReport is a feature file where some scenarios are enforced and some untagged.
 type PartialReport struct {
 	Feature        string
 	TotalScenarios int
@@ -49,6 +54,7 @@ type PartialReport struct {
 	Untagged       int
 }
 
+// LegacyReport is a feature file's bound and unbound counts, with the unbound titles.
 type LegacyReport struct {
 	Feature       string
 	Bound         int

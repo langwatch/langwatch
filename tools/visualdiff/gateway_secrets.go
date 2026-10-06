@@ -10,8 +10,8 @@ import (
 	"strings"
 )
 
-// The gateway's three credentials are checked all-or-none, and each must be at
-// least MinGatewaySecretLength characters. A developer's own .env commonly
+// MinGatewaySecretLength is the shortest each of the gateway's three credentials
+// may be; they are checked all-or-none. A developer's own .env commonly
 // carries short placeholders — the check then refuses the api's boot, correctly,
 // and a run that only wanted to photograph screens dies with it.
 //

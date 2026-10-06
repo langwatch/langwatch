@@ -26,17 +26,20 @@ func isJSSpace(r rune) bool {
 
 func jsTrim(s string) string { return strings.TrimFunc(s, isJSSpace) }
 
+// Scenario is one scenario read from a feature file: title, tags and line.
 type Scenario struct {
 	Title string
 	Tags  []string
 	Line  int
 }
 
+// BindingRef is where a binding annotation sits in a test file.
 type BindingRef struct {
 	File string
 	Line int
 }
 
+// Binding is a test's claim to prove the scenario with Title.
 type Binding struct {
 	Title string
 	Ref   BindingRef
