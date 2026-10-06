@@ -11,6 +11,7 @@
 import { execFileSync } from "node:child_process";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { grantFactToRow } from "@langwatch/authz-server";
+import { deriveGrantId } from "@langwatch/authz-server/migration";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -183,6 +184,79 @@ describe("given a shared project read in the ledger", () => {
     });
     expect(outcome).toEqual({ grantId: sharedGrantId, attached: false });
     expect(appended).toHaveLength(0);
+  });
+
+  it("gives a pair revoked earlier in the same second a fresh id rather than the revoked row's", async () => {
+    const frozenMs = Date.UTC(2026, 9, 7, 10, 0, 0, 400);
+    // A member of this organisation, so the lineage check passes.
+    const sameSecondMember = await project({
+      teamId: reader.teamId,
+      suffix: "same-second",
+    });
+    const revokedSameSecond = deriveGrantId({
+      organizationId: organization.id,
+      principal: { type: "project", id: reader.id },
+      scope: { type: "PROJECT", id: sameSecondMember.id },
+      occurredAtMs: frozenMs,
+    });
+    await prisma.grant.create({
+      data: {
+        id: revokedSameSecond,
+        organizationId: organization.id,
+        principalType: GrantPrincipalType.PROJECT,
+        principalId: reader.id,
+        roleKey: "project-reader",
+        source: "aggregate-reconciler",
+        scopeType: GrantScopeType.PROJECT,
+        scopeId: sameSecondMember.id,
+        condition: CONDITION,
+        occurredAt: new Date(frozenMs),
+        revokedAt: new Date(frozenMs),
+        revokedReason: "aggregate_rule_no_longer_matches",
+      },
+    });
+    const sent = appended.length;
+
+    try {
+      const outcome = await new GrantsLedgerWriter(prisma, {
+        now: () => frozenMs,
+        commands: async () => ({
+          commands: Object.fromEntries(
+            COMMAND_VERBS.map((verb) => [
+              verb,
+              {
+                send: async (data: unknown) => {
+                  appended.push({ verb, data });
+                },
+              },
+            ]),
+          ) as unknown as AuthzGrantsCommandSenders,
+        }),
+      }).attachSharedProjectGrant({
+        organizationId: organization.id,
+        readerProjectId: reader.id,
+        memberProjectId: sameSecondMember.id,
+        condition: CONDITION,
+        actor: { type: "system", id: SYSTEM_ACTORS.aggregateReconciler },
+        awaitProjection: false,
+      });
+
+      expect(outcome.attached).toBe(true);
+      expect(outcome.grantId).not.toBe(revokedSameSecond);
+      const command = appended[sent]?.data as {
+        grant: { grantId: string; occurredAtMs: number };
+      };
+      expect(command.grant.grantId).toBe(outcome.grantId);
+      expect(command.grant.occurredAtMs).toBe(
+        (Math.floor(frozenMs / 1000) + 1) * 1000,
+      );
+    } finally {
+      appended.splice(sent);
+      await prisma.grant.deleteMany({
+        where: { id: revokedSameSecond, organizationId: organization.id },
+      });
+      await prisma.project.deleteMany({ where: { id: sameSecondMember.id } });
+    }
   });
 
   it("lands a shared read through the projection's raw upsert with its condition and no legacy head", async () => {
