@@ -1,6 +1,7 @@
 /**
  * What every template builds its widgets from: a stored definition from code and
- * named queries, and the full-width and half-width places on the chart grid.
+ * named queries, plus the presence query its empty face runs, and the full-width
+ * and half-width places on the chart grid.
  */
 
 import { CHART_GRID_COLUMNS } from "../../../../model/chart-grid.ts";
@@ -9,18 +10,21 @@ import {
   type DashboardWidgetDefinition,
 } from "../../../../model/dashboard-widget-definition.ts";
 import type { BoardTemplateWidget } from "./board-template.ts";
+import { PRESENCE_SQL } from "./source-presence-queries.ts";
+import type { WidgetCode } from "./widget-code-parts.ts";
 
 export function definition({
   code,
   queries,
 }: {
-  code: string;
+  code: WidgetCode;
   queries: Readonly<Record<string, string>>;
 }): DashboardWidgetDefinition {
+  const all = { ...queries, present: PRESENCE_SQL[code.source] };
   return {
     version: DASHBOARD_WIDGET_DEFINITION_VERSION,
-    code,
-    queries: Object.entries(queries).map(([name, text]) => ({ name, sql: text, parameters: [] })),
+    code: code.tsx,
+    queries: Object.entries(all).map(([name, text]) => ({ name, sql: text, parameters: [] })),
   };
 }
 

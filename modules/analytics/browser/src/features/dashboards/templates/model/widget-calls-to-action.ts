@@ -1,7 +1,7 @@
 /**
- * The not-connected face of every template widget, keyed by the source the widget
- * reads: what is missing, one sentence on what turns up once it is there, and the
- * button to the page that sets it up.
+ * The empty faces of every template widget, keyed by the source the widget reads:
+ * when the source never sent data, what is missing, what turns up once it is there
+ * and the button to the page that sets it up; when it did, one quiet-period line.
  */
 
 import type { NavigableTarget } from "@langwatch/analytics-contract/chart-frame-protocol";
@@ -28,6 +28,8 @@ export interface CallToAction {
   readonly line: string;
   readonly icon: string;
   readonly button: string;
+  /** Shown instead when the source sent data, just none in the board's period. */
+  readonly quiet: string;
   /** The route key `LW.navigate` opens: an allowlisted page, never a raw path. */
   readonly target: NavigableTarget;
 }
@@ -45,6 +47,7 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
     line: "Once traces flow in you'll see request volume, success rate, p95 latency, cost and the traces that explain every spike.",
     icon: TRACES_ICON,
     button: "Connect traces",
+    quiet: "No traces in this period.",
     target: "traces",
   },
   requests: {
@@ -52,6 +55,7 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
     line: "Send your agent's traces to LangWatch and this panel fills with its own traffic, errors and latency.",
     icon: TRACES_ICON,
     button: "Connect traces",
+    quiet: "No traces in this period.",
     target: "traces",
   },
   tokens: {
@@ -60,6 +64,7 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
     icon: `<circle cx="8" cy="8" r="6" />
           <path d="M18.09 10.37A6 6 0 1 1 10.34 18M7 6h1v4M16.71 13.88l.7.71-2.82 2.82" />`,
     button: "Connect traces",
+    quiet: "No token counts in this period.",
     target: "traces",
   },
   models: {
@@ -67,6 +72,7 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
     line: "Send LLM spans with the model name to see which models carry your traffic and your spend.",
     icon: CHIP_ICON,
     button: "Connect traces",
+    quiet: "No model calls in this period.",
     target: "traces",
   },
   spans: {
@@ -74,6 +80,7 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
     line: "Send a span for each step, such as LLM calls, tools and retrieval, to find the slow ones.",
     icon: `<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />`,
     button: "Connect traces",
+    quiet: "No spans in this period.",
     target: "traces",
   },
   conversations: {
@@ -81,6 +88,7 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
     line: "Send a conversation (thread) id with each trace to see how many turns a conversation takes.",
     icon: CHAT_ICON,
     button: "Connect traces",
+    quiet: "No conversations in this period.",
     target: "traces",
   },
   satisfaction: {
@@ -89,6 +97,7 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
     icon: `<circle cx="12" cy="12" r="10" />
           <path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" />`,
     button: "Set up evaluations",
+    quiet: "No satisfaction scores in this period.",
     target: "onlineEvaluations",
   },
   topics: {
@@ -97,6 +106,7 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
     icon: `<circle cx="12" cy="12" r="10" />
           <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01" />`,
     button: "Connect traces",
+    quiet: "No traces with a topic in this period.",
     target: "traces",
   },
   scenarios: {
@@ -104,6 +114,7 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
     line: "Scenario pass rate and coverage across your suites, so you know what behaviour is actually tested.",
     icon: `<path d="M13 5h8M13 12h8M13 19h8M3 17l2 2 4-4M3 7l2 2 4-4" />`,
     button: "Run a scenario",
+    quiet: "No scenario runs in this period.",
     target: "scenarios",
   },
   judges: {
@@ -111,6 +122,7 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
     line: "Evaluator pass rate plotted against latency and cost, so you can see quality move with load.",
     icon: JUDGE_ICON,
     button: "Add a judge",
+    quiet: "No judge results in this period.",
     target: "onlineEvaluations",
   },
   evaluations: {
@@ -118,6 +130,7 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
     line: "Add an online evaluation to score your traces as they arrive, then read pass rates here.",
     icon: JUDGE_ICON,
     button: "Set up evaluations",
+    quiet: "No evaluation results in this period.",
     target: "onlineEvaluations",
   },
   feedback: {
@@ -125,6 +138,7 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
     line: "Thumbs and annotations from your users, tracked over time next to quality and cost.",
     icon: CHAT_ICON,
     button: "Collect feedback",
+    quiet: "No reviewer thumbs in this period.",
     target: "annotations",
   },
   gateway: {
@@ -134,6 +148,7 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
           <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
           <circle cx="18" cy="5" r="3" />`,
     button: "Route via Gateway",
+    quiet: "No gateway traffic in this period.",
     target: "gatewayVirtualKeys",
   },
   codingAgents: {
@@ -142,6 +157,7 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
     icon: `<path d="M12 8V4H8M2 14h2M20 14h2M15 13v2M9 13v2" />
           <rect width="16" height="12" x="4" y="8" rx="2" />`,
     button: "Connect",
+    quiet: "No coding-agent sessions in this period.",
     target: "codingSessions",
   },
 };

@@ -1,8 +1,7 @@
 /**
- * Each Flight Deck widget's not-connected face names its own source, rather than
- * a generic "connect something" message, and its button opens that source's own
- * setup page. The widget's stored code only reaches that face once its own
- * count query comes back with no rows.
+ * Each Flight Deck widget's setup face names its own source, not a generic
+ * message, and its button opens that source's setup page. The stored code only
+ * reaches that face once its own count query comes back with no rows.
  */
 
 import { describe, expect, it } from "vitest";
@@ -74,7 +73,7 @@ describe.each(OWN_CALL_TO_ACTION)(
 
     /** @scenario "AC6 Unconnected source shows a call to action" */
     it("renders that call to action as soon as its own count query comes back with no rows", () => {
-      expect(code).toContain(noRowsCheck);
+      expect(code.tsx).toContain(noRowsCheck);
     });
   },
 );

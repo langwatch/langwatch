@@ -13,6 +13,7 @@ import * as chart from "./question-chart-widgets.ts";
 import * as sql from "./question-queries.ts";
 import * as table from "./question-table-widgets.ts";
 import { definition, full, half, TABLE_ROWS } from "./template-widget.ts";
+import type { WidgetCode } from "./widget-code-parts.ts";
 
 const PAIR = 6;
 
@@ -25,7 +26,7 @@ function widget({
 }: {
   key: string;
   name: string;
-  code: string;
+  code: WidgetCode;
   queries: Readonly<Record<string, string>>;
   layout: BoardTemplateWidget["layout"];
 }): BoardTemplateWidget {

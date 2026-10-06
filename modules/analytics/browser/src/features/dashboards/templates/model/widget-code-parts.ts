@@ -254,8 +254,9 @@ const BUTTON = `const BUTTON = {
 const DASHED = { border: "1px dashed " + C.strong, borderRadius: 8, background: C.muted + "4d" };`;
 
 /**
- * The not-connected face: icon tile, title, one sentence and the button to the page that
- * turns the source on. Compact lays it out as one row, for a panel only a strip tall.
+ * The empty face. It asks whether the source sent data lately: if so, one quiet-period
+ * line; if not, icon tile, title, one sentence and the button to the page that turns the
+ * source on. Compact lays the setup step out as one row, for a panel only a strip tall.
  */
 function callToActionCode({ source, compact }: { source: WidgetSource; compact: boolean }) {
   const cta = CALLS_TO_ACTION[source];
@@ -269,10 +270,15 @@ function callToActionCode({ source, compact }: { source: WidgetSource; compact: 
   const button = `<button style={BUTTON} onClick={() => LW.navigate("${cta.target}", {})}>
         ${cta.button}
       </button>`;
+  const presence = `const present = LW.useChartQuery("present", {});
+  if (present.isError) return <Note color={C.red}>{present.error.message}</Note>;
+  if (!present.data) return <Note>Loading</Note>;
+  if (present.data.length > 0) return <Note>${cta.quiet}</Note>;`;
   if (compact) {
     return `${BUTTON}
 
 function CallToAction() {
+  ${presence}
   return (
     <div style={{ ...DASHED, display: "flex", alignItems: "center", gap: 12,
       padding: "12px 16px" }}>
@@ -289,6 +295,7 @@ function CallToAction() {
   return `${BUTTON}
 
 function CallToAction() {
+  ${presence}
   return (
     <div style={{ ...DASHED, flex: 1, ...CENTRED, gap: 8, padding: "24px 20px",
       textAlign: "center" }}>
@@ -341,6 +348,12 @@ function queryStatesCode(queries: readonly string[]): string {
   if (${pending}) return <Panel><Note>Loading</Note></Panel>;`;
 }
 
+/** A widget's stored TSX, and the source its empty face checks for. */
+export interface WidgetCode {
+  readonly tsx: string;
+  readonly source: WidgetSource;
+}
+
 export interface WidgetCodeSpec {
   /** The one comment line at the top: what the panel shows. */
   readonly summary: string;
@@ -370,7 +383,7 @@ export function widgetCode({
   queries,
   body,
   compactCallToAction = false,
-}: WidgetCodeSpec): string {
+}: WidgetCodeSpec): WidgetCode {
   const imports = recharts ? `import { ${recharts.join(", ")} } from "recharts";\n\n` : "";
   const sections = [
     PALETTE,
@@ -380,5 +393,5 @@ export function widgetCode({
     ...(components ? [components] : []),
     `export default function Widget() {\n${queryStatesCode(queries)}\n${body}\n}`,
   ];
-  return `// ${summary}\n${imports}${sections.join("\n\n")}\n`;
+  return { tsx: `// ${summary}\n${imports}${sections.join("\n\n")}\n`, source };
 }

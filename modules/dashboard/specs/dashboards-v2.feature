@@ -131,6 +131,29 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Evidence: the failed create call and the still-open picker
 
   # ---------------------------------------------------------------------------
+  # Empty widgets
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: AC13 A quiet period does not ask the member to connect a source
+    Given a template widget whose source sent data in the last 90 days
+    And none of that data falls in the board's period
+    Then the widget says there is nothing in this period, naming what it counts
+    And it shows no setup button
+    # Evidence: a connected project's widget over an empty period
+
+  @unit
+  Scenario: AC13b A source that was never set up shows its setup step
+    Given a template widget whose source sent no data in the last 90 days
+    Then the widget shows that source's setup step and the button to its setup page
+    # Evidence: a new project's widget
+
+  @unit
+  Scenario: AC13c Every template widget checks its own source
+    Then each template widget stores a query that asks whether its source sent data in the last 90 days
+    And the widget runs that query only when its own queries return nothing
+
+  # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
 
@@ -153,3 +176,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 10: "A non-empty board still offers a way to add a widget" → Scenario: AC10 A non-empty board still offers a way to add a widget
   # AC 11: "Existing boards are unaffected" → Scenario: AC11 Existing boards are unaffected
   # AC 12: "A picked question adds its widget and seeds Langy" (added by langwatch/tasks#911: the picker adds widgets and drafts Langy, no longer only asks) → Scenario: AC12 A picked question adds its widget and seeds Langy; Scenario: AC12b Without Langy a picked question still adds its widget; Scenario: AC12c A failed add keeps the picker open and does not seed Langy
+  # AC 13: "An empty widget tells a quiet period from a missing source" (added by langwatch/tasks#911: no rows no longer means not connected) → Scenario: AC13 A quiet period does not ask the member to connect a source; Scenario: AC13b A source that was never set up shows its setup step; Scenario: AC13c Every template widget checks its own source
