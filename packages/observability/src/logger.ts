@@ -38,33 +38,47 @@ export function registerLogContextProvider(provider: LogContextProvider): void {
  * causes stay readable. Other fields of a cause, and extras such as a
  * HandledError's `reasons` or `meta`, are dropped by design.
  *
- * Non-Error throwables are summarised too: a string, an error-like object
- * (string `message`), or any other value rendered as bounded JSON.
+ * Non-Error throwables are summarised too: a string and an error-like object
+ * (string `message`) keep their text, while any other value is described by
+ * type and top-level key names only, never contents, because a thrown plain
+ * object can hold secrets (e.g. request headers). Message and stack are
+ * length-capped on every path, and the function never throws.
  */
-export function summarizeError(error: unknown): {
+export function summarizeError(error: unknown): ErrorSummary {
+  try {
+    return summarizeUnsafe(error);
+  } catch {
+    return { type: "unknown", message: UNSERIALIZABLE_MESSAGE };
+  }
+}
+
+type ErrorSummary = {
   type: string;
   message: string;
   code?: string | number;
   stack?: string;
-} {
-  if (typeof error === "string") return { type: "string", message: error };
+};
+
+function summarizeUnsafe(error: unknown): ErrorSummary {
+  if (typeof error === "string") {
+    return { type: "string", message: truncate(error, MAX_SUMMARY_MESSAGE_LENGTH) };
+  }
 
   if (!(error instanceof Error)) {
     if (isErrorLike(error)) {
       const { name, message, code, stack } = error;
       return {
         type: typeof name === "string" && name ? name : "Object",
-        message,
+        message: truncate(message, MAX_SUMMARY_MESSAGE_LENGTH),
         ...(typeof code === "string" || typeof code === "number"
           ? { code }
           : {}),
-        ...(typeof stack === "string" ? { stack } : {}),
+        ...(typeof stack === "string"
+          ? { stack: truncate(stack, MAX_SUMMARY_STACK_LENGTH) }
+          : {}),
       };
     }
-    return {
-      type: typeof error,
-      message: stringifyBounded(error),
-    };
+    return describeOpaqueValue(error);
   }
 
   const serialized = redactCommandCredentials(pino.stdSerializers.err(error));
@@ -77,13 +91,22 @@ export function summarizeError(error: unknown): {
   const code = (error as { code?: unknown }).code;
   return {
     type,
-    message,
+    message: truncate(message, MAX_SUMMARY_MESSAGE_LENGTH),
     ...(typeof code === "string" || typeof code === "number" ? { code } : {}),
-    ...(stack === undefined ? {} : { stack }),
+    ...(stack === undefined
+      ? {}
+      : { stack: truncate(stack, MAX_SUMMARY_STACK_LENGTH) }),
   };
 }
 
 const MAX_SUMMARY_MESSAGE_LENGTH = 1000;
+const MAX_SUMMARY_STACK_LENGTH = 8000;
+const MAX_SUMMARY_KEYS = 10;
+const UNSERIALIZABLE_MESSAGE = "Unserializable thrown value";
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? text.slice(0, max) : text;
+}
 
 function isErrorLike(value: unknown): value is {
   message: string;
@@ -98,14 +121,22 @@ function isErrorLike(value: unknown): value is {
   );
 }
 
-function stringifyBounded(value: unknown): string {
-  let text: string;
-  try {
-    text = JSON.stringify(value) ?? String(value);
-  } catch {
-    text = String(value);
+/** Describes a non-error value without ever reading its contents. */
+function describeOpaqueValue(value: unknown): ErrorSummary {
+  if (value !== null && typeof value === "object") {
+    const keys = Object.keys(value).slice(0, MAX_SUMMARY_KEYS).join(", ");
+    return {
+      type: "Object",
+      message: truncate(
+        `Non-error value thrown (keys: ${keys})`,
+        MAX_SUMMARY_MESSAGE_LENGTH,
+      ),
+    };
   }
-  return text.slice(0, MAX_SUMMARY_MESSAGE_LENGTH);
+  return {
+    type: typeof value,
+    message: truncate(String(value), MAX_SUMMARY_MESSAGE_LENGTH),
+  };
 }
 
 /**

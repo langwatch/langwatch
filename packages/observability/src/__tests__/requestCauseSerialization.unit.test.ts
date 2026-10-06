@@ -280,8 +280,51 @@ describe("emitted request-log records", () => {
     });
 
     describe("when it is a plain object without a message", () => {
-      it("renders the object as the message", () => {
+      it("names its keys in the message", () => {
         expect(emittedFor({ reason: "x" }).message).toContain("reason");
+      });
+
+      it("labels it Object", () => {
+        expect(emittedFor({ reason: "x" }).type).toBe("Object");
+      });
+    });
+
+    describe("when it is a plain object holding a secret", () => {
+      const thrown = { headers: { authorization: "Bearer secret" } };
+
+      it("does not emit the secret", () => {
+        expect(JSON.stringify(emittedFor(thrown))).not.toContain(
+          "Bearer secret",
+        );
+      });
+
+      it("names the top-level key", () => {
+        expect(emittedFor(thrown).message).toContain("headers");
+      });
+    });
+
+    describe("when it is a string of 5000 characters", () => {
+      it("caps the message at 1000 characters", () => {
+        expect(emittedFor("x".repeat(5000)).message.length).toBeLessThanOrEqual(
+          1000,
+        );
+      });
+    });
+
+    describe("when it is a circular object with a throwing toString", () => {
+      function hostile() {
+        const value: Record<string, unknown> = {
+          toString() {
+            throw new Error("nope");
+          },
+        };
+        value.self = value;
+        return value;
+      }
+
+      it("still emits a record", () => {
+        expect(() => emittedFor(hostile())).not.toThrow();
+        expect(emittedFor(hostile())).toBeDefined();
       });
     });
 
@@ -293,5 +336,47 @@ describe("emitted request-log records", () => {
         expect(`${cause.message}\n${cause.stack}`).toContain("inner");
       });
     });
+  });
+
+  describe("given an ioredis ReplyError carrying the AUTH password", () => {
+    const replyError = () =>
+      Object.assign(
+        new Error("WRONGPASS invalid username-password pair or user is disabled."),
+        {
+          name: "ReplyError",
+          command: { name: "auth", args: ["default", "s3cret-pass"] },
+        },
+      );
+
+    for (const { label, statusCode } of [
+      { label: "warn", statusCode: 409 },
+      { label: "error", statusCode: 500 },
+    ]) {
+      describe(`when it is logged at ${label} level`, () => {
+        it("does not emit the password anywhere in the line", () => {
+          const chunks: string[] = [];
+          const sink = new Writable({
+            write(chunk, _enc, cb) {
+              chunks.push(String(chunk));
+              cb();
+            },
+          });
+          const logger = pino(
+            { level: "debug", serializers: NODE_LOG_SERIALIZERS },
+            sink,
+          );
+          logHttpRequest(logger as never, {
+            method: "POST",
+            url: "/api/thing",
+            statusCode,
+            duration: 5,
+            userAgent: null,
+            error: replyError(),
+          });
+          expect(chunks.join("")).toContain("WRONGPASS");
+          expect(chunks.join("")).not.toContain("s3cret-pass");
+        });
+      });
+    }
   });
 });
