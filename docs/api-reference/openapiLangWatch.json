@@ -8312,70 +8312,6 @@
         ]
       }
     },
-    "/api/v1/agents/{id}/test": {
-      "post": {
-        "operationId": "testAgent",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "scenarioRunId": {
-                      "type": "string",
-                      "description": "The run to follow; open it in the simulations run drawer."
-                    },
-                    "batchRunId": {
-                      "type": "string",
-                      "description": "The batch the run belongs to."
-                    },
-                    "setId": {
-                      "type": "string",
-                      "description": "The internal set that holds agent test runs."
-                    }
-                  },
-                  "required": [
-                    "scenarioRunId",
-                    "batchRunId",
-                    "setId"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          }
-        },
-        "summary": "Schedule a scripted test run and return its run identifiers",
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ],
-        "x-access-policy": {
-          "kind": "handlerManaged",
-          "credential": [
-            "project_api_key"
-          ],
-          "permissions": [
-            "scenarios:create"
-          ]
-        },
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "description": "The agent id."
-          }
-        ]
-      }
-    },
     "/api/v1/agents/{id}/call": {
       "post": {
         "operationId": "callConnectedAgent",
@@ -87090,6 +87026,70 @@
               "minLength": 1
             },
             "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/{id}/test": {
+      "post": {
+        "operationId": "testAgent",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scenarioRunId": {
+                      "type": "string",
+                      "description": "The run to follow; open it in the simulations run drawer."
+                    },
+                    "batchRunId": {
+                      "type": "string",
+                      "description": "The batch the run belongs to."
+                    },
+                    "setId": {
+                      "type": "string",
+                      "description": "The internal set that holds agent test runs."
+                    }
+                  },
+                  "required": [
+                    "scenarioRunId",
+                    "batchRunId",
+                    "setId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "summary": "Schedule a scripted test run and return its run identifiers",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "scenarios:create"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The agent id."
           }
         ]
       }

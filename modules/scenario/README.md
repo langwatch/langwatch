@@ -11,7 +11,7 @@ Scenarios and simulations: authored scenarios, their runs and events, exports, a
 | Classification | core (`modules/catalogue.json`)                                                                            |
 | Subjects       | scenario, simulation                                                                                       |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                |
-| Api token      | `ScenarioApi` = `moduleApi<ScenarioApi>()("scenario")`, `contract/src/scenario.api.ts:442` (72 operations) |
+| Api token      | `ScenarioApi` = `moduleApi<ScenarioApi>()("scenario")`, `contract/src/scenario.api.ts:439` (72 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                 |
 
 ## What scenario owns
@@ -52,6 +52,6 @@ Anything else scenario needs belongs to another module and is reached through it
 
 ## Who depends on scenario
 
-[agent](../agent/README.md), [langy](../langy/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [platform-health](../platform-health/README.md), [suite](../suite/README.md) (as a peer).
+[langy](../langy/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [platform-health](../platform-health/README.md), [suite](../suite/README.md) (as a peer).
 
 <!-- readme:generated:end -->

@@ -6,7 +6,7 @@ The server half of [agent](../README.md). Agents a project builds and runs: thei
 
 ## Installation
 
-`defineProcessModule("agent").withRepositories(agentRepositories).withApi(AgentModule).withTransports(…, …, …, agentLegacyRest, agentTrpcTransport, httpProxyTrpcTransport).withTasks(…).withTransportFacts(…)`, `src/agent.module.ts:22`.
+`defineProcessModule("agent").withRepositories(agentRepositories).withApi(AgentModule).withTransports(…, …, …, agentLegacyRest, agentTrpcTransport, httpProxyTrpcTransport).withTasks(…).withTransportFacts(…)`, `src/agent.module.ts:21`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Agent application.
 
-Peers call these through the token, declared at `../contract/src/agent.api.ts:47`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/agent.api.ts:45`; nothing else in this package is public.
 
 #### `listWorkflowConfigs`
 
@@ -274,18 +274,6 @@ Unarchived, recently seen connected agents in these projects, newest registratio
 findConnectedInProjects(input: { projectIds: string[] }): Promise<Agent[]>;
 ```
 
-#### `testTurn`
-
-```typescript
-testTurn(input: { id: string; projectId: string; message: string; params?: Record<string, string | number | boolean>; actorId: string; }): Promise<AgentTestTurnResult>;
-```
-
-#### `testRun`
-
-```typescript
-testRun(input: { agentId: string; projectId: string; /** The person who started it; null for a key that acts as nobody. */ actorId: string | null; /** The API key they started it with; the run's own key holds no more than it. */ callerApiKeyId?: string | null; }): Promise<AgentTestRunResult>;
-```
-
 #### `platformUrl`
 
 The platform's own deep link to this agent's editor drawer.
@@ -439,7 +427,7 @@ type Response = z.infer<typeof archiveResultSchema>; // ../contract/src/agent-re
 
 |             |                                  |
 | ----------- | -------------------------------- |
-| Declared at | `src/transport/agent.rest.ts:97` |
+| Declared at | `src/transport/agent.rest.ts:92` |
 | Base URL    | `/api/v1/agents`                 |
 | Addressing  | v1-only                          |
 | Credential  | project                          |
@@ -448,7 +436,7 @@ type Response = z.infer<typeof archiveResultSchema>; // ../contract/src/agent-re
 
 List agents with their current presence and owner
 
-Permission `project:view`. Declared at `src/transport/agent.rest.ts:105`.
+Permission `project:view`. Declared at `src/transport/agent.rest.ts:100`.
 
 Answers at `/api/v1/agents`.
 
@@ -461,7 +449,7 @@ type Response = z.infer<typeof agentListResponseSchema>; // ../contract/src/agen
 
 Create an authored agent; connected agents register through the SDK
 
-Permission `project:update`. Declared at `src/transport/agent.rest.ts:124`.
+Permission `project:update`. Declared at `src/transport/agent.rest.ts:119`.
 
 Answers at `/api/v1/agents`.
 
@@ -474,7 +462,7 @@ type Response = z.infer<typeof agentResponseSchema>; // ../contract/src/agent-re
 
 Get an agent in the caller's project
 
-Permission `project:view`. Declared at `src/transport/agent.rest.ts:142`.
+Permission `project:view`. Declared at `src/transport/agent.rest.ts:137`.
 
 Answers at `/api/v1/agents/:id`.
 
@@ -487,7 +475,7 @@ type Response = z.infer<typeof agentResponseSchema>; // ../contract/src/agent-re
 
 Update an authored agent
 
-Permission `project:update`. Declared at `src/transport/agent.rest.ts:158`.
+Permission `project:update`. Declared at `src/transport/agent.rest.ts:153`.
 
 Answers at `/api/v1/agents/:id`.
 
@@ -501,7 +489,7 @@ type Response = z.infer<typeof agentResponseSchema>; // ../contract/src/agent-re
 
 Update an authored agent; PUT retains partial update semantics
 
-Permission `project:update`. Declared at `src/transport/agent.rest.ts:176`.
+Permission `project:update`. Declared at `src/transport/agent.rest.ts:171`.
 
 Answers at `/api/v1/agents/:id`.
 
@@ -515,7 +503,7 @@ type Response = z.infer<typeof agentResponseSchema>; // ../contract/src/agent-re
 
 Archive an agent while keeping its runs
 
-Permission `project:delete`. Declared at `src/transport/agent.rest.ts:194`.
+Permission `project:delete`. Declared at `src/transport/agent.rest.ts:189`.
 
 Answers at `/api/v1/agents/:id`.
 
@@ -524,25 +512,11 @@ type Params = z.infer<typeof agentRestParamsSchema>; // ../contract/src/agent-re
 type Response = z.infer<typeof archiveResultSchema>; // ../contract/src/agent-rest.schemas.ts:93
 ```
 
-#### `POST /:id/test` · `testAgent`
-
-Schedule a scripted test run and return its run identifiers
-
-Permission `scenarios:create`. Declared at `src/transport/agent.rest.ts:205`.
-
-Answers at `/api/v1/agents/:id/test`.
-
-```typescript
-type Params = z.infer<typeof agentRestParamsSchema>; // ../contract/src/agent-rest.schemas.ts:8
-type Body = z.infer<typeof testAgentBodySchema>; // ../contract/src/agent-rest.schemas.ts:107
-type Response = z.infer<typeof agentTestRunResponseSchema>; // ../contract/src/agent-rest.schemas.ts:100
-```
-
 #### `POST /:id/call` · `callConnectedAgent`
 
 Send one conversation turn to an online connected agent
 
-Permission `scenarios:create`. Declared at `src/transport/agent.rest.ts:221`.
+Permission `scenarios:create`. Declared at `src/transport/agent.rest.ts:200`.
 
 Answers at `/api/v1/agents/:id/call`.
 
@@ -556,7 +530,7 @@ type Response = z.infer<typeof relayCallResponseSchema>; // ../contract/src/conn
 
 ### `agents`
 
-Contract `../contract/src/agent.trpc.ts:31`, router `src/transport/agent.trpc.ts:16`.
+Contract `../contract/src/agent.trpc.ts:28`, router `src/transport/agent.trpc.ts:16`.
 
 | Procedure                   | Kind     | Gate                            | Input                               | Output                           |
 | --------------------------- | -------- | ------------------------------- | ----------------------------------- | -------------------------------- |
@@ -572,12 +546,10 @@ Contract `../contract/src/agent.trpc.ts:31`, router `src/transport/agent.trpc.ts
 | `agents.pushToCopies`       | mutation | Permission `evaluations:manage` | `agentApiPushToCopiesInputSchema`   | `agentPushToCopiesSchema`        |
 | `agents.syncFromSource`     | mutation | Permission `evaluations:manage` | `agentApiAgentReferenceInputSchema` | `agentSyncFromSourceSchema`      |
 | `agents.getHistory`         | query    | Permission `evaluations:view`   | `agentApiAgentReferenceInputSchema` | inline                           |
-| `agents.testTurn`           | mutation | Permission `evaluations:manage` | `agentApiTestTurnInputSchema`       | `agentTestTurnResultSchema`      |
-| `agents.testRun`            | mutation | Permission `scenarios:create`   | `agentApiAgentReferenceInputSchema` | `agentTestRunResultSchema`       |
 
 ### `httpProxy`
 
-Contract `../contract/src/agent.trpc.ts:89`, router `src/transport/http-proxy.trpc.ts:5`.
+Contract `../contract/src/agent.trpc.ts:79`, router `src/transport/http-proxy.trpc.ts:5`.
 
 | Procedure           | Kind     | Gate                            | Input                      | Output                  |
 | ------------------- | -------- | ------------------------------- | -------------------------- | ----------------------- |
@@ -603,8 +575,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                | Environment variable                   | Declared at                        |
 | ------ | ------------------- | -------------------------------------- | ---------------------------------- |
-| config | `replicaCount`      | `LANGWATCH_APP_REPLICAS`               | `../contract/src/agent.api.ts:197` |
-| config | `relayMaxPayloadMb` | `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB` | `../contract/src/agent.api.ts:198` |
-| config | `publicBaseUrl`     | `BASE_HOST`                            | `../contract/src/agent.api.ts:202` |
+| config | `replicaCount`      | `LANGWATCH_APP_REPLICAS`               | `../contract/src/agent.api.ts:180` |
+| config | `relayMaxPayloadMb` | `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB` | `../contract/src/agent.api.ts:181` |
+| config | `publicBaseUrl`     | `BASE_HOST`                            | `../contract/src/agent.api.ts:185` |
 
 <!-- readme:generated:end -->
