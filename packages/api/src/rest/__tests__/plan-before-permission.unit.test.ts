@@ -42,9 +42,18 @@ const cliRefusal: RestProtocolRefusal = ({ failure, response }) => {
     : response.decline();
 };
 
-function world({ entitled, permitted }: { entitled: boolean; permitted: boolean }) {
+function world({
+  entitled,
+  permitted,
+  refusal,
+}: {
+  entitled: boolean;
+  permitted: boolean;
+  refusal?: RestProtocolRefusal;
+}) {
   const asked: string[] = [];
   const door = CliTokenIdentity.create({
+    ...(refusal ? { refusal } : {}),
     verify: async () => {
       asked.push("identify");
 
@@ -192,5 +201,68 @@ describe("a route with declared answers and a refusal of its own", () => {
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toMatchObject({ code: "missing_credentials" });
+  });
+});
+
+/** The owner's wire a door writes its refusals in: one marker, so the writer is plain. */
+const doorRefusal: RestProtocolRefusal = ({ failure, response }) =>
+  HandledError.isHandled(failure)
+    ? response.write({
+        status: failure.httpStatus,
+        mediaType: "application/json",
+        body: JSON.stringify({ written_by: "door", code: failure.code }),
+      })
+    : response.decline();
+
+describe("a door with a refusal of its own", () => {
+  /** @scenario "A door writes the refusals raised behind it in its owner's wire" */
+  it("writes the plan and permission refusals of a route that keeps none", async () => {
+    const plan = await mount(
+      router(),
+      world({ entitled: false, permitted: false, refusal: doorRefusal }),
+    ).request(`/api/q31-sources/${VERSION}/`, { headers: BEARER });
+    const permission = await mount(
+      router(),
+      world({ entitled: true, permitted: false, refusal: doorRefusal }),
+    ).request(`/api/q31-sources/${VERSION}/`, { headers: BEARER });
+
+    expect(plan.status).toBe(402);
+    await expect(plan.json()).resolves.toEqual({
+      written_by: "door",
+      code: "enterprise_plan_required",
+    });
+    expect(permission.status).toBe(403);
+    await expect(permission.json()).resolves.toEqual({
+      written_by: "door",
+      code: "permission_denied",
+    });
+  });
+
+  /** @scenario "A door writes the refusals raised behind it in its owner's wire" */
+  it("writes the door's own refusal too", async () => {
+    const response = await mount(
+      router(),
+      world({ entitled: true, permitted: true, refusal: doorRefusal }),
+    ).request(`/api/q31-sources/${VERSION}/`);
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      written_by: "door",
+      code: "missing_credentials",
+    });
+  });
+
+  /** @scenario "A door writes the refusals raised behind it in its owner's wire" */
+  it("gives way to a route that keeps a refusal of its own", async () => {
+    const response = await mount(
+      router({ refusal: cliRefusal }),
+      world({ entitled: false, permitted: true, refusal: doorRefusal }),
+    ).request(`/api/q31-sources/${VERSION}/`, { headers: BEARER });
+
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toEqual({
+      error: "payment_required",
+      error_description: expect.any(String),
+    });
   });
 });

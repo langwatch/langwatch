@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { RestProtocolRefusal } from "@langwatch/api/rest";
 import {
   IngestionSourceNotFoundError,
   governanceCliRefusalAnswers,
   type GovernanceCliRefusalAnswer,
 } from "@langwatch/enterprise-governance-contract";
+import { HandledError } from "@langwatch/handled-error";
 
 /** The answer bodies every `/api/auth/cli` route shares: success, created, refusal. */
 export function ok<Body>(
@@ -48,4 +50,61 @@ export function posted(raw: string): unknown {
   } catch {
     return {};
   }
+}
+
+/**
+ * Main's CLI wire for the plan and permission refusals the CLI token door asks (Q31):
+ * `{ error, error_description, upgrade_url? }`. Every other refusal is declined to the
+ * family's boundary, so the door's 401 stays canonical.
+ */
+export function cliDoorRefusal({
+  publicBaseUrl,
+}: {
+  publicBaseUrl: string | undefined;
+}): RestProtocolRefusal {
+  const upgradeUrl = `${(publicBaseUrl ?? "http://localhost:5560").replace(/\/+$/, "")}/settings/subscription`;
+
+  return ({ failure, response }) => {
+    const answered = cliDoorAnswer({ failure, upgradeUrl });
+    if (answered.outcome === "declined") return response.decline();
+
+    return response.write({
+      status: answered.answer.status,
+      mediaType: "application/json",
+      body: JSON.stringify(answered.answer.body),
+    });
+  };
+}
+
+type CliDoorAnswer =
+  | Readonly<{ outcome: "written"; answer: GovernanceCliRefusalAnswer }>
+  | Readonly<{ outcome: "declined" }>;
+
+function cliDoorAnswer({
+  failure,
+  upgradeUrl,
+}: {
+  failure: Error;
+  upgradeUrl: string;
+}): CliDoorAnswer {
+  if (!HandledError.isHandled(failure)) return { outcome: "declined" };
+
+  if (failure.code === "enterprise_plan_required") {
+    const body = governanceCliRefusalAnswers[402].parse({
+      error: "payment_required",
+      error_description: failure.message,
+      upgrade_url: upgradeUrl,
+    });
+
+    return { outcome: "written", answer: { status: 402, body } };
+  }
+
+  const permission = failure.meta?.permission;
+  if (failure.code === "permission_denied" && typeof permission === "string") {
+    const description = `Missing required permission '${permission}' on this organization`;
+
+    return { outcome: "written", answer: refuse("forbidden", description, 403) };
+  }
+
+  return { outcome: "declined" };
 }

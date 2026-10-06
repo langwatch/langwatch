@@ -93,11 +93,7 @@ export class GovernanceCliService {
 
   async budgetStatus(input: GovernanceCliRequest): Promise<GovernanceCliBudgetStatusAnswer> {
     const gate = await this.#gate.admit(input);
-    if ("refusal" in gate) {
-      if (gate.refusal.status === 402)
-        throw new Error("budget status admits with no plan feature, so it never answers 402");
-      return gate.refusal;
-    }
+    if ("refusal" in gate) return gate.refusal;
     const status = await this.#credentials.budgetStatus(gate.caller);
     if (status.outcome === "clear") return ok(governanceCliBudgetStatusAnswers[200], { ok: true });
     return {
@@ -182,11 +178,7 @@ export class GovernanceCliService {
   async ingestionSources(
     input: GovernanceCliSourcesRequest,
   ): Promise<GovernanceCliIngestionSourcesAnswer> {
-    const gate = await this.#gate.admit({
-      ...input,
-      feature: "ingestionSources",
-      permission: "ingestionSources:view",
-    });
+    const gate = await this.#gate.admit(input);
     if ("refusal" in gate) return gate.refusal;
     const sources = await this.#activity.sources({
       organizationId: gate.caller.organization_id,
@@ -209,11 +201,7 @@ export class GovernanceCliService {
   async ingestionSourceEvents(
     input: GovernanceCliSourceEventsRequest,
   ): Promise<GovernanceCliIngestionSourceEventsAnswer> {
-    const gate = await this.#gate.admit({
-      ...input,
-      feature: "activityMonitor",
-      permission: "activityMonitor:view",
-    });
+    const gate = await this.#gate.admit(input);
     if ("refusal" in gate) return gate.refusal;
     try {
       const events = await this.#activity.eventsForSource({
@@ -231,11 +219,7 @@ export class GovernanceCliService {
   async ingestionSourceHealth(
     input: GovernanceCliSourceRequest,
   ): Promise<GovernanceCliIngestionSourceHealthAnswer> {
-    const gate = await this.#gate.admit({
-      ...input,
-      feature: "ingestionSources",
-      permission: "activityMonitor:view",
-    });
+    const gate = await this.#gate.admit(input);
     if ("refusal" in gate) return gate.refusal;
     try {
       const health = await this.#activity.healthForSource({
@@ -251,7 +235,7 @@ export class GovernanceCliService {
   async governanceStatus(
     input: GovernanceCliRequest,
   ): Promise<GovernanceCliGovernanceStatusAnswer> {
-    const gate = await this.#gate.admit({ ...input, feature: "ingestionSources" });
+    const gate = await this.#gate.admit(input);
     if ("refusal" in gate) return gate.refusal;
     return ok(governanceCliGovernanceStatusAnswers[200], {
       setup: await this.#setupState.resolve(gate.caller.organization_id),

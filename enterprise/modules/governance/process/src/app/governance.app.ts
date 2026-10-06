@@ -195,6 +195,7 @@ import {
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
+import { cliDoorRefusal } from "../rules/governance-cli-answer.rules.ts";
 import { nextIngestionPullRunAt } from "../rules/ingestion-pull-schedule.rules.ts";
 import { toPullLifecycleSource } from "../rules/pull-schedule.rules.ts";
 import { ratePulledUsage } from "../rules/pulled-usage-rate.rules.ts";
@@ -802,15 +803,12 @@ export class GovernanceModule implements GovernanceRestApi {
         return session;
       },
       permitted: (input) => this.dependencies.permissions.getDecision(input),
+      refusal: cliDoorRefusal({ publicBaseUrl }),
     });
     this.cliAccessService = GovernanceCliAccessService.create({
       sessions: dependencies.auth,
       users: dependencies.users,
       organizations: dependencies.organizations,
-      plans: () => dependencies.entitlements,
-      permittedOnOrganization: (input) =>
-        this.permittedOn("organization", input.organizationId, input),
-      publicBaseUrl,
     });
     this.cliCredentialService = GovernanceCliCredentialService.create({
       personalKeys: dependencies.enterpriseGateway,

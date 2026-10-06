@@ -18,7 +18,11 @@ import type { MountableRestApp } from "./addressing.ts";
 import { CliTokenIdentity } from "./cli-token-identity.ts";
 import type { RestDoorCredential, RestTransportDeclaration } from "./declaration.ts";
 import type { IdempotentRunner } from "./idempotency.ts";
-import { isRestCredentialBinding, type RestTransportMiddlewareBinding } from "./request.ts";
+import {
+  isRestCredentialBinding,
+  type RestDoor,
+  type RestTransportMiddlewareBinding,
+} from "./request.ts";
 import { canonicalErrorResponse } from "./response.ts";
 import { createRestRuntime, type RestDeprecationLog } from "./runtime.ts";
 
@@ -139,7 +143,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
 
   private identitiesFor(
     declaration: RestTransportDeclaration<unknown>,
-  ): Record<RestDoorCredential, RestIdentity> {
+  ): Record<RestDoorCredential, RestDoor> {
     return {
       ...this.options.identities,
       internal_secret:

@@ -301,7 +301,7 @@ export function routeHandlers(app: Hono) {
 
 export { BrowserSessionIdentity, BrowserOriginRefusedError } from "./browser-session.ts";
 
-export { bindRestCredential, type RestCredentialBinding } from "./request.ts";
+export { bindRestCredential, type RestCredentialBinding, type RestDoor } from "./request.ts";
 
 export { BearerIdentity } from "./bearer-identity.ts";
 export { SessionKeyIdentity } from "./session-key-identity.ts";
