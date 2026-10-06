@@ -194,6 +194,18 @@ export class VerificationCeremonyService {
       actor: { type: "user", id: userId },
     });
 
+    await this.settleRecordedOutcome({ userId, identifierId, verificationId });
+  }
+
+  private async settleRecordedOutcome({
+    userId,
+    identifierId,
+    verificationId,
+  }: {
+    userId: string;
+    identifierId: string;
+    verificationId: string;
+  }): Promise<void> {
     // What this person is told is what was RECORDED, never what this thread
     // decided (ADR-135): trusting this thread's own verdict could tell
     // someone their address belongs to a stranger, or a dead-ended address

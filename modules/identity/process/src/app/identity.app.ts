@@ -160,6 +160,7 @@ import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.servic
 import { SsoDomainOwnershipBackfillService } from "../services/sso-domain-ownership-backfill.service.ts";
 import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
 import { SsoEngineProviderService } from "../services/sso-engine-provider.service.ts";
+import { SsoIdpCredentialsService } from "../services/sso-idp-credentials.service.ts";
 import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
 import { SsoIssuerDirectoryService } from "../services/sso-issuer-directory.service.ts";
 import { SsoIssuerEndpointOriginsService } from "../services/sso-issuer-endpoint-origins.service.ts";
@@ -686,10 +687,12 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
           connections: () => ssoConnections,
           reads: setup.repositories.ssoConnections,
           activity: setup.repositories.ssoMigrationEvidence,
-          credentials: setup.repositories.ssoCredentials,
+          idpCredentials: SsoIdpCredentialsService.create({
+            credentials: setup.repositories.ssoCredentials,
+            registrations: SsoIdpRegistrationService.create({ discovery: issuerDiscovery }),
+          }),
           breakGlass,
           passwordDoor,
-          registrations: SsoIdpRegistrationService.create({ discovery: issuerDiscovery }),
           finalization: SsoMigrationFinalizationService.create({
             connections: () => ssoConnections,
             evidence: ssoMigrationProgress,

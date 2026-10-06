@@ -23,6 +23,7 @@ import {
 import type { SsoCredentialRepository } from "../../repositories/sso-credential.repository.ts";
 import { SsoBreakGlassRecoveryService } from "../sso-break-glass-recovery.service.ts";
 import type { SsoConnectionService } from "../sso-connection.service.ts";
+import { SsoIdpCredentialsService } from "../sso-idp-credentials.service.ts";
 import type { SsoIdpRegistrationService } from "../sso-idp-registration.service.ts";
 import type { SsoMigrationFinalizationService } from "../sso-migration-finalization.service.ts";
 import { SsoSetupCommandsService } from "../sso-setup-commands.service.ts";
@@ -106,10 +107,12 @@ function serviceOver({
     connections: () => createApiFixture<SsoConnectionService>({ activateConnection }),
     reads: new OneConnection(row),
     activity: identityRepositoriesOverMemory(store).ssoMigrationEvidence,
-    credentials: createApiFixture<SsoCredentialRepository>({}),
+    idpCredentials: SsoIdpCredentialsService.create({
+      credentials: createApiFixture<SsoCredentialRepository>({}),
+      registrations: createApiFixture<SsoIdpRegistrationService>({}),
+    }),
     breakGlass,
     passwordDoor: async () => passwordDoor,
-    registrations: createApiFixture<SsoIdpRegistrationService>({}),
     finalization: createApiFixture<SsoMigrationFinalizationService>({}),
     now: () => 1_700_000_000_000,
   });
