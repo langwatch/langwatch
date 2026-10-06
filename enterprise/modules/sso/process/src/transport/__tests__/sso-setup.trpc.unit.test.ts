@@ -170,6 +170,7 @@ async function harness(
 }
 
 const TARGET = { organizationId: "org_acme", connectionId: "ssoc_1" };
+type Caller = Awaited<ReturnType<typeof harness>>["caller"];
 
 describe("the organization's own single sign-on surface", () => {
   describe("given the mounted router", () => {
@@ -235,6 +236,7 @@ describe("the organization's own single sign-on surface", () => {
   });
 
   describe("given a reader who may see single sign-on but not manage it", () => {
+    /** @scenario "An administrator without sso:manage reads where setup stands and cannot change it" */
     it("still reads where the setup stands, which is what the page renders", async () => {
       const { caller } = await harness({
         permits: (permission) => permission === "sso:view",
@@ -313,6 +315,7 @@ describe("the organization's own single sign-on surface", () => {
   });
 
   describe("given that same reader at the ceremony", () => {
+    /** @scenario "An administrator without sso:manage reads where setup stands and cannot change it" */
     /** @scenario "Running the ceremony takes managing single sign-on, not only seeing it" */
     it("refuses every verb of it, and runs none of it", async () => {
       const { caller, ceremony } = await harness({
@@ -445,6 +448,7 @@ describe("the organization's own single sign-on surface", () => {
       );
     });
 
+    /** @scenario "An administrator without sso:manage reads where setup stands and cannot change it" */
     /** @scenario "Only an administrator who may manage single sign-on can edit" */
     it("refuses a reader who may see single sign-on but not manage it", async () => {
       const { caller, commands } = await harness({
@@ -675,6 +679,86 @@ describe("the organization's own single sign-on surface", () => {
 
       await expect(caller.activate(TARGET)).rejects.toMatchObject({ code: "FORBIDDEN" });
       expect(commands.activate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an administrator going live, whatever identity answers", () => {
+    /** @scenario "Every change the customer makes is recorded before it is attempted" */
+    it("records who turned it on before identity is asked", async () => {
+      const { auditLog, caller, commands } = await harness();
+
+      await caller.activate(TARGET);
+
+      expect(auditLog.record).toHaveBeenCalledWith({
+        userId: "user_ana",
+        organizationId: "org_acme",
+        action: "ssoSetup.activate",
+        args: TARGET,
+        targetKind: "ssoConnection",
+        targetId: "ssoc_1",
+      });
+      const recorded = auditLog.record.mock.invocationCallOrder[0];
+      const commanded = commands.activate.mock.invocationCallOrder[0];
+      expect(recorded).toBeDefined();
+      expect(commanded).toBeDefined();
+      expect(recorded!).toBeLessThan(commanded!);
+    });
+
+    /** @scenario "Every change the customer makes is recorded before it is attempted" */
+    it("keeps the row when identity refuses the activation", async () => {
+      const { auditLog, caller, commands } = await harness();
+      commands.activate.mockRejectedValueOnce(new Error("a domain is still unproved"));
+
+      await expect(caller.activate(TARGET)).rejects.toThrow("a domain is still unproved");
+
+      expect(commands.activate).toHaveBeenCalledTimes(1);
+      expect(auditLog.record).toHaveBeenCalledTimes(1);
+      expect(auditLog.record).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user_ana", action: "ssoSetup.activate" }),
+      );
+    });
+
+    /** @scenario "Every change the customer makes is recorded before it is attempted" */
+    it("keeps the row for every sibling change identity refuses", async () => {
+      const refusal = new Error("identity refused the change");
+      const siblings = [
+        {
+          action: "setArrivals",
+          refuse: (commands: RecordingSsoSetupCommands) =>
+            commands.setArrivals.mockRejectedValueOnce(refusal),
+          press: (caller: Caller) => caller.setArrivals({ ...TARGET, policy: "admit" }),
+        },
+        {
+          action: "rename",
+          refuse: (commands: RecordingSsoSetupCommands) =>
+            commands.rename.mockRejectedValueOnce(refusal),
+          press: (caller: Caller) => caller.rename({ ...TARGET, name: "Corporate sign-in" }),
+        },
+        {
+          action: "discardConnection",
+          refuse: (commands: RecordingSsoSetupCommands) =>
+            commands.discardConnection.mockRejectedValueOnce(refusal),
+          press: (caller: Caller) => caller.discardConnection(TARGET),
+        },
+        {
+          action: "removeConnection",
+          refuse: (commands: RecordingSsoSetupCommands) =>
+            commands.removeConnection.mockRejectedValueOnce(refusal),
+          press: (caller: Caller) => caller.removeConnection({ ...TARGET, reason: null }),
+        },
+      ];
+
+      for (const sibling of siblings) {
+        const { auditLog, caller, commands } = await harness();
+        sibling.refuse(commands);
+
+        await expect(sibling.press(caller)).rejects.toThrow("identity refused the change");
+
+        expect(auditLog.record).toHaveBeenCalledTimes(1);
+        expect(auditLog.record).toHaveBeenCalledWith(
+          expect.objectContaining({ userId: "user_ana", action: `ssoSetup.${sibling.action}` }),
+        );
+      }
     });
   });
 
