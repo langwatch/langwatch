@@ -10,8 +10,8 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Project } from "~/generated/prisma/client";
 import { projectNavigation } from "~/components/sidebar/projectKindNavigation";
+import type { Project } from "~/generated/prisma/client";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
