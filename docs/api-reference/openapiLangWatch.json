@@ -5027,7 +5027,7 @@
           "pageSize": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "maximum": 4000
+            "maximum": 9007199254740991
           },
           "groupBy": {
             "type": "string"
