@@ -26,6 +26,27 @@ export class MemoryAuditLogRepository implements AuditLogRepository {
     return { id: row.id, occurredAt: row.createdAt.epochMilliseconds };
   }
 
+  async createOnce({
+    entry,
+    id,
+    occurredAt,
+  }: {
+    entry: AuditLogEntry;
+    id: string;
+    occurredAt: number;
+  }): Promise<RecordedAuditLogEntry> {
+    const existing = this.store.rows.find((row) => row.id === id);
+    if (existing !== undefined) {
+      return { id: existing.id, occurredAt: existing.createdAt.epochMilliseconds };
+    }
+    this.store.rows.push({
+      ...entry,
+      id,
+      createdAt: Temporal.Instant.fromEpochMilliseconds(occurredAt),
+    });
+    return { id, occurredAt };
+  }
+
   async hasRecordedSince(input: RecordedSinceInput): Promise<boolean> {
     return this.store.rows.some(
       (row) =>
