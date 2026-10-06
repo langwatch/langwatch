@@ -159,3 +159,12 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Timings (S3-TIMINGS): KEEP the default timings
 - Retry (S3-RETRY): RE-runnable rule: a guard rule makes new migrations re-runnable, then the runner auto-resolves (not the recommended never-auto-resolve)
 - Old indexes (mig-guard): MARKER for this branch's earlier unmerged migrations
+
+## Round 22 (C, held:65 (two-owner check), held:66 (set-not-null), held:68 (stamp owners), mig-ci stamp)
+
+- Two owners (mig-guard): ENFORCER policy over the migration folders
+- NOT NULL (mig-guard): NO escape hatch
+- Owner map (mig-s2-manifests): ENFORCER prints the owner map
+- Seat wiring (Q209 follow-up): Alex asked back 'unclean?' about both options; clarification asked.
+- Seat wiring (Q209, clarified): the process hands the seat to registries like any store; TRACE's registry builds an event-payloads repository over it, scoped to trace's own aggregates, with a memory twin.
+- Stop serving (lapsed presence): /readyz turns 503 so the load balancer drains it AND a worker pauses taking jobs; both resume after a good presence write. Readiness must be able to turn off again.
