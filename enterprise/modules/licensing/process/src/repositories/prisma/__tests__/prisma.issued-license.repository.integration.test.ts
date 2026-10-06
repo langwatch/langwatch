@@ -10,6 +10,7 @@ import {
  * constraints and conditional writes decide, not the service's checks.
  */
 import type { Prisma } from "@langwatch/prisma-client/generated";
+import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { nowInstant } from "@langwatch/time";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -23,7 +24,6 @@ import {
   createLicensingTestConnection,
   TEST_DATABASE_URL,
 } from "./support/licensing-database.fixture.ts";
-import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 const RUN = `lic-reg-${crypto.randomUUID().slice(0, 8)}`;
 

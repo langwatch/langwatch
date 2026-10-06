@@ -5,6 +5,7 @@
  * Single-use redemption against a real Postgres: the store decides, not the process.
  */
 import type { Prisma } from "@langwatch/prisma-client/generated";
+import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { nowInstant } from "@langwatch/time";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -19,7 +20,6 @@ import {
   createLicensingTestConnection,
   TEST_DATABASE_URL,
 } from "./support/licensing-database.fixture.ts";
-import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 const RUN = `act-${crypto.randomUUID().slice(0, 8)}`;
 

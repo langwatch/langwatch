@@ -2,6 +2,7 @@
  * Runs two writes on one Postgres row so the second parks on the first's row
  * lock and re-checks its WHERE clause against the row the first committed: the
  * overlap a conditional write must survive, staged rather than hoped for.
+ * @see specs/tooling/test-row-lock-race.feature
  */
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -55,30 +56,44 @@ export async function raceOnOneRow<T>({
     release = resolve;
   });
 
-  const answers: { first: T[] } = { first: [] };
+  let firstAnswer: { value: T } | undefined;
+  let firstFailure: { error: unknown } | undefined;
   const firstRuns = prisma.$transaction(
     async (tx) => {
-      answers.first.push(await first(tx));
+      firstAnswer = { value: await first(tx) };
       await held;
     },
     { timeout: TRANSACTION_TIMEOUT_MS },
   );
-
-  await waitUntil(() => answers.first.length > 0, "the first write to land");
-
-  const secondRuns = prisma.$transaction(async (tx) => second(tx), {
-    timeout: TRANSACTION_TIMEOUT_MS,
+  firstRuns.catch((error: unknown) => {
+    firstFailure = { error };
   });
 
-  await waitUntil(
-    () => updateIsWaitingOnALock({ prisma, table }),
-    `an UPDATE of ${table} to park on the row lock`,
-  );
+  const stillRunning = (): void => {
+    if (firstFailure) throw firstFailure.error;
+  };
 
-  release();
+  let secondRuns: Promise<T> | undefined;
+  try {
+    await waitUntil(() => {
+      stillRunning();
+      return firstAnswer !== undefined;
+    }, "the first write to land");
+
+    secondRuns = prisma.$transaction(async (tx) => second(tx), {
+      timeout: TRANSACTION_TIMEOUT_MS,
+    });
+    secondRuns.catch(() => void 0);
+
+    await waitUntil(() => {
+      stillRunning();
+      return updateIsWaitingOnALock({ prisma, table });
+    }, `an UPDATE of ${table} to park on the row lock`);
+  } finally {
+    release();
+  }
+
   await firstRuns;
-
-  const [firstAnswer] = answers.first;
-  if (firstAnswer === undefined) throw new Error("the first write answered nothing");
-  return { first: firstAnswer, second: await secondRuns };
+  if (!firstAnswer || !secondRuns) throw new Error("the race ended before both writes ran");
+  return { first: firstAnswer.value, second: await secondRuns };
 }

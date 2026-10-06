@@ -38,6 +38,10 @@
       "types": "./dist/cleanup-test-rows.d.ts",
       "default": "./src/cleanup-test-rows.ts"
     },
+    "./row-lock-race": {
+      "types": "./dist/row-lock-race.d.ts",
+      "default": "./src/row-lock-race.ts"
+    },
     "./saml-signer": {
       "types": "./dist/saml-signer.d.ts",
       "default": "./src/saml-signer.ts"
