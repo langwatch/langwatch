@@ -44,13 +44,19 @@ source_block() {
   ' "$1"
 }
 
+# The awk readers below sit at the end of a pipe under `pipefail`. Each reads
+# its input to the end instead of exiting at the first match: an early exit
+# closes the pipe while the writer still has output, and the writer's SIGPIPE
+# fails the script with status 141.
+
 # The pod template's annotations in a Deployment block read on stdin: the
 # `annotations:` under `template:`, up to the pod `spec:`.
 pod_annotations() {
   awk '
+    finished { next }
     /^  template:/ { intemplate = 1 }
     intemplate && /^      annotations:/ { inann = 1; next }
-    intemplate && /^    spec:/ { exit }
+    intemplate && /^    spec:/ { finished = 1; next }
     inann { sub(/^[[:space:]]*/, ""); print }
   '
 }
@@ -58,8 +64,9 @@ pod_annotations() {
 # The pod template's app.kubernetes.io/name label in a Deployment block.
 pod_name_label() {
   awk '
+    finished { next }
     /^  template:/ { intemplate = 1 }
-    intemplate && /app.kubernetes.io\/name:/ { print $2; exit }
+    intemplate && /app.kubernetes.io\/name:/ { print $2; finished = 1 }
   '
 }
 
@@ -75,9 +82,10 @@ scrape_job() {
 # job block on stdin.
 keep_regex_for() {
   awk -v label="$1" '
+    finished { next }
     /- source_labels:/ { matched = (index($0, "[" label "]") > 0) }
     matched && /action:/ && !/keep/ { matched = 0 }
-    matched && /regex:/ { print $2; exit }
+    matched && /regex:/ { print $2; finished = 1 }
   '
 }
 
