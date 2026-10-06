@@ -549,8 +549,8 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then the request is decided on the operator's own second factor
     And it never fails as an unexplained error
 
-  # No longer @unimplemented: this branch binds it in
-  # `impersonationRevokeMigration.integration.test.ts`.
+  # Bound by prisma.auth-session.impersonation-revoke.integration.test.ts (modules/auth),
+  # which runs main's identity_auth revoke block as shipped.
   @integration
   Scenario: The one revoke at deploy is the impersonating sessions
     Given sessions exist carrying the legacy impersonation payload

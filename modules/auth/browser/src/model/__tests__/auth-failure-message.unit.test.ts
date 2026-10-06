@@ -118,6 +118,21 @@ describe("authFailureMessage", () => {
     });
   });
 
+  describe("when a passkey sign-up is refused for an address that must use its organization's sign-in", () => {
+    it("says an account cannot be created here, and never that the passkey failed", () => {
+      expect(registryCopy("registration_not_available")).toBe("You can't create an account here");
+      expect(
+        frontDoorErrorCopy({
+          code: "registration_not_available",
+          httpStatus: 403,
+          meta: {},
+          tips: [],
+          traceId: undefined,
+        })?.description,
+      ).toBe("This workspace signs you in through your organization. Use that sign-in.");
+    });
+  });
+
   describe("when nothing recognizable comes back", () => {
     /** @scenario An unexpected failure still says something honest */
     it("falls back rather than putting an identifier on screen", () => {
