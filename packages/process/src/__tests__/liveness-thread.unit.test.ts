@@ -154,6 +154,38 @@ describe("Server", () => {
     });
   });
 
+  describe("given a process whose application takes minutes to start, as a voice tunnel can", () => {
+    describe("when the kubelet probes while that start is still running", () => {
+      /** @scenario The liveness server boots before every other stage, including the voice tunnel */
+      it("answers liveness, because the health door is the first stage started", async () => {
+        const server = Server.create({ name: "worker-test", logger, ownsProcess: false });
+        servers.push(server);
+        let releaseStart: () => void = () => undefined;
+        const tunnel = new Promise<void>((resolve) => {
+          releaseStart = resolve;
+        });
+        let started = false;
+
+        const running = server.run({
+          name: "worker",
+          start: () => tunnel.then(() => void (started = true)),
+          stop: () => undefined,
+        });
+        const address = await vi.waitFor(() => {
+          if (server.healthAddress === null) throw new Error("the health door is not up yet");
+          return server.healthAddress;
+        });
+        const health = await fetch(urlOf(address, LIVENESS_PATH));
+
+        expect(health.status).toBe(200);
+        expect(started).toBe(false);
+        releaseStart();
+        await running;
+        expect(started).toBe(true);
+      });
+    });
+  });
+
   describe("given a process with no HTTP surface and an upgrade router", () => {
     describe("when a caller upgrades", () => {
       it("hands the upgrade to the main thread's router through the thread", async () => {

@@ -54,13 +54,19 @@ import { z } from "zod";
 import type { ExposedSurface } from "../process-supply.ts";
 import type { ApiUiBundle } from "./bundle-config.ts";
 
+/** The deployment's own shared secrets, each named by the internal family namespace it guards. */
+export const deploymentBearerNamespaces = ["cron"] as const;
+export type DeploymentBearers = Readonly<
+  Partial<Record<(typeof deploymentBearerNamespaces)[number], RestIdentity>>
+>;
+
 export type ApiSurfaceComposition = Readonly<{
   members: ProcessMemberSource;
   logger: Logger;
   stores: Readonly<{ database: boolean; redis: boolean }>;
   bundle: ApiUiBundle | undefined;
   storage: StorageEndpoints;
-  internalBearers: ReadonlyMap<string, RestIdentity>;
+  internalBearers: DeploymentBearers;
   instanceAdmin: RestIdentity;
   trustedProxies: readonly string[] | undefined;
   executionProxyBaseUrl: string | undefined;
@@ -77,6 +83,7 @@ export type ApiSurfaceComposition = Readonly<{
 export function apiSurface(
   composition: ApiSurfaceComposition,
 ): (peers: TransportPeers) => ExposedSurface<unknown, unknown> {
+  refuseUnguardedBearers(composition.internalBearers);
   return (peers) => {
     const surface = ApiSurface.create(composition, peers);
 
@@ -139,9 +146,13 @@ class ApiSurface {
         scim_token: unboundDirectoryDoor(),
         instance_admin: this.composition.instanceAdmin,
       },
-      bearers: (namespace) =>
-        this.composition.internalBearers.get(namespace) ??
-        bearerDoor({ name: namespace, token: void 0 }),
+      bearers: (namespace) => {
+        const named = deploymentBearerNamespaces.find((name) => name === namespace);
+        return (
+          (named && this.composition.internalBearers[named]) ??
+          bearerDoor({ name: namespace, token: void 0 })
+        );
+      },
       audit: this.door.audit.rest,
       idempotency,
       rateLimiter,
@@ -312,6 +323,17 @@ export function bearerDoor(options: { name: string; token: string | undefined })
     identify: ({ request }) => admit(request),
     identifyOptional: ({ request }) => admit(request),
   };
+}
+
+/** A shared secret under a name no door guards is refused here, never left guarding nothing. */
+function refuseUnguardedBearers(bearers: DeploymentBearers): void {
+  const known: readonly string[] = deploymentBearerNamespaces;
+  const unguarded = Object.keys(bearers).filter((name) => !known.includes(name));
+  if (unguarded.length === 0) return;
+  throw new Error(
+    `No door guards the shared secret supplied as ${unguarded.map((name) => `"${name}"`).join(", ")}; ` +
+      `the deployment's shared secrets are ${known.map((name) => `"${name}"`).join(", ")}.`,
+  );
 }
 
 /** Main's instance-admin family: absent (404, before any credential) with no key set or on SaaS. */

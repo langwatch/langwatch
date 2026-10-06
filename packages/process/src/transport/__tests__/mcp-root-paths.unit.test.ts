@@ -76,7 +76,7 @@ function servedSurface({ doors }: { doors: RawHttpHost }): NodeHandler {
     stores: { database: false, redis: false },
     bundle: void 0,
     storage: {},
-    internalBearers: new Map(),
+    internalBearers: {},
     instanceAdmin: bearerDoor({ name: "instance-admin", token: void 0 }),
     trustedProxies: void 0,
     executionProxyBaseUrl: void 0,
