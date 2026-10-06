@@ -56,6 +56,19 @@ Feature: Usage meters, decisions and who learns them
     When the meter seed runs twice
     Then each trace counts once
 
+  # Q14 (Alex, 2026-10-06): the seed folds the month's billable_events once.
+  @unit @usage
+  Scenario: The meter seed counts each trace once, in its first month
+    Given traces recorded this month and last month before the trace meter existed
+    When the meter seed runs twice
+    Then each trace counts once, in the month its first span arrived
+
+  @unit @usage
+  Scenario: A dry run of the meter seed writes nothing
+    Given traces recorded this month before the trace meter existed
+    When the meter seed runs as a dry run
+    Then it reports what it would fold and writes no meter row
+
   # --- The billable-events meter ------------------------------------------------
 
   @unit @usage
@@ -98,20 +111,29 @@ Feature: Usage meters, decisions and who learns them
     When the refused organization's process manager wakes
     Then a limit_cleared event is recorded
 
-  @unit @usage @unimplemented
+  @unit @usage
+  Scenario: A trace-metered organization past its allowance records the limit as reached
+    Given an organization on tiered pricing whose month's traces reach its plan's allowance
+    When usage counts the organization's month
+    Then the trace meter is read
+    And a limit_reached event is recorded with the trace count and the unit traces
+
+  # The billable-events meter is still read for an uncapped plan: billing reports
+  # month_counted's total to Stripe whatever the cap.
+  @unit @usage
   Scenario: An unlimited plan is never counted for enforcement
     Given the organization's plan caps nothing
     When usage counts the organization's month
-    Then no meter is read and no limit event is recorded
+    Then the trace meter is not read and no limit event is recorded
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: A count the meter cannot answer decides nothing
     Given the meter's store cannot be read
     When usage counts the organization's month
     Then no limit event is recorded
     And a warning is logged naming the organization and its plan
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: The plan chooses the meter
     Given an organization on seat-and-event pricing
     When usage counts the organization's month

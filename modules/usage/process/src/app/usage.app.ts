@@ -51,6 +51,7 @@ export class UsageModule implements UsageApiContract {
     const meter = repositories.billableEvents;
     const counting = UsageCountingService.create({
       meter,
+      traceMeter: repositories.traces,
       entitlement: dependencies.entitlement,
       billing: dependencies.billing,
     });
