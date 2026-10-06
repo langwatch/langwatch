@@ -20,7 +20,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { AnyTRPCRouter } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 
-import type { Authorize, Entitlements } from "../access/access.ts";
+import type { Authorize, Entitlements, PlatformDecision } from "../access/access.ts";
 import type { TrpcAuditSink, TrpcSessionVersions } from "../hosting/api-door.ts";
 import type { SessionCaller, SessionReader } from "../hosting/session-reader.ts";
 import type {
@@ -426,6 +426,8 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
 function decidingOnce(authz: Authorize): Authorize {
   const decisions = new Map<string, Promise<PermissionDecision>>();
   const lineages = new Map<string, Promise<AuthzScopeLineageResult>>();
+  const platform = new Map<string, Promise<PlatformDecision>>();
+  const askPlatform = authz.getPlatformDecision?.bind(authz);
 
   return {
     getDecision: (input) =>
@@ -437,6 +439,12 @@ function decidingOnce(authz: Authorize): Authorize {
       askOnce(lineages, JSON.stringify([input.organizationId, input.teamId, input.projectId]), () =>
         authz.checkScopeLineage(input),
       ),
+    ...(askPlatform === void 0
+      ? {}
+      : {
+          getPlatformDecision: (input) =>
+            askOnce(platform, JSON.stringify(input), () => askPlatform(input)),
+        }),
   };
 }
 

@@ -109,3 +109,51 @@ describe("given one request was allowed", () => {
     });
   });
 });
+
+interface QueueApi {
+  listQueues(input: unknown): { queues: string[] };
+}
+
+const QueueApi = moduleApi<QueueApi>()("ops");
+
+const platformReads = defineTrpcRouter(
+  QueueApi,
+  defineTrpcContract("queues")
+    .query("listQueues")
+    .withInput(z.object({}))
+    .withOutput(z.object({ queues: z.array(z.string()) }))
+    .build(),
+)
+  .procedure("listQueues")
+  .withPermission("ops:view", { at: "platform" })
+  .handle(({ app, input }) => app.listQueues(input))
+  .build();
+
+describe("given a procedure that asks a platform-tier permission", () => {
+  it("hands the platform question to the host's authorization, once per request", async () => {
+    const authz = createApiDouble<Authorize>({
+      getPlatformDecision: async () => ({ permitted: true }),
+    });
+    const platform = vi.spyOn(authz, "getPlatformDecision");
+    const trpc = TrpcHost.create({
+      sessions: SessionReader.create({ verify: async () => ({ userId: "operator-1" }) }),
+      authz,
+    });
+    trpc.mount(composeTrpcRouters("queues", [platformReads]), () => ({
+      listQueues: () => ({ queues: ["collector"] }),
+    }));
+    const request = new Request(
+      `http://api.test${TrpcHost.path}/queues.listQueues?input=${encodeURIComponent("{}")}`,
+    );
+
+    const response = await fetchRequestHandler({
+      endpoint: TrpcHost.path,
+      req: request,
+      router: trpc.router,
+      createContext: () => trpc.context({ request }),
+    });
+
+    expect(((await response.json()) as { result?: unknown }).result).toBeDefined();
+    expect(platform).toHaveBeenCalledTimes(1);
+  });
+});
