@@ -286,7 +286,7 @@ import {
   type OpsProcessMembers,
   sharedStorageStatsInstance,
 } from "./ops-composition.build.ts";
-/** The back-office methods that only read; every other one needs `ops:manage`. */
+/** The instance admin methods that only read; every other one needs `ops:manage`. */
 const ADMIN_READ_METHODS: ReadonlySet<string> = new Set([
   "getList",
   "getOne",
@@ -296,7 +296,7 @@ const ADMIN_READ_METHODS: ReadonlySet<string> = new Set([
 
 /**
  * Who an operator request is attributed to: the impersonator where there is
- * one, so a back-office read is recorded against the human who made it rather
+ * one, so an instance admin read is recorded against the human who made it rather
  * than against the account they were borrowing.
  */
 function actingIdentityOf(operator: OpsOperator): OpsOperator;
