@@ -355,9 +355,15 @@ function splitSentences(s) {
 
 // Markup that is not prose and carries punctuation the regex rules would
 // otherwise count: an image's leading exclamation mark, a comment's arrow.
-// Both go entirely, so nothing is left for a rule to match.
+// Both go entirely, an unclosed comment to the end, until none is left.
 function stripMarkup(s) {
-  return s.replace(/<!--[\s\S]*?-->/g, "").replace(/!\[[^\]]*\]\([^)]*\)/g, "");
+  let text = s;
+  let previous;
+  do {
+    previous = text;
+    text = text.replace(/<!--[\s\S]*?(?:-->|$)/g, "");
+  } while (text !== previous);
+  return text.replace(/!\[[^\]]*\]\([^)]*\)/g, "");
 }
 
 function stripInlineCode(s) {
