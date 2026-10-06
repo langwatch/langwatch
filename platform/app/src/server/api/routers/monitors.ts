@@ -209,7 +209,10 @@ export const monitorsRouter = createTRPCRouter({
       } = input;
       const prisma = ctx.prisma;
 
-      await assertProjectRunsMonitors({ prisma, projectId });
+      await assertProjectRunsMonitors({
+        projects: getApp().projects,
+        projectId,
+      });
 
       // A monitor without an evaluator sits enabled but evaluates nothing —
       // reject at the boundary instead of creating it broken.
@@ -270,7 +273,10 @@ export const monitorsRouter = createTRPCRouter({
       const { monitorId, projectId, sourceProjectId } = input;
       const prisma = ctx.prisma;
 
-      await assertProjectRunsMonitors({ prisma, projectId });
+      await assertProjectRunsMonitors({
+        projects: getApp().projects,
+        projectId,
+      });
 
       const hasSourcePermission = await probeProjectPermission(
         ctx,

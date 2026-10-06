@@ -1,4 +1,4 @@
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { ProjectService } from "../projects/project.service";
 import { isAggregateProjectKind } from "../projects/project-kinds";
 import { MonitorOnAggregateProjectError } from "./errors";
 
@@ -15,15 +15,11 @@ export function assertProjectKindRunsMonitors(
 
 /** {@link assertProjectKindRunsMonitors} for a caller holding only the id. */
 export async function assertProjectRunsMonitors({
-  prisma,
+  projects,
   projectId,
 }: {
-  prisma: PrismaClient;
+  projects: Pick<ProjectService, "getKindById">;
   projectId: string;
 }): Promise<void> {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { kind: true },
-  });
-  assertProjectKindRunsMonitors(project?.kind);
+  assertProjectKindRunsMonitors(await projects.getKindById(projectId));
 }

@@ -11,6 +11,10 @@
  */
 import type { PrismaClient } from "~/generated/prisma/client";
 import { aggregateProjectRouteViolation } from "../projects/project-kinds";
+import {
+  PrismaProjectKindRepository,
+  type ProjectKindRepository,
+} from "../projects/repositories/project-kind.prisma.repository";
 import type { PermissionDecision } from "./permission-decision.repository";
 
 /** How the gate learns a project's kind. */
@@ -23,25 +27,23 @@ export interface ProjectKindReader {
 const MAX_CACHED_KINDS = 10_000;
 
 /**
- * Reads `Project.kind` by id. A kind is written once, at creation, and no
- * route changes it, so a remembered answer never goes stale and is safe to
- * keep per process; the bound only caps memory.
+ * Reads `Project.kind` by id through the projects repository and remembers
+ * it. A kind is written once, at creation, and no route changes it, so a
+ * remembered answer never goes stale and is safe to keep per process; the
+ * bound only caps memory.
  */
-export class PrismaProjectKindReader implements ProjectKindReader {
+export class CachedProjectKindReader implements ProjectKindReader {
   private readonly kinds = new Map<string, string>();
 
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly source: ProjectKindRepository) {}
 
   async kindOf(projectId: string): Promise<string | null> {
     const cached = this.kinds.get(projectId);
     if (cached !== undefined) return cached;
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: { kind: true },
-    });
-    if (!project) return null;
-    this.remember(projectId, project.kind);
-    return project.kind;
+    const kind = await this.source.findKindById(projectId);
+    if (kind === null) return null;
+    this.remember(projectId, kind);
+    return kind;
   }
 
   async kindsOf(projectIds: readonly string[]): Promise<Map<string, string>> {
@@ -53,11 +55,7 @@ export class PrismaProjectKindReader implements ProjectKindReader {
       else missing.push(projectId);
     }
     if (missing.length === 0) return found;
-    const projects = await this.prisma.project.findMany({
-      where: { id: { in: missing } },
-      select: { id: true, kind: true },
-    });
-    for (const { id, kind } of projects) {
+    for (const [id, kind] of await this.source.findKindsByIds(missing)) {
       this.remember(id, kind);
       found.set(id, kind);
     }
@@ -73,15 +71,17 @@ export class PrismaProjectKindReader implements ProjectKindReader {
   }
 }
 
-const readersByPrisma = new WeakMap<PrismaClient, PrismaProjectKindReader>();
+const readersByPrisma = new WeakMap<PrismaClient, CachedProjectKindReader>();
 
 /** One reader, and so one cache, per Prisma handle. */
 export function projectKindReaderFor(
   prisma: PrismaClient,
-): PrismaProjectKindReader {
+): CachedProjectKindReader {
   const existing = readersByPrisma.get(prisma);
   if (existing) return existing;
-  const reader = new PrismaProjectKindReader(prisma);
+  const reader = new CachedProjectKindReader(
+    new PrismaProjectKindRepository(prisma),
+  );
   readersByPrisma.set(prisma, reader);
   return reader;
 }

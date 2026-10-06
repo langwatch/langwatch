@@ -17,6 +17,8 @@ import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
+import { ProjectService } from "../project.service";
+import { PrismaProjectRepository } from "../repositories/project.prisma.repository";
 import {
   type AggregateFixture,
   realOrganizationService,
@@ -37,6 +39,9 @@ describe("Feature: the aggregate project is read only", () => {
   beforeAll(async () => {
     globalForApp.__langwatch_app = createTestApp({
       organizations: realOrganizationService(prisma),
+      // The monitor guard reads the project's kind through the project
+      // service, which the test App otherwise leaves empty.
+      projects: new ProjectService(new PrismaProjectRepository(prisma)),
     });
     fixture = await seedAggregateOrganization(prisma, { label: "agg-ro" });
     aggregate = await fixture.makeAggregate("company-view");

@@ -472,7 +472,10 @@ export const experimentsRouter = createTRPCRouter({
     )
     .permission("workflows:create")
     .mutation(async ({ input }) => {
-      await assertProjectRunsMonitors({ prisma, projectId: input.projectId });
+      await assertProjectRunsMonitors({
+        projects: getApp().projects,
+        projectId: input.projectId,
+      });
 
       const experiment =
         await experimentService().findByIdWithWorkflowCurrentVersion({
