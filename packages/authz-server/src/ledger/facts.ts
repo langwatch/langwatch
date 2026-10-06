@@ -1,3 +1,7 @@
+import {
+  AUTHORIZATION_CONDITION_TYPES,
+  type AuthorizationConditionType,
+} from "@langwatch/actor";
 /**
  * The authorization domain's facts: what a grant IS, what a role IS, and the
  * vocabulary they are written in.
@@ -98,8 +102,8 @@ export type LegacyBindingRole = "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
  * the wire refuses a non-empty one); `from` and `until` are ISO instants
  * bounding the rows by start time. An own grant carries no condition.
  */
-export const GRANT_CONDITION_TYPES = ["trace", "span", "log"] as const;
-export type GrantConditionType = (typeof GRANT_CONDITION_TYPES)[number];
+export const GRANT_CONDITION_TYPES = AUTHORIZATION_CONDITION_TYPES;
+export type GrantConditionType = AuthorizationConditionType;
 
 export type GrantCondition = {
   type: GrantConditionType;
