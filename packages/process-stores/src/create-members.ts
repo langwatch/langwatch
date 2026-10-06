@@ -137,6 +137,11 @@ function prismaMember({
   return buildPrisma({ config: database, logger: read("logger") });
 }
 
+function clickhouseConfigured(config: ProcessConfig): boolean {
+  const clickhouse = config.clickhouse;
+  return Boolean(clickhouse?.url?.trim()) || (clickhouse?.privateRoutes?.length ?? 0) > 0;
+}
+
 function clickhouseMember({
   config,
   tenantDirectory,
@@ -145,9 +150,7 @@ function clickhouseMember({
   tenantDirectory: () => TenantDirectory;
 }): BuiltMember<ProcessMembers["clickhouse"]> {
   const clickhouse = config.clickhouse;
-  const configured =
-    Boolean(clickhouse?.url?.trim()) || (clickhouse?.privateRoutes?.length ?? 0) > 0;
-  if (!clickhouse || !configured) {
+  if (!clickhouse || !clickhouseConfigured(config)) {
     throw new MemberNotConfiguredError(
       "clickhouse",
       "set CLICKHOUSE_URL or a CLICKHOUSE_URL__<label>__<orgId> route",
@@ -208,7 +211,7 @@ function eventingMember({
     prisma: read("prisma"),
     ...(eventing.participation === undefined ? {} : { participation: eventing.participation }),
     ...(eventing.groupQueue === undefined ? {} : { redis: read("redis") }),
-    ...(eventing.store.kind === "producer-only"
+    ...(eventing.store.kind === "producer-only" && !clickhouseConfigured(config)
       ? {}
       : { eventLog: { clickhouse: read("clickhouse") } }),
   });

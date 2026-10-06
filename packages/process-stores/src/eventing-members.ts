@@ -7,6 +7,8 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   createEventingGroupQueueFactory,
   type EventingParticipation,
+  EventLogReadSeat,
+  type EventReadSeat,
   EventSourcing,
   type EventSourcingOptions,
   type EventStore,
@@ -59,7 +61,10 @@ export function buildEventing(options: {
   readonly prisma: PrismaClient;
   /** Absent where the role states no queue, which runs projections inline. */
   readonly redis?: RedisConnection;
-  /** Absent on a role that drains nothing and so reads no event log. */
+  /**
+   * The event log's ClickHouse. A draining role appends through it; any role given it reads one
+   * event by id through a seat beside its store, which a producer's store still refuses (Q209).
+   */
   readonly eventLog?: EventingEventLogMembers;
   /** Overrides the half this process's role would otherwise install. */
   readonly participation?: EventingParticipation;
@@ -71,6 +76,8 @@ export function buildEventing(options: {
     processName: options.processName,
     ...(options.eventLog === undefined ? {} : { eventLog: options.eventLog }),
   });
+  const eventReadSeat =
+    options.eventLog === undefined ? undefined : eventingReadSeat(options.eventLog);
   const queueFactory =
     config.groupQueue === undefined || options.redis === undefined
       ? undefined
@@ -83,6 +90,7 @@ export function buildEventing(options: {
   const eventing = new EventSourcing({
     enabled: true,
     eventStore,
+    ...(eventReadSeat === undefined ? {} : { eventReadSeat }),
     consumersEnabled: config.consumersEnabled,
     executionTarget: config.executionTarget,
     processManagerMode: config.processManagerMode ?? "run",
@@ -166,6 +174,15 @@ function eventingEventStore(options: {
       retention,
     }),
     retention,
+  });
+}
+
+/** One event by id over the event log, whichever store this role appends through. */
+function eventingReadSeat(eventLog: EventingEventLogMembers): EventReadSeat {
+  return EventLogReadSeat.create({
+    repository: EventingClickHouseEventRepository.createForEventReads({
+      resolveClient: eventingClickHouseResolver(eventLog.clickhouse),
+    }),
   });
 }
 

@@ -1,7 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 
-import { EventNotFoundError } from "../../../services/errorHandling.ts";
+import { ConfigurationError, EventNotFoundError } from "../../../services/errorHandling.ts";
 import type {
+  EventOccurredAtWindow,
   EventRecord,
   EventRepository,
 } from "../../../stores/repositories/eventRepository.types.ts";
@@ -105,6 +106,24 @@ function mapEventLogRows({
   }));
 }
 
+/** The EventOccurredAt bound as SQL; `EventOccurredAt = 0` (unknown) rows are always kept. */
+function occurredAtPredicate(window: EventOccurredAtWindow | undefined): {
+  predicate: string;
+  params: Record<string, number>;
+} {
+  if (window === undefined) return { predicate: "", params: {} };
+  return {
+    predicate: `AND (
+            EventOccurredAt = 0
+            OR (
+              EventOccurredAt >= {occurredAtFromMs:UInt64}
+              AND EventOccurredAt <= {occurredAtToMs:UInt64}
+            )
+          )`,
+    params: { occurredAtFromMs: window.fromMs, occurredAtToMs: window.toMs },
+  };
+}
+
 /**
  * ClickHouse implementation of EventRepository: raw data access without
  * business logic. Schema in
@@ -115,8 +134,16 @@ export class EventingClickHouseEventRepository implements EventRepository {
 
   private constructor(
     private readonly resolveClient: EventingClickHouseClientResolver,
-    private readonly retention: EventingRetentionConfiguration,
+    /** Absent on a reads-only repository, which refuses to insert. */
+    private readonly retention: EventingRetentionConfiguration | undefined,
   ) {}
+
+  /** One-event reads only, for a read seat: a process that appends nothing states no retention. */
+  static createForEventReads(options: {
+    resolveClient: EventingClickHouseClientResolver;
+  }): Pick<EventRepository, "getEventRecord"> {
+    return new EventingClickHouseEventRepository(options.resolveClient, undefined);
+  }
 
   static create(options: {
     resolveClient: EventingClickHouseClientResolver;
@@ -134,8 +161,10 @@ export class EventingClickHouseEventRepository implements EventRepository {
     aggregateType: string;
     aggregateId: string;
     eventId: string;
+    occurredAt?: EventOccurredAtWindow;
   }): Promise<EventRecord> {
-    const { tenantId, aggregateType, aggregateId, eventId } = request;
+    const { tenantId, aggregateType, aggregateId, eventId, occurredAt } = request;
+    const window = occurredAtPredicate(occurredAt);
     const client = await this.getClient(tenantId);
     const result = await client.query({
       query: `
@@ -146,6 +175,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
           AND AggregateType = {aggregateType:String}
           AND AggregateId = {aggregateId:String}
           AND EventId = {eventId:String}
+          ${window.predicate}
         ORDER BY EventTimestamp DESC
         LIMIT 1
       `,
@@ -154,6 +184,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
         aggregateType,
         aggregateId,
         eventId,
+        ...window.params,
       },
       format: "JSONEachRow",
     });
@@ -463,13 +494,22 @@ export class EventingClickHouseEventRepository implements EventRepository {
       return;
     }
 
+    const retention = this.retention;
+    if (retention === undefined) {
+      throw new ConfigurationError(
+        "EventingClickHouseEventRepository",
+        "This repository was built for event reads and states no retention, so it cannot insert.",
+        { operation: "insertEventRecords" },
+      );
+    }
+
     try {
       const tenantId = records[0]!.TenantId;
       const stampedRecords = records.map((r) => ({
         ...r,
         // Default-on: stamp the process-injected fallback when the store did
         // not resolve a tenant policy, never leave it to the column default.
-        _retention_days: r._retention_days ?? this.retention.defaultRetentionDays,
+        _retention_days: r._retention_days ?? retention.defaultRetentionDays,
       }));
       const client = await this.getClient(tenantId);
       await client.insert({

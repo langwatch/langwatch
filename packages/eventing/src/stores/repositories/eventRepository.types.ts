@@ -17,6 +17,12 @@ export interface EventRecord {
   _retention_days?: number;
 }
 
+/** Inclusive EventOccurredAt bounds, in epoch milliseconds. */
+export interface EventOccurredAtWindow {
+  fromMs: number;
+  toMs: number;
+}
+
 /**
  * Repository interface for event data access: raw CRUD operations without
  * business logic. Validation, transformation and deduplication belong to the
@@ -33,6 +39,8 @@ export interface EventRepository {
     aggregateType: string;
     aggregateId: string;
     eventId: string;
+    /** Partition-pruning bound on EventOccurredAt; a row with no occurred time always matches. */
+    occurredAt?: EventOccurredAtWindow;
   }): Promise<EventRecord>;
 
   /**

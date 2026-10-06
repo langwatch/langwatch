@@ -47,6 +47,7 @@ import {
 } from "./services/handoff/failedHandoff.ts";
 import { JOB_ROUTING_FIELD, type JobTenants, readJobRouting } from "./services/queues/jobLane.ts";
 import type { JobRegistryEntry } from "./services/queues/queueManager.ts";
+import type { EventReadSeat } from "./stores/eventReadSeat.ts";
 import type { EventStore } from "./stores/eventStore.types.ts";
 import { EventUpcaster, type PipelineUpcasts } from "./upcast/eventUpcast.ts";
 import { upcastEventStore } from "./upcast/upcastEventStore.ts";
@@ -59,6 +60,8 @@ const logger = createLogger("langwatch:event-sourcing");
 export interface EventSourcingOptions {
   enabled?: boolean;
   eventStore?: EventStore;
+  /** One event by id beside the event store, which may refuse reads (event-read-seat.feature). */
+  eventReadSeat?: EventReadSeat;
   queueFactory?: (
     definition: EventSourcedQueueDefinition<Record<string, unknown>>,
   ) => EventSourcedQueueProcessor<Record<string, unknown>>;
@@ -129,6 +132,7 @@ export class EventSourcing {
 
   // Infrastructure — lazily initialized
   private _eventStore?: EventStore;
+  private readonly _eventReadSeat?: EventReadSeat;
   private _globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   private readonly _globalJobRegistry = new Map<string, JobRegistryEntry>();
   private readonly _upcastDrains = new Map<
@@ -165,6 +169,7 @@ export class EventSourcing {
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;
     this._eventStore = options.eventStore;
+    this._eventReadSeat = options.eventReadSeat;
     this._queueFactory = options.queueFactory;
     this._queueName = options.queueName ?? "event-sourcing/jobs";
     this._consumersEnabled = options.consumersEnabled ?? true;
@@ -260,6 +265,11 @@ export class EventSourcing {
   get eventStore(): EventStore | undefined {
     this.ensureInitialized();
     return this._eventStore;
+  }
+
+  /** The one-event read this process composed beside its store; absent where it composed none. */
+  get eventReadSeat(): EventReadSeat | undefined {
+    return this._eventReadSeat;
   }
 
   get globalQueue(): EventSourcedQueueProcessor<Record<string, unknown>> | undefined {

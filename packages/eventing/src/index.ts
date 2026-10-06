@@ -140,6 +140,12 @@ export type {
   EventStoreEventReadInput,
   EventStoreReadContext,
 } from "./stores/eventStore.types.ts";
+export {
+  EVENT_READ_WINDOW_MS,
+  EventLogReadSeat,
+  eventReadWindow,
+  type EventReadSeat,
+} from "./stores/eventReadSeat.ts";
 export type {
   ProjectionStore,
   ProjectionStoreReadContext,
