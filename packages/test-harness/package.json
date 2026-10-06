@@ -46,6 +46,14 @@
       "types": "./dist/saml-signer.d.ts",
       "default": "./src/saml-signer.ts"
     },
+    "./live-upgrade": {
+      "types": "./dist/live-upgrade/index.d.ts",
+      "default": "./src/live-upgrade/index.ts"
+    },
+    "./oidc-provider": {
+      "types": "./dist/oidc-provider/index.d.ts",
+      "default": "./src/oidc-provider/index.ts"
+    },
     "./api-fixture": {
       "types": "./dist/api-fixture/index.d.ts",
       "default": "./src/api-fixture/index.ts"

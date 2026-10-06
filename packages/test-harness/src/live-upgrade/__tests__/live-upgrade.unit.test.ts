@@ -6,10 +6,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   createLiveUpgrade,
-  LIVE_UPGRADE_COMMAND,
+  liveUpgradeCommand,
   type LiveUpgradeOutcome,
   type RunLiveUpgrade,
-} from "./live-upgrade.fixture.ts";
+} from "../live-upgrade.ts";
 
 const STORES = {
   databaseUrl: "postgresql://postgres@127.0.0.1:55433/langwatch_test",
@@ -48,14 +48,12 @@ describe("the live fixtures' upgrade", () => {
       ]);
     });
 
-    it("spawns the tasks entry itself, naming no env file", () => {
-      expect(LIVE_UPGRADE_COMMAND.cwd).toMatch(/apps\/tasks\/$/);
-      expect(LIVE_UPGRADE_COMMAND.args).toEqual([
-        "--experimental-transform-types",
-        "src/main.ts",
-        "upgrade",
-      ]);
-      expect(LIVE_UPGRADE_COMMAND.args.some((arg) => arg.includes("env-file"))).toBe(false);
+    it("spawns the tasks entry itself in the tasks directory it is handed, naming no env file", () => {
+      const command = liveUpgradeCommand({ tasksDirectory: "/checkout/apps/tasks/" });
+
+      expect(command.cwd).toBe("/checkout/apps/tasks/");
+      expect(command.args).toEqual(["--experimental-transform-types", "src/main.ts", "upgrade"]);
+      expect(command.args.some((arg) => arg.includes("env-file"))).toBe(false);
     });
   });
 
@@ -63,7 +61,7 @@ describe("the live fixtures' upgrade", () => {
     /** @scenario "The live fixture fails the test by name when the upgrade fails" */
     it("fails every boot by code with the exit code and output, and never runs it again", async () => {
       const { run, runs } = recordingUpgrade({ exitCode: 3, output: "upgrade lease not acquired" });
-      const upgradedLiveDatabase = createLiveUpgrade({ run });
+      const upgradedLiveDatabase = createLiveUpgrade({ run, path: undefined });
 
       const first = await upgradedLiveDatabase(STORES).catch((error: unknown) => error);
       const second = await upgradedLiveDatabase(STORES).catch((error: unknown) => error);
