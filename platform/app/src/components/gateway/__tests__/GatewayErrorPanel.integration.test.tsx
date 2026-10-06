@@ -28,7 +28,7 @@ const renderPanel = (error: unknown) => {
     <ChakraProvider value={defaultSystem}>
       <GatewayErrorPanel
         title="Failed to load budgets"
-        error={error as { message?: string }}
+        error={error}
         onRetry={onRetry}
       />
     </ChakraProvider>,

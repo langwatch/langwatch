@@ -7,9 +7,16 @@ import {
 
 export type GatewayErrorPanelProps = {
   title?: string;
-  error?: { message?: string } | null;
+  /** Whatever the failed query carried: a tRPC client error, an Error, or nothing. */
+  error?: unknown;
   onRetry?: () => void;
 };
+
+function readMessage(error: unknown): string {
+  if (typeof error !== "object" || error === null) return "";
+  const message = (error as { message?: unknown }).message;
+  return typeof message === "string" ? message.trim() : "";
+}
 
 /**
  * Renders a consistent error surface for gateway list pages when the
@@ -33,7 +40,7 @@ export function GatewayErrorPanel({
     );
   }
   const message =
-    error?.message?.trim() ||
+    readMessage(error) ||
     "The request failed unexpectedly. Please try again or check the server logs.";
   return (
     <Box paddingY={12}>

@@ -302,8 +302,10 @@ describe("Feature: saving a first provider from onboarding or the Langy gate", (
         const tile = (label: string) =>
           document.querySelector<HTMLElement>(`[aria-label="${label}"]`)!;
         await user.click(tile("Custom, OpenAI-compatible"));
-        const customInputs = Array.from(document.querySelectorAll("input"));
-        await user.type(customInputs[1]!, "https://stale.acme.test/v1");
+        await user.type(
+          screen.getByLabelText(/Base URL/, { selector: "input" }),
+          "https://stale.acme.test/v1",
+        );
         await user.click(tile("Codex (OpenAI account)"));
         await user.click(tile("OpenAI"));
 
