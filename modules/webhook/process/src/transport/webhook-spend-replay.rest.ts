@@ -1,6 +1,5 @@
 import {
   canonicalBaseResponses,
-  defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
@@ -11,7 +10,6 @@ import {
   type WebhookSpendReplayBody,
   type WebhookSpendReplayResponse,
 } from "@langwatch/webhook-contract";
-import { z } from "zod";
 
 /**
  * @see ADR-072 (pull gates under the same plan flag as push)
@@ -27,15 +25,6 @@ export interface WebhookSpendReplayDoorApi {
 }
 
 export const WebhookSpendReplayApi = moduleApi<WebhookSpendReplayDoorApi>()("webhook");
-
-/**
- * Whether the credential's organization holds the plan billing events are sold under
- * (ADR-072), resolved after auth and the permission check against webhook's own plan read.
- */
-export const webhookSpendReplayPlanGate = defineRestMiddleware(
-  "webhookSpendReplayPlanGate",
-  z.object({}),
-);
 
 const REPLAY_DESCRIPTION =
   "Re-delivers the window's spend envelopes to ONE endpoint through the " +
@@ -60,7 +49,7 @@ export const webhookSpendReplayRest = defineRestRouter(WebhookSpendReplayApi)
   .withInput(webhookSpendReplayBodySchema)
   .withPermission("gatewaySpend:manage")
   .withOutput(webhookSpendReplayResponseSchema)
-  .withMiddleware(webhookSpendReplayPlanGate)
+  .withEntitlement("webhook_endpoints")
   .withDocs({
     operationId: "postApiGatewayV1SpendEventsReplay",
     tags: ["Gateway Spend"],

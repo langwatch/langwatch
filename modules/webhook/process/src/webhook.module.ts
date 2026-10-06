@@ -1,8 +1,3 @@
-import {
-  bindRestMiddleware,
-  ForbiddenError,
-  organizationCredentialOfRequest,
-} from "@langwatch/api/rest";
 import { defineProcessModule } from "@langwatch/process";
 import type { WebhookEnvelope, WebhookSpendEventRow } from "@langwatch/webhook-contract";
 
@@ -11,10 +6,7 @@ import { webhookDeliveryEventing } from "./eventing/webhook-delivery.pipeline.ts
 import { webhookRepositories } from "./repositories/webhook-repositories.registry.ts";
 import { WebhookEnvelopeService } from "./services/webhook-envelope.service.ts";
 import { webhookEndpointTrpcTransport } from "./transport/webhook-endpoint.trpc.ts";
-import {
-  webhookSpendReplayPlanGate,
-  webhookSpendReplayRest,
-} from "./transport/webhook-spend-replay.rest.ts";
+import { webhookSpendReplayRest } from "./transport/webhook-spend-replay.rest.ts";
 import { webhookRest } from "./transport/webhook.rest.ts";
 
 export type { WebhookAppDependencies, WebhookTestDispatch } from "./app/webhook.app.ts";
@@ -25,25 +17,7 @@ export const webhookProcessModule = defineProcessModule("webhook")
   .withRepositories(webhookRepositories)
   .withApi(WebhookModule)
   .withTransports(webhookEndpointTrpcTransport, webhookRest, webhookSpendReplayRest)
-  .withEventing(webhookDeliveryEventing)
-  .withTransportFacts(({ dependencies }) => [
-    /**
-     * ADR-072: the spend replay gates under the webhook platform's plan flag, resolved per
-     * request after auth and the permission check. Fail-closed: a rejected lookup refuses.
-     */
-    bindRestMiddleware(webhookSpendReplayPlanGate, async (context) => {
-      const plan = await dependencies.entitlement.getActivePlan({
-        organizationId: organizationCredentialOfRequest(context.req.raw).organizationId,
-      });
-      if (plan.webhookEndpointsEnabled !== true) {
-        throw new ForbiddenError(
-          "The billing events API is an enterprise feature; this organization's plan does not include it.",
-        );
-      }
-
-      return {};
-    }),
-  ]);
+  .withEventing(webhookDeliveryEventing);
 
 /**
  * How another package composes this feature: the envelope a spend row is
