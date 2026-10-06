@@ -12,12 +12,19 @@ import {
 } from "~/server/app-layer/authz/permission-adapters";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { aggregateRuleSchema } from "~/server/app-layer/projects/aggregate-rule";
+import { AggregateRuleService } from "~/server/app-layer/projects/aggregate-rule.service";
 import {
+  AGGREGATE_PROJECT_KIND,
+  aggregateProjectCreateFields,
+  aggregateProjectRouteViolation,
   governanceProjectRouteViolation,
+  isAggregateProjectKind,
   personalWorkspaceArchiveViolation,
   personalWorkspaceCreateViolation,
   personalWorkspaceMoveViolation,
 } from "~/server/app-layer/projects/project.service";
+import { PrismaAggregateRuleRepository } from "~/server/app-layer/projects/repositories/aggregate-rule.prisma.repository";
 import { mintProjectSlug } from "~/server/app-layer/projects/projectSlug";
 import type { Session } from "~/server/auth";
 import { TeamService } from "~/server/teams/team.service";
@@ -73,6 +80,29 @@ function assertMoveStaysOutOfPersonalWorkspaces({
 }
 
 /**
+ * Whoever creates an aggregate has to be able to open it. `organization:manage`
+ * can come from a custom role, but opening an aggregate is decided on the
+ * organisation role alone (ADR-144 decision 5), so creation asks the same
+ * question rather than leaving a creator locked out of what they made.
+ */
+async function assertCanOpenAggregates(
+  prisma: PrismaClient,
+  { userId, organizationId }: { userId: string; organizationId: string },
+): Promise<void> {
+  const membership = await prisma.organizationUser.findUnique({
+    where: { userId_organizationId: { userId, organizationId } },
+    select: { role: true },
+  });
+  const violation = aggregateProjectRouteViolation({
+    kind: AGGREGATE_PROJECT_KIND,
+    organizationRole: membership?.role,
+  });
+  if (violation) {
+    throw new TRPCError({ code: "FORBIDDEN", message: violation });
+  }
+}
+
+/**
  * The hidden governance project is not a workspace, and these mutations write
  * Prisma directly rather than going through `ProjectService`, so they enforce
  * the guard themselves. The rule itself is defined once in the projects app
@@ -95,6 +125,9 @@ export const projectRouter = createTRPCRouter({
         name: z.string(),
         language: z.string(),
         framework: z.string(),
+        /** ADR-144: an aggregate reads its members and owns no traces. */
+        kind: z.enum(["application", AGGREGATE_PROJECT_KIND]).optional(),
+        aggregateRule: aggregateRuleSchema.optional(),
       }),
     )
     .use(
@@ -102,10 +135,20 @@ export const projectRouter = createTRPCRouter({
         {
           kind: "custom",
           reason:
-            "creating into an existing team asks that team; creating a team alongside asks the organization",
+            "creating into an existing team asks that team; creating a team alongside, or an aggregate project anywhere, asks the organization",
           permissions: ["project:create", "organization:manage"],
         },
         ({ ctx, input, next }) => {
+          // An aggregate reads other people's personal projects, so whichever
+          // team it attaches to, only someone who manages the organisation
+          // may create one (ADR-144 decision 5).
+          if (isAggregateProjectKind(input.kind)) {
+            return checkOrganizationPermission("organization:manage")({
+              ctx,
+              input,
+              next,
+            });
+          }
           if (input.teamId) {
             return checkTeamPermission("project:create")({
               ctx,
@@ -134,6 +177,23 @@ export const projectRouter = createTRPCRouter({
       await assertTeamCanHoldANewProject(prisma, {
         teamId: input.teamId,
         organizationId: input.organizationId,
+      });
+
+      const isAggregate = isAggregateProjectKind(input.kind);
+      if (isAggregate) {
+        await assertCanOpenAggregates(prisma, {
+          userId,
+          organizationId: input.organizationId,
+        });
+      }
+      // Validated before the team is created, so a refused rule writes nothing.
+      const kindFields = await aggregateProjectCreateFields({
+        kind: input.kind,
+        aggregateRule: input.aggregateRule,
+        organizationId: input.organizationId,
+        aggregateRules: new AggregateRuleService(
+          new PrismaAggregateRuleRepository(prisma),
+        ),
       });
 
       const projectNanoId = nanoid();
@@ -178,6 +238,7 @@ export const projectRouter = createTRPCRouter({
           framework: input.framework,
           teamId: teamId,
           apiKey: generateApiKey(),
+          ...kindFields,
         },
       });
 
@@ -188,6 +249,12 @@ export const projectRouter = createTRPCRouter({
       // (The eager per-project Langy service key that used to be minted here is
       // gone — Langy now mints a per-turn, per-user session key scoped to exactly
       // what the caller holds; no long-lived project key is provisioned.)
+
+      // An aggregate owns no traces, so it gets no gateway key whose traces
+      // would land on it (ADR-144 decision 7).
+      if (isAggregate) {
+        return { success: true, projectSlug: project.slug };
+      }
 
       // Best-effort: mint Langy's gateway virtual key so it shows up in the
       // user's /virtual-keys list from day 1 (configurable model + fallback

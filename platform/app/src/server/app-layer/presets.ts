@@ -354,6 +354,8 @@ import { permissionsServiceFor } from "./permissions/runtime";
 import { PresenceService } from "./presence/presence.service";
 import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { RedisPresenceRepository } from "./presence/repositories/presence.redis.repository";
+import { AggregateRuleService } from "./projects/aggregate-rule.service";
+import { PrismaAggregateRuleRepository } from "./projects/repositories/aggregate-rule.prisma.repository";
 import { ProjectService } from "./projects/project.service";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
@@ -537,6 +539,7 @@ export function initializeDefaultApp(options?: {
     new ProjectService(
       projectRepository,
       new LwqlKeyMapClickHouseRepository(resolveClickHouseClient),
+      new AggregateRuleService(new PrismaAggregateRuleRepository(prisma)),
     ),
     "ProjectService",
   );
