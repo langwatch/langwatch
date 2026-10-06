@@ -64,6 +64,30 @@ Feature: Analytics timeseries service
       When the Analytics service executes it
       Then the repository receives a daily adjusted timescale
 
+  Rule: Compare the routed read with the legacy read only where the tripwire is on
+
+    @unit
+    Scenario: A project with the read tripwire on is also read from the legacy table
+      Given the analytics read tripwire flag is on for the project
+      And a timeseries query is routed to the trace analytics rollup
+      When the Analytics service executes it
+      Then the trace analytics rollup and the legacy trace summaries table are both read
+      And the routed result is returned whatever the legacy table says
+
+    @unit
+    Scenario: A project with the read tripwire off is read only from the routed table
+      Given the analytics read tripwire flag is off for the project
+      And a timeseries query is routed to the trace analytics rollup
+      When the Analytics service executes it
+      Then only the trace analytics rollup is read
+
+    @unit
+    Scenario: A routed result that diverges from the legacy result is logged
+      Given the routed and legacy results disagree beyond the tolerance on one metric
+      When the tripwire compares them
+      Then a warning names the project, the table and the diverging metric
+      And no warning is logged when the two agree
+
   Rule: Keep feature ownership narrow
 
     @unit

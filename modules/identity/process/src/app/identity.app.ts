@@ -151,6 +151,7 @@ import {
 } from "../services/sso-break-glass.service.ts";
 import { SsoConnectionBackofficeService } from "../services/sso-connection-backoffice.service.ts";
 import { SsoConnectionDirectoryMoveService } from "../services/sso-connection-directory-move.service.ts";
+import { SsoConnectionGrandfatherService } from "../services/sso-connection-grandfather.service.ts";
 import type { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { SsoConnectionHistoryService } from "../services/sso-connection-history.service.ts";
 import { SsoConnectionRoutingService } from "../services/sso-connection-routing.service.ts";
@@ -179,6 +180,7 @@ import {
   type SsoTestArrivalMemberships,
 } from "../services/sso-test-arrival.service.ts";
 import { SsoUserResolutionService } from "../services/sso-user-resolution.service.ts";
+import { IdentityConnectionGrandfatherMigrationService } from "../services/system-migration-identity-connection-grandfather.service.ts";
 import { IdentityIdentifierBackfillMigrationService } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationService } from "../services/system-migration-identity-secret-heal.service.ts";
 import { SsoDomainOwnershipMigrationService } from "../services/system-migration-sso-domain-ownership.service.ts";
@@ -207,6 +209,7 @@ type IdentityAppParts = {
   backfill: IdentityBackfillService;
   secrets: IdentitySecretCarryService;
   ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService;
+  ssoConnectionGrandfather: SsoConnectionGrandfatherService | null;
   joinRequestGuards: JoinRequestGuardsService;
   ssoConnections: SsoConnectionService | null;
   ssoConnectionGuards: SsoConnectionGuardsService;
@@ -719,19 +722,38 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       SignInMethodPolicyService.findFederatedMethods(resolveAuthProvider);
     // Main's router (identity/runtime.ts): projected connections first, the legacy columns
     // when none decides, the method policy, one break-glass budget, the account lookup.
+    const legacyDomainRouting = LegacySsoDomainRoutingService.create({
+      organizations: setup.repositories.legacySsoOrganizations,
+      mountedMethods,
+    });
+    const connectionDomainRouting = SsoConnectionRoutingService.create({
+      connections: setup.repositories.ssoConnectionRouting,
+      dial: ssoMethodDialWith({
+        mountedMethods: async () => (await mountedMethods()).map((method) => method.id),
+        engineHoldsProvider: (args) =>
+          setup.repositories.ssoEngineProviders.findRegisteredProvider(args),
+      }),
+    });
+    // D04: its proof reads through the two routing ports that decide sign-in, never the store.
+    const ssoConnectionGrandfather = ssoConnections
+      ? SsoConnectionGrandfatherService.create({
+          connections: ssoConnections,
+          legacy: setup.repositories.legacySsoOrganizations,
+          legacyRouting: legacyDomainRouting,
+          connectionRouting: connectionDomainRouting,
+          // The legacy columns name a provider and nothing else: a reference to the mounted one.
+          idpMetadataFor: ({ ssoProvider }) => ({
+            issuer: null,
+            providerId: ssoProvider,
+            clientIdRef: null,
+            secretRef: null,
+            certRefs: [],
+          }),
+        })
+      : null;
     const signInRouter = SignInRouterService.create({
-      legacy: LegacySsoDomainRoutingService.create({
-        organizations: setup.repositories.legacySsoOrganizations,
-        mountedMethods,
-      }),
-      domains: SsoConnectionRoutingService.create({
-        connections: setup.repositories.ssoConnectionRouting,
-        dial: ssoMethodDialWith({
-          mountedMethods: async () => (await mountedMethods()).map((method) => method.id),
-          engineHoldsProvider: (args) =>
-            setup.repositories.ssoEngineProviders.findRegisteredProvider(args),
-        }),
-      }),
+      legacy: legacyDomainRouting,
+      domains: connectionDomainRouting,
       policy: signInMethodPolicy,
       breakGlass: InProcessBreakGlassLimiterService.create(),
       accounts: SignInAccountLookupService.create({
@@ -775,6 +797,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService.create(
         setup.repositories.ssoDomainOwnership,
       ),
+      ssoConnectionGrandfather,
       joinRequestGuards,
       ssoConnections,
       ssoConnectionGuards,
@@ -1049,7 +1072,14 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
   }
 
   registeredMigrations(): readonly SystemMigration[] {
-    return [SsoDomainOwnershipMigrationService.create(this.#parts.ssoDomainOwnershipBackfill)];
+    const { ssoConnectionGrandfather, ssoDomainOwnershipBackfill } = this.#parts;
+
+    return [
+      ...(ssoConnectionGrandfather
+        ? [IdentityConnectionGrandfatherMigrationService.create(ssoConnectionGrandfather)]
+        : []),
+      SsoDomainOwnershipMigrationService.create(ssoDomainOwnershipBackfill),
+    ];
   }
 
   joinRequestGuards(): JoinRequestGuardsService {

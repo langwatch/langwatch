@@ -193,6 +193,52 @@ describe("given an evaluate door", () => {
   });
 });
 
+describe("given an evaluate door and a body that is JSON but not an evaluation", () => {
+  const sendBody = (path: string, body: unknown) => {
+    const runtime = createRestRuntime({
+      identity: {
+        authenticate: () => ({
+          actor: { type: "user", id: "user-1" },
+          scope: { tier: "project", id: PROJECT_ID },
+        }),
+      },
+    });
+    const app = runtime.mount(evaluationsLegacyRest.router(), {
+      app: () =>
+        createApiFixture<EvaluationApi>({
+          findMonitorBySlug: () => Promise.resolve(null),
+          listCustomEvaluators: () => Promise.resolve([]),
+        }),
+      onError: (error, context) => context.json({ error: String(error) }, 500),
+    });
+
+    return app.fetch(
+      new Request(`http://api.test${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    );
+  };
+
+  describe("when the body omits the data the evaluator scores", () => {
+    /** @scenario "An evaluate request that fails validation answers 400 with the sentence" */
+    it("answers 400 with the validation sentence under error", async () => {
+      loggerSpies.error.mockClear();
+
+      const response = await sendBody("/api/evaluations/langevals/valid_format/evaluate", {
+        settings: {},
+      });
+
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { error?: unknown };
+      expect(typeof body.error).toBe("string");
+      expect(body.error).toContain("data");
+      expect(loggerSpies.error).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
 describe("given the legacy evaluation batch log behind a door that refuses the caller", () => {
   it("leaves the refusal to the family's boundary, not main's 400 sentence", async () => {
     class DoorRefusedError extends HandledError {

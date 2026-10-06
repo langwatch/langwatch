@@ -85,6 +85,7 @@ import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-quest
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
+import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
 import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
 import { FilterService } from "../services/filter.service.ts";
@@ -119,6 +120,9 @@ import type {
   AnalyticsLegacyTimeseriesAnswer,
 } from "../transport/analytics-legacy.rest.ts";
 import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
+
+/** ADR-034: runs the legacy read beside the routed one and logs a divergence. */
+const ANALYTICS_READ_TRIPWIRE_FLAG = "release_event_sourced_analytics_read_tripwire";
 
 /**
  * The filter-value read this feature makes on the host's filter registry — declared
@@ -336,6 +340,13 @@ export class AnalyticsModule
       repository: setup.repositories.analytics,
       evaluationRepository: evaluations.open({
         defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
+      }),
+      tripwire: LoggingAnalyticsTripwireService.create({
+        isEnabled: (projectId) =>
+          setup.dependencies.featureFlags.isEnabled(ANALYTICS_READ_TRIPWIRE_FLAG, {
+            kind: "project",
+            projectId,
+          }),
       }),
     });
     const lwqlConfig = setup.config.langwatchQl;

@@ -349,3 +349,11 @@ Feature: Evaluation service boundary
     When its lifecycle fact is recorded
     Then the fact carries the project, the evaluation, its evaluator type, score and verdict
     And it names no admin and no organization count
+
+  @integration
+  Scenario: An evaluate request that fails validation answers 400 with the sentence
+    Given a project API key that may manage evaluations
+    When an evaluate door receives a JSON body that omits the data the evaluator scores
+    Then it answers 400 with the validation sentence under error
+    And the refusal is logged with the zod issues
+    And the evaluator is not run
