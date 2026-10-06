@@ -8,8 +8,8 @@ const CATEGORIES = [
   [
     "Migrations",
     (p) =>
-      /^packages\/prisma-client\/prisma\/migrations\//.test(p) ||
-      /^packages\/clickhouse-migrations\/migrations\//.test(p) ||
+      p.startsWith("packages/prisma-client/prisma/migrations/") ||
+      p.startsWith("packages/clickhouse-migrations/migrations/") ||
       /^(?:enterprise\/)?modules\/[^/]+\/(?:contract|process)\/src\/migrations\//.test(p) ||
       p.endsWith("schema.prisma"),
   ],
@@ -25,14 +25,14 @@ const CATEGORIES = [
     (p) =>
       /(^|\/)(__tests__|tests)\//.test(p) ||
       /\.(test|spec)\.[cm]?[jt]sx?$/.test(p) ||
-      /_test\.go$/.test(p) ||
+      p.endsWith("_test.go") ||
       /(^|\/)test_[^/]+\.py$/.test(p) ||
       p.startsWith("dev/tests/agentic-e2e/"),
   ],
   ["CI/CD", (p) => p.startsWith(".github/")],
   [
     "Deploy",
-    (p) => p.startsWith("charts/") || /(^|\/)Dockerfile[^/]*$/.test(p) || /^infra\//.test(p),
+    (p) => p.startsWith("charts/") || /(^|\/)Dockerfile[^/]*$/.test(p) || p.startsWith("infra/"),
   ],
   [
     "Docs",
@@ -57,7 +57,7 @@ const CATEGORIES = [
   ["Apps", (p) => p.startsWith("apps/")],
   ["Tools", (p) => p.startsWith("tools/") || p.startsWith("dev/")],
   // Python precedes "Go services": services/langevals starts with `services/`.
-  ["Python", (p) => /^services\/langevals\//.test(p)],
+  ["Python", (p) => p.startsWith("services/langevals/")],
   ["Go services", (p) => /^(services|pkg|cmd)\//.test(p) || p === "go.mod"],
   ["Other", () => true],
 ];
