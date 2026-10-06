@@ -80,11 +80,11 @@ describe("given a test worker is running Claude Code", () => {
           mode: 0o755,
         });
 
-        const harness = spawn(
-          process.execPath,
-          ["--import", "tsx", harnessPath, workingDirectory],
-          { cwd: skillsRoot, stdio: "ignore" },
-        );
+        // Node runs the TypeScript harness directly (type stripping); tsx is gone.
+        const harness = spawn(process.execPath, [harnessPath, workingDirectory], {
+          cwd: skillsRoot,
+          stdio: "ignore",
+        });
 
         let claudePid: number | undefined;
         let claudeChildPid: number | undefined;
