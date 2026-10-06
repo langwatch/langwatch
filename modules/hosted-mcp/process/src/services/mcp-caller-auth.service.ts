@@ -44,7 +44,7 @@ export type McpCallerLookup =
   | Readonly<{ kind: "refused" }>;
 
 /** An authenticated request's key and the project it belongs to, or a 401 already sent. */
-export type McpAuthentication =
+type McpAuthentication =
   | Readonly<{ kind: "authenticated"; apiKey: string; projectId: string }>
   | Readonly<{ kind: "answered" }>;
 

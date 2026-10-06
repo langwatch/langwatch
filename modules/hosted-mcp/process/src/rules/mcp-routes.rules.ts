@@ -136,7 +136,7 @@ export function isMcpRoute(pathname: string): boolean {
 }
 
 /** Which path-suffixed discovery document a path names, if it is under one of those subtrees. */
-export type McpMetadataSubtreePath =
+type McpMetadataSubtreePath =
   | Readonly<{ kind: "outside" }>
   | Readonly<{ kind: "unpublished" }>
   | Readonly<{ kind: "protected-resource"; resourceSuffix: string }>

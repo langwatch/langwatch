@@ -14,7 +14,7 @@ const DISALLOWED_REDIRECT_SCHEMES: readonly string[] = [
   "filesystem:",
 ];
 
-export type PostedApprovalFields = z.infer<typeof postedApprovalFieldsSchema>;
+type PostedApprovalFields = z.infer<typeof postedApprovalFieldsSchema>;
 
 /** What one approval decided; everything but `approved` is a refusal RFC 6749 §4.1.2.1 names. */
 export type McpApprovalOutcome =
@@ -99,7 +99,7 @@ export function parsePostedApproval(raw: string): PostedApprovalFields | undefin
 }
 
 /** The posted fields an approval needs, or the refusal of them before any approval is asked. */
-export type PostedFieldsCheck =
+type PostedFieldsCheck =
   | Readonly<{ kind: "complete"; projectId: string; redirectUri: string; clientId: string }>
   | Readonly<{ kind: "refused"; error: string }>;
 

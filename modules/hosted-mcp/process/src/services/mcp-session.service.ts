@@ -28,7 +28,7 @@ export const MAX_SESSIONS_PER_KEY = 20;
  * authorize flow; governance tools attribute audit rows and enforce RBAC with it. `projectId`
  * is the tenant its access log lines carry.
  */
-export type McpOpenSession<T> = {
+type McpOpenSession<T> = {
   transport: T;
   apiKey: string;
   projectId: string | undefined;

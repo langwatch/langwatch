@@ -32,7 +32,7 @@ function canonicalArrayValue(value: { values: OtlpAnyValue[] }): unknown {
   };
 }
 
-export function canonicalAnyValue(value: OtlpAnyValue | UnknownRecord | undefined): unknown {
+function canonicalAnyValue(value: OtlpAnyValue | UnknownRecord | undefined): unknown {
   const parsed = otlpAnyValueSchema.safeParse(value);
   if (!parsed.success) return { type: "empty" };
   const typed = parsed.data;

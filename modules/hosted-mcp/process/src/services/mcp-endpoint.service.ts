@@ -44,7 +44,7 @@ export interface McpHandler {
   closeAllSessions: () => Promise<void>;
 }
 
-export type McpEndpointCollaborators = Readonly<{
+type McpEndpointCollaborators = Readonly<{
   sessionRecords: McpSessionRepository;
   relay: McpSessionRelayRepository;
   oauthTokenRecords: McpOAuthTokenRepository;

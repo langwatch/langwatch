@@ -18,7 +18,7 @@ const codeExecutionResponseBodySchema = z.object({
  * structurally: a module server package may not depend on another module's
  * server package, and what this needs is one method rather than a vertical.
  */
-export type EvaluatorNlpDispatcher = {
+type EvaluatorNlpDispatcher = {
   dispatch(input: {
     projectId: string;
     body: StudioClientEvent;
@@ -34,7 +34,7 @@ export type EvaluatorNlpDispatcher = {
 };
 
 /** One run of a code evaluator, as the code service reads the answer. */
-export type EvaluatorCodeExecutionResult = {
+type EvaluatorCodeExecutionResult = {
   ok: boolean;
   statusText: string;
   body: {

@@ -11,7 +11,7 @@ export interface VapidKeyCipher {
   decrypt(ciphertext: string): string;
 }
 
-export type VapidKeyDatabase = PrismaRepositoryClient<readonly ["WebPushVapidKey"]>;
+type VapidKeyDatabase = PrismaRepositoryClient<readonly ["WebPushVapidKey"]>;
 
 export class PrismaWebPushVapidKeyRepository
   extends PrismaRepository.for("WebPushVapidKey")

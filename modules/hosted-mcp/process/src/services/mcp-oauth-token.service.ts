@@ -22,7 +22,7 @@ type OAuthError = Readonly<{
   error_description?: string;
 }>;
 
-export type McpOAuthTokenExchange =
+type McpOAuthTokenExchange =
   | Readonly<{
       status: 200;
       body: Readonly<{
@@ -35,7 +35,7 @@ export type McpOAuthTokenExchange =
   | Readonly<{ status: 400 | 401 | 500; body: OAuthError }>;
 
 /** The OAuth form values after the raw Node transport has decoded them. */
-export type McpOAuthTokenRequest = Readonly<{
+type McpOAuthTokenRequest = Readonly<{
   grantType: string | undefined;
   code: string | undefined;
   codeVerifier: string | undefined;

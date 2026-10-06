@@ -38,7 +38,7 @@ export function webPushTopicHeader(subject: string): string {
 }
 
 /** What a push service's answer means for one send. */
-export type WebPushAnswer =
+type WebPushAnswer =
   | { outcome: "delivered" }
   | { outcome: "gone" }
   | { outcome: "retry"; retryAfterMs?: number }

@@ -24,7 +24,7 @@ export function clickHouseTimestamp(epochMs: number): Date {
  */
 const MAX_UINT64 = 18_446_744_073_709_551_615n;
 
-export interface RawMetricRow {
+interface RawMetricRow {
   TenantId: string;
   PointId: string;
   SeriesId: string;

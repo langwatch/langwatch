@@ -5,12 +5,10 @@ const MAX_BODY_BYTES = 10_485_760;
 const BODY_TOO_LARGE = "Request body too large";
 
 /** A body read: the text, or a refusal already sent to the caller, who must stop. */
-export type McpBodyRead = Readonly<{ kind: "read"; body: string }> | Readonly<{ kind: "answered" }>;
+type McpBodyRead = Readonly<{ kind: "read"; body: string }> | Readonly<{ kind: "answered" }>;
 
 /** A JSON body read: the parsed document, or a refusal already sent to the caller. */
-export type McpJsonBodyRead =
-  | Readonly<{ kind: "read"; body: unknown }>
-  | Readonly<{ kind: "answered" }>;
+type McpJsonBodyRead = Readonly<{ kind: "read"; body: unknown }> | Readonly<{ kind: "answered" }>;
 
 /**
  * The raw Node exchange this endpoint answers on: bodies in, JSON and protocol refusals out,

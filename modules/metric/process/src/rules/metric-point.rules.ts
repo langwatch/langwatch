@@ -19,7 +19,7 @@ import {
 import { validatePointShape } from "./metric-validation.rules.ts";
 import { canonicalPointValues, canonicalValueSection } from "./metric-values.rules.ts";
 
-export interface PreparedMetricPoint {
+interface PreparedMetricPoint {
   dataPoint: CanonicalMetricDataPoint;
   correlations: MetricTraceCorrelation[];
 }
