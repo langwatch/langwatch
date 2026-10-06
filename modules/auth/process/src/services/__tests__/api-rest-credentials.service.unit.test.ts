@@ -96,6 +96,7 @@ const store = new KeyStore(
     ],
   ]),
   new Map<string, OrganizationApiKeyResolution>([
+    ["sk-lw-project", { ok: false, reason: "wrong_credential_class" }],
     [
       "sk-lw-org",
       {
@@ -205,6 +206,33 @@ describe("the key door", () => {
 });
 
 /** @see specs/security/api-endpoint-authorization.feature */
+describe("the organization door", () => {
+  describe("given a token that matches no key at all", () => {
+    /** @scenario "A credential that resolves to nothing is not blamed on its class" */
+    it("is refused as invalid credentials, naming no credential class", async () => {
+      const refusal = await door
+        .identifyOrganization({ request: request({ authorization: "Bearer sk-lw-typo" }) })
+        .then(
+          () => new Error("the door admitted the request"),
+          (error: unknown) => error,
+        );
+
+      expect(refusal).toMatchObject({ code: "invalid_credentials", httpStatus: 401 });
+      expect((refusal as Error).message).not.toMatch(/project|organization/i);
+    });
+
+    it("tells a project key from it, naming the class the endpoint needs", async () => {
+      expect(
+        await refusalCode(
+          door.identifyOrganization({
+            request: request({ authorization: "Bearer sk-lw-project" }),
+          }),
+        ),
+      ).toBe("credential_class_mismatch");
+    });
+  });
+});
+
 describe("the project door", () => {
   describe("given a live key that reaches several projects and names none", () => {
     /** @scenario "A key that reaches several projects and names none is told to name one" */

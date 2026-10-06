@@ -64,6 +64,7 @@ function makeService({
   const memory = MemoryAuthDatabase.create();
   const mail = MemorySignUpVerificationMailChannel.create();
   const budgets: string[] = [];
+  const lookups: string[] = [];
   let clock = NOW;
   let minted = 0;
   let current = holder;
@@ -72,7 +73,12 @@ function makeService({
   const service = SignUpVerificationService.create({
     tokens: MemorySignUpVerificationTokenRepository.create({ memory }),
     mailer: mailer ?? mail,
-    users: createApiFixture<UserApi>({ findByEmail: async () => current }),
+    users: createApiFixture<UserApi>({
+      findByEmail: async ({ email }) => {
+        lookups.push(email);
+        return current;
+      },
+    }),
     route: async () => decision,
     checkSignUp: async () =>
       signUpRefused ? { allowed: false, reason: "invite_only" } : { allowed: true, via: "open" },
@@ -91,6 +97,7 @@ function makeService({
     memory,
     mail,
     budgets,
+    lookups,
     advance: (milliseconds: number) => {
       clock = clock.add({ milliseconds });
     },
@@ -327,6 +334,33 @@ describe("given a signed-out sign-up asking for a new account's link", () => {
         harness.service.requestNewAccountVerification({ email: "sam@acme.com" }),
       ).rejects.toMatchObject({ code: "auth_direct_registration_unavailable" });
       expect(harness.mail.sent).toEqual([]);
+    });
+
+    /** @scenario Sign-up never reveals account existence when managed SSO cannot route */
+    it.each([
+      ["a connection the deployment is not licensed to serve", "method_not_licensed"],
+      ["a connection whose provider is not configured", "method_not_configured"],
+    ] as const)("refuses alike when the domain is managed by %s", async (_label, reasonCode) => {
+      const unroutable: RoutingDecision = {
+        outcome: "method_picker",
+        methodSet: [{ id: "password", kind: "password", connectionId: null }],
+        reasonCode,
+        domainManaged: true,
+      };
+
+      for (const holder of [
+        account({ emailVerified: true }),
+        account({ emailVerified: false }),
+        null,
+      ]) {
+        const harness = makeService({ decision: unroutable, holder });
+
+        await expect(
+          harness.service.requestNewAccountVerification({ email: "sam@acme.com" }),
+        ).rejects.toMatchObject({ code: "auth_direct_registration_unavailable" });
+        expect(harness.lookups).toEqual([]);
+        expect(harness.mail.sent).toEqual([]);
+      }
     });
 
     it("refuses by name and mails nothing", async () => {
