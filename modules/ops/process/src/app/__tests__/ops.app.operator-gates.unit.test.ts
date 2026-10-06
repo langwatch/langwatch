@@ -63,13 +63,7 @@ describe("given the platform-operator grant answers through authz", () => {
   });
 
   /** @scenario "Operator gates ask the platform-operator grant" */
-  it("admits staff on ops:view and refuses a non-holder", async () => {
-    expect((await app.admitStaff(VIEWER)).id).toBe(VIEWER.id);
-    await expect(app.admitStaff(OUTSIDER)).rejects.toMatchObject({ code: "permission_denied" });
-  });
-
-  /** @scenario "Operator gates ask the platform-operator grant" */
-  it("hides the admin door from a non-holder as not found, and demands manage for writes", async () => {
+  it("demands manage for a back-office write, hidden as not found", async () => {
     const run = (actor: OpsOperator, method: "getList" | "update") =>
       app.runAdminOperation({
         actor,
@@ -79,8 +73,8 @@ describe("given the platform-operator grant answers through authz", () => {
         params: {},
       });
 
-    await expect(run(OUTSIDER, "getList")).rejects.toMatchObject({ code: "not_found" });
     await expect(run(VIEWER, "update")).rejects.toMatchObject({ code: "not_found" });
+    await expect(run(OUTSIDER, "update")).rejects.toMatchObject({ code: "not_found" });
   });
 });
 

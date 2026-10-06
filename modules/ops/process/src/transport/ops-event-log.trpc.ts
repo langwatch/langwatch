@@ -1,83 +1,54 @@
 /**
  * The server half of the event-log, replay and anomaly procedures.
- * Platform-tier throughout: see `ops-operator.trpc.ts` for why the gate is
- * the application's rather than the door's.
+ * Platform-tier throughout: the door asks `ops:view` or `ops:manage` of the
+ * operator's platform grant.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { OpsApi, opsEventLogTrpc } from "@langwatch/ops-contract";
 
-import { OPS_MANAGE, OPS_VIEW, opsOperatorFact } from "#transport/ops-operator.trpc";
+import { opsOperatorFact } from "#transport/ops-operator.trpc";
 
 export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsEventLogTrpc> =
   defineTrpcRouter(OpsApi, opsEventLogTrpc)
     .procedure("searchAggregates")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.searchAggregates({
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) =>
+      app.searchAggregates({
         query: input.query,
         tenantIds: input.tenantId ? [input.tenantId] : [],
         sinceMs: input.sinceMs,
-      });
-    })
+      }),
+    )
 
     .procedure("getEventLogSearchWindow")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.getEventLogSearchWindow();
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app }) => app.getEventLogSearchWindow())
 
     .procedure("loadAggregateEvents")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.getAggregateEvents(input);
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.getAggregateEvents(input))
 
     .procedure("computeProjectionState")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.computeProjectionState(input);
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.computeProjectionState(input))
 
     .procedure("discoverAggregates")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.discoverAggregates({
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) =>
+      app.discoverAggregates({
         projectionNames: input.projectionNames,
         since: input.since,
         tenantIds: input.tenantIds ?? [],
-      });
-    })
+      }),
+    )
 
     .procedure("searchTenants")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.searchProjects({ query: input.query });
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.searchProjects({ query: input.query }))
 
     .procedure("dryRunReplay")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_MANAGE)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:manage");
-
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ input }) => {
       return {
         status: "coming_soon" as const,
         message: "Dry run is not yet implemented. Full replay will process all aggregates.",
@@ -87,30 +58,18 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     })
 
     .procedure("getReplayHistory")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.getHistory();
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app }) => app.getHistory())
 
     .procedure("getReplayRun")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.findHistoryEntry({ runId: input.runId });
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.findHistoryEntry({ runId: input.runId }))
 
     .procedure("startReplay")
     .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_MANAGE)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:manage");
-
-      return app.startReplay({
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app, input }, operator) =>
+      app.startReplay({
         projectionNames: input.projectionNames,
         since: input.since,
         tenantIds: input.tenantIds ?? [],
@@ -119,42 +78,26 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
         description: input.description,
         userName: operator?.name ?? operator?.email ?? "unknown",
         requestedByUserId: operator?.id,
-      });
-    })
+      }),
+    )
 
     .procedure("getReplayStatus")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.getStatus();
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app }) => app.getStatus())
 
     .procedure("cancelReplay")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_MANAGE)
-    .handle(async ({ app }, operator) => {
-      await app.admitOperator(operator, "ops:manage");
-
-      return app.cancelReplay();
-    })
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app }) => app.cancelReplay())
 
     .procedure("listAnomalies")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
+    .withPermission("ops:view", { at: "platform" })
+    .handle(async ({ app }) => {
       return { anomalies: await app.listAnomalies() };
     })
 
     .procedure("dismissAnomaly")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_MANAGE)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:manage");
-
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(async ({ app, input }) => {
       return { dismissed: await app.dismissAnomaly(input) };
     })
     .build();

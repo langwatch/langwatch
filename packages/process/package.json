@@ -33,7 +33,6 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/ops-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/secrets": "workspace:*",

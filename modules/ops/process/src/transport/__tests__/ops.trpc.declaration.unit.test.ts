@@ -37,7 +37,8 @@ function boundAccess(declaration: Declaration): Record<string, string> {
 
   const runtime: TrpcProcedureFactory<object> = {
     procedure: ({ procedure, access }) => {
-      declared[wireName(procedure)] = access.kind;
+      declared[wireName(procedure)] =
+        access.kind === "permission-platform" ? `${access.kind}:${access.permission}` : access.kind;
 
       return {};
     },
@@ -192,6 +193,22 @@ const OPS_PROCEDURES: Readonly<Record<string, "query" | "mutation" | "subscripti
 /** The one procedure that answers a non-operator instead of refusing them. */
 const ANSWERING_PROBE = "getScope";
 
+/** The procedures whose handler reads the operator's name, email or impersonation. */
+const OPERATOR_READERS = [
+  ANSWERING_PROBE,
+  "startReplay",
+  "grantPlatformOperator",
+  "revokePlatformOperator",
+  "runBlobCleanup",
+  "deleteBlob",
+  "enrollMigrationTenant",
+  "enrollMigrationCohort",
+  "runSystemMigrationForOrganization",
+  "runSystemMigrationPass",
+  "assertSystemMigrationLegacyWritersDrained",
+  "rollBackSystemMigrationTenant",
+];
+
 describe("the ops tRPC declarations", () => {
   describe("given the six parts of the ops namespace", () => {
     it("declares every procedure the operator surfaces call, once", () => {
@@ -225,36 +242,47 @@ describe("the ops tRPC declarations", () => {
 
   describe("given the server bindings", () => {
     /**
-     * Platform-tier: no id in the input names a scope, so the application
-     * proves the operator standing and the declaration says so. A procedure
-     * that slipped to `no-permission` here would be one nobody checks.
+     * Platform-tier: no id in the input names a scope, so the door asks the operator's platform
+     * grant. A procedure that slipped to `no-permission` here would be one nobody checks.
      */
-    it("declares every procedure but the probe as service-authorized", () => {
+    it("declares every procedure but the probe at the platform tier", () => {
       const access = Object.assign({}, ...OPS_TRANSPORTS.map(boundAccess)) as Record<
         string,
         string
       >;
       const relaxed = Object.entries(access)
-        .filter(([, kind]) => kind !== "service-authorized")
+        .filter(([, kind]) => !kind.startsWith("permission-platform:"))
         .map(([name]) => name);
 
       expect(relaxed).toEqual([ANSWERING_PROBE]);
       expect(access[ANSWERING_PROBE]).toBe("no-permission");
     });
 
-    /**
-     * Every procedure needs the operator, because every procedure gates on
-     * them. One that asked for no fact would be one the application could not
-     * refuse.
-     */
-    it("asks the mount to bind the operator on every procedure", () => {
+    it("asks ops:manage of every mutation", () => {
+      const access = Object.assign({}, ...OPS_TRANSPORTS.map(boundAccess)) as Record<
+        string,
+        string
+      >;
+      const mutations = Object.entries(OPS_PROCEDURES)
+        .filter(([, kind]) => kind === "mutation")
+        .map(([name]) => name);
+
+      expect(mutations.filter((name) => access[name] !== "permission-platform:ops:manage")).toEqual(
+        [],
+      );
+    });
+
+    /** The operator is bound only where the handler reads the person, beyond who may call it. */
+    it("binds the operator only where the handler reads who it is", () => {
       const facts = Object.assign({}, ...OPS_TRANSPORTS.map(boundFacts)) as Record<
         string,
         string[]
       >;
+      const reading = Object.entries(facts)
+        .filter(([, names]) => names.includes("opsOperator"))
+        .map(([name]) => name);
 
-      expect(Object.keys(facts).toSorted()).toEqual(Object.keys(OPS_PROCEDURES).toSorted());
-      expect(Object.values(facts).every((names) => names.includes("opsOperator"))).toBe(true);
+      expect(reading.toSorted()).toEqual(OPERATOR_READERS.toSorted());
     });
   });
 
@@ -287,19 +315,13 @@ describe("the ops tRPC declarations", () => {
       expect(Object.keys(opsBugReportTrpc.members).toSorted()).toEqual(["getAll", "getById"]);
     });
 
-    /**
-     * A bug report carries no tenant, so there is no scope to check: the
-     * declaration says so in words, and the application asks for the platform grant.
-     */
-    it("declares both reads as deliberately unchecked, on the operator fact", () => {
+    /** A bug report carries no tenant, so the door asks the operator's platform grant. */
+    it("declares both reads at the platform tier, with no operator fact", () => {
       expect(boundAccess(opsBugReportTrpcTransport)).toEqual({
-        getAll: "no-permission",
-        getById: "no-permission",
+        getAll: "permission-platform:ops:view",
+        getById: "permission-platform:ops:view",
       });
-      expect(boundFacts(opsBugReportTrpcTransport)).toEqual({
-        getAll: ["opsOperator"],
-        getById: ["opsOperator"],
-      });
+      expect(boundFacts(opsBugReportTrpcTransport)).toEqual({ getAll: [], getById: [] });
     });
   });
 });

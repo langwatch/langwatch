@@ -7,11 +7,10 @@
 import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import { HandledError } from "@langwatch/handled-error";
 import type { OpsOperator } from "@langwatch/ops-contract";
-import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { OpsTrpcTestContext } from "../../transport/__tests__/ops.trpc.harness.ts";
+import { opsTrpcMembers } from "../../transport/__tests__/ops.trpc.harness.ts";
 import { opsOperatorFact } from "../../transport/ops-operator.trpc.ts";
 import { opsPlatformTrpcTransport } from "../../transport/ops-platform.trpc.ts";
 import type { OpsSystemMigrationRunner } from "../ops.app.ts";
@@ -67,26 +66,21 @@ function callerFor(operator: OpsOperator) {
     members: { createSystemMigrations: () => service },
     authz: platformOperatorAuthz({ holders: { user_alex: ["ops:view", "ops:manage"] } }),
   });
-  const admitOperator = app.admitOperator.bind(app);
   let current = "";
-
-  vi.spyOn(app, "admitOperator").mockImplementation((asked, permission) => {
-    demandedPermissions.set(current, permission);
-
-    return admitOperator(asked, permission);
-  });
 
   const trpc = initTRPC.context<MigrationTestContext>().create();
   const router = createTrpcRuntime<MigrationTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: trpcTestMembers<OpsTrpcTestContext>(),
+    members: opsTrpcMembers({
+      holders: { user_alex: ["ops:view", "ops:manage"] },
+      asked: (permission) => demandedPermissions.set(current, permission),
+    }),
   }).mount(opsPlatformTrpcTransport, () => app, {
     facts: [bindTrpcFact(opsOperatorFact, (ctx: MigrationTestContext) => ctx.operator)],
   });
 
-  // The name the grain is recorded under: tRPC hands the handler no path, and
-  // the application is what the grain is asked of.
+  // The name the grain is recorded under: tRPC hands the door no path.
   const named = new Proxy(router.createCaller({ actor: { id: operator.id }, operator }), {
     get: (target, property: string) => {
       const procedure = Reflect.get(target, property) as unknown;

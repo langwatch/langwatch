@@ -32,9 +32,6 @@
       "path": "../observability/tsconfig.build.json"
     },
     {
-      "path": "../../modules/ops/contract/tsconfig.build.json"
-    },
-    {
       "path": "../prisma-client/tsconfig.build.json"
     },
     {

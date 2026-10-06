@@ -4,11 +4,10 @@
  * the answer (never carrying search text), paging defaults, and the
  * refusal for an unknown report id.
  */
-import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import { createTrpcRuntime } from "@langwatch/api/trpc";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { OpsOperator } from "@langwatch/ops-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -18,10 +17,7 @@ import {
   platformOperatorAuthz,
 } from "../../app/__tests__/ops.fixture.ts";
 import { opsBugReportTrpcTransport } from "../ops-bug-report.trpc.ts";
-import { opsOperatorFact } from "../ops-operator.trpc.ts";
-import type { OpsTrpcTestContext } from "./ops.trpc.harness.ts";
-
-type BugReportTestContext = { actor: { id: string }; operator: OpsOperator | null };
+import { opsTrpcMembers, type OpsTrpcTestContext } from "./ops.trpc.harness.ts";
 
 const STAFF: OpsOperator = { id: "operator", email: OPS_STAFF_ADDRESS };
 const CUSTOMER: OpsOperator = { id: "customer", email: "someone@acme.com" };
@@ -32,23 +28,22 @@ const IMPERSONATING: OpsOperator = {
 
 function harness({ cloudOps = true }: { cloudOps?: boolean } = {}) {
   const record = vi.fn<AuditLogApi["record"]>(async () => ({ id: "audit", occurredAt: 0 }));
+  const holders = { [STAFF.id]: ["ops:view", "ops:manage"] } as const;
   const { app, repositories } = createOpsTestApp({
-    authz: platformOperatorAuthz({ holders: { [STAFF.id]: ["ops:view", "ops:manage"] } }),
+    authz: platformOperatorAuthz({ holders }),
     auditLog: createApiFixture<AuditLogApi>({ record }),
     members: { cloudOps },
   });
 
-  const trpc = initTRPC.context<BugReportTestContext>().create();
-  const router = createTrpcRuntime<BugReportTestContext>({
+  const trpc = initTRPC.context<OpsTrpcTestContext>().create();
+  const router = createTrpcRuntime<OpsTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: trpcTestMembers<OpsTrpcTestContext>(),
-  }).mount(opsBugReportTrpcTransport, () => app, {
-    facts: [bindTrpcFact(opsOperatorFact, (ctx: BugReportTestContext) => ctx.operator)],
-  });
+    members: opsTrpcMembers({ holders }),
+  }).mount(opsBugReportTrpcTransport, () => app);
 
   const callerFor = (operator: OpsOperator | null) =>
-    router.createCaller({ actor: { id: operator?.id ?? "anonymous" }, operator });
+    router.createCaller({ actor: operator ? { id: operator.id } : null, operator });
 
   return {
     record,
@@ -72,10 +67,13 @@ async function fileReport(
 describe("the bugReports tRPC namespace", () => {
   describe("given a caller who holds no platform-operator grant", () => {
     /** @scenario "Non-admins cannot access bug reports" */
-    it("refuses the listing and writes no audit row", async () => {
+    it("refuses the listing at the door, naming the permission, and writes no audit row", async () => {
       const { customerCaller, record } = harness();
 
-      await expect(customerCaller.getAll({})).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(customerCaller.getAll({})).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        cause: { code: "permission_denied", meta: { permission: "ops:view" } },
+      });
       expect(record).not.toHaveBeenCalled();
     });
 
@@ -87,10 +85,10 @@ describe("the bugReports tRPC namespace", () => {
       });
     });
 
-    it("refuses a caller with no operator at all", async () => {
+    it("refuses a caller with no session as unauthenticated", async () => {
       const { anonymousCaller } = harness();
 
-      await expect(anonymousCaller.getAll({})).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(anonymousCaller.getAll({})).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
   });
 

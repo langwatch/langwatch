@@ -1168,7 +1168,7 @@ export class OpsModule implements OpsApi {
   async startAdminImpersonation(
     input: StartAdminImpersonationInput,
   ): Promise<AdminImpersonationStarted> {
-    const staff = await this.#admitHiddenStaff({ operator: input.actor, permission: "ops:manage" });
+    const staff = actingIdentityOf(input.actor);
     const session = this.#adminSession(input.session);
 
     await this.#dependencies.ops.startImpersonation({
@@ -1185,7 +1185,6 @@ export class OpsModule implements OpsApi {
   async stopAdminImpersonation(
     input: StopAdminImpersonationInput,
   ): Promise<AdminImpersonationStopped> {
-    await this.#admitHiddenStaff({ operator: input.actor, permission: "ops:manage" });
     const session = this.#adminSession(input.session);
 
     await this.#dependencies.ops.stopImpersonation({ sessionId: session.id });
@@ -1194,10 +1193,11 @@ export class OpsModule implements OpsApi {
   }
 
   async runAdminOperation(input: RunAdminOperationInput): Promise<AdminOperationResult> {
-    const staff = await this.#admitHiddenStaff({
-      operator: input.actor,
-      permission: ADMIN_READ_METHODS.has(input.method) ? "ops:view" : "ops:manage",
-    });
+    // The door asked ops:view; a write method is the one question that depends on the body.
+    if (!ADMIN_READ_METHODS.has(input.method)) {
+      await this.#admitHiddenStaff({ operator: input.actor, permission: "ops:manage" });
+    }
+    const staff = actingIdentityOf(input.actor);
     const resource = adminResourceNameSchema.safeParse(
       ADMIN_RESOURCE_NAMES[input.resource] ?? input.resource,
     );
@@ -1406,19 +1406,6 @@ export class OpsModule implements OpsApi {
     if (!(await this.#operatorOf({ operator, permission }))) {
       throw new OpsOperatorRequiredError(permission);
     }
-  }
-
-  /**
-   * The staff gate on the support inbox. The same grant, named for what
-   * it decides there: a bug report carries no tenant, so staff is the only
-   * question that could be asked about it.
-   */
-  async admitStaff(operator: OpsOperator | null): Promise<OpsOperator> {
-    if (!(await this.#operatorOf({ operator, permission: "ops:view" }))) {
-      throw new OpsOperatorRequiredError("ops:view");
-    }
-
-    return actingIdentityOf(operator);
   }
 
   /**

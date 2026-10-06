@@ -46,7 +46,6 @@ import {
 } from "@langwatch/api/trpc";
 import type { RestResolvedProjectCredential } from "@langwatch/authorization";
 import type { Logger } from "@langwatch/observability";
-import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { Hono } from "hono";
@@ -99,7 +98,7 @@ class ApiSurface {
       : void 0;
     const rateLimiter = stores.redis ? members.read("rateLimiter") : void 0;
 
-    return new ApiSurface({ composition, peers, door, sessions, idempotency, rateLimiter });
+    return new ApiSurface({ composition, door, sessions, idempotency, rateLimiter });
   }
 
   readonly #rest: RestHost | undefined;
@@ -111,14 +110,12 @@ class ApiSurface {
 
   private constructor({
     composition,
-    peers,
     door,
     sessions,
     idempotency,
     rateLimiter,
   }: {
     composition: ApiSurfaceComposition;
-    peers: TransportPeers;
     door: ApiDoor;
     sessions: SessionReader;
     idempotency: IdempotentRunner | undefined;
@@ -127,13 +124,11 @@ class ApiSurface {
     this.composition = composition;
     this.door = door;
     this.sessions = sessions;
-    if (composition.selection.selected.rest)
-      this.#rest = this.#restHost(peers, idempotency, rateLimiter);
+    if (composition.selection.selected.rest) this.#rest = this.#restHost(idempotency, rateLimiter);
     if (composition.selection.selected.trpc) this.#trpc = this.#trpcHost(rateLimiter);
   }
 
   #restHost(
-    peers: TransportPeers,
     idempotency: IdempotentRunner | undefined,
     rateLimiter: RateLimiter | undefined,
   ): RestHost {
@@ -150,7 +145,7 @@ class ApiSurface {
       audit: this.door.audit.rest,
       idempotency,
       rateLimiter,
-      facts: this.#restFacts(peers.find(OpsApi)),
+      facts: this.#restFacts(),
       entitlements: this.door.entitlements,
     });
   }
@@ -212,26 +207,13 @@ class ApiSurface {
     });
   }
 
-  async #adminActor(request: Request) {
-    const caller = await this.sessions.read(request);
-    if (!caller?.userId) return null;
-    return { id: caller.userId, email: caller.email, impersonator: caller.impersonator };
-  }
-
-  #restFacts(ops: OpsApi | undefined): readonly RestTransportMiddlewareBinding[] {
+  #restFacts(): readonly RestTransportMiddlewareBinding[] {
     return [
       bindRestMiddleware(
         unsubscribeCallerAddress,
         (context) => ClientAddress.resolvedFor(context.req.raw) ?? null,
       ),
 
-      // Main's hidden 404 for anyone not on the staff list, answered before the body is read.
-      bindRestMiddleware(adminActor, async (context) => {
-        const operator = await this.#adminActor(context.req.raw);
-        const scope = await ops?.operatorScope(operator);
-        if (scope?.kind !== "platform") throw new AdminSurfaceHiddenError();
-        return operator;
-      }),
       bindRestMiddleware(adminAuthSession, async (context) => {
         const caller = await this.sessions.read(context.req.raw);
 
@@ -369,25 +351,6 @@ function browserCausePayload(cause: unknown): Record<string, unknown> | null {
 const unsubscribeCallerAddress = defineRestMiddleware(
   "unsubscribeCallerAddress",
   z.string().nullable(),
-);
-
-const operatorImpersonator = z.object({
-  id: z.string().optional(),
-  name: z.string().nullish(),
-  email: z.string().nullish(),
-  image: z.string().nullish(),
-});
-
-const adminActor = defineRestMiddleware(
-  "adminActor",
-  z
-    .object({
-      id: z.string(),
-      name: z.string().nullish(),
-      email: z.string().nullish(),
-      impersonator: operatorImpersonator.optional(),
-    })
-    .nullable(),
 );
 
 const adminAuthSession = defineRestMiddleware(

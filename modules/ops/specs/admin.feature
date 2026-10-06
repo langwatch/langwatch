@@ -10,10 +10,17 @@ Feature: Platform administration package boundary
   @unit
   Scenario: Operator gates ask the platform-operator grant
     Given authz answers ops:view and ops:manage at the platform tier per user
-    When a read gate, a write gate, the staff gate and the operator scope are asked
+    When a procedure's platform permission, a back-office write and the operator scope are asked
     Then reads need ops:view and writes need ops:manage
     And an impersonating operator is read by the impersonator's own grant
     And a caller who holds nothing is refused, or answered as no scope
+
+  @unit
+  Scenario: The back office answers a refused caller the hidden 404 at its door
+    Given the admin routes sit behind the browser door, asked at the platform tier
+    When a caller with no session, a customer, or a view-only operator on an impersonation route asks
+    Then the door answers 404 not_found before the body is read
+    And no application operation runs
 
   @unit
   Scenario: An admin cannot impersonate another admin

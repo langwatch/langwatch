@@ -462,8 +462,6 @@ export interface OpsApi {
   operatorScope(operator: OpsOperator | null): Promise<OpsScope>;
   /** Refuses anyone who does not hold the permission at the platform tier. */
   admitOperator(operator: OpsOperator | null, permission: OpsOperatorPermission): Promise<void>;
-  /** Refuses anyone who does not hold `ops:view` at the platform tier. */
-  admitStaff(operator: OpsOperator | null): Promise<OpsOperator>;
   /**
    * The staff list, refused as not-found so a probe learns nothing about the
    * surface, and only where ops's cloud-ops capability is on (§3.5).

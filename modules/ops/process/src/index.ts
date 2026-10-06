@@ -69,12 +69,7 @@ export type { ProcessManagerPurgeTarget } from "./repositories/process-manager-p
 // The transport declarations the process mounts. Each is inert: it names its
 // routes or procedures, the access each is reached behind, and the facts the
 // mounting process must bind - and nothing about how this process runs.
-export {
-  adminRest,
-  adminActor,
-  adminAuthSession,
-  adminAuditRequest,
-} from "./transport/admin.rest.ts";
+export { adminRest, adminAuthSession, adminAuditRequest } from "./transport/admin.rest.ts";
 export { opsBugReportRest, bugReportCredential } from "./transport/ops-bug-report.rest.ts";
 export { opsClickHouseExplainRest } from "./transport/ops-clickhouse-explain.rest.ts";
 export { opsOperatorFact } from "./transport/ops-operator.trpc.ts";

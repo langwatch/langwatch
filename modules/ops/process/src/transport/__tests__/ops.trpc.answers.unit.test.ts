@@ -9,7 +9,6 @@ import type { TrpcContract } from "@langwatch/module";
 import type { OpsApi, OpsOperator } from "@langwatch/ops-contract";
 import type { OpsCapability } from "@langwatch/ops-process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -24,9 +23,7 @@ import { opsEventLogTrpcTransport } from "../ops-event-log.trpc.ts";
 import { opsOperatorFact } from "../ops-operator.trpc.ts";
 import { opsPlatformTrpcTransport } from "../ops-platform.trpc.ts";
 import { opsQueueTrpcTransport } from "../ops-queue.trpc.ts";
-import type { OpsTrpcTestContext } from "./ops.trpc.harness.ts";
-
-type OpsAnswersContext = { actor: { id: string }; operator: OpsOperator | null };
+import { opsTrpcMembers, type OpsTrpcTestContext } from "./ops.trpc.harness.ts";
 
 const OPERATOR: OpsOperator = { id: "user_alex", email: OPS_STAFF_ADDRESS };
 const OUTSIDER: OpsOperator = { id: "user_sam", email: "sam@acme.com" };
@@ -36,23 +33,25 @@ function mount<Contract extends TrpcContract>(
   capability: Partial<OpsCapability> = {},
   members: NonNullable<Parameters<typeof createOpsTestApp>[0]>["members"] = {},
 ) {
+  const holders = { [OPERATOR.id]: ["ops:view", "ops:manage"] } as const;
   const { app } = createOpsTestApp({
     capability,
     members,
-    authz: platformOperatorAuthz({ holders: { [OPERATOR.id]: ["ops:view", "ops:manage"] } }),
+    authz: platformOperatorAuthz({ holders }),
   });
-  const trpc = initTRPC.context<OpsAnswersContext>().create();
-  const router = createTrpcRuntime<OpsAnswersContext>({
+  const trpc = initTRPC.context<OpsTrpcTestContext>().create();
+  const router = createTrpcRuntime<OpsTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: trpcTestMembers<OpsTrpcTestContext>(),
+    members: opsTrpcMembers({ holders }),
   }).mount(declaration, () => app, {
-    facts: [bindTrpcFact(opsOperatorFact, (ctx: OpsAnswersContext) => ctx.operator)],
+    facts: [bindTrpcFact(opsOperatorFact, (ctx: OpsTrpcTestContext) => ctx.operator)],
   });
 
   return {
     operator: router.createCaller({ actor: { id: OPERATOR.id }, operator: OPERATOR }),
     outsider: router.createCaller({ actor: { id: OUTSIDER.id }, operator: OUTSIDER }),
+    anonymous: router.createCaller({ actor: null, operator: null }),
   };
 }
 
@@ -168,18 +167,32 @@ describe("the ops surface's declared answers", () => {
   });
 
   describe("given a caller who holds no platform-operator grant", () => {
-    it("refuses the read rather than answering an empty one", async () => {
+    it("refuses the read at the door rather than answering an empty one", async () => {
       const { outsider } = mount(opsDashboardTrpcTransport);
 
-      await expect(outsider.getBadgeCounts()).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(outsider.getBadgeCounts()).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        cause: { code: "permission_denied", meta: { permission: "ops:view" } },
+      });
     });
 
-    it("refuses the write", async () => {
+    it("refuses the write at the door, naming ops:manage", async () => {
       const { outsider } = mount(opsQueueTrpcTransport);
 
       await expect(
         outsider.unblockGroup({ queueName: "traces", groupId: "g-1" }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        cause: { code: "permission_denied", meta: { permission: "ops:manage" } },
+      });
+    });
+
+    it("refuses a caller with no session as unauthenticated", async () => {
+      const { anonymous } = mount(opsQueueTrpcTransport);
+
+      await expect(anonymous.getBlockedSummary()).rejects.toMatchObject({
+        code: "UNAUTHORIZED",
+      });
     });
 
     /** The probe answers rather than refuses, so the menu can poll it. */
