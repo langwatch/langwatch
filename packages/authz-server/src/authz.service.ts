@@ -38,7 +38,6 @@ import {
 } from "@langwatch/authz";
 import { createLogger } from "@langwatch/observability";
 import type { AuthzCollectorService } from "./authz-collector.service";
-import type { AuthzReadRepository } from "./authz-read.repository";
 
 const decisions = createLogger("langwatch:authz:decisions");
 
@@ -193,15 +192,10 @@ export class AuthzService {
     if (!scope) return { allowed: false, organizationRole: null };
 
     const scopeOrg = scopeOrganizationId(scope);
-    const pass = this.collector.beginPass();
     const [grants, ownerGrants] = await Promise.all([
-      this.collector.collectGrants({
-        principal,
-        organizationId: scopeOrg,
-        reader: pass,
-      }),
+      this.collectCached({ principal, organizationId: scopeOrg }),
       ceiling
-        ? this.ownerGrantsFor({ principal, organizationId: scopeOrg, reader: pass })
+        ? this.ownerGrantsFor({ principal, organizationId: scopeOrg })
         : Promise.resolve(null),
     ]);
     const decision = this.engine.decideWithCeiling({
@@ -248,14 +242,9 @@ export class AuthzService {
     // decide — so this is a no-op for the user callers this has today and
     // closes the hole before an api-key caller reaches it.
     const scopeOrg = scopeOrganizationId(scope);
-    const pass = this.collector.beginPass();
     const [grants, ownerGrants] = await Promise.all([
-      this.collector.collectGrants({
-        principal,
-        organizationId: scopeOrg,
-        reader: pass,
-      }),
-      this.ownerGrantsFor({ principal, organizationId: scopeOrg, reader: pass }),
+      this.collectCached({ principal, organizationId: scopeOrg }),
+      this.ownerGrantsFor({ principal, organizationId: scopeOrg }),
     ]);
     const demoProjectId = this.demoProjectId();
     const matched = permissions.find(
@@ -348,17 +337,12 @@ export class AuthzService {
     >;
     organizationRole: OrganizationRoleOrNull;
   }> {
-    // The api-key owner ceiling, off the same snapshot as the key's grants —
-    // see `canAnyByIds`. Null for a user or service-key principal, and
+    // The api-key owner ceiling, read through the epoch cache as check()
+    // reads it — see `canAnyByIds`. Null for a user or service-key principal, and
     // `decideWithCeiling` with a null ceiling is a plain decide.
-    const pass = this.collector.beginPass();
     const [grants, ownerGrants] = await Promise.all([
-      this.collector.collectGrants({
-        principal,
-        organizationId,
-        reader: pass,
-      }),
-      this.ownerGrantsFor({ principal, organizationId, reader: pass }),
+      this.collectCached({ principal, organizationId }),
+      this.ownerGrantsFor({ principal, organizationId }),
     ]);
     const demoProjectId = this.demoProjectId();
     const allowedAt = (
@@ -457,15 +441,9 @@ export class AuthzService {
   private async ownerGrantsFor({
     principal,
     organizationId,
-    reader,
   }: {
     principal: AuthzPrincipalRef;
     organizationId: string;
-    /** Present when the ceiling must come off the same snapshot as the key's
-     *  own grants. Intersecting two heads would let a gate expiry between the
-     *  two collections cap a ledger binding list with a legacy one. Passing a
-     *  reader also means not using the cache, which is the point. */
-    reader?: AuthzReadRepository;
   }): Promise<CollectedGrants | null> {
     if (principal.type !== "apiKey") return null;
     const owner = await this.collector.findApiKeyOwner({
@@ -476,13 +454,7 @@ export class AuthzService {
       type: "user",
       id: owner.userId,
     };
-    return reader
-      ? this.collector.collectGrants({
-          principal: ownerPrincipal,
-          organizationId,
-          reader,
-        })
-      : this.collectCached({ principal: ownerPrincipal, organizationId });
+    return this.collectCached({ principal: ownerPrincipal, organizationId });
   }
 
   private async resourceGrantsFor(

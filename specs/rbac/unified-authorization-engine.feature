@@ -267,6 +267,19 @@ Feature: Unified authorization engine
     Then no further database reads occur for those checks
     And the answers match a fresh resolution exactly
 
+  @unit
+  Scenario: Checks asked by ids read the same cached grants as a resolved-scope check
+    Given alice's grants were resolved once after the latest grant change
+    When the platform checks alice's permissions by organization, project and batch ids
+    Then no further grant reads occur for those checks
+    And the answers match a fresh resolution exactly
+
+  @unit
+  Scenario: A revocation reaches a check asked by ids on the caller's next request
+    Given alice's grants are being served from a cache
+    When an admin revokes alice's binding, or demotes the owner of alice's API key
+    Then the next check asked by ids is denied
+
   @unimplemented
   Scenario: An impersonated request records both identities
     Given a platform admin impersonates user "customer-carol"
