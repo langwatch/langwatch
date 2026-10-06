@@ -34,14 +34,14 @@ describe.skipIf(!liveStoresConfigured)("given the worker booted with the queue's
   });
 
   describe("when the ops feature installer has run", () => {
-    /** @scenario "The worker starts all three loops when it boots" */
+    /** @scenario "The worker starts its three scheduled loops and the queue-metrics writer when it boots" */
     it("runs the queue-metrics writer, which holds the fleet's lease on the shared store", async () => {
       await expect.poll(leaseKeys, { timeout: 30_000 }).not.toEqual([]);
     });
   });
 
   describe("when the worker closes", () => {
-    /** @scenario "Shutting the worker down stops every loop it started" */
+    /** @scenario "Shutting the worker down stops the queue-metrics writer it started" */
     it("hands the writer's lease back, so no writer is left running", async () => {
       expect(await leaseKeys()).not.toEqual([]);
 

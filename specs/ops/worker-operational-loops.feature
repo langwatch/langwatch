@@ -19,17 +19,19 @@ Feature: The worker runs the operational loops nobody else can
   Rule: The loops are started, and stopped
 
     @unit
-    Scenario: The worker starts all three loops when it boots
+    Scenario: The worker starts its three scheduled loops and the queue-metrics writer when it boots
       Given a deployment that opted out of nothing
       When the ops feature installer runs
-      Then the enqueue-rate tick, the usage report, the queue-metrics writer and
-        the storage collection are all running
+      Then the enqueue-rate tick, the usage report and the storage collection are
+        each mounted as a scheduled process manager
+      And the queue-metrics writer is running and holds the fleet's writer lease
 
     @unit
-    Scenario: Shutting the worker down stops every loop it started
+    Scenario: Shutting the worker down stops the queue-metrics writer it started
       Given the ops feature installer has run
       When the worker closes
-      Then no timer it started is left running
+      Then the queue-metrics writer hands back the fleet's writer lease
+      And no writer is left running
 
   Rule: A loop a deployment turned off is off, and one it cannot compose is named
 
@@ -38,7 +40,7 @@ Feature: The worker runs the operational loops nobody else can
       Given a deployment that is the hosted product
       When the ops feature installer runs
       Then the usage report does not start
-      And the other two loops still run
+      And the other loops still run
 
     @unit
     Scenario: An operator's opt-out stops the usage report

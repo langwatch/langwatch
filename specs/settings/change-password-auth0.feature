@@ -111,15 +111,15 @@ Feature: Change password from /settings/security
     When I open the dialog
     Then Current Password, New Password and Confirm New Password are all masked
 
-  # Everything on this page is keyed on the reader's own account, so there is no
-  # scope to hold a grant over. A page-level refusal here would leave a member
-  # with no way to change their own password.
+  # /settings/authentication holds the organization's sign-in methods (SSO and
+  # its connectors), so it stays behind the SSO view grant. A reader's own
+  # password lives on /settings/security, which this grant does not gate.
   @integration
-  Scenario: Every signed-in reader can open their own sign-in methods
+  Scenario: The organization's sign-in methods page needs the SSO view grant
     Given I hold no organization or project permissions at all
     When I open /settings/authentication
-    Then the page opens
-    And it is framed in the settings chrome
+    Then the page is refused and names the sso:view grant
+    And a reader holding sso:view opens it
 
   @integration
   Scenario: Cancel button closes the dialog without submitting

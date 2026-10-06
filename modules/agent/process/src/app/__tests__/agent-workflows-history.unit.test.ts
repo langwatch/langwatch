@@ -266,6 +266,7 @@ describe("AgentModule workflow and audit ownership", () => {
   });
 
   /** @scenario "A workflow copy owns its copied graph" */
+  /** @scenario "A copied workflow agent points at the graph the workflow module copied" */
   it("points a copied Agent at the Workflow copy returned by its owner", async () => {
     const copy = vi.fn(async () => agentWorkflowCopyFixture());
     const { app, repositories } = createAgentAppFixture({

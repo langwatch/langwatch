@@ -218,5 +218,15 @@ describe("given the pages main guarded", () => {
         refusedThenOpened({ count: pages.length, permission: "evaluations:view" }),
       );
     });
+
+    /** @scenario "The organization's sign-in methods page needs the SSO view grant" */
+    it("refuses /settings/authentication to a reader with no grants and opens it on sso:view", () => {
+      const page = "pages/settings/authentication";
+      expect(accessFor({ page, grants: [], flagsOn: true })).toEqual({
+        kind: "forbidden",
+        permission: "sso:view",
+      });
+      expect(accessFor({ page, grants: ["sso:view"], flagsOn: true })).toEqual({ kind: "open" });
+    });
   });
 });

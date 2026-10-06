@@ -57,7 +57,7 @@ function mount<Contract extends TrpcContract>(
 
 describe("the ops surface's declared answers", () => {
   describe("given an operator holding the platform-operator grant", () => {
-    /** @scenario "checkOpsPermission grants access for admin callers" */
+    /** @scenario "An operator's gated ops read is admitted" */
     it("admits a gated read and answers the scope probe with the platform reach", async () => {
       const { operator } = mount(opsDashboardTrpcTransport);
 
@@ -176,7 +176,7 @@ describe("the ops surface's declared answers", () => {
       });
     });
 
-    /** @scenario "checkOpsPermission still throws FORBIDDEN for non-ops callers" */
+    /** @scenario "An ops write is refused at the door for a non-operator" */
     it("refuses the write at the door, naming ops:manage", async () => {
       const unblockQueueGroup = vi.fn(async () => ({ wasBlocked: true }));
       const { outsider } = mount(opsQueueTrpcTransport, { unblockQueueGroup });
@@ -199,7 +199,7 @@ describe("the ops surface's declared answers", () => {
     });
 
     /** The probe answers rather than refuses, so the menu can poll it. */
-    /** @scenario "checkOpsPermission with throwOnDeny=false populates kind=none for status probes" */
+    /** @scenario "The scope probe answers a non-operator with kind none" */
     it("answers the probe with no reach at all", async () => {
       const { outsider } = mount(opsDashboardTrpcTransport);
 

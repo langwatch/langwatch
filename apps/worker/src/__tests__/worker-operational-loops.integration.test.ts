@@ -25,7 +25,7 @@ afterEach(async () => {
 
 describe("given the worker's installed list booted for a deployment that opted out of nothing", () => {
   describe("when the ops feature installer has run", () => {
-    /** @scenario "The worker starts all three loops when it boots" */
+    /** @scenario "The worker starts its three scheduled loops and the queue-metrics writer when it boots" */
     it.each(SCHEDULED_LOOPS)(
       "mounts the $loop as a scheduled process manager on $pipeline",
       async ({ pipeline, manager }) => {

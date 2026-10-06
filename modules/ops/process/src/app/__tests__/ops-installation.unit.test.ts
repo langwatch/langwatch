@@ -155,8 +155,8 @@ function process(
 describe("ops app installation", () => {
   describe("given a process that boots the feature over memory", () => {
     /** @scenario "The deployment's operator list reaches the back office" */
-    /** @scenario "resolveOpsScope returns kind=platform for admin users" */
-    /** @scenario "resolveOpsScope returns kind=none for non-ops users instead of null" */
+    /** @scenario "The operator scope of a platform operator is platform" */
+    /** @scenario "The operator scope of a user outside the operator list is none, never a refusal" */
     it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
       const runtime = await process(role).boot();
 

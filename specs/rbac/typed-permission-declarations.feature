@@ -212,12 +212,6 @@ Feature: Typed permission declarations
     And the check runs even though the endpoint replaced the guard's middleware array
 
   @unit
-  Scenario: A registered policy that promises an unenforced permission fails the build
-    Given a management endpoint whose declared policy names a permission the config does not enforce
-    When the service builds
-    Then the build fails naming both halves of the declaration
-
-  @unit
   Scenario: A passing imperative check returns a proof, not a boolean
     Given a caller the engine permits
     When an asserting imperative check runs

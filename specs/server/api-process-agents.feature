@@ -15,13 +15,11 @@ Feature: The standalone API process composes its own agent service
   # repository, the linked-workflow reads and the audit-history read from ONE
   # guarded Prisma client, which is the client this process already composes.
   #
-  # One capability did not come with them, and it is named rather than hidden.
   # Copying a WORKFLOW agent copies the Studio graph it points at, which is the
-  # Workflow application's `copy` — a dataset copier, a DSL rewriter and the
-  # version rules behind them. This process composes no Workflow application,
-  # so it composes no workflow-copy capability, and the agent service it builds
-  # refuses that one operation by name instead of writing an agent that points
-  # at another project's graph.
+  # workflow module's `copy` — a dataset copier, a DSL rewriter and the version
+  # rules behind them. The agent service asks the workflow module for that copy
+  # through its installed `WorkflowApi` peer, so a copied agent points at a
+  # graph in its own project, never at another project's.
 
   Rule: A process with a database composes the agent service itself
 
@@ -51,17 +49,17 @@ Feature: The standalone API process composes its own agent service
       And the agents RPC surface mounts backed by the null object
       And every agents call refuses by name instead of leaving no route at all
 
-  Rule: The one capability it cannot compose is announced at boot
+  Rule: Copying a workflow agent copies its graph through the workflow module
 
     @unit
-    Scenario: The process says it copies no workflow agents
-      Given the process is composing its own agent service
-      When it composes
-      Then it records that it holds no workflow-copy capability
-      And every other agent operation is served
+    Scenario: A copied workflow agent points at the graph the workflow module copied
+      Given an agent service composed with the workflow module as its peer
+      And a workflow agent pointing at a Studio graph
+      When the agent is copied to another project
+      Then the workflow module is asked to copy the graph into that project
+      And the copied agent points at the graph the workflow module returned
+      And the source agent is unchanged
 
     # The boot statement used to carry a standing list of adapters no package
     # implemented, and the entries that closed had to be removed from it by
-    # hand. The list outlived its last true entry and was deleted; what the
-    # agent service does or does not hold is stated by the service composing
-    # it, in the scenario above.
+    # hand. The list outlived its last true entry and was deleted.
