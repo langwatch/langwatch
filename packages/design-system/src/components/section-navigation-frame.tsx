@@ -6,7 +6,7 @@
 import { Box, HStack, Link, Stack, Text } from "@chakra-ui/react";
 import type { MouseEvent, ReactNode } from "react";
 
-import { isBrowserClick } from "./browser-click.ts";
+import { isBrowserClick } from "./back-link.tsx";
 
 /** One entry on the rail: where it goes and how it reads. */
 export type SectionNavigationLink = {

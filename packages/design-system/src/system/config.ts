@@ -6,9 +6,8 @@
 import { defineConfig, defineRecipe, defineSlotRecipe } from "@chakra-ui/react";
 
 import { colorSystem } from "../color-mode/color-system.ts";
-import { alertSlotRecipe } from "./alert.recipe.ts";
+import { alertSlotRecipe, statusHairline } from "./alert.recipe.ts";
 import { drawerSlotRecipe } from "./drawer.recipe.ts";
-import { statusHairline } from "./status-hairline.ts";
 
 // Inter and JetBrains Mono are loaded by the CSS @import in the application's
 // globals.scss. This file names the families, it does not fetch them.

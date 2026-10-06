@@ -158,3 +158,19 @@ function scopesOf(permission: AuthzPermission): readonly string[] {
   const resource = permission.split(":")[0] as AuthzResource;
   return AUTHZ_RESOURCES[resource]?.scopes ?? [];
 }
+
+export type AuthzScopeLineageInput = Readonly<Partial<Record<ScopeTierField, unknown>>>;
+
+export type AuthzScopeLineageEntry = Readonly<{
+  tier: DeclaredScopeTier;
+  id: string;
+  organizationId: string | null;
+}>;
+
+export type AuthzScopeLineageResult =
+  | Readonly<{ kind: "consistent" }>
+  | Readonly<{
+      kind: "mismatch";
+      widest: Readonly<{ tier: DeclaredScopeTier; id: string }>;
+      entries: readonly AuthzScopeLineageEntry[];
+    }>;

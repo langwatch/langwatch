@@ -6,7 +6,7 @@ import { processMetrics, processTelemetry } from "@langwatch/observability/node"
 import { afterEach, describe, expect, it } from "vitest";
 
 import { processConfig } from "../config.ts";
-import { Server } from "../server-factory.ts";
+import { Server } from "../preamble.ts";
 
 const servers: { close(): Promise<void> }[] = [];
 

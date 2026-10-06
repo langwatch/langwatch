@@ -4,7 +4,6 @@ import process from "node:process";
 import type { Duplex } from "node:stream";
 
 import { GracefulShutdown } from "./graceful-shutdown.ts";
-import { hostedRuntime } from "./hosted-runtime.ts";
 import { drainHttpServer } from "./http-drain.ts";
 import {
   HEARTBEAT_INTERVAL_MS,
@@ -524,4 +523,23 @@ export async function bindHttpServer(
       await new Promise((resume) => setTimeout(resume, BIND_RETRY_MS));
     }
   }
+}
+
+type Runtime = Readonly<{ start(): Promise<void> | void; stop(): Promise<void> | void }>;
+
+/**
+ * The booted application, spoken as a component: the chain stays fluent and
+ * no call site hand-rolls a `{ name, start, stop }` object.
+ */
+export function hostedRuntime({
+  name,
+  runtime,
+  drain,
+}: Readonly<{ name: string; runtime: Runtime; drain?: boolean }>): ServerComponent {
+  return {
+    name,
+    start: () => runtime.start(),
+    stop: () => runtime.stop(),
+    ...(drain === true ? { drain: true } : {}),
+  };
 }

@@ -5,7 +5,7 @@ import { REDACTED, Secret } from "@langwatch/secrets";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { Server } from "../server-factory.ts";
+import { Server } from "../preamble.ts";
 
 const SECRET_VALUE = "sk-preamble-do-not-log";
 

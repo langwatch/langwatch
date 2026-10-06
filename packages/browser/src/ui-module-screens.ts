@@ -7,8 +7,8 @@
 import { lazyRoute, type LazyRouteModule } from "@langwatch/browser-host/navigation";
 import type { RouteObject } from "react-router";
 
-import type { UiPageLoader, UiPageLoaderRegistry } from "./ui-feature-install.ts";
 import { withUiPageGuard } from "./ui-page-guard.tsx";
+import type { UiPageLoader, UiPageLoaderRegistry } from "./ui-page-loaders.ts";
 import { UI_PAGE_FALLBACKS } from "./ui-page.tsx";
 import type { UiWebRouteParent } from "./ui-web-installation.ts";
 import type { SupplyModule, WebScreen } from "./web-module.ts";

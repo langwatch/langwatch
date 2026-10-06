@@ -2,10 +2,9 @@ import { type Mock, vi } from "vitest";
 import { z } from "zod";
 
 import type { AggregateType } from "../../domain/aggregateType.ts";
-import type { EventType } from "../../domain/eventType.ts";
 import type { TenantId } from "../../domain/tenantId.ts";
 import { createTenantId } from "../../domain/tenantId.ts";
-import { type Event, EventSchema, type Projection } from "../../domain/types.ts";
+import { type Event, EventSchema, type EventType, type Projection } from "../../domain/types.ts";
 import { ensureJsonSafe, type JsonValue } from "../../process-manager/json.ts";
 import type { ProcessIntent } from "../../process-manager/processManager.types.ts";
 import type {

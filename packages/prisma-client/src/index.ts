@@ -59,9 +59,13 @@ export {
   PrismaMigrationService,
   type PrismaMigrationServiceOptions,
 } from "./migration.ts";
-export { PrismaReadinessService, type PrismaReadinessOptions } from "./readiness.ts";
-export { PrismaSeed, PrismaSeedService } from "./seed.ts";
-export { PrismaShutdownService } from "./shutdown.ts";
+export {
+  PrismaReadinessService,
+  PrismaSeed,
+  PrismaSeedService,
+  PrismaShutdownService,
+  type PrismaReadinessOptions,
+} from "./connection.ts";
 export {
   isRecordNotFoundError,
   isUniqueConstraintError,

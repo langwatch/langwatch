@@ -1,7 +1,11 @@
 import { z } from "zod";
 
-import { clauseField, isClause } from "./clause-field.ts";
-import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
+import {
+  clauseField,
+  isClause,
+  type GuardMiddleware,
+  type GuardParams,
+} from "./guard-middleware.ts";
 import { ORG_BEARING_MODEL_NAMES } from "./organization-guard.ts";
 
 // Looks for `projectId`, `organizationId`, or `tenantId` anywhere in

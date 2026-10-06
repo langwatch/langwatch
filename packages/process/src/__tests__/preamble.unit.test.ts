@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { processConfig } from "../config.ts";
-import { Server } from "../server-factory.ts";
+import { Server } from "../preamble.ts";
 
 const owner = {
   name: "github",

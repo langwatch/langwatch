@@ -1,4 +1,5 @@
 import type { GroupQueueDependencies } from "@langwatch/group-queue";
+import { z } from "zod";
 
 import type { ProcessStore } from "../process-manager/stores/processStore.types.ts";
 import { createEventingGroupQueueFactory } from "../queues/groupQueueFactory.ts";
@@ -16,7 +17,6 @@ import {
 import { PrismaProcessStore } from "./adapters/postgres/prisma-process-store.ts";
 import type { EventingClickHouseClientResolver } from "./clickhouse-client-resolver.ts";
 import type { EventingProcessPersistenceDatabase } from "./process-persistence.database.ts";
-import type { EventingRetentionConfiguration } from "./retention.ts";
 
 export interface EventingServerRuntimeOptions {
   database: EventingProcessPersistenceDatabase;
@@ -89,4 +89,19 @@ export class EventingServerRuntime {
         : {}),
     };
   }
+}
+
+const eventingRetentionConfigurationSchema = z.object({
+  defaultRetentionDays: z.number().int().positive(),
+});
+
+/** Validated, process-injected fallback for rows without a tenant override. */
+export type EventingRetentionConfiguration = Readonly<{
+  defaultRetentionDays: number;
+}>;
+
+export function createEventingRetentionConfiguration(input: {
+  defaultRetentionDays: number;
+}): EventingRetentionConfiguration {
+  return eventingRetentionConfigurationSchema.parse(input);
 }

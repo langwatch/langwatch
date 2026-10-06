@@ -7,14 +7,9 @@ import { createUiRouter, type UiRouter } from "@langwatch/browser-host/navigatio
 import type { ComponentType } from "react";
 import type { FallbackProps } from "react-error-boundary";
 
-import {
-  mergeUiPageLoaders,
-  type UiFeatureInstall,
-  type UiPageLoader,
-  type UiPageLoaderRegistry,
-} from "./ui-feature-install.ts";
+import { mergeUiPageLoaders } from "./ui-feature-loaders.ts";
 import { createUiFeatureShell } from "./ui-feature-shell.tsx";
-import type { UiFailureInterceptor } from "./ui-feature.ts";
+import type { UiFailureInterceptor, UiFeatureInstall } from "./ui-feature.ts";
 import { createUiInnerProvider, type UiInnerProviderInstall } from "./ui-inner-providers.tsx";
 import { createUiModuleHostStack } from "./ui-module-hosts.tsx";
 import {
@@ -22,6 +17,7 @@ import {
   type UiOuterProviderInstall,
   type UiProviderShell,
 } from "./ui-outer-providers.tsx";
+import { type UiPageLoader, type UiPageLoaderRegistry } from "./ui-page-loaders.ts";
 import { createUiRootLayout } from "./ui-root-layout.tsx";
 import type { UiRouteDescriptor, UiShellLayout } from "./ui-route-descriptor.ts";
 import { createUiRouteObjects } from "./ui-route-objects.tsx";

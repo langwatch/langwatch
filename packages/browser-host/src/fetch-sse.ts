@@ -3,7 +3,6 @@ import { createLogger } from "@langwatch/observability/browser";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 
 import { toError } from "./errors.ts";
-import { FetchSSETimeoutError } from "./fetch-sse-errors.ts";
 
 const logger = createLogger("sseClient");
 const EVENT_STREAM_CONTENT_TYPE = "text/event-stream";
@@ -192,4 +191,11 @@ export async function fetchSSE<T>({
       .then(() => request.finish())
       .catch((error) => request.fail(toError(error)));
   });
+}
+
+export class FetchSSETimeoutError extends Error {
+  constructor(message = "Timeout occurred") {
+    super(message);
+    this.name = "Timeout";
+  }
 }

@@ -2,8 +2,12 @@
 
 import isEmpty from "lodash-es/isEmpty.js";
 
-import { clauseField, isClause } from "./clause-field.ts";
-import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
+import {
+  clauseField,
+  isClause,
+  type GuardMiddleware,
+  type GuardParams,
+} from "./guard-middleware.ts";
 
 /**
  * Middleware featured below

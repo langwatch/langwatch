@@ -16,7 +16,13 @@ import {
 
 import { isProcessModule } from "./process-container.ts";
 import { ProcessServer } from "./process-server.ts";
-import type { ServerComponent, ServerContribution, ServerLogger } from "./server.ts";
+import {
+  Server as ServerBoundary,
+  type ServerComponent,
+  type ServerContribution,
+  type ServerLogger,
+  type ServerOptions,
+} from "./server.ts";
 
 /** An owner as the preamble reads one: a name, and what it declared (§6). */
 export type PreambleOwner = ConfigOwner &
@@ -164,4 +170,13 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
 /** A process that composed no telemetry logs nowhere rather than crashing. */
 function silentLogger(): ServerLogger {
   return { info: () => undefined, error: () => undefined };
+}
+
+export class Server extends ServerBoundary {
+  static create(name: string): ServerPreamble;
+  static create(options: ServerOptions): ServerBoundary;
+  static create(value: string | ServerOptions): ServerPreamble | ServerBoundary {
+    if (typeof value === "string") return ServerPreamble.create(value);
+    return ServerBoundary.create(value);
+  }
 }

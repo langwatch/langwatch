@@ -4,8 +4,7 @@
  * so a catch-site throw from a counter or log sink never masks the real error.
  */
 
-import { quietly } from "./observability.ts";
-import { QUERY_CAUSE_FIELD, RETRY_CAUSE_FIELD } from "./resilience.ts";
+import { QUERY_CAUSE_FIELD, quietly, RETRY_CAUSE_FIELD } from "./resilience.ts";
 import type { RetryAttemptNotice } from "./retry.ts";
 import {
   extractQueryPreview,

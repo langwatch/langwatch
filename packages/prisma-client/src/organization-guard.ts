@@ -4,8 +4,12 @@ import {
   RESERVED_SYSTEM_KEY_NAMES,
 } from "@langwatch/api-key-contract";
 
-import { clauseField, isClause } from "./clause-field.ts";
-import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
+import {
+  clauseField,
+  isClause,
+  type GuardMiddleware,
+  type GuardParams,
+} from "./guard-middleware.ts";
 
 /**
  * Organization-tenancy guard: enforces single-organization scoping with organizationId predicates.

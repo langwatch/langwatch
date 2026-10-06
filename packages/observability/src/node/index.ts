@@ -5,10 +5,10 @@ export {
   type ProcessObservability,
   type ProcessObservabilityFlusher,
   type ProcessObservabilityOptions,
+  UnexportedSpanProcessor,
 } from "./process-observability.ts";
 
 export { createAuthoritativeOtlpConfiguration } from "./otlp-configuration.ts";
-export { UnexportedSpanProcessor } from "./unexported-spans.ts";
 export {
   normaliseTagKey,
   startProfiling,

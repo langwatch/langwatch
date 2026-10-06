@@ -2,8 +2,8 @@
  * Refuses a statement that is not scoped to exactly one tenant.
  */
 
-import { quietly } from "./observability.ts";
 import type { InsertRequest, QueryRequest } from "./query.ts";
+import { quietly } from "./resilience.ts";
 
 export type TenantScopeViolation =
   | { kind: "missing-predicate" }
@@ -325,7 +325,7 @@ export class TenantGuard {
       // is the one where the guard has already decided to allow. An exception from it would
       // propagate out of `assert` and refuse a statement the guard just approved, which is a
       // reporting hook deciding policy. Observability must not change what it observes; see
-      // ./observability.ts.
+      // ./resilience.ts.
       quietly(() => this.onUnscoped?.(request));
       return;
     }

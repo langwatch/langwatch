@@ -54,7 +54,7 @@ import {
   type UiFeatureApiTransport,
 } from "./transport.ts";
 import { UiApiWaitingGate } from "./ui-api-waiting-gate.tsx";
-import type { UiFailureHost, UiFailureInterceptor } from "./ui-feature-install.ts";
+import type { UiFailureHost, UiFailureInterceptor } from "./ui-feature.ts";
 import type { UiProviderShell } from "./ui-outer-providers.tsx";
 
 /** The device store the shell publishes to every feature. */

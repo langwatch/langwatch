@@ -6,9 +6,7 @@ import remarkGfm from "remark-gfm";
 
 import { useRouter } from "../use-router.ts";
 import { RenderCode } from "./render-code.tsx";
-import { stringifyIfObject } from "./stringify-if-object.ts";
 export { RenderCode } from "./render-code.tsx";
-export { stringifyIfObject } from "./stringify-if-object.ts";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { getProxiedImageUrl } from "@langwatch/design-system/external-image";
 
@@ -243,3 +241,16 @@ export const Markdown = memo(
     prevProps.color === nextProps.color &&
     prevProps.children === nextProps.children,
 );
+
+/**
+ * If the value is an object, stringify it. Otherwise, return the value.
+ * @param value - The value to stringify if it is an object.
+ * @returns The value as a string.
+ */
+export const stringifyIfObject = <T,>(value: T): T | string => {
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+
+  return value;
+};

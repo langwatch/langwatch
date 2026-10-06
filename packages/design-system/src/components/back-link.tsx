@@ -6,8 +6,6 @@ import { HStack, Link } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 
-import { isBrowserClick } from "./browser-click.ts";
-
 export function BackLink({
   href,
   onNavigate,
@@ -35,4 +33,10 @@ export function BackLink({
       </HStack>
     </Link>
   );
+}
+
+/** A click the browser keeps: a new tab, a new window, a download. */
+export function isBrowserClick(event: MouseEvent<HTMLAnchorElement>): boolean {
+  if (event.defaultPrevented || event.button !== 0) return true;
+  return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
 }

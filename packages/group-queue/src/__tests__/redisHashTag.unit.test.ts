@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hasRedisHashTag } from "../redisHashTag.ts";
+import { hasRedisHashTag } from "../envelopeBlobLifecycle.ts";
 
 describe("hasRedisHashTag", () => {
   describe("given a name with a non-empty hash tag", () => {
