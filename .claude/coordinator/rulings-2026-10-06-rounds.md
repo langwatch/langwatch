@@ -80,3 +80,5 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Presence (D2): KEEP the runner-owned presence table; minimumWriterGeneration stays as an override.
 - Target table (D4): KEEP the child table _langwatch_upgrade_target.
 - Gate hook (D5): KEEP the withUpgradeGate preamble step in packages/process for api and worker.
+- Stripe channel (Q69): PER-SUBJECT channels (customers, subscriptions, invoices, prices, webhooks), each with a memory twin, over one client billing builds once; about four lanes (handoff a-billing-governance §11).
+- Inline evals (instant-eval-billing :210): CHECK first whether a synchronous SELECT eval(...) returns verdicts on this branch; if not, it is a wider regression and returns to Alex with options.
