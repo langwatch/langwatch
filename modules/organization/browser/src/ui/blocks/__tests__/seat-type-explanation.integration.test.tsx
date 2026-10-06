@@ -89,7 +89,8 @@ describe("the seat-type choice", () => {
       const user = userEvent.setup();
       renderInviteForm();
 
-      const short = screen.getByText(SEAT_TYPE_COPY.liteMemberShortDescription);
+      const liteOption = await openSeatPicker(user);
+      const short = within(liteOption).getByText(SEAT_TYPE_COPY.liteMemberShortDescription);
       expect(short.textContent).not.toMatch(BILLING_WORDS);
 
       await user.click(screen.getByTestId("lite-member-info"));
