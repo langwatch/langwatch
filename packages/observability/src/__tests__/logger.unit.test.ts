@@ -7,6 +7,7 @@ import {
   consoleIgnoreFields,
   createLogger,
 } from "../logger";
+import { summarizeError } from "../request/errorSummary";
 
 vi.mock("@opentelemetry/api", () => ({
   context: { active: vi.fn(() => ({})) },
@@ -117,26 +118,46 @@ describe("createLogger", () => {
       expect(parsed.error).not.toHaveProperty("_superjson");
     });
 
-    it("falls back to standard serializer for non-Error values", () => {
+    it("emits a non-Error value as given", () => {
       const { dest, chunks } = captureDest();
-
       const logger = pino(
-        {
-          level: "error",
-          serializers: {
-            error: (err: unknown) => {
-              if (!(err instanceof Error))
-                return pino.stdSerializers.err(err as Error);
-              return pino.stdSerializers.err(err);
-            },
-          },
-        },
+        { level: "error", serializers: NODE_LOG_SERIALIZERS },
         dest,
       );
 
       logger.error({ error: "not an error object" }, "string error");
 
-      expect(chunks.length).toBeGreaterThan(0);
+      expect(JSON.parse(chunks[0]!).error).toBe("not an error object");
+    });
+
+    it("keeps pino's type label on an unbranded plain object", () => {
+      const { dest, chunks } = captureDest();
+      const logger = pino(
+        { level: "error", serializers: NODE_LOG_SERIALIZERS },
+        dest,
+      );
+
+      logger.error({ error: { message: "x" } }, "plain object");
+
+      expect(JSON.parse(chunks[0]!).error).toMatchObject({
+        type: "Object",
+        message: "x",
+      });
+    });
+
+    it("passes an error summary through unchanged", () => {
+      const { dest, chunks } = captureDest();
+      const logger = pino(
+        { level: "error", serializers: NODE_LOG_SERIALIZERS },
+        dest,
+      );
+
+      logger.error({ error: summarizeError("boom") }, "summary");
+
+      expect(JSON.parse(chunks[0]!).error).toEqual({
+        type: "string",
+        message: "boom",
+      });
     });
   });
 

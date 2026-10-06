@@ -1,4 +1,5 @@
 import pino from "pino";
+import { ERROR_SUMMARY } from "../constants";
 import { redactCommandCredentials } from "../logger";
 
 /**
@@ -24,9 +25,9 @@ import { redactCommandCredentials } from "../logger";
  */
 export function summarizeError(error: unknown): ErrorSummary {
   try {
-    return summarizeUnsafe(error);
+    return brand(summarizeUnsafe(error));
   } catch {
-    return { type: "unknown", message: UNSERIALIZABLE_MESSAGE };
+    return brand({ type: "unknown", message: UNSERIALIZABLE_MESSAGE });
   }
 }
 
@@ -37,10 +38,15 @@ type ErrorSummary = {
   stack?: string;
 };
 
-const MAX_SUMMARY_MESSAGE_LENGTH = 1000;
+export const MAX_SUMMARY_MESSAGE_LENGTH = 1000;
 export const MAX_SUMMARY_STACK_LENGTH = 8000;
 const UNSERIALIZABLE_MESSAGE = "Unserializable thrown value";
 const TRUNCATION_MARKER = "… [truncated]";
+
+/** Marks a summary so the logger serializer recognises it; never enumerable. */
+function brand(summary: ErrorSummary): ErrorSummary {
+  return Object.defineProperty(summary, ERROR_SUMMARY, { value: true });
+}
 
 function summarizeUnsafe(error: unknown): ErrorSummary {
   if (typeof error === "string") {

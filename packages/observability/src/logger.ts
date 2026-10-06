@@ -3,7 +3,7 @@ import pino, {
   type LoggerOptions,
   type Logger as PinoLogger,
 } from "pino";
-import { DEFAULT_SERVICE_NAME, REQUEST_CAUSE_FIELD } from "./constants";
+import { DEFAULT_SERVICE_NAME, ERROR_SUMMARY, REQUEST_CAUSE_FIELD } from "./constants";
 
 type LogContextProvider = () => Record<string, string | null>;
 
@@ -24,16 +24,23 @@ export function registerLogContextProvider(provider: LogContextProvider): void {
 }
 
 /**
- * Error serializer for every cause key. A plain object (such as the bounded
- * summary request logging produces) passes through untouched, since pino's err
- * serializer would relabel it `type: "Object"`. Every `Error` gets its full
- * redacted pino serialization; any other value goes to pino's err serializer.
+ * Error serializer for every cause key. A branded error summary (see
+ * `ERROR_SUMMARY`, produced by request logging) passes through untouched, since
+ * pino's err serializer would relabel it `type: "Object"`. Every `Error` gets
+ * its full redacted pino serialization; anything else, including an unbranded
+ * plain object, goes to pino's err serializer.
  */
 const errorSerializer = (error: unknown) => {
   if (error instanceof Error) {
     return redactCommandCredentials(pino.stdSerializers.err(error));
   }
-  if (error !== null && typeof error === "object") return error;
+  if (
+    error !== null &&
+    typeof error === "object" &&
+    (error as Record<symbol, unknown>)[ERROR_SUMMARY] === true
+  ) {
+    return error;
+  }
   return pino.stdSerializers.err(error as Error);
 };
 

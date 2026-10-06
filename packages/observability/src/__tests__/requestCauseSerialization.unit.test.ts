@@ -19,7 +19,10 @@ import pino from "pino";
 import { describe, expect, it } from "vitest";
 import { REQUEST_CAUSE_FIELD } from "../constants";
 import { NODE_LOG_SERIALIZERS } from "../logger";
-import { MAX_SUMMARY_STACK_LENGTH } from "../request/errorSummary";
+import {
+  MAX_SUMMARY_MESSAGE_LENGTH,
+  MAX_SUMMARY_STACK_LENGTH,
+} from "../request/errorSummary";
 import { logHttpRequest } from "../request/requestLogging";
 
 /**
@@ -315,9 +318,9 @@ describe("emitted request-log records", () => {
 
     describe("when it is a string of 5000 characters", () => {
       /** @scenario Long messages and stacks are cut with a marker */
-      it("caps the message at 1000 characters and marks the cut", () => {
+      it("caps the message and marks the cut", () => {
         const { message } = emittedFor("x".repeat(5000));
-        expect(message.length).toBeLessThanOrEqual(1000);
+        expect(message.length).toBeLessThanOrEqual(MAX_SUMMARY_MESSAGE_LENGTH);
         expect(message.endsWith("… [truncated]")).toBe(true);
       });
     });
@@ -387,31 +390,25 @@ describe("emitted request-log records", () => {
   describe("given a deserialized ReplyError that is not an Error instance", () => {
     /** @scenario Credentials in a failed Redis command never reach the summary */
     it("does not emit the password anywhere in the line", () => {
-      const chunks: string[] = [];
-      const sink = new Writable({
-        write(chunk, _enc, cb) {
-          chunks.push(String(chunk));
-          cb();
-        },
-      });
-      const logger = pino(
-        { level: "debug", serializers: NODE_LOG_SERIALIZERS },
-        sink,
+      const emitted = JSON.stringify(
+        captureRecords((logger) => {
+          logHttpRequest(logger as never, {
+            method: "POST",
+            url: "/api/thing",
+            statusCode: 500,
+            duration: 5,
+            userAgent: null,
+            error: {
+              name: "ReplyError",
+              message:
+                "WRONGPASS invalid username-password pair AUTH s3cret-pass",
+              command: { name: "auth", args: ["default", "s3cret-pass"] },
+            },
+          });
+        }),
       );
-      logHttpRequest(logger as never, {
-        method: "POST",
-        url: "/api/thing",
-        statusCode: 500,
-        duration: 5,
-        userAgent: null,
-        error: {
-          name: "ReplyError",
-          message: "WRONGPASS invalid username-password pair AUTH s3cret-pass",
-          command: { name: "auth", args: ["default", "s3cret-pass"] },
-        },
-      });
-      expect(chunks.join("")).toContain("WRONGPASS");
-      expect(chunks.join("")).not.toContain("s3cret-pass");
+      expect(emitted).toContain("WRONGPASS");
+      expect(emitted).not.toContain("s3cret-pass");
     });
   });
 
@@ -432,27 +429,20 @@ describe("emitted request-log records", () => {
       describe(`when it is logged at ${label} level`, () => {
         /** @scenario Credentials in a failed Redis command never reach the summary */
         it("does not emit the password anywhere in the line", () => {
-          const chunks: string[] = [];
-          const sink = new Writable({
-            write(chunk, _enc, cb) {
-              chunks.push(String(chunk));
-              cb();
-            },
-          });
-          const logger = pino(
-            { level: "debug", serializers: NODE_LOG_SERIALIZERS },
-            sink,
+          const emitted = JSON.stringify(
+            captureRecords((logger) => {
+              logHttpRequest(logger as never, {
+                method: "POST",
+                url: "/api/thing",
+                statusCode,
+                duration: 5,
+                userAgent: null,
+                error: replyError(),
+              });
+            }),
           );
-          logHttpRequest(logger as never, {
-            method: "POST",
-            url: "/api/thing",
-            statusCode,
-            duration: 5,
-            userAgent: null,
-            error: replyError(),
-          });
-          expect(chunks.join("")).toContain("WRONGPASS");
-          expect(chunks.join("")).not.toContain("s3cret-pass");
+          expect(emitted).toContain("WRONGPASS");
+          expect(emitted).not.toContain("s3cret-pass");
         });
       });
     }
