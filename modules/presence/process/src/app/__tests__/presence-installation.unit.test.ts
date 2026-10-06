@@ -25,8 +25,7 @@ const heartbeat = {
 function composePresence(worker?: { eventing: EventSourcing }) {
   const app = createApp({ role: worker ? "worker" : "api" })
     .withModules([withMemoryRepositories(presenceProcessModule)])
-    .withMember("keyvalue", null)
-    .withMember("logging", { warn: () => undefined });
+    .withMembers({ keyvalue: null, logging: { warn: () => undefined } });
   return worker ? app.withEventing(worker.eventing) : app;
 }
 

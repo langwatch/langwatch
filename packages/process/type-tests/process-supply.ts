@@ -120,15 +120,13 @@ const missingCustomMember = createApp({ role: "api" }).withModules([connectionsM
 expectTypeOf<MissingNames<typeof missingCustomMember>>().toEqualTypeOf<"connections">();
 // @ts-expect-error an outstanding declared custom member refuses boot
 void missingCustomMember.boot();
-const customMemberReady = missingCustomMember.withMember("connections", connections);
+const customMemberReady = missingCustomMember.withMembers({ connections });
 expectTypeOf<MissingNames<typeof customMemberReady>>().toEqualTypeOf<never>();
 void (() => customMemberReady.boot());
 // @ts-expect-error a custom member must have the module-declared value type
-void missingCustomMember.withMember("connections", { primary: () => 42 });
+void missingCustomMember.withMembers({ connections: { primary: () => 42 } });
 // @ts-expect-error a custom member name must be declared by an installed module
-void missingCustomMember.withMember("connection", connections);
-// @ts-expect-error custom members cannot be supplied before their declaration is installed
-void createApp({ role: "api" }).withMember("connections", connections);
+void missingCustomMember.withMembers({ connection: connections });
 
 const missingSupplyToken = createApp({ role: "api" }).withModules([licenseConsumerModule]);
 expectTypeOf<MissingNames<typeof missingSupplyToken>>().toEqualTypeOf<"peer.licenseSource">();

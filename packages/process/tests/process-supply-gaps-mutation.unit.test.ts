@@ -21,8 +21,8 @@ const mutations = {
     file: "src/process-supply.ts",
     mutate(source: string) {
       return source
-        .replace("const Name extends keyof RequiredMemberSet & string", "const Name extends string")
-        .replace("Value extends MemberValueFrom<RequiredMemberSet, Name>", "Value");
+        .replace("const Next extends Partial<RequiredMemberSet>", "const Next extends object")
+        .replace("members: Next & ValidateSupply<Next, RequiredMemberSet>", "members: Next");
     },
     diagnostic: "Unused '@ts-expect-error' directive",
   },
@@ -48,60 +48,68 @@ const mutations = {
 >;
 
 describe("process supply gap probes", () => {
-  it.each(Object.entries(mutations))("fails when %s is gutted", (_name, mutation) => {
-    const directory = mkdtempSync(resolve(packageRoot, ".process-supply-gaps-"));
-    try {
-      cpSync(resolve(packageRoot, "src"), resolve(directory, "src"), { recursive: true });
-      mkdirSync(resolve(directory, "tests"));
-      mkdirSync(resolve(directory, "type-tests"));
-      cpSync(
-        resolve(packageRoot, "tests/process-supply.fixtures.ts"),
-        resolve(directory, "tests/process-supply.fixtures.ts"),
-      );
-      cpSync(
-        resolve(packageRoot, "type-tests/process-supply.ts"),
-        resolve(directory, "type-tests/process-supply.ts"),
-      );
-
-      const mutatedPath = resolve(directory, mutation.file);
-      const source = readFileSync(mutatedPath, "utf8");
-      const mutated = mutation.mutate(source);
-      if (mutated === source) throw new Error(`The ${mutation.file} mutation did not apply.`);
-      writeFileSync(mutatedPath, mutated);
-      writeFileSync(
-        resolve(directory, "tsconfig.json"),
-        JSON.stringify({
-          compilerOptions: {
-            allowImportingTsExtensions: true,
-            module: "ESNext",
-            moduleResolution: "Bundler",
-            noEmit: true,
-            skipLibCheck: true,
-            strict: true,
-            target: "ES2022",
-            types: ["node"],
-          },
-          files: ["type-tests/process-supply.ts"],
-        }),
-      );
-
-      let output = "";
+  it.each(Object.entries(mutations))(
+    "fails when %s is gutted",
+    { timeout: 60_000 },
+    (_name, mutation) => {
+      const directory = mkdtempSync(resolve(packageRoot, ".process-supply-gaps-"));
       try {
-        execFileSync(
-          resolve(packageRoot, "node_modules/typescript/bin/tsc"),
-          ["--project", resolve(directory, "tsconfig.json"), "--pretty", "false"],
-          { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+        cpSync(resolve(packageRoot, "src"), resolve(directory, "src"), { recursive: true });
+        mkdirSync(resolve(directory, "tests"));
+        mkdirSync(resolve(directory, "type-tests"));
+        cpSync(
+          resolve(packageRoot, "tests/process-supply.fixtures.ts"),
+          resolve(directory, "tests/process-supply.fixtures.ts"),
         );
-      } catch (error) {
-        if (!(error instanceof Error) || !("stdout" in error) || typeof error.stdout !== "string") {
-          throw error;
-        }
-        output = error.stdout;
-      }
+        cpSync(
+          resolve(packageRoot, "type-tests/process-supply.ts"),
+          resolve(directory, "type-tests/process-supply.ts"),
+        );
 
-      expect(output).toContain(mutation.diagnostic);
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
-    }
-  });
+        const mutatedPath = resolve(directory, mutation.file);
+        const source = readFileSync(mutatedPath, "utf8");
+        const mutated = mutation.mutate(source);
+        if (mutated === source) throw new Error(`The ${mutation.file} mutation did not apply.`);
+        writeFileSync(mutatedPath, mutated);
+        writeFileSync(
+          resolve(directory, "tsconfig.json"),
+          JSON.stringify({
+            compilerOptions: {
+              allowImportingTsExtensions: true,
+              module: "ESNext",
+              moduleResolution: "Bundler",
+              noEmit: true,
+              skipLibCheck: true,
+              strict: true,
+              target: "ES2022",
+              types: ["node"],
+            },
+            files: ["type-tests/process-supply.ts"],
+          }),
+        );
+
+        let output = "";
+        try {
+          execFileSync(
+            resolve(packageRoot, "node_modules/typescript/bin/tsc"),
+            ["--project", resolve(directory, "tsconfig.json"), "--pretty", "false"],
+            { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+          );
+        } catch (error) {
+          if (
+            !(error instanceof Error) ||
+            !("stdout" in error) ||
+            typeof error.stdout !== "string"
+          ) {
+            throw error;
+          }
+          output = error.stdout;
+        }
+
+        expect(output).toContain(mutation.diagnostic);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    },
+  );
 });

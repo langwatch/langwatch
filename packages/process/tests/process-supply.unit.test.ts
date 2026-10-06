@@ -100,7 +100,7 @@ describe("process supply", () => {
   it("hands a module its declared custom member", async () => {
     const runtime = await createApp({ role: "api" })
       .withModules([connectionsModule])
-      .withMember("connections", connections)
+      .withMembers({ connections })
       .boot();
     expect(runtime.module(connectionsModule).provided.primary()).toBe("primary");
     expect(runtime.members).toEqual({ connections });

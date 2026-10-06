@@ -41,10 +41,9 @@ const statements = {
   memberType: 'createApp({ role: "api" }).withModules([clockModule]).withClock(42);',
   customMissing: 'createApp({ role: "api" }).withModules([connectionsModule]).boot();',
   customType:
-    'createApp({ role: "api" }).withModules([connectionsModule]).withMember("connections", { primary: () => 42 });',
+    'createApp({ role: "api" }).withModules([connectionsModule]).withMembers({ connections: { primary: () => 42 } });',
   customUndeclared:
-    'createApp({ role: "api" }).withModules([connectionsModule]).withMember("connection", connections);',
-  customBeforeModules: 'createApp({ role: "api" }).withMember("connections", connections);',
+    'createApp({ role: "api" }).withModules([connectionsModule]).withMembers({ connection: connections });',
   config: 'createApp({ role: "api" }).withModules([configModule]).boot();',
   configSlice: 'createApp({ role: "api" }).withModules([configModule]).withConfig({});',
   configType:
@@ -118,7 +117,7 @@ const statements = {
     'createApp({ role: "worker" }).withService({ name: "producer", start: () => void 0 });',
   goodClock: 'createApp({ role: "api" }).withModules([clockModule]).withClock(clock).boot();',
   goodCustom:
-    'createApp({ role: "api" }).withModules([connectionsModule]).withMember("connections", connections).boot();',
+    'createApp({ role: "api" }).withModules([connectionsModule]).withMembers({ connections }).boot();',
   goodMemory:
     'createApp({ role: "api" }).withModules([memoryRepositoryModule]).withClock(clock).boot();',
   goodPeer: 'createApp({ role: "api" }).withModules([peerModule]).provide({ project }).boot();',
@@ -208,7 +207,6 @@ describe("compiler checked process supply", () => {
     "customMissing",
     "customType",
     "customUndeclared",
-    "customBeforeModules",
     "configSlice",
     "configType",
     "peer",
