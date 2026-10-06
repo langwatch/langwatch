@@ -73,6 +73,33 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And the member can choose auto-refresh off, every minute, or every 5 minutes
     # Evidence: screenshot of the header with the time and the refresh menu
 
+  @integration
+  Scenario: AC19 One control sets the range, the grain and the refresh
+    Given a member opens a board
+    Then the header has one period control showing the range and grain, such as "30d · auto"
+    And its menu has three columns: Range, Grain and Refresh, each with a check on the current choice
+    And there is no separate auto-refresh control in the header
+    # Evidence: screenshot of the open menu
+
+  @unit
+  Scenario: AC19b A grain that does not fit the range cannot be picked
+    Given a board's range
+    Then a grain is offered only when the range divided by that grain stays within the bucket budget
+    And 1m is offered for Live, 1h and 24h only
+    And 5m is listed but never offered, as LangWatchQL has no five-minute step
+    And changing to a range the current grain does not fit sets the grain to auto
+    # Decision: shown greyed out rather than hidden, as in the prototype
+
+  @unit @integration
+  Scenario: AC19c Live is the last hour, rolling, refreshed every minute
+    When the member picks Live
+    Then the board reads the last hour at auto grain, which is one-minute buckets
+    And the control shows a green dot and "Live"
+    And the board refreshes every minute and the window moves forward with each refresh
+    And the other refresh choices are greyed out until the member picks another range
+    # Decision: Live overrides the refresh choice without changing it; the member's own choice
+    # applies again on any other range
+
   # ---------------------------------------------------------------------------
   # Bring-your-own-AI
   # ---------------------------------------------------------------------------
@@ -229,6 +256,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 8: "An MCP agent adds a widget to a board" → Scenario: AC8 An MCP agent adds a widget to a board; Scenario: AC8b add_dashboard_widget rejects an unknown dashboard
   # AC 9: "The docs explain how to build boards from an agent" → Scenario: AC9 The docs explain how to build boards from an agent
   # AC 10: "A non-empty board still offers a way to add a widget" → Scenario: AC10 A non-empty board still offers a way to add a widget
+  # AC 19: "One control for range, grain and refresh, with Live" (added by langwatch/tasks#911: the refresh menu moves into the period control) → Scenario: AC19 One control sets the range, the grain and the refresh; Scenario: AC19b A grain that does not fit the range cannot be picked; Scenario: AC19c Live is the last hour, rolling, refreshed every minute
   # AC 11: "Existing boards are unaffected" → Scenario: AC11 Existing boards are unaffected
   # AC 12: "A picked question adds its widget and seeds Langy" (added by langwatch/tasks#911: the picker adds widgets and drafts Langy, no longer only asks) → Scenario: AC12 A picked question adds its widget and seeds Langy; Scenario: AC12b Without Langy a picked question still adds its widget; Scenario: AC12c A failed add keeps the picker open and does not seed Langy
   # AC 13: "An empty widget tells a quiet period from a missing source" (added by langwatch/tasks#911: no rows no longer means not connected) → Scenario: AC13 A quiet period does not ask the member to connect a source; Scenario: AC13b A source that was never set up shows its setup step; Scenario: AC13c Every template widget checks its own source

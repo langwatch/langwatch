@@ -13,7 +13,7 @@ import { useState, type ReactNode } from "react";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { HandledErrorAlert } from "../../../../ui/elements/handled-error-alert.tsx";
 import { CreateDashboardWidgetDrawer } from "../../../../ui/sections/create-dashboard-widget-drawer.tsx";
-import { DashboardAutoRefreshMenu } from "../../../../ui/sections/dashboard-auto-refresh-menu.tsx";
+import { DashboardRefreshStatus } from "../../../../ui/sections/dashboard-auto-refresh-menu.tsx";
 import {
   DashboardRefreshedAtContext,
   useDashboardAutoRefresh,
@@ -74,7 +74,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const [openedAt] = useState(() => nowInstant().epochMilliseconds);
   const widgets = boardWidgets.widgetsOn(board.id);
   const subject = boardSubject({ board, widgets });
-  const autoRefresh = useDashboardAutoRefresh();
+  const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
 
   return (
     <BoardPage
@@ -90,8 +90,10 @@ function OpenBoard({ board }: { board: SavedBoard }) {
             <BoardPeriodControl
               range={range}
               grain={grain}
+              refresh={autoRefresh.option}
               onRangeChange={setRange}
               onGrainChange={setGrain}
+              onRefreshChange={autoRefresh.setOption}
             />
           }
           shareControl={
@@ -103,9 +105,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
             />
           }
           refreshControl={
-            <DashboardAutoRefreshMenu
-              option={autoRefresh.option}
-              onChange={autoRefresh.setOption}
+            <DashboardRefreshStatus
               refreshedAt={autoRefresh.refreshedAt ?? openedAt}
               onRefreshNow={autoRefresh.refreshNow}
             />

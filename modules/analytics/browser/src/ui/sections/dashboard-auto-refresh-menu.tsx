@@ -1,7 +1,7 @@
 /**
- * Dashboard header auto-refresh choice — the same trigger-plus-menu
- * shape the widget card's range picker uses. With `refreshedAt` it also
- * shows "Updated … ago"; with `onRefreshNow` it adds a Refresh button.
+ * Dashboard header auto-refresh: "Updated … ago" and a Refresh button
+ * (DashboardRefreshStatus), and for the reports page the menu to pick the
+ * interval. A board picks its interval in its period control instead.
  */
 
 import { Menu } from "@langwatch/design-system/menu";
@@ -33,14 +33,11 @@ function useUpdatedAgoLabel(refreshedAt: number | undefined): string | undefined
   return `Updated ${Math.round(minutes / 60)}h ago`;
 }
 
-export function DashboardAutoRefreshMenu({
-  option,
-  onChange,
+/** "Updated … ago" with `refreshedAt`, and a Refresh button with `onRefreshNow`. */
+export function DashboardRefreshStatus({
   refreshedAt,
   onRefreshNow,
 }: {
-  readonly option: DashboardAutoRefreshOption;
-  readonly onChange: (option: DashboardAutoRefreshOption) => void;
   /** Epoch ms of the last scheduled refresh, shown as "Updated … ago". */
   readonly refreshedAt?: number;
   /** Reloads every widget now and resets `refreshedAt`. */
@@ -65,6 +62,24 @@ export function DashboardAutoRefreshMenu({
           <RefreshCw size={14} />
         </IconButton>
       )}
+    </HStack>
+  );
+}
+
+export function DashboardAutoRefreshMenu({
+  option,
+  onChange,
+  refreshedAt,
+  onRefreshNow,
+}: {
+  readonly option: DashboardAutoRefreshOption;
+  readonly onChange: (option: DashboardAutoRefreshOption) => void;
+  readonly refreshedAt?: number;
+  readonly onRefreshNow?: () => void;
+}) {
+  return (
+    <HStack gap={1}>
+      <DashboardRefreshStatus refreshedAt={refreshedAt} onRefreshNow={onRefreshNow} />
       <Menu.Root>
         <Menu.Trigger asChild>
           <Button variant="ghost" size="sm" aria-label="Auto-refresh">

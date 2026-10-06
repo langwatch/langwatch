@@ -1,7 +1,7 @@
 /**
  * The period every widget on a board reads over, from the address's `range`
  * and `grain`, and the writes the header control makes. One reading per
- * board, so every widget updates together (AC13).
+ * board, so every widget updates together (AC13). Live rolls on the minute.
  */
 
 import { nowInstant } from "@langwatch/time";
@@ -10,6 +10,7 @@ import { useMemo } from "react";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import {
   type BoardPeriod,
+  boardGrainFits,
   boardPeriodBounds,
   boardPeriodGranularity,
   type BoardPeriodGrain,
@@ -24,10 +25,12 @@ export function useBoardPeriod() {
   const range = parseBoardPeriodRange(query.range);
   const grain = parseBoardPeriodGrain(query.grain);
 
-  // Fixed once per range change, not every render, so widgets do not refetch on each rerender.
+  // Fixed per range change so widgets do not refetch on each render; Live moves on each minute.
+  const liveEnd =
+    range === "live" ? Math.ceil(nowInstant().epochMilliseconds / 60_000) * 60_000 : 0;
   const { periodStart, periodEnd } = useMemo(
-    () => boardPeriodBounds({ range, now: nowInstant().epochMilliseconds }),
-    [range],
+    () => boardPeriodBounds({ range, now: liveEnd || nowInstant().epochMilliseconds }),
+    [range, liveEnd],
   );
   const period: BoardPeriod = useMemo(
     () => ({
@@ -42,7 +45,12 @@ export function useBoardPeriod() {
     range,
     grain,
     period,
-    setRange: (next: BoardPeriodRange) => host.setQuery({ ...query, range: next }),
+    // Live and a range the grain cannot carry both go back to auto (AC19b, AC19c).
+    setRange: (next: BoardPeriodRange) => {
+      const resets =
+        grain !== "auto" && (next === "live" || !boardGrainFits({ range: next, grain }));
+      host.setQuery(resets ? { ...query, range: next, grain: "auto" } : { ...query, range: next });
+    },
     setGrain: (next: BoardPeriodGrain) => host.setQuery({ ...query, grain: next }),
   };
 }

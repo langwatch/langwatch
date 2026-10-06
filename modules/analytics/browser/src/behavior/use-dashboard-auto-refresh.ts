@@ -50,8 +50,10 @@ export const DashboardRefetchIntervalContext = createContext<number | false>(fal
 
 export const useDashboardRefetchInterval = () => useContext(DashboardRefetchIntervalContext);
 
-export function useDashboardAutoRefresh() {
-  const option = useDashboardAutoRefreshStore((state) => state.option);
+/** With `live`, polls every minute whatever the member picked, without changing their pick. */
+export function useDashboardAutoRefresh({ live = false }: { live?: boolean } = {}) {
+  const picked = useDashboardAutoRefreshStore((state) => state.option);
+  const option: DashboardAutoRefreshOption = live ? "1m" : picked;
   const setOption = useDashboardAutoRefreshStore((state) => state.setOption);
   const refetchInterval: number | false = DASHBOARD_AUTO_REFRESH_MS[option] ?? false;
 

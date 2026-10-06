@@ -29,12 +29,12 @@ const advance = (ms: number) =>
     await vi.advanceTimersByTimeAsync(ms);
   });
 
-function renderAutoRefresh() {
+function renderAutoRefresh({ live = false }: { live?: boolean } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
-  const rendered = renderHook(() => useDashboardAutoRefresh(), { wrapper });
+  const rendered = renderHook(() => useDashboardAutoRefresh({ live }), { wrapper });
   return { ...rendered, client };
 }
 
@@ -91,6 +91,22 @@ describe("given the member changes the interval", () => {
       expect(second.result.current.refetchInterval).toBe(false);
       await advance(MINUTE * 10);
       expect(second.result.current.refreshedAt).toBeUndefined();
+    });
+  });
+
+  describe("when the board is Live", () => {
+    /** @scenario "AC19c Live is the last hour, rolling, refreshed every minute" */
+    it("polls every minute without changing the member's own choice", () => {
+      const first = renderAutoRefresh();
+      act(() => first.result.current.setOption("off"));
+      first.unmount();
+
+      const live = renderAutoRefresh({ live: true });
+      expect(live.result.current.option).toBe("1m");
+      expect(live.result.current.refetchInterval).toBe(MINUTE);
+      live.unmount();
+
+      expect(renderAutoRefresh().result.current.option).toBe("off");
     });
   });
 
