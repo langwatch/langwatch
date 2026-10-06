@@ -33,14 +33,14 @@ import type { ConnectCredentialOutcome } from "./connect-credential.service.ts";
 import type { ConnectManagedKeys } from "./license-registry.service.ts";
 
 /** The credential service, as the sync uses it. It binds the instance on first use. */
-export interface ConnectCredentialResolver {
+interface ConnectCredentialResolver {
   resolve(input: {
     token: string;
     instanceId: string | null | undefined;
   }): Promise<ConnectCredentialOutcome>;
 }
 
-export interface LicenseSyncOptions {
+interface LicenseSyncOptions {
   credentials: ConnectCredentialResolver;
   repository: IssuedLicenseRepository;
   managedKeys: ConnectManagedKeys;

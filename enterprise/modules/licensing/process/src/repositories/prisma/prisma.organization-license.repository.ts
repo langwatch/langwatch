@@ -12,7 +12,7 @@ import type {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type OrganizationLicenseDatabase = Pick<PrismaClient, "organization">;
+type OrganizationLicenseDatabase = Pick<PrismaClient, "organization">;
 
 /** The activated licence key, read off and written onto the organization row it is stored on. */
 export class PrismaOrganizationLicenseRepository implements OrganizationLicenseRepository {

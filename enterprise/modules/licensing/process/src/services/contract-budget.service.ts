@@ -17,7 +17,7 @@ import { contractTermsOf } from "../rules/contract-terms.rules.ts";
 
 const CENTS = 100;
 
-export interface ContractBudgetCollaborators {
+interface ContractBudgetCollaborators {
   store: ContractBudgetStore;
   licensesOf: (organizationId: string) => Promise<IssuedLicenseRecord[]>;
   /** Attributed when the customer moves its own cap: no person is present. */

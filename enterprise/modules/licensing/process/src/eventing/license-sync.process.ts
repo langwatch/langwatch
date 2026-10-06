@@ -16,11 +16,11 @@ export const licenseSyncStateSchema = z.object({
   /** Epoch ms of the last sync this process asked for. */
   lastSyncAt: z.number().nullable(),
 });
-export type LicenseSyncState = z.infer<typeof licenseSyncStateSchema>;
+type LicenseSyncState = z.infer<typeof licenseSyncStateSchema>;
 
 export const LICENSE_SYNC_INITIAL_STATE: LicenseSyncState = { lastSyncAt: null };
 
-export type LicenseSyncIntents = {
+type LicenseSyncIntents = {
   sync: IntentSpec<typeof licenseSyncSchema>;
 };
 

@@ -48,7 +48,7 @@ import {
 } from "../rules/issued-license.rules.ts";
 import type { ContractBudgets } from "./contract-budget.service.ts";
 
-export interface LicenseRegistryOptions {
+interface LicenseRegistryOptions {
   repository: IssuedLicenseRepository;
   organizations: LicenseCustomers;
   managedKeys: ConnectManagedKeys;
@@ -61,7 +61,7 @@ export interface LicenseRegistryOptions {
 }
 
 /** What `issue` decides, with the term as an instant rather than a wire string. */
-export type IssueLicenseTerms = Omit<ContractIssueLicenseInput, "expiresAt"> & {
+type IssueLicenseTerms = Omit<ContractIssueLicenseInput, "expiresAt"> & {
   expiresAt: Instant;
 };
 

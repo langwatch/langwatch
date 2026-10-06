@@ -21,7 +21,7 @@ import { statusOfIssuedLicense } from "../rules/issued-license.rules.ts";
 import { isInstanceIdShape } from "../rules/license-token.rules.ts";
 import type { ConnectManagedKeys } from "./license-registry.service.ts";
 
-export interface ConnectCredentialOptions {
+interface ConnectCredentialOptions {
   repository: IssuedLicenseRepository;
   managedKeys: ConnectManagedKeys;
   cryptography: LicenseCryptography;

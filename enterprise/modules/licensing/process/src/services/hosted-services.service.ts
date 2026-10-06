@@ -34,7 +34,7 @@ import type { HostedBudgetUsage, HostedUsageReader } from "./hosted-usage-reader
 const CENTS = 100;
 const INSTANT_EVALS = "instant_evals";
 
-export interface HostedServicesCollaborators {
+interface HostedServicesCollaborators {
   licenses: Pick<IssuedLicenseRepository, "findByVirtualKeyId">;
   judge: HostedJudge;
   spend: { add(entry: ConnectSpendEntry): void };

@@ -20,7 +20,7 @@ interface Pending extends ConnectSpendEntry {
   requests: number;
 }
 
-export interface ConnectSpendBufferCollaborators {
+interface ConnectSpendBufferCollaborators {
   recorder: HostedSpendRecorder;
   logger?: LicenseLogger;
   /** How long spend waits before it is written. */

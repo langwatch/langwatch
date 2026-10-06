@@ -1091,7 +1091,7 @@ function connectInstallParts({
 }
 
 /** The hosted end of Connect (ADR-156, section 5), composed on every deployment. */
-export type HostedServicesInfrastructure = Readonly<{
+type HostedServicesInfrastructure = Readonly<{
   budgets: ContractBudgetStore;
   usage: HostedUsageReader;
   judge: HostedJudge;
@@ -1099,7 +1099,7 @@ export type HostedServicesInfrastructure = Readonly<{
 }>;
 
 /** Everything the license registry needs from the rest of the deployment. */
-export type LicenseRegistryInfrastructure = Readonly<{
+type LicenseRegistryInfrastructure = Readonly<{
   repository: IssuedLicenseRepository;
   organizations: LicenseCustomers;
   managedKeys: ConnectManagedKeys;
@@ -1119,7 +1119,7 @@ export type LicenseRegistryInfrastructure = Readonly<{
  * deployment needs to call LangWatch with the license it already holds. Absent
  * where the deployment switched Connect off, which builds no client at all.
  */
-export type ConnectInstallInfrastructure = Readonly<{
+type ConnectInstallInfrastructure = Readonly<{
   organizations: ConnectOrganizationRepository;
   identity: InstanceIdentityRepository;
   /** Composed only where Connect is permitted; absent means no outbound call. */
@@ -1141,7 +1141,7 @@ export type ConnectInstallInfrastructure = Readonly<{
  * The registry of self-hosted installs (ADR-156, section 10), which the usage
  * report receiver writes. Every deployment composes it from its own stores.
  */
-export type SelfHostedInstancesInfrastructure = Readonly<{
+type SelfHostedInstancesInfrastructure = Readonly<{
   repository: SelfHostedInstanceRepository;
   /** The licence bound to an install, which names its customer. */
   licenses: Pick<IssuedLicenseRepository, "findAllBoundToInstance">;

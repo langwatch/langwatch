@@ -13,14 +13,14 @@ import { SIGNAL_EVENTS, SIGNAL_HEADLINES } from "../rules/self-hosted-signals.ru
 import type { SelfHostedSignalEvent } from "../rules/self-hosted-signals.rules.ts";
 import type { LicenseLogger } from "./license.service.ts";
 
-export type SignalAnnouncement = Readonly<{
+type SignalAnnouncement = Readonly<{
   signals: readonly SelfHostedSignal[];
   instance: SelfHostedInstanceRecord;
   leadingDomain: string | undefined;
   organizationId: string | null;
 }>;
 
-export type SelfHostedCrmCollaborators = Readonly<{
+type SelfHostedCrmCollaborators = Readonly<{
   customers: CloudCustomerLookup;
   notifications: SelfHostedLeadNotifications;
   /** Absent where no CRM is configured. */

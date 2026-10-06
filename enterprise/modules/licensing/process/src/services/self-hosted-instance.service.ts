@@ -31,7 +31,7 @@ import type { SelfHostedCrmService } from "./self-hosted-crm.service.ts";
 /** How many history rows the drawer shows. */
 const REPORT_HISTORY_LIMIT = 30;
 
-export type SelfHostedInstanceCollaborators = Readonly<{
+type SelfHostedInstanceCollaborators = Readonly<{
   repository: SelfHostedInstanceRepository;
   licenses: Pick<IssuedLicenseRepository, "findAllBoundToInstance">;
   organizations: Pick<LicenseCustomers, "findById">;

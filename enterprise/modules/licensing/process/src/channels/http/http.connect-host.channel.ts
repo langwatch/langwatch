@@ -23,7 +23,7 @@ import { z } from "zod";
 export type ConnectDispatcher = Dispatcher;
 
 /** How calls to LangWatch leave this install: the runtime's own fetch, or a proxy pool. */
-export type ConnectTransport =
+type ConnectTransport =
   | { readonly via: "runtime" }
   | { readonly via: "proxy"; readonly dispatcher: ConnectDispatcher };
 
@@ -79,13 +79,13 @@ const refusalSchema = z.union([
 ]);
 
 /** What this transport reads of an answered request, and nothing else. */
-export interface ConnectHostResponse {
+interface ConnectHostResponse {
   readonly status: number;
   json(): Promise<unknown>;
 }
 
 /** What this transport sends of a request, and nothing else. */
-export interface ConnectRequestInit {
+interface ConnectRequestInit {
   readonly method: string;
   readonly headers: Record<string, string>;
   readonly body?: string;

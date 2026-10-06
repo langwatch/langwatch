@@ -10,7 +10,7 @@ import type {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type ConnectOrganizationDatabase = Pick<PrismaClient, "organization">;
+type ConnectOrganizationDatabase = Pick<PrismaClient, "organization">;
 
 export class PrismaConnectOrganizationRepository implements ConnectOrganizationRepository {
   static create(database: ConnectOrganizationDatabase): PrismaConnectOrganizationRepository {

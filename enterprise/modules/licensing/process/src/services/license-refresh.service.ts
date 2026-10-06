@@ -21,13 +21,13 @@ import type { ConnectOrganizationRepository } from "../repositories/connect-orga
 import type { ConnectInstallService } from "./connect-install.service.ts";
 
 /** The seats in use, counted the way the seat guard counts them. */
-export interface LicenseSeatCounter {
+interface LicenseSeatCounter {
   getMemberCount(organizationId: string): Promise<number>;
   getMembersLiteCount(organizationId: string): Promise<number>;
 }
 
 /** Applying a delivered license goes through the same path a pasted key does. */
-export interface LicenseApplication {
+interface LicenseApplication {
   validateAndStoreLicense(input: {
     organizationId: string;
     licenseKey: string;
@@ -36,7 +36,7 @@ export interface LicenseApplication {
   >;
 }
 
-export interface LicenseRefreshServiceDependencies {
+interface LicenseRefreshServiceDependencies {
   readonly install: ConnectInstallService;
   readonly organizations: ConnectOrganizationRepository;
   readonly seats: LicenseSeatCounter;

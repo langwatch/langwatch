@@ -13,7 +13,7 @@ import type {
   InstanceReportSwitches,
 } from "../repositories/instance-identity.repository.ts";
 
-export interface InstanceIdentityServiceDependencies {
+interface InstanceIdentityServiceDependencies {
   readonly repository: InstanceIdentityRepository;
   /** A fresh UUID. Supplied, so a suite mints a predictable one. */
   readonly newInstanceId: () => string;

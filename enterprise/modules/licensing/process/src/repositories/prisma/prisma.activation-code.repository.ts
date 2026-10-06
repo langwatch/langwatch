@@ -12,7 +12,7 @@ import type {
  * A transaction client carries the same model methods, so a caller that needs
  * the row and its own writes to land together passes one in.
  */
-export type ActivationCodeDatabase = Pick<PrismaClient, "activationCode" | "$executeRaw">;
+type ActivationCodeDatabase = Pick<PrismaClient, "activationCode" | "$executeRaw">;
 
 export class PrismaActivationCodeRepository implements ActivationCodeRepository {
   static create(database: ActivationCodeDatabase): PrismaActivationCodeRepository {

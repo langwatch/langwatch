@@ -9,8 +9,6 @@ import { connectHostedRest } from "./transport/connect-hosted.rest.ts";
 import { connectTrpcTransport } from "./transport/connect.trpc.ts";
 import { licenseTrpcTransport } from "./transport/licensing.trpc.ts";
 
-export type { LicensingInfrastructure, LicensingRuntime } from "./app/licensing.app.ts";
-
 export const licensingProcessModule = defineProcessModule("licensing")
   .withRepositories(licensingRepositories)
   .withApi(LicensingModule)

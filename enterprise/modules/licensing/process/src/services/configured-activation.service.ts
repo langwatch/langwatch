@@ -18,7 +18,7 @@ export type ConfiguredActivationOutcome =
   | { outcome: "refused"; code: string }
   | { outcome: "license_rejected"; error: string };
 
-export interface ConfiguredActivationLogger {
+interface ConfiguredActivationLogger {
   info(fields: Record<string, unknown>, message: string): void;
   warn(fields: Record<string, unknown>, message: string): void;
 }

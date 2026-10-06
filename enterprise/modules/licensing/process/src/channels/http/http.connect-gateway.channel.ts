@@ -14,7 +14,7 @@ import { ConnectGatewayChannel } from "../connect-gateway.channel.ts";
 import { type ConnectHostOptions, ConnectHost } from "./http.connect-host.channel.ts";
 
 /** Origin of the hosted services host; the paths are this channel's own. */
-export type HttpConnectGatewayChannelOptions = ConnectHostOptions;
+type HttpConnectGatewayChannelOptions = ConnectHostOptions;
 
 /** The three hosted routes, over the shared transport. */
 export class HttpConnectGatewayChannel extends ConnectGatewayChannel {

@@ -12,7 +12,7 @@ import type {
  * A transaction client carries the same model methods, so a caller that needs
  * the row and its own writes to land together passes one in.
  */
-export type IssuedLicenseDatabase = Pick<PrismaClient, "issuedLicense" | "$executeRaw">;
+type IssuedLicenseDatabase = Pick<PrismaClient, "issuedLicense" | "$executeRaw">;
 
 /** The deployment's cipher: a reissued license waits at rest sealed, never in the clear. */
 export type IssuedLicenseCipher = Readonly<{

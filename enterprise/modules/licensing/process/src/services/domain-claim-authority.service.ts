@@ -3,7 +3,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type { LicenseService } from "./license.service.ts";
 
-export interface DomainClaimAuthorityDeps {
+interface DomainClaimAuthorityDeps {
   isSaas: boolean;
   licenses: Pick<LicenseService, "isPlatformSsoLicensed" | "findPlatformLicenseDigests">;
   organizations: Pick<OrganizationApi, "findAllIds">;

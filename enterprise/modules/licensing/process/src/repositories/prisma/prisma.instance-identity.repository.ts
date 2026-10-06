@@ -10,7 +10,7 @@ import type {
 /** The fixed key, so the table can hold exactly one row. */
 const ROW_ID = "self";
 
-export type InstanceIdentityDatabase = Pick<PrismaClient, "instanceIdentity">;
+type InstanceIdentityDatabase = Pick<PrismaClient, "instanceIdentity">;
 
 export class PrismaInstanceIdentityRepository implements InstanceIdentityRepository {
   static create(database: InstanceIdentityDatabase): PrismaInstanceIdentityRepository {

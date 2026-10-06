@@ -44,7 +44,7 @@ const USAGE_UNREACHABLE_CODES: ReadonlySet<string> = new Set([
 ]);
 
 /** What a deployment decided about Connect, before any license has its say. */
-export interface ConnectDeployment {
+interface ConnectDeployment {
   /**
    * False only where an operator switched Connect off. True is not a claim that
    * anything is reachable: the license decides that.
@@ -54,7 +54,7 @@ export interface ConnectDeployment {
   readonly licenseEndpoint: string;
 }
 
-export interface ConnectInstallServiceDependencies {
+interface ConnectInstallServiceDependencies {
   readonly organizations: ConnectOrganizationRepository;
   readonly identity: InstanceIdentityService;
   readonly cryptography: LicenseCryptography;
