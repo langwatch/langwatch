@@ -38,7 +38,7 @@ type ErrorSummary = {
 };
 
 const MAX_SUMMARY_MESSAGE_LENGTH = 1000;
-const MAX_SUMMARY_STACK_LENGTH = 8000;
+export const MAX_SUMMARY_STACK_LENGTH = 8000;
 const UNSERIALIZABLE_MESSAGE = "Unserializable thrown value";
 const TRUNCATION_MARKER = "… [truncated]";
 
@@ -49,7 +49,7 @@ function summarizeUnsafe(error: unknown): ErrorSummary {
 
   if (!(error instanceof Error)) {
     if (isErrorLike(error)) {
-      const { name, message, code, stack } = error;
+      const { name, message, code, stack } = redactCommandCredentials(error);
       return {
         type: typeof name === "string" && name ? name : "Object",
         message: truncate(message, MAX_SUMMARY_MESSAGE_LENGTH),

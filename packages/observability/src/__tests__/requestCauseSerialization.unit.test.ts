@@ -19,6 +19,7 @@ import pino from "pino";
 import { describe, expect, it } from "vitest";
 import { REQUEST_CAUSE_FIELD } from "../constants";
 import { NODE_LOG_SERIALIZERS } from "../logger";
+import { MAX_SUMMARY_STACK_LENGTH } from "../request/errorSummary";
 import { logHttpRequest } from "../request/requestLogging";
 
 /**
@@ -321,6 +322,40 @@ describe("emitted request-log records", () => {
       });
     });
 
+    describe("when it is an Error with a 20000-character stack", () => {
+      /** @scenario Long messages and stacks are cut with a marker */
+      it("caps the stack and marks the cut", () => {
+        const error = new Error("boom");
+        error.stack = "x".repeat(20000);
+        const { stack } = emittedFor(error);
+        expect(stack.length).toBeLessThanOrEqual(MAX_SUMMARY_STACK_LENGTH);
+        expect(stack.endsWith("… [truncated]")).toBe(true);
+      });
+    });
+
+    describe("when reading the thrown value throws", () => {
+      // Only `message` throws: the level choice reads `code` and `httpStatus`
+      // before summarising, outside the fallback this test exercises.
+      const hostileProxy = () =>
+        new Proxy(
+          {},
+          {
+            get(_target, key) {
+              if (key === "message") throw new Error("nope");
+              return undefined;
+            },
+          },
+        );
+
+      /** @scenario A value that cannot be described still produces a record */
+      it("emits the unserializable fallback", () => {
+        expect(emittedFor(hostileProxy())).toEqual({
+          type: "unknown",
+          message: "Unserializable thrown value",
+        });
+      });
+    });
+
     describe("when it is a circular object with a throwing toString", () => {
       function hostile() {
         const value: Record<string, unknown> = {
@@ -346,6 +381,37 @@ describe("emitted request-log records", () => {
         );
         expect(`${cause.message}\n${cause.stack}`).toContain("inner");
       });
+    });
+  });
+
+  describe("given a deserialized ReplyError that is not an Error instance", () => {
+    /** @scenario Credentials in a failed Redis command never reach the summary */
+    it("does not emit the password anywhere in the line", () => {
+      const chunks: string[] = [];
+      const sink = new Writable({
+        write(chunk, _enc, cb) {
+          chunks.push(String(chunk));
+          cb();
+        },
+      });
+      const logger = pino(
+        { level: "debug", serializers: NODE_LOG_SERIALIZERS },
+        sink,
+      );
+      logHttpRequest(logger as never, {
+        method: "POST",
+        url: "/api/thing",
+        statusCode: 500,
+        duration: 5,
+        userAgent: null,
+        error: {
+          name: "ReplyError",
+          message: "WRONGPASS invalid username-password pair AUTH s3cret-pass",
+          command: { name: "auth", args: ["default", "s3cret-pass"] },
+        },
+      });
+      expect(chunks.join("")).toContain("WRONGPASS");
+      expect(chunks.join("")).not.toContain("s3cret-pass");
     });
   });
 
