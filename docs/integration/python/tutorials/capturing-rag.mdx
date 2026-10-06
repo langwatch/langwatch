@@ -188,7 +188,7 @@ system_prompt = SystemMessage(
 agent = create_agent(
     model=ChatOpenAI(model="gpt-5.6-luna", reasoning_effort="none"),
     tools=[langwatch_docs_search],
-    system_praompt=system_prompt,
+    system_prompt=system_prompt,
 )
 
 @langwatch.trace(name="LangChain RAG Agent Execution")
