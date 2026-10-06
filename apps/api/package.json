@@ -16,8 +16,8 @@
     }
   },
   "scripts": {
-    "start:prepare:db": "cd ../tasks && pnpm --silent task prisma-migrate clickhouse-migrate lwql-provision system-migrations-pass",
-    "start": "pnpm --silent run start:prepare:db && node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
+    "start:prepare:db": "cd ../tasks && pnpm --silent task upgrade && pnpm --silent task system-migrations-pass",
+    "start": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
     "predev": "bash ../../dev/scripts/devscripts.sh ensure-built",
     "dev": "node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
     "typecheck": "tsc -b tsconfig.test.json",
@@ -158,6 +158,7 @@
     "@langwatch/topic-process": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-process": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@langwatch/user-process": "workspace:*",
     "@langwatch/webhook-contract": "workspace:*",

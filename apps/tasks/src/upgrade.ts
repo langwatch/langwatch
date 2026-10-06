@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { readdirSync } from "node:fs";
 import { hostname } from "node:os";
 import { fileURLToPath } from "node:url";
 
@@ -12,6 +11,7 @@ import {
 } from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
 import type { UpgradeClickHouse } from "@langwatch/upgrade";
+import { readImageTree } from "@langwatch/upgrade/gate";
 import { loadReleases, stampRelease } from "@langwatch/upgrade/manifest";
 import { formatStatus } from "@langwatch/upgrade/reader";
 import {
@@ -26,13 +26,6 @@ import {
 
 import type { TaskInput } from "./config.ts";
 import { lwqlProvision } from "./lwql-provision.ts";
-
-const PRISMA_MIGRATIONS = fileURLToPath(
-  new URL("../../../packages/prisma-client/prisma/migrations/", import.meta.url),
-);
-const GOOSE_MIGRATIONS = fileURLToPath(
-  new URL("../../../packages/clickhouse-migrations/migrations/", import.meta.url),
-);
 
 export type UpgradeCommand = { command: "run" } | { command: "status" | "plan"; json: boolean };
 
@@ -79,11 +72,7 @@ function sqlReader(client: ClickHouseClient): UpgradeClickHouse {
 
 /** Every Prisma folder and goose file this image ships, as steps (ids per blitz plan 5.3). */
 function imageSteps({ release }: { release: string }) {
-  const current = {
-    prismaFolders: readdirSync(PRISMA_MIGRATIONS).filter((name) => /^\d{14}_/.test(name)),
-    gooseFiles: readdirSync(GOOSE_MIGRATIONS).filter((name) => name.endsWith(".sql")),
-    codeSteps: [],
-  };
+  const current = readImageTree();
   const cutAt = "1970-01-01T00:00:00Z";
   const tree = stampRelease({
     release,

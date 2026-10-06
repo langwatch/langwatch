@@ -1183,6 +1183,9 @@ importers:
       '@langwatch/trace-process':
         specifier: workspace:*
         version: link:../../modules/trace/process
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../packages/upgrade
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../modules/user/contract
@@ -2754,6 +2757,9 @@ importers:
       '@langwatch/trace-process':
         specifier: workspace:*
         version: link:../../modules/trace/process
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../packages/upgrade
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../modules/user/contract
@@ -17159,6 +17165,15 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../ksuid
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../process-stores
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../secrets
+      pg:
+        specifier: ^8.22.0
+        version: 8.22.0
       prisma:
         specifier: 'catalog:'
         version: 7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
@@ -17184,9 +17199,6 @@ importers:
       '@types/pg':
         specifier: ^8.20.3
         version: 8.20.4
-      pg:
-        specifier: ^8.22.0
-        version: 8.22.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

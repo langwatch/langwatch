@@ -32,16 +32,15 @@ const (
 
 // bootProfile describes how one repo layout migrates, seeds, and starts.
 type bootProfile struct {
-	name                  string
-	prepareArgvs          [][]string // codegen/build steps, run after pnpm install
-	prismaMigrateArgv     []string
-	clickhouseMigrateArgv []string
-	seedArgv              []string
-	lwqlProvisionArgv     []string // converges the LangWatchQL access model (ADR-159)
-	startArgv             []string
-	workerArgv            []string // the worker that projects what the API ingests
-	overlay               bool     // write the composed env to overlayEnvFile
-	healthPath            string   // the liveness path apidiff polls after start
+	name              string
+	prepareArgvs      [][]string // codegen/build steps, run after pnpm install
+	migrateArgvs      [][]string // run in order before the seed; the modular start never migrates
+	seedArgv          []string
+	lwqlProvisionArgv []string // converges the LangWatchQL access model (ADR-159)
+	startArgv         []string
+	workerArgv        []string // the worker that projects what the API ingests
+	overlay           bool     // write the composed env to overlayEnvFile
+	healthPath        string   // the liveness path apidiff polls after start
 }
 
 var (
@@ -58,12 +57,14 @@ var (
 			{"--filter", "@langwatch/mcp-server", "run", "build"},
 			{"run", "ensure:built"},
 		},
-		prismaMigrateArgv:     []string{"run", "prisma:migrate"},
-		clickhouseMigrateArgv: []string{"run", "clickhouse:migrate"},
-		seedArgv:              []string{"run", "prisma:seed"},
-		lwqlProvisionArgv:     []string{"run", "lwql:provision"},
-		startArgv:             []string{"--filter", "@langwatch/platform-api", "start"},
-		workerArgv:            []string{"--filter", "@langwatch/worker", "start"},
+		// The root preparation script: the upgrade and the system-migrations pass
+		// where the tree has them, the api and worker refusing to serve without
+		// (specs/upgrade/entry-points.feature); the three migration tasks before.
+		migrateArgvs:      [][]string{{"run", "start:prepare:db"}},
+		seedArgv:          []string{"run", "prisma:seed"},
+		lwqlProvisionArgv: []string{"run", "lwql:provision"},
+		startArgv:         []string{"--filter", "@langwatch/platform-api", "start"},
+		workerArgv:        []string{"--filter", "@langwatch/worker", "start"},
 		// The modular api has no /api/health route of its own; /healthz is
 		// process-server's own built-in liveness door, mounted on the same
 		// listener as the app (server.ts's `serve()`) and reserved by name,
@@ -77,13 +78,15 @@ var (
 			{"--filter", "langwatch", "build"},
 			{"--filter", "@langwatch/mcp-server", "run", "build"},
 		},
-		prismaMigrateArgv:     []string{"run", "prisma:migrate"},
-		clickhouseMigrateArgv: []string{"--filter", "@langwatch/web", "clickhouse:migrate"},
-		seedArgv:              []string{"run", "prisma:seed"},
-		lwqlProvisionArgv:     []string{"--filter", "@langwatch/web", "lwql:provision"},
-		startArgv:             []string{"--filter", "@langwatch/web", "start:app:dev"},
-		workerArgv:            []string{"--filter", "@langwatch/web", "start:workers:dev"},
-		overlay:               true,
+		migrateArgvs: [][]string{
+			{"run", "prisma:migrate"},
+			{"--filter", "@langwatch/web", "clickhouse:migrate"},
+		},
+		seedArgv:          []string{"run", "prisma:seed"},
+		lwqlProvisionArgv: []string{"--filter", "@langwatch/web", "lwql:provision"},
+		startArgv:         []string{"--filter", "@langwatch/web", "start:app:dev"},
+		workerArgv:        []string{"--filter", "@langwatch/web", "start:workers:dev"},
+		overlay:           true,
 		// platform/app/src/server/routes/health.ts: a Hono liveness/readiness
 		// probe mounted at "/api/health", replacing the old pages/api/health.ts.
 		healthPath: "/api/health",

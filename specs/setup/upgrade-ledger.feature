@@ -164,6 +164,12 @@ Feature: The upgrade ledger records every step an installation has taken
     Then only the recent process is returned
 
   @integration
+  Scenario: Removing a process's presence deletes only its row
+    Given two processes that wrote their presence
+    When the presence of one of them is removed, and then removed again
+    Then only the other process's row remains and the second removal is not an error
+
+  @integration
   Scenario: Registering declared steps records them pending with owner and description
     Given two steps declared by two modules, neither in the ledger
     When the declared steps are registered

@@ -134,7 +134,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Database migrations run automatically on startup.
+The one-shot `migrate` service runs the upgrade first; the app and the workers start only after it has completed successfully. If your compose file predates the `migrate` service, copy it from [`infra/compose.yml`](https://github.com/langwatch/langwatch/blob/main/infra/compose.yml), or the app will refuse to start (see [Run the upgrade](#run-the-upgrade)).
 
 ## Helm Chart
 
@@ -164,24 +164,39 @@ helm upgrade langwatch langwatch/langwatch \
 # x-release-please-end
 ```
 
-## Database Migrations
+## Run the upgrade
 
-### PostgreSQL
+<Warning>
+The app and the workers **never migrate the database themselves**. When they start on an installation that has not been upgraded to their release, they **refuse to start** and log which steps are outstanding:
 
-On a Helm upgrade, a pre-upgrade Job runs the migrations on the new image before any pod rolls; the app and worker containers also run them on start, where they are a no-op. `app.features.skipEnvValidation` is inert: no process reads `SKIP_ENV_VALIDATION` any more. For the split into api, worker and tasks applications, see [the chart's upgrade notes](https://github.com/langwatch/langwatch/tree/main/charts/langwatch#upgrading-to-the-split-api-worker-and-tasks-applications).
-
-To disable the Prisma step (e.g., if you run migrations separately):
-
-```yaml
-app:
-  extraEnvs:
-    - name: SKIP_PRISMA_MIGRATE
-      value: "true"
+```text
+langwatch-api (api) refuses to serve: the installation is behind this image: blocking steps not done: prisma:20261006180000_..., clickhouse:00042. Run `pnpm task upgrade` from this image, then start it again.
 ```
 
-### ClickHouse
+Run the upgrade from the **new** image, then start the app again.
+</Warning>
 
-The application runs schema migrations on startup. No manual intervention is required.
+Each way of running LangWatch runs the upgrade for you:
+
+| How you run LangWatch | Who runs the upgrade |
+| --- | --- |
+| Helm, `helm upgrade` | the pre-upgrade Job, on the new image, before any pod rolls |
+| Helm, first install | the app's first boot, once, on the empty database; the workers restart until it is done |
+| Helm with `app.migrations.preRoll: false` | **you**, before `helm upgrade` (below) |
+| Docker Compose | the `migrate` service, on every `docker compose up` |
+| `npx @langwatch/server` | the CLI, before it starts the services |
+
+To run it yourself, from the new image with the app's environment (`DATABASE_URL`, `CLICKHOUSE_URL`, `REDIS_URL`):
+
+```bash
+cd /app/apps/api && pnpm --silent run start:prepare:db
+```
+
+That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one lease, so a second run waits for the first) and then the system-migrations pass. It is safe to run again: on a current installation it does nothing. To see what it would do first, run `cd /app/apps/tasks && pnpm task upgrade plan`; `pnpm task upgrade status` shows the ledger.
+
+`upgrade` exits non-zero and names the cause when it cannot proceed: `1` a step failed (a failed Prisma migration is named with the `prisma migrate resolve --rolled-back` command to clear it), `2` the installation is below this release's supported floor, `3` another upgrade holds the lease.
+
+For the split into api, worker and tasks applications, see [the chart's upgrade notes](https://github.com/langwatch/langwatch/tree/main/charts/langwatch#upgrading-to-the-split-api-worker-and-tasks-applications). `app.features.skipEnvValidation` is inert: no process reads `SKIP_ENV_VALIDATION` any more.
 
 ## Rollback
 

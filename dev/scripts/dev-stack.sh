@@ -248,12 +248,12 @@ fi
 # reload on every file change and are restarted when they crash, so a
 # migration inside one of them runs again on each of those — which is how a
 # crashlooping api lane came to re-run three migration processes every second.
-# `haven up` owns the same step for a haven stack (its `prepare` step) and
-# reaches the same script; apps/tasks runs the three tasks in one process,
-# under an advisory lock, so two stacks starting at once serialise rather than
-# rebuilding a schema underneath one another.
+# `haven up` owns the same step for a haven stack (its `prepare` step). The
+# script is apps/api's: `pnpm task upgrade` under its own lease, so two stacks
+# starting at once serialise rather than rebuilding a schema underneath one
+# another, then the system-migrations pass (specs/upgrade/entry-points.feature).
 echo "  → preparing the databases (once for this stack)"
-pnpm --silent -C "$REPO_ROOT" run start:prepare:db
+pnpm --silent -C "$REPO_ROOT/apps/api" run start:prepare:db
 
 # --- the lanes -------------------------------------------------------------
 

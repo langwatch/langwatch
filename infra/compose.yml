@@ -1,4 +1,29 @@
 services:
+  # One-shot: applies what this release needs (`pnpm task upgrade`, then the
+  # system-migrations pass) and exits. The app and the workers never migrate;
+  # they wait for this to succeed, and refuse by name if it has not run. It
+  # runs again on every `up`, where a current installation makes it a no-op.
+  migrate:
+    image: langwatch/langwatch:latest
+    command: ["pnpm", "--silent", "run", "start:prepare:db"]
+    working_dir: /app/apps/api
+    environment:
+      DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
+      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+    env_file:
+      - .env
+    pull_policy: always
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
   app:
     image: langwatch/langwatch:latest
     environment:
@@ -22,6 +47,8 @@ services:
     ports:
       - "5560:5560"
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -51,6 +78,8 @@ services:
       - .env
     pull_policy: always
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:

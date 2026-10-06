@@ -219,20 +219,19 @@ jobs:
         # Generated per run: a committed hex literal reads as a leaked key to the scanner.
         run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
-      - name: Setup database
-        run: pnpm prisma:migrate
+      - name: Install goose
+        run: bash .github/scripts/install-goose.sh
+
+      # The api and the worker never migrate and refuse to serve until the
+      # upgrade has run: the preparation script, `upgrade` then the
+      # system-migrations pass (specs/upgrade/entry-points.feature).
+      - name: Upgrade the databases
+        run: pnpm start:prepare:db
 
       - name: Seed test project
         env:
           HAVEN_SEED_LANGWATCH_API_KEY: sk-lw-local-development-key
         run: pnpm prisma:seed
-
-      - name: Install goose
-        run: bash .github/scripts/install-goose.sh
-
-      - name: Setup ClickHouse
-        working-directory: apps/tasks
-        run: pnpm task clickhouse-migrate
 
       - name: Build LangWatch browser bundle
         run: pnpm exec nx run workspace:build:types --outputStyle=static && pnpm exec nx run @langwatch/ui:build --outputStyle=static

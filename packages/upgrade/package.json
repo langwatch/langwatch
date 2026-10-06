@@ -27,6 +27,9 @@
   },
   "dependencies": {
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "pg": "^8.22.0",
     "prisma": "catalog:",
     "zod": "catalog:"
   },
@@ -37,7 +40,6 @@
     "@prisma/client": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "^8.20.3",
-    "pg": "^8.22.0",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

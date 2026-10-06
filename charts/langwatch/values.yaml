@@ -177,7 +177,7 @@ images:
 app:
   ## @param app.migrations.preRoll [default: true] Apply this release's migrations in a
   ## pre-upgrade Job on the new image, before any Deployment rolls (ADR-155). Fail-closed.
-  ## Off means the containers migrate on boot, as before.
+  ## Off means you run `pnpm task upgrade` yourself first; the containers never migrate.
   ## @param app.migrations.preRollTimeoutSeconds [default: 2100] activeDeadlineSeconds for that Job.
   migrations:
     preRoll: true

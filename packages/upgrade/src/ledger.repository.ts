@@ -380,6 +380,13 @@ export class UpgradeLedgerRepository {
     return rows.map((row) => upgradePresenceSchema.parse(row));
   }
 
+  /** Deletes a process's presence on a graceful stop; a missing row is not an error. */
+  async removePresence({ processId }: { processId: string }): Promise<void> {
+    await this.postgres.query(`DELETE FROM "_langwatch_upgrade_presence" WHERE "process_id" = $1`, [
+      processId,
+    ]);
+  }
+
   async findSteps(): Promise<UpgradeStep[]> {
     const { rows } = await this.postgres.query<object>(
       `SELECT ${STEP_COLUMNS} FROM "_langwatch_upgrade_step" ORDER BY "id"`,

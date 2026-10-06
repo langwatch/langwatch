@@ -608,6 +608,22 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
 
       expect(live.map((row) => row.processId)).toEqual(["recent"]);
     });
+
+    /** @scenario "Removing a process's presence deletes only its row" */
+    it("deletes the named process's row, keeps the other, and ignores a missing row", async () => {
+      const ledger = ledgerOf(scratch);
+      await ledger.createTables();
+      await ledger.writePresence(serving("stopping", ["a:one"]));
+      await ledger.writePresence(serving("serving", ["a:one"]));
+
+      await ledger.removePresence({ processId: "stopping" });
+      await ledger.removePresence({ processId: "stopping" });
+
+      const { rows } = await scratch.postgres.query<{ process_id: string }>(
+        `SELECT "process_id" FROM "_langwatch_upgrade_presence" ORDER BY "process_id"`,
+      );
+      expect(rows.map((row) => row.process_id)).toEqual(["serving"]);
+    });
   });
 
   describe("when declared steps are registered", () => {

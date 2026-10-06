@@ -63,11 +63,12 @@ func TestProfileCommandArgvs(t *testing.T) {
 	if got := strings.Join(monolithProfile.startArgv, " "); got != "--filter @langwatch/web start:app:dev" {
 		t.Fatalf("monolith start = %q", got)
 	}
-	if got := strings.Join(monolithProfile.clickhouseMigrateArgv, " "); got != "--filter @langwatch/web clickhouse:migrate" {
+	if got := strings.Join(monolithProfile.migrateArgvs[1], " "); got != "--filter @langwatch/web clickhouse:migrate" {
 		t.Fatalf("monolith clickhouse migrate = %q", got)
 	}
-	if got := strings.Join(modularProfile.clickhouseMigrateArgv, " "); got != "run clickhouse:migrate" {
-		t.Fatalf("modular clickhouse migrate = %q", got)
+	// The modular start serves without migrating; the root preparation script is its one migrate.
+	if got := len(modularProfile.migrateArgvs); got != 1 || strings.Join(modularProfile.migrateArgvs[0], " ") != "run start:prepare:db" {
+		t.Fatalf("modular migrate = %q", modularProfile.migrateArgvs)
 	}
 }
 

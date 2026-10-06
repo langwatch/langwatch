@@ -190,13 +190,13 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.app.resources | nindent 12 }}
-          # 40 minutes (15s x 160). Serving starts only after the database
-          # migrations and the system-migration preflight finish, and that
-          # preflight is designed to take up to ~27 minutes before it gives up
-          # (25 passes, each waiting up to 60s for its queue work to settle,
-          # 5s between them). A budget shorter than the design turns a slow or
-          # non-converging preflight into CrashLoopBackOff, which hides the
-          # error the preflight would otherwise report by name.
+          # 40 minutes (15s x 160). The app never migrates: serving starts only
+          # once its upgrade gate admits it, which on a first install means
+          # running `pnpm task upgrade` once, and the system-migrations pass
+          # behind it is designed to take up to ~27 minutes (25 passes, each
+          # waiting up to 60s for its queue work to settle, 5s between them). A
+          # shorter budget turns a slow first install into CrashLoopBackOff,
+          # which hides the error the gate would otherwise report by name.
           startupProbe:
             httpGet:
               path: /api/health

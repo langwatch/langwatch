@@ -1,0 +1,167 @@
+/**
+ * `servingUpgradeGate`'s seam over a real Postgres: each test gets its own schema. Requires
+ * LANGWATCH_TEST_DATABASE_URL. Spec: specs/upgrade/entry-points.feature.
+ */
+import pg from "pg";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { createLedgerTables } from "../../ledger-tables.ts";
+import type { ReleaseTreeSteps } from "../../manifest/stamp.ts";
+import { UPGRADE_COMMAND } from "../serving-gate.ts";
+import { upgradeGateOver } from "../serving-upgrade-gate.ts";
+
+const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
+const PRISMA_FOLDER = "20261006180000_upgrade_ledger_widen";
+const PRISMA = `prisma:${PRISMA_FOLDER}`;
+const GOOSE = "clickhouse:00042";
+const TREE: ReleaseTreeSteps = {
+  prismaFolders: [PRISMA_FOLDER],
+  gooseFiles: ["00042_add_column.sql"],
+  codeSteps: [],
+};
+
+let sequence = 0;
+let scratch: { name: string; admin: pg.Pool; postgres: pg.Pool; closed: boolean };
+
+beforeEach(async () => {
+  const name = `serving_gate_${Date.now().toString(36)}_${sequence++}`;
+  const admin = new pg.Pool({ connectionString: DB_URL, max: 1 });
+  await admin.query(`CREATE SCHEMA "${name}"`);
+  const postgres = new pg.Pool({
+    connectionString: DB_URL,
+    max: 1,
+    options: `-c search_path=${name}`,
+  });
+  scratch = { name, admin, postgres, closed: false };
+});
+
+afterEach(async () => {
+  if (!scratch.closed) await scratch.postgres.end();
+  await scratch.admin.query(`DROP SCHEMA "${scratch.name}" CASCADE`);
+  await scratch.admin.end();
+});
+
+async function recordSteps(steps: Record<string, "done" | "pending">): Promise<void> {
+  const { postgres } = scratch;
+  await postgres.query(`CREATE TABLE "_prisma_migrations" ("migration_name" TEXT NOT NULL)`);
+  await createLedgerTables({ postgres });
+  for (const [id, status] of Object.entries(steps)) {
+    await postgres.query(
+      `INSERT INTO "_langwatch_upgrade_step" ("id", "kind", "mode", "status", "updated_at")
+       VALUES ($1, $2, 'blocking', $3, now())`,
+      [id, id.startsWith("prisma:") ? "postgres-schema" : "clickhouse-schema", status],
+    );
+  }
+}
+
+function gateFor({
+  role,
+  withClickHouse = true,
+  firstInstall = async () => 0,
+}: {
+  role: "api" | "worker";
+  withClickHouse?: boolean;
+  firstInstall?: () => Promise<number>;
+}) {
+  return upgradeGateOver({
+    role,
+    postgres: scratch.postgres,
+    close: async () => {
+      scratch.closed = true;
+      await scratch.postgres.end();
+    },
+    tree: TREE,
+    release: null,
+    withClickHouse,
+    processId: `test:${role}`,
+    firstInstall,
+  });
+}
+
+describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
+  describe("given a blocking step of this image still pending", () => {
+    /** @scenario "A serving process refuses by name when its installation is behind" */
+    it("refuses the worker by name and closes its connection", async () => {
+      await recordSteps({ [PRISMA]: "done", [GOOSE]: "pending" });
+
+      const verdict = await gateFor({ role: "worker" }).admit();
+
+      expect(verdict).toMatchObject({ admitted: false, outcome: "behind", outstanding: [GOOSE] });
+      expect(verdict.admitted ? "" : verdict.refusal).toContain(UPGRADE_COMMAND);
+      expect(scratch.closed).toBe(true);
+    });
+  });
+
+  describe("given every blocking step done", () => {
+    /** @scenario "A serving process is admitted once the upgrade has run" */
+    it("admits the api and records its presence until release", async () => {
+      await recordSteps({ [PRISMA]: "done", [GOOSE]: "done" });
+      const gate = gateFor({ role: "api" });
+
+      await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
+      const { rows } = await scratch.postgres.query(
+        `SELECT "process_id" FROM "_langwatch_upgrade_presence"`,
+      );
+      expect(rows).toEqual([{ process_id: "test:api" }]);
+
+      await gate.release();
+      expect(scratch.closed).toBe(true);
+    });
+  });
+
+  describe("given an empty ledger on an empty schema", () => {
+    /** @scenario "The api's first boot on an empty installation runs the upgrade once" */
+    it("runs the upgrade once for the api and admits it after", async () => {
+      let runs = 0;
+      const gate = gateFor({
+        role: "api",
+        firstInstall: async () => {
+          runs += 1;
+          await recordSteps({ [PRISMA]: "done", [GOOSE]: "done" });
+          return 0;
+        },
+      });
+
+      await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
+      expect(runs).toBe(1);
+      await gate.release();
+    });
+
+    /** @scenario "The api refuses a first install whose upgrade failed" */
+    it("refuses the api with the command and the exit code when the upgrade failed", async () => {
+      const verdict = await gateFor({ role: "api", firstInstall: async () => 3 }).admit();
+
+      expect(verdict).toMatchObject({ admitted: false, outcome: "first-install" });
+      expect(verdict.admitted ? "" : verdict.refusal).toContain(UPGRADE_COMMAND);
+      expect(verdict.admitted ? "" : verdict.refusal).toContain("exited 3");
+      expect(scratch.closed).toBe(true);
+    });
+
+    /** @scenario "The worker never runs the upgrade on a first install" */
+    it("refuses the worker and runs nothing", async () => {
+      let runs = 0;
+      const verdict = await gateFor({
+        role: "worker",
+        firstInstall: async () => {
+          runs += 1;
+          return 0;
+        },
+      }).admit();
+
+      expect(verdict).toMatchObject({ admitted: false, outcome: "behind" });
+      expect(verdict.admitted ? "" : verdict.refusal).toContain(UPGRADE_COMMAND);
+      expect(runs).toBe(0);
+    });
+  });
+
+  describe("given no ClickHouse target configured", () => {
+    /** @scenario "A process with no ClickHouse configured does not wait on ClickHouse steps" */
+    it("admits with the ClickHouse steps still pending", async () => {
+      await recordSteps({ [PRISMA]: "done", [GOOSE]: "pending" });
+      const gate = gateFor({ role: "worker", withClickHouse: false });
+
+      await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
+      await gate.release();
+    });
+  });
+});

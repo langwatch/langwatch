@@ -150,10 +150,10 @@ jobs:
 
       # The candidate's schema and seed, the state a developer's own stack is in:
       # the base boots on it with its migrations skipped (README, "Running in CI").
+      # The candidate's api and worker refuse to serve until its upgrade has run.
       - name: Migrate and seed the shared databases
         run: |
-          pnpm prisma:migrate
-          pnpm clickhouse:migrate
+          pnpm start:prepare:db
           pnpm prisma:seed
 
       - name: Read the runner's Playwright version

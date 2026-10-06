@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -1294,19 +1295,11 @@ func (state *bootState) migrateAndSeed(ctx context.Context, instance Instance) e
 	if err != nil {
 		return err
 	}
-	state.logf("migrate %s: prisma + clickhouse", instance.Name)
-	steps := []struct {
-		name string
-		args []string
-	}{
-		{"prisma migrate", instance.Profile.prismaMigrateArgv},
-		{"clickhouse migrate", instance.Profile.clickhouseMigrateArgv},
-		{"seed", instance.Profile.seedArgv},
-	}
-	for _, step := range steps {
-		spec := commandSpec{name: "pnpm", args: step.args, dir: instance.Dir, env: env}
+	state.logf("migrate %s: the profile's preparation, then the seed", instance.Name)
+	for _, args := range append(slices.Clone(instance.Profile.migrateArgvs), instance.Profile.seedArgv) {
+		spec := commandSpec{name: "pnpm", args: args, dir: instance.Dir, env: env}
 		if err := state.run(ctx, spec, state.sideLog(instance.Name)); err != nil {
-			return fmt.Errorf("%s %s: %w", step.name, instance.Name, err)
+			return fmt.Errorf("%s %s: %w", strings.Join(args, " "), instance.Name, err)
 		}
 	}
 	return nil

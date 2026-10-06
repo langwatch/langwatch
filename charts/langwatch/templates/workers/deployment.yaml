@@ -193,10 +193,11 @@ spec:
           # no bearer token is copied into this podspec.
           # See specs/server/worker-liveness-probe.feature.
           #
-          # 40 minutes (15s x 160), matching the app: this lane runs the same
-          # `start:prepare:db` + system-migration preflight before it listens,
-          # and that preflight is designed to take up to ~27 minutes. See the
-          # app deployment for why a shorter budget hides the real error.
+          # 40 minutes (15s x 160), matching the app: the worker never
+          # migrates; its upgrade gate refuses to start until the ledger
+          # records this image's steps, and the pre-roll Job's upgrade can take
+          # up to ~27 minutes. See the app deployment for why a shorter budget
+          # hides the real error.
           startupProbe:
             httpGet:
               path: /healthz

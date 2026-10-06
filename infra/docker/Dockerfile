@@ -296,21 +296,21 @@ EXPOSE 5560
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]
 
-# The boot chain lives in apps/api, not here: `pnpm --silent run start` is
-# `start:prepare:db && node src/main.ts`, and start:prepare:db runs
-# the three tasks from apps/tasks in order — prisma-migrate (packages/prisma-
-# client's history), clickhouse-migrate (the goose runner, TTL reconciler and
-# ClickHouse SQL, now packages/clickhouse-migrations'), and lwql-provision. Written
-# once so a container, a laptop and the api lane haven supervises boot the same
-# way; a copy here would migrate twice and drift.
+# Serving never migrates (specs/upgrade/entry-points.feature). `pnpm --silent run
+# start` runs the api alone: it reads the upgrade ledger at boot and refuses by
+# name, with the command to run, when a blocking step of this image is not done.
+# The one exception is a first install (an empty ledger on an empty schema), where
+# the api runs the upgrade once itself (Q10), so a Helm first install converges.
 #
-# The order is load-bearing: LangWatchQL provisioning reads both the Postgres
-# schema and the ClickHouse one, so it cannot run before either. Sequenced with
-# `&&` so a failed migration stops the boot rather than serving against a schema
-# that was never applied.
+# The upgrade is a one-shot step BEFORE the serving containers, run on this image:
+#   cd /app/apps/api && pnpm --silent run start:prepare:db
+# which is `pnpm task upgrade` (Postgres, ClickHouse, LangWatchQL, under one lease)
+# and then the system-migrations pass. The chart's pre-roll Job, the compose
+# `migrate` service and the npx server run it; it is written once, in apps/api,
+# so this file holds no copy of it.
 #
 # The API process serves the REST, tRPC and SSE families AND the browser bundle
 # it finds at /app/apps/ui/dist/client, so this one container is the whole
 # interactive tier. The worker deployment runs the same image from
-# /app/apps/worker, whose start script runs the same start:prepare:db chain.
+# /app/apps/worker, whose start script runs the worker alone, behind the same gate.
 CMD cd /app/apps/api && pnpm --silent run start

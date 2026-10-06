@@ -192,15 +192,15 @@ jobs:
           pnpm start:prepare:files
           pnpm ensure:built
 
+      # Head's upgrade, as its pre-roll Job runs it: the schema plus the ledger a
+      # gated base api reads before it serves (specs/upgrade/entry-points.feature).
       - name: Migrate with head's tasks
         working-directory: head
         env:
           CLICKHOUSE_URL: ${{ env.CLICKHOUSE_BASE_URL }}/test_analytics_migrated_schema
         run: |
           set -euo pipefail
-          pnpm prisma:migrate
-          cd apps/tasks
-          pnpm task clickhouse-migrate
+          pnpm --filter @langwatch/tasks task upgrade
 
       - name: Install and prepare base
         if: steps.layout.outputs.judged == 'true'

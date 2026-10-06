@@ -282,12 +282,11 @@ jobs:
       - name: Install goose
         run: bash .github/scripts/install-goose.sh
 
-      - name: Setup database
-        run: pnpm prisma:migrate
-
-      - name: Setup ClickHouse
-        working-directory: apps/tasks
-        run: pnpm task clickhouse-migrate
+      # The api and the worker never migrate and refuse to serve until the
+      # upgrade has run: the preparation script, `upgrade` then the
+      # system-migrations pass (specs/upgrade/entry-points.feature).
+      - name: Upgrade the databases
+        run: pnpm start:prepare:db
 
       # The browser bundle only. apps/api and apps/worker run from source
       # through node and have no build of their own.
@@ -300,9 +299,6 @@ jobs:
 
       - name: Run E2E tests
         env:
-          # Migrations already ran in earlier steps; skip them during pnpm start
-          SKIP_PRISMA_MIGRATE: "true"
-          SKIP_CLICKHOUSE_MIGRATE: "true"
           # Launch the runner's preinstalled Google Chrome (no browser download)
           E2E_BROWSER_CHANNEL: chrome
           # The api started below serves the suite; the e2e stack borrows it instead of booting its own.
