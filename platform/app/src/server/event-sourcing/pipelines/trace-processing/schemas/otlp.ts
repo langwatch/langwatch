@@ -126,7 +126,7 @@ export const keyValueSchema: z.ZodType<OtlpKeyValue, z.ZodTypeDef, any> =
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const arrayValueSchema: z.ZodType<OtlpArrayValue, z.ZodTypeDef, any> =
   z.object({
-    values: z.array(anyValueSchema),
+    values: z.array(anyValueSchema).optional().default([]),
   });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -135,7 +135,7 @@ export const keyValueListSchema: z.ZodType<
   z.ZodTypeDef,
   any
 > = z.object({
-  values: z.array(keyValueSchema),
+  values: z.array(keyValueSchema).optional().default([]),
 });
 
 export const resourceSchema = z.object({
@@ -209,7 +209,7 @@ export const spanSchema = z.object({
   traceState: z.string().nullable().optional(),
   parentSpanId: idSchema.nullable().optional(),
   name: z.string(),
-  kind: eSpanKindSchema,
+  kind: eSpanKindSchema.optional().default(ESpanKind.SPAN_KIND_UNSPECIFIED),
   startTimeUnixNano: fixed64Schema,
   endTimeUnixNano: fixed64Schema,
   attributes: z.array(keyValueSchema).optional().default([]),
@@ -237,7 +237,7 @@ export const scopeSpansSchema = z.object({
 
 export const resourceSpansSchema = z.object({
   resource: resourceSchema.optional(),
-  scopeSpans: z.array(scopeSpansSchema),
+  scopeSpans: z.array(scopeSpansSchema).optional().default([]),
   schemaUrl: z.string().optional(),
 });
 

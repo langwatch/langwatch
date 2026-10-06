@@ -170,18 +170,49 @@ describe("otlp schemas", () => {
       });
     });
 
-    describe("when the span and resource omit attributes", () => {
-      /** @scenario "A span and resource that omit attributes are accepted" */
-      it("accepts both with empty attributes", () => {
+    describe("when the span omits attributes", () => {
+      /** @scenario "A span that omits attributes is accepted" */
+      it("accepts it with empty attributes", () => {
         const { attributes: _omitted, ...span } = makeValidSpan();
 
-        const spanResult = spanSchema.safeParse(span);
-        const resourceResult = resourceSchema.safeParse({});
+        const result = spanSchema.safeParse(span);
 
-        expect(spanResult.success).toBe(true);
-        expect(spanResult.data?.attributes).toEqual([]);
-        expect(resourceResult.success).toBe(true);
-        expect(resourceResult.data?.attributes).toEqual([]);
+        expect(result.success).toBe(true);
+        expect(result.data?.attributes).toEqual([]);
+      });
+    });
+
+    describe("when the span omits kind", () => {
+      /** @scenario "A span that omits kind is accepted as unspecified" */
+      it("accepts it as SPAN_KIND_UNSPECIFIED", () => {
+        const { kind: _omitted, ...span } = makeValidSpan();
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        expect(result.data?.kind).toBe(0);
+      });
+    });
+
+    describe("when an attribute holds an empty array or key-value list", () => {
+      /** @scenario "An empty array or key-value-list attribute value is accepted" */
+      it("accepts both with empty values", () => {
+        const span = makeValidSpan({
+          attributes: [
+            { key: "a", value: { arrayValue: {} } },
+            { key: "k", value: { kvlistValue: {} } },
+          ],
+        });
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        expect(result.data?.attributes[0]?.value.arrayValue?.values).toEqual(
+          [],
+        );
+        expect(result.data?.attributes[1]?.value.kvlistValue?.values).toEqual(
+          [],
+        );
       });
     });
 
@@ -236,6 +267,18 @@ describe("otlp schemas", () => {
         if (result.success) {
           expect(result.data.status).toEqual({});
         }
+      });
+    });
+  });
+
+  describe("resourceSchema", () => {
+    describe("when attributes are omitted", () => {
+      /** @scenario "A resource that omits attributes is accepted" */
+      it("accepts it with empty attributes", () => {
+        const result = resourceSchema.safeParse({});
+
+        expect(result.success).toBe(true);
+        expect(result.data?.attributes).toEqual([]);
       });
     });
   });

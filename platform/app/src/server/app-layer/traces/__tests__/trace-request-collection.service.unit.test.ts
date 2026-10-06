@@ -284,4 +284,51 @@ describe("TraceRequestCollectionService.handleOtlpTraceRequest", () => {
       });
     });
   });
+
+  describe("given an OTLP/JSON request that omits default-valued fields", () => {
+    describe("when a span has no attributes or kind, and its link, event and resource carry only required fields", () => {
+      /** @scenario "An OTLP/JSON request omitting default-valued fields ingests every span" */
+      it("ingests the span without rejecting it", async () => {
+        const { service, recordSpan } = makeService();
+        const nowNs = String(Date.now() * 1_000_000);
+        const request = {
+          resourceSpans: [
+            {
+              resource: {},
+              scopeSpans: [
+                {
+                  scope: { name: "test" },
+                  spans: [
+                    {
+                      traceId: "aaaa0000000000000000000000000001",
+                      spanId: "bbbb000000000001",
+                      name: "span",
+                      startTimeUnixNano: nowNs,
+                      endTimeUnixNano: nowNs,
+                      links: [
+                        {
+                          traceId: "cccc0000000000000000000000000001",
+                          spanId: "dddd000000000001",
+                        },
+                      ],
+                      events: [{ timeUnixNano: nowNs, name: "evt" }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        } as unknown as IExportTraceServiceRequest;
+
+        const result = await service.handleOtlpTraceRequest(
+          tenantId,
+          request,
+          piiRedactionLevel,
+        );
+
+        expect(result.rejectedSpans).toBe(0);
+        expect(recordSpan).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
 });

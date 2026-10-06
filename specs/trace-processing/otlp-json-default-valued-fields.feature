@@ -21,7 +21,36 @@ Feature: OTLP/JSON spans omitting default-valued fields are accepted
     And the event has empty attributes
 
   @unit
-  Scenario: A span and resource that omit attributes are accepted
-    Given an OTLP/JSON span and resource with no attributes field
-    When they are validated for ingest
-    Then both are accepted with empty attributes
+  Scenario: A span that omits attributes is accepted
+    Given an OTLP/JSON span with no attributes field
+    When the span is validated for ingest
+    Then it is accepted with empty attributes
+
+  @unit
+  Scenario: A resource that omits attributes is accepted
+    Given an OTLP/JSON resource with no attributes field
+    When the resource is validated for ingest
+    Then it is accepted with empty attributes
+
+  @unit
+  Scenario: An empty array or key-value-list attribute value is accepted
+    Given an attribute whose arrayValue or kvlistValue is an empty object
+    When the span is validated for ingest
+    Then it is accepted
+    And the array or key-value list has empty values
+
+  @unit
+  Scenario: A span that omits kind is accepted as unspecified
+    Given an OTLP/JSON span with no kind field
+    When the span is validated for ingest
+    Then it is accepted with kind SPAN_KIND_UNSPECIFIED
+
+  @unit
+  Scenario: An OTLP/JSON request omitting default-valued fields ingests every span
+    Given an OTLP/JSON request whose span has no attributes or kind
+    And its link carries only traceId and spanId
+    And its event carries only timeUnixNano and name
+    And its resource is empty
+    When the request is ingested
+    Then no span is rejected
+    And the span is recorded
