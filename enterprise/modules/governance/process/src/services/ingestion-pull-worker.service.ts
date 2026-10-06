@@ -54,7 +54,7 @@ export interface PulledUsageEntitlements {
 }
 
 /** ADR-128 §12: the discovery feed's trigger for the identity match engine. */
-export interface DiscoveredPeopleMatcher {
+interface DiscoveredPeopleMatcher {
   runFor(input: { organizationId: string }): Promise<void>;
 }
 

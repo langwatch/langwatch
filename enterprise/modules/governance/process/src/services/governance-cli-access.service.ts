@@ -35,12 +35,12 @@ export type GovernanceCliCaller = Readonly<{
 export type GovernanceCliEnterpriseFeature = "ingestionSources" | "activityMonitor";
 
 /** The plan gate's verdict, with the upgrade page a refusal points at. */
-export type GovernanceCliPlanDecision =
+type GovernanceCliPlanDecision =
   | Readonly<{ entitled: true }>
   | Readonly<{ entitled: false; errorMessage: string; upgradeUrl: string }>;
 
 /** Whether the caller still holds an active seat in the token's organization. */
-export type GovernanceCliMembershipDecision = Readonly<{ active: boolean }>;
+type GovernanceCliMembershipDecision = Readonly<{ active: boolean }>;
 
 /** The complete admission result for one CLI governance request. */
 export type GovernanceCliAdmission =

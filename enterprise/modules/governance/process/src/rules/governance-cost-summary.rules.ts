@@ -22,7 +22,7 @@ import {
 } from "./governance-cost-rollup-cell.rules.ts";
 
 /** How long a pull's touch keeps a day provisional (main `GOVERNANCE_SETTLING_WINDOW_DAYS`). */
-export const GOVERNANCE_SETTLING_WINDOW_DAYS = 30;
+const GOVERNANCE_SETTLING_WINDOW_DAYS = 30;
 const DAY_MS = 86_400_000;
 
 export function laneWithoutFigure(): GovernanceCostLane {
@@ -75,7 +75,7 @@ function minorFigure({
 }
 
 /** A day still inside its settling window may yet move; derived from the clock, never stored. */
-export function isWithinSettlingWindow({
+function isWithinSettlingWindow({
   lastObservedAtSeconds,
   windowDays,
   now,
@@ -159,7 +159,7 @@ function dayCurrencyLinesFrom(row: GovernanceCostDayLaneGroup): GovernanceCostDa
 }
 
 /** The metered lane marks rather than withholds: a priced request stands the figure. */
-export function gatewayFigureStands(counts: {
+function gatewayFigureStands(counts: {
   requestCount: number;
   pricedRequestCount: number;
   requestsWithoutAmount: number;

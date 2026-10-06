@@ -59,7 +59,7 @@ export interface CostRollupDayComparer {
 }
 
 export const COST_ROLLUP_MISMATCH_METRIC_NAME = "langwatch_governance_cost_rollup_mismatch_total";
-export const COST_ROLLUP_LAG_METRIC_NAME = "langwatch_governance_cost_rollup_lag_seconds";
+const COST_ROLLUP_LAG_METRIC_NAME = "langwatch_governance_cost_rollup_lag_seconds";
 
 export class CostRollupDayComparerService implements CostRollupDayComparer {
   readonly costSource = GOVERNANCE_COST_SOURCE.PULLED;

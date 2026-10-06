@@ -27,7 +27,7 @@
  */
 
 /** The config key naming the Azure subscription a source reads the bill of. */
-export const AZURE_SUBSCRIPTION_FIELD = "azureSubscriptionId";
+const AZURE_SUBSCRIPTION_FIELD = "azureSubscriptionId";
 
 /** A source that already reads some subscription's bill. */
 export interface AzureBillReader {

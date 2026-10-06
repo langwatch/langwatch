@@ -1,6 +1,6 @@
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 
-export interface RegisteredGovernancePuller {
+interface RegisteredGovernancePuller {
   readonly id: string;
   validateConfig(config: unknown): unknown;
   runOnce(options: PullRunOptions, config: unknown): Promise<PullResult>;

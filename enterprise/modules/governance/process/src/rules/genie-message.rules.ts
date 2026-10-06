@@ -21,7 +21,7 @@ export interface GenieThought {
   content?: string;
 }
 
-export interface GenieQueryAttachment {
+interface GenieQueryAttachment {
   query?: string | null;
   description?: string | null;
   statement_id?: string | null;

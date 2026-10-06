@@ -13,7 +13,7 @@ export const filedCellSchema = z.object({
   rawActorId: z.string(),
   occurredAtMs: z.number(),
 });
-export type FiledCell = z.infer<typeof filedCellSchema>;
+type FiledCell = z.infer<typeof filedCellSchema>;
 
 /** Where the charge sits NOW, which is what the next version is compared against. */
 export function filedCellFor(record: PulledUsageObservedEventData): FiledCell {

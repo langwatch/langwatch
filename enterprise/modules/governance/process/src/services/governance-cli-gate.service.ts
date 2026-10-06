@@ -14,9 +14,9 @@ import type {
   GovernanceCliEnterpriseFeature,
 } from "./governance-cli-access.service.ts";
 
-export type GovernanceCliGateRefusal = Extract<GovernanceCliRefusalAnswer, { status: 402 | 403 }>;
+type GovernanceCliGateRefusal = Extract<GovernanceCliRefusalAnswer, { status: 402 | 403 }>;
 
-export type GovernanceCliAdmitInput = GovernanceCliRequest &
+type GovernanceCliAdmitInput = GovernanceCliRequest &
   Readonly<{
     feature?: GovernanceCliEnterpriseFeature;
     permission?: AuthzPermission;

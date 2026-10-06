@@ -36,13 +36,13 @@ export interface IngestionPullListingOutcomeChannel {
 }
 
 /** One on-demand listing, as the process manager's `listAgents`/`listPeople` intent carries it. */
-export type IngestionPullListingRequest = {
+type IngestionPullListingRequest = {
   sourceId: string;
   requestId: string;
   requestedAt: number;
 };
 
-export type IngestionPullListingExecution = {
+type IngestionPullListingExecution = {
   tenantId: string;
   attempt: number;
   listing: IngestionPullListingRequest;

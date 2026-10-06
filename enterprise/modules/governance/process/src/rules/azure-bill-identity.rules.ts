@@ -8,7 +8,7 @@ const SUBSCRIPTION_FIELD = "_azureBillSubscriptionId";
 type Config = Record<string, unknown>;
 
 /** A source that has, or once had, an Azure bill claim: the rows the identity is read from. */
-export interface AzureBillHistoryEntry {
+interface AzureBillHistoryEntry {
   id: string;
   parserConfig: unknown;
 }

@@ -19,7 +19,7 @@ type Client = Prisma.TransactionClient | PrismaClient;
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type IngestionTemplateDatabase = Pick<
+type IngestionTemplateDatabase = Pick<
   PrismaClient,
   "ingestionTemplate" | "auditLog" | "$transaction"
 >;

@@ -9,7 +9,7 @@ import {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type GovernanceSetupStateDatabase = Pick<PrismaClient, "anomalyRule" | "ingestionSource">;
+type GovernanceSetupStateDatabase = Pick<PrismaClient, "anomalyRule" | "ingestionSource">;
 
 export class PrismaGovernanceSetupStateRepository extends GovernanceSetupStateRepository {
   private constructor(private readonly prisma: GovernanceSetupStateDatabase) {

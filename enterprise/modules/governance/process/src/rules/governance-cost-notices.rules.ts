@@ -47,7 +47,7 @@ function storedCursorJson(pollerCursor: unknown): unknown {
 type CostCaveats = Pick<GovernanceCostSummary, "staleSources" | "unpricedWindow" | "azureBilling">;
 
 /** A claimed bill's read state; absent when no source claims one. */
-export type AzureBillState = {
+type AzureBillState = {
   isPrepaidDeclared: boolean;
   hasAzureSpendRows: boolean;
   costPricedThroughDay: string | null;

@@ -97,7 +97,7 @@ export type GovernanceIngestBatch = Readonly<{
   contentType: string | undefined;
 }>;
 
-export type GovernanceIngestTraceReceipt =
+type GovernanceIngestTraceReceipt =
   | Readonly<{ outcome: "wrong-endpoint" }>
   | Readonly<{
       outcome: "received";
@@ -107,11 +107,11 @@ export type GovernanceIngestTraceReceipt =
       hint?: string | undefined;
     }>;
 
-export type GovernanceIngestWebhookReceipt =
+type GovernanceIngestWebhookReceipt =
   | Readonly<{ outcome: "wrong-endpoint" }>
   | Readonly<{ outcome: "received"; bytes: number; eventId: string }>;
 
-export type GovernanceIngestLogReceipt = Readonly<{
+type GovernanceIngestLogReceipt = Readonly<{
   outcome: "received";
   bytes: number;
   logRecords: number;

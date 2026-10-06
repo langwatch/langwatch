@@ -9,7 +9,7 @@ import type {
 import type { Instant } from "@langwatch/time";
 
 /** A seat in an organization, and whether it still answers as active. */
-export type MemoryGovernanceMember = {
+type MemoryGovernanceMember = {
   userId: string;
   organizationId: string;
   isAdmin: boolean;
@@ -17,13 +17,13 @@ export type MemoryGovernanceMember = {
 };
 
 /** A person the directory names, and the workspace rows keyed to them. */
-export type MemoryGovernancePerson = {
+type MemoryGovernancePerson = {
   name: string | null;
   email: string | null;
 };
 
 /** One dated member-to-department link; `validTo` null is the open one. */
-export type MemoryDepartmentMembershipLink = {
+type MemoryDepartmentMembershipLink = {
   id: string;
   organizationId: string;
   userId: string;
@@ -33,7 +33,7 @@ export type MemoryDepartmentMembershipLink = {
 };
 
 /** An alert the spend-spike evaluator has already raised for a rule. */
-export type MemoryGovernanceAlert = AnomalyAlertDispatchRecord & {
+type MemoryGovernanceAlert = AnomalyAlertDispatchRecord & {
   ruleId: string;
   open: boolean;
   dispatches: Record<string, unknown>[];

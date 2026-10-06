@@ -4,7 +4,7 @@ import {
   type IngestionPullProcessingEvent,
 } from "@langwatch/enterprise-governance-contract";
 
-export type IngestionPullRunStatus = {
+type IngestionPullRunStatus = {
   sourceId: string;
   enabled: boolean;
   cron: string | null;

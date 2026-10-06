@@ -185,7 +185,7 @@ export interface GovernanceClickHouseRepositories {
  * two methods every one of them calls. Narrow rather than the vendor client so a
  * member-backed wrapper satisfies it without a cast.
  */
-export interface GovernanceClickHouseTenantClient {
+interface GovernanceClickHouseTenantClient {
   query<Row>(input: {
     query: string;
     query_params?: Record<string, unknown>;

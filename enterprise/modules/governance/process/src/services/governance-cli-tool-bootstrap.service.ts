@@ -8,7 +8,7 @@ import {
 
 import type { CliAdminContactReader } from "./cli-admin-contact.service.ts";
 
-export type CliBudgetOverview = {
+type CliBudgetOverview = {
   gatewayAccess: boolean;
   budgets: {
     window: string;

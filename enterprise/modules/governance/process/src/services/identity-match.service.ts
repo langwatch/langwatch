@@ -25,14 +25,14 @@ import {
 import { isUniqueViolation } from "../rules/postgres-constraint.rules.ts";
 
 /** What one pass over an organization's discovered people did. */
-export interface AutoLinkOutcome {
+interface AutoLinkOutcome {
   linked: number;
   suspended: number;
   /** Nothing proved them: most are contractors with no account, but it is also a broken directory. */
   unproven: number;
 }
 
-export interface IdentityMatchDependencies {
+interface IdentityMatchDependencies {
   discoveredPeople: DiscoveredPersonRepository;
   matches: IdentityMatchRepository;
   suggestions: IdentityMatchSuggestionRepository;

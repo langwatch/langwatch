@@ -28,7 +28,7 @@ export type PulledUsageQuantities = {
  * amount and the code naming it arrive and are consumed together — split
  * across two call sites, a euro figure reads as dollars.
  */
-export type ProviderReportedPriceInput = {
+type ProviderReportedPriceInput = {
   basis: typeof PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED;
   /**
    * The provider's amount as a decimal string, in ITS OWN currency. Named for

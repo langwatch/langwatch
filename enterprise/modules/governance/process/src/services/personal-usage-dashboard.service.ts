@@ -11,7 +11,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { DefaultGovernancePersonalUsageService } from "./personal-usage.service.ts";
 
 /** Whose usage, over which window. Absent window means the store's default. */
-export type PersonalUsageDashboardQuery = {
+type PersonalUsageDashboardQuery = {
   userId: string;
   organizationId: string;
   window?: PersonalUsageWindow;

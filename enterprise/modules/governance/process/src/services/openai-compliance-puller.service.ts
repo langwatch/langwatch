@@ -54,26 +54,25 @@ import { type S3PollingConfig, S3PollingPullerService } from "./s3-puller.servic
  * IngestionSource.parserConfig with `_overrides_` semantics that the
  * puller respects via the override below.
  */
-export const OPENAI_COMPLIANCE_PULL_CONFIG: Omit<S3PollingConfig, "bucket" | "prefix" | "region"> =
-  {
-    adapter: "s3_polling",
-    parser: "ndjson",
-    schedule: "*/15 * * * *",
-    eventMapping: {
-      source_event_id: "$.id",
-      event_timestamp: "$.created_at",
-      actor: "$.user.id",
-      action: "$.type",
-      target: "$.model",
-      cost_usd: "$.cost.usd",
-      tokens_input: "$.tokens.input",
-      tokens_output: "$.tokens.output",
-      extra: {
-        object: "$.object",
-      },
+const OPENAI_COMPLIANCE_PULL_CONFIG: Omit<S3PollingConfig, "bucket" | "prefix" | "region"> = {
+  adapter: "s3_polling",
+  parser: "ndjson",
+  schedule: "*/15 * * * *",
+  eventMapping: {
+    source_event_id: "$.id",
+    event_timestamp: "$.created_at",
+    actor: "$.user.id",
+    action: "$.type",
+    target: "$.model",
+    cost_usd: "$.cost.usd",
+    tokens_input: "$.tokens.input",
+    tokens_output: "$.tokens.output",
+    extra: {
+      object: "$.object",
     },
-    retainRawPayload: false,
-  };
+  },
+  retainRawPayload: false,
+};
 
 interface OpenAiAdminInput {
   bucket: string;

@@ -24,7 +24,7 @@ import {
 import { schedulerWillPull } from "../rules/pull-schedule.rules.ts";
 
 /** What one press dispatches, per source. Returns once the ask is recorded. */
-export type AgentListingDispatcher = (command: AgentListingRequestCommand) => Promise<unknown>;
+type AgentListingDispatcher = (command: AgentListingRequestCommand) => Promise<unknown>;
 
 interface GovernanceAgentSyncDependencies {
   sources: IngestionSourceRepository;

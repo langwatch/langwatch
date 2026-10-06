@@ -38,7 +38,7 @@ export type GovernanceCliPersonalWorkspace = Readonly<{
   project: Readonly<{ id: string; slug: string; name: string }>;
 }>;
 
-export type GovernanceCliBudgetStatus =
+type GovernanceCliBudgetStatus =
   | Readonly<{ outcome: "clear" }>
   | Readonly<{
       outcome: "blocked";
@@ -50,11 +50,11 @@ export type GovernanceCliBudgetStatus =
       adminEmail: string | null;
     }>;
 
-export type GovernanceCliPersonalProjectOutcome =
+type GovernanceCliPersonalProjectOutcome =
   | Readonly<{ outcome: "resolved"; project: GovernanceCliProject }>
   | Readonly<{ outcome: "failed" }>;
 
-export type GovernanceCliVirtualKeyOutcome =
+type GovernanceCliVirtualKeyOutcome =
   | Readonly<{ outcome: "issued"; id: string; secret: string; prefix: string }>
   | Readonly<{ outcome: "no-eligible-providers" }>
   | Readonly<{ outcome: "failed" }>;

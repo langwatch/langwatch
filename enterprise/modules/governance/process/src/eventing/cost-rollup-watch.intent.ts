@@ -54,7 +54,7 @@ export const compareCostRollupDaySchema = z.object({
   costSource: z.string().min(1),
 });
 
-export type CompareCostRollupDayPayload = z.infer<typeof compareCostRollupDaySchema>;
+type CompareCostRollupDayPayload = z.infer<typeof compareCostRollupDaySchema>;
 
 /**
  * Where a disagreement becomes drift, or does not — the attempt number is

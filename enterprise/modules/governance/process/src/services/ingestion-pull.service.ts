@@ -65,7 +65,7 @@ export const INGESTION_PULL_MAX_ATTEMPTS = 3;
 export const INGESTION_PULL_LEASE_DURATION_MS = 10 * 60 * 1000;
 export const INGESTION_PULL_CONCURRENCY = 4;
 
-export type IngestionPullExecution = {
+type IngestionPullExecution = {
   tenantId: string;
   attempt: number;
   pull: IngestionPullRun;

@@ -17,7 +17,7 @@ export const ROLE_USER = 1;
  */
 export const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export interface ActivityFrom {
+interface ActivityFrom {
   id?: string | null;
   role?: number | null;
   /** The only field naming a real directory account. Users only. */

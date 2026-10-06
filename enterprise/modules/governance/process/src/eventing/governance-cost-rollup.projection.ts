@@ -39,7 +39,7 @@ const governanceCostRollupEvents = [
 type GovernanceCostRollupEvent = PulledUsageObservedEvent | PulledUsageRetractedEvent;
 
 /** Erasure's pseudonym substitution, applied at the key so a replay cannot write the original back. */
-export interface GovernanceCostRollupActorIds {
+interface GovernanceCostRollupActorIds {
   actorIdForRollupWrite: (input: { tenantId: string; rawActorId: string }) => string;
 }
 

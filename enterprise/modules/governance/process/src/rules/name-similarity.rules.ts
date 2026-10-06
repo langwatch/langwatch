@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /** Names whose lengths differ by more than this share of the longer are never compared. */
-export const LENGTH_BAND = 0.4;
+const LENGTH_BAND = 0.4;
 
 /** The score a pair must reach to be put to a reviewer (ADR-128 §12). */
 export const SUGGESTION_THRESHOLD = 0.6;
@@ -85,7 +85,7 @@ function editDistance(left: string, right: string): number {
 }
 
 /** A pair the prefilter refused is not a zero score: nothing was compared. */
-export type NameSimilarity = { outcome: "not_compared" } | { outcome: "scored"; score: number };
+type NameSimilarity = { outcome: "not_compared" } | { outcome: "scored"; score: number };
 
 /**
  * One minus the normalized edit distance, when the prefilter admits the pair.

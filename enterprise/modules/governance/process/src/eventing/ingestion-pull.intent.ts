@@ -24,8 +24,8 @@ export const ingestionPullListingIntentSchema = z.object({
   requestedAt: z.number(),
 });
 
-export type IngestionPullRunIntent = z.infer<typeof ingestionPullRunIntentSchema>;
-export type IngestionPullListingPayload = z.infer<typeof ingestionPullListingIntentSchema>;
+type IngestionPullRunIntent = z.infer<typeof ingestionPullRunIntentSchema>;
+type IngestionPullListingPayload = z.infer<typeof ingestionPullListingIntentSchema>;
 
 type IntentContext = { projectId: string; attempt: number };
 

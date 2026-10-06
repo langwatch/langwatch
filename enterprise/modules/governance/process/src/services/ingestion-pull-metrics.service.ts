@@ -12,8 +12,8 @@ export interface IngestionPullMetricsSink {
   observeDuration(durationMs: number): void;
 }
 
-export const INGESTION_PULL_TOTAL_METRIC_NAME = "ingestion_pull_total";
-export const INGESTION_PULL_DURATION_METRIC_NAME = "ingestion_pull_duration_milliseconds";
+const INGESTION_PULL_TOTAL_METRIC_NAME = "ingestion_pull_total";
+const INGESTION_PULL_DURATION_METRIC_NAME = "ingestion_pull_duration_milliseconds";
 
 /** Ingestion-pull runs by outcome, and how long each took, pushed over OTLP. */
 export class IngestionPullMetricsService implements IngestionPullMetricsSink {

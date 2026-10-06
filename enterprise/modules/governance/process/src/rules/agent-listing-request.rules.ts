@@ -2,7 +2,7 @@
 
 import { sourceTypeCanListAgents } from "./listing-source-types.rules.ts";
 
-export interface ListableSourceRecord {
+interface ListableSourceRecord {
   id: string;
   name: string;
   sourceType: string;

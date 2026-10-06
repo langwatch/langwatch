@@ -39,7 +39,7 @@ import { type HttpPollingConfig, HttpPollingPullerAdapter } from "./http.polling
  * absolute URLs and uses them as-is, so we don't need any special
  * pagination handling here.
  */
-export const COPILOT_STUDIO_PULL_CONFIG: HttpPollingConfig = {
+const COPILOT_STUDIO_PULL_CONFIG: HttpPollingConfig = {
   adapter: "http_polling",
   url: "https://graph.microsoft.com/v1.0/auditLogs/directoryAudits",
   method: "GET",

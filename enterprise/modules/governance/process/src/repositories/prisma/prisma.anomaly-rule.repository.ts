@@ -11,7 +11,7 @@ import {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type AnomalyRuleDatabase = Pick<PrismaClient, "anomalyRule">;
+type AnomalyRuleDatabase = Pick<PrismaClient, "anomalyRule">;
 
 export class PrismaAnomalyRuleRepository extends AnomalyRuleRepository {
   private constructor(private readonly prisma: AnomalyRuleDatabase) {
