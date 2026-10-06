@@ -22,7 +22,7 @@ type CanonicalSpanStore = {
  * A log record for canonical extraction; its scope and body gate the detectors.
  * Log records carry no events, so extractors gate on body and attributes alone.
  */
-export type CanonicalLogRecordStore = {
+type CanonicalLogRecordStore = {
   readonly scopeName: string;
   readonly body: string;
   readonly attrs: CanonicalAttributeStore;

@@ -53,7 +53,7 @@ interface ScopedCondition {
 }
 
 /** The evaluator and the result conditions bound to it. */
-export interface EvaluationScope {
+interface EvaluationScope {
   anchor: TagToken;
   conditions: ScopedCondition[];
 }

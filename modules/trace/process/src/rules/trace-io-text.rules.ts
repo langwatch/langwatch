@@ -49,7 +49,7 @@ export function shouldExcludeSpan(span: NormalizedSpan): boolean {
  * frameworks (LangChain, Haystack, Flowise, Optimization Studio, etc.).
  * Order matters: first match wins.
  */
-export const COMMON_TEXT_KEYS = [
+const COMMON_TEXT_KEYS = [
   "text",
   "input",
   "question",
@@ -123,7 +123,7 @@ function extractTextFromSingleKeyWrapper(
  * message-shaped (no role/content structure). Handles common wrapper patterns like `{ input:
  * "hello" }` or `{ question: "what is 2+2?" }` that are used by various frameworks.
  */
-export function extractTextFromPlainJson(obj: Record<string, unknown>, depth = 0): string | null {
+function extractTextFromPlainJson(obj: Record<string, unknown>, depth = 0): string | null {
   if (depth >= MAX_PLAIN_JSON_RECURSION_DEPTH) {
     return null;
   }

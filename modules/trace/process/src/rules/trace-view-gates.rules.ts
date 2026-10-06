@@ -85,7 +85,7 @@ export function gateSessionTitle<T extends { codingAgent: { title: string | null
 }
 
 /** What {@link gateSessionTitle} adds to a row's coding-agent enrichment. */
-export interface SessionTitleRedactionFlag {
+interface SessionTitleRedactionFlag {
   /** True only when a title existed and this viewer may not read it. */
   titleRedacted: boolean;
 }
@@ -141,7 +141,7 @@ export function gateEvaluations({
  * Internal cost-classification markers filtered from drawer resource view.
  * Fixed set, independent of viewer. Applied before gateResources.
  */
-export const HIDDEN_RESOURCE_ATTRS: ReadonlySet<string> = new Set([NON_BILLABLE_ATTR]);
+const HIDDEN_RESOURCE_ATTRS: ReadonlySet<string> = new Set([NON_BILLABLE_ATTR]);
 
 export function withoutHiddenResourceAttrs(attrs: Record<string, string>): Record<string, string> {
   let hasHidden = false;

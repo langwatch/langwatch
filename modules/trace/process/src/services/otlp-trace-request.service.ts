@@ -27,7 +27,7 @@ type TraceFlagsInfo = {
   remote: boolean | null; // only meaningful if not null
 };
 
-export type ParentContext = {
+type ParentContext = {
   traceId: string | null;
   spanId: string | null;
   isRemote: boolean | null;

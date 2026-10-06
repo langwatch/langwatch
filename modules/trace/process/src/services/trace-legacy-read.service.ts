@@ -32,7 +32,7 @@ import { TraceReadEnrichmentService } from "./trace-read-enrichment.service.ts";
  * Minimum prefix length we will attempt to resolve. Shorter strings fall through to "not found" —
  * this avoids scanning the entire trace_summaries table on a single-character typo.
  */
-export const MIN_TRACE_ID_PREFIX_LENGTH = 8;
+const MIN_TRACE_ID_PREFIX_LENGTH = 8;
 
 /**
  * Full length of a trace ID. Inputs shorter than this are treated as
@@ -52,7 +52,7 @@ const TRACE_ID_PREFIX_CANDIDATE_LIMIT = 5;
  * would scan every partition (incl. cold S3 storage) on a miss. Full 32-char IDs still resolve
  * unbounded via the normal exact-match path.
  */
-export const TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS = 90;
+const TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS = 90;
 
 /**
  * Thrown when a trace ID prefix matches more than one trace in the project.

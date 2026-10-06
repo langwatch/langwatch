@@ -250,5 +250,3 @@ export class TraceDerivationSpanClickHouseRepository {
     return fullSpanRowsSchema.parse(await result.json()).map((row) => mapChRowToNormalized(row));
   }
 }
-
-export { DERIVATION_EVENT_LIMIT, DERIVATION_SPAN_LIMIT };

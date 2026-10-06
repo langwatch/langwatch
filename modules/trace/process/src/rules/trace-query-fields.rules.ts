@@ -87,7 +87,7 @@ export function expressionFacet(key: string): ExpressionCategoricalDef | RangeFa
 }
 
 /** Auto-derived `trace_summaries` categorical: direct equality + summary read. */
-export function categoricalFacet(key: string): FieldDef {
+function categoricalFacet(key: string): FieldDef {
   const def = expressionFacet(key);
   if (def.kind !== "categorical") {
     throw new Error(`facet '${key}' is not a categorical facet`);

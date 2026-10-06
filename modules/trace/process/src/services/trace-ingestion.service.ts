@@ -33,7 +33,7 @@ type SpanIngestionResult = {
   error?: string;
 };
 
-export type TraceRequestCollectionResult = {
+type TraceRequestCollectionResult = {
   rejectedSpans: number;
   /**
    * The dispatch failures within `rejectedSpans`: transient, so a durable-cursor caller retries.

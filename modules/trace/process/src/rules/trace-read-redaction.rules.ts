@@ -47,7 +47,7 @@ function readSpanDropMarker(span: Span): string[] {
  * `drop` privacy policy, in a stable order, so the trace view can explain the
  * absence instead of rendering a blank that looks like missing instrumentation.
  */
-export function collectDroppedCategories(spans: Span[] | undefined): string[] {
+function collectDroppedCategories(spans: Span[] | undefined): string[] {
   const found = new Set<string>();
   for (const span of spans ?? []) {
     for (const category of readSpanDropMarker(span)) {

@@ -3,7 +3,7 @@ import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 /** The fail-open reasons the edge extraction reports. First three: hook
  * standing down (flag store, privacy probe, store refusal). Last three: budget
  * outcomes (per-span cap, deadline, part store). */
-export type TraceEdgeMediaFailOpenReason =
+type TraceEdgeMediaFailOpenReason =
   | "flag_store"
   | "privacy_probe"
   | "storage"

@@ -26,7 +26,6 @@ import {
   traceMetadataBodySchema,
   traceMetadataResponseSchema,
   traceNotFoundBodySchema,
-  traceSearchBodyExtensions,
   traceSearchBodySchema,
   traceSearchResponseSchema,
   tracesRestCredentialSchema,
@@ -301,7 +300,7 @@ async function searchTraces({
   return streamSearchEnvelope(serializedTraces, pagination, schemaSuffix);
 }
 
-export function createTracesRest(): Readonly<{
+function createTracesRest(): Readonly<{
   protocol: "rest";
   namespace: string;
   router: () => RestTransportDeclaration<TraceApi>;
@@ -471,6 +470,3 @@ export function createTracesRest(): Readonly<{
 
 /** The metadata amendment stays absent: no module member answers its command queue. */
 export const tracesRest = createTracesRest();
-
-export { traceSearchBodyExtensions };
-export type { TraceSearchBody };

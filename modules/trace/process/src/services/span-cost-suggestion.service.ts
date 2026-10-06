@@ -4,7 +4,7 @@ import {
   type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 
-export interface SpanCostSuggestionInput {
+interface SpanCostSuggestionInput {
   projectId: string;
   model: string | null;
   cost: number | null | undefined;

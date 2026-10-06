@@ -33,7 +33,7 @@ import {
 import { translateFilterAst } from "./trace-query.rules.ts";
 
 /** One field's expression over the trace view, and the facet it has to equal. */
-export type LangWatchQLTraceFilterField = Readonly<{
+type LangWatchQLTraceFilterField = Readonly<{
   expression: string;
   /** The name its value binds under, for a readable statement. */
   param: string;

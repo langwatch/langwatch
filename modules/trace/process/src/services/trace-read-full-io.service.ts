@@ -6,7 +6,7 @@ import {
 
 import type { TraceIOExtractionService } from "./trace-io-extraction.service.ts";
 
-export type TraceFullIoRecord = {
+type TraceFullIoRecord = {
   input: { type: string; value: TraceRecordValue } | null;
   output: { type: string; value: TraceRecordValue } | null;
 };

@@ -20,7 +20,7 @@ const FIRST_TOKEN_EVENTS = new Set([
   "First Token Stream Event",
 ]);
 
-export const LAST_TOKEN_EVENTS = new Set([
+const LAST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",
   "llm.content.completion.chunk",
   "last_token",

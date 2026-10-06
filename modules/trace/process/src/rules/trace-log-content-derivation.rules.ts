@@ -139,8 +139,6 @@ function parseJsonObject(raw: string): Record<string, unknown> | null {
   }
 }
 
-export type { DerivedToolCall };
-
 /**
  * Attributes to merge onto a log record at ingest. Empty for any record we have
  * no derivation for — the caller merges unconditionally and pays nothing.
