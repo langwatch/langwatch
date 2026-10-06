@@ -16,7 +16,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
-import { BLOCK_QUESTION_SECTIONS } from "../model/block-questions.ts";
+import { PICKER_SECTIONS } from "../catalogue/index.ts";
 import { BOARD_VISIBILITY_LOCKED_REASON } from "../model/board-visibility.ts";
 import { AGENT_FLIGHT_DECK_TEMPLATE } from "../templates/index.ts";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
@@ -306,11 +306,12 @@ describe("a member's board", () => {
 
     describe("when the member browses every section", () => {
       /** @scenario "AC12 Only working questions are offered" */
+      /** @scenario "AC16 The picker offers every catalogue widget that has code, grouped by the question tree" */
       it("lists every question in its own section, and no Blocks section", async () => {
         openPicker();
 
         const dialog = await screen.findByRole("dialog");
-        for (const section of BLOCK_QUESTION_SECTIONS) {
+        for (const section of PICKER_SECTIONS) {
           const listed = within(within(dialog).getByRole("region", { name: section.title }));
           expect(listed.getAllByRole("button")).toHaveLength(section.questions.length);
           for (const { question } of section.questions) {
@@ -318,7 +319,7 @@ describe("a member's board", () => {
             expect(row).toBeEnabled();
           }
         }
-        expect(await pickerRegions()).toEqual(BLOCK_QUESTION_SECTIONS.map(({ title }) => title));
+        expect(await pickerRegions()).toEqual(PICKER_SECTIONS.map(({ title }) => title));
         expect(within(dialog).queryByRole("region", { name: "Blocks" })).toBeNull();
       });
     });
@@ -334,7 +335,7 @@ describe("a member's board", () => {
       it("closes the picker, adds the question's widget below the existing ones, and drafts Langy to send", async () => {
         const user = userEvent.setup();
         const { server, host } = openPicker(withExistingWidget());
-        const traffic = BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions).find(
+        const traffic = PICKER_SECTIONS.flatMap(({ questions }) => questions).find(
           ({ id }) => id === "traffic",
         )!;
 
@@ -365,7 +366,7 @@ describe("a member's board", () => {
         const user = userEvent.setup();
         const server = inMemoryServer({ boards: OWN_BOARDS, refuseWidgetCreate: true });
         const { host } = openPicker(server);
-        const traffic = BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions).find(
+        const traffic = PICKER_SECTIONS.flatMap(({ questions }) => questions).find(
           ({ id }) => id === "traffic",
         )!;
 
@@ -396,8 +397,8 @@ describe("a member's board", () => {
           permissions,
         });
 
-        expect(await pickerRegions()).toEqual(BLOCK_QUESTION_SECTIONS.map(({ title }) => title));
-        for (const { question } of BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions)) {
+        expect(await pickerRegions()).toEqual(PICKER_SECTIONS.map(({ title }) => title));
+        for (const { question } of PICKER_SECTIONS.flatMap(({ questions }) => questions)) {
           expect(screen.getByRole("button", { name: new RegExp(escape(question)) })).toBeEnabled();
         }
         expect(screen.queryByRole("button", { name: "Ask Langy" })).toBeNull();
@@ -414,8 +415,8 @@ describe("a member's board", () => {
         flags: FLAG_ON,
         permissions: MEMBER,
       });
-      const overall = BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions).find(
-        ({ id }) => id === "overall",
+      const overall = PICKER_SECTIONS.flatMap(({ questions }) => questions).find(
+        ({ id }) => id === "ck-status",
       )!;
 
       await user.click(

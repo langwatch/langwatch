@@ -8,6 +8,7 @@ import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
 import type { DashboardWidgetDraft } from "../../../model/dashboard-widget-definition.ts";
+import { pickerWidgets } from "../catalogue/index.ts";
 import type { BlockQuestion } from "../model/block-questions.ts";
 import {
   addedWidgetSlots,
@@ -15,7 +16,6 @@ import {
   boardWidgetsOf,
   duplicateSlot,
 } from "../model/board-widgets.ts";
-import { questionWidgets } from "../templates/model/question-widgets.ts";
 
 export function useBoardWidgets() {
   const host = useAnalyticsHost();
@@ -83,7 +83,7 @@ export function useBoardWidgets() {
     write({
       fallbackTitle: "Couldn't add the block",
       work: async () => {
-        const widgets = questionWidgets(question.id);
+        const widgets = pickerWidgets(question.id);
         const placements = widgetsOn(dashboardId).map(({ placement }) => placement);
         const slots = addedWidgetSlots({ placements, widgets });
         const layouts = await Promise.all(

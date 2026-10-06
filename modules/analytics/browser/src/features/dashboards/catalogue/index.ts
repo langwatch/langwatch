@@ -1,6 +1,8 @@
 /** The dashboards catalogue: the question tree, every widget and every template. */
 
 export { preloadedTemplatesFor, templateWidgetsFor } from "./model/catalogue-boards.ts";
+export { PICKER_SECTIONS, pickerWidgets } from "./model/catalogue-picker.ts";
+export { IMPLEMENTED_WIDGET_IDS, implementedWidget } from "./model/widget-implementations.ts";
 export {
   AGENT_KIND_LABELS,
   AGENT_KINDS,

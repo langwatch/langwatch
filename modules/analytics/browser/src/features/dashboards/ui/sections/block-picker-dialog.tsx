@@ -1,7 +1,7 @@
 /**
- * The "Add a block" picker. Every question is always listed; choosing one adds
- * its widget(s) to the board and then, when Langy is available, opens Langy with
- * the question's prompt as a draft to send. A pinned footer asks Langy anything else.
+ * The "Add a block" picker: every catalogue widget with code, grouped by the question tree.
+ * Choosing one adds it to the board, then, when Langy is available, drafts its prompt in
+ * Langy to send. A pinned footer asks Langy anything else.
  */
 
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { PICKER_SECTIONS } from "../../catalogue/index.ts";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import {
   type BoardSubject,
@@ -33,7 +34,6 @@ import {
   boardQuestion,
 } from "../../langy/model/board-langy.ts";
 import {
-  BLOCK_QUESTION_SECTIONS,
   type BlockQuestion,
   type BlockQuestionIcon,
   type BlockQuestionSection,
@@ -74,7 +74,7 @@ export function BlockPickerDialog({
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const sections = searchBlockQuestions({ sections: BLOCK_QUESTION_SECTIONS, search });
+  const sections = searchBlockQuestions({ sections: PICKER_SECTIONS, search });
   const typed = search.trim();
   const hasMatches = sections.length > 0;
   const canAskOnEnter = langy.enabled && !hasMatches && typed.length > 0;
@@ -291,7 +291,7 @@ function PickerRow({
       >
         <Icon size={16} strokeWidth={2.1} aria-hidden />
       </Box>
-      <VStack align="start" gap={0} minWidth={0}>
+      <VStack align="stretch" gap={0} minWidth={0} flex={1} textAlign="start">
         <Text fontSize="13px" lineHeight="1.375" fontWeight="medium" color="fg" truncate>
           {title}
         </Text>

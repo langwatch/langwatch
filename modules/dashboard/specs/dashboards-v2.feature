@@ -185,6 +185,14 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And the library's own templates are in the gallery only
     # Decision: the prototype's Cockpit cards replace the Flight Deck's widgets; the Flight Deck name stays
 
+  @integration
+  Scenario: AC16 The picker offers every catalogue widget that has code, grouped by the question tree
+    Given the picker is open on a board
+    Then each branch of the question tree with a built widget is a section, in tree order
+    And each section lists its built widgets by the question they answer
+    And picking one stores it on the board under that question, as AC12 describes
+    # Decision: a catalogue widget without code is not offered until it is built
+
   # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
@@ -211,3 +219,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 13: "An empty widget tells a quiet period from a missing source" (added by langwatch/tasks#911: no rows no longer means not connected) → Scenario: AC13 A quiet period does not ask the member to connect a source; Scenario: AC13b A source that was never set up shows its setup step; Scenario: AC13c Every template widget checks its own source
   # AC 14: "Reviewer thumbs are named as reviewer thumbs" (added by langwatch/tasks#911: the annotations table holds reviewer thumbs, not user feedback) → Scenario: AC14 Reviewer thumbs are named as reviewer thumbs
   # AC 15: "One catalogue of widgets and templates, from the dashboards library" (added by langwatch/tasks#911: the library is the guide for what to build) → Scenario: AC15 Every widget answers a question from the question tree; Scenario: AC15b A project's preloaded boards never repeat a widget; Scenario: AC15c The prototype's boards are the starter set, under the Agent Flight Deck name
+  # AC 16: "The picker offers the catalogue" (added by langwatch/tasks#911: the picker moves from answer shapes to the question tree) → Scenario: AC16 The picker offers every catalogue widget that has code, grouped by the question tree
