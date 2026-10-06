@@ -45,14 +45,11 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { opsProcessModule } from "../../ops.module.ts";
+import { MemoryOpsSnapshotRepository } from "../../repositories/memory/memory.ops-snapshot.repository.ts";
 import { MemorySystemMigrationStateRepository } from "../../repositories/memory/memory.system-migration-state.repository.ts";
-import {
-  SNAPSHOT_EPOCH_KEY,
-  SNAPSHOT_LEASE_KEY,
-} from "../../repositories/redis/redis.ops-snapshot.repository.ts";
 import { OPS_STAFF_ADDRESS, platformOperatorAuthz } from "./ops.fixture.ts";
 
 /** A store that holds nothing: every command is written down, a lease `SET` is granted. */
@@ -209,47 +206,49 @@ describe("ops app installation", () => {
   });
 
   describe("given the process starts", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
     /** @scenario "The queue-metrics writer contends for the lease in every serving role" */
     it.each(["api", "worker"] as const)(
       "the %s role runs the queue-metrics writer and hands its lease back on stop",
       async (role) => {
-        const redisCommands: unknown[][] = [];
-        const runtime = await process(role, redisCommands).boot();
-        const leaseCommands = () =>
-          redisCommands.filter((command) => command.includes(SNAPSHOT_LEASE_KEY));
+        const acquire = vi.spyOn(MemoryOpsSnapshotRepository.prototype, "acquireOrRenewLease");
+        const release = vi.spyOn(MemoryOpsSnapshotRepository.prototype, "releaseLease");
+        const runtime = await process(role).boot();
 
         try {
-          expect(leaseCommands()).toEqual([]);
+          expect(acquire).not.toHaveBeenCalled();
           await runtime.start();
 
-          await vi.waitFor(() =>
-            expect(leaseCommands()).toContainEqual(expect.arrayContaining(["set"])),
-          );
+          await vi.waitFor(() => expect(acquire).toHaveBeenCalled());
+          expect(release).not.toHaveBeenCalled();
         } finally {
           await runtime.stop();
         }
 
-        expect(leaseCommands().at(-1)?.[0]).toBe("eval");
+        expect(release).toHaveBeenCalled();
       },
     );
   });
 
-  describe("given a worker holding the queue's Redis", () => {
+  describe("given a worker holding the snapshot store", () => {
     /** @scenario "The worker publishes the operations snapshot the dashboard reads" */
     it("claims the writer lease and takes an epoch from the same store", async () => {
-      const redisCommands: unknown[][] = [];
-      const runtime = await process("worker", redisCommands).boot();
+      const acquire = vi.spyOn(MemoryOpsSnapshotRepository.prototype, "acquireOrRenewLease");
+      const runtime = await process("worker").boot();
 
       try {
         await runtime.start();
 
-        await vi.waitFor(() => {
-          expect(redisCommands).toContainEqual(expect.arrayContaining(["set", SNAPSHOT_LEASE_KEY]));
-          expect(redisCommands).toContainEqual(
-            expect.arrayContaining(["incr", SNAPSHOT_EPOCH_KEY]),
-          );
+        await vi.waitFor(() => expect(acquire).toHaveBeenCalled());
+        await expect(acquire.mock.results[0]?.value).resolves.toMatchObject({
+          isHeld: true,
+          epoch: 1,
         });
       } finally {
+        vi.restoreAllMocks();
         await runtime.stop();
       }
     });

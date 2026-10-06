@@ -14,6 +14,8 @@ import { describe, expect, it } from "vitest";
 
 import { OpsOperations } from "../../app/ops-composition.build.ts";
 import type { OpsEventExplorer, OpsProcessExplorer, OpsReplayRunner } from "../../app/ops.app.ts";
+import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
+import { PrismaAdminBackofficeRepository } from "../../repositories/prisma/prisma.instance-admin.repository.ts";
 import { AuditStub, organizationEdit } from "./support/backoffice-doubles.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
@@ -37,6 +39,10 @@ const refuseEveryQuery = new Proxy(
 
 function backoffice(connectionDecides = true) {
   return OpsOperations.create({
+    repositories: {
+      ...MemoryOpsRepositories.create(),
+      instanceAdmin: PrismaAdminBackofficeRepository.create(refuseEveryQuery as never),
+    },
     database: refuseEveryQuery as never,
     audit: new AuditStub(),
     auditLog: createApiFixture<AuditLogApi>(),

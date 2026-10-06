@@ -10,7 +10,7 @@ import { PlanTypes, SubscriptionStatus } from "@langwatch/prisma-client/generate
 import { defaultHandler, getListHandler, getOneHandler } from "ra-data-simple-prisma";
 
 import { toBackofficeUserRow } from "../../rules/backoffice-user-row.rules.ts";
-import { AdminBackofficeRepository } from "../admin-backoffice.repository.ts";
+import { AdminBackofficeRepository } from "../instance-admin.repository.ts";
 import {
   type AdminDatabase,
   ORGANIZATION_SAFE_SELECT,

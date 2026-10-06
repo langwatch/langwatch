@@ -2,10 +2,14 @@ import { PrismaProcessStore } from "@langwatch/eventing/server";
 import { prismaRepositories } from "@langwatch/prisma-client";
 
 import type { OpsRepositories } from "../ops.repositories.ts";
+import { PrismaImpersonationRepository } from "./prisma.admin.repository.ts";
 import { PrismaBugReportRepository } from "./prisma.bug-report.repository.ts";
+import { PrismaPostgresHealthRepository } from "./prisma.datastore-health.repository.ts";
+import { PrismaAdminBackofficeRepository } from "./prisma.instance-admin.repository.ts";
 import { PrismaMigrationMembershipRepository } from "./prisma.migration-membership.repository.ts";
 import { PrismaOrganizationTenantSourceRepository } from "./prisma.organization-tenant-source.repository.ts";
 import { PrismaProcessManagerPurgeRepository } from "./prisma.process-manager-purge.repository.ts";
+import { ProcessOpsPrismaRepository } from "./prisma.process-ops.repository.ts";
 import { PrismaProjectTenantSourceRepository } from "./prisma.project-tenant-source.repository.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "./prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "./prisma.system-migration-state.repository.ts";
@@ -18,12 +22,29 @@ const claimedOpsRepositories = prismaRepositories({
   bugReports: PrismaBugReportRepository,
 });
 
-/** The claimed rows, eventing's own process store and the migration pass's Postgres reads. */
+/** The ones the live registry builds over Redis and ClickHouse. */
+type NotPostgres =
+  | "migrationLease"
+  | "snapshots"
+  | "metrics"
+  | "queues"
+  | "blobStore"
+  | "replay"
+  | "anomalyState"
+  | "storageReadings"
+  | "redisHealth"
+  | "events"
+  | "storageFootprint";
+
+/**
+ * The claimed rows, eventing's own process store, the migration pass's Postgres reads, and the
+ * operator's reads and edits across the platform's rows.
+ */
 export const PostgresOpsRepositories = {
   ...claimedOpsRepositories,
   create: (
     members: Parameters<typeof claimedOpsRepositories.create>[0],
-  ): Omit<OpsRepositories, "migrationLease"> => {
+  ): Omit<OpsRepositories, NotPostgres> => {
     const { prisma } = members;
     return {
       ...claimedOpsRepositories.create(members),
@@ -36,6 +57,10 @@ export const PostgresOpsRepositories = {
       projectTenants: PrismaProjectTenantSourceRepository.create(prisma),
       userTenants: PrismaUserTenantSourceRepository.create({ prisma }),
       organizationMemberTenants: PrismaOrganizationMemberTenantSourceRepository.create({ prisma }),
+      instanceAdmin: PrismaAdminBackofficeRepository.create(prisma),
+      impersonation: PrismaImpersonationRepository.create(prisma),
+      processFleet: ProcessOpsPrismaRepository.create({ prisma }),
+      postgresHealth: PrismaPostgresHealthRepository.create(prisma),
     };
   },
 };

@@ -1,13 +1,17 @@
 import {
   IDLE_STATUS,
+  type AdminOperationInput,
   type Anomaly,
   type BugReport,
+  type DetailSnapshot,
+  type LiveSnapshot,
   type ProcessAuditEntryView,
   type ReplayHistoryEntry,
   type SchedulerAuditEntryView,
   type ReplayStatus,
 } from "@langwatch/ops-contract";
 
+import type { ImpersonationTarget, ImpersonationWindow } from "../impersonation.repository.ts";
 import type { StorageStatsReading } from "../storage-stats-readings.repository.ts";
 
 /** One event as the in-memory event log keeps it, with the columns the explorer reads by. */
@@ -74,6 +78,25 @@ export class MemoryOpsStore {
   /** The operator trails, newest act last. */
   readonly processAudit: ProcessAuditEntryView[] = [];
   readonly schedulerAudit: SchedulerAuditEntryView[] = [];
+  /** The published snapshots and the writer lease over them; a lease here never lapses. */
+  readonly snapshots: {
+    live?: LiveSnapshot;
+    detail?: DetailSnapshot;
+    leaseToken?: string;
+    epoch: number;
+  } = { epoch: 0 };
+  /** The collector's persisted metrics window, and when each pipeline path was last seen. */
+  metricsState: string | undefined = undefined;
+  readonly knownPipelinePaths = new Map<string, number>();
+  /** The instance admin's rows, per resource, keyed by id. */
+  readonly adminRows = new Map<
+    AdminOperationInput["resource"],
+    Map<string, Record<string, unknown>>
+  >();
+  /** Who may be impersonated, who holds a second factor, and each session's window. */
+  readonly impersonationTargets = new Map<string, ImpersonationTarget>();
+  readonly secondFactorUserIds = new Set<string>();
+  readonly impersonationWindows = new Map<string, ImpersonationWindow>();
   replayStatus: ReplayStatus = { ...IDLE_STATUS };
   replayLockHolder: string | null = null;
   replayCancelled = false;

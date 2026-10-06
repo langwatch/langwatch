@@ -8,7 +8,7 @@ import {
 } from "@langwatch/ops-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
-import type { AdminBackofficeRepository } from "../repositories/admin-backoffice.repository.ts";
+import type { AdminBackofficeRepository } from "../repositories/instance-admin.repository.ts";
 import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes.rules.ts";
 import type { AdminAuditSink } from "./impersonation.service.ts";
 

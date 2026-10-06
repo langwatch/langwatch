@@ -23,6 +23,11 @@ import type {
   QueuePayloadDecoder,
   QueuePayloadDecoding,
 } from "../app/ops.app.ts";
+import { PrismaImpersonationRepository } from "../repositories/prisma/prisma.admin.repository.ts";
+import { PrismaAdminBackofficeRepository } from "../repositories/prisma/prisma.instance-admin.repository.ts";
+import { QueueRedisRepository } from "../repositories/redis/queue.repository.ts";
+import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
+import { BlobStoreRedisRepository } from "../repositories/redis/redis.blob-store.repository.ts";
 import type { OpsService } from "../services/ops.service.ts";
 
 const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
@@ -68,17 +73,23 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
   beforeAll(async () => {
     if (!redisUrl) return;
     redis = new Redis(redisUrl);
+    const database = prismaDouble({
+      user: { findUnique: async () => null },
+      session: { update: async () => ({}) },
+    });
     ops = OpsOperations.create({
-      database: prismaDouble({
-        user: { findUnique: async () => null },
-        session: { update: async () => ({}) },
-      }),
+      repositories: {
+        instanceAdmin: PrismaAdminBackofficeRepository.create(database),
+        impersonation: PrismaImpersonationRepository.create(database),
+        queues: QueueRedisRepository.create({ redis, payloads: new NoopQueuePayloadDecoder() }),
+        blobStore: BlobStoreRedisRepository.create(redis),
+        anomalyState: RedisAnomalyStateRepository.create(redis),
+      },
+      database,
       authz: createApiFixture<AuthzApi>(),
       audit: { record: async () => undefined },
       auditLog: createApiFixture<AuditLogApi>(),
       users: {} as UserApi,
-      redis,
-      queuePayloads: new NoopQueuePayloadDecoder(),
       scheduler: {
         schedules,
         projects,

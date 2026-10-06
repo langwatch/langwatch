@@ -258,11 +258,7 @@ import type { AnomalyDetectionTickResult } from "../eventing/ops-anomaly-detecti
 import { PLATFORM_OPERATOR_SEED_TENANT_ID } from "../eventing/ops-platform-operator-seed.process.ts";
 import type { ProjectionReplayRun } from "../eventing/ops-projection-replay.events.ts";
 import { ClickHouseClickHouseHealthRepository } from "../repositories/clickhouse/clickhouse.datastore-health.repository.ts";
-import { PrismaPostgresHealthRepository } from "../repositories/prisma/prisma.datastore-health.repository.ts";
 import { RedisAnomalyRateTrackerRepository } from "../repositories/redis/redis.anomaly-rate-tracker.repository.ts";
-import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
-import { RedisRedisHealthRepository } from "../repositories/redis/redis.datastore-health.repository.ts";
-import { RedisStorageStatsReadingsRepository } from "../repositories/redis/redis.storage-stats-readings.repository.ts";
 import { decideCloudOps } from "../rules/cloud-ops.rules.ts";
 import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
 import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules.ts";
@@ -765,13 +761,12 @@ export class OpsModule implements OpsApi {
       logger,
       config: setup.config,
       resources: setup.resources,
-      processStore: setup.repositories.processStore,
       repositories: setup.repositories,
       rateTracker,
       cloudOps,
     });
 
-    const { dependencies, config } = setup;
+    const { dependencies, config, repositories } = setup;
     const { members } = setup;
     const checkup = OpsCheckupService.create({
       facts: {
@@ -795,14 +790,14 @@ export class OpsModule implements OpsApi {
         lwql: dependencies.analytics,
       },
       repositories: {
-        postgres: PrismaPostgresHealthRepository.create(members.prisma),
+        postgres: repositories.postgresHealth,
         clickhouse: await setup.secrets.into(OpsModule.secrets.clickhouseUrl, (connectionUrl) =>
           ClickHouseClickHouseHealthRepository.create({
             clickhouse: members.clickhouse,
             connectionUrl,
           }),
         ),
-        redis: RedisRedisHealthRepository.create(members.redis),
+        redis: repositories.redisHealth,
       },
       channels: {
         usageReport: HttpUsageReportChannel.create(),
@@ -818,15 +813,15 @@ export class OpsModule implements OpsApi {
 
     const anomalies = AnomalyDetectorService.create({
       rateTracker,
-      anomalyState: RedisAnomalyStateRepository.create(members.redis),
+      anomalyState: repositories.anomalyState,
       featureFlags: dependencies.featureFlags,
     });
 
     // Every process exports the gauges; only the process running `ops_storage_stats` measures.
-    const storageReadings = RedisStorageStatsReadingsRepository.create({ redis: members.redis });
+    const storageReadings = repositories.storageReadings;
     StorageStatsGaugesService.create({ readings: storageReadings }).publish();
     const storageStats = StorageStatsCollectionService.create({
-      resolveInstances: async () => [sharedStorageStatsInstance(members.clickhouse)],
+      resolveInstances: async () => [sharedStorageStatsInstance(repositories.storageFootprint)],
       readings: storageReadings,
       collectBackups: setup.config.collectClickHouseBackupMetrics,
       logger,
@@ -840,7 +835,7 @@ export class OpsModule implements OpsApi {
     const app = OpsModule.fromInfrastructure({
       infrastructure,
       dependencies,
-      repositories: setup.repositories,
+      repositories,
       checkup,
       anomalies,
       storageStats,
