@@ -166,7 +166,9 @@ export const prismaTableCatalogue = {
   "SelfHostedInstance": "SelfHostedInstance",
   "SelfHostedInstanceReport": "SelfHostedInstanceReport",
   "WebPushSubscription": "WebPushSubscription",
-  "WebPushVapidKey": "WebPushVapidKey"
+  "WebPushVapidKey": "WebPushVapidKey",
+  "LangwatchUpgradeRun": "_langwatch_upgrade_run",
+  "LangwatchUpgradeStep": "_langwatch_upgrade_step"
 } as const;
 
 export const prismaModelFieldCatalogue = {
@@ -2772,6 +2774,31 @@ export const prismaModelFieldCatalogue = {
     "publicKey",
     "privateKeyEncrypted",
     "createdAt"
+  ],
+  "LangwatchUpgradeRun": [
+    "id",
+    "kind",
+    "release",
+    "startedAt",
+    "finishedAt",
+    "outcome",
+    "plan",
+    "report"
+  ],
+  "LangwatchUpgradeStep": [
+    "id",
+    "kind",
+    "release",
+    "mode",
+    "status",
+    "inferred",
+    "attempt",
+    "lastError",
+    "report",
+    "runId",
+    "startedAt",
+    "finishedAt",
+    "updatedAt"
   ]
 } as const;
 
@@ -3360,7 +3387,9 @@ export const prismaRelationCatalogue = {
   "SelfHostedInstance": {},
   "SelfHostedInstanceReport": {},
   "WebPushSubscription": {},
-  "WebPushVapidKey": {}
+  "WebPushVapidKey": {},
+  "LangwatchUpgradeRun": {},
+  "LangwatchUpgradeStep": {}
 } as const;
 
 export type PrismaTableModel = keyof typeof prismaTableCatalogue;
