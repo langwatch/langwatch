@@ -2,9 +2,10 @@
  * A scenario row inside an expanded run: the status circle, status label and the metrics it has.
  * @vitest-environment jsdom
  * @see specs/scenarios/suites-page-metrics-display.feature
+ * @see specs/features/suites/suite-list-view-status.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { ScenarioRunStatus, type ScenarioRunData } from "@langwatch/scenario-contract";
+import { ScenarioRunStatus, Verdict, type ScenarioRunData } from "@langwatch/scenario-contract";
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -56,6 +57,41 @@ describe("<ScenarioTargetRow/>", () => {
       expect(within(listRow).getByText("2.3s")).toBeInTheDocument();
       expect(listRow.textContent).not.toContain("$");
       expect(within(listRow).queryByText("⋅")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a run that passed with 4 of 5 criteria met", () => {
+    it("shows the status with its count and not a percentage", () => {
+      const row = renderRow(
+        runOf({
+          status: ScenarioRunStatus.SUCCESS,
+          results: {
+            verdict: Verdict.SUCCESS,
+            metCriteria: ["a", "b", "c", "d"],
+            unmetCriteria: ["e"],
+          },
+        }),
+      );
+
+      expect(within(row.parentElement!).getByText("Passed (4/5)")).toBeInTheDocument();
+      expect(row.textContent).not.toContain("100%");
+    });
+  });
+
+  describe("given a run that failed with 2 of 5 criteria met", () => {
+    it("shows the status with its count", () => {
+      const row = renderRow(
+        runOf({
+          status: ScenarioRunStatus.FAILED,
+          results: {
+            verdict: Verdict.FAILURE,
+            metCriteria: ["a", "b"],
+            unmetCriteria: ["c", "d", "e"],
+          },
+        }),
+      );
+
+      expect(within(row.parentElement!).getByText("Failed (2/5)")).toBeInTheDocument();
     });
   });
 });
