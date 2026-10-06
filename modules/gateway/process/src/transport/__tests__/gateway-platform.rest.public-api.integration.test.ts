@@ -438,6 +438,72 @@ describe("the gateway platform family's public wire", () => {
     });
   });
 
+  describe("given the virtual-key, budget and cache-rule lists", () => {
+    const lists = ["/virtual-keys", "/budgets", "/cache-rules"] as const;
+
+    /** The three paged reads, each recording the page size it was asked for. */
+    function pagedReads() {
+      const getVirtualKeyPage = vi.fn().mockResolvedValue([]);
+      const listBudgetPageWithHealth = vi
+        .fn()
+        .mockResolvedValue({ budgets: [], spendAvailable: true, scopeReach: new Map() });
+      const listCacheRulePage = vi.fn().mockResolvedValue([]);
+      const call = mount({
+        getVirtualKeyPage,
+        listBudgetPageWithHealth,
+        listCacheRulePage,
+        visibleToVirtualKeyCaller: async ({ virtualKeys }) => [...virtualKeys],
+        toVirtualKeySnakeDtos: async () => [],
+        groupMemberCounts: async () => new Map(),
+      });
+      const limitsAsked = () =>
+        [getVirtualKeyPage, listBudgetPageWithHealth, listCacheRulePage].flatMap((read) =>
+          read.mock.calls.map(([input]) => (input as { limit: number }).limit),
+        );
+      return {
+        call,
+        limitsAsked,
+        reads: [getVirtualKeyPage, listBudgetPageWithHealth, listCacheRulePage],
+      };
+    }
+
+    /** @scenario Every paged list refuses a page past the cap */
+    it("answers 422 validation_error for ?limit=201 and reads no row", async () => {
+      const { call, reads } = pagedReads();
+
+      const answers = await Promise.all(lists.map((path) => call("GET", `${path}?limit=201`)));
+
+      expect(answers.map((a) => [a.status, a.body.code])).toEqual(
+        lists.map(() => [422, "validation_error"]),
+      );
+      expect(reads.some((read) => read.mock.calls.length > 0)).toBe(false);
+    });
+
+    /** @scenario Every paged list refuses a page of no rows */
+    it("answers 422 validation_error for ?limit=0", async () => {
+      const { call } = pagedReads();
+
+      const answers = await Promise.all(lists.map((path) => call("GET", `${path}?limit=0`)));
+
+      expect(answers.map((a) => [a.status, a.body.code])).toEqual(
+        lists.map(() => [422, "validation_error"]),
+      );
+    });
+
+    /** @scenario A list that names no page size reads the default page */
+    it("reads 50 rows with no limit and 200 rows for the cap", async () => {
+      const unnamed = pagedReads();
+      await Promise.all(lists.map((path) => unnamed.call("GET", path)));
+      const capped = pagedReads();
+      await Promise.all(lists.map((path) => capped.call("GET", `${path}?limit=200`)));
+
+      expect([unnamed.limitsAsked(), capped.limitsAsked()]).toEqual([
+        [50, 50, 50],
+        [200, 200, 200],
+      ]);
+    });
+  });
+
   describe("given more virtual keys than fit in one page", () => {
     const rows = ["vk_5", "vk_4", "vk_3", "vk_2", "vk_1"].map(
       (id, index): GatewayVirtualKeyRecord => ({

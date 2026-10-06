@@ -15,8 +15,10 @@ import { PrismaGatewayProviderLabelRepository } from "./prisma.gateway-provider-
 import { PrismaGatewayRealtimeSessionRepository } from "./prisma.gateway-realtime-session.repository.ts";
 import { PrismaGatewayScopeResolutionRepository } from "./prisma.gateway-scope-resolution.repository.ts";
 import { PrismaGatewaySpendScopeRepository } from "./prisma.gateway-spend-scope.repository.ts";
+import { PrismaGatewayTraceDestinationReportRepository } from "./prisma.gateway-trace-destination-report.repository.ts";
 import { PrismaGatewayTraceExportKeyRepository } from "./prisma.gateway-trace-export-key.repository.ts";
 import { PrismaGatewayTransactionRepository } from "./prisma.gateway-transaction.repository.ts";
+import { PrismaGatewayVirtualKeyConfigBackfillRepository } from "./prisma.gateway-virtual-key-config-backfill.repository.ts";
 import { PrismaVirtualKeyDirectBudgetRepository } from "./prisma.gateway-virtual-key-direct-budget.repository.ts";
 import { PrismaVirtualKeyAuthorizationRepository } from "./prisma.virtual-key-authorization.repository.ts";
 import { PrismaGatewayVirtualKeyRepository } from "./prisma.virtual-key.repository.ts";
@@ -42,6 +44,8 @@ type GatewayPostgresRepositories = Pick<
   | "realtimeSessions"
   | "internalStore"
   | "traceExportKeys"
+  | "traceDestinationReport"
+  | "virtualKeyConfigBackfill"
 >;
 
 /** Keys, budgets, rules and sessions over the one guarded Postgres connection. */
@@ -86,6 +90,12 @@ export class PostgresGatewayRepositories {
       realtimeSessions: PrismaGatewayRealtimeSessionRepository.create({ database: prisma }),
       internalStore: PrismaGatewayInternalStoreRepository.create({ database: prisma }),
       traceExportKeys: PrismaGatewayTraceExportKeyRepository.create({ prisma, cipher: encryption }),
+      traceDestinationReport: PrismaGatewayTraceDestinationReportRepository.create({
+        database: prisma,
+      }),
+      virtualKeyConfigBackfill: PrismaGatewayVirtualKeyConfigBackfillRepository.create({
+        database: prisma,
+      }),
     };
   }
 }

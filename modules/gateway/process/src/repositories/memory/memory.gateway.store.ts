@@ -22,6 +22,15 @@ type MemoryGatewayGroup = {
 /** A team as gateway reads it; the team module owns the real row. */
 type MemoryGatewayTeam = { id: string; organizationId: string; name: string; slug: string };
 
+/** A project as the trace-destination report reads it; the project module owns the real row. */
+type MemoryGatewayProject = {
+  id: string;
+  teamId: string;
+  kind?: string;
+  archivedAt?: Instant | null;
+  createdAt?: Instant;
+};
+
 /** A person and the organizations they are a member of; the auth module owns the real rows. */
 type MemoryGatewayUser = {
   id: string;
@@ -60,7 +69,7 @@ export type MemoryGatewaySeed = Readonly<{
   groupMemberships?: readonly { groupId: string; userId: string }[];
   modelProviders?: readonly MemoryGatewayModelProvider[];
   teams?: readonly MemoryGatewayTeam[];
-  projects?: readonly { id: string; teamId: string }[];
+  projects?: readonly MemoryGatewayProject[];
   users?: readonly MemoryGatewayUser[];
   organizations?: readonly { id: string; name: string; slug: string }[];
   routingPolicies?: readonly MemoryGatewayRoutingPolicy[];
@@ -96,7 +105,7 @@ export class MemoryGatewayStore {
   readonly groupMemberships: readonly { groupId: string; userId: string }[];
   readonly modelProviders: readonly MemoryGatewayModelProvider[];
   readonly teams: readonly MemoryGatewayTeam[];
-  readonly projects: readonly { id: string; teamId: string }[];
+  readonly projects: readonly MemoryGatewayProject[];
   readonly users: readonly MemoryGatewayUser[];
   readonly organizations: readonly { id: string; name: string; slug: string }[];
   readonly routingPolicies: readonly MemoryGatewayRoutingPolicy[];

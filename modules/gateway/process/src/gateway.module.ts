@@ -19,6 +19,8 @@ import {
   GatewayBudgetChangeDedupeService,
   type BudgetChangeEventDedupeService,
 } from "./services/gateway-budget-change-dedupe.service.ts";
+import { TraceDestinationReportTask } from "./tasks/trace-destination-report.task.ts";
+import { VirtualKeyConfigBackfillTask } from "./tasks/virtual-key-config-backfill.task.ts";
 import { agentCacheRest } from "./transport/agent-cache.rest.ts";
 import { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
 import { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
@@ -55,6 +57,12 @@ export const gatewayProcessModule = defineProcessModule("gateway")
   .withEventing(gatewayGovernanceEventsEventing)
   .withEventing(gatewaySpendEventing)
   .withEventing(gatewayRealtimeSessionEventing)
+  .withTasks(({ repositories }) => [
+    TraceDestinationReportTask.create({ repository: () => repositories.traceDestinationReport }),
+    VirtualKeyConfigBackfillTask.create({
+      repository: () => repositories.virtualKeyConfigBackfill,
+    }),
+  ])
   .withTransportFacts(({ app }) => {
     if (!(app instanceof GatewayModule)) {
       throw new TypeError("Gateway transport requires its constructed application");

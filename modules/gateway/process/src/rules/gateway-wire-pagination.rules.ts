@@ -13,9 +13,6 @@ import { Temporal, toDate, type Instant } from "@langwatch/time";
 
 const CURSOR_SEPARATOR = "\x00";
 
-export const PAGE_LIMIT_DEFAULT = 50;
-export const PAGE_LIMIT_MAX = 200;
-
 /** One column of the sort key, most significant first. */
 interface KeysetColumn {
   name: string;

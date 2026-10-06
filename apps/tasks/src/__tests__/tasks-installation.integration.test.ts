@@ -138,6 +138,7 @@ const isTask = (contribution: unknown): contribution is Task => contribution ins
 
 describe("the tasks process installation", () => {
   /** @scenario "Every installed module boots in the tasks role over memory stores" */
+  /** @scenario "The gateway offers its operator tasks to the tasks process" */
   it("boots every installed module and lists every task the modules declared", async () => {
     const { runtime } = await bootTasks();
 
@@ -153,6 +154,8 @@ describe("the tasks process installation", () => {
         "stripe-prices-sync",
         "dataset-content-backfill",
         "demo-data",
+        "trace-destination-report",
+        "virtual-key-config-backfill",
         "model-registry-sync",
         "model-provider-migrate-credentials",
         "model-provider-migrate-custom-models",

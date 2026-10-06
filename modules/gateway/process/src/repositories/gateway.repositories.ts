@@ -18,8 +18,10 @@ import type { GatewayScopeResolutionRepository } from "./gateway-scope-resolutio
 import type { GatewaySpendEventsRepository } from "./gateway-spend-events.repository.ts";
 import type { GatewaySpendFoldCacheRepository } from "./gateway-spend-fold-cache.repository.ts";
 import type { GatewaySpendScopeRepository } from "./gateway-spend-scope.repository.ts";
+import type { GatewayTraceDestinationReportRepository } from "./gateway-trace-destination-report.repository.ts";
 import type { GatewayTraceExportKeyRepository } from "./gateway-trace-export-key.repository.ts";
 import type { GatewayTransactionRepository } from "./gateway-transaction.repository.ts";
+import type { GatewayVirtualKeyConfigBackfillRepository } from "./gateway-virtual-key-config-backfill.repository.ts";
 import type { VirtualKeyDirectBudgetRepository } from "./gateway-virtual-key-direct-budget.repository.ts";
 import type { GatewayVirtualKeyRepository } from "./gateway-virtual-key.repository.ts";
 import type { VirtualKeyAuthorizationRepository } from "./virtual-key-authorization.repository.ts";
@@ -57,6 +59,10 @@ export interface GatewayRepositories {
   readonly realtimeSessions: GatewayRealtimeSessionRepository;
   readonly internalStore: GatewayInternalStoreRepository;
   readonly traceExportKeys: GatewayTraceExportKeyRepository;
+  /** The read behind the `trace-destination-report` task. */
+  readonly traceDestinationReport: GatewayTraceDestinationReportRepository;
+  /** The reads and writes behind the `virtual-key-config-backfill` task. */
+  readonly virtualKeyConfigBackfill: GatewayVirtualKeyConfigBackfillRepository;
   /** The budget ledger every debit lands in and every health figure reads. */
   readonly budgetSpend: GatewayBudgetSpendRepository;
   readonly principalSpend: GatewayPrincipalSpendRepository;
