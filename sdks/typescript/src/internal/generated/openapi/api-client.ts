@@ -15670,6 +15670,10 @@ export interface operations {
                         finished_at?: number | null;
                         stopped_at?: number | null;
                     };
+                    expected?: {
+                        dataset: number;
+                        evaluations: number;
+                    } | null;
                 };
             };
         };
@@ -17040,6 +17044,18 @@ export interface operations {
                             updatedAt: number;
                             finishedAt?: number | null;
                             stoppedAt?: number | null;
+                        };
+                        /** @description What is stored against what the run reported. Results are stored after they are reported, so a read can hold part of a run: `complete` is false until the run has ended and every reported row and evaluation is stored. `expected` is null when the run reported no counts */
+                        completeness: {
+                            complete: boolean;
+                            dataset: {
+                                received: number;
+                                expected: number | null;
+                            };
+                            evaluations: {
+                                received: number;
+                                expected: number | null;
+                            };
                         };
                     };
                 };

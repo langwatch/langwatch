@@ -37930,6 +37930,32 @@
                         ]
                       }
                     }
+                  },
+                  "expected": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "dataset": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "evaluations": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "dataset",
+                          "evaluations"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -41261,6 +41287,75 @@
                         "updatedAt"
                       ],
                       "additionalProperties": false
+                    },
+                    "completeness": {
+                      "type": "object",
+                      "properties": {
+                        "complete": {
+                          "type": "boolean"
+                        },
+                        "dataset": {
+                          "type": "object",
+                          "properties": {
+                            "received": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "expected": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "received",
+                            "expected"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "evaluations": {
+                          "type": "object",
+                          "properties": {
+                            "received": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "expected": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "received",
+                            "expected"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "complete",
+                        "dataset",
+                        "evaluations"
+                      ],
+                      "additionalProperties": false,
+                      "description": "What is stored against what the run reported. Results are stored after they are reported, so a read can hold part of a run: `complete` is false until the run has ended and every reported row and evaluation is stored. `expected` is null when the run reported no counts"
                     }
                   },
                   "required": [
@@ -41269,7 +41364,8 @@
                     "projectId",
                     "dataset",
                     "evaluations",
-                    "timestamps"
+                    "timestamps",
+                    "completeness"
                   ],
                   "additionalProperties": false
                 }
