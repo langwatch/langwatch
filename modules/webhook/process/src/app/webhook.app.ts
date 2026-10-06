@@ -41,6 +41,7 @@ import type { WebhookDispatchResult as DeliveryDispatchResult } from "../rules/w
 import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
 import { webhookEndpointConfiguration } from "../rules/webhook-endpoint-policy.rules.ts";
 import { WebhookAccessService } from "../services/webhook-access.service.ts";
+import { WebhookDeliveryRequestService } from "../services/webhook-delivery-request.service.ts";
 import {
   WebhookDeliveryService,
   type WebhookDeliveryProcessDeps,
@@ -401,6 +402,8 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
   };
   appendReplayToEndpointStream: WebhookApiContract["appendReplayToEndpointStream"] = (input) =>
     this.#requeue.appendReplay(input);
+  requestDelivery: WebhookApiContract["requestDelivery"] = (input) =>
+    this.#deliveryRequests.requestDelivery(input);
 
   /** `POST /api/gateway/v1/spend-events/replay`, over this module's own endpoints and log. */
   answerSpendReplay: WebhookSpendReplayDoorApi["answerSpendReplay"] = (input) =>
@@ -411,6 +414,15 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
       endpoints: this.#dependencies.endpoints,
       configuration: webhookEndpointConfiguration(),
     });
+  }
+
+  get #deliveryRequests(): WebhookDeliveryRequestService {
+    const { endpoints, endpointStream } = this.#dependencies;
+    const getPlan = this.#delivery?.getPlan;
+    if (!endpointStream || !getPlan) {
+      throw new Error("webhook requestDelivery needs the process store eventing supplies");
+    }
+    return WebhookDeliveryRequestService.create({ endpoints, getPlan, stream: endpointStream });
   }
 
   get #requeue(): WebhookEndpointRequeueService {
