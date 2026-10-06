@@ -3,43 +3,49 @@
  * the body: 401 ahead of any 400 or 422, in the `{ message }` the tool parses.
  * @vitest-environment node
  */
-import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import { bindRestCredential, BearerIdentity, RestHost } from "@langwatch/api/rest";
 import { describe, expect, it } from "vitest";
 
 import { createOpsTestApp } from "../../app/__tests__/ops.fixture.ts";
-import { extractBearerSecret } from "../../rules/ops-door.rules.ts";
-import { operatorSecret, opsClickHouseExplainRest } from "../ops-clickhouse-explain.rest.ts";
+import { opsClickHouseExplainRest } from "../ops-clickhouse-explain.rest.ts";
 
 const SECRET = "operator-secret";
+const UNAUTHORIZED = { message: "Unauthorized" };
 
-function mountApp() {
-  const { app } = createOpsTestApp({ members: { findOpsApiKey: () => SECRET } });
-  const runtime = createRestRuntime({
-    identity: {
-      authenticate: () => {
-        throw new Error("The operator door resolves its own secret.");
-      },
+/** The route as the ops module mounts it, its door built from `findOpsApiKey`. */
+function mountApp(configured: string | null = SECRET) {
+  const { app } = createOpsTestApp({ members: { findOpsApiKey: () => configured } });
+  const closed = BearerIdentity.create({ name: "unbound", token: void 0 });
+  const host = RestHost.create({
+    identities: {
+      project: closed,
+      organization: closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
+      browser: closed,
     },
+    bearers: () => closed,
+    audit: { record: async () => {} },
   });
 
-  return runtime.mount(opsClickHouseExplainRest.router(), {
-    app: () => app,
-    credential: "public",
-    onError: (error, context) => canonicalErrorResponse(error, context),
-    facts: [
-      bindRestMiddleware(operatorSecret, (context) => {
-        app.authorizeOperatorSecret({
-          presented: extractBearerSecret(context.req.header("authorization") ?? null),
-        });
-
-        return null;
-      }),
-    ],
+  host.mount(opsClickHouseExplainRest.router(), () => app, {
+    facts: [bindRestCredential("internal_secret", () => app.operatorDoor)],
   });
+
+  return host.app;
 }
 
-const explain = (body: string, authorization?: string) =>
-  mountApp().request("/api/ops/clickhouse/explain", {
+const explain = ({
+  body,
+  authorization,
+  configured,
+}: {
+  body: string;
+  authorization?: string;
+  configured?: string | null;
+}) =>
+  mountApp(configured).request("/api/ops/clickhouse/explain", {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -50,43 +56,53 @@ const explain = (body: string, authorization?: string) =>
 
 describe("POST /api/ops/clickhouse/explain", () => {
   describe("when the caller presents no secret", () => {
-    it("answers 401 to a body that is not JSON", async () => {
-      const response = await explain("not json");
+    /** @scenario "The operator EXPLAIN door refuses a caller without the secret before the body" */
+    it("answers main's 401 to a body that is not JSON and to one that fails the schema", async () => {
+      const malformed = await explain({ body: "not json" });
+      const invalid = await explain({ body: "{}" });
 
-      expect(response.status).toBe(401);
-      await expect(response.json()).resolves.toEqual({ message: "Unauthorized" });
-    });
-
-    it("answers 401 to a body that fails the schema", async () => {
-      const response = await explain("{}");
-
-      expect(response.status).toBe(401);
+      expect(malformed.status).toBe(401);
+      await expect(malformed.json()).resolves.toEqual(UNAUTHORIZED);
+      expect(invalid.status).toBe(401);
+      await expect(invalid.json()).resolves.toEqual(UNAUTHORIZED);
     });
   });
 
   describe("when the caller presents the wrong secret", () => {
-    it("answers 401", async () => {
-      const response = await explain("{}", "Bearer operator-secreT");
+    /** @scenario "A wrong operator secret is refused with main's 401" */
+    it("answers main's 401", async () => {
+      const response = await explain({ body: "{}", authorization: "Bearer operator-secreT" });
 
       expect(response.status).toBe(401);
-      await expect(response.json()).resolves.toEqual({ message: "Unauthorized" });
+      expect(response.headers.get("content-type")).toContain("application/json");
+      await expect(response.json()).resolves.toEqual(UNAUTHORIZED);
+    });
+  });
+
+  describe("when the deployment set no operator secret, or a blank one", () => {
+    /** @scenario "A deployment without an operator secret refuses every call with main's 401" */
+    it("answers main's 401 even to a caller presenting nothing or a blank bearer", async () => {
+      const unset = await explain({ body: "{}", configured: null });
+      const blank = await explain({ body: "{}", authorization: "Bearer  ", configured: "  " });
+      const empty = await explain({ body: "{}", authorization: "Bearer ", configured: "" });
+
+      for (const response of [unset, blank, empty]) {
+        expect(response.status).toBe(401);
+        await expect(response.json()).resolves.toEqual(UNAUTHORIZED);
+      }
     });
   });
 
   describe("when the caller presents the secret", () => {
-    it("answers 400 to a body that is not JSON", async () => {
-      const response = await explain("not json", `Bearer ${SECRET}`);
+    /** @scenario "A caller with the operator secret has the body judged" */
+    it("answers 400 to a body that is not JSON and 422 naming the field that failed", async () => {
+      const malformed = await explain({ body: "not json", authorization: `Bearer ${SECRET}` });
+      const invalid = await explain({ body: "{}", authorization: `Bearer ${SECRET}` });
 
-      expect(response.status).toBe(400);
-      await expect(response.json()).resolves.toEqual({ message: "request body must be JSON" });
-    });
-
-    it("answers 422 naming the field that failed", async () => {
-      const response = await explain("{}", `Bearer ${SECRET}`);
-
-      expect(response.status).toBe(422);
-      const body: unknown = await response.json();
-      expect(body).toEqual({ message: expect.stringMatching(/^query: /) });
+      expect(malformed.status).toBe(400);
+      await expect(malformed.json()).resolves.toEqual({ message: "request body must be JSON" });
+      expect(invalid.status).toBe(422);
+      await expect(invalid.json()).resolves.toEqual({ message: expect.stringMatching(/^query: /) });
     });
   });
 });

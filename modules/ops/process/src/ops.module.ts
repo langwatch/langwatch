@@ -1,4 +1,4 @@
-import { bindRestMiddleware } from "@langwatch/api/rest";
+import { bindRestCredential, bindRestMiddleware } from "@langwatch/api/rest";
 import { defineProcessModule } from "@langwatch/process";
 
 import { OpsModule } from "#app/ops.app";
@@ -9,7 +9,6 @@ import { storageStatsEventing } from "#eventing/ops-storage-stats.pipeline";
 import { systemMigrationsEventing } from "#eventing/ops-system-migrations.pipeline";
 import { usageReportEventing } from "#eventing/ops-usage-report.pipeline";
 import { opsRepositories } from "#repositories/ops-repositories.registry";
-import { extractBearerSecret } from "#rules/ops-door.rules";
 import { GrantPlatformOperatorTask } from "#tasks/grant-platform-operator.task";
 import { ProcessManagerPurgeTask } from "#tasks/process-manager-purge.task";
 import { SystemMigrationsPassTask } from "#tasks/system-migrations-pass.task";
@@ -18,7 +17,7 @@ import { checkupRest } from "#transport/checkup.rest";
 import { checkupTrpcTransport } from "#transport/checkup.trpc";
 import { bugReportCredential, opsBugReportRest } from "#transport/ops-bug-report.rest";
 import { opsBugReportTrpcTransport } from "#transport/ops-bug-report.trpc";
-import { operatorSecret, opsClickHouseExplainRest } from "#transport/ops-clickhouse-explain.rest";
+import { opsClickHouseExplainRest } from "#transport/ops-clickhouse-explain.rest";
 import { opsTrpcTransport } from "#transport/ops.trpc";
 
 export const opsProcessModule = defineProcessModule("ops")
@@ -37,16 +36,17 @@ export const opsProcessModule = defineProcessModule("ops")
   // failed - so the credential only enriches a report, at the same
   // precedence the project door reads a token at (Basic, Bearer,
   // X-Auth-Token). Unverified: a bad token still files the report. The
-  // operator secret refuses (constant time, in the app) before the body is read.
-  .withTransportFacts(({ app }) => [
-    bindRestMiddleware(bugReportCredential, (context) => extractRequestCredential(context.req.raw)),
-    bindRestMiddleware(operatorSecret, (context) => {
-      const presented = extractBearerSecret(context.req.header("authorization") ?? null);
-      app.authorizeOperatorSecret({ presented });
-
-      return null;
-    }),
-  ])
+  // EXPLAIN door compares the operator secret before the body is read.
+  .withTransportFacts(({ app }) => {
+    if (!(app instanceof OpsModule))
+      throw new TypeError("Ops transport requires its constructed application");
+    return [
+      bindRestMiddleware(bugReportCredential, (context) =>
+        extractRequestCredential(context.req.raw),
+      ),
+      bindRestCredential("internal_secret", () => app.operatorDoor),
+    ];
+  })
   .withEventing(usageReportEventing)
   .withEventing(anomalyDetectionEventing)
   .withEventing(storageStatsEventing)

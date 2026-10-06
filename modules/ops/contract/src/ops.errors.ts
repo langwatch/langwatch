@@ -173,16 +173,6 @@ export class OpsOperatorRequiredError extends HandledError {
   }
 }
 
-/** No operator secret was presented, or the presented one did not match. */
-export class OpsOperatorSecretRequiredError extends HandledError {
-  declare readonly code: "unauthorized";
-
-  constructor() {
-    super("unauthorized", "Unauthorized", { httpStatus: 401, fault: "customer" });
-    this.name = "OpsOperatorSecretRequiredError";
-  }
-}
-
 /** Intake allows ten reports an hour per caller; the eleventh waits. */
 export class BugReportRateLimitedError extends HandledError {
   constructor() {

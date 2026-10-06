@@ -469,11 +469,6 @@ export interface OpsApi {
   admitCloudAdmin(operator: OpsOperator | null): Promise<OpsOperator>;
   /** Whether Cloud admin is on here: the one answer the browser's public config projects. */
   offersCloudOps(): boolean;
-  /**
-   * Refuses a caller who did not present this deployment's operator secret.
-   * Compared in constant time, and refused outright where no secret is set.
-   */
-  authorizeOperatorSecret(input: { presented: string | null }): void;
   /** One operator EXPLAIN, guardrails and fail-closed rule included. */
   explainClickHouseQuery(input: OpsExplainRequest): Promise<OpsExplainAnswer>;
   /** One EXPLAIN as the operator door received it, answered in the bodies the tool parses. */

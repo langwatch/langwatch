@@ -1,8 +1,8 @@
-import { timingSafeEqual } from "node:crypto";
-
 import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { AnnotationApi } from "@langwatch/annotation-contract";
 import { ApiKeyApi, type ApiKeyApi as ApiKeyApiContract } from "@langwatch/api-key-contract";
+import type { RestIdentity } from "@langwatch/api/hosting";
+import { BearerIdentity } from "@langwatch/api/rest";
 /**
  * Operator back office application: holds every capability the feature api reaches, and centralizes
  * rules the transport was deciding separately.
@@ -89,7 +89,6 @@ import {
   OpsConfirmationRequiredError,
   OpsImpersonatedOperatorRefusedError,
   OpsOperatorRequiredError,
-  OpsOperatorSecretRequiredError,
   OpsOperatorSessionRequiredError,
   OpsUnknownFeatureFlagError,
   type OpsOperatorPermission,
@@ -246,6 +245,7 @@ import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickho
 import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
 import { toCallerKey, toDoorStatus, toExplainDoorAnswer } from "#rules/ops-door.rules";
+import { OPS_OPERATOR_DOOR } from "#rules/ops-intake-refusal.rules";
 import { BugReportInboxService } from "#services/bug-report-inbox.service";
 import { BugReportIntakeService } from "#services/bug-report-intake.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
@@ -617,9 +617,8 @@ export interface OpsAppInfrastructure {
   /** The ClickHouse account an operator EXPLAIN runs as. */
   explainClients: OpsExplainClients;
   /**
-   * The operator secret a caller presents, read PER REQUEST so a deployment
-   * that rotates it without a restart is honoured. Null where this deployment
-   * configured none, which refuses every call.
+   * The operator secret the EXPLAIN door compares a caller's bearer with. Null
+   * where this deployment configured none, which refuses every call.
    */
   findOpsApiKey(): string | null;
   /** The product-analytics target this deployment configured, for peers that send to it. */
@@ -1484,20 +1483,14 @@ export class OpsModule implements OpsApi {
   // -- the operator-only ClickHouse EXPLAIN ----------------------------------
 
   /**
-   * The operator secret, compared in constant time. A deployment that
-   * configured none refuses every call: a blank expected secret must never
-   * match a blank presented one.
+   * The EXPLAIN route's door: this deployment's operator secret as a bearer.
+   * A deployment that set none refuses every call, as one that set it blank does.
    */
-  authorizeOperatorSecret(input: { presented: string | null }): void {
-    const expected = this.#dependencies.findOpsApiKey();
-
-    if (!expected || !input.presented) throw new OpsOperatorSecretRequiredError();
-
-    const presented = Buffer.from(input.presented);
-    const secret = Buffer.from(expected);
-
-    if (presented.length !== secret.length) throw new OpsOperatorSecretRequiredError();
-    if (!timingSafeEqual(presented, secret)) throw new OpsOperatorSecretRequiredError();
+  get operatorDoor(): RestIdentity {
+    return BearerIdentity.create({
+      name: OPS_OPERATOR_DOOR,
+      token: this.#dependencies.findOpsApiKey() ?? void 0,
+    });
   }
 
   /** One EXPLAIN, wrapped so it cannot execute, audited by its shape. */
