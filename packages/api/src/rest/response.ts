@@ -3,6 +3,7 @@ import {
   HandledError,
   handledErrorFaultSchema,
   type HandledErrorFault,
+  isTransientRefusal,
   isZodLikeError,
   type SerializedReason,
   ValidationError,
@@ -831,7 +832,7 @@ export function legacyErrorOf({
 /**
  * The envelope for a handled error: its own code, status, meta and reason chain, except a
  * 5xx whose class does not declare the fault the caller's, which answers the opaque body
- * (ruling 2026-10-05). A handled message is customer-safe by construction (ADR-045).
+ * (ruling 2026-10-05) unless it is a transient refusal (rulings 2026-10-06, round 9, CH-1).
  */
 function handledErrorEnvelope(
   error: HandledError,
@@ -843,7 +844,7 @@ function handledErrorEnvelope(
     isValidation ? VALIDATION_ERROR_STATUS : (error.httpStatus ?? 500)
   ) as ContentfulStatusCode;
 
-  if (status >= 500 && error.fault !== "customer") {
+  if (status >= 500 && error.fault !== "customer" && !isTransientRefusal(error)) {
     return {
       status,
       body: apiErrorBody({

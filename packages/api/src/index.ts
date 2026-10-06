@@ -35,6 +35,7 @@ export {
 } from "./errors.ts";
 
 export type { RateLimiter, ResponseCache, UpgradeHandler } from "./ports.ts";
+export { jsonTextField } from "./json-text-field.ts";
 export { ConnectUpgradeRouter } from "./ports.ts";
 export {
   WebSocketHost,

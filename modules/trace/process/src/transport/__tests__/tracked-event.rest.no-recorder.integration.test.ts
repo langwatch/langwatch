@@ -68,8 +68,8 @@ describe("given a process with no tracked-event recorder", () => {
         const answer = await post({ family, path });
 
         expect({ name, status: answer.status }).toEqual({ name, status: 503 });
-        // The §12 5xx mask carries a platform fault as `internal_error` (held question CH-1).
-        expect({ name, code: answer.body.code }).toEqual({ name, code: "internal_error" });
+        // A transient 503 refusal keeps its code (rulings 2026-10-06, round 9, CH-1).
+        expect({ name, code: answer.body.code }).toEqual({ name, code: "service_unavailable" });
         expect(answer.body.message).not.toBe("Event tracked");
       }
     });

@@ -164,7 +164,7 @@ Feature: The REST runtime renders what a transport may not hand-roll
 
     @unit
     Scenario: A 5xx the class does not declare the caller's stays masked
-      Given a HandledError declaring a platform fault at 503, a HandledError at 503 declaring no fault, or a plain thrown Error
+      Given a HandledError declaring a platform fault at 503 outside the transient allowlist (transient-refusals.feature), a HandledError at 503 declaring no fault, or a plain thrown Error
       When the REST boundary renders it
       Then the answer is the opaque internal_error body at the error's status, with no meta
 

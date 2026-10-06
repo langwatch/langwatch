@@ -79,6 +79,7 @@ Feature: Tracked-event validation answers the caller
     Given a process that registered no trace command queue
     When a valid event is posted to either tracked-event URL
     Then the response status is 503
+    And the response code is "service_unavailable"
     And the response is not the "Event tracked" confirmation
     And the event is not recorded
 
