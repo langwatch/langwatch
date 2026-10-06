@@ -33,14 +33,28 @@ func (g *schemaGen) value(s map[string]any, depth int) any {
 	if enum, ok := s["enum"].([]any); ok && len(enum) > 0 {
 		return enum[g.r.IntN(len(enum))]
 	}
+	if next := g.composed(s); next != nil {
+		return g.value(next, depth+1)
+	}
+	return g.typed(s, depth)
+}
+
+// composed is the schema an anyOf or oneOf draws, or allOf merges; nil when
+// s composes nothing.
+func (g *schemaGen) composed(s map[string]any) map[string]any {
 	for _, key := range []string{"anyOf", "oneOf"} {
 		if alts := nonNull(schemas(s[key])); len(alts) > 0 {
-			return g.value(alts[g.r.IntN(len(alts))], depth+1)
+			return alts[g.r.IntN(len(alts))]
 		}
 	}
 	if all := schemas(s["allOf"]); len(all) > 0 {
-		return g.value(mergeAll(s, all), depth+1)
+		return mergeAll(s, all)
 	}
+	return nil
+}
+
+// typed draws a value for a schema by its type; a string when it has none.
+func (g *schemaGen) typed(s map[string]any, depth int) any {
 	switch schemaType(s) {
 	case "object":
 		return g.object(s, depth)
@@ -270,20 +284,7 @@ func mergeAll(base map[string]any, all []map[string]any) map[string]any {
 	props := map[string]any{}
 	var required []any
 	for _, s := range append([]map[string]any{base}, all...) {
-		for k, v := range s {
-			switch k {
-			case "allOf":
-			case "properties":
-				m, _ := v.(map[string]any)
-				for name, p := range m {
-					props[name] = p
-				}
-			case "required":
-				required = append(required, asSlice(v)...)
-			default:
-				out[k] = v
-			}
-		}
+		required = mergeInto(mergeTarget{out: out, props: props}, s, required)
 	}
 	if len(props) > 0 {
 		out["properties"], out["type"] = props, "object"
@@ -292,4 +293,29 @@ func mergeAll(base map[string]any, all []map[string]any) map[string]any {
 		out["required"] = required
 	}
 	return out
+}
+
+// mergeTarget is the schema mergeAll builds and the properties it unions.
+type mergeTarget struct {
+	out, props map[string]any
+}
+
+// mergeInto folds one allOf branch into target, returning the required list
+// with the branch's own appended.
+func mergeInto(target mergeTarget, s map[string]any, required []any) []any {
+	for k, v := range s {
+		switch k {
+		case "allOf":
+		case "properties":
+			m, _ := v.(map[string]any)
+			for name, p := range m {
+				target.props[name] = p
+			}
+		case "required":
+			required = append(required, asSlice(v)...)
+		default:
+			target.out[k] = v
+		}
+	}
+	return required
 }

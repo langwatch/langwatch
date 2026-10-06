@@ -186,6 +186,7 @@ func (s *Server) serveS3(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "origin not allowed", http.StatusForbidden)
 		return
 	}
+	x := exchange{w: w, r: r, requestID: requestID}
 	bucket, key, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
 	obj := object{bucket: bucket, key: key}
 	switch {
@@ -196,23 +197,29 @@ func (s *Server) serveS3(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/_sim/", http.StatusFound)
 		return
 	case bucket == "":
-		s.fail(w, r, requestID, obj.fail(http.StatusNotImplemented, "NotImplemented", "storagesim serves path-style bucket requests only"))
+		x.fail(obj.fail(http.StatusNotImplemented, "NotImplemented", "storagesim serves path-style bucket requests only"))
 		return
 	}
 	if e := validate(obj); e != nil {
-		s.fail(w, r, requestID, *e)
+		x.fail(*e)
 		return
 	}
 	if e := s.authenticate(r, obj); e != nil {
-		s.fail(w, r, requestID, *e)
+		x.fail(*e)
 		return
 	}
 	if key == "" {
-		s.serveBucket(w, r, requestID, obj)
+		s.serveBucket(x, obj)
 		return
 	}
-	if !s.bucketExists(bucket) {
-		s.fail(w, r, requestID, obj.noSuchBucket())
+	s.serveObject(x, obj)
+}
+
+// serveObject answers PutObject, GetObject, HeadObject and DeleteObject.
+func (s *Server) serveObject(x exchange, obj object) {
+	w, r := x.w, x.r
+	if !s.bucketExists(obj.bucket) {
+		x.fail(obj.noSuchBucket())
 		return
 	}
 	var e *s3Error
@@ -228,7 +235,7 @@ func (s *Server) serveS3(w http.ResponseWriter, r *http.Request) {
 		e = new(obj.fail(http.StatusMethodNotAllowed, "MethodNotAllowed", "The specified method is not allowed against this resource."))
 	}
 	if e != nil {
-		s.fail(w, r, requestID, *e)
+		x.fail(*e)
 	}
 }
 
@@ -259,8 +266,9 @@ func (s *Server) bucketExists(bucket string) bool {
 }
 
 // serveBucket answers HeadBucket and CreateBucket.
-func (s *Server) serveBucket(w http.ResponseWriter, r *http.Request, requestID string, obj object) {
-	switch r.Method {
+func (s *Server) serveBucket(x exchange, obj object) {
+	w := x.w
+	switch x.r.Method {
 	case http.MethodPut:
 		s.bucketMu.Lock()
 		if s.buckets != nil {
@@ -271,12 +279,12 @@ func (s *Server) serveBucket(w http.ResponseWriter, r *http.Request, requestID s
 		w.WriteHeader(http.StatusOK)
 	case http.MethodHead:
 		if !s.bucketExists(obj.bucket) {
-			s.fail(w, r, requestID, obj.noSuchBucket())
+			x.fail(obj.noSuchBucket())
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 	default:
-		s.fail(w, r, requestID, obj.fail(http.StatusNotImplemented, "NotImplemented", "storagesim does not list or configure buckets"))
+		x.fail(obj.fail(http.StatusNotImplemented, "NotImplemented", "storagesim does not list or configure buckets"))
 	}
 }
 
@@ -463,7 +471,7 @@ func (s *Server) getObject(w http.ResponseWriter, r *http.Request, obj object) *
 	h := w.Header()
 	h.Set("Content-Type", m.ContentType)
 	h.Set("ETag", m.ETag)
-	setSafeServing(h, m.ContentType, obj.key, false)
+	setSafeServing(h, m.ContentType, obj.key)
 	http.ServeContent(w, r, "", info.ModTime(), f)
 	return nil
 }
@@ -480,13 +488,18 @@ var inlineTypes = []string{"image/png", "image/jpeg", "image/gif", "image/webp",
 
 // setSafeServing keeps stored bytes inert: never sniffed, sandboxed, and
 // downloaded rather than shown unless they are a plain image or text.
-func setSafeServing(h http.Header, contentType, key string, download bool) {
+func setSafeServing(h http.Header, contentType, key string) {
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Content-Security-Policy", "sandbox")
 	mediaType, _, _ := mime.ParseMediaType(contentType)
-	if download || !slices.Contains(inlineTypes, mediaType) {
-		h.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": path.Base(key)}))
+	if !slices.Contains(inlineTypes, mediaType) {
+		setAttachment(h, key)
 	}
+}
+
+// setAttachment makes a browser download the bytes under key's base name.
+func setAttachment(h http.Header, key string) {
+	h.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": path.Base(key)}))
 }
 
 func isHexSHA256(s string) bool {
@@ -515,13 +528,21 @@ type s3Error struct {
 	RequestID         string   `xml:"RequestId"`
 }
 
+// exchange is one S3 request, its response and the request id it answers with.
+type exchange struct {
+	w         http.ResponseWriter
+	r         *http.Request
+	requestID string
+}
+
 // fail answers e as S3 does: the XML body, or the bare status on a HEAD.
-func (s *Server) fail(w http.ResponseWriter, r *http.Request, requestID string, e s3Error) {
-	if r.Method == http.MethodHead {
+func (x exchange) fail(e s3Error) {
+	w := x.w
+	if x.r.Method == http.MethodHead {
 		w.WriteHeader(e.Status)
 		return
 	}
-	e.RequestID = requestID
+	e.RequestID = x.requestID
 	w.Header().Set("Content-Type", "application/xml")
 	w.WriteHeader(e.Status)
 	_, _ = io.WriteString(w, xml.Header)

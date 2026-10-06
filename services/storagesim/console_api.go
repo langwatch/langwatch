@@ -210,6 +210,9 @@ func (s *Server) handleRaw(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = f.Close() }()
 	w.Header().Set("Content-Type", info.ContentType)
-	setSafeServing(w.Header(), info.ContentType, info.Key, r.URL.Query().Get("download") != "")
+	setSafeServing(w.Header(), info.ContentType, info.Key)
+	if r.URL.Query().Get("download") != "" {
+		setAttachment(w.Header(), info.Key)
+	}
 	http.ServeContent(w, r, "", info.LastModified, f)
 }

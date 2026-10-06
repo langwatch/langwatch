@@ -185,7 +185,11 @@ func readBody(w http.ResponseWriter, r *http.Request) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading the body: %w", err)
 	}
-	return decodeBody(body, r.Header.Get("Content-Encoding"), r.URL.Query().Get("compression"), r.Header.Get("Content-Type"))
+	return decodeBody(body, bodyEncoding{
+		contentEncoding: r.Header.Get("Content-Encoding"),
+		compression:     r.URL.Query().Get("compression"),
+		contentType:     r.Header.Get("Content-Type"),
+	})
 }
 
 func (s *Server) handlePostHogCapture(w http.ResponseWriter, r *http.Request) {
