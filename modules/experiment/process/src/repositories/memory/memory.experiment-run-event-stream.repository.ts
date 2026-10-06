@@ -1,13 +1,13 @@
 import {
-  ExperimentRunEventStream,
+  ExperimentRunEventStreamRepository,
   type ExperimentRunStreamMessage,
   type ExperimentRunStreamUnsubscribe,
-} from "../experiment-run-event-stream.channel.ts";
+} from "../experiment-run-event-stream.repository.ts";
 
 type Listener = (message: ExperimentRunStreamMessage) => void;
 
 /** One process is the whole deployment: a frame reaches this process's subscribers or nobody. */
-export class MemoryExperimentRunEventStreamChannel extends ExperimentRunEventStream {
+export class MemoryExperimentRunEventStreamRepository extends ExperimentRunEventStreamRepository {
   /** Every frame published, per run, in order; what a test reads back. */
   readonly published = new Map<string, ExperimentRunStreamMessage[]>();
   readonly #listeners = new Map<string, Set<Listener>>();
@@ -16,8 +16,8 @@ export class MemoryExperimentRunEventStreamChannel extends ExperimentRunEventStr
     super();
   }
 
-  static create(): MemoryExperimentRunEventStreamChannel {
-    return new MemoryExperimentRunEventStreamChannel();
+  static create(): MemoryExperimentRunEventStreamRepository {
+    return new MemoryExperimentRunEventStreamRepository();
   }
 
   async publish({

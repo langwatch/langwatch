@@ -15,10 +15,10 @@ import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contrac
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
-import type { ExperimentRunStreamMessage } from "../../channels/experiment-run-event-stream.channel.ts";
+import type { ExperimentRunStreamMessage } from "../../repositories/experiment-run-event-stream.repository.ts";
 import type { ExperimentRunProgressState } from "../../repositories/experiment-run-fold.repository.ts";
 import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment-run-abort.repository.ts";
+import { MemoryExperimentRunEventStreamRepository } from "../../repositories/memory/memory.experiment-run-event-stream.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
 import { foldEvaluatorsOf } from "../../rules/experiment-run-plan.rules.ts";
@@ -187,7 +187,7 @@ function compose({
     },
     "collaborators",
   );
-  const stream = experimentRunEventStreamChannels.memory.create();
+  const stream = MemoryExperimentRunEventStreamRepository.create();
   const cells = ExperimentRunCellService.create({
     folds,
     stream,

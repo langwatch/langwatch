@@ -1,15 +1,16 @@
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
-import { experimentRunEventStreamChannels } from "../experiment-run-event-stream-channels.registry.ts";
 import {
-  ExperimentRunEventStream,
+  ExperimentRunEventStreamRepository,
   type ExperimentRunStreamMessage,
-} from "../experiment-run-event-stream.channel.ts";
+} from "../experiment-run-event-stream.repository.ts";
+import { MemoryExperimentRunEventStreamRepository } from "../memory/memory.experiment-run-event-stream.repository.ts";
+import { RedisExperimentRunEventStreamRepository } from "../redis/redis.experiment-run-event-stream.repository.ts";
 
-const tiers: [string, () => ExperimentRunEventStream][] = [
-  ["memory", () => experimentRunEventStreamChannels.memory.create()],
-  ["redis", () => experimentRunEventStreamChannels.live.create({ redis: memoryRedisDouble() })],
+const tiers: [string, () => ExperimentRunEventStreamRepository][] = [
+  ["memory", () => MemoryExperimentRunEventStreamRepository.create()],
+  ["redis", () => RedisExperimentRunEventStreamRepository.create({ redis: memoryRedisDouble() })],
 ];
 
 const started: ExperimentRunStreamMessage = {
@@ -21,7 +22,7 @@ const progress: ExperimentRunStreamMessage = {
   frame: { type: "progress", completed: 1, total: 2 },
 };
 
-describe.each(tiers)("ExperimentRunEventStream (%s)", (_tier, create) => {
+describe.each(tiers)("ExperimentRunEventStreamRepository (%s)", (_tier, create) => {
   describe("when a run's frames are published", () => {
     /** @scenario "A run's frames reach the stream that subscribed to the run, and no other" */
     it("delivers them in order to the run's subscriber, and not to another run's", async () => {
@@ -75,7 +76,7 @@ describe.each(tiers)("ExperimentRunEventStream (%s)", (_tier, create) => {
   });
 });
 
-describe("RedisExperimentRunEventStreamChannel", () => {
+describe("RedisExperimentRunEventStreamRepository", () => {
   describe("when a frame is published", () => {
     it("writes `{ seq, frame }` on the run's channel", async () => {
       const published: { channel: string; message: string }[] = [];
@@ -87,7 +88,7 @@ describe("RedisExperimentRunEventStreamChannel", () => {
           },
         },
       });
-      const stream = experimentRunEventStreamChannels.live.create({ redis });
+      const stream = RedisExperimentRunEventStreamRepository.create({ redis });
 
       await stream.publish({ runId: "run_1", ...started });
 
@@ -100,12 +101,12 @@ describe("RedisExperimentRunEventStreamChannel", () => {
   describe("when a malformed message arrives on a run's channel", () => {
     it("drops it and keeps delivering the frames after it", async () => {
       const redis = memoryRedisDouble();
-      const stream = experimentRunEventStreamChannels.live.create({ redis });
+      const stream = RedisExperimentRunEventStreamRepository.create({ redis });
       const heard: ExperimentRunStreamMessage[] = [];
       await stream.subscribe({ runId: "run_1", onMessage: (message) => heard.push(message) });
 
-      await redis.publish(ExperimentRunEventStream.channelFor("run_1"), "not json");
-      await redis.publish(ExperimentRunEventStream.channelFor("run_1"), '{"seq":-1}');
+      await redis.publish(ExperimentRunEventStreamRepository.channelFor("run_1"), "not json");
+      await redis.publish(ExperimentRunEventStreamRepository.channelFor("run_1"), '{"seq":-1}');
       await stream.publish({ runId: "run_1", ...started });
 
       expect(heard).toEqual([started]);

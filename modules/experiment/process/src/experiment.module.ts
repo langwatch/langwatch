@@ -10,6 +10,7 @@ import { ExperimentModule, type ExperimentAppDependencies } from "#app/experimen
 
 import { experimentLifecycleEventing } from "./eventing/experiment-lifecycle.pipeline.ts";
 import { experimentRunProcessingEventing } from "./eventing/experiment-run-processing.pipeline.ts";
+import { experimentRepositories } from "./repositories/experiment-repositories.registry.ts";
 import { experimentDspyStepsRest } from "./transport/experiment-dspy-steps.rest.ts";
 import { experimentInitRest } from "./transport/experiment-init.rest.ts";
 import {
@@ -24,6 +25,7 @@ import { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 export type { ExperimentAppDependencies };
 
 export const experimentProcessModule = defineProcessModule("experiment")
+  .withRepositories(experimentRepositories)
   .withApi(ExperimentModule)
   .withTransports(
     // The workbench's project-keyed family and the two doors a browser opens.

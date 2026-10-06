@@ -1,8 +1,8 @@
 import { createTenantId, EventUtils } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
-import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
 import type { ExperimentRunProgressState } from "../../repositories/experiment-run-fold.repository.ts";
+import { MemoryExperimentRunEventStreamRepository } from "../../repositories/memory/memory.experiment-run-event-stream.repository.ts";
 import {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_EVENT_VERSIONS,
@@ -74,7 +74,7 @@ describe("the run's frames subscriber", () => {
   describe("when the fold has folded an event of a planned run", () => {
     /** @scenario "A run's live frames are published from its progress fold with their seq" */
     it("publishes only that event's frames, with the seq the fold gave them", async () => {
-      const stream = experimentRunEventStreamChannels.memory.create();
+      const stream = MemoryExperimentRunEventStreamRepository.create();
       const { spec } = createExperimentRunFramesSubscriber({ stream });
       const event = cellFinished();
 
@@ -88,7 +88,7 @@ describe("the run's frames subscriber", () => {
 
   describe("when the run has no plan", () => {
     it("publishes nothing, as the old loop streams its own", async () => {
-      const stream = experimentRunEventStreamChannels.memory.create();
+      const stream = MemoryExperimentRunEventStreamRepository.create();
       const { spec } = createExperimentRunFramesSubscriber({ stream });
       const event = cellFinished();
 

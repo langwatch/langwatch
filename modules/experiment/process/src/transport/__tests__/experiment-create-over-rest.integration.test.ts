@@ -15,6 +15,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { ExperimentModule } from "../../app/experiment.app.ts";
+import type { ExperimentDspyRetentionRepository } from "../../repositories/experiment-dspy-retention.repository.ts";
 import type { ExperimentDspyRepository } from "../../repositories/experiment-dspy.repository.ts";
 import type { ExperimentRunRepository } from "../../repositories/experiment-run.repository.ts";
 import type { ExperimentRepository } from "../../repositories/experiment.repository.ts";
@@ -42,6 +43,7 @@ function createOverRest() {
     repository,
     runRepository: createApiFixture<ExperimentRunRepository>(),
     dspyRepository: createApiFixture<ExperimentDspyRepository>(),
+    dspyRetention: createApiFixture<ExperimentDspyRetentionRepository>(),
     slugify: (value) => value.toLowerCase().replaceAll(" ", "-"),
     newId: () => "experiment-new",
     references: {

@@ -11,6 +11,7 @@ import {
 import { Temporal, toDate } from "@langwatch/time";
 import { z } from "zod";
 
+import { llmSummary, mergeByHash } from "../../rules/experiment-dspy-step.rules.ts";
 import type { ExperimentDspyRetentionRepository } from "../experiment-dspy-retention.repository.ts";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
 
@@ -94,37 +95,9 @@ const dspySummaryRowsSchema = z.array(
   }),
 );
 
-function mergeByHash<T extends { hash: string }>(existing: T[], incoming: T[]): T[] {
-  const seen = new Set(existing.map((item) => item.hash));
-  return [
-    ...existing,
-    ...incoming.filter((item) => {
-      if (seen.has(item.hash)) return false;
-      seen.add(item.hash);
-      return true;
-    }),
-  ];
-}
-
-function llmSummary(calls: ExperimentDspyLlmCall[]): {
-  total: number;
-  tokens: number;
-  cost: number;
-} {
-  return calls.reduce(
-    (total, call) => ({
-      total: total.total + 1,
-      tokens: total.tokens + (call.prompt_tokens ?? 0) + (call.completion_tokens ?? 0),
-      cost: total.cost + (call.cost ?? 0),
-    }),
-    { total: 0, tokens: 0, cost: 0 },
-  );
-}
-
 export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository {
   static create(options: {
     resolveClient: ExperimentDspyClickHouseResolver;
-    retention: ExperimentDspyRetentionRepository;
     telemetry: ExperimentDspyTelemetry;
   }): ClickHouseExperimentDspyRepository {
     return new ClickHouseExperimentDspyRepository(options);
@@ -133,14 +106,19 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
   private constructor(
     private readonly options: {
       resolveClient: ExperimentDspyClickHouseResolver;
-      retention: ExperimentDspyRetentionRepository;
       telemetry: ExperimentDspyTelemetry;
     },
   ) {
     super();
   }
 
-  async upsert(input: ExperimentDspyStep): Promise<void> {
+  async upsert({
+    step: input,
+    retention,
+  }: {
+    step: ExperimentDspyStep;
+    retention: ExperimentDspyRetentionRepository;
+  }): Promise<void> {
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return;
@@ -148,7 +126,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
       const examples = mergeByHash<ExperimentDspyExample>(existing?.examples ?? [], input.examples);
       const llmCalls = mergeByHash<ExperimentDspyLlmCall>(existing?.llmCalls ?? [], input.llmCalls);
       const summary = llmSummary(llmCalls);
-      const retentionDays = await this.options.retention.findTraceRetentionDays(input.tenantId);
+      const retentionDays = await retention.findTraceRetentionDays(input.tenantId);
 
       await client.insert({
         table: TABLE_NAME,

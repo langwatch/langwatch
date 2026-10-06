@@ -4,7 +4,7 @@
  */
 import type { SubscriberSpec } from "@langwatch/eventing";
 
-import type { ExperimentRunEventStream } from "../channels/experiment-run-event-stream.channel.ts";
+import type { ExperimentRunEventStreamRepository } from "../repositories/experiment-run-event-stream.repository.ts";
 import type { ExperimentRunProgressState } from "../repositories/experiment-run-fold.repository.ts";
 import { framesOfEvent } from "../rules/experiment-run-frames.rules.ts";
 import type { ExperimentRunProcessingEvent } from "./experiment-run-events.process.ts";
@@ -21,7 +21,7 @@ export type ExperimentRunProgressSubscriber = {
 export function createExperimentRunFramesSubscriber({
   stream,
 }: {
-  stream: ExperimentRunEventStream;
+  stream: ExperimentRunEventStreamRepository;
 }): ExperimentRunProgressSubscriber {
   return {
     name: "experimentRunFrames",

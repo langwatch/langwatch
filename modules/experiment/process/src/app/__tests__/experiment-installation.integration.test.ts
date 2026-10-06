@@ -1,6 +1,6 @@
 /**
  * Experiment installed the way the worker installs it, over the memory tier and
- * real peer resolution: an empty ClickHouse, a Redis nothing reads at boot, no queue.
+ * real peer resolution, no queue; the live tier where a row's ClickHouse shape is the claim.
  * @vitest-environment node
  */
 import type { AgentApi } from "@langwatch/agent-contract";
@@ -22,15 +22,16 @@ import { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelCost, ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp } from "@langwatch/process";
-import { memoryStores } from "@langwatch/process-stores";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import { memoryStores, type StoresMemberSource } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import {
   parseStudioWorkflow,
   type WorkflowApi,
@@ -78,7 +79,20 @@ const customCost: ModelCost = {
 
 const RETAINED = { traces: 91, scenarios: 63, experiments: 126 };
 
-async function bootWorker(workflow = createApiFixture<WorkflowApi>({})) {
+/** The live tier over held clients: an empty ClickHouse, a Postgres and Redis unread at boot. */
+function liveStores(driver: EmptyDriver): StoresMemberSource {
+  const clients: Record<string, unknown> = {
+    prisma: createApiFixture<PrismaClient>({}, "prisma (unused at boot)"),
+    clickhouse: new ClickHouseQueryClient({ driver }),
+    redis: memoryRedisDouble(),
+  };
+  return { tier: "live", order: Object.keys(clients), read: (name) => clients[name] };
+}
+
+async function bootWorker({
+  workflow = createApiFixture<WorkflowApi>({}),
+  live = false,
+}: { workflow?: WorkflowApi; live?: boolean } = {}) {
   let retentionReads = 0;
   const driver = new EmptyDriver();
   const eventing = new EventSourcing({
@@ -88,13 +102,8 @@ async function bootWorker(workflow = createApiFixture<WorkflowApi>({})) {
   });
   const runtime = await createApp({ role: "worker" })
     .withModules([experimentProcessModule])
-    .withStores(memoryStores())
+    .withStores(live ? liveStores(driver) : memoryStores())
     .withEventing(eventing)
-    .withRelational(createApiFixture<ProcessMembers["prisma"]>({}, "prisma (unused at boot)"))
-    .withAnalytical(new ClickHouseQueryClient({ driver }))
-    .withKeyvalue(
-      createApiFixture<NonNullable<ProcessMembers["redis"]>>({}, "redis (unused at boot)"),
-    )
     .withConfig({
       experiment: {
         blockLocalHttpCalls: false,
@@ -179,7 +188,7 @@ describe("experiment installed in the worker", () => {
 
   /** @scenario "A DSPy step is stamped with its tenant's traces retention" */
   it("stamps a DSPy step with the tenant's traces retention, not a fixed one", async () => {
-    const { runtime, driver } = await bootWorker();
+    const { runtime, driver } = await bootWorker({ live: true });
 
     try {
       await runtime.service(ExperimentApi).upsertDspyStep({
@@ -293,13 +302,13 @@ describe("experiment installed in the worker", () => {
       const prepared = { ...dsl, description: "prepared" };
       const create = vi.fn(async () => ({ workflow: created, version }));
       const saveStudioVersion = vi.fn(async () => version);
-      const { runtime } = await bootWorker(
-        createApiFixture<WorkflowApi>({
+      const { runtime } = await bootWorker({
+        workflow: createApiFixture<WorkflowApi>({
           prepareStudioDsl: async () => prepared,
           create,
           saveStudioVersion,
         }),
-      );
+      });
 
       try {
         await expect(
@@ -322,7 +331,9 @@ describe("experiment installed in the worker", () => {
 
     it("saves a later version through the Studio's own save, as the caller", async () => {
       const saveStudioVersion = vi.fn(async () => version);
-      const { runtime } = await bootWorker(createApiFixture<WorkflowApi>({ saveStudioVersion }));
+      const { runtime } = await bootWorker({
+        workflow: createApiFixture<WorkflowApi>({ saveStudioVersion }),
+      });
       const input = {
         projectId: "project_1",
         workflowId: "workflow_1",

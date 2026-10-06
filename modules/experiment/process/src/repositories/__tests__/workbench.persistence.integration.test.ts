@@ -26,6 +26,7 @@ import {
   ExperimentService,
   type ExperimentService as ExperimentServiceContract,
 } from "../../services/experiment.service.ts";
+import type { ExperimentDspyRetentionRepository } from "../experiment-dspy-retention.repository.ts";
 import type { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
 import type { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import { PrismaExperimentRepository } from "../prisma/prisma.experiment.repository.ts";
@@ -86,6 +87,7 @@ const service = (): ExperimentServiceContract =>
     repository: PrismaExperimentRepository.create(database()),
     runRepository: unusedRunRepository,
     dspyRepository: unusedDspyRepository,
+    dspyRetention: createApiFixture<ExperimentDspyRetentionRepository>(),
     slugify: (value) =>
       value
         .toLowerCase()

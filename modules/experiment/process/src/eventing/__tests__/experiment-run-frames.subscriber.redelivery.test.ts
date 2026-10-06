@@ -1,8 +1,8 @@
 import { createTenantId, EventUtils } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
-import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
 import type { ExperimentRunProgressState } from "../../repositories/experiment-run-fold.repository.ts";
+import { MemoryExperimentRunEventStreamRepository } from "../../repositories/memory/memory.experiment-run-event-stream.repository.ts";
 import {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_EVENT_VERSIONS,
@@ -59,7 +59,7 @@ const progress: ExperimentRunProgressState = {
 
 describe("the frames subscriber under redelivery", () => {
   it("republishes the same seq, so a listener that keeps the newest seq shows the frame once", async () => {
-    const stream = experimentRunEventStreamChannels.memory.create();
+    const stream = MemoryExperimentRunEventStreamRepository.create();
     const { spec } = createExperimentRunFramesSubscriber({ stream });
 
     await spec.handler(finished, { tenantId, aggregateId, state: progress });

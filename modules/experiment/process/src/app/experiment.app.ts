@@ -87,7 +87,6 @@ import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import { PresenceApi } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
@@ -105,12 +104,8 @@ import {
   type ExperimentLifecyclePipeline,
 } from "../eventing/experiment-lifecycle.pipeline.ts";
 import type { ExperimentRunProcessingPipeline } from "../eventing/experiment-run-processing.pipeline.ts";
-import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository.ts";
-import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository.ts";
-import { ClickHouseExperimentSession } from "../repositories/clickhouse/clickhouse.experiment-session.store.ts";
-import { PrismaExperimentPeopleRepository } from "../repositories/prisma/prisma.experiment-people.repository.ts";
-import { PrismaExperimentWorkflowVersionRepository } from "../repositories/prisma/prisma.experiment-workflow-version.repository.ts";
-import { PrismaExperimentRepository } from "../repositories/prisma/prisma.experiment.repository.ts";
+import type { ExperimentPeopleRepository } from "../repositories/experiment-people.repository.ts";
+import type { ExperimentRepositories } from "../repositories/experiment.repositories.ts";
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
 import {
   EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE,
@@ -122,7 +117,6 @@ import { ExperimentDspyRetentionService } from "../services/experiment-dspy-rete
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
 import { ExperimentListingService } from "../services/experiment-listing.service.ts";
 import { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
-import { ExperimentRunHistoryTelemetryService } from "../services/experiment-run-history-telemetry.service.ts";
 import type { ExperimentRunModelCostService } from "../services/experiment-run-model-cost.service.ts";
 import {
   ExperimentRunService,
@@ -149,13 +143,6 @@ import type { WorkflowEvaluationService } from "../services/experiment-workflow-
 import { ExperimentWorkflowLinkService } from "../services/experiment-workflow-link.service.ts";
 import { ExperimentService } from "../services/experiment.service.ts";
 
-/** The display names behind the author ids a version history stores. */
-export type ExperimentPeople = Readonly<{
-  namesOf(
-    ids: readonly string[],
-  ): Promise<readonly Readonly<{ id: string; name: string | null }>[]>;
-}>;
-
 /** What the process composes this feature's application from. */
 export interface ExperimentAppDependencies {
   experiments: ExperimentService;
@@ -171,7 +158,7 @@ export interface ExperimentAppDependencies {
   /** Presence's tenant fan-out, where `experiment_updated` arrives. */
   broadcast: ExperimentUpdateEmitters;
   permissions: Pick<AuthzApi, "hasPermission">;
-  people: ExperimentPeople;
+  people: Pick<ExperimentPeopleRepository, "namesOf">;
   /** The project's own model cost rules, as the pricing cascade reads them. */
   modelCosts: Pick<ExperimentRunModelCostService, "listFor">;
   /** The slug this deployment derives from a name. */
@@ -199,8 +186,9 @@ const NO_RUNS: ExperimentRunAggregate = { runsCount: 0, lastRunAt: null };
 
 type ExperimentSetup = FeatureSetup<
   typeof ExperimentModule.dependencies,
-  MembersRead<readonly ["prisma", "clickhouse", "redis"]>,
-  ExperimentServerConfig
+  never,
+  ExperimentServerConfig,
+  ExperimentRepositories
 >;
 
 export class ExperimentModule implements ExperimentApi {
@@ -233,30 +221,18 @@ export class ExperimentModule implements ExperimentApi {
     storedObjects: StoredObjectApi,
   };
   static readonly config = experimentConfig;
-  static readonly reads = ["prisma", "clickhouse", "redis"] as const;
 
   static create(setup: ExperimentSetup): ExperimentModule {
-    const { members, dependencies, config } = setup;
-    const { prisma, clickhouse } = members;
+    const { repositories, dependencies, config } = setup;
     const logger = createLogger("langwatch:experiment");
     const { workflows, dataset, agents, evaluators, prompts, retention } = dependencies;
     const commands = ExperimentRunCommandDispatcherService.create();
     const senders: { commands?: EventingCommands<ExperimentLifecyclePipeline> } = {};
-    const resolveClient = ClickHouseExperimentSession.resolverOver(clickhouse);
-    const telemetry = ExperimentRunHistoryTelemetryService.create(logger);
     const experiments = ExperimentService.create({
-      repository: PrismaExperimentRepository.create(prisma),
-      runRepository: ClickHouseExperimentRunRepository.create({
-        workflowVersions: PrismaExperimentWorkflowVersionRepository.create(prisma),
-        resolveClient,
-        tupleParam: (values) => ClickHouseExperimentRunRepository.tupleParam(values),
-        telemetry,
-      }),
-      dspyRepository: ClickHouseExperimentDspyRepository.create({
-        resolveClient,
-        retention: ExperimentDspyRetentionService.create({ retention }),
-        telemetry,
-      }),
+      repository: repositories.experiments,
+      runRepository: repositories.runHistory,
+      dspyRepository: repositories.dspySteps,
+      dspyRetention: ExperimentDspyRetentionService.create({ retention }),
       execution: commands,
       slugify: slugifyExperimentName,
       newId: () => generate(EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE).toString(),
@@ -269,8 +245,7 @@ export class ExperimentModule implements ExperimentApi {
     const runs = ExperimentRunService.create({
       commands,
       experiments,
-      resolveClient,
-      members,
+      runStores: repositories.runProcessing,
       peers: dependencies,
       config,
       // A start's refusal names the role; a suite that builds by hand names none.
@@ -289,7 +264,7 @@ export class ExperimentModule implements ExperimentApi {
       monitors: dependencies.monitors,
       broadcast: dependencies.presence,
       permissions: dependencies.permissions,
-      people: PrismaExperimentPeopleRepository.create(prisma),
+      people: repositories.people,
       modelCosts: runs.cost,
       workflowAuthoring: ExperimentWorkflowAuthoringService.create(workflows),
       workflowEvaluations: runs.workflowEvaluations,

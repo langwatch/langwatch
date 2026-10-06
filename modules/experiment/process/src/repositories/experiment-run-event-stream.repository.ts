@@ -22,7 +22,7 @@ export type ExperimentRunStreamMessage = z.infer<typeof experimentRunStreamMessa
 /** Stops hearing one subscription; the others on the same run keep hearing it. */
 export type ExperimentRunStreamUnsubscribe = () => Promise<void>;
 
-export abstract class ExperimentRunEventStream {
+export abstract class ExperimentRunEventStreamRepository {
   /** The pub/sub channel a run's frames travel on. */
   static channelFor(runId: string): string {
     return `experiment_run:${runId}`;

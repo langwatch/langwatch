@@ -1,11 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 
 import {
-  ExperimentRunEventStream,
+  ExperimentRunEventStreamRepository,
   type ExperimentRunStreamMessage,
   type ExperimentRunStreamUnsubscribe,
   experimentRunStreamMessageSchema,
-} from "../experiment-run-event-stream.channel.ts";
+} from "../experiment-run-event-stream.repository.ts";
 
 /** The connection a subscription holds; a `Redis`, a `Cluster` and a double all satisfy it. */
 export type ExperimentRunStreamSubscriberClient = {
@@ -30,7 +30,7 @@ const logger = createLogger("langwatch:experiment:run-event-stream");
  * Redis pub/sub on `experiment_run:<runId>`. A subscribing connection can run no other command,
  * so listening opens one dedicated connection, lazily, shared by every run this process streams.
  */
-export class RedisExperimentRunEventStreamChannel extends ExperimentRunEventStream {
+export class RedisExperimentRunEventStreamRepository extends ExperimentRunEventStreamRepository {
   readonly #listeners = new Map<string, Set<Listener>>();
   readonly #subscriptions = new Map<string, Promise<unknown>>();
   #subscriber: ExperimentRunStreamSubscriberClient | undefined;
@@ -43,8 +43,8 @@ export class RedisExperimentRunEventStreamChannel extends ExperimentRunEventStre
     redis,
   }: {
     redis: ExperimentRunStreamRedis;
-  }): RedisExperimentRunEventStreamChannel {
-    return new RedisExperimentRunEventStreamChannel(redis);
+  }): RedisExperimentRunEventStreamRepository {
+    return new RedisExperimentRunEventStreamRepository(redis);
   }
 
   async publish({
@@ -53,7 +53,7 @@ export class RedisExperimentRunEventStreamChannel extends ExperimentRunEventStre
     frame,
   }: { runId: string } & ExperimentRunStreamMessage): Promise<void> {
     await this.redis.publish(
-      ExperimentRunEventStream.channelFor(runId),
+      ExperimentRunEventStreamRepository.channelFor(runId),
       JSON.stringify({ seq, frame }),
     );
   }
@@ -65,7 +65,7 @@ export class RedisExperimentRunEventStreamChannel extends ExperimentRunEventStre
     runId: string;
     onMessage: Listener;
   }): Promise<ExperimentRunStreamUnsubscribe> {
-    const channel = ExperimentRunEventStream.channelFor(runId);
+    const channel = ExperimentRunEventStreamRepository.channelFor(runId);
     const listeners = this.#listeners.get(channel) ?? new Set<Listener>();
     listeners.add(onMessage);
     this.#listeners.set(channel, listeners);

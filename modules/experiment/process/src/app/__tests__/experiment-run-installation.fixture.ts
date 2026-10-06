@@ -39,7 +39,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import { createApp } from "@langwatch/process";
-import { memoryStores } from "@langwatch/process-stores";
+import type { StoresMemberSource } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
@@ -337,12 +337,21 @@ function boot({
   peers: PeerOverrides;
   workflow: WorkflowApi;
 }) {
+  // The live tier: two processes share a run only through the stores both hold.
+  const clients: Record<string, unknown> = {
+    prisma: database.client,
+    clickhouse: new ClickHouseQueryClient({ driver: new EmptyDriver() }),
+    redis: memoryRedisDouble({ store: redis }),
+  };
+  const stores: StoresMemberSource = {
+    tier: "live",
+    order: Object.keys(clients),
+    read: (name) => clients[name],
+  };
   const app = createApp({ role })
     .withModules([experimentProcessModule])
-    .withStores(memoryStores())
+    .withStores(stores)
     .withEventing(eventing)
-    .withRelational(database.client)
-    .withAnalytical(new ClickHouseQueryClient({ driver: new EmptyDriver() }))
     .withConfig({
       experiment: {
         blockLocalHttpCalls: false,
@@ -354,10 +363,7 @@ function boot({
     })
     .withObservability((observability) => observability.withLogging(createTestLogger().logger));
 
-  return app
-    .withKeyvalue(memoryRedisDouble({ store: redis }))
-    .provide({ ...peersOf(peers), workflow })
-    .boot();
+  return app.provide({ ...peersOf(peers), workflow }).boot();
 }
 
 export type RunPairOptions = Readonly<{

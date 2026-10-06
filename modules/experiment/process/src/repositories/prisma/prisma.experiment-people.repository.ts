@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { ExperimentPeople } from "../../app/experiment.app.ts";
+import { ExperimentPeopleRepository } from "../experiment-people.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
@@ -9,12 +9,14 @@ import type { ExperimentPeople } from "../../app/experiment.app.ts";
 export type ExperimentPeopleDatabase = Pick<PrismaClient, "user">;
 
 /** The display names behind the author ids a version history stores. */
-export class PrismaExperimentPeopleRepository implements ExperimentPeople {
+export class PrismaExperimentPeopleRepository extends ExperimentPeopleRepository {
   static create(database: ExperimentPeopleDatabase): PrismaExperimentPeopleRepository {
     return new PrismaExperimentPeopleRepository(database);
   }
 
-  private constructor(private readonly database: ExperimentPeopleDatabase) {}
+  private constructor(private readonly database: ExperimentPeopleDatabase) {
+    super();
+  }
 
   async namesOf(
     ids: readonly string[],
