@@ -59,6 +59,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   }: {
     organizationIds: readonly string[];
   }): Promise<OrganizationUsageCount> {
+    if (organizationIds.length === 0) return { members: 0, teams: 0, ssoProviders: [] };
     const scope = { organizationId: { in: [...organizationIds] } };
     const [members, teams, organizations, firstTwo] = await Promise.all([
       this.database.organizationUser.count({ where: scope }),

@@ -10,6 +10,7 @@ import {
  * is left alone, and the accounts go through the module that owns them.
  * @see specs/identity/sso-connection-lifecycle.feature
  */
+import { guardOrganizationId } from "@langwatch/prisma-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
@@ -113,6 +114,10 @@ function scenario({
   const detachIdentifier = vi.fn(async () => []);
   const markPrimary = vi.fn(async () => []);
   const retire = vi.fn(async () => ({ retired: 1, remaining: 0 }));
+  const organizationIdsForMember = vi.fn(async (_args: { userId: string }) => [
+    ORG,
+    ...otherOrganizations,
+  ]);
 
   const service = SsoLegacyIdentityRetirementService.create({
     identity: createApiFixture<IdentityService>({ detachIdentifier, markPrimary }),
@@ -120,13 +125,13 @@ function scenario({
     evidence: repositories.ssoMigrationEvidence,
     memberships: {
       listActiveMembers: async () => [{ userId: ANA, name: "Ana", email: "ana@acme.com" }],
-      organizationIdsForMember: async () => [ORG, ...otherOrganizations],
+      organizationIdsForMember,
     },
     legacyAccess: { count: async () => 0, retire },
     now: () => NOW,
   });
 
-  return { service, detachIdentifier, markPrimary, retire };
+  return { service, detachIdentifier, markPrimary, retire, organizationIdsForMember };
 }
 
 const request = {
@@ -243,5 +248,49 @@ describe("retiring the identities a grandfathered connection minted", () => {
 
     expect(detachIdentifier).not.toHaveBeenCalled();
     expect(retire).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("asking which other organizations a member's legacy provider also serves", () => {
+  /**
+   * @scenario "Finishing is refused by the tenancy guard when a member's memberships are read across organizations"
+   */
+  it("finds the other organizations through the member, and the guard refuses a read bounded only by 'not this organization'", async () => {
+    const { service, organizationIdsForMember } = scenario({
+      otherOrganizations: [OTHER_ORG],
+      otherOrganizationConnections: [
+        legacy({ connectionId: "ssoc_globex", organizationId: OTHER_ORG }),
+      ],
+    });
+
+    await expect(service.retire(request)).rejects.toMatchObject({
+      code: "sso_migration_finalization_blocked",
+    });
+    expect(organizationIdsForMember).toHaveBeenCalledExactlyOnceWith({ userId: ANA });
+
+    const reaches = vi.fn(async () => "ok");
+    await expect(
+      guardOrganizationId(
+        {
+          model: "OrganizationUser",
+          action: "findMany",
+          args: { where: { userId: ANA, disabledAt: null } },
+        },
+        reaches,
+      ),
+    ).resolves.toBe("ok");
+    expect(reaches).toHaveBeenCalledTimes(1);
+
+    await expect(
+      guardOrganizationId(
+        {
+          model: "OrganizationUser",
+          action: "findMany",
+          args: { where: { organizationId: { not: ORG } } },
+        },
+        reaches,
+      ),
+    ).rejects.toThrow(/organizationId/);
+    expect(reaches).toHaveBeenCalledTimes(1);
   });
 });

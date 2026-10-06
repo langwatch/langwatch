@@ -141,12 +141,22 @@ const hasUserBound = (clause: unknown): boolean => {
   return typeof userId === "string" || isNonEmptyStringList(userId);
 };
 
-// A single organizationId literal is the canonical single-org predicate. We
-// deliberately do NOT accept `organizationId: { in: [...] }` here: a list of
-// org ids would target several organizations, which the single-organization
-// invariant forbids, and no call-site needs it.
-const hasOrganizationId = (clause: unknown): boolean =>
-  typeof clauseField(clause, "organizationId") === "string";
+const isOrganizationIdValue = (value: unknown): boolean =>
+  typeof value === "string" && value.trim().length > 0;
+
+// Admits a non-empty organizationId, or exactly `{ in: [non-empty ids] }` for
+// maintenance reads over a finite set. `{ not }`, an empty list, a non-string
+// member or `{ in }` beside another operator never count as tenant scope.
+const hasOrganizationId = (clause: unknown): boolean => {
+  const organizationId = clauseField(clause, "organizationId");
+  if (isOrganizationIdValue(organizationId)) return true;
+  if (!isClause(organizationId)) return false;
+  const keys = Object.keys(organizationId);
+  const ids = clauseField(organizationId, "in");
+  return (
+    keys.length === 1 && Array.isArray(ids) && ids.length > 0 && ids.every(isOrganizationIdValue)
+  );
+};
 
 const hasRowId = (clause: unknown): boolean => {
   const id = clauseField(clause, "id");
@@ -157,12 +167,13 @@ const hasRowId = (clause: unknown): boolean => {
 
 // Prisma names a compound unique key by joining its field names with "_"
 // (e.g. `userId_organizationId`, `organizationId_name`). A WHERE that targets
-// such a key embeds organizationId and therefore bounds to one org + one row.
+// such a key bounds to one org + one row only when its value is an object
+// carrying a non-empty string organizationId; an operator there does not.
 const hasCompositeOrgKey = (clause: unknown): boolean => {
-  if (!clause || typeof clause !== "object") return false;
-  return Object.keys(clause).some((key) => {
-    const value = clauseField(clause, key);
-    return value && typeof value === "object" && key.split("_").includes("organizationId");
+  if (!isClause(clause)) return false;
+  return Object.entries(clause).some(([key, value]) => {
+    if (!key.split("_").includes("organizationId")) return false;
+    return isOrganizationIdValue(clauseField(value, "organizationId"));
   });
 };
 
