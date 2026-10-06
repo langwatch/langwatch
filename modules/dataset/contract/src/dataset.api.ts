@@ -1,3 +1,4 @@
+import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import { moduleApi } from "@langwatch/module";
 
 import type { BatchEvaluationRecord, BatchEvaluationSummary } from "./batch-record.trpc.ts";
@@ -161,3 +162,10 @@ export interface DatasetApi {
 }
 
 export const DatasetApi = moduleApi<DatasetApi>()("dataset");
+
+/** Dataset's settings: only the shared deployment origin its platform links are built on. */
+export const datasetConfig = Config.define(() => ({
+  publicBaseUrl,
+}));
+
+export type DatasetServerConfig = ConfigOf<typeof datasetConfig>;

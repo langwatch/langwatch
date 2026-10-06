@@ -10,6 +10,12 @@ import {
   annotationQueueDetailSchema,
   annotationWithFullUserSchema,
 } from "./annotation-response.schemas.ts";
+import type {
+  AnnotationApiCreateInput,
+  AnnotationApiOptimizedQueuesInput,
+  AnnotationApiQueueWalkStepInput,
+  AnnotationApiUpdateInput,
+} from "./annotation-trpc.schemas.ts";
 
 export type AnnotationWithFullUser = z.infer<typeof annotationWithFullUserSchema>;
 export type AnnotationWithUserSummary = z.infer<typeof annotationWithUserSummarySchema>;
@@ -46,3 +52,11 @@ export type AnnotationReviewQueueItem = z.infer<typeof annotationReviewQueueItem
 export type AnnotationReviewQueue = z.infer<typeof annotationReviewQueueSchema>;
 export type AnnotationOptimizedQueues = z.infer<typeof annotationOptimizedQueuesSchema>;
 export type AnnotationQueueWalkStep = z.infer<typeof annotationQueueWalkStepSchema>;
+
+export type AnnotationReviewOptimizedQueuesInput = AnnotationApiOptimizedQueuesInput &
+  Readonly<{ userId: string }>;
+export type AnnotationReviewCreateInput = AnnotationApiCreateInput & Readonly<{ actorId: string }>;
+export type AnnotationReviewUpdateInput = AnnotationApiUpdateInput & Readonly<{ actorId: string }>;
+export type AnnotationReviewDeleteInput = Readonly<{ projectId: string; annotationId: string }>;
+export type AnnotationQueueWalkStepInput = AnnotationApiQueueWalkStepInput &
+  Readonly<{ userId: string }>;

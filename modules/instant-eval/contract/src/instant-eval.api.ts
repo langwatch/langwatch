@@ -1,5 +1,5 @@
 import type { RestCredentialPrincipal } from "@langwatch/authorization";
-import { moduleApi } from "@langwatch/module";
+import { moduleApi, defineTrpcContract } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
 import type { InstantEvalJudgement, InstantEvalQuestion } from "./instant-eval-judging.ts";
@@ -219,3 +219,5 @@ export interface InstantEvalApi {
 }
 
 export const InstantEvalApi = moduleApi<InstantEvalApi>()("instant-eval");
+
+export const instantEvalTrpc = defineTrpcContract("instantEval").build();

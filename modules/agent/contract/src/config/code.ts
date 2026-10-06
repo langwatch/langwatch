@@ -1,7 +1,20 @@
 import { z } from "zod";
 
 import { agentInputBindingSchema, fieldSchema } from "../fields.ts";
-import { baseAgentConfigSchema } from "./base.ts";
+
+export const baseAgentConfigSchema = z.object({
+  _library_ref: z.string().optional(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  cls: z.string().optional(),
+  parameters: z.array(fieldSchema).optional(),
+  inputs: z.array(fieldSchema).optional(),
+  outputs: z.array(fieldSchema).optional(),
+  isCustom: z.boolean().optional(),
+  behave_as: z.literal("evaluator").optional(),
+});
+
+export type BaseAgentConfig = z.infer<typeof baseAgentConfigSchema>;
 
 export const codeParameterSchema = z.object({
   identifier: z.literal("code"),
@@ -36,3 +49,16 @@ export const codeAgentConfigSchema = z.object({
 });
 
 export type CodeAgentConfig = z.infer<typeof codeAgentConfigSchema>;
+
+export const workflowAgentConfigSchema = z.object({
+  ...baseAgentConfigSchema.shape,
+  isCustom: z.boolean().optional(),
+  workflow_id: z.string().optional(),
+  publishedId: z.string().optional(),
+  version_id: z.string().optional(),
+  versions: z.record(z.string(), z.unknown()).optional(),
+  scenarioMappings: z.record(z.string(), agentInputBindingSchema).optional(),
+  scenarioOutputField: z.string().optional(),
+});
+
+export type WorkflowAgentConfig = z.infer<typeof workflowAgentConfigSchema>;

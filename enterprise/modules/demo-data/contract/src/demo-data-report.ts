@@ -1,3 +1,5 @@
+import { Config, type ConfigOf } from "@langwatch/config";
+import { moduleApi } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { z } from "zod";
 
@@ -30,3 +32,17 @@ export const demoDataRunInputSchema = z.object({
 });
 
 export type DemoDataRunInput = z.infer<typeof demoDataRunInputSchema>;
+
+/** The demo instance's seeding: one run over an allowlisted demo organization. */
+export interface DemoDataApi {
+  runSeedDemo(input: DemoDataRunInput): Promise<SeedRunReport>;
+}
+
+export const DemoDataApi = moduleApi<DemoDataApi>()("demo-data");
+
+/** Main's gate: the comma-separated organizations the seeding may touch; absent everywhere but the demo instance. */
+export const demoDataConfig = Config.define((c) => ({
+  demoOrgIds: c.env("DEMO_ORG_IDS", z.string().optional()),
+}));
+
+export type DemoDataConfig = ConfigOf<typeof demoDataConfig>;

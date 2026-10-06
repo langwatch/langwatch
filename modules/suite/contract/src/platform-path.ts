@@ -2,7 +2,7 @@
 
 import { isOnPlatformSet } from "@langwatch/scenario-contract";
 
-import type { SuiteKind } from "./suite.kind.ts";
+import type { SuiteKind } from "./suite.ts";
 
 /** The flag that decides which interface a project reads. */
 export const AGENT_TESTING_FLAG = "release_ui_agent_testing_v2_enabled";

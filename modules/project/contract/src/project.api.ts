@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/module";
+import { moduleApi, uiTokens } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
 import type { TopicClusteringRequest } from "./project.responses.ts";
@@ -169,3 +169,18 @@ export interface ProjectApi {
 }
 
 export const ProjectApi = moduleApi<ProjectApi>()("project");
+
+/** The inline command palette project lends by token to a landing hero (§10, §10.1). */
+
+/** What a landing hero hands project's lent inline command palette. */
+export type HeroAskFieldProps = { placeholder: string };
+
+export const HeroAskFieldToken = uiTokens("project").component<HeroAskFieldProps>("heroAskField");
+
+/** Main's project selector, lent by project to pages outside the navigation shell (§10, §10.1). */
+
+/** The switcher needs nothing handed in: it reads the scope and the graph itself. */
+export type ProjectSwitcherProps = Record<string, never>;
+
+export const ProjectSwitcherToken =
+  uiTokens("project").component<ProjectSwitcherProps>("projectSwitcher");

@@ -11,8 +11,5 @@ export * from "./annotation-score.trpc.ts";
 export * from "./annotation.errors.ts";
 export * from "./annotation-queue.errors.ts";
 export * from "./annotation-queue.schemas.ts";
-export * from "./annotation-queue.types.ts";
 export * from "./annotation-review.schemas.ts";
-export * from "./annotation-review.types.ts";
 export * from "./annotation-form.types.ts";
-export * from "./annotation-lent-components.ts";

@@ -36,3 +36,8 @@ export const storedObjectFileRouteFilenameQuerySchema = z.object({
 export type StoredObjectFileRouteFilenameQuery = z.infer<
   typeof storedObjectFileRouteFilenameQuerySchema
 >;
+
+/** `GET /api/image-proxy?url=` - an absent `url` is main's 400, not a validation refusal. */
+export const imageProxyQuerySchema = z.object({ url: z.string().optional() });
+
+export type ImageProxyRequest = z.infer<typeof imageProxyQuerySchema>;

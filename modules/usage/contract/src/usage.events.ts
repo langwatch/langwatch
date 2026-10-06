@@ -1,4 +1,6 @@
+import { Config, type ConfigOf, isSaas } from "@langwatch/config";
 import { usageUnitSchema } from "@langwatch/entitlement-contract";
+import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
 /** Usage's pipeline and the facts it records; peers react to them, none asks `UsageApi` (§3). */
@@ -48,3 +50,15 @@ export type LimitReachedEventData = z.infer<typeof limitReachedEventDataSchema>;
 /** A reached limit no longer holds, after an upgrade or a lower recount. */
 export const limitClearedEventDataSchema = z.object(limitDecision);
 export type LimitClearedEventData = z.infer<typeof limitClearedEventDataSchema>;
+
+/** Usage answers by events (§3): no peer asks it, so the token carries no operation yet. */
+export type UsageApi = Readonly<Record<never, never>>;
+
+export const UsageApi = moduleApi<UsageApi>()("usage");
+
+/** Usage's settings: only the shared leaf telling Cloud, which meters, from an install. */
+export const usageConfig = Config.define(() => ({
+  isSaas,
+}));
+
+export type UsageServerConfig = ConfigOf<typeof usageConfig>;

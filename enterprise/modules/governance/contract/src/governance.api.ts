@@ -5,6 +5,7 @@ import { moduleApi } from "@langwatch/module";
 import type {
   RecordWorkspaceViewInput,
   RecordWorkspaceViewResult,
+  GovernanceCallSurface,
 } from "./admin-workspace-view-audit.ts";
 import type {
   AiToolEntry,
@@ -36,7 +37,6 @@ import type {
   AgentSyncSourceListing,
   GovernanceAgentRow,
 } from "./governance-agents.ts";
-import type { GovernanceCallSurface } from "./governance-audit.ts";
 import type {
   GovernanceCliBudgetStatusAnswer,
   GovernanceCliBootstrapAnswer,

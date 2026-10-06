@@ -1,12 +1,14 @@
-import { moduleApi } from "@langwatch/module";
+import { moduleApi, uiTokens } from "@langwatch/module";
 
-import type { AnnotationQueueItem, AnnotationQueueListedItem } from "./annotation-queue.schemas.ts";
+import type { AnnotationFormState } from "./annotation-form.types.ts";
 import type {
+  AnnotationQueueItem,
+  AnnotationQueueListedItem,
   AnnotationQueueCaller,
   AnnotationQueueConfiguration,
   AnnotationQueueScope,
   QueueAnnotationTracesInput,
-} from "./annotation-queue.types.ts";
+} from "./annotation-queue.schemas.ts";
 import type {
   AnnotationQueueDetail,
   AnnotationQueueListEntry,
@@ -20,14 +22,12 @@ import type {
   AnnotationQueueWalkStep,
   AnnotationWithFullUser,
   AnnotationWithUserSummary,
-} from "./annotation-review.schemas.ts";
-import type {
   AnnotationReviewCreateInput,
   AnnotationReviewDeleteInput,
   AnnotationReviewOptimizedQueuesInput,
   AnnotationQueueWalkStepInput,
   AnnotationReviewUpdateInput,
-} from "./annotation-review.types.ts";
+} from "./annotation-review.schemas.ts";
 import type {
   AnnotationScore,
   AnnotationScoreName,
@@ -116,3 +116,20 @@ export interface AnnotationApi {
 }
 
 export const AnnotationApi = moduleApi<AnnotationApi>()("annotation");
+
+/** The annotation form pieces, lent by token to the trace explorer that hosts them (§10.1). */
+
+/** What trace hands annotation's form body in annotate mode. */
+export type AnnotateBodyProps = { state: AnnotationFormState };
+
+/** What trace hands annotation form body in suggest mode, diffed against the output it corrects. */
+export type SuggestBodyProps = { state: AnnotationFormState; originalOutput: string };
+
+/** What trace hands annotation's form footer: save, delete and cancel over the same state. */
+export type AnnotationFormFooterProps = { state: AnnotationFormState; padding: number };
+
+export const AnnotateBodyToken =
+  uiTokens("annotation").component<AnnotateBodyProps>("annotateBody");
+export const SuggestBodyToken = uiTokens("annotation").component<SuggestBodyProps>("suggestBody");
+export const AnnotationFormFooterToken =
+  uiTokens("annotation").component<AnnotationFormFooterProps>("annotationFormFooter");

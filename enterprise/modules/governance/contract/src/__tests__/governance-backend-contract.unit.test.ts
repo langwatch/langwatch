@@ -7,7 +7,7 @@ import {
   assertThresholdConfig,
 } from "../anomaly-rule.ts";
 import { departmentSchema } from "../department.ts";
-import { isGovernanceOriginTrace } from "../governance-attributes.ts";
+import { isGovernanceOriginTrace } from "../governance.ts";
 import { getStarterTemplate, isOttlEnabledSourceType } from "../ingestion-source.ts";
 import { ottlTransformInputSchema, ottlValidationResultSchema } from "../ottl.ts";
 import { normalizedPullEventSchema, pulledUsageHintSchema } from "../puller.ts";

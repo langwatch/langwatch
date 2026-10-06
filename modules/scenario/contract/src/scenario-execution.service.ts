@@ -1,5 +1,5 @@
 import type { ResolvedRunModels } from "./run-models.ts";
-import type { RunSecretCiphertext } from "./run-secret-ciphertext.ts";
+import type { RunSecretCiphertext } from "./run-parameters.ts";
 import type {
   ChildProcessJobData,
   ExecutionContext,

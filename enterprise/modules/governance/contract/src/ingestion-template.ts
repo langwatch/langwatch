@@ -1,7 +1,10 @@
 import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 
-import { DEFAULT_GOVERNANCE_SURFACE, governanceCallSurfaceSchema } from "./governance-audit.ts";
+import {
+  DEFAULT_GOVERNANCE_SURFACE,
+  governanceCallSurfaceSchema,
+} from "./admin-workspace-view-audit.ts";
 
 export const ingestionTemplateSchema = z
   .object({

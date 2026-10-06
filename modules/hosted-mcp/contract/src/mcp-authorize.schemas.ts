@@ -1,3 +1,5 @@
+import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
+import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
 /** What the approving browser is sent to next. */
@@ -53,3 +55,40 @@ export const postedApprovalFieldsSchema = z.object({
     .optional()
     .catch(void 0),
 });
+
+/** The callable Hosted MCP capability exposed to process transports. */
+export interface HostedMcpApiContract {
+  createHandler(): HostedMcpHandler;
+}
+
+/** Portable shape of the long-lived MCP HTTP surface. */
+export interface HostedMcpHandler {
+  handleRequest(request: object, response: object): void;
+  isMcpRoute: (pathname: string) => boolean;
+  clearTokenCache: () => void;
+  clearRateLimiters: () => void;
+  closeAllSessions: () => Promise<void>;
+}
+
+export const HostedMcpApi = moduleApi<HostedMcpApiContract>()("hosted-mcp");
+
+/** Hosted MCP's one deployment fact: the public origin an MCP client is told to come back to. */
+export const hostedMcpConfig = Config.define(() => ({
+  publicBaseUrl,
+}));
+
+export type HostedMcpServerConfig = ConfigOf<typeof hostedMcpConfig>;
+
+/** The one-time authorization-code record written by the consent flow. */
+export const mcpAuthorizationCodeRecordSchema = z.object({
+  projectId: z.string(),
+  organizationId: z.string(),
+  userId: z.string(),
+  codeChallenge: z.string(),
+  codeChallengeMethod: z.string(),
+  redirectUri: z.string(),
+  clientId: z.string(),
+  expiresAt: z.number(),
+});
+
+export type McpAuthorizationCodeRecord = z.infer<typeof mcpAuthorizationCodeRecordSchema>;

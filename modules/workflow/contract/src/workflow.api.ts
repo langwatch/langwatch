@@ -4,13 +4,13 @@ import { moduleApi } from "@langwatch/module";
 
 import type { StudioClientEvent, StudioServerEvent } from "./studio-events.ts";
 import type { ExecutionState, Field, StudioWorkflow } from "./studio-workflow.ts";
-import type { ExecuteWorkflowComponentInput } from "./workflow-component.commands.ts";
 import type {
   ExecuteSyncRelayEvent,
   WorkflowCodeCompletionResponse,
   WorkflowRestEnvelope,
 } from "./workflow-rest.schemas.ts";
 import type {
+  ExecuteWorkflowComponentInput,
   ArchiveWorkflowCommand,
   CopyWorkflowCommand,
   CreateWorkflowCommand,

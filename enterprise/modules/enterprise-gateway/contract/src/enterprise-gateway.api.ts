@@ -4,6 +4,7 @@ import type {
 } from "@langwatch/model-provider-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { moduleApi } from "@langwatch/module";
+import { z } from "zod";
 
 import type {
   EnsureDefaultPersonalVirtualKeyInput,
@@ -69,3 +70,6 @@ export interface EnterpriseGatewayApi {
 }
 
 export const EnterpriseGatewayApi = moduleApi<EnterpriseGatewayApi>()("enterprise-gateway");
+
+/** A write whose whole answer is that it happened: a screen refetches, never trusting a row. */
+export const enterpriseGatewayWriteAcknowledgedSchema = z.object({ ok: z.boolean() }).strict();

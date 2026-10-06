@@ -3,6 +3,7 @@
  * Spec: modules/langy/specs/langy-panel-trpc.feature
  */
 import { defineTrpcContract } from "@langwatch/module";
+import { z } from "zod";
 
 import { LANGY_CONVERSATION_EVENT_TYPES } from "./constants.ts";
 import {
@@ -196,4 +197,16 @@ export const langyEgressTrpc = defineTrpcContract("langyEgress")
   .mutation("set")
   .withInput(langyEgressSetInputSchema)
   .withOutput(langyEgressStateSchema)
+  .build();
+
+/**
+ * The `setupSkills.*` namespace: setup instructions the empty states copy
+ * for a coding agent, kept server-side (~100 kB of markdown) until a reader opens the menu.
+ * Spec: specs/skills/empty-state-skill-setup.feature
+ */
+
+export const setupSkillsTrpc = defineTrpcContract("setupSkills")
+  .query("getPrompt")
+  .withInput(z.object({ projectId: z.string(), skill: z.string() }))
+  .withOutput(z.object({ body: z.string() }).strict())
   .build();

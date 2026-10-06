@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { studioWorkflowSchema } from "./studio-workflow.ts";
 import { workflowDslSchema, workflowRunOriginSchema } from "./workflow.ts";
 
 export const createWorkflowCommandSchema = z.object({
@@ -93,3 +94,14 @@ export type ArchiveWorkflowCommand = z.infer<typeof archiveWorkflowCommandSchema
 export type PublishWorkflowCommand = z.infer<typeof publishWorkflowCommandSchema>;
 export type CopyWorkflowCommand = z.infer<typeof copyWorkflowCommandSchema>;
 export type RunWorkflowCommand = z.infer<typeof runWorkflowCommandSchema>;
+
+export const executeWorkflowComponentInputSchema = z.object({
+  projectId: z.string().min(1),
+  workflow: studioWorkflowSchema,
+  nodeId: z.string().min(1),
+  traceId: z.string().min(1),
+  inputs: z.record(z.string(), z.unknown()),
+  origin: z.enum(["agent_test", "workflow"]),
+});
+
+export type ExecuteWorkflowComponentInput = z.infer<typeof executeWorkflowComponentInputSchema>;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolvePresenceAvailability } from "../presence-availability.ts";
+import { resolvePresenceAvailability } from "../presence.ts";
 
 describe("resolvePresenceAvailability()", () => {
   describe("when the organization switch is off", () => {

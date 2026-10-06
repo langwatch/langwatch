@@ -9,8 +9,20 @@ import {
 import { z } from "zod";
 
 import { MAX_PLAN_NAME_LENGTH } from "./plan-name.ts";
-import { suiteKindSchema } from "./suite.kind.ts";
 import { suiteScopeSchema } from "./suite.scope.ts";
+
+/**
+ * The kinds of SimulationSuite: "run_plan" is hand-assembled, "test_suite"
+ * groups scenarios via `Scenario.testSuiteId`. A string column plus this
+ * union, not a Prisma enum — adding a kind must not need a migration.
+ */
+export const SUITE_KINDS = ["test_suite", "run_plan"] as const;
+export const suiteKindSchema = z.enum(SUITE_KINDS);
+export type SuiteKind = z.infer<typeof suiteKindSchema>;
+
+export function isSuiteKind(value: string): value is SuiteKind {
+  return suiteKindSchema.validate(value);
+}
 
 export const RUN_ALL_SUITE_LABEL = "managed:run-all";
 export const RUN_ALL_SUITE_NAME = "All test cases";
@@ -255,3 +267,19 @@ export const suiteRunStateDataSchema = z
   })
   .strict();
 export type SuiteRunStateData = z.infer<typeof suiteRunStateDataSchema>;
+
+const INTERNAL_SET_PREFIX = "__internal__";
+export const SUITE_SET_SUFFIX = "__suite";
+
+export function isSuiteSetId(setId: string): boolean {
+  return setId.startsWith(INTERNAL_SET_PREFIX) && setId.endsWith(SUITE_SET_SUFFIX);
+}
+
+export function getSuiteSetId(suiteId: string): string {
+  return `${INTERNAL_SET_PREFIX}${suiteId}${SUITE_SET_SUFFIX}`;
+}
+
+export function extractSuiteId(setId: string): string | null {
+  if (!isSuiteSetId(setId)) return null;
+  return setId.slice(INTERNAL_SET_PREFIX.length, -SUITE_SET_SUFFIX.length);
+}

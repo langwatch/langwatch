@@ -10,8 +10,8 @@ export {
   type RecordedAuditLogEntry,
   type RecordedSinceInput,
 } from "./audit-log.ts";
-export { recordAuditLogCommandSchema, type RecordAuditLogCommand } from "./audit-log.commands.ts";
-export { AuditLogApi } from "./audit-log.api.ts";
+export { recordAuditLogCommandSchema, type RecordAuditLogCommand } from "./audit-log.ts";
+export { AuditLogApi } from "./audit-log.ts";
 export {
   recentItemSchema,
   recentItemsInputSchema,
@@ -20,4 +20,4 @@ export {
   type RecentItemsInput,
   type RecentItemType,
 } from "./recent-items.ts";
-export { homeTrpc } from "./home.trpc.ts";
+export { homeTrpc } from "./recent-items.ts";
