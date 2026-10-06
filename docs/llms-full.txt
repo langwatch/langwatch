@@ -69338,7 +69338,7 @@ To run it yourself, from the new image with the app's environment (`DATABASE_URL
 cd /app/apps/api && pnpm --silent run start:prepare:db
 ```
 
-That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one lease, so a second run waits for the first) and then the system-migrations pass. It is safe to run again: on a current installation it does nothing. To see what it would do first, run `cd /app/apps/tasks && pnpm task upgrade plan`; `pnpm task upgrade status` shows the ledger.
+That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one lease, so a second run waits for the first) and then the system-migrations pass. It is safe to run again: on a current installation it applies no step and leaves the schema as it is. To see what it would do first, run `cd /app/apps/tasks && pnpm task upgrade plan`; `pnpm task upgrade status` shows the ledger.
 
 `upgrade` exits non-zero and names the cause when it cannot proceed: `1` a step failed (a failed Prisma migration is named with the `prisma migrate resolve --rolled-back` command to clear it), `2` the installation is below this release's supported floor, `3` another upgrade holds the lease.
 
