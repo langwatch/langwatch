@@ -235,6 +235,13 @@ Feature: The REST runtime renders what a transport may not hand-roll
       And a protocol route that declares its own refusal document renders that 400 in it
 
     @integration
+    Scenario: A route that read any media type on main declares it accepted and still documents its own
+      Given a route that declares its media type accepted, as main's routes that never asked the Content-Type do
+      When it is called with a JSON body under text/plain, or with no Content-Type at all
+      Then the handler is handed the body as sent
+      And its OpenAPI document still publishes the body under the media type it declared
+
+    @integration
     Scenario: A refused credential is answered before the media type is checked
       Given a raw-body route behind a credential door that declares its media type
       When a caller presents no credential and a body under another media type

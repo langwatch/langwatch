@@ -28,8 +28,13 @@ describe("given the hosted MCP approval declaration", () => {
       expect(route?.access?.kind).toBe("optional");
       expect(route?.permission).toBeUndefined();
       // The body is read, never parsed: a blank field is this route's own
-      // refusal, worded in OAuth terms, not a validation envelope.
-      expect(route?.rawBody).toEqual({ form: "text", mediaType: "application/json" });
+      // refusal, worded in OAuth terms, not a validation envelope. Main read it
+      // under any media type, so another is accepted rather than refused.
+      expect(route?.rawBody).toEqual({
+        form: "text",
+        mediaType: "application/json",
+        mismatch: "accepted",
+      });
     });
   });
 

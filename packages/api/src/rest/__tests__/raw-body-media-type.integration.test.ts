@@ -20,6 +20,7 @@ import {
 } from "../../errors.ts";
 import type { RestCaller } from "../../hosting/api-door.ts";
 import { defineRestRouter } from "../declaration.ts";
+import { restRouteDocumentation } from "../openapi.ts";
 import type { RestProtocolRefusal } from "../response-kind.ts";
 import { createRestRuntime } from "../runtime.ts";
 
@@ -83,6 +84,12 @@ const notes = defineRestRouter(NoteApi)
       body: JSON.stringify(await app.record({ raw })),
     }),
   )
+
+  .post("/accepted", "recordAcceptedNote")
+  .withRawBody("text", { mediaType: JSON_TYPE, mismatch: "accepted" })
+  .withPermission("organization:manage")
+  .withOutput(answer)
+  .handle(async ({ app, raw }) => app.record({ raw }))
 
   .post("/signed", "recordSignedNote")
   .withRawBody("text", { mediaType: JSON_TYPE })
@@ -216,6 +223,36 @@ describe("a raw-body route that keeps main's 400 for another media type", () => 
       expect(response.status).toBe(400);
       await expect(response.text()).resolves.toBe(MAIN_NOT_JSON_BODY);
       expect(record).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("a raw-body route that declares its media type accepted, as main read any", () => {
+  describe.each(["text/plain", undefined])("when a JSON body is sent under %s", (contentType) => {
+    /** @scenario "A route that read any media type on main declares it accepted and still documents its own" */
+    it("hands the handler the body as sent", async () => {
+      const { hono, record } = notesApp();
+
+      const response = await hono.request(
+        "/api/v1/notes/accepted",
+        post({ body: '{"note":"as sent"}', contentType }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(record).toHaveBeenCalledWith({ raw: '{"note":"as sent"}' });
+    });
+  });
+
+  describe("when its OpenAPI document is read", () => {
+    /** @scenario "A route that read any media type on main declares it accepted and still documents its own" */
+    it("still publishes the body under the media type it declared", () => {
+      const route = notes.router().routes.find((each) => each.operation === "recordAcceptedNote");
+
+      expect(route).toBeDefined();
+      expect(restRouteDocumentation({ route: route! }).requestBody).toEqual({
+        required: true,
+        content: { [JSON_TYPE]: {} },
+      });
     });
   });
 });

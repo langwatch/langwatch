@@ -636,7 +636,11 @@ function routeStack<Api>({
     : [];
 
   const raw = route.rawBody ? [rawBodyMiddleware(route.rawBody)] : [];
-  const media = route.rawBody?.mismatch ? [mediaTypeMiddleware(route.rawBody)] : [];
+  const mismatch = route.rawBody?.mismatch;
+  const media =
+    route.rawBody && mismatch !== undefined && mismatch !== "accepted"
+      ? [mediaTypeMiddleware(route.rawBody)]
+      : [];
 
   return [
     ...(route.response?.refusal ? [protocolRefusalScope(route)] : []),

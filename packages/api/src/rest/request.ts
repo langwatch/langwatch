@@ -444,9 +444,10 @@ export type RestRawBody = Readonly<{
 
 /**
  * How a raw-body route refuses a Content-Type it does not read (Alex, 2026-10-05, E9): 415, or
- * main's 400 where the legacy family and the collector keep it.
+ * main's 400 where the legacy family and the collector keep it, or `accepted`: the type is only
+ * documented and any is read, as main's routes that never asked the header did.
  */
-export type RestMediaTypeMismatch = "unsupported_media_type" | "malformed_request";
+export type RestMediaTypeMismatch = "unsupported_media_type" | "malformed_request" | "accepted";
 
 /** What the handler is handed for the form it asked for. */
 export type RawBodyValue<Form extends RestRawBodyForm> = Form extends "text"

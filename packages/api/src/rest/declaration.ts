@@ -791,9 +791,9 @@ class RouteBuilder<Api, S extends RouteShape> {
   }
 
   /**
-   * The body is the evidence, so nothing parses it: the handler is handed the exact characters
-   * or bytes it was sent, read once. A named `mediaType` is also enforced after the door: any
-   * other Content-Type is refused with `mismatch` (415 unless the route keeps main's 400).
+   * The body is the evidence, so nothing parses it: the handler gets the exact characters or
+   * bytes sent, read once. A named `mediaType` is enforced after the door: another Content-Type
+   * is refused with `mismatch` (415, main's 400 where kept), or read anyway when `accepted`.
    */
   withRawBody<Form extends RestRawBodyForm>(
     this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
