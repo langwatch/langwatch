@@ -11,6 +11,8 @@ export const auditLogEntrySchema = z.object({
    *  nobody has identified — a lock taken against an address with no account
    *  is precisely the row an attack shows up in, and it still gets appended. */
   userId: z.string().min(1).optional(),
+  /** Who really did it when that is not `userId`, e.g. whoever sent an accepted invite. */
+  actorUserId: z.string().min(1).optional(),
   organizationId: z.string().min(1).optional(),
   projectId: z.string().min(1).optional(),
   action: z.string().min(1),
@@ -21,6 +23,9 @@ export const auditLogEntrySchema = z.object({
   metadata: auditLogJsonValueSchema.optional(),
   targetKind: z.string().min(1).optional(),
   targetId: z.string().min(1).optional(),
+  /** The target's state either side of a change, as the governance trail shows it. */
+  before: auditLogJsonValueSchema.optional(),
+  after: auditLogJsonValueSchema.optional(),
 });
 
 export type AuditLogEntry = z.infer<typeof auditLogEntrySchema>;
@@ -66,8 +71,9 @@ export interface AuditLogApi {
 export const AuditLogApi = moduleApi<AuditLogApi>()("audit-log");
 
 /**
- * `idempotencyKey` is the row's id, an `audit` KSUID the producer mints once when it records the
- * intent in its own commit; a repeat delivery writes nothing and answers the first row (Alex, Q72).
+ * `idempotencyKey` is an `audit` KSUID the producer mints once, in the commit that records the
+ * intent; the row stores it in its own unique column, so a repeat delivery writes nothing and
+ * answers the first row (Alex, Q72; audit R2). The row's id stays the table's own.
  */
 export const recordAuditLogCommandSchema = z.object({
   ...auditLogEntrySchema.shape,

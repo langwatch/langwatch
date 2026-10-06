@@ -3636,6 +3636,9 @@ model AuditLog {
   before     Json?
   after      Json?
 
+  /// A producer's outbox key: a redelivered audit intent finds its row here (Alex, audit R2).
+  idempotencyKey String? @unique
+
   @@index([createdAt])
   @@index([userId])
   @@index([actorUserId])

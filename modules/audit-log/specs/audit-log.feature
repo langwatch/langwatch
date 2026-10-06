@@ -90,15 +90,24 @@ Feature: Audit logging
     And their home strip lists the workflow
 
   Rule: A producer's audit goes through its own outbox after commit (Alex, Q72, 2026-10-06)
-    The producer records an audit intent, keyed by an audit id it mints once, in its own commit.
-    Its outbox calls AuditLogApi.record after commit and retries until the row is written.
+    The producer records an audit intent, keyed by an audit id it mints once, in its own commit
+    (Alex, audit R1: the intent shares the domain change's transaction). Its outbox calls
+    AuditLogApi.record after commit and retries until the row is written. The key lives in its own
+    unique column; every row keeps the table's one id scheme (Alex, audit R2).
 
     @unit
     Scenario: A keyed audit entry recorded twice writes one row
       Given an audit intent keyed by an audit id
       When the producer's outbox delivers it twice
-      Then one audit row is stored under that id
+      Then one audit row is stored under that key
       And both deliveries answer the same row
+
+    @unit
+    Scenario: A keyed audit row takes the table's own id, not its key
+      Given an audit intent keyed by an audit id
+      When the producer's outbox delivers it
+      Then the row's id is not the key
+      And the row records the key as its idempotency key
 
     @unit
     Scenario: A keyed audit entry keeps the moment the producer committed it
@@ -115,7 +124,7 @@ Feature: Audit logging
     Scenario: Concurrent deliveries of one keyed audit entry store one row
       Given an audit intent keyed by an audit id
       When two deliveries of it race against Postgres
-      Then one audit row is stored under that id
+      Then one audit row is stored under that key
 
     @unit
     Scenario: A failed audit delivery is retried from the producer's outbox

@@ -80,11 +80,7 @@ export class AuditLogService {
     if (key.resource !== AUDIT_KEY_RESOURCE) {
       throw new Error(`an audit idempotency key is an "${AUDIT_KEY_RESOURCE}" KSUID`);
     }
-    return this.repository.createOnce({
-      entry,
-      id: idempotencyKey,
-      occurredAt: key.date.getTime(),
-    });
+    return this.repository.createOnce({ entry, idempotencyKey, occurredAt: key.date.getTime() });
   }
 
   /** Who, what and which target stay; only secret-bearing values are replaced. */
