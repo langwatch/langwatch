@@ -44,7 +44,9 @@ type SessionReader = () => Promise<McpSession>;
 const SURFACE = "mcp" as const;
 const FORBIDDEN_PREFIX = "FORBIDDEN: ";
 const NEEDS_OAUTH_PREFIX = "AUTH_REQUIRED: ";
-const NEEDS_OAUTH_FOR_WRITES = `${NEEDS_OAUTH_PREFIX}This governance MCP tool requires an OAuth-authenticated session (mint via /api/mcp/authorize). Project-apiKey-only sessions can use read tools but cannot perform writes.`;
+const NEEDS_OAUTH_FOR_WRITES =
+  `${NEEDS_OAUTH_PREFIX}This governance MCP tool requires an OAuth-authenticated session (mint via /api/mcp/authorize). ` +
+  `Project-apiKey-only sessions can use read tools but cannot perform writes.`;
 
 function text(value: string) {
   return { content: [{ type: "text" as const, text: value }] };
@@ -115,6 +117,7 @@ export class GovernanceMcpToolsService {
     };
     this.registerTemplateReads(server, organizationTier);
     this.registerTemplateWrites(server, organizationTier);
+    this.registerTemplateCopies(server, organizationTier);
     this.registerIngestionKeys(server, session);
   }
 
@@ -193,7 +196,8 @@ export class GovernanceMcpToolsService {
   private registerTemplateReads(server: GovernanceMcpServer, session: SessionReader): void {
     server.tool(
       "governance_ingestion_templates_list",
-      "List the user-visible ingestion templates for the caller's organization. Returns the union of platform-published defaults and any org-authored rows; excludes the OTTL source. Mirrors GET /api/governance/ingestion-templates.",
+      "List the user-visible ingestion templates for the caller's organization. Returns the union of platform-published " +
+        "defaults and any org-authored rows; excludes the OTTL source. Mirrors GET /api/governance/ingestion-templates.",
       {},
       () =>
         this.read(session, "aiTools:view", (organizationId) =>
@@ -205,7 +209,8 @@ export class GovernanceMcpToolsService {
     // so a project-apiKey session without a user identity is refused, not silently allowed.
     server.tool(
       "governance_ingestion_templates_admin_list",
-      "Admin catalog read — same union as the user-visible list but INCLUDES ottlRules. Requires aiTools:manage. Mirrors GET /api/governance/ingestion-templates/admin.",
+      "Admin catalog read — same union as the user-visible list but INCLUDES ottlRules. Requires aiTools:manage. " +
+        "Mirrors GET /api/governance/ingestion-templates/admin.",
       {},
       () =>
         this.write(session, "aiTools:manage", ({ organizationId }) =>
@@ -227,7 +232,8 @@ export class GovernanceMcpToolsService {
   private registerTemplateWrites(server: GovernanceMcpServer, session: SessionReader): void {
     server.tool(
       "governance_ingestion_templates_create",
-      "Author a new org-scoped ingestion template. The slug is auto-generated from displayName + a random suffix. Requires aiTools:manage. Mirrors POST /api/governance/ingestion-templates.",
+      "Author a new org-scoped ingestion template. The slug is auto-generated from displayName + a random suffix. " +
+        "Requires aiTools:manage. Mirrors POST /api/governance/ingestion-templates.",
       {
         source_type: z
           .string()
@@ -257,7 +263,8 @@ export class GovernanceMcpToolsService {
 
     server.tool(
       "governance_ingestion_templates_update_ottl_rules",
-      "Update the ottlRules of an org-authored template. Platform rows are immutable. Requires aiTools:manage. Mirrors PATCH /api/governance/ingestion-templates/:id/ottl-rules.",
+      "Update the ottlRules of an org-authored template. Platform rows are immutable. Requires aiTools:manage. " +
+        "Mirrors PATCH /api/governance/ingestion-templates/:id/ottl-rules.",
       {
         id: z.string(),
         ottl_rules: z.string().describe("New ottlRules body. Empty string permitted."),
@@ -272,10 +279,13 @@ export class GovernanceMcpToolsService {
           }),
         ),
     );
+  }
 
+  private registerTemplateCopies(server: GovernanceMcpServer, session: SessionReader): void {
     server.tool(
       "governance_ingestion_templates_clone_from_platform",
-      "Clone a platform-published template into an editable org-authored row. Requires aiTools:manage. Mirrors POST /api/governance/ingestion-templates/:id/clone.",
+      "Clone a platform-published template into an editable org-authored row. Requires aiTools:manage. Mirrors " +
+        "POST /api/governance/ingestion-templates/:id/clone.",
       { source_template_id: z.string() },
       ({ source_template_id }) =>
         this.write(session, "aiTools:manage", (caller) =>
@@ -289,7 +299,8 @@ export class GovernanceMcpToolsService {
 
     server.tool(
       "governance_ingestion_templates_archive",
-      "Soft-archive an org-authored template. Existing ingestion keys continue to land traces; new installs are blocked. Requires aiTools:manage. Mirrors DELETE /api/governance/ingestion-templates/:id.",
+      "Soft-archive an org-authored template. Existing ingestion keys continue to land traces; new installs " +
+        "are blocked. Requires aiTools:manage. Mirrors DELETE /api/governance/ingestion-templates/:id.",
       { id: z.string() },
       async ({ id }) => {
         const current = await session();
@@ -334,7 +345,12 @@ export class GovernanceMcpToolsService {
     // key every other machine under this login exports with. The explicit rotate is on /me.
     server.tool(
       "governance_ingestion_keys_mint",
-      "Mint an ingestion key for the caller's personal project + source_type, returning the ik-lw-* token (shown ONCE). Minting adds a key rather than replacing one, so the keys other machines already export with keep working. source_type must match a published ingestion template named by template_id; a tool the LangWatch CLI wraps (claude_code, codex, gemini, opencode, copilot_*) is refused here, because its key is minted by the CLI on the machine that runs it and retired with that machine's session. Requires OAuth-authenticated session + organization:view.",
+      "Mint an ingestion key for the caller's personal project + source_type, returning the ik-lw-* token (shown " +
+        "ONCE). Minting adds a key rather than replacing one, so the keys other machines already export with " +
+        "keep working. source_type must match a published ingestion template named by template_id; a tool the " +
+        "LangWatch CLI wraps (claude_code, codex, gemini, opencode, copilot_*) is refused here, because its key " +
+        "is minted by the CLI on the machine that runs it and retired with that machine's session. Requires OAuth-authenticated " +
+        "session + organization:view.",
       {
         source_type: z.string(),
         template_id: z.string().optional(),
@@ -354,7 +370,10 @@ export class GovernanceMcpToolsService {
     // Answers main's plain-text line rather than JSON, as the template archive does.
     server.tool(
       "governance_ingestion_keys_revoke",
-      "Revoke one of the caller's own ingestion keys by api_key_id (from governance_ingestion_keys_list). The token stops authorizing trace writes from that moment; past traces stay. Idempotent: a key already revoked stays revoked. Another person's key answers ingestion_key_not_found. Requires OAuth-authenticated session + organization:view.",
+      "Revoke one of the caller's own ingestion keys by api_key_id (from governance_ingestion_keys_list). The " +
+        "token stops authorizing trace writes from that moment; past traces stay. Idempotent: a key already revoked " +
+        "stays revoked. Another person's key answers ingestion_key_not_found. Requires OAuth-authenticated session " +
+        "+ organization:view.",
       { api_key_id: z.string() },
       async ({ api_key_id }) => {
         const current = await session();

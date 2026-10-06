@@ -86,7 +86,10 @@ export class ErasureSuppressionService {
       if (!(error instanceof ErasureSecretMissingError)) throw error;
       this.logger.error(
         { error, organizationId, provider, suppressedIdentifiers: hashes.size },
-        "This organization has erased identifiers but this process has no erasure secret, so the list cannot be checked; this run will not suppress anything and an erased identifier may be re-imported. Set the same secret every other process uses — a split deployment where one side has it and the other does not produces exactly this",
+        "This organization has erased identifiers but this process has no erasure secret, so the list cannot " +
+          "be checked; this run will not suppress anything and an erased identifier may be re-imported. Set the " +
+          "same secret every other process uses — a split deployment where one side has it and the other does not " +
+          "produces exactly this",
       );
       return NO_SUPPRESSION;
     }
@@ -137,7 +140,9 @@ export class ErasureSuppressionService {
     } catch (error) {
       if (!(error instanceof ErasureSecretMissingError)) throw error;
       throw new Error(
-        `Governance area ${tenantId} belongs to an organization that has erased somebody, but this process has no erasure secret, so the stand-in cannot be computed. Writing the identifier as it stands would put an erased person's address into the daily cost table. Set the same value every other process uses.`,
+        `Governance area ${tenantId} belongs to an organization that has erased somebody, but this process has ` +
+          `no erasure secret, so the stand-in cannot be computed. Writing the identifier as it stands would put ` +
+          `an erased person's address into the daily cost table. Set the same value every other process uses.`,
         { cause: error },
       );
     }
