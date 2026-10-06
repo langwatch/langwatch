@@ -74,6 +74,7 @@ class StubRepository implements UserRepository {
   createPasskeyUser = vi.fn(async () => ({ id: user.id }));
   hasPassword = vi.fn(async () => true);
   setFirstPassword = vi.fn(async () => "set" as const);
+  adoptUnconfirmed = vi.fn(async () => "adopted" as const);
   findPasskeyNudgeStatus = vi.fn(async () => ({
     hasPasskey: false,
     twoStepEnabled: false,

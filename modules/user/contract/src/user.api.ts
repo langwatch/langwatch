@@ -32,6 +32,7 @@ import type {
   UserApiRequestBudgetIncreaseInput,
 } from "./user.schemas.ts";
 import type {
+  AdoptUnconfirmedAccountOutcome,
   ChangeOwnPasswordInput,
   CreateCredentialUserInput,
   CreatePasskeyUserInput,
@@ -111,6 +112,11 @@ export interface UserApi {
   createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser>;
   /** Mints an account whose only sign-in method is the passkey about to be registered. */
   createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser>;
+  /**
+   * An address proof adopts the unfinished account on it: one transaction confirms the address
+   * and drops every sign-in method set before the proof; memberships stay (rulings 2026-10-06).
+   */
+  adoptUnconfirmedAccount(input: UserEmailInput): Promise<AdoptUnconfirmedAccountOutcome>;
   /** The signup form's whole path: the mode gate, the throttle and the mint. */
   registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser>;
   hasPassword(input: UserIdInput): Promise<boolean>;

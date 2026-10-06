@@ -13,6 +13,7 @@ import {
   userCredentialAccountSchema,
   userPasskeyNudgeStatusSchema,
   userNotificationChoiceSchema,
+  type AdoptUnconfirmedAccountOutcome,
   type CreateUserInput,
   type UpdateUserProfileInput,
   type UserAccountInfo,
@@ -264,6 +265,33 @@ export class PrismaUserRepository
     });
 
     return "set";
+  }
+
+  async adoptUnconfirmed(input: { id: string }): Promise<AdoptUnconfirmedAccountOutcome> {
+    // Serializable, so a sign-in or a confirmation racing the adoption is either seen
+    // here or retried against what this one wrote.
+    return this.serializableTransaction<AdoptUnconfirmedAccountOutcome>(async (transaction) => {
+      const row = await transaction.user.findUnique({
+        where: { id: input.id },
+        select: { emailVerified: true, lastLoginAt: true },
+      });
+      if (!row) return "no_account";
+      if (row.emailVerified) return "already_confirmed";
+      if (row.lastLoginAt) return "signed_in";
+
+      await transaction.account.deleteMany({ where: { userId: input.id } });
+      await transaction.passkey.deleteMany({ where: { userId: input.id } });
+      await transaction.user.update({
+        where: { id: input.id },
+        data: {
+          emailVerified: true,
+          signupConfirmationPending: false,
+          passkeySignupClaimHash: null,
+        },
+      });
+
+      return "adopted";
+    });
   }
 
   async findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus> {
