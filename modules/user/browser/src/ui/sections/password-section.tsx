@@ -125,6 +125,7 @@ export function PasswordSection() {
       <RemoveSignInMethodDialog
         target={removal.target}
         staysBehind={removal.staysBehind}
+        organizationEnforcesSso={false}
         isRemoving={removal.isRemoving}
         onClose={removal.cancel}
         onConfirm={removal.confirm}

@@ -85,21 +85,6 @@ export function canChangePassword(authProvider: string | undefined): boolean {
 }
 
 /**
- * Whether a linked method may be removed — never the last one, and never
- * any of them on an organization pinned to a single sign-on provider. The
- * server refuses under a serializable transaction; this says so before the click.
- */
-export function isRemovableMethod({
-  linkedCount,
-  hasSsoProvider,
-}: {
-  linkedCount: number;
-  hasSsoProvider: boolean;
-}): boolean {
-  return !hasSsoProvider && linkedCount > 1;
-}
-
-/**
  * Whether a passkey lives on a portable key (usb, nfc, ble)
  * rather than a synced device authenticator.
  */

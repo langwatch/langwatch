@@ -75,18 +75,12 @@ Feature: Change password from /settings/security
   # ── The linked sign-in methods list ────────────────────────────────────────
 
   @integration
-  Scenario: The only linked sign-in method offers no way to remove it
-    Given my account holds exactly one linked sign-in method
-    Then no control to remove it is offered
+  Scenario: The only linked sign-in method stands its remove control down
+    Given my account holds exactly one linked sign-in method the removal guard would refuse
+    Then the control to remove it is disabled before the click
+    And no confirmation opens
     Because the server refuses the last account under a serializable transaction,
       and the affordance should say so before the click rather than after it
-
-  @integration
-  Scenario: An organization on single sign-on links and removes nothing
-    Given my organization is pinned to a single sign-on provider
-    Then I am told my company's provider signs me in
-    And neither linking nor removing a method is offered,
-      because a second way in would route around the provider the organization chose
 
   @integration
   Scenario: Removing a linked sign-in method re-reads the list

@@ -9,7 +9,6 @@ import {
   canChangePassword,
   federatedMethodLabel,
   isCredentialAccount,
-  isRemovableMethod,
   isSecurityKey,
   passkeyLabel,
   providerDisplayName,
@@ -89,37 +88,6 @@ describe("given the deployment's sign-in mode", () => {
       expect(canChangePassword("google")).toBe(false);
       expect(canChangePassword("okta")).toBe(false);
       expect(canChangePassword(void 0)).toBe(false);
-    });
-  });
-});
-
-describe("given the methods an account holds", () => {
-  describe("when only one is linked", () => {
-    /**
-     * The server refuses the last account under a serializable transaction;
-     * this is the affordance saying so before the click rather than after it.
-     */
-    /** @scenario The only linked sign-in method offers no way to remove it */
-    it("is not removable", () => {
-      expect(isRemovableMethod({ linkedCount: 1, hasSsoProvider: false })).toBe(false);
-    });
-  });
-
-  describe("when several are linked", () => {
-    /** @scenario Removing a linked sign-in method re-reads the list */
-    it("is removable", () => {
-      expect(isRemovableMethod({ linkedCount: 2, hasSsoProvider: false })).toBe(true);
-    });
-  });
-
-  describe("when the organization is pinned to a single sign-on provider", () => {
-    /**
-     * A second way in would route around the provider the organization chose,
-     * so none of them may be removed and none may be added.
-     */
-    /** @scenario An organization on single sign-on links and removes nothing */
-    it("is never removable, however many are linked", () => {
-      expect(isRemovableMethod({ linkedCount: 3, hasSsoProvider: true })).toBe(false);
     });
   });
 });

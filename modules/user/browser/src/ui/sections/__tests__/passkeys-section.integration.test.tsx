@@ -105,13 +105,16 @@ describe("given an account with no passkeys", () => {
   });
 
   describe("when the password is the only way in", () => {
+    /** @scenario "An account with one way in is told so, where the remedy is" */
     it("warns that a forgotten password would leave them outside", async () => {
       state.hasPassword = true;
       state.accounts = [{ id: "acc-pw", provider: "credential", providerAccountId: "u-1" }];
       renderSection({ passkeys: [] });
 
       const notice = await screen.findByTestId("last-way-in-notice");
+      expect(screen.getByTestId("passkeys-settings-section").contains(notice)).toBe(true);
       expect(notice.textContent).toMatch(/Your password is the only way into this account/);
+      expect(notice.textContent).toMatch(/Add a passkey/);
     });
   });
 
@@ -179,6 +182,7 @@ describe("given an account with no passkeys", () => {
 });
 
 describe("given a passkey alongside a password", () => {
+  /** @scenario "An account with more than one way in is told nothing" */
   it("says nothing about a last way in", async () => {
     state.hasPassword = true;
     state.accounts = [{ id: "acc-pw", provider: "credential", providerAccountId: "u-1" }];

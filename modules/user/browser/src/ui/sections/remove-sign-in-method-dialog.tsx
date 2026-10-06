@@ -4,18 +4,22 @@ import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitive
 import type { SignInMethodRemovalTarget } from "../../behavior/use-sign-in-method-removal.ts";
 
 /**
- * The question before a way in is given up: what stays, and whether another
- * becomes primary first. "Are you sure" is unanswerable without knowing what is left.
+ * The question before a way in is given up: what stays, whether another
+ * becomes primary first, and whether single sign-on brings it back. "Are you sure"
+ * is unanswerable without knowing what is left.
  */
 export function RemoveSignInMethodDialog({
   target,
   staysBehind,
+  organizationEnforcesSso,
   isRemoving,
   onClose,
   onConfirm,
 }: {
   target: SignInMethodRemovalTarget | null;
   staysBehind: (accountId: string) => string[];
+  /** Only a linked account comes back on the next sign-in; a password never does. */
+  organizationEnforcesSso: boolean;
   isRemoving: boolean;
   onClose: () => void;
   onConfirm: (accountId: string) => void;
@@ -47,6 +51,12 @@ export function RemoveSignInMethodDialog({
             {target?.demotesFirst ? (
               <Text fontSize="sm" color="fg.muted">
                 This is your primary sign-in method, so another confirmed one becomes primary first.
+              </Text>
+            ) : null}
+            {organizationEnforcesSso ? (
+              <Text fontSize="sm" color="fg.muted" data-testid="unlink-relinks-on-sso">
+                Your organization signs people in through single sign-on, so the next time you sign
+                in that way it will be linked again.
               </Text>
             ) : null}
           </VStack>

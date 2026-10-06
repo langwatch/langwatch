@@ -5,6 +5,7 @@
  */
 
 import {
+  Box,
   Button,
   HStack,
   IconButton,
@@ -13,17 +14,20 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AtSign, KeyRound, X } from "lucide-react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
+import { useSignInMethodRemoval } from "../../behavior/use-sign-in-method-removal.ts";
+import { refusalCopy } from "../../features/account-identifiers/model/refusal-copy.ts";
 import { EmailIdentifiersSection } from "../../features/account-identifiers/ui/sections/email-identifiers-section.tsx";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import {
   connectableProviders,
   connectLabel,
-  isRemovableMethod,
   providerDisplayName,
 } from "../../model/sign-in-methods.ts";
+import { RemoveSignInMethodDialog } from "./remove-sign-in-method-dialog.tsx";
 
 export function EmailAndLinkedAccountsSection() {
   const host = usePersonalWorkspaceHost();
@@ -64,47 +68,87 @@ export function EmailAndLinkedAccountsSection() {
   );
 }
 
-function LinkedAccountRows({ hasSsoProvider }: { hasSsoProvider: boolean }) {
-  const host = usePersonalWorkspaceHost();
-  const accounts = api.user.getLinkedAccounts.useQuery({});
-  const unlinkAccount = api.user.unlinkAccount.useMutation();
-  const utils = api.useUtils();
+function UnlinkMethodButton({
+  name,
+  removable,
+  refusalCode,
+  isPending,
+  onAsk,
+}: {
+  name: string;
+  removable: boolean;
+  refusalCode: string | null;
+  isPending: boolean;
+  onAsk: () => void;
+}) {
+  const button = (
+    <IconButton
+      aria-label={`Remove ${name}`}
+      variant="ghost"
+      size="xs"
+      onClick={onAsk}
+      disabled={!removable || isPending}
+      data-testid="unlink-method"
+    >
+      <X size={16} />
+    </IconButton>
+  );
+  if (removable || !refusalCode) return button;
 
-  const handleUnlink = async (accountId: string) => {
-    try {
-      await unlinkAccount.mutateAsync({ accountId });
-      await utils.user.getLinkedAccounts.invalidate();
-      host.succeeded({ title: "Sign-in method removed" });
-    } catch (error) {
-      host.failed({ error, fallbackTitle: "Couldn't remove the sign-in method" });
-    }
-  };
+  return (
+    <Tooltip content={refusalCopy(refusalCode)} showArrow>
+      <Box data-testid="unlink-method-blocked">{button}</Box>
+    </Tooltip>
+  );
+}
+
+/**
+ * The guard decides whether a row can go, not a count and not the organization's
+ * sign-on setting: an enforcing organization may unlink, and the question says it
+ * comes back.
+ */
+function LinkedAccountRows({ hasSsoProvider }: { hasSsoProvider: boolean }) {
+  const accounts = api.user.getLinkedAccounts.useQuery({});
+  const removal = useSignInMethodRemoval({
+    successTitle: "Sign-in method removed",
+    failureTitle: "Couldn't remove the sign-in method",
+  });
 
   if (accounts.isLoading) return <Spinner size="sm" />;
 
   const linked = accounts.data ?? [];
   return (
     <VStack align="stretch" gap={1} width="full">
-      {linked.map((account) => (
-        <HStack key={account.id} width="full" gap={2} paddingY={2}>
-          <KeyRound size={16} />
-          <Text fontSize="sm">
-            {providerDisplayName(account.provider, account.providerAccountId)}
-          </Text>
-          <Spacer />
-          {isRemovableMethod({ linkedCount: linked.length, hasSsoProvider }) && (
-            <IconButton
-              aria-label="Remove sign-in method"
-              variant="ghost"
-              size="xs"
-              onClick={() => void handleUnlink(account.id)}
-              disabled={unlinkAccount.isPending}
-            >
-              <X size={16} />
-            </IconButton>
-          )}
-        </HStack>
-      ))}
+      {linked.map((account) => {
+        const name = providerDisplayName(account.provider, account.providerAccountId);
+        const verdict = removal.verdictFor(account.id);
+        return (
+          <HStack key={account.id} width="full" gap={2} paddingY={2}>
+            <KeyRound size={16} />
+            <Text fontSize="sm">{name}</Text>
+            <Spacer />
+            {verdict ? (
+              <UnlinkMethodButton
+                name={name}
+                removable={verdict.removable}
+                refusalCode={verdict.refusalCode}
+                isPending={removal.isRemoving}
+                onAsk={() =>
+                  removal.ask({ accountId: account.id, name, demotesFirst: verdict.demotesFirst })
+                }
+              />
+            ) : null}
+          </HStack>
+        );
+      })}
+      <RemoveSignInMethodDialog
+        target={removal.target}
+        staysBehind={removal.staysBehind}
+        organizationEnforcesSso={hasSsoProvider}
+        isRemoving={removal.isRemoving}
+        onClose={removal.cancel}
+        onConfirm={removal.confirm}
+      />
     </VStack>
   );
 }

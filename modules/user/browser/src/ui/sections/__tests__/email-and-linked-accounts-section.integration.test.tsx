@@ -4,7 +4,7 @@
  * Email address and linked accounts. Scoped with `within`, see the handoff.
  */
 
-import { cleanup, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,6 +21,7 @@ const { state } = vi.hoisted(() => ({
     authProvider: "auth0" as string | undefined,
     linkedAccounts: [] as { id: string; provider: string; providerAccountId: string }[],
     accountsLoading: false,
+    identifiers: [] as Record<string, unknown>[],
   },
 }));
 
@@ -38,11 +39,16 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
   });
   const api = {
     useUtils: () => ({
-      user: { getLinkedAccounts: { invalidate: calls.invalidateLinked } },
+      user: {
+        getLinkedAccounts: { invalidate: calls.invalidateLinked },
+        hasPassword: { invalidate: vi.fn() },
+      },
       identity: { myIdentifiers: { invalidate: vi.fn() } },
     }),
     identity: {
-      myIdentifiers: { useQuery: () => ({ data: [], isPending: false, error: null }) },
+      myIdentifiers: {
+        useQuery: () => ({ data: state.identifiers, isPending: false, error: null }),
+      },
       myMethodsLastUsed: { useQuery: () => ({ data: undefined }) },
       addEmailIdentifier: mutation(() => ({ identifierId: "id-new" })),
       resendIdentifierConfirmation: mutation(() => ({ sent: true })),
@@ -75,11 +81,28 @@ beforeEach(() => {
   state.authProvider = "auth0";
   state.linkedAccounts = [{ id: "acc-1", provider: "auth0", providerAccountId: "auth0|user-123" }];
   state.accountsLoading = false;
+  state.identifiers = [];
   calls.unlinkAccount.mockReset();
   calls.invalidateLinked.mockReset();
 });
 
 afterEach(() => cleanup());
+
+/** What the detach guard says about one linked account, as the route would answer it. */
+function verdict(overrides: Record<string, unknown> & { accountId: string }) {
+  return {
+    identifierId: `id-${overrides.accountId}`,
+    provider: "oidc",
+    value: `${overrides.accountId}@acme.example`,
+    isPrimary: false,
+    confirmed: true,
+    resendable: false,
+    removable: true,
+    refusalCode: null,
+    demotesFirst: false,
+    ...overrides,
+  };
+}
 
 function renderSection(options: Parameters<typeof fakePersonalWorkspaceHost>[0] = {}) {
   const host = fakePersonalWorkspaceHost({
@@ -153,35 +176,57 @@ describe("given a deployment that reports no identity provider", () => {
 
 describe("given an organization pinned to a single sign-on provider", () => {
   describe("when the page renders", () => {
-    /** @scenario "An organization on single sign-on links and removes nothing" */
-    it("says why, and offers neither linking nor removing", () => {
-      state.linkedAccounts = [
-        { id: "acc-1", provider: "auth0", providerAccountId: "okta|a" },
-        { id: "acc-2", provider: "auth0", providerAccountId: "github|b" },
-      ];
+    it("says why nothing more can be linked, and offers no connect button", () => {
+      state.linkedAccounts = [{ id: "acc-1", provider: "auth0", providerAccountId: "okta|a" }];
       const { scope } = renderSection({
         organization: { ...FAKE_ORGANIZATION, ssoProvider: "okta" },
       });
 
       expect(scope.getByText(/company's SSO provider/i)).toBeTruthy();
       expect(scope.queryByRole("button", { name: /Connect single sign-on/i })).toBeNull();
-      expect(scope.queryByRole("button", { name: /Remove sign-in method/i })).toBeNull();
+    });
+  });
+
+  describe("when the reader asks to unlink the single sign-on method", () => {
+    /** @scenario "A member of an organization that enforces single sign-on is told it comes back" */
+    it("says signing in that way links it again, and allows the unlink", async () => {
+      state.linkedAccounts = [{ id: "acc-1", provider: "auth0", providerAccountId: "okta|a" }];
+      state.identifiers = [verdict({ accountId: "acc-1" })];
+      const { scope } = renderSection({
+        organization: { ...FAKE_ORGANIZATION, ssoProvider: "okta" },
+      });
+
+      await userEvent.click(scope.getByTestId("unlink-method"));
+
+      const notice = await screen.findByTestId("unlink-relinks-on-sso");
+      expect(notice.textContent).toMatch(/linked again/i);
+      expect(screen.getByTestId("confirm-unlink-method")).toHaveProperty("disabled", false);
     });
   });
 });
 
 describe("given an organization with no single sign-on and two linked methods", () => {
-  describe("when the reader removes one", () => {
+  describe("when the reader asks to unlink one", () => {
+    /** @scenario "Unlinking a single sign-on method asks first and says what stays" */
     /** @scenario "Removing a linked sign-in method re-reads the list" */
-    it("sends the account id and re-reads the list", async () => {
+    it("names the ways in that stay and unlinks nothing until confirmed", async () => {
       state.linkedAccounts = [
         { id: "acc-1", provider: "auth0", providerAccountId: "okta|a" },
         { id: "acc-2", provider: "auth0", providerAccountId: "github|b" },
       ];
+      state.identifiers = [
+        verdict({ accountId: "acc-1", value: "sam@acme.example" }),
+        verdict({ accountId: "acc-2", value: "sam@gmail.example" }),
+      ];
       const { scope, host } = renderSection();
 
-      const removals = scope.getAllByRole("button", { name: "Remove sign-in method" });
-      await userEvent.click(removals[0]!);
+      await userEvent.click(scope.getAllByTestId("unlink-method")[0]!);
+
+      const dialog = await screen.findByTestId("unlink-method-dialog");
+      expect(dialog.textContent).toContain("sam@gmail.example");
+      expect(calls.unlinkAccount).not.toHaveBeenCalled();
+
+      await userEvent.click(screen.getByTestId("confirm-unlink-method"));
 
       await waitFor(() => expect(calls.unlinkAccount).toHaveBeenCalledWith({ accountId: "acc-1" }));
       expect(calls.invalidateLinked).toHaveBeenCalled();
@@ -191,14 +236,40 @@ describe("given an organization with no single sign-on and two linked methods", 
         ),
       );
     });
-  });
 
-  describe("when only one method is linked", () => {
-    /** @scenario "The only linked sign-in method offers no way to remove it" */
-    it("offers no way to remove it", () => {
+    /** @scenario "Unlinking a primary single sign-on method demotes it first" */
+    it("says another way in becomes primary before it goes", async () => {
+      state.linkedAccounts = [
+        { id: "acc-1", provider: "auth0", providerAccountId: "okta|a" },
+        { id: "acc-2", provider: "auth0", providerAccountId: "github|b" },
+      ];
+      state.identifiers = [
+        verdict({ accountId: "acc-1", isPrimary: true, demotesFirst: true }),
+        verdict({ accountId: "acc-2" }),
+      ];
       const { scope } = renderSection();
 
-      expect(scope.queryByRole("button", { name: "Remove sign-in method" })).toBeNull();
+      await userEvent.click(scope.getAllByTestId("unlink-method")[0]!);
+
+      const dialog = await screen.findByTestId("unlink-method-dialog");
+      expect(dialog.textContent).toMatch(/becomes primary first/i);
+    });
+  });
+
+  describe("when the guard would refuse the only linked method", () => {
+    /** @scenario "The only linked sign-in method stands its remove control down" */
+    it("stands the control down before the click", () => {
+      state.identifiers = [
+        verdict({
+          accountId: "acc-1",
+          removable: false,
+          refusalCode: "identity_detach_strands_user",
+        }),
+      ];
+      const { scope } = renderSection();
+
+      expect(scope.getByTestId("unlink-method")).toHaveProperty("disabled", true);
+      expect(scope.queryByTestId("unlink-method-dialog")).toBeNull();
     });
   });
 

@@ -5,7 +5,7 @@
  */
 import "@testing-library/jest-dom/vitest";
 import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FakeSsoHost, renderWithSsoHost } from "../../../testing.tsx";
@@ -100,6 +100,18 @@ describe("given a live OpenID Connect connection to okta", () => {
     expect(screen.getByTestId("authentication-domain-chip")).toHaveTextContent(
       "acme.com · Record missing",
     );
+  });
+
+  /** @scenario "A connection that is on but carrying nobody says both" */
+  it("says who the connection routes beside whether it is on, in two separate chips", () => {
+    renderCard();
+
+    const card = within(screen.getByTestId("single-sign-on-card"));
+    const routing = card.getByTestId("sso-routing-chip");
+    expect(routing).toHaveTextContent("Everybody");
+    expect(card.getByText("Active")).toBeInTheDocument();
+    expect(routing).not.toHaveTextContent("Active");
+    expect(card.getByText("Active")).not.toBe(routing);
   });
 
   /** @scenario "The overview offers only what the connection really has" */
