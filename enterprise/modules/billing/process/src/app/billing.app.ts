@@ -44,7 +44,6 @@ import { GatewayApi } from "@langwatch/gateway-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
-import { AdminSurfaceHiddenError, type OpsOperatorPermission } from "@langwatch/ops-contract";
 import { OrganizationApi, type OrganizationCaller } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -899,15 +898,18 @@ export class BillingModule
       ...plan,
       overrideAddingLimitations:
         !!impersonatorId &&
-        (await this.#isOperator({ userId: impersonatorId, permission: "ops:view" })),
+        (await this.#authorization.can({
+          principal: { type: "user", id: impersonatorId },
+          permission: "ops:view",
+          scope: { type: "platform" },
+        })),
     };
   }
 
   async getConnectedBillingOverview(
     input: { organizationId: string },
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedBillingOverview> {
-    const staff = await this.#admitStaff({ by, permission: "ops:view" });
     await this.#record({
       staff,
       action: "connectedBilling.get",
@@ -919,9 +921,8 @@ export class BillingModule
 
   async onboardConnectedCustomer(
     input: ConnectedOnboardRequest,
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedBillingAccountView> {
-    const staff = await this.#admitStaff({ by, permission: "ops:manage" });
     const account = await this.#connectedBilling().billing.onboard({
       ...input,
       termStartsAt: Temporal.Instant.from(input.termStartsAt),
@@ -944,9 +945,8 @@ export class BillingModule
 
   async addConnectedCommit(
     input: ConnectedAddCommitRequest,
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedCreditGrantView> {
-    const staff = await this.#admitStaff({ by, permission: "ops:manage" });
     const grant = await this.#connectedBilling().billing.addCommit({
       ...input,
       operatorId: staff.id,
@@ -962,9 +962,8 @@ export class BillingModule
 
   async renewConnectedTerm(
     input: ConnectedRenewRequest,
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedBillingAccountView> {
-    const staff = await this.#admitStaff({ by, permission: "ops:manage" });
     const account = await this.#connectedBilling().billing.renew({
       ...input,
       termStartsAt: Temporal.Instant.from(input.termStartsAt),
@@ -986,9 +985,8 @@ export class BillingModule
 
   async completeConnectedRenewalIfDue(
     input: { organizationId: string },
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<RenewalCompletion> {
-    const staff = await this.#admitStaff({ by, permission: "ops:manage" });
     const outcome = await this.#connectedBilling().billing.completeRenewalIfDue(input);
     await this.#record({
       staff,
@@ -1001,9 +999,8 @@ export class BillingModule
 
   async markConnectedInvoicePaidOutOfBand(
     input: { stripeInvoiceId: string },
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<void> {
-    const staff = await this.#admitStaff({ by, permission: "ops:manage" });
     await this.#connectedBilling().billing.markPaidOutOfBand(input);
     await this.#auditLog.record({
       userId: staff.id,
@@ -1044,34 +1041,6 @@ export class BillingModule
   async runConnectedBillingTick(): Promise<void> {
     if (!this.#isSaas) return;
     await this.#connectedBilling().tick.run();
-  }
-
-  /** The staff member, or a 404 that says nothing about why. */
-  async #admitStaff({
-    by,
-    permission,
-  }: {
-    by: BillingStaff | null;
-    permission: OpsOperatorPermission;
-  }): Promise<BillingStaff> {
-    if (!by || !(await this.#isOperator({ userId: by.id, permission }))) {
-      throw new AdminSurfaceHiddenError();
-    }
-    return by;
-  }
-
-  #isOperator({
-    userId,
-    permission,
-  }: {
-    userId: string;
-    permission: OpsOperatorPermission;
-  }): Promise<boolean> {
-    return this.#authorization.can({
-      principal: { type: "user", id: userId },
-      permission,
-      scope: { type: "platform" },
-    });
   }
 
   /** Off Cloud nothing is invoiced; on Cloud a missing payment key is a deployment fault. */

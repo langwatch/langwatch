@@ -212,20 +212,6 @@ describe("the installed billing application", () => {
   });
 
   describe("given the backoffice", () => {
-    it("answers a caller without the platform-operator grant not found, saying nothing about why", async () => {
-      const { app } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });
-
-      await expect(
-        app.getConnectedBillingOverview({ organizationId: ACME }, CUSTOMER_ADMIN),
-      ).rejects.toMatchObject({ code: "not_found" });
-      await expect(app.renewConnectedTerm(renewal(100_00), CUSTOMER_ADMIN)).rejects.toMatchObject({
-        code: "not_found",
-      });
-      await expect(
-        app.markConnectedInvoicePaidOutOfBand({ stripeInvoiceId: "in_1" }, null),
-      ).rejects.toMatchObject({ code: "not_found" });
-    });
-
     it("shows a staff member a customer never onboarded, with the license's terms and seats", async () => {
       const { app } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });
 
@@ -250,37 +236,6 @@ describe("the installed billing application", () => {
           },
         ],
       });
-    });
-
-    /** @scenario "A view-only operator reads the billing overview but is refused on every billing write" */
-    it("lets a view-only operator read the overview and refuses every write", async () => {
-      const { app } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });
-      const refused = { code: "not_found" };
-
-      await expect(
-        app.getConnectedBillingOverview({ organizationId: ACME }, VIEWER),
-      ).resolves.toMatchObject({ account: null });
-      await expect(
-        app.onboardConnectedCustomer(
-          {
-            ...renewal(100_00),
-            organizationName: "Acme",
-            billingEmail: "finance@acme.example",
-            bankTransfer: null,
-          },
-          VIEWER,
-        ),
-      ).rejects.toMatchObject(refused);
-      await expect(
-        app.addConnectedCommit({ organizationId: ACME, amountUsdCents: 100 }, VIEWER),
-      ).rejects.toMatchObject(refused);
-      await expect(app.renewConnectedTerm(renewal(100_00), VIEWER)).rejects.toMatchObject(refused);
-      await expect(
-        app.completeConnectedRenewalIfDue({ organizationId: ACME }, VIEWER),
-      ).rejects.toMatchObject(refused);
-      await expect(
-        app.markConnectedInvoicePaidOutOfBand({ stripeInvoiceId: "in_1" }, VIEWER),
-      ).rejects.toMatchObject(refused);
     });
 
     it("records who read a customer's billing, as main's backoffice did", async () => {

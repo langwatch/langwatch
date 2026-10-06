@@ -73,3 +73,10 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Ops renames (Q-U9): RENAME to ops.upgrade.*, no aliases; the wire difference is accepted.
 - Cloud fleet (Q-U6): ONE fleet page; cloud regions send the same usage report as self-hosted installs.
 - Alerts (Q-U7): EMAIL platform operators and show the operator banner; Slack only where ops' notifier is configured.
+
+## Round 11 (D, upgrade design kept as built)
+
+- One model (D1): KEEP one ledger keyed by step id (and target) for cloud and self-hosted (ADR-173).
+- Presence (D2): KEEP the runner-owned presence table; minimumWriterGeneration stays as an override.
+- Target table (D4): KEEP the child table _langwatch_upgrade_target.
+- Gate hook (D5): KEEP the withUpgradeGate preamble step in packages/process for api and worker.

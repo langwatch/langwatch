@@ -22,8 +22,8 @@ import type {
 import type { RenewalCompletion } from "./connected-billing.ts";
 
 /**
- * The staff member a backoffice command is checked against: the impersonator
- * where one is borrowing a customer's session. `null` is nobody signed in.
+ * The staff member the platform door admitted for a backoffice command: the
+ * impersonator where one is borrowing a customer's session.
  */
 export type BillingStaff = Readonly<{ id: string; email?: string | null | undefined }>;
 
@@ -31,36 +31,36 @@ export type BillingStaff = Readonly<{ id: string; email?: string | null | undefi
  * What the billing module answers other modules: invoice billing for a
  * connected self-hosted customer (ADR-156 section 7). Every operation refuses
  * off LangWatch Cloud, and where no payment provider is configured. The
- * backoffice operations answer anyone without the platform-operator grant not found.
+ * backoffice operations trust the platform door (Q43): staff only, writes need ops:manage.
  */
 export interface BillingApi {
   /** The commercial state of one connected customer. */
   getConnectedBillingOverview(
     input: { organizationId: string },
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedBillingOverview>;
   /** Onboards a customer, or completes an onboarding that stopped halfway. */
   onboardConnectedCustomer(
     input: ConnectedOnboardRequest,
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedBillingAccountView>;
   /** Raises the commit mid-term: a second paid credit, and the budget with it. */
   addConnectedCommit(
     input: ConnectedAddCommitRequest,
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedCreditGrantView>;
   renewConnectedTerm(
     input: ConnectedRenewRequest,
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedBillingAccountView>;
   completeConnectedRenewalIfDue(
     input: { organizationId: string },
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<RenewalCompletion>;
   /** Finance received the money outside the payment provider. */
   markConnectedInvoicePaidOutOfBand(
     input: { stripeInvoiceId: string },
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<void>;
   /**
    * One seat invoicing pass: decides every seat change licensing recorded that
