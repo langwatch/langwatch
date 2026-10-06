@@ -182,12 +182,7 @@ func usesAuth(item *scenario, kind string) bool {
 func (runner *scenarioRunner) seed(needs scenarioNeeds) {
 	var session sync.WaitGroup
 	defer session.Wait()
-	for _, side := range runner.sides {
-		if needs.sessionLogin {
-			session.Add(1)
-			go func() { defer session.Done(); runner.engine.mintCLISession(side.baseURL, side.creds) }()
-		}
-	}
+	runner.mintSessions(needs, &session)
 	if runner.sessionSeeding {
 		session.Wait() // seedOrg reads the credentials the sign-in writes
 	}
@@ -196,6 +191,26 @@ func (runner *scenarioRunner) seed(needs scenarioNeeds) {
 		return
 	}
 	runner.seedRunOrgs(needs)
+	runner.seedShards(needs)
+	if needs.restricted {
+		runner.seedRestricted()
+	}
+}
+
+// mintSessions signs the CLI session in on every side when the scenarios need it.
+func (runner *scenarioRunner) mintSessions(needs scenarioNeeds, session *sync.WaitGroup) {
+	if !needs.sessionLogin {
+		return
+	}
+	for _, side := range runner.sides {
+		session.Add(1)
+		go func() { defer session.Done(); runner.engine.mintCLISession(side.baseURL, side.creds) }()
+	}
+}
+
+// seedShards seeds every side's project and organization shards, and its
+// foreign organization when asked, all at once.
+func (runner *scenarioRunner) seedShards(needs scenarioNeeds) {
 	var group sync.WaitGroup
 	for _, side := range runner.sides {
 		side.projects = make([]*shardContext, needs.projects)
@@ -214,9 +229,6 @@ func (runner *scenarioRunner) seed(needs scenarioNeeds) {
 		}
 	}
 	group.Wait()
-	if needs.restricted {
-		runner.seedRestricted()
-	}
 }
 
 func (runner *scenarioRunner) seedRestricted() {
@@ -235,8 +247,15 @@ func (side *scenarioSide) allShards() []*shardContext {
 	return append(all, side.orgs...)
 }
 
-func (runner *scenarioRunner) call(side *scenarioSide, method, path, bearer string, body any) rawResult {
-	return runner.engine.fixtureRequest(fixtureCall{method: method, url: side.baseURL + path, headers: bearerHeader(bearer), body: body})
+// seedCall is one seeding request: method and path on the side, the bearer
+// credential, and the JSON body (nil for none).
+type seedCall struct {
+	method, path, bearer string
+	body                 any
+}
+
+func (runner *scenarioRunner) call(side *scenarioSide, request seedCall) rawResult {
+	return runner.engine.fixtureRequest(fixtureCall{method: request.method, url: side.baseURL + request.path, headers: bearerHeader(request.bearer), body: request.body})
 }
 
 func seedFailure(what string, result rawResult) string {
@@ -306,7 +325,7 @@ func (runner *scenarioRunner) createProject(side *scenarioSide, orgKey, name str
 			case <-time.After(time.Duration(attempt) * time.Second):
 			}
 		}
-		if created = runner.call(side, http.MethodPost, "/api/projects", orgKey, projectBody(attemptName, "")); created.status != 0 {
+		if created = runner.call(side, seedCall{method: http.MethodPost, path: "/api/projects", bearer: orgKey, body: projectBody(attemptName, "")}); created.status != 0 {
 			return created
 		}
 	}
@@ -353,7 +372,7 @@ func (runner *scenarioRunner) seedOrg(side *scenarioSide, name string) *shardCon
 	if runner.options.Keys.AdminKey == "" {
 		return runner.seedOrgBySession(side, name, shard)
 	}
-	created := runner.call(side, http.MethodPost, "/api/organizations", runner.options.Keys.AdminKey, map[string]any{"name": name, "slug": name})
+	created := runner.call(side, seedCall{method: http.MethodPost, path: "/api/organizations", bearer: runner.options.Keys.AdminKey, body: map[string]any{"name": name, "slug": name}})
 	organization, _ := created.body["organization"].(map[string]any)
 	team, _ := created.body["team"].(map[string]any)
 	adminKey, _ := created.body["adminApiKey"].(map[string]any)
@@ -366,7 +385,7 @@ func (runner *scenarioRunner) seedOrg(side *scenarioSide, name string) *shardCon
 	}
 	shard.keys.OrgKey = token
 	shard.vars["orgId"], shard.vars["orgKey"], shard.vars["teamId"] = orgID, token, teamID
-	runner.fileProject(shard, runner.call(side, http.MethodPost, "/api/projects", token, projectBody(name, teamID)))
+	runner.fileProject(shard, runner.call(side, seedCall{method: http.MethodPost, path: "/api/projects", bearer: token, body: projectBody(name, teamID)}))
 	return shard
 }
 
@@ -396,7 +415,7 @@ func (runner *scenarioRunner) seedOrgBySession(side *scenarioSide, name string, 
 	}
 	shard.keys.OrgKey = token
 	shard.vars["orgId"], shard.vars["orgKey"], shard.vars["teamId"] = orgID, token, teamID
-	runner.fileProject(shard, runner.call(side, http.MethodPost, "/api/projects", token, projectBody(name, teamID)))
+	runner.fileProject(shard, runner.call(side, seedCall{method: http.MethodPost, path: "/api/projects", bearer: token, body: projectBody(name, teamID)}))
 	return shard
 }
 
@@ -425,7 +444,7 @@ func (runner *scenarioRunner) mintRestricted(side *scenarioSide, shard *shardCon
 		"keyType": "service", "name": "apidiff-restricted-" + runner.tag, "permissionMode": "readonly",
 		"bindings": []map[string]any{{"role": "VIEWER", "scopeType": "PROJECT", "scopeId": shard.vars["projectId"]}},
 	}
-	minted := runner.call(side, http.MethodPost, "/api/api-keys", shard.keys.OrgKey, body)
+	minted := runner.call(side, seedCall{method: http.MethodPost, path: "/api/api-keys", bearer: shard.keys.OrgKey, body: body})
 	token, _ := minted.body["token"].(string)
 	if !succeeded(minted) || token == "" {
 		shard.restrictedErr = seedFailure("mint restricted key", minted)
@@ -446,13 +465,9 @@ func (runner *scenarioRunner) setupFailure(needs scenarioNeeds) string {
 	return ""
 }
 
-func (side *scenarioSide) setupFailure(needs scenarioNeeds) string {
-	for _, home := range []*shardContext{side.shared, side.runOrg} {
-		if home != nil && home.err != "" {
-			return home.err
-		}
-	}
-	var asked []string // one cause per thing the scenarios asked for; "" when it worked
+// askedCauses is one cause per thing the scenarios asked for; "" when it worked.
+func (side *scenarioSide) askedCauses(needs scenarioNeeds) []string {
+	var asked []string
 	for _, shard := range append(append([]*shardContext{}, side.projects...), side.orgs...) {
 		asked = append(asked, shard.err)
 	}
@@ -461,6 +476,16 @@ func (side *scenarioSide) setupFailure(needs scenarioNeeds) string {
 	} else if needs.sessionLogin {
 		asked = append(asked, "")
 	}
+	return asked
+}
+
+func (side *scenarioSide) setupFailure(needs scenarioNeeds) string {
+	for _, home := range []*shardContext{side.shared, side.runOrg} {
+		if home != nil && home.err != "" {
+			return home.err
+		}
+	}
+	asked := side.askedCauses(needs)
 	for _, cause := range asked {
 		if cause == "" {
 			return ""

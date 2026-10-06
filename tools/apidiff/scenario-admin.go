@@ -22,16 +22,7 @@ func (runner *scenarioRunner) probeAdminKey() {
 	if key == "" {
 		return
 	}
-	statuses := make([]int, len(runner.sides))
-	var group sync.WaitGroup
-	for index, side := range runner.sides {
-		group.Add(1)
-		go func() {
-			defer group.Done()
-			statuses[index] = runner.call(side, http.MethodGet, "/api/organizations", key, nil).status
-		}()
-	}
-	group.Wait()
+	statuses := runner.adminStatuses(key)
 	var absent []string
 	for index, side := range runner.sides {
 		if statuses[index] == http.StatusNotFound {
@@ -42,6 +33,30 @@ func (runner *scenarioRunner) probeAdminKey() {
 		return
 	}
 	fmt.Fprintf(runner.options.Progress, "scenarios: instance-admin routes answer 404 on %s (SaaS): running without the admin key; scenarios needing it are deferred to the self-hosted pass\n", strings.Join(absent, " and "))
+	runner.dropAdminKey()
+	if runner.sessionSeeding {
+		fmt.Fprintln(runner.options.Progress, "scenarios: seeding second organizations through the seeded admin's session")
+	}
+}
+
+// adminStatuses asks every side, at once, what GET /api/organizations answers to key.
+func (runner *scenarioRunner) adminStatuses(key string) []int {
+	statuses := make([]int, len(runner.sides))
+	var group sync.WaitGroup
+	for index, side := range runner.sides {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			statuses[index] = runner.call(side, seedCall{method: http.MethodGet, path: "/api/organizations", bearer: key}).status
+		}()
+	}
+	group.Wait()
+	return statuses
+}
+
+// dropAdminKey runs without the admin key; seeding goes through the seeded
+// admin's session when every side can sign it in.
+func (runner *scenarioRunner) dropAdminKey() {
 	runner.options.Keys.AdminKey = ""
 	runner.adminAbsent = true
 	runner.sessionSeeding = true
@@ -50,9 +65,6 @@ func (runner *scenarioRunner) probeAdminKey() {
 		if side.creds[credSessionCookie] == "" && !runner.engine.signInAdmin(side.baseURL, side.creds) {
 			runner.sessionSeeding = false
 		}
-	}
-	if runner.sessionSeeding {
-		fmt.Fprintln(runner.options.Progress, "scenarios: seeding second organizations through the seeded admin's session")
 	}
 }
 

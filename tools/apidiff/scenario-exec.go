@@ -152,12 +152,12 @@ func (exec *scenarioExec) verifyStep(index int) *stepError {
 
 func (exec *scenarioExec) mainStep() *stepError {
 	request := exec.item.Request
-	result, failure := exec.send("request", request, exec.item.Auth, exec.item.Expect.Status)
+	result, failure := exec.send("request", outgoing{request: request, auth: exec.item.Auth, allowed: exec.item.Expect.Status})
 	if failure != nil {
 		return failure
 	}
 	exec.out.main, exec.out.mainSent = result, true
-	return exec.judge("request", &exec.item.Expect, result, exec.item.Capture)
+	return exec.judge("request", stepCheck{expect: &exec.item.Expect, captures: exec.item.Capture}, result)
 }
 
 // requestStep sends a setup or verify request, polling when it says
@@ -168,16 +168,24 @@ func (exec *scenarioExec) requestStep(label string, step *scenarioStep) *stepErr
 		if step.Expect != nil {
 			allowed = step.Expect.Status
 		}
-		result, failure := exec.send(label, *step.Request, exec.stepAuth(), allowed)
+		result, failure := exec.send(label, outgoing{request: *step.Request, auth: exec.stepAuth(), allowed: allowed})
 		if failure != nil {
 			return failure
 		}
-		return exec.judge(label, step.Expect, result, step.Capture)
+		return exec.judge(label, stepCheck{expect: step.Expect, captures: step.Capture}, result)
 	})
 }
 
+// stepCheck is what a response is judged by: the expectation and the captures
+// filed when it holds.
+type stepCheck struct {
+	expect   *scenarioExpect
+	captures map[string]string
+}
+
 // judge holds a response to an expect and, when it holds, files the captures.
-func (exec *scenarioExec) judge(label string, expect *scenarioExpect, result SideResult, captures map[string]string) *stepError {
+func (exec *scenarioExec) judge(label string, check stepCheck, result SideResult) *stepError {
+	expect, captures := check.expect, check.captures
 	detail := ""
 	if expect == nil || expect.empty() {
 		detail = successDetail(result)
@@ -208,17 +216,26 @@ func (exec *scenarioExec) expandExpect(expect scenarioExpect) (scenarioExpect, e
 	if expect.NotContains, err = exec.expandList(expect.NotContains); err != nil {
 		return expect, err
 	}
-	if len(expect.Headers) > 0 {
-		expanded := make(map[string]string, len(expect.Headers))
-		for name, text := range expect.Headers {
-			if expanded[name], err = expandText(text, exec.vars); err != nil {
-				return expect, err
-			}
-		}
-		expect.Headers = expanded
+	if expect.Headers, err = exec.expandHeaders(expect.Headers); err != nil {
+		return expect, err
 	}
 	expect.Path, err = expandText(expect.Path, exec.vars)
 	return expect, err
+}
+
+// expandHeaders fills the placeholders in each expected header; none stays as it is.
+func (exec *scenarioExec) expandHeaders(headers map[string]string) (map[string]string, error) {
+	if len(headers) == 0 {
+		return headers, nil
+	}
+	expanded := make(map[string]string, len(headers))
+	for name, text := range headers {
+		var err error
+		if expanded[name], err = expandText(text, exec.vars); err != nil {
+			return headers, err
+		}
+	}
+	return expanded, nil
 }
 
 func (exec *scenarioExec) expandList(list stringList) (stringList, error) {
@@ -282,7 +299,7 @@ func (exec *scenarioExec) countStep(label string, step *scenarioStep, index int)
 }
 
 func (exec *scenarioExec) listLength(label string, count *scenarioCount) (int, *stepError) {
-	result, failure := exec.send(label, count.Request, exec.stepAuth(), nil)
+	result, failure := exec.send(label, outgoing{request: count.Request, auth: exec.stepAuth()})
 	if failure != nil {
 		return 0, failure
 	}
@@ -301,11 +318,20 @@ func (exec *scenarioExec) listLength(label string, count *scenarioCount) (int, *
 	return length, nil
 }
 
+// outgoing is one request to send: the request, the auth it falls back to when
+// it names none, and the statuses its expectation allows.
+type outgoing struct {
+	request scenarioRequest
+	auth    string
+	allowed intList
+}
+
 // send expands one request, sends it with the credential its auth names and
 // files the record. A transport error and a 429 nobody expected are harness
 // failures.
-func (exec *scenarioExec) send(label string, request scenarioRequest, fallbackAuth string, allowed intList) (SideResult, *stepError) {
-	built, err := exec.build(request, fallbackAuth)
+func (exec *scenarioExec) send(label string, out outgoing) (SideResult, *stepError) {
+	allowed := out.allowed
+	built, err := exec.build(out.request, out.auth)
 	if err != nil {
 		return SideResult{}, harnessFailure(label, "%v", err)
 	}
@@ -335,39 +361,60 @@ func (exec *scenarioExec) build(request scenarioRequest, fallbackAuth string) (p
 		return probeRequest{}, err
 	}
 	built := probeRequest{baseURL: exec.side.baseURL, method: request.Method, path: path, headers: map[string]string{}}
-	switch {
-	case isAbsoluteURL(path):
-		built.baseURL = ""
-	case strings.HasPrefix(path, "/"):
-		if built.headers, err = exec.side.authHeaders(exec.shard, kind); err != nil {
-			return built, err
-		}
-	default:
-		return built, fmt.Errorf("request path %q is neither /path nor an absolute http(s) URL", excerpt(path))
+	if err := exec.target(&built, kind); err != nil {
+		return built, err
 	}
-	for name, value := range request.Headers {
-		if built.headers[name], err = expandText(value, exec.vars); err != nil {
-			return built, err
-		}
-	}
-	if request.ContentType != "" {
-		if built.headers["Content-Type"], err = expandText(request.ContentType, exec.vars); err != nil {
-			return built, err
-		}
+	if err := exec.addHeaders(&built, request); err != nil {
+		return built, err
 	}
 	if built.query, err = exec.expandQuery(request.Query); err != nil {
 		return built, err
 	}
+	return exec.withBody(built, request)
+}
+
+// target sends an absolute path as it is, and a /path to the side with the
+// credential kind names.
+func (exec *scenarioExec) target(built *probeRequest, kind string) error {
+	var err error
+	switch {
+	case isAbsoluteURL(built.path):
+		built.baseURL = ""
+	case strings.HasPrefix(built.path, "/"):
+		built.headers, err = exec.side.authHeaders(exec.shard, kind)
+	default:
+		err = fmt.Errorf("request path %q is neither /path nor an absolute http(s) URL", excerpt(built.path))
+	}
+	return err
+}
+
+func (exec *scenarioExec) addHeaders(built *probeRequest, request scenarioRequest) error {
+	var err error
+	for name, value := range request.Headers {
+		if built.headers[name], err = expandText(value, exec.vars); err != nil {
+			return err
+		}
+	}
+	if request.ContentType != "" {
+		built.headers["Content-Type"], err = expandText(request.ContentType, exec.vars)
+	}
+	return err
+}
+
+// withBody expands the raw body, or else the body, wrapping a tRPC one for the side.
+func (exec *scenarioExec) withBody(built probeRequest, request scenarioRequest) (probeRequest, error) {
 	if request.BodyRaw != nil {
 		raw, rawErr := expandText(*request.BodyRaw, exec.vars)
 		built.raw = &raw
 		return built, rawErr
 	}
-	if request.Body != nil {
-		built.body, err = expandValue(request.Body, exec.vars)
-		if isTRPCPath(path) {
-			built.body = wrapTRPCBody(exec.side.trpc, built.body)
-		}
+	if request.Body == nil {
+		return built, nil
+	}
+	var err error
+	built.body, err = expandValue(request.Body, exec.vars)
+	if isTRPCPath(built.path) {
+		built.body = wrapTRPCBody(exec.side.trpc, built.body)
 	}
 	return built, err
 }

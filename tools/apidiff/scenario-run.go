@@ -292,7 +292,7 @@ func (runner *scenarioRunner) runOne(result *scenarioResult, pick int) {
 		sides.Add(1)
 		go func() {
 			defer sides.Done()
-			runner.runSide(side, result, pick, outcomes[index])
+			runner.runSide(side, result, sideSlot{pick: pick, out: outcomes[index]})
 		}()
 	}
 	sides.Wait()
@@ -306,11 +306,17 @@ func (runner *scenarioRunner) runOne(result *scenarioResult, pick int) {
 	runner.settle(result)
 }
 
-func (runner *scenarioRunner) runSide(side *scenarioSide, result *scenarioResult, pick int, out *sideOutcome) {
+// sideSlot is where one side's run of a scenario lands: the shard it picks and its outcome.
+type sideSlot struct {
+	pick int
+	out  *sideOutcome
+}
+
+func (runner *scenarioRunner) runSide(side *scenarioSide, result *scenarioResult, slot sideSlot) {
 	side.acquire(runner.ctx)
 	defer side.release()
-	shard := side.shardFor(result.item.Shard, pick)
-	exec := &scenarioExec{runner: runner, side: side, item: result.item, shard: shard, out: out}
+	shard := side.shardFor(result.item.Shard, slot.pick)
+	exec := &scenarioExec{runner: runner, side: side, item: result.item, shard: shard, out: slot.out}
 	exec.vars = runner.varsFor(side, shard, result)
 	exec.run()
 }
