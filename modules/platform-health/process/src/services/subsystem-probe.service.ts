@@ -7,6 +7,7 @@ import { randomBytes } from "node:crypto";
 
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { type CanaryTransport, HealthCheckFailedError } from "@langwatch/platform-health-contract";
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
 import type { SubsystemProbeChannel } from "../channels/subsystem-probe.channel.ts";
@@ -104,6 +105,11 @@ type CanaryOtelPayload = Readonly<{
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+type CanaryProbe = "collector" | "processor";
+
+/** How long a canary POST may hang before the probe calls it a failure. */
+const CANARY_TIMEOUT_MS = 30_000;
+
 const failure = (
   httpStatus: 404 | 500,
   message: string,
@@ -126,8 +132,9 @@ export class SubsystemProbeService {
     projectId,
     signal,
   }: ProbeCredential): Promise<SubsystemProbeOutcome> {
-    const [restResponse, otelResponse] = await Promise.all([
+    const [, otelResponse] = await Promise.all([
       this.#postRestCanary({
+        probe: "collector",
         authToken,
         projectId,
         signal,
@@ -135,6 +142,7 @@ export class SubsystemProbeService {
         input: "\u{1F423}",
       }),
       this.#postOtelCanary({
+        probe: "collector",
         authToken,
         projectId,
         signal,
@@ -142,9 +150,6 @@ export class SubsystemProbeService {
         input: "\u{1F423}",
       }),
     ]);
-
-    const refused = detectFirstRefusal(restResponse, otelResponse);
-    if (refused) return refused;
 
     return { ok: true, status: otelResponse.status, body: await otelResponse.json() };
   }
@@ -190,6 +195,7 @@ export class SubsystemProbeService {
 
     const [restResponse, otelResponse] = await Promise.all([
       this.#postRestCanary({
+        probe: "processor",
         authToken,
         projectId,
         signal,
@@ -197,6 +203,7 @@ export class SubsystemProbeService {
         input: "\u{1F424}",
       }),
       this.#postOtelCanary({
+        probe: "processor",
         authToken,
         projectId,
         signal,
@@ -216,9 +223,6 @@ export class SubsystemProbeService {
       },
       "Canary traces sent",
     );
-
-    const refused = detectFirstRefusal(restResponse, otelResponse);
-    if (refused) return refused;
 
     const otelBody = await otelResponse.json();
 
@@ -315,17 +319,21 @@ export class SubsystemProbeService {
   }
 
   #postRestCanary({
+    probe,
     authToken,
     projectId,
     signal,
     traceId,
     input,
   }: ProbeCredential & {
+    probe: CanaryProbe;
     traceId: string;
     input: string;
   }): Promise<Response> {
     const now = nowInstant().epochMilliseconds;
-    return this.#collaborators.canaries.post({
+    return this.#sendCanary({
+      probe,
+      transport: "rest",
       path: "/api/collector",
       headers: canaryHeaders(authToken, projectId),
       signal,
@@ -346,6 +354,7 @@ export class SubsystemProbeService {
   }
 
   #postOtelCanary({
+    probe,
     authToken,
     projectId,
     signal,
@@ -353,6 +362,7 @@ export class SubsystemProbeService {
     input,
     model,
   }: ProbeCredential & {
+    probe: CanaryProbe;
     traceId: string;
     input: string;
     model?: string;
@@ -390,12 +400,64 @@ export class SubsystemProbeService {
       ],
     };
 
-    return this.#collaborators.canaries.post({
+    return this.#sendCanary({
+      probe,
+      transport: "otlp",
       path: "/api/otel/v1/traces",
       headers: canaryHeaders(authToken, projectId),
       signal,
       body: JSON.stringify(payload),
     });
+  }
+
+  /**
+   * One canary POST back through our own boundary. A network-level failure and
+   * a refusal are the same handled outcome, and the transport cause is logged
+   * here because the wire masks a non-handled reason.
+   */
+  async #sendCanary({
+    probe,
+    transport,
+    path,
+    headers,
+    body,
+    signal,
+  }: {
+    probe: CanaryProbe;
+    transport: CanaryTransport;
+    path: string;
+    headers: Readonly<Record<string, string>>;
+    body: string;
+    signal: AbortSignal | undefined;
+  }): Promise<Response> {
+    const deadline = new AbortController();
+    const timer = setTimeout(() => deadline.abort(), CANARY_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await this.#collaborators.canaries.post({
+        path,
+        headers,
+        body,
+        signal: signal === undefined ? deadline.signal : AbortSignal.any([signal, deadline.signal]),
+      });
+    } catch (error) {
+      logger.error({ probe, transport, path, error }, "Health canary transport failed");
+      throw new HealthCheckFailedError({
+        probe,
+        transport,
+        reasons: [error instanceof Error ? error : new Error(String(error))],
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!response.ok) {
+      logger.error(
+        { probe, transport, path, upstreamStatus: response.status },
+        "Health canary refused by our own boundary",
+      );
+      throw new HealthCheckFailedError({ probe, transport, upstreamStatus: response.status });
+    }
+    return response;
   }
 
   /**
@@ -442,15 +504,4 @@ export class SubsystemProbeService {
     logger.warn({ traceId, attempts: attempt }, "Trace poll exhausted all attempts");
     return `Failed to get ${label} trace after multiple retries`;
   }
-}
-
-/** The first canary leg our own boundary refused, where either did. */
-function detectFirstRefusal(rest: Response, otel: Response): SubsystemProbeOutcome | null {
-  if (!rest.ok) {
-    return failure(500, "Failed to send trace to LangWatch using REST", "canary_rest_refused");
-  }
-  if (!otel.ok) {
-    return failure(500, "Failed to send trace to LangWatch using OTLP", "canary_otlp_refused");
-  }
-  return null;
 }

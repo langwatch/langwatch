@@ -1,4 +1,7 @@
-import type { PlatformHealthCheckName } from "@langwatch/platform-health-contract";
+import {
+  HealthCheckFailedError,
+  type PlatformHealthCheckName,
+} from "@langwatch/platform-health-contract";
 
 import type {
   SubsystemProbeOutcome,
@@ -94,9 +97,12 @@ export class SubsystemProbeRunService {
     if (this.name === "collector" || this.name === "evaluations" || this.name === "processor") {
       const [projectId] = await this.#credential.findProjectIds();
       const credential = { authToken, projectId: projectId ?? null, signal: query.signal };
-      if (this.name === "collector") return read(await this.#probes.runCollector(credential));
       if (this.name === "evaluations") return read(await this.#probes.runEvaluations(credential));
-      return read(await this.#probes.runProcessor(credential));
+      return this.#readCanary(() =>
+        this.name === "collector"
+          ? this.#probes.runCollector(credential)
+          : this.#probes.runProcessor(credential),
+      );
     }
 
     const target = this.name === "triggers" ? query.triggerId : query.workflowId;
@@ -125,6 +131,20 @@ export class SubsystemProbeRunService {
             signal: query.signal,
           }),
     );
+  }
+
+  /** A refused canary names the half that refused it; a transport failure stays a thrown probe. */
+  async #readCanary(run: () => Promise<SubsystemProbeOutcome>): Promise<SubsystemProbeResult> {
+    try {
+      return read(await run());
+    } catch (error) {
+      if (!(error instanceof HealthCheckFailedError) || error.meta.upstreamStatus === undefined) {
+        throw error;
+      }
+      const reason =
+        error.meta.transport === "otlp" ? "canary_otlp_refused" : "canary_rest_refused";
+      return { outcome: "unhealthy", detail: DETAIL[reason] };
+    }
   }
 }
 

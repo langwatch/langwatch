@@ -35,3 +35,39 @@ export class PlatformHealthUnhealthyError extends HandledError {
     this.report = report;
   }
 }
+
+/** Which boundary a canary was sent through. */
+export type CanaryTransport = "rest" | "otlp";
+
+/**
+ * A canary round trip did not complete, which is the platform's fault: the
+ * probes answer external monitors. `meta` is customer-visible, so it names
+ * only the probe, transport and upstream status; the cause goes in the log.
+ */
+export class HealthCheckFailedError extends HandledError {
+  declare readonly code: "health_check_failed";
+
+  constructor({
+    probe,
+    transport,
+    upstreamStatus,
+    reasons,
+  }: {
+    probe: string;
+    transport?: CanaryTransport;
+    upstreamStatus?: number;
+    reasons?: readonly Error[];
+  }) {
+    super("health_check_failed", "The health check could not complete.", {
+      httpStatus: 500,
+      fault: "platform",
+      meta: {
+        check: probe,
+        ...(transport !== undefined ? { transport } : {}),
+        ...(upstreamStatus !== undefined ? { upstreamStatus } : {}),
+      },
+      ...(reasons ? { reasons } : {}),
+    });
+    this.name = "HealthCheckFailedError";
+  }
+}
