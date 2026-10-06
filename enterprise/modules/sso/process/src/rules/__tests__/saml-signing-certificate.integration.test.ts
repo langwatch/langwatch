@@ -13,17 +13,16 @@
 import { inflateRawSync } from "node:zlib";
 
 import { sso } from "@better-auth/sso";
-import { betterAuth } from "better-auth";
-import { memoryAdapter } from "better-auth/adapters/memory";
-import { describe, expect, it } from "vitest";
-
 import {
   createSigningIdentity,
   idpMetadata,
   signSamlResponse,
   tamperWithAssertion,
   type SigningIdentity,
-} from "./support/saml-signer.ts";
+} from "@langwatch/test-harness/saml-signer";
+import { betterAuth } from "better-auth";
+import { memoryAdapter } from "better-auth/adapters/memory";
+import { describe, expect, it } from "vitest";
 
 const BASE_URL = "http://localhost:5624";
 const PROVIDER_ID = "acme-saml";

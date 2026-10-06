@@ -1,11 +1,7 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * A stand-in SAML identity provider's signing half, for tests only.
- *
- * Every certificate is generated when the test runs (a fresh RSA key and a
- * self-signed X.509 built from node:crypto alone), so no private key is ever
- * committed. The assertion is written already in exclusive canonical form, so
- * the digest and signature here are over exactly what a verifier canonicalises.
+ * A stand-in SAML identity provider's signing half, for tests only. Keys and
+ * certificates are generated per run from node:crypto alone, so no private key
+ * is committed; the assertion is written in exclusive canonical form.
  */
 import {
   createHash,
@@ -15,6 +11,8 @@ import {
   randomUUID,
   X509Certificate,
 } from "node:crypto";
+
+import { nowInstant, type Instant } from "@langwatch/time";
 
 export interface SigningIdentity {
   /** The certificate, PEM-armoured, as an administrator pastes it. */
@@ -41,8 +39,14 @@ const sequence = (...parts: Buffer[]) => der(0x30, Buffer.concat(parts));
 const set = (...parts: Buffer[]) => der(0x31, Buffer.concat(parts));
 const oid = (hex: string) => der(0x06, Buffer.from(hex, "hex"));
 const utf8 = (text: string) => der(0x0c, Buffer.from(text, "utf8"));
-const utcTime = (date: Date) =>
-  der(0x17, Buffer.from(date.toISOString().replace(/[-:T]/g, "").slice(2, 14) + "Z", "ascii"));
+const utcTime = (moment: Instant) =>
+  der(
+    0x17,
+    Buffer.from(
+      moment.toString({ fractionalSecondDigits: 0 }).replace(/[-:T]/g, "").slice(2, 14) + "Z",
+      "ascii",
+    ),
+  );
 
 function name(commonName: string): Buffer {
   return sequence(set(sequence(oid(OID_COMMON_NAME), utf8(commonName))));
@@ -59,13 +63,13 @@ export function createSigningIdentity({
 }: { commonName?: string } = {}): SigningIdentity {
   const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
   const algorithm = sequence(oid(OID_SHA256_WITH_RSA), der(0x05, Buffer.alloc(0)));
-  const now = Date.now();
+  const now = nowInstant();
   const tbs = sequence(
     der(0xa0, der(0x02, Buffer.from([2]))),
     der(0x02, Buffer.concat([Buffer.from([0x01]), randomBytes(8)])),
     algorithm,
     name(commonName),
-    sequence(utcTime(new Date(now - 86_400_000)), utcTime(new Date(now + 86_400_000 * 365))),
+    sequence(utcTime(now.subtract({ hours: 24 })), utcTime(now.add({ hours: 24 * 365 }))),
     name(commonName),
     publicKey.export({ type: "spki", format: "der" }),
   );
@@ -114,10 +118,12 @@ export interface SamlAssertionClaims {
 function assertionBody({
   claims,
   issueInstant,
+  issuedAt,
   expiry,
 }: {
   claims: SamlAssertionClaims;
   issueInstant: string;
+  issuedAt: Instant;
   expiry: string;
 }) {
   const q = escapeAttribute;
@@ -127,32 +133,31 @@ function assertionBody({
     "@@SIGNATURE@@" +
     `<saml:Subject><saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">${t(claims.nameId)}</saml:NameID>` +
     `<saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml:SubjectConfirmationData${claims.inResponseTo ? ` InResponseTo="${q(claims.inResponseTo)}"` : ""} NotOnOrAfter="${expiry}" Recipient="${q(claims.recipient)}"></saml:SubjectConfirmationData></saml:SubjectConfirmation></saml:Subject>` +
-    `<saml:Conditions NotBefore="${new Date(Date.parse(issueInstant) - 60_000).toISOString()}" NotOnOrAfter="${expiry}"><saml:AudienceRestriction><saml:Audience>${t(claims.audience)}</saml:Audience></saml:AudienceRestriction></saml:Conditions>` +
+    `<saml:Conditions NotBefore="${issuedAt.subtract({ minutes: 1 }).toString()}" NotOnOrAfter="${expiry}"><saml:AudienceRestriction><saml:Audience>${t(claims.audience)}</saml:Audience></saml:AudienceRestriction></saml:Conditions>` +
     `<saml:AuthnStatement AuthnInstant="${issueInstant}"><saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef></saml:AuthnContext></saml:AuthnStatement>` +
     `<saml:AttributeStatement><saml:Attribute Name="email"><saml:AttributeValue>${t(claims.email)}</saml:AttributeValue></saml:Attribute></saml:AttributeStatement>`
   );
 }
 
 /**
- * A SAML Response whose single Assertion is signed by `identity`, base64
- * encoded the way a browser posts it. Sign with one identity and hand a
- * connection another to get an assertion nobody configured; edit the result
- * with `tamperWithAssertion` to get one altered after signing.
+ * A SAML Response whose single Assertion is signed by `identity`, base64 as a
+ * browser posts it. Sign with another identity than the connection's, or edit
+ * the result with `tamperWithAssertion`, to get an assertion it must refuse.
  */
 export function signSamlResponse({
   identity,
   claims,
-  now = new Date(),
+  now = nowInstant(),
 }: {
   identity: SigningIdentity;
   claims: SamlAssertionClaims;
-  now?: Date;
+  now?: Instant;
 }): string {
-  const issueInstant = now.toISOString();
-  const expiry = new Date(now.getTime() + 5 * 60_000).toISOString();
+  const issueInstant = now.toString();
+  const expiry = now.add({ minutes: 5 }).toString();
   const assertionId = claims.assertionId ?? `_${randomUUID()}`;
   const assertionOpen = `<saml:Assertion xmlns:saml="${NS_ASSERTION}" ID="${assertionId}" IssueInstant="${issueInstant}" Version="2.0">`;
-  const body = assertionBody({ claims, issueInstant, expiry });
+  const body = assertionBody({ claims, issueInstant, issuedAt: now, expiry });
 
   // The digest covers the assertion as it stands without its own Signature.
   const unsigned = `${assertionOpen}${body.replace("@@SIGNATURE@@", "")}</saml:Assertion>`;

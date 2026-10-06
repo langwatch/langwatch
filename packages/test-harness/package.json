@@ -38,6 +38,10 @@
       "types": "./dist/cleanup-test-rows.d.ts",
       "default": "./src/cleanup-test-rows.ts"
     },
+    "./saml-signer": {
+      "types": "./dist/saml-signer.d.ts",
+      "default": "./src/saml-signer.ts"
+    },
     "./api-fixture": {
       "types": "./dist/api-fixture/index.d.ts",
       "default": "./src/api-fixture/index.ts"
