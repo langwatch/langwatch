@@ -1,7 +1,8 @@
 /**
  * @vitest-environment node
  * A local HTTP server stands in for ClickHouse and counts the statements it
- * holds at once, so the bound is observed where the server would enforce its own.
+ * holds at once. Under a stated cap it holds accepted statements until the
+ * first refusal, so the cap is reached however load spreads the arrivals.
  */
 import { createServer, type Server } from "node:http";
 
@@ -12,6 +13,7 @@ import type { ClickHouseConfig } from "../config.ts";
 
 const directory = { organizationForTenant: () => Promise.resolve("organization-1") };
 const HOLD_MS = 50;
+const SATURATION_WAIT_MS = 5_000;
 
 describe("given the ClickHouse member in front of a server", () => {
   let server: Server;
@@ -21,6 +23,9 @@ describe("given the ClickHouse member in front of a server", () => {
   let serverCap: number | undefined;
   let refused: number;
   let requestUrls: string[];
+  let saturate: () => void;
+  let saturated: Promise<void>;
+  let giveUpWaiting: NodeJS.Timeout;
 
   beforeEach(async () => {
     inFlight = 0;
@@ -28,12 +33,17 @@ describe("given the ClickHouse member in front of a server", () => {
     serverCap = undefined;
     refused = 0;
     requestUrls = [];
+    saturated = new Promise<void>((resolve) => {
+      saturate = resolve;
+    });
+    giveUpWaiting = setTimeout(() => saturate(), SATURATION_WAIT_MS);
     server = createServer((request, response) => {
       requestUrls.push(request.url ?? "");
       request.resume();
       request.on("end", () => {
         if (serverCap !== undefined && inFlight >= serverCap) {
           refused += 1;
+          saturate();
           response.statusCode = 500;
           response.setHeader("X-ClickHouse-Exception-Code", "202");
           response.end(
@@ -43,11 +53,13 @@ describe("given the ClickHouse member in front of a server", () => {
         }
         inFlight += 1;
         peak = Math.max(peak, inFlight);
-        setTimeout(() => {
-          inFlight -= 1;
-          response.setHeader("Content-Type", "application/x-ndjson");
-          response.end();
-        }, HOLD_MS);
+        void (serverCap === undefined ? Promise.resolve() : saturated).then(() =>
+          setTimeout(() => {
+            inFlight -= 1;
+            response.setHeader("Content-Type", "application/x-ndjson");
+            response.end();
+          }, HOLD_MS),
+        );
       });
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -57,6 +69,7 @@ describe("given the ClickHouse member in front of a server", () => {
   });
 
   afterEach(async () => {
+    clearTimeout(giveUpWaiting);
     await new Promise((resolve) => server.close(resolve));
   });
 
