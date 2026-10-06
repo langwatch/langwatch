@@ -427,9 +427,10 @@ func TestElevenLabsNativeSpeechStream_RoutesReachTheirVendorPath(t *testing.T) {
 				gotBody, _ = io.ReadAll(r.Body)
 				w.Header().Set("Content-Type", tc.contentType)
 				flusher, _ := w.(http.Flusher)
+				// Counted before the flush: the client may read the chunk before this goroutine resumes.
+				produced.Add(1)
 				_, _ = w.Write([]byte(tc.chunks[0]))
 				flusher.Flush()
-				produced.Add(1)
 				select {
 				case <-next:
 				case <-r.Context().Done():
