@@ -9,7 +9,7 @@
     "browser-host's `*-drawers.ts` props files": 1,
     "computeNextRunAt": 15,
     "createProcess": 2,
-    "declared(\"<name>\")": 49,
+    "declared(\"<name>\")": 42,
     "DrawerPropsMapOf": 4,
     "DrawersDifferingFromMap": 6,
     "MEMBER_NAMES": 12,
