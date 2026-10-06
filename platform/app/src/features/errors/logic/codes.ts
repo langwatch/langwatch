@@ -190,6 +190,7 @@ export const APP_ERROR_CODES = [
   "gateway_spend_group_by_unstable",
   "gateway_spend_unavailable",
   "gateway_trace_project_ambiguous",
+  "gateway_trace_project_not_a_destination",
   "gateway_trace_project_unknown",
   "github_installation_suspended",
   "github_not_connected",

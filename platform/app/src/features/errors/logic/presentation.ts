@@ -4612,6 +4612,13 @@ const presentations = {
         : "Pick the project where its traces and costs land. Without one they go to a hidden governance project, and every budget on the project you had in mind counts nothing.";
     },
   },
+  gateway_trace_project_not_a_destination: {
+    // The form is still open with the aggregate picked, so the copy says
+    // what to pick instead.
+    title: "That project doesn't receive traces",
+    describe: () =>
+      "It reads traces from other projects and has none of its own. Pick one of the projects it reads as this key's destination.",
+  },
   gateway_trace_project_unknown: {
     // Says the destination is the problem, not the key, because the form
     // shows a picker and the natural reading of a refusal there is that the

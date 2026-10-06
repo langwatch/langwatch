@@ -18,6 +18,7 @@ import {
   liveGrants,
   liveRoles,
 } from "~/server/app-layer/authz/repositories/live-rows";
+import { NON_DESTINATION_PROJECT_KINDS } from "~/server/app-layer/projects/project-kinds";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { holdsOrganizationBinding } from "~/utils/memberRoleConstraints";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
@@ -690,7 +691,9 @@ export class ApiKeyRepository {
       where: {
         team: { organizationId },
         archivedAt: null,
-        kind: { not: "internal_governance" },
+        // Neither the governance project nor an aggregate (ADR-144) receives
+        // traces through a key, so neither is a scope a key may name.
+        kind: { notIn: [...NON_DESTINATION_PROJECT_KINDS] },
       },
       select: { id: true, name: true, teamId: true },
       orderBy: { name: "asc" },
