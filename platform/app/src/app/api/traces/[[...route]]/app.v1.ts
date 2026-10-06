@@ -2,7 +2,10 @@ import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
+import {
+  getAllForProjectInput,
+  publicTraceSearchPageSizeInput,
+} from "~/server/api/routers/traces.schemas";
 import { readCodingAgentTranscriptWithProtections } from "~/server/api/routers/tracesV2";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
@@ -232,6 +235,7 @@ const traceSearchBodySchema = getAllForProjectInput
   .extend({
     startDate: flexibleDateSchema,
     endDate: flexibleDateSchema,
+    pageSize: publicTraceSearchPageSizeInput,
     scrollId: z.string().optional().nullable(),
     format: z
       .enum(["digest", "json"])

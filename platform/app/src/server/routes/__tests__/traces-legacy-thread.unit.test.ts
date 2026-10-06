@@ -79,6 +79,7 @@ vi.mock("~/server/app-layer/app", () => ({
 }));
 
 vi.mock("~/server/api/routers/traces.schemas", () => ({
+  publicTraceSearchPageSizeInput: z.number().optional(),
   getAllForProjectInput: z.object({
     projectId: z.string(),
     startDate: z.number(),

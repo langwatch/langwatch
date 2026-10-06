@@ -7,7 +7,13 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { getAllForProjectInput, tracesFilterInput } from "../traces.schemas";
+import {
+  getAllForDownloadInput,
+  getAllForProjectInput,
+  MAX_TRACE_LIST_PAGE_SIZE,
+  publicTraceSearchPageSizeInput,
+  tracesFilterInput,
+} from "../traces.schemas";
 
 const base = {
   projectId: "project_123",
@@ -97,6 +103,107 @@ describe("getAllForProjectInput", () => {
       });
 
       expect(result.success).toBe(true);
+    });
+  });
+});
+
+describe("page size cap", () => {
+  describe.each([
+    ["tracesFilterInput", tracesFilterInput],
+    ["getAllForProjectInput", getAllForProjectInput],
+  ])("given %s", (_name, schema) => {
+    describe("when pageSize equals the cap", () => {
+      it("accepts it", () => {
+        const result = schema.safeParse({
+          ...base,
+          pageSize: MAX_TRACE_LIST_PAGE_SIZE,
+        });
+
+        expect(result.success).toBe(true);
+      });
+    });
+
+    describe.each([[1001], [10_000]])("when pageSize is %i", (pageSize) => {
+      it("rejects it", () => {
+        const result = schema.safeParse({ ...base, pageSize });
+
+        expect(result.success).toBe(false);
+      });
+
+      it("reports the issue on the pageSize path", () => {
+        const result = schema.safeParse({ ...base, pageSize });
+
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error.issues[0]?.path).toEqual(["pageSize"]);
+      });
+    });
+  });
+});
+
+describe("getAllForDownloadInput", () => {
+  describe("given a download-sized pageSize", () => {
+    it("accepts 10000 with includeSpans true", () => {
+      const result = getAllForDownloadInput.safeParse({
+        ...base,
+        includeSpans: true,
+        pageSize: 10_000,
+      });
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe.each([
+    ["zero", 0],
+    ["fractional", 2.5],
+  ])("given a %s pageSize", (_label, pageSize) => {
+    it("rejects it", () => {
+      const result = getAllForDownloadInput.safeParse({
+        ...base,
+        includeSpans: true,
+        pageSize,
+      });
+
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("given a non-zero pageOffset", () => {
+    it("rejects it", () => {
+      const result = getAllForDownloadInput.safeParse({
+        ...base,
+        includeSpans: true,
+        pageOffset: 25,
+      });
+
+      expect(result.success).toBe(false);
+    });
+  });
+});
+
+describe("publicTraceSearchPageSizeInput", () => {
+  describe("given a pageSize above the list cap", () => {
+    it("accepts it, since the route clamps instead of rejecting", () => {
+      const result = publicTraceSearchPageSizeInput.safeParse(5000);
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("given no pageSize", () => {
+    it("accepts undefined", () => {
+      const result = publicTraceSearchPageSizeInput.safeParse(undefined);
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("given a zero pageSize", () => {
+    it("rejects it", () => {
+      const result = publicTraceSearchPageSizeInput.safeParse(0);
+
+      expect(result.success).toBe(false);
     });
   });
 });

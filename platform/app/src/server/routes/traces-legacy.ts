@@ -13,7 +13,10 @@ import type { AuthzPermission as Permission } from "@langwatch/authz";
 import type { Context } from "hono";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
+import {
+  getAllForProjectInput,
+  publicTraceSearchPageSizeInput,
+} from "~/server/api/routers/traces.schemas";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import {
@@ -236,6 +239,7 @@ const paramsSchema = getAllForProjectInput
         message: "Invalid date format for endDate",
       }),
     ]),
+    pageSize: publicTraceSearchPageSizeInput,
     scrollId: z.string().optional().nullable(),
     format: z.enum(["digest", "json"]).optional(),
     llmMode: z.boolean().optional().default(false),

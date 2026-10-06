@@ -58,6 +58,7 @@ vi.mock("~/server/traces/projection", async (importOriginal) => {
 vi.mock("~/server/api/routers/traces.schemas", () => {
   const { z } = require("zod");
   return {
+    publicTraceSearchPageSizeInput: z.number().optional(),
     getAllForProjectInput: z.object({
       projectId: z.string(),
       startDate: z.number(),

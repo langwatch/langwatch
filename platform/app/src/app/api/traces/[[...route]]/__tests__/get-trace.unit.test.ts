@@ -60,6 +60,7 @@ vi.mock("@langwatch/observability", () => ({
 vi.mock("~/server/api/routers/traces.schemas", () => {
   const { z } = require("zod");
   return {
+    publicTraceSearchPageSizeInput: z.number().optional(),
     getAllForProjectInput: z.object({
       projectId: z.string(),
       startDate: z.number(),
