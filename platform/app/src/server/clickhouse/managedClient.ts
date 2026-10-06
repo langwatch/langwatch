@@ -7,8 +7,8 @@ import { queryWindowed } from "~/server/app-layer/clients/clickhouse/windowed-re
 import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
 import { ClickHouseLogger } from "./clickhouseLogger";
 import {
-  getClickHouseInsertConcurrencyShare,
   getClickHouseMaxOpenConnections,
+  getClickHouseStatementLaneReserveShare,
 } from "./connectionPool";
 import {
   incrementClickHouseQueryCount,
@@ -195,12 +195,13 @@ export function createManagedClickHouseClient({
   return wrapWithDefaultSettings(
     withStatementLimit({
       client: createResilientClickHouseClient({ client: raw, cluster }),
-      // The pool size, split between an insert lane and a read lane and never
-      // exceeded, so total capacity is unchanged. The difference is that the
-      // queues in front of it are finite, timed and counted, and slow inserts
-      // cannot occupy the slots reads need.
+      // The pool size, never exceeded, so total capacity is unchanged. The
+      // difference is that the queues in front of it are finite, timed and
+      // counted, and each kind of work reserves a minimum the other cannot
+      // take — so slow inserts cannot occupy the slots reads need, while a lone
+      // kind still borrows all but the other's reserve.
       maxConcurrent: maxOpenConnections,
-      insertShare: getClickHouseInsertConcurrencyShare(),
+      reserveShare: getClickHouseStatementLaneReserveShare(),
       instance,
     }),
   );

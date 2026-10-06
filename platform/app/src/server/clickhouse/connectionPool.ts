@@ -3,7 +3,7 @@ import {
   resolvePoolSize,
 } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
-import { DEFAULT_INSERT_SHARE } from "./statementLimit";
+import { DEFAULT_LANE_RESERVE_SHARE } from "./statementLimit";
 
 const logger = createLogger("langwatch:clickhouse:connection-pool");
 
@@ -62,24 +62,27 @@ export function getClickHouseMaxOpenConnections(): number {
 }
 
 /**
- * Resolve the fraction of this process's statement slots reserved for inserts.
+ * Resolve the fraction of this process's statement slots each kind of work
+ * keeps in reserve for the other (see `./statementLimit.ts`).
  *
- * Read from `CLICKHOUSE_INSERT_CONCURRENCY_SHARE`; the rest of the slots serve
- * reads (see `./statementLimit.ts`). Anything outside the open interval (0, 1)
- * is refused rather than clamped: 0 or 1 would hand one kind of work every slot,
- * which is the starvation the split exists to prevent, so a typo falls back to
- * the default instead of silently reintroducing it.
+ * Read from `CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE`. The valid range is the
+ * half-open interval (0, 0.5]: a reserve of nothing reintroduces the starvation
+ * the lanes exist to prevent, and a reserve above half the budget would hold
+ * back more for one kind than that kind may itself use. A value outside it is a
+ * typo, so it warns and falls back rather than silently misconfiguring the
+ * bound. A blank or whitespace value is "unset", not a mistake, so it takes the
+ * default quietly.
  */
-export function getClickHouseInsertConcurrencyShare(): number {
-  const raw = process.env.CLICKHOUSE_INSERT_CONCURRENCY_SHARE;
-  if (raw === undefined || raw.trim() === "") return DEFAULT_INSERT_SHARE;
+export function getClickHouseStatementLaneReserveShare(): number {
+  const raw = process.env.CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE;
+  if (raw === undefined || raw.trim() === "") return DEFAULT_LANE_RESERVE_SHARE;
 
   const parsed = Number(raw);
-  if (Number.isFinite(parsed) && parsed > 0 && parsed < 1) return parsed;
+  if (Number.isFinite(parsed) && parsed > 0 && parsed <= 0.5) return parsed;
 
   logger.warn(
-    { raw, using: DEFAULT_INSERT_SHARE },
-    "Invalid CLICKHOUSE_INSERT_CONCURRENCY_SHARE; using default",
+    { raw, using: DEFAULT_LANE_RESERVE_SHARE },
+    "Invalid CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE; using default",
   );
-  return DEFAULT_INSERT_SHARE;
+  return DEFAULT_LANE_RESERVE_SHARE;
 }

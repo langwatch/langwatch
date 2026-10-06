@@ -7,7 +7,7 @@ import { clickHouseConcurrencyMetrics } from "../metrics";
 import {
   MIN_QUEUE_DEPTH,
   STATEMENT_WAIT_TIMEOUT_MS,
-  splitStatementBudget,
+  statementLaneCaps,
   withStatementLimit,
 } from "../statementLimit";
 
@@ -67,7 +67,8 @@ describe("withStatementLimit", () => {
       /** @scenario statements are bounded, and the bound is the one that binds */
       it("starts only as many statements as the bound", async () => {
         const driver = deferrableClient();
-        // 4 splits 2 reads / 2 inserts, so the read lane's bound is 2.
+        // 4 with a reserve of 1 leaves each lane a cap of 3, so a fourth read
+        // has no read slot and waits.
         const limited = withStatementLimit({
           client: driver.client,
           maxConcurrent: 4,
@@ -78,10 +79,11 @@ describe("withStatementLimit", () => {
           limited.query({ query: "SELECT 1" }),
           limited.query({ query: "SELECT 2" }),
           limited.query({ query: "SELECT 3" }),
+          limited.query({ query: "SELECT 4" }),
         ];
         await settleMicrotasks();
 
-        expect(driver.started).toBe(2);
+        expect(driver.started).toBe(3);
 
         driver.releaseAll();
         await settleMicrotasks();
@@ -405,9 +407,9 @@ describe("withStatementLimit", () => {
     describe("when they are issued", () => {
       it("bounds inserts, commands and execs alongside queries", async () => {
         const driver = deferrableClient();
-        // Reads, commands and execs share the read lane; inserts have their own.
-        // With 4 split 2/2, two of the three non-insert statements start and
-        // the third waits behind them.
+        // Inserts have their own lane; command/exec/query share the read lane.
+        // With 4 and a reserve of 1, one insert plus three read-lane statements
+        // exactly fill the budget of 4, so a fourth read-lane statement waits.
         const limited = withStatementLimit({
           client: driver.client,
           maxConcurrent: 4,
@@ -419,17 +421,19 @@ describe("withStatementLimit", () => {
           limited.command({ query: "OPTIMIZE TABLE spans" }),
           limited.exec({ query: "SELECT 1" }),
           limited.query({ query: "SELECT 2" }),
+          limited.query({ query: "SELECT 3" }),
         ];
         await settleMicrotasks();
 
-        // The insert and two read-lane statements start; the fourth waits for
-        // a read slot - a write path that ignored the bound would be the one
+        // The insert and three read-lane statements run; the fifth has no slot
+        // and waits - a write path that ignored the bound would be the one
         // that rejected live ingest.
-        expect(driver.started).toBe(3);
+        expect(driver.started).toBe(4);
 
-        driver.releaseAll();
-        await settleMicrotasks();
-        driver.releaseAll();
+        for (let round = 0; round < 2; round += 1) {
+          driver.releaseAll();
+          await settleMicrotasks();
+        }
         await Promise.all(inFlight);
       });
     });
@@ -446,18 +450,21 @@ describe("withStatementLimit", () => {
           instance,
         });
 
+        // 4 inserts, cap 3: three run, the fourth waits on the insert lane.
         const inserts = Array.from({ length: 4 }, () =>
           limited.insert({ table: "spans", values: [] }),
         );
         await settleMicrotasks();
-        expect(driver.started).toBe(2);
+        expect(driver.started).toBe(3);
 
+        // One slot is still free - the inserts' cap stops at 3 of the 4-slot
+        // budget - so a read takes it immediately.
         const read = limited.query({ query: "SELECT 1" });
         await settleMicrotasks();
 
         expect(driver.client.query).toHaveBeenCalledTimes(1);
 
-        for (let round = 0; round < 3; round += 1) {
+        for (let round = 0; round < 4; round += 1) {
           driver.releaseAll();
           await settleMicrotasks();
         }
@@ -478,9 +485,9 @@ describe("withStatementLimit", () => {
         const read = limited.query({ query: "SELECT 1" });
         await settleMicrotasks();
 
-        expect(driver.client.insert).toHaveBeenCalledTimes(2);
+        expect(driver.client.insert).toHaveBeenCalledTimes(3);
 
-        for (let round = 0; round < 3; round += 1) {
+        for (let round = 0; round < 4; round += 1) {
           driver.releaseAll();
           await settleMicrotasks();
         }
@@ -504,14 +511,52 @@ describe("withStatementLimit", () => {
           limited.query({ query: `SELECT ${index}` }),
         );
         await settleMicrotasks();
-        expect(driver.started).toBe(2);
+        expect(driver.started).toBe(3);
 
         const insert = limited.insert({ table: "spans", values: [] });
         await settleMicrotasks();
 
         expect(driver.client.insert).toHaveBeenCalledTimes(1);
 
-        for (let round = 0; round < 3; round += 1) {
+        for (let round = 0; round < 4; round += 1) {
+          driver.releaseAll();
+          await settleMicrotasks();
+        }
+        await Promise.all([...reads, insert]);
+      });
+    });
+  });
+
+  describe("given only reads are issued and no inserts", () => {
+    describe("when more reads arrive than a fixed half-budget would allow", () => {
+      /** @scenario a lone kind of work borrows the idle lane's capacity */
+      it("borrows the idle insert lane's slots, keeping only its reserve", async () => {
+        const driver = deferrableClient();
+        // 4 with a reserve of 1: a hard half would cap reads at 2, but the read
+        // lane may borrow up to 3 - everything except the inserts' one reserve.
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 4,
+          instance,
+        });
+
+        const reads = Array.from({ length: 3 }, (_, index) =>
+          limited.query({ query: `SELECT ${index}` }),
+        );
+        await settleMicrotasks();
+
+        // Three, not two: the read lane borrowed the idle insert lane's slots.
+        expect(driver.started).toBe(3);
+
+        // The inserts' reserve stayed free: an insert that arrives now starts
+        // at once on the one slot held back for it.
+        const insert = limited.insert({ table: "spans", values: [] });
+        await settleMicrotasks();
+
+        expect(driver.client.insert).toHaveBeenCalledTimes(1);
+        expect(driver.started).toBe(4);
+
+        for (let round = 0; round < 2; round += 1) {
           driver.releaseAll();
           await settleMicrotasks();
         }
@@ -552,25 +597,26 @@ describe("withStatementLimit", () => {
     });
   });
 
-  describe("given an insert share", () => {
-    describe("when the share is set to 0.25 of a budget of 8", () => {
-      it("gives inserts two slots", async () => {
+  describe("given a configured reserve share", () => {
+    describe("when inserts flood a budget of 8 with a quarter reserved", () => {
+      it("holds inserts to the budget less the reserve", async () => {
         const driver = deferrableClient();
+        // 8 with a reserve share of 0.25: reserve 2, so each lane caps at 6.
         const limited = withStatementLimit({
           client: driver.client,
           maxConcurrent: 8,
-          insertShare: 0.25,
+          reserveShare: 0.25,
           instance,
         });
 
-        const inserts = Array.from({ length: 5 }, () =>
+        const inserts = Array.from({ length: 8 }, () =>
           limited.insert({ table: "spans", values: [] }),
         );
         await settleMicrotasks();
 
-        expect(driver.started).toBe(2);
+        expect(driver.started).toBe(6);
 
-        for (let round = 0; round < 4; round += 1) {
+        for (let round = 0; round < 3; round += 1) {
           driver.releaseAll();
           await settleMicrotasks();
         }
@@ -625,9 +671,10 @@ describe("withStatementLimit", () => {
           (v) => v.labels.instance === instance && v.labels.lane === "insert",
         );
 
-        expect(insertLane?.value).toBe(2);
+        // The insert lane caps at 3 of the 4-slot budget.
+        expect(insertLane?.value).toBe(3);
 
-        for (let round = 0; round < 3; round += 1) {
+        for (let round = 0; round < 4; round += 1) {
           driver.releaseAll();
           await settleMicrotasks();
         }
@@ -654,7 +701,7 @@ describe("withStatementLimit", () => {
 
         expect(readLane?.value).toBe(0);
 
-        for (let round = 0; round < 3; round += 1) {
+        for (let round = 0; round < 4; round += 1) {
           driver.releaseAll();
           await settleMicrotasks();
         }
@@ -679,51 +726,92 @@ describe("withStatementLimit", () => {
           (v) => v.labels.instance === instance && v.labels.lane === "insert",
         );
 
-        expect(insertLane?.value).toBe(2);
+        // Three inserts run, the fourth waits on the insert lane.
+        expect(insertLane?.value).toBe(1);
 
-        for (let round = 0; round < 3; round += 1) {
+        for (let round = 0; round < 4; round += 1) {
           driver.releaseAll();
           await settleMicrotasks();
         }
         await Promise.all(inserts);
       });
     });
+
+    describe("when inserts hold a lane slot but wait on the total ceiling", () => {
+      it("counts them as queued on the insert lane", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 4,
+          instance,
+        });
+
+        // Three reads fill the read lane and take 3 of the 4 total slots. One
+        // insert takes the last total slot; two more hold an insert-lane slot
+        // but cannot run until the total ceiling frees.
+        const reads = Array.from({ length: 3 }, (_, index) =>
+          limited.query({ query: `SELECT ${index}` }),
+        );
+        const inserts = Array.from({ length: 3 }, () =>
+          limited.insert({ table: "spans", values: [] }),
+        );
+        await settleMicrotasks();
+
+        expect(driver.started).toBe(4);
+
+        const { values } = await clickHouseConcurrencyMetrics.queued.get();
+        const insertLane = values.find(
+          (v) => v.labels.instance === instance && v.labels.lane === "insert",
+        );
+
+        // Both total-blocked inserts count as queued even though they hold an
+        // insert-lane slot.
+        expect(insertLane?.value).toBe(2);
+
+        for (let round = 0; round < 4; round += 1) {
+          driver.releaseAll();
+          await settleMicrotasks();
+        }
+        await Promise.all([...reads, ...inserts]);
+      });
+    });
   });
 });
 
-describe("splitStatementBudget", () => {
+describe("statementLaneCaps", () => {
   describe.each([
-    { maxConcurrent: 4, insertShare: 0.5, insert: 2, read: 2 },
-    { maxConcurrent: 10, insertShare: 0.3, insert: 3, read: 7 },
-    { maxConcurrent: 2, insertShare: 0.9, insert: 1, read: 1 },
-    { maxConcurrent: 5, insertShare: 0.01, insert: 1, read: 4 },
-  ])("given a budget of $maxConcurrent and a share of $insertShare", ({
+    { maxConcurrent: 4, reserveShare: 0.25, reserve: 1, laneCap: 3 },
+    { maxConcurrent: 10, reserveShare: 0.3, reserve: 3, laneCap: 7 },
+    { maxConcurrent: 2, reserveShare: 0.5, reserve: 1, laneCap: 1 },
+    { maxConcurrent: 5, reserveShare: 0.01, reserve: 1, laneCap: 4 },
+    { maxConcurrent: 8, reserveShare: 0.9, reserve: 4, laneCap: 4 },
+  ])("given a budget of $maxConcurrent and a reserve share of $reserveShare", ({
     maxConcurrent,
-    insertShare,
-    insert,
-    read,
+    reserveShare,
+    reserve,
+    laneCap,
   }) => {
-    describe("when the budget is split", () => {
-      it(`gives ${insert} to inserts and ${read} to reads`, () => {
-        expect(splitStatementBudget({ maxConcurrent, insertShare })).toEqual({
-          insert,
-          read,
+    describe("when the caps are computed", () => {
+      it(`reserves ${reserve} and caps each lane at ${laneCap}`, () => {
+        expect(statementLaneCaps({ maxConcurrent, reserveShare })).toEqual({
+          reserve,
+          laneCap,
         });
       });
 
-      it("accounts for the whole budget", () => {
-        const split = splitStatementBudget({ maxConcurrent, insertShare });
+      it("keeps a lane cap plus its reserve within the whole budget", () => {
+        const caps = statementLaneCaps({ maxConcurrent, reserveShare });
 
-        expect((split?.insert ?? 0) + (split?.read ?? 0)).toBe(maxConcurrent);
+        expect((caps?.laneCap ?? 0) + (caps?.reserve ?? 0)).toBe(maxConcurrent);
       });
     });
   });
 
   describe("given a budget of one", () => {
-    describe("when the budget is split", () => {
-      it("returns null because it cannot be split", () => {
+    describe("when the caps are computed", () => {
+      it("returns null because it cannot reserve against a single slot", () => {
         expect(
-          splitStatementBudget({ maxConcurrent: 1, insertShare: 0.5 }),
+          statementLaneCaps({ maxConcurrent: 1, reserveShare: 0.25 }),
         ).toBeNull();
       });
     });

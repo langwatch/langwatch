@@ -70,21 +70,29 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
 
   # An insert holds its connection until the async insert flushes, so with one
   # shared bound a burst of ingest could occupy every slot and starve UI reads.
-  # Each lane gets its own share of the same budget (configurable via
-  # CLICKHOUSE_INSERT_CONCURRENCY_SHARE), so neither can delay the other and
-  # together they still never exceed the budget.
+  # Each kind reserves a minimum of the shared budget for the other
+  # (configurable via CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE) but may borrow the
+  # rest when the other is idle, so neither can delay the other, a lone kind
+  # still uses the whole budget, and together they never exceed it.
   @unit
   Scenario: a saturated insert lane does not delay reads
-    Given the insert lane has used all of its share of the budget
+    Given the insert lane has used every slot it may hold
     When a read is issued
     Then the read starts immediately
     And the surplus inserts keep waiting
 
   @unit
   Scenario: a saturated read lane does not delay inserts
-    Given the read lane has used all of its share of the budget
+    Given the read lane has used every slot it may hold
     When an insert is issued
     Then the insert starts immediately
+
+  @unit
+  Scenario: a lone kind of work borrows the idle lane's capacity
+    Given only reads are being issued and no inserts
+    When more reads are issued than a fixed half-budget would allow
+    Then they all start, up to the whole budget less the inserts' reserve
+    And the inserts' reserved slots stay free for an insert that may yet arrive
 
   @unit
   Scenario: both lanes together never exceed the connection budget
