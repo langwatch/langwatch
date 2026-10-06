@@ -22,3 +22,17 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Cross-owner ClickHouse reads (Q207): new trace and gateway *Api query operations for plain reads; one-statement subqueries become named policy exceptions.
 - Trace analytics tables (Q207): ANALYTICS owns them; trace drops its copy of the has-signal predicate.
 - Unowned ClickHouse tables (Q207): RECORD event_log as framework owned and the six legacy tables as legacy owned in the policy; nothing dropped.
+
+## Round 4 (D, CI policy blockers)
+
+- Event tables (Q205): EVENTING surfaces; eventing exposes a retention operation and declares its own LWQL catalogue entries, which analytics composes.
+- Test exports (Q208): MOVE the fixtures into each consuming module; trace's and gateway's './testing' exports go (not the recommended keep).
+- Client role (Q208): ADD a 'client' role to the enforcer allowing @langwatch/api and React; the linter follows the record.
+- Shell types (Q208): the MODULE's contract; auth and navigation contracts export the types and apps/ui imports them type-only; the side doors go.
+
+## Round 5 (D, raw clients, ops repositories, group-queue)
+
+- Raw clients (Q212): NAMED, linted exceptions with a written reason for Better Auth's storage adapter and ops' event replay; ops' memory registry may require eventing.
+- Ops repositories (Q212): MOVE the peer Api calls into ops' services; repositories take only ops' own store.
+- ClickHouse health (Q212): resolve CLICKHOUSE_URL through secrets.into at boot and pass it in.
+- Blob store (Q211): INJECT mintUri; group-queue takes a mint function and a generic destination type, no module import.
