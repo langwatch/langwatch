@@ -9,11 +9,11 @@ import {
 } from "@langwatch/webhook-contract";
 import { z } from "zod";
 
-export const requestSpendDeliveryCommandDataSchema = z.object({
+const requestSpendDeliveryCommandDataSchema = z.object({
   ...webhookSpendDeliveryRequestSchema.shape,
   tenantId: z.string().min(1),
 });
-export type RequestSpendDeliveryCommandData = z.infer<typeof requestSpendDeliveryCommandDataSchema>;
+type RequestSpendDeliveryCommandData = z.infer<typeof requestSpendDeliveryCommandDataSchema>;
 
 export const webhookSpendDeliveryRequestedEventSchema = z.object({
   ...EventSchema.shape,

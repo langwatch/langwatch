@@ -9,7 +9,6 @@ import { webhookEndpointTrpcTransport } from "./transport/webhook-endpoint.trpc.
 import { webhookSpendReplayRest } from "./transport/webhook-spend-replay.rest.ts";
 import { webhookRest } from "./transport/webhook.rest.ts";
 
-export type { WebhookAppDependencies, WebhookTestDispatch } from "./app/webhook.app.ts";
 export type { WebhookLiveDatabase } from "./repositories/prisma/prisma.webhook.repositories.ts";
 
 /** The canonical outbound-webhook feature declaration. */

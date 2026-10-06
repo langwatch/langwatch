@@ -32,7 +32,7 @@ import {
 } from "./webhook-spend-payload.rules.ts";
 
 /** What an outcome handler needs from the process context. */
-export interface DeliverOutcomeContext<Intent> {
+interface DeliverOutcomeContext<Intent> {
   projectId: string;
   intent: (name: "deliver", key: string, payload: DeliverPayload) => Intent;
 }
@@ -56,7 +56,7 @@ export function retryDelayMs({
   return Math.max(0, Math.round(step - spread + random() * spread * 2));
 }
 
-export function isEndpointStreamKey(processKey: string): boolean {
+function isEndpointStreamKey(processKey: string): boolean {
   return processKey.startsWith("endpoint:");
 }
 

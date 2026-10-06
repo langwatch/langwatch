@@ -22,9 +22,9 @@ export const VECTORS_RELATIVE_PATH = "specs/webhooks/signature-vectors.json";
  * stale timestamp (clock or replay), bad digest (wrong secret or tampered
  * body), unparsed header (misrouted) — checked in that order, so malformed wins over stale.
  */
-export type VectorOutcome = "valid" | "malformed_header" | "stale_timestamp" | "invalid_signature";
+type VectorOutcome = "valid" | "malformed_header" | "stale_timestamp" | "invalid_signature";
 
-export interface SigningVector {
+interface SigningVector {
   name: string;
   why: string;
   /** The exact bytes signed. Never re-serialize before verifying. */
@@ -35,7 +35,7 @@ export interface SigningVector {
   expected_header: string;
 }
 
-export interface VerificationVector {
+interface VerificationVector {
   name: string;
   why: string;
   body: string;
@@ -48,7 +48,7 @@ export interface VerificationVector {
   expected: VectorOutcome;
 }
 
-export interface SignatureVectorFile {
+interface SignatureVectorFile {
   $schema_note: string;
   generated_by: string;
   generated_from: string;
@@ -341,7 +341,7 @@ const VERIFICATION_VECTORS: VerificationVector[] = [
   },
 ];
 
-export function buildVectors(): SignatureVectorFile {
+function buildVectors(): SignatureVectorFile {
   return {
     $schema_note:
       "Generated file. Do not hand-edit: run `pnpm --filter @langwatch/tasks task webhook-signature-vectors`.",

@@ -18,7 +18,7 @@ const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKe
           HttpStatus, NeedsReconciliation, SettleReason, Labels, Metadata,
           DurationMS, toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
 
-export type WebhookClickHouseClient = {
+type WebhookClickHouseClient = {
   query(input: {
     query: string;
     query_params: Record<string, unknown>;
@@ -92,7 +92,7 @@ function newestFirst(left: WebhookSpendEventRow, right: WebhookSpendEventRow): n
   return left.gatewayRequestId < right.gatewayRequestId ? 1 : -1;
 }
 
-export type WebhookEventsCursor = {
+type WebhookEventsCursor = {
   occurredAtMs: number;
   gatewayRequestId: string;
 };

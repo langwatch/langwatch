@@ -13,7 +13,7 @@ export const governanceEnvelopeSchema = z.object({
   schema_version: z.literal("1"),
   data: z.record(z.string(), z.string().nullable()),
 });
-export type GovernanceEnvelope = z.infer<typeof governanceEnvelopeSchema>;
+type GovernanceEnvelope = z.infer<typeof governanceEnvelopeSchema>;
 
 function isoMillis(epochMs: number): string {
   return Temporal.Instant.fromEpochMilliseconds(epochMs).toString({ fractionalSecondDigits: 3 });

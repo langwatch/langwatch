@@ -23,7 +23,7 @@ export type WebhookReplayEndpoint = {
 };
 
 /** What a replay reads and appends to: webhook's own registry, emitted log and stream. */
-export type WebhookSpendReplayCollaborators = Readonly<{
+type WebhookSpendReplayCollaborators = Readonly<{
   findDeliverable(input: {
     organizationId: string;
     endpointId: string;

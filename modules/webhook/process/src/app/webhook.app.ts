@@ -102,7 +102,7 @@ async function recordTestFire(
 const logger = createLogger("langwatch:webhook:app");
 
 /** One endpoint's last hop, as the delivery worker performs it. */
-export type WebhookTestDispatchInput = {
+type WebhookTestDispatchInput = {
   destination: WebhookDestinationConfig;
   organizationId: string;
   endpointId: string;

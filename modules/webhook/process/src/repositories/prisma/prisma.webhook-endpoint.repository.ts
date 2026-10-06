@@ -103,7 +103,7 @@ function statusSnapshotOf(row: {
   };
 }
 
-export interface WebhookEndpointDeps {
+interface WebhookEndpointDeps {
   prisma: WebhookEndpointDatabase;
   ids: WebhookId;
   secrets: WebhookSecret;

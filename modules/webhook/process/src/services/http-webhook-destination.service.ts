@@ -12,7 +12,7 @@ import type { WebhookEgressService } from "./webhook-egress.service.ts";
 /** How much of the receiver's response the delivery log keeps. */
 const RESPONSE_SNIPPET_CHARS = 1000;
 
-export interface HttpWebhookDestinationServiceOptions {
+interface HttpWebhookDestinationServiceOptions {
   url: string;
   /**
    * The process's ONE outbound webhook sender: the SSRF fence, the TLS policy

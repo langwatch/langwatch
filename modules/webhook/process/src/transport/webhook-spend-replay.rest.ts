@@ -24,7 +24,7 @@ export interface WebhookSpendReplayDoorApi {
   ): Promise<WebhookSpendReplayResponse>;
 }
 
-export const WebhookSpendReplayApi = moduleApi<WebhookSpendReplayDoorApi>()("webhook");
+const WebhookSpendReplayApi = moduleApi<WebhookSpendReplayDoorApi>()("webhook");
 
 const REPLAY_DESCRIPTION =
   "Re-delivers the window's spend envelopes to ONE endpoint through the " +

@@ -21,7 +21,7 @@ export type WebhookGatewayEventDelivery = (
 ) => Promise<void>;
 
 /** One peer subscriber per gateway fact webhook delivers, each on that event's contract data. */
-export type WebhookGatewayEventSubscribers = Readonly<{
+type WebhookGatewayEventSubscribers = Readonly<{
   gatewaySpendAdmittedDelivery: PeerSubscriberDefinition<
     typeof gatewaySpendAdmittedEventDataSchema
   >;

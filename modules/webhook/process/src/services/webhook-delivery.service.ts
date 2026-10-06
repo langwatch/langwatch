@@ -109,7 +109,7 @@ export interface WebhookDeliveryProcessDeps {
  * inbox source id so re-delivering recently-delivered envelopes cannot
  * collide with their historical batches and silently no-op.
  */
-export type WebhookReplayInput = {
+type WebhookReplayInput = {
   organizationId: string;
   endpoint: WebhookEndpointView;
   envelope: SendBatchPayload["envelopes"][number];

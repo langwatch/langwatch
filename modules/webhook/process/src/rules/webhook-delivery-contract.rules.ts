@@ -36,7 +36,7 @@ export const EMPTY_SPEND_USAGE: SpendUsage = {
   image_count: 0,
 };
 
-export type SpendAttributionData = {
+type SpendAttributionData = {
   organization_id: string;
   virtual_key_id: string;
   principal_user_id: string;
@@ -49,7 +49,7 @@ export type SpendAttributionData = {
   metadata: string;
 };
 
-export type SpendOutcomeAttributionData = SpendAttributionData & {
+type SpendOutcomeAttributionData = SpendAttributionData & {
   admitted_at: number;
 };
 
@@ -60,7 +60,7 @@ export type AdmitSpendCommandData = SpendAttributionData & {
   outcome_carries_attribution: boolean;
 };
 
-export type SpendOutcomeData = SpendOutcomeAttributionData & {
+type SpendOutcomeData = SpendOutcomeAttributionData & {
   gateway_request_id: string;
   occurred_at: number;
   tenantId: string;
@@ -161,7 +161,7 @@ export const MAINTENANCE_TENANT = "__webhook_maintenance__";
 
 /** Attribution captured at admission; outcome events carry only the
  *  outcome. Field names mirror the admit command's wire shape. */
-export const spendAttributionSchema = z.object({
+const spendAttributionSchema = z.object({
   organization_id: z.string(),
   virtual_key_id: z.string(),
   principal_user_id: z.string(),
@@ -192,7 +192,7 @@ export const INITIAL_WEBHOOK_DELIVERY_STATE: WebhookDeliveryState = {
  *  a durable outbox row, so a payload the previous build wrote is read back
  *  by this one, and a field without a default turns that row into a
  *  permanent parse failure instead of a delivery. */
-export const spendUsagePayloadSchema = z.object({
+const spendUsagePayloadSchema = z.object({
   input_tokens: z.number().int().min(0),
   output_tokens: z.number().int().min(0),
   cache_read_input_tokens: z.number().int().min(0),
@@ -276,7 +276,7 @@ export type SendBatchPayload = z.infer<typeof sendBatchSchema>;
  * The per-endpoint stream instance (processKey `endpoint:<id>`): the coalescing buffer the
  * deliver and flush executors commit directly. `salt` marks a replayed entry.
  */
-export const endpointStreamStateSchema = z.object({
+const endpointStreamStateSchema = z.object({
   pending: z.array(
     z.object({
       envelope: bufferedEnvelopeSchema,

@@ -11,7 +11,7 @@ export type WebhookRetentionDatabase = Pick<PrismaClient, "$executeRaw">;
  * ADR-040 §6 bounds the automations log at 30 days and the endpoints platform
  * adopted the same bound; one table now holds both, so there is one number.
  */
-export const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * The two system-owned maintenance sweeps the delivery log needs. Deliberately global and

@@ -319,7 +319,7 @@ async function putOnQueue({
   }
 }
 
-export interface SqsWebhookDestinationServiceOptions extends SqsDestinationConfig {
+interface SqsWebhookDestinationServiceOptions extends SqsDestinationConfig {
   /** The process-owned SQS transport. */
   channel: SqsWebhookSender;
   /**
