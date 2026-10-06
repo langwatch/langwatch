@@ -184,6 +184,35 @@ describe("the I/O preview sub-row", () => {
   });
 });
 
+/** Every rule of a sheet, descending into at-rules such as `@layer` blocks. */
+function flattenRules(rules: CSSRule[]): CSSRule[] {
+  return rules.flatMap((rule) => [
+    rule,
+    ...("cssRules" in rule ? flattenRules([...(rule as CSSGroupingRule).cssRules]) : []),
+  ]);
+}
+
+describe("the hover over a trace with an I/O sub-row", () => {
+  /** @scenario "Two-zone hover treats both lines as one unit" */
+  it("groups the header row and the I/O row under one hover rule", () => {
+    const { container } = renderTable({ traces: [trace()] });
+
+    const { main, sub } = bodyRows(container);
+    const group = main.parentElement as HTMLElement;
+    expect(sub.parentElement).toBe(group);
+    expect(group.tagName).toBe("TBODY");
+    const rules = [...document.styleSheets].flatMap((sheet) => flattenRules([...sheet.cssRules]));
+    const hoverRule = rules.find(
+      (rule): rule is CSSStyleRule =>
+        rule instanceof CSSStyleRule &&
+        [...group.classList].some((name) => rule.selectorText.startsWith(`.${name}:`)) &&
+        rule.selectorText.includes(":hover") &&
+        rule.selectorText.endsWith(">tr>td"),
+    );
+    expect(hoverRule?.style.background).toContain("--chakra-colors-gray-subtle");
+  });
+});
+
 describe("the error detail sub-row", () => {
   /** @scenario Erroring span on root shows "(root)" */
   it("names the root as the erroring span when no child span carries the error", () => {

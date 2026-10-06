@@ -76,16 +76,19 @@ Rule: Origin filter in sidebar
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
+  @integration
   Scenario: Origin facet is first in the sidebar
     When the filter sidebar renders
     Then the Origin section appears above all other facet sections
     And it has slightly more visual emphasis than other facets
 
+  @integration
   Scenario: Origin facet shows three values with counts
     When the filter sidebar renders
     Then the Origin section shows "Application", "Simulation", and "Evaluation"
     And each value has a count badge
 
+  @integration
   Scenario: No origin selected by default
     When the Observe page loads
     Then no origin checkbox is checked
@@ -139,6 +142,7 @@ Rule: Toolbar strip
     And the right cluster includes (in order): tour button, live indicator, time range picker, columns dropdown, grouping selector, density toggle, find button, keyboard shortcuts button
     And the toolbar row is 36px minimum height
 
+  @integration
   Scenario: Lens tabs take remaining horizontal space
     Then the lens tabs flex to fill remaining space before the right cluster
 
@@ -223,10 +227,12 @@ Rule: Conversations lens
     And the locked section cannot be expanded
     And hovering the heading shows "This filter is set by the Conversations view. Switch to All Traces to change it."
 
+  @integration
   Scenario: Conversations sorted by most recent activity
     When the Conversations lens is active
     Then conversations are sorted by most recent message timestamp descending
 
+  @integration
   Scenario: Traces without conversation ID are excluded
     Given some traces have no conversation ID
     When the Conversations lens is active
@@ -593,6 +599,7 @@ Rule: Two-zone row format (compact density only)
     Given a trace root span has gen_ai.input.messages in attributes
     Then it also renders as an LLM trace with I/O sub-rows
 
+  @integration
   Scenario: Two-zone hover treats both lines as one unit
     Given a trace has I/O sub-rows
     When the user hovers over the I/O sub-row
@@ -883,11 +890,13 @@ Rule: Data gating and null handling
   Background:
     Given the user is authenticated with "traces:view" permission
 
+  @integration
   Scenario: Zero traces in project shows onboarding empty state
     Given the project has zero traces
     When the Observe page loads
     Then the onboarding empty state is shown instead of the table
 
+  @integration
   Scenario: Lens preset has no matching data
     Given the project has traces but none with errors
     When the Errors lens is active
