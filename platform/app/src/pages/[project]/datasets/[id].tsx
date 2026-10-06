@@ -3,6 +3,7 @@ import { FlaskConical } from "lucide-react";
 import { useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { DatasetEditorTable } from "~/components/datasets/editor/DatasetEditorTable";
+import { parseRowQueryParam } from "~/components/datasets/editor/datasetRowPaging";
 import { retryDatasetNormalize } from "~/components/datasets/services/directUpload";
 import { showErrorToast } from "~/features/errors";
 import { useRegisterLangyPageContext } from "~/features/langy/LangyContext";
@@ -16,6 +17,10 @@ export default function Dataset() {
   const datasetId = router.query.id as string;
   const { project, hasPermission } = useOrganizationTeamProject();
   const [isRetrying, setIsRetrying] = useState(false);
+
+  // `?row={index}` deep-links to one entry (issue #8190) — e.g. an
+  // experiment result row's "View in dataset" link.
+  const initialRowIndex = parseRowQueryParam(router.query.row);
 
   // Lifted to the page so the read-gate and the processing banner are decided
   // here (ADR-032 I-READY), and the editor only reads records once ready.
@@ -125,6 +130,7 @@ export default function Dataset() {
             datasetId={datasetId}
             readEnabled={isReady}
             floatingSelectionBar
+            initialRowIndex={initialRowIndex}
             headerActions={
               hasPermission("evaluations:manage") ? (
                 <Button

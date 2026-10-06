@@ -72,6 +72,7 @@ import {
   plainRecordCount,
   searchFailedMessage,
 } from "./datasetEditorCopy";
+import { pageForRowIndex } from "./datasetRowPaging";
 import { datasetTableCss } from "./datasetTableStyles";
 import {
   createDatasetEditorStore,
@@ -151,6 +152,7 @@ export function DatasetEditorTable({
   editorPortalRef,
   headerActions,
   readEnabled = true,
+  initialRowIndex,
 }: {
   datasetId?: string;
   inMemoryDataset?: InMemoryDataset;
@@ -180,6 +182,11 @@ export function DatasetEditorTable({
   /** Pass when hosting the editor inside a modal dialog so the floating
    *  cell editor stays within the dialog's pointer-events scope. */
   editorPortalRef?: React.RefObject<HTMLDivElement | null>;
+  /** Zero-based dataset row to land on and highlight, e.g. arriving from an
+   *  experiment result row's "View in dataset" link (issue #8190). Saved
+   *  mode only, read once at mount — later changes are ignored, since a
+   *  caller updating it while the editor is open has no "re-arrive" to mean. */
+  initialRowIndex?: number;
 }) {
   const { project } = useOrganizationTeamProject();
   const [store] = useState(() => createDatasetEditorStore());
@@ -191,8 +198,40 @@ export function DatasetEditorTable({
   // Saved datasets are read one page at a time (classic page N of M) instead of
   // the whole dataset, which previously truncated past a byte cap and silently
   // hid the rest. In-memory mode (no datasetId) keeps its full local copy.
-  const [page, setPage] = useState(1);
+  //
+  // `initialRowIndex` lands on the PAGE that row is on rather than page 1 —
+  // computed once, in the lazy initializer, from the pageSize this same
+  // render starts with. A deep link to row 327 opening on page 1 and asking
+  // the reader to page forward to it defeats the entire point of the link.
+  const [page, setPage] = useState(() =>
+    initialRowIndex != null
+      ? pageForRowIndex({
+          index: initialRowIndex,
+          pageSize: DATASET_EDITOR_PAGE_SIZE,
+        }).page
+      : 1,
+  );
   const [pageSize, setPageSize] = useState(DATASET_EDITOR_PAGE_SIZE);
+
+  // The local (within-page) position still to be scrolled to and highlighted,
+  // once this page's rows are on screen. Cleared on a timer after it is shown
+  // — see the highlight effect near the VirtualizedTableBody render below —
+  // so visiting the editor again later doesn't relight a stale row.
+  const [highlightedRowIndex, setHighlightedRowIndex] = useState<
+    number | null
+  >(() =>
+    initialRowIndex != null
+      ? pageForRowIndex({
+          index: initialRowIndex,
+          pageSize: DATASET_EDITOR_PAGE_SIZE,
+        }).indexOnPage
+      : null,
+  );
+  useEffect(() => {
+    if (highlightedRowIndex == null) return;
+    const timeout = setTimeout(() => setHighlightedRowIndex(null), 2500);
+    return () => clearTimeout(timeout);
+  }, [highlightedRowIndex]);
 
   // ── Row search ────────────────────────────────────────────────────
   //
@@ -987,6 +1026,9 @@ export function DatasetEditorTable({
                 isLoading={!!datasetId && databaseDataset.isLoading}
                 shouldVirtualize={shouldVirtualize}
                 disableVirtualization={false}
+                highlightedRowIndex={
+                  holdingPreviousData ? null : highlightedRowIndex
+                }
                 displayRowCount={displayRowCount}
               />
             </tbody>

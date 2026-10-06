@@ -19,7 +19,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { ExternalLink } from "react-feather";
 import { cellPictureUrl } from "~/components/datasets/cellPictureUrl";
+import { datasetEntryDeepLinkHref } from "~/components/datasets/editor/datasetRowPaging";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { ExperimentRunWithItems } from "../../../server/experiments-v3/services/types";
@@ -69,6 +71,8 @@ export function BatchEvaluationV2EvaluationResult({
   isFinished: _isFinished,
   size = "md",
   workflowId: _workflowId,
+  projectSlug,
+  datasetId,
 }: {
   evaluator: string;
   results: ExperimentRunWithItems["evaluations"];
@@ -78,6 +82,13 @@ export function BatchEvaluationV2EvaluationResult({
   isFinished: boolean;
   size?: "sm" | "md";
   workflowId: string | null;
+  /** Slug of the project the experiment belongs to, for building the
+   *  View-in-dataset link below. */
+  projectSlug: string;
+  /** The dataset this run evaluated (issue #6411's `datasetId` fallback).
+   *  Null when none is recorded, in which case no Dataset column is shown —
+   *  there is nowhere for the link to point. */
+  datasetId: string | null;
 }) {
   const evaluatorHeaders = getEvaluationColumns(results);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -312,6 +323,43 @@ export function BatchEvaluationV2EvaluationResult({
       });
     }
 
+    // Dataset column: a result row's only identifier is otherwise its
+    // zero-based index, which means finding the source entry in a 50+ row
+    // dataset is a manual count (issue #8190). The index survives a page
+    // switch on the dataset side (both sides order by createdAt ascending),
+    // so it still resolves correctly as long as no rows were added/removed
+    // since the run.
+    if (datasetId) {
+      cols.push({
+        id: "dataset",
+        header: "Dataset",
+        minWidth: 90,
+        render: (row) => {
+          const index = row.datasetEntry?.index;
+          if (index == null) return "-";
+          return (
+            <Button
+              size="xs"
+              colorPalette="gray"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(
+                  datasetEntryDeepLinkHref({ projectSlug, datasetId, index }),
+                  "_blank",
+                );
+              }}
+            >
+              <HStack gap={1}>
+                <ExternalLink size={12} /> View
+              </HStack>
+            </Button>
+          );
+        },
+        text: () => undefined,
+      });
+    }
+
     // Trace column
     const hasAnyTraceId = Object.values(datasetByIndex).some(
       (d) => d.traceId && d.traceId !== "0",
@@ -356,6 +404,8 @@ export function BatchEvaluationV2EvaluationResult({
     openDrawer,
     datasetByIndex,
     rowHeight,
+    projectSlug,
+    datasetId,
   ]);
 
   // Track whether the user is pinned to the bottom (live-run autoscroll)

@@ -568,6 +568,8 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
                   isFinished={isFinished}
                   size={size}
                   workflowId={experiment.workflowId}
+                  projectSlug={project.slug}
+                  datasetId={experiment.datasetId}
                 />
               </Tabs.Content>
             ) : null;
