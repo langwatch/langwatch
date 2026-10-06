@@ -275,6 +275,41 @@ describe("GatewaySpendDebitService", () => {
     });
   });
 
+  describe("given an outcome with no virtual key and no provider", () => {
+    /** @scenario "A project budget sees an Instant Eval outcome" */
+    it("debits the organization, team and project budgets that apply", async () => {
+      const { debits, resolver, ledger } = harness({
+        budgets: [
+          resolved({ id: "b-org", scopeType: "ORGANIZATION" }),
+          resolved({ id: "b-team", scopeType: "TEAM" }),
+          resolved({ id: "b-project", scopeType: "PROJECT" }),
+          resolved({ id: "b-openai", scopeType: "PROJECT", providerKey: "openai" }),
+        ],
+      });
+
+      await debits.write(
+        payload({
+          gateway_request_id: "instant-eval:run-1",
+          virtual_key_id: "",
+          model_provider_id: "",
+          principal_user_id: "",
+        }),
+      );
+
+      expect(resolver.asked[0]).toMatchObject({
+        organizationId: "org-1",
+        teamId: "team-1",
+        projectId: "project-1",
+      });
+      const rows = ledger.batches.flat();
+      expect(rows.map((row) => row.budgetId)).toEqual(["b-org", "b-team", "b-project"]);
+      expect(new Set(rows.map((row) => row.gatewayRequestId))).toEqual(
+        new Set(["instant-eval:run-1"]),
+      );
+      expect(rows[0]).toMatchObject({ providerKey: null, amountNanoUsd: 420_000_000 });
+    });
+  });
+
   describe("given a failed outcome", () => {
     it("records a guardrail refusal apart from a provider error", async () => {
       const { debits, ledger } = harness({ budgets: [resolved({ id: "b" })] });
