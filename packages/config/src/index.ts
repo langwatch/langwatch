@@ -13,6 +13,11 @@ export {
   type ProcessConfigOf,
 } from "./config.ts";
 export {
+  alignDevAuthUrlsToPort,
+  type DevAddressAlignment,
+  type DevAddressRealignment,
+} from "./dev-port-alignment.ts";
+export {
   adminEmails,
   allowedProxyHosts,
   allowLoopbackVoiceProviders,
