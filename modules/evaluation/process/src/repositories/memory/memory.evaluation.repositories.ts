@@ -1,4 +1,7 @@
+import { memoryObjectStorage } from "@langwatch/process-stores";
+
 import type { EvaluationRepositories } from "../evaluation.repositories.ts";
+import { ObjectStorageEvaluationLangevalsStagingRepository } from "../object-storage/object-storage.evaluation-langevals-staging.repository.ts";
 import { MemoryEvaluationAnalyticsFoldCacheRepository } from "./memory.evaluation-analytics-fold-cache.repository.ts";
 import { MemoryEvaluationCostRepository } from "./memory.evaluation-cost.repository.ts";
 import { MemoryEvaluationInputRepository } from "./memory.evaluation-input.repository.ts";
@@ -15,6 +18,9 @@ export class MemoryEvaluationRepositories {
       monitorPerformance: MemoryMonitorPerformanceRepository.create(),
       analyticsFoldCache: MemoryEvaluationAnalyticsFoldCacheRepository.create(),
       inputs: MemoryEvaluationInputRepository.create(),
+      langevalsStaging: ObjectStorageEvaluationLangevalsStagingRepository.create({
+        objectStorage: memoryObjectStorage(),
+      }),
     };
   }
 }

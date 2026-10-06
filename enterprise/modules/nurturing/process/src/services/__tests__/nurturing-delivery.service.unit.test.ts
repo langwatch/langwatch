@@ -90,7 +90,7 @@ function users(): UserApi {
   });
 }
 
-/** The platform's idempotency member: true the first time a key is seen. */
+/** A claim repository double: true the first time a key is seen. */
 function claims() {
   const seen = new Set<string>();
   return {

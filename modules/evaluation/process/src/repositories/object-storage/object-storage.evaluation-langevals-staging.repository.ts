@@ -1,18 +1,23 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { ObjectStorage, StoredObjectAddress } from "@langwatch/process-stores/members";
+import type { ObjectStorage, StoredObjectAddress } from "@langwatch/process-stores";
 import { nowInstant } from "@langwatch/time";
 
-import type { LangevalsPayloadStaging, StagedLangevalsPayload } from "./langevals.channel.ts";
+import type {
+  LangevalsPayloadStaging,
+  StagedLangevalsPayload,
+} from "../../channels/langevals.channel.ts";
 
 const logger = createLogger("langwatch:langevals:stagePayload");
 
 const STAGED_PAYLOAD_RESOURCE = "langevalspayload";
 
-/** A port of main's `stagePayloadToS3`, over the process's object storage member. */
-export class ObjectStorageLangevalsPayloadStaging implements LangevalsPayloadStaging {
-  static create(input: { objectStorage: ObjectStorage }): ObjectStorageLangevalsPayloadStaging {
-    return new ObjectStorageLangevalsPayloadStaging(input.objectStorage);
+/** A port of main's `stagePayloadToS3`, over the process's object storage. */
+export class ObjectStorageEvaluationLangevalsStagingRepository implements LangevalsPayloadStaging {
+  static create(input: {
+    objectStorage: ObjectStorage;
+  }): ObjectStorageEvaluationLangevalsStagingRepository {
+    return new ObjectStorageEvaluationLangevalsStagingRepository(input.objectStorage);
   }
 
   private constructor(private readonly objects: ObjectStorage) {}

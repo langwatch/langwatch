@@ -41,7 +41,6 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { openAiApiKey, Secret } from "@langwatch/secrets";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -49,7 +48,6 @@ import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { langevalsChannels } from "../channels/langevals-channels.registry.ts";
 import { NullLangevalsChannel } from "../channels/null.langevals.channel.ts";
-import { ObjectStorageLangevalsPayloadStaging } from "../channels/object-storage.langevals-payload-staging.channel.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 import type { EvaluationLifecyclePipeline } from "../eventing/evaluation-lifecycle.pipeline.ts";
 import {
@@ -228,7 +226,7 @@ export interface EvaluationRunner {
 
 type EvaluationSetup = FeatureSetup<
   typeof EvaluationModule.dependencies,
-  MembersRead<typeof EvaluationModule.reads>,
+  never,
   EvaluationServerConfig,
   EvaluationRepositories
 >;
@@ -286,7 +284,6 @@ export class EvaluationModule implements EvaluationApiContract {
     /** The experiment and run history SDK batches and dataset evaluations are written into. */
     experiments: ExperimentApi,
   };
-  static readonly reads = ["objectStorage"] as const;
   static readonly secrets = {
     openAi: openAiApiKey,
     azureContentSafety: Secret.load("AZURE_CONTENT_SAFETY_KEY", { optional: true }),
@@ -393,7 +390,7 @@ export class EvaluationModule implements EvaluationApiContract {
   }
 
   private static withEnvironment(
-    { dependencies, repositories, members, config }: EvaluationSetup,
+    { dependencies, repositories, config }: EvaluationSetup,
     environment: EvaluatorEnvironmentService,
   ): EvaluationModule {
     const commands = EvaluationCommandDispatcherService.create();
@@ -401,9 +398,7 @@ export class EvaluationModule implements EvaluationApiContract {
     const langevals = config.langevalsEndpoint
       ? langevalsChannels.live.create({
           config,
-          staging: ObjectStorageLangevalsPayloadStaging.create({
-            objectStorage: members.objectStorage,
-          }),
+          staging: repositories.langevalsStaging,
         })
       : NullLangevalsChannel.create();
     const telemetry = EvaluationExecutionMetricsService.create();

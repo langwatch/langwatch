@@ -10,6 +10,7 @@ import { Temporal } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
+import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
 import {
   fireExperimentRan,
@@ -80,7 +81,7 @@ function isoOf(epochMilliseconds: number): string {
 export class NurturingDeliveryService {
   private constructor(
     private readonly deps: Readonly<{
-      claims: Readonly<{ claim(key: string, ttlSeconds: number): Promise<boolean> }>;
+      claims: NurturingClaimRepository;
       /** Absent where the deployment named no Customer.io key. */
       customerIo: NurturingService | undefined;
       /** Absent where the deployment named no PostHog key. */

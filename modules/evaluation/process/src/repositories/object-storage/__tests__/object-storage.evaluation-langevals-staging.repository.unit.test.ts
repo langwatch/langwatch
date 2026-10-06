@@ -1,8 +1,8 @@
 import { memoryObjectStorage } from "@langwatch/process-stores";
-import type { ObjectStorage } from "@langwatch/process-stores/members";
+import type { ObjectStorage } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
-import { ObjectStorageLangevalsPayloadStaging } from "../object-storage.langevals-payload-staging.channel.ts";
+import { ObjectStorageEvaluationLangevalsStagingRepository } from "../object-storage.evaluation-langevals-staging.repository.ts";
 
 const PREFIX = "langevals-staging/project_1/evaluation";
 
@@ -13,12 +13,14 @@ async function textAt(url: string, objects = memoryObjectStorage()): Promise<str
   return Buffer.concat(chunks).toString("utf8");
 }
 
-describe("ObjectStorageLangevalsPayloadStaging", () => {
+describe("ObjectStorageEvaluationLangevalsStagingRepository", () => {
   describe("when a payload is staged", () => {
     /** @scenario "A staged payload is parked in the project's object storage behind a signed download" */
     it("parks the body under the prefix and answers a signed download", async () => {
       const objects = memoryObjectStorage();
-      const staging = ObjectStorageLangevalsPayloadStaging.create({ objectStorage: objects });
+      const staging = ObjectStorageEvaluationLangevalsStagingRepository.create({
+        objectStorage: objects,
+      });
 
       const staged = await staging.stage({
         projectId: "project_1",
@@ -35,7 +37,9 @@ describe("ObjectStorageLangevalsPayloadStaging", () => {
     /** @scenario "Discarding a staged payload removes it from object storage" */
     it("removes the parked body on discard", async () => {
       const objects = memoryObjectStorage();
-      const staging = ObjectStorageLangevalsPayloadStaging.create({ objectStorage: objects });
+      const staging = ObjectStorageEvaluationLangevalsStagingRepository.create({
+        objectStorage: objects,
+      });
       const staged = await staging.stage({
         projectId: "project_1",
         keyPrefix: PREFIX,
@@ -63,7 +67,9 @@ describe("ObjectStorageLangevalsPayloadStaging", () => {
           return objects.write(at, body, facts);
         },
       };
-      const staging = ObjectStorageLangevalsPayloadStaging.create({ objectStorage: recording });
+      const staging = ObjectStorageEvaluationLangevalsStagingRepository.create({
+        objectStorage: recording,
+      });
       const controller = new AbortController();
       controller.abort(new Error("deadline"));
 
