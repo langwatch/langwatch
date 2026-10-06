@@ -101,6 +101,7 @@ type AuthzMemoryProjectRow = {
   isPersonal: boolean;
   apiKey: string;
   createdAt: Instant;
+  archivedAt?: Instant | null;
 };
 
 /** A share grant's counted views (GrantUsage). */

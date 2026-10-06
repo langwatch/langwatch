@@ -173,7 +173,7 @@ export class MemoryAuthzReadRepository extends AuthzReadRepository {
   }: {
     projectId: string;
   }): Promise<{ teamId: string; organizationId: string } | null> => {
-    const project = this.memory.projects.find((row) => row.id === projectId);
+    const project = this.memory.projects.find((row) => row.id === projectId && !row.archivedAt);
     const team = this.memory.teams.find((row) => row.id === project?.teamId);
     if (!project || !team) return null;
     return { teamId: team.id, organizationId: team.organizationId };

@@ -82,7 +82,7 @@ export abstract class ScopeLineageRepository {
   // mock built to this class and assert on these members via
   // `expect(...).toHaveBeenCalledWith`, which is unsafe against a
   // method-shorthand member under `unbound-method`.
-  /** A project's team + organization, or null when the project is unknown. */
+  /** A project's team + organization, or null when the project is unknown or archived. */
   abstract findProjectLineage: (args: {
     projectId: string;
   }) => Promise<{ teamId: string; organizationId: string } | null>;

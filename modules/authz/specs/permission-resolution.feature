@@ -123,6 +123,11 @@ Feature: Permission resolution
     When a permission is checked on it
     Then the check is denied and carries no organization role
 
+  Scenario: An archived project resolves to no scope, as an unknown one does
+    Given a project that has been archived
+    When its team and organization are resolved
+    Then nothing is resolved for it, for every caller
+
   Scenario: A caller with no organization membership resolves nothing
     Given a caller with a binding but no membership in the owning organization
     When a permission is checked

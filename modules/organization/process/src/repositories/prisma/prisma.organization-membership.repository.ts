@@ -8,6 +8,7 @@ import type {
 import { newAuthzGrantId } from "@langwatch/authz-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { readJoinerRole } from "@langwatch/identity-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   CannotRemoveSelfAsLastAdminError,
   DeveloperSeatNoSharedAccessError,
@@ -89,6 +90,8 @@ import type {
   UpdateTeamMemberRoleInput,
 } from "../organization-membership.repository.ts";
 import type { OrganizationSettingsCipher } from "../organization.repository.ts";
+
+const logger = createLogger("langwatch:organization:membership-repository");
 
 /**
  * The team's name for a refusal or a report, both of which are read by somebody
@@ -965,74 +968,102 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }
 
   async createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult> {
-    const created = await this.prisma.$transaction(async (tx) => {
-      const organization = await tx.organization.create({
-        data: {
-          id: input.orgId,
-          name: input.orgName,
-          slug: input.orgSlug,
-          phoneNumber: input.phoneNumber,
-          signupData: input.signUpData as Prisma.InputJsonValue | undefined,
-          primaryIntent: input.primaryIntent ?? null,
-          pricingModel: input.pricingModel,
-        },
-      });
+    const created = await this.createFounderBootstrap(input);
 
-      await tx.organizationUser.create({
-        data: {
+    try {
+      // The membership stays disabled while the founder's two grants make
+      // their round trip, so committing the organization first exposes no access.
+      await this.writer.attachBindings({
+        organizationId: created.organization.id,
+        bindings: [
+          { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: created.organization.id },
+          { scopeType: RoleBindingScopeType.TEAM, scopeId: created.team.id },
+        ].map((scope) => ({
+          bindingId: newAuthzGrantId(),
+          principal: { userId: input.userId },
+          role: TeamUserRole.ADMIN,
+          customRoleId: null,
+          ...scope,
+          membershipStamp: created.membershipStamp,
+          membershipBootstrap: true,
+        })),
+        caller: { type: "system" },
+        actor: ledgerActorFor({
           userId: input.userId,
-          organizationId: organization.id,
-          role: "ADMIN",
-        },
+          fallback: "organizationService",
+        }),
+        onDuplicate: "skip",
+        requireProjection: true,
       });
 
-      const team = await tx.team.create({
-        data: {
-          id: input.teamId,
-          name: input.orgName,
-          slug: input.teamSlug,
-          organizationId: organization.id,
+      await this.prisma.organizationUser.update({
+        where: {
+          userId_organizationId: {
+            userId: input.userId,
+            organizationId: created.organization.id,
+          },
         },
+        data: { disabledAt: null },
       });
-
-      return {
-        organization: { id: organization.id, name: organization.name },
-        team: { id: team.id, slug: team.slug, name: team.name },
-      };
-    });
-
-    // The organization, its membership row and its first team are not grant
-    // facts; the founder's two ADMIN grants are, so they are emitted once the
-    // scopes they point at exist.
-    await this.writer.attachBindings({
-      organizationId: created.organization.id,
-      bindings: [
-        {
-          bindingId: newAuthzGrantId(),
-          principal: { userId: input.userId },
-          role: TeamUserRole.ADMIN,
-          customRoleId: null,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: created.organization.id,
+    } catch (error) {
+      // A queued append may outlive this request: deleting the committed rows
+      // leaves any late projection pointing at an organization never reused.
+      await this.deleteProvisionedOrganization(created.organization.id).catch(
+        (cleanupError: unknown) => {
+          logger.error(
+            { organizationId: created.organization.id, userId: input.userId, error: cleanupError },
+            "failed to clean up an incomplete founder organization",
+          );
         },
-        {
-          bindingId: newAuthzGrantId(),
-          principal: { userId: input.userId },
-          role: TeamUserRole.ADMIN,
-          customRoleId: null,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: created.team.id,
-        },
-      ],
-      caller: { type: "system" },
-      actor: ledgerActorFor({
-        userId: input.userId,
-        fallback: "organizationService",
-      }),
-      onDuplicate: "skip",
-    });
+      );
+      throw error;
+    }
 
-    return created;
+    return { organization: created.organization, team: created.team };
+  }
+
+  /** The organization, its first team and the founder's membership, held disabled. */
+  private async createFounderBootstrap(
+    input: CreateAndAssignInput,
+  ): Promise<CreateAndAssignResult & { membershipStamp: string }> {
+    const pendingDisabledAt = new Date();
+    return this.prisma.$transaction(
+      async (tx) => {
+        const organization = await tx.organization.create({
+          data: {
+            id: input.orgId,
+            name: input.orgName,
+            slug: input.orgSlug,
+            phoneNumber: input.phoneNumber,
+            signupData: input.signUpData as Prisma.InputJsonValue | undefined,
+            primaryIntent: input.primaryIntent ?? null,
+            pricingModel: input.pricingModel,
+          },
+        });
+        const membership = await tx.organizationUser.create({
+          data: {
+            userId: input.userId,
+            organizationId: organization.id,
+            role: "ADMIN",
+            disabledAt: pendingDisabledAt,
+          },
+        });
+        const team = await tx.team.create({
+          data: {
+            id: input.teamId,
+            name: input.orgName,
+            slug: input.teamSlug,
+            organizationId: organization.id,
+          },
+        });
+        return {
+          organization: { id: organization.id, name: organization.name },
+          team: { id: team.id, slug: team.slug, name: team.name },
+          membershipStamp: membership.membershipStamp,
+        };
+      },
+      { maxWait: 10_000, timeout: 30_000 },
+    );
   }
 
   async createForProvisioning(input: CreateForProvisioningInput): Promise<CreateAndAssignResult> {

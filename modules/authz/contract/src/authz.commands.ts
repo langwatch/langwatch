@@ -203,6 +203,10 @@ export const authzLedgerBindingAttachSchema = z
     scopeId: z.string().min(1),
     /** When the binding stops granting; the writing service refuses a moment already passed. */
     expiresAtMs: z.number().int().optional(),
+    /** Founder creation only: the membership generation, read in the transaction that made it. */
+    membershipStamp: z.string().min(1).optional(),
+    /** Founder-only: lets the grant land while its membership is still held disabled. */
+    membershipBootstrap: z.boolean().optional(),
   })
   .strict();
 export type AuthzLedgerBindingAttach = z.infer<typeof authzLedgerBindingAttachSchema>;
