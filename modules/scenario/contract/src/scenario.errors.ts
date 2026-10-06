@@ -224,23 +224,6 @@ export class ScenarioFieldTypeInvalidError extends HandledError {
   }
 }
 
-/**
- * Error when ClickHouse-backed simulation reads are not composed yet,
- * refusing raw crash with undefined.
- */
-export class ScenarioSimulationsUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor() {
-    super(
-      "service_unavailable",
-      "This deployment cannot read simulation runs yet, because its simulation reads are not composed.",
-      { httpStatus: 503, fault: "platform" },
-    );
-    this.name = "ScenarioSimulationsUnavailableError";
-  }
-}
-
 /** Refuses decryption without the deployment key before a provider receives invalid credentials. */
 export class ScenarioSecretsUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";

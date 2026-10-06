@@ -112,7 +112,6 @@ import {
   type ScenarioUsageCount,
   type SimulationService as SimulationServiceContract,
   type SimulationSetData,
-  ScenarioSimulationsUnavailableError,
   withActor,
   withNote,
   withResolvedModels,
@@ -1065,10 +1064,7 @@ export class ScenarioModule implements ScenarioApi {
   async getRunDataForAllSuites(
     input: SimulationAllSuitesInput,
   ): Promise<SimulationAllSuitesRunData> {
-    const simulations = this.#dependencies.simulations;
-    if (!simulations) throw new ScenarioSimulationsUnavailableError();
-
-    return simulations.getRunDataForAllSuites(input);
+    return this.#dependencies.simulations.getRunDataForAllSuites(input);
   }
 
   // -- the live stream -------------------------------------------------------

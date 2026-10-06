@@ -135,10 +135,10 @@ describe("scenario app installation", () => {
         controller.abort();
         await expect(updates.next()).rejects.toMatchObject({ name: "AbortError" });
 
-        // The memory tier refuses Results reads as main refused a deployment without ClickHouse.
+        // The memory tier answers Results reads from its run fold, empty before any run.
         await expect(
           app.getResultsOverview({ filter: { projectId, startDate: 0 }, groupBy: "scenario" }),
-        ).rejects.not.toBeInstanceOf(TypeError);
+        ).resolves.toMatchObject({ groups: [] });
         await expect(app.getRunConfigurations({ projectId })).resolves.toEqual([]);
       } finally {
         await runtime.stop();
