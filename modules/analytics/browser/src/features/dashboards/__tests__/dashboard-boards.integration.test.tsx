@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  * A member's boards against an in-memory dashboards and widgets server: the
- * header, the blank board and its template, the picker (questions for Langy),
- * the period and the widget menu. @see modules/dashboard/specs/dashboards-v1.feature
+ * header, the blank board and its way to the templates library, the picker
+ * (questions for Langy), the period and the widget menu.
+ * @see modules/dashboard/specs/dashboards-v1.feature
  */
 
 import {
@@ -20,7 +21,6 @@ import { StubAnalyticsHost } from "../../../testing.tsx";
 import { AGENT_KIND_LABELS, PICKER_QUESTIONS, PICKER_SECTIONS } from "../catalogue/index.ts";
 import { boardSubject } from "../langy/model/board-langy.ts";
 import { BOARD_VISIBILITY_LOCKED_REASON } from "../model/board-visibility.ts";
-import { BOARD_TEMPLATES } from "../templates/index.ts";
 import { BlockPickerDialog } from "../ui/sections/block-picker-dialog.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
@@ -284,53 +284,39 @@ async function pickerRegions() {
 
 afterEach(cleanup);
 
-const FLIGHT_DECK = BOARD_TEMPLATES.find(({ id }) => id === "cockpit")!;
-
 describe("a member's board", () => {
   describe("given a member opens a board with nothing on it", () => {
     /** @scenario 'AC1 The empty board has no "Add a block" box' */
     /** @scenario "AC10 Blank board matches the reference" */
-    /** @scenario "AC17 Every widget and template is listed, coming soon until it is built" */
-    it("shows the template strip and no Add a block box", async () => {
-      openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
+    it("shows the Ask bar and one button to the templates library, and no template cards", async () => {
+      openBoard({
+        server: inMemoryServer({ boards: OWN_BOARDS }),
+        flags: LANGY_ON,
+        permissions: LANGY_MEMBER,
+      });
 
       expect(await screen.findByText("Add a description")).toBeInTheDocument();
-      expect(await screen.findByText("Start from a template")).toBeInTheDocument();
-      expect(
-        await screen.findByRole("button", {
-          name: new RegExp(escape(FLIGHT_DECK.name)),
-        }),
-      ).toBeDisabled();
-      expect(screen.getAllByText(/^Coming soon: \d+ of \d+ widgets built$/).length).toBe(
-        BOARD_TEMPLATES.filter(({ comingSoon }) => comingSoon !== void 0).length,
+      expect(await screen.findByText("This board is empty")).toBeInTheDocument();
+      expect(screen.getByText("What would you like to know?")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Start from a template" })).toHaveAttribute(
+        "href",
+        "/test-project/dashboards/templates",
       );
+      expect(screen.queryByRole("button", { name: /^Create a board from / })).toBeNull();
+      expect(screen.queryByText(/^Coming soon/)).toBeNull();
       expect(screen.queryByRole("button", { name: /Add a block/ })).toBeNull();
     });
-  });
 
-  describe("when the member starts from a template whose widgets are all built", () => {
-    const READY = BOARD_TEMPLATES.find(({ comingSoon }) => comingSoon === void 0)!;
+    describe("when the member presses Start from a template", () => {
+      /** @scenario 'AC1 The empty board has no "Add a block" box' */
+      it("opens the templates library", async () => {
+        const user = userEvent.setup();
+        const { host } = openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
 
-    /** @scenario "AC8 Starting from the template makes a new board of editable widgets" */
-    it("makes a new board only they see, with every template widget, and opens it", async () => {
-      const user = userEvent.setup();
-      const server = inMemoryServer({ boards: OWN_BOARDS });
-      const { host } = openBoard({ server });
+        await user.click(await screen.findByRole("link", { name: "Start from a template" }));
 
-      await user.click(await screen.findByRole("button", { name: new RegExp(escape(READY.name)) }));
-
-      await waitFor(() => expect(host.navigations).toHaveLength(1));
-      const [created] = server.state.boards.slice(OWN_BOARDS.length);
-      expect(created).toMatchObject({
-        name: READY.name,
-        visibility: "only_me",
-        description: READY.description,
+        expect(host.navigations).toEqual(["/test-project/dashboards/templates"]);
       });
-      expect(host.navigations).toEqual([`/test-project/dashboards/${created!.id}`]);
-      const onBoard = server.state.widgets.filter(({ dashboardId }) => dashboardId === created!.id);
-      expect(onBoard.map(({ name }) => name).toSorted()).toEqual(
-        READY.widgets.map(({ name }) => name).toSorted(),
-      );
     });
   });
 
@@ -1039,7 +1025,7 @@ describe("a member's board", () => {
         await waitFor(() => expect(callsTo(server, "dashboardWidgets.delete")).toHaveLength(1));
         reload(server);
 
-        expect(await screen.findByText("Start from a template")).toBeInTheDocument();
+        expect(await screen.findByText("This board is empty")).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "Actions for Traces" })).toBeNull();
       });
     });

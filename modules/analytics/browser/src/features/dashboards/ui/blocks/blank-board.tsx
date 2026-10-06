@@ -1,24 +1,18 @@
 /**
- * A board with nothing on it yet: the "Start from a template" grid, which makes a new
- * board from any built template. The dashed "Add a block" target stays only as the
- * compact footer on a non-empty board.
+ * A board with nothing on it yet: one calm empty state whose single action opens the
+ * templates library, so the Ask bar above stays the first thing to reach for. The dashed
+ * "Add a block" target stays only as the compact footer on a non-empty board.
  */
 
-import { Box, Button, Grid, Text, VStack } from "@langwatch/design-system/primitives";
-import { Plus } from "lucide-react";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Box, Button, Text } from "@langwatch/design-system/primitives";
+import { LayoutTemplate, Plus } from "lucide-react";
 
-import type { LibraryTemplate } from "../../model/template-library.ts";
-import type { BoardTemplateId } from "../../templates/index.ts";
-import { TemplateCard } from "./template-card.tsx";
+import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
 
 /** The compact footer below a board's widgets, opening the question picker. */
-export function AddBlockCard({
-  onClick,
-  compact = false,
-}: {
-  onClick: () => void;
-  compact?: boolean;
-}) {
+export function AddBlockCard({ onClick }: { onClick: () => void }) {
   return (
     <Button
       variant="plain"
@@ -27,7 +21,7 @@ export function AddBlockCard({
       flexDirection="column"
       gap={2}
       paddingX={6}
-      paddingY={compact ? 8 : 16}
+      paddingY={8}
       lineHeight="1.45"
       borderWidth="1px"
       borderStyle="dashed"
@@ -59,59 +53,38 @@ export function AddBlockCard({
   );
 }
 
-function TemplateStrip({
-  templates,
-  creatingId,
-  onOpen,
-}: {
-  templates: readonly LibraryTemplate[];
-  /** The template a board is being made from; its card shows it is busy. */
-  creatingId: BoardTemplateId | undefined;
-  onOpen: (template: LibraryTemplate) => void;
-}) {
+/**
+ * Everything a blank board shows under its header. The action is a real link, so a
+ * modified click still opens the library in a new tab.
+ */
+export function BlankBoard({ templatesHref }: { templatesHref: string }) {
+  const host = useAnalyticsHost();
   return (
-    <VStack align="stretch" gap={2}>
-      <Text
-        paddingX={1}
-        fontSize="10.5px"
-        fontWeight="semibold"
-        letterSpacing="0.09em"
-        textTransform="uppercase"
-        color="gray.400"
+    <NoDataInfoBlock
+      title="This board is empty"
+      description="Start from a ready-made dashboard and make it your own."
+      icon={<LayoutTemplate />}
+    >
+      <Button
+        asChild
+        variant="solid"
+        colorPalette="orange"
+        size="md"
+        borderRadius="full"
+        paddingX={5}
       >
-        Start from a template
-      </Text>
-      <Grid templateColumns="repeat(auto-fill, minmax(280px, 1fr))" gap={3}>
-        {templates.map((template) => (
-          <TemplateCard
-            key={template.board.id}
-            template={template}
-            isCreating={creatingId === template.board.id}
-            onCreate={() => onOpen(template)}
-          />
-        ))}
-      </Grid>
-    </VStack>
-  );
-}
-
-/** Everything a blank board shows under its header. */
-export function BlankBoard({
-  templates,
-  creatingTemplateId,
-  onOpenTemplate,
-}: {
-  templates: readonly LibraryTemplate[];
-  creatingTemplateId: BoardTemplateId | undefined;
-  onOpenTemplate: (template: LibraryTemplate) => void;
-}) {
-  return (
-    <VStack align="stretch" gap={5}>
-      <TemplateStrip
-        templates={templates}
-        creatingId={creatingTemplateId}
-        onOpen={onOpenTemplate}
-      />
-    </VStack>
+        <a
+          href={templatesHref}
+          onClick={(event) => {
+            if (opensElsewhere(event)) return;
+            event.preventDefault();
+            host.navigate(templatesHref);
+          }}
+        >
+          <LayoutTemplate aria-hidden />
+          Start from a template
+        </a>
+      </Button>
+    </NoDataInfoBlock>
   );
 }

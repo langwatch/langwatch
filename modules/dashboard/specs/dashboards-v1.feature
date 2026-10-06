@@ -73,10 +73,10 @@ Feature: Dashboards v1
 
   @integration
   Scenario: AC8 Starting from the template makes a new board of editable widgets
-    Given a member on a board with nothing on it
-    When they choose the Agent Flight Deck under "Start from a template"
-    Then a new board named "Agent Flight Deck" is created, visible only to them
-    And when that name is taken it is numbered: "Agent Flight Deck 2", then 3
+    Given a member in the templates library
+    When they create a board from a ready template
+    Then a new board named after the template is created, visible only to them
+    And when that name is taken it is numbered: the name, then the name with 2, then 3
     And it carries the template's description
     And every template widget is stored on it as an ordinary widget, at its template place
     And the new board opens
@@ -101,8 +101,7 @@ Feature: Dashboards v1
     Then it is visible only to them, under Mine in the sidebar
     When it opens
     Then they see "Add a description"
-    And they see "Start from a template" listing the Agent Flight Deck and one
-      template per question group of the picker
+    And they see one "Start from a template" button that opens the templates library
 
   @e2e
   Scenario: AC11 Ask Langy by question
@@ -351,9 +350,9 @@ Feature: Dashboards v1
   # AC 5: "Status tiles compare with the previous period" → Scenario: AC5 Status tiles compare with the previous period
   # AC 6: "Unconnected source shows a call to action" → Scenario: AC6 Unconnected source shows a call to action
   # AC 7: "Connected state comes from real data" → Scenario: AC7 Connected state comes from real data
-  # AC 8: "The Agent Flight Deck is a template" (changed: was "The Flight Deck cannot be edited"; the read-only board and its server refusal are gone) → Scenario: AC8 Starting from the template makes a new board of editable widgets
+  # AC 8: "The Agent Flight Deck is a template" (changed: was "The Flight Deck cannot be edited"; the read-only board and its server refusal are gone; changed again: boards are made from the templates library, not the blank board) → Scenario: AC8 Starting from the template makes a new board of editable widgets
   # AC 9: "Empty period" → Scenario: AC9 Empty period shows an empty state
-  # AC 10: "Blank board matches the reference" (changed by langwatch/tasks#911: no "Add a block" area on the empty board) → Scenario: AC10 Blank board matches the reference
+  # AC 10: "Blank board matches the reference" (changed by langwatch/tasks#911: no "Add a block" area on the empty board; changed again: one button to the templates library instead of the template cards) → Scenario: AC10 Blank board matches the reference
   # AC 11: "Add a block by question" (changed by langwatch/tasks#911: picking a question adds its widget and drafts Langy to send, instead of sending and writing nothing) → Scenario: AC11 Ask Langy by question
   # AC 12: "Only working questions are offered" (changed by langwatch/tasks#911: the picker lists every question with or without Langy) → Scenario: AC12 Only working questions are offered
   # AC 13: "Period and grain" (changed: widgets, through their reserved parameters) → Scenario: AC13 Period and grain update every block; Scenario: AC13 Grain choices update every block

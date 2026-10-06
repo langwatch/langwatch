@@ -1,6 +1,6 @@
 /**
  * One board: its header, the ask bar, and its stored widgets on the grid, or the
- * blank-board state with the template strip. Every widget is editable; "Add chart"
+ * blank-board state pointing to the templates library. Every widget is editable; "Add chart"
  * opens the widget drawer, the footer "Add a block" the question picker.
  */
 
@@ -19,7 +19,6 @@ import {
 } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
 import { useBlockPickerAddress } from "../../behavior/use-block-picker-address.ts";
 import { useBoardDescription } from "../../behavior/use-board-description.ts";
-import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
 import { useBoardPeriod } from "../../behavior/use-board-period.ts";
 import { useBoardVisibility } from "../../behavior/use-board-visibility.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
@@ -27,7 +26,7 @@ import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-da
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import { boardSubject, widgetPromptDraft } from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
-import { TEMPLATE_LIBRARY } from "../../model/template-library.ts";
+import { dashboardTemplatesPath } from "../../model/boards.ts";
 import { AddBlockCard, BlankBoard } from "../blocks/blank-board.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
@@ -62,7 +61,6 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const projectId = host.project()?.id ?? "";
   const saved = useSavedDashboards();
   const boardWidgets = useBoardWidgets();
-  const fromTemplate = useBoardFromTemplate();
   const { description, saveDescription } = useBoardDescription({
     dashboardId: board.id,
     stored: board.description,
@@ -123,16 +121,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
         />
       )}
       {boardWidgets.status === "success" && widgets.length === 0 && (
-        <BlankBoard
-          templates={TEMPLATE_LIBRARY}
-          creatingTemplateId={fromTemplate.creatingId}
-          onOpenTemplate={({ board: template }) =>
-            void fromTemplate.createFromTemplate({
-              template,
-              existingNames: saved.boards.map(({ name }) => name),
-            })
-          }
-        />
+        <BlankBoard templatesHref={dashboardTemplatesPath({ projectSlug: saved.projectSlug })} />
       )}
       {boardWidgets.status === "success" && widgets.length > 0 && (
         <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
@@ -159,7 +148,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                   : undefined
               }
             />
-            <AddBlockCard compact onClick={picker.open} />
+            <AddBlockCard onClick={picker.open} />
           </VStack>
         </DashboardRefreshedAtContext.Provider>
       )}

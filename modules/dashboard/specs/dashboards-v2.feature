@@ -14,7 +14,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @integration
   Scenario: AC1 The empty board has no "Add a block" box
     Given the dashboards flag is on and a member opens a board with no widgets
-    Then they see the Ask bar and "Start from a template" with the template cards
+    Then they see the Ask bar, "This board is empty" and one "Start from a template" button
+    And the button opens the templates library
+    And they see no template cards
     And they do not see the "Add a block" box
     # Evidence: screenshot of an empty board
 
@@ -26,7 +28,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @e2e @unimplemented
   Scenario: AC2 Template cards say what the board shows
-    Given a member opens a board with no widgets
+    Given a member opens the templates library
     Then each question-group template card shows a summary of what the board shows
     And the summary comes from its own field, not the picker's "why" line
     And the summary is not cut off on a 1440px wide screen
@@ -643,7 +645,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC106 Templates library: a ready template creates a board, a coming-soon one cannot
     Then each card shows a preview, the name, the job, the trunk, the number of widgets
       and the agent kinds it suits
-    And "Create board" on a ready template makes the same board as picking it on a blank board, and opens it
+    And "Create board" on a ready template makes a board only the member sees, named after the template, and opens it
     And a coming-soon card says how many of its widgets are built and cannot create a board
 
   @integration
@@ -861,7 +863,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Decision: no migration of stored widget code in this PR; new templates only
 
   # --- AC Coverage Map ---
-  # AC 1: "The empty board has no 'Add a block' box" → Scenario: AC1 The empty board has no "Add a block" box
+  # AC 1: "The empty board has no 'Add a block' box" (changed: one button to the templates library instead of the template cards) → Scenario: AC1 The empty board has no "Add a block" box
   # AC 2: "Template cards say what the board shows" → Scenario: AC2 Template cards say what the board shows
   # AC 3: "A status tile without an earlier period says so" → Scenario: AC3 A status tile without an earlier period says so
   # AC 4: "Money has cents" → Scenario: AC4 Money has cents
