@@ -29,6 +29,7 @@ export function scimRepositoryFixture(overrides: Partial<ScimRepository> = {}): 
     findTokenIdsForConnection: vi.fn(async () => []),
     moveDirectoryToConnection: vi.fn(async () => undefined),
     findTokensByHashes: vi.fn(async () => []),
+    replaceTokenDigest: vi.fn(async () => undefined),
     recordTokenUse: vi.fn(async () => undefined),
     findMembership: vi.fn(async () => null),
     findOrganizationUsers: vi.fn(async () => ({ rows: [], total: 0 })),

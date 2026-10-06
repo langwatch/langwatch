@@ -9,6 +9,7 @@ import { storageStatsEventing } from "#eventing/ops-storage-stats.pipeline";
 import { systemMigrationsEventing } from "#eventing/ops-system-migrations.pipeline";
 import { usageReportEventing } from "#eventing/ops-usage-report.pipeline";
 import { opsRepositories } from "#repositories/ops-repositories.registry";
+import { CredentialsResealTask, credentialsResealCiphers } from "#tasks/credentials-reseal.task";
 import { GrantPlatformOperatorTask } from "#tasks/grant-platform-operator.task";
 import { ProcessManagerPurgeTask } from "#tasks/process-manager-purge.task";
 import { SystemMigrationsPassTask } from "#tasks/system-migrations-pass.task";
@@ -53,8 +54,12 @@ export const opsProcessModule = defineProcessModule("ops")
   .withEventing(projectionReplayEventing)
   .withEventing(systemMigrationsEventing)
   .withEventing(platformOperatorSeedEventing)
-  .withTasks(({ repositories, app }) => [
+  .withTasks(async ({ repositories, app, secrets }) => [
     ProcessManagerPurgeTask.create({ repository: () => repositories.processManagerPurge }),
+    CredentialsResealTask.create({
+      repository: () => repositories.credentialsReseal,
+      ciphers: await credentialsResealCiphers({ secrets, handles: OpsModule.secrets }),
+    }),
     GrantPlatformOperatorTask.create({ operators: app }),
     SystemMigrationsPassTask.create({ pass: () => app.systemMigrationPass() }),
   ]);

@@ -189,25 +189,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
-{{/* Validate evaluators secrets */}}
-{{- if .Values.app.evaluators.azureOpenAI.enabled }}
-  {{- if .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.name }}
-    {{- if empty .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.key }}
-      {{- $errors = append $errors "app.evaluators.azureOpenAI.endpoint.secretKeyRef.name is set but key is empty" }}
-    {{- end }}
-  {{- else if empty .Values.app.evaluators.azureOpenAI.endpoint.value }}
-    {{- $errors = append $errors "app.evaluators.azureOpenAI.enabled is true but endpoint is not configured" }}
-  {{- end }}
-  
-  {{- if .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.name }}
-    {{- if empty .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.key }}
-      {{- $errors = append $errors "app.evaluators.azureOpenAI.apiKey.secretKeyRef.name is set but key is empty" }}
-    {{- end }}
-  {{- else if empty .Values.app.evaluators.azureOpenAI.apiKey.value }}
-    {{- $errors = append $errors "app.evaluators.azureOpenAI.enabled is true but apiKey is not configured" }}
-  {{- end }}
+{{/* The previous credentials key is optional. Only a half-written secret
+     reference is an error: it names a Secret but no key inside it. */}}
+{{- $credsPrevious := (.Values.app.credentialsEncryptionKey).previous | default dict }}
+{{- if and (($credsPrevious.secretKeyRef).name) (empty ($credsPrevious.secretKeyRef).key) }}
+  {{- $errors = append $errors "app.credentialsEncryptionKey.previous.secretKeyRef.name is set but key is empty" }}
 {{- end }}
 
+{{/* Validate evaluators secrets */}}
 {{- if .Values.app.evaluators.google.enabled }}
   {{- if .Values.app.evaluators.google.credentials.secretKeyRef.name }}
     {{- if empty .Values.app.evaluators.google.credentials.secretKeyRef.key }}
@@ -1040,10 +1029,31 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       key: credentialsEncryptionKey
 {{- end }}
 
-# Evaluators - Azure OpenAI Integration
-{{- if .Values.app.evaluators.azureOpenAI.enabled }}
-{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_OPENAI_ENDPOINT" "fieldValues" .Values.app.evaluators.azureOpenAI.endpoint) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_OPENAI_KEY" "fieldValues" .Values.app.evaluators.azureOpenAI.apiKey) }}
+{{/* Previous credentials key, set only during a rotation. Every process that
+     gets CREDENTIALS_SECRET gets this too, so data written under the old key
+     stays readable while it is re-encrypted. Never generated: an install that
+     names no previous key renders no variable.
+
+     Precedence: an explicit secretKeyRef, then an inline value, then the key
+     secrets.secretKeys.credentialsEncryptionKeyPrevious names inside
+     secrets.existingSecret. */}}
+{{- $credsPrevious := (.Values.app.credentialsEncryptionKey).previous | default dict }}
+{{- $credsPreviousKey := (.Values.secrets.secretKeys).credentialsEncryptionKeyPrevious | default "" }}
+{{- if ($credsPrevious.secretKeyRef).name }}
+- name: CREDENTIALS_SECRET_PREVIOUS
+  valueFrom:
+    secretKeyRef:
+      name: {{ $credsPrevious.secretKeyRef.name }}
+      key: {{ $credsPrevious.secretKeyRef.key }}
+{{- else if $credsPrevious.value }}
+- name: CREDENTIALS_SECRET_PREVIOUS
+  value: {{ $credsPrevious.value | quote }}
+{{- else if and .Values.secrets.existingSecret $credsPreviousKey }}
+- name: CREDENTIALS_SECRET_PREVIOUS
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.secrets.existingSecret }}
+      key: {{ $credsPreviousKey }}
 {{- end }}
 
 # Evaluators - Google AI Integration
@@ -1090,8 +1100,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- else }}
 - name: STORED_OBJECTS_BACKEND
   value: "s3"
-- name: USE_S3_STORAGE
-  value: "true"
 # Emit S3_BUCKET_NAME — the app/server reads this name across all
 # storage code paths (storage.ts, stored-objects.service.ts,
 # env-create.mjs). The legacy `S3_BUCKET` env was a no-op for every

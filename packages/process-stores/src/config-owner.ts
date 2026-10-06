@@ -1,6 +1,11 @@
 import { PRIVATE_ROUTE_ENV_PREFIX } from "@langwatch/clickhouse-client";
 import { Config, type ProcessConfigOf } from "@langwatch/config";
-import { credentialsSecret, Secret, sessionSecret } from "@langwatch/secrets";
+import {
+  credentialsSecret,
+  credentialsSecretPrevious,
+  Secret,
+  sessionSecret,
+} from "@langwatch/secrets";
 import { z } from "zod";
 
 /** Main's per-organisation S3 family prefix, parsed in object-storage-private-accounts.ts. */
@@ -85,6 +90,8 @@ export const storesOwner = {
     redis: Secret.load("REDIS_URL", { optional: true }),
     encryption: credentialsSecret,
     encryptionFallback: sessionSecret,
+    /** Opens values sealed before a CREDENTIALS_SECRET rotation; never seals. */
+    encryptionPrevious: credentialsSecretPrevious,
     s3AccessKeyId: Secret.load("S3_ACCESS_KEY_ID", { optional: true }),
     s3SecretAccessKey: Secret.load("S3_SECRET_ACCESS_KEY", { optional: true }),
     s3SessionToken: Secret.load("S3_SESSION_TOKEN", { optional: true }),

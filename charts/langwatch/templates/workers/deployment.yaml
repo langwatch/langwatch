@@ -78,6 +78,13 @@ spec:
         {{- with (coalesce .Values.workers.pod.annotations .Values.global.podAnnotations) }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+        {{- if .Values.app.telemetry.metrics.enabled }}
+        {{- /* What the langwatch-workers scrape job keeps on. The port is the
+               worker's health and metrics listener, the one the probes below
+               use. */}}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "2999"
+        {{- end }}
     spec:
       # Workers do not call the Kubernetes API, so don't mount the SA token.
       {{- with (include "langwatch.serviceAccountName" .) }}

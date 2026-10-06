@@ -291,6 +291,10 @@ export class ScimModule implements ScimApiContract {
     const tokenPepper = await secrets.into(ScimModule.secrets.tokenPepper, (credentials) =>
       secrets.into(ScimModule.secrets.tokenPepperFallback, (session) => credentials ?? session),
     );
+    const previousTokenPepper = await secrets.into(
+      ScimModule.secrets.tokenPepperPrevious,
+      (previous) => previous || void 0,
+    );
     const scimSyncLedger = ScimSyncLedgerWriterService.create();
     const lifecycle = ScimSyncLifecycleService.create({
       guards: ScimSyncGuardsService.create({ syncs: repositories.scimSyncs }),
@@ -310,6 +314,7 @@ export class ScimModule implements ScimApiContract {
       lifecycle,
       provenOffboarding: config.provenOffboarding,
       tokenPepper,
+      previousTokenPepper,
       connections,
     });
 

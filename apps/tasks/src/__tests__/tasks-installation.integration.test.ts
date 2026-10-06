@@ -160,6 +160,7 @@ describe("the tasks process installation", () => {
         "model-provider-migrate-credentials",
         "model-provider-migrate-custom-models",
         "process-manager-purge",
+        "credentials-reseal",
         "grant-platform-operator",
         "system-migrations-pass",
         "backfill-organization-presence-setting",

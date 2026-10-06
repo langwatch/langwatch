@@ -7,7 +7,13 @@ import { createLogger } from "@langwatch/observability";
 import type { OperatorReadMint } from "@langwatch/prisma-client";
 
 import { buildClickHouse } from "./clickhouse-member.ts";
-import { aesEncryption, loggedTelemetry, resolvedSecrets, systemClock } from "./config-members.ts";
+import {
+  aesEncryption,
+  loggedTelemetry,
+  resolvedSecrets,
+  rotatingEncryption,
+  systemClock,
+} from "./config-members.ts";
 import type { ProcessConfig } from "./config.ts";
 import { buildPrisma, buildRedis, type BuiltMember } from "./datastore-members.ts";
 import { buildEventing } from "./eventing-members.ts";
@@ -78,7 +84,25 @@ type TenantDirectory = ReturnType<typeof cachedTenantDirectory>;
 /** No key is a state, not a refusal: only a use of the cipher refuses. */
 function encryptionMember(config: ProcessConfig): Encryption {
   const key = config.encryptionKey.trim();
-  return key ? aesEncryption(Buffer.from(key, "hex")) : refusingEncryption();
+  if (!key) return refusingEncryption();
+
+  const current = aesEncryption(Buffer.from(key, "hex"));
+  const previousKey = config.previousEncryptionKey?.trim();
+  if (!previousKey) return current;
+
+  return rotatingEncryption({ current, previous: previousEncryption(previousKey) });
+}
+
+/** A malformed previous key refuses as a malformed current one does, under its own name. */
+function previousEncryption(key: string): Encryption {
+  try {
+    return aesEncryption(Buffer.from(key, "hex"));
+  } catch (error) {
+    throw new Error(
+      `CREDENTIALS_SECRET_PREVIOUS is not a usable key. ${error instanceof Error ? error.message : ""}`,
+      { cause: error },
+    );
+  }
 }
 
 function prismaMember({
