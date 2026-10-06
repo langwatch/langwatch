@@ -61,6 +61,7 @@ describe("<ScenarioTargetRow/>", () => {
   });
 
   describe("given a run that passed with 4 of 5 criteria met", () => {
+    /** @scenario "List view row displays passed status with criteria count" */
     it("shows the status with its count and not a percentage", () => {
       const row = renderRow(
         runOf({
@@ -79,6 +80,7 @@ describe("<ScenarioTargetRow/>", () => {
   });
 
   describe("given a run that failed with 2 of 5 criteria met", () => {
+    /** @scenario "List view row displays failed status with criteria count" */
     it("shows the status with its count", () => {
       const row = renderRow(
         runOf({

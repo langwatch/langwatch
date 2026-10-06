@@ -14,6 +14,7 @@ const criteria = ({ met, unmet }: { met: number; unmet: number }) => ({
 
 describe("formatRunStatusLabel()", () => {
   describe("given a successful run with five met criteria", () => {
+    /** @scenario "Successful run shows "passed" with criteria count" */
     it("reads Passed with the count of met over all criteria", () => {
       const label = formatRunStatusLabel({
         status: ScenarioRunStatus.SUCCESS,
@@ -25,6 +26,7 @@ describe("formatRunStatusLabel()", () => {
   });
 
   describe("given a failed run with three met and two unmet criteria", () => {
+    /** @scenario "Failed run shows "failed" with criteria count" */
     it("reads Failed with the count of met over all criteria", () => {
       const label = formatRunStatusLabel({
         status: ScenarioRunStatus.FAILED,
@@ -36,6 +38,7 @@ describe("formatRunStatusLabel()", () => {
   });
 
   describe("given a successful run with no evaluation results", () => {
+    /** @scenario "Run with no criteria results shows status without count" */
     it("reads Passed with no count", () => {
       const label = formatRunStatusLabel({ status: ScenarioRunStatus.SUCCESS, results: null });
 
@@ -44,6 +47,7 @@ describe("formatRunStatusLabel()", () => {
   });
 
   describe("given a failed run with zero criteria", () => {
+    /** @scenario "Run with zero criteria shows status without count" */
     it("reads Failed with no count", () => {
       const label = formatRunStatusLabel({
         status: ScenarioRunStatus.FAILED,
@@ -55,6 +59,7 @@ describe("formatRunStatusLabel()", () => {
   });
 
   describe("given a run that has not finished", () => {
+    /** @scenario "In-progress run shows "running" without criteria count" */
     it("reads Running for an in-progress run, even when criteria are listed", () => {
       const label = formatRunStatusLabel({
         status: ScenarioRunStatus.IN_PROGRESS,
@@ -64,6 +69,7 @@ describe("formatRunStatusLabel()", () => {
       expect(label).toBe("Running");
     });
 
+    /** @scenario "Pending run shows "pending" without criteria count" */
     it("reads Pending for a pending run", () => {
       expect(formatRunStatusLabel({ status: ScenarioRunStatus.PENDING })).toBe("Pending");
     });
