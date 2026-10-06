@@ -7,6 +7,7 @@ Feature: Annotation service boundary
     Then the card, editor body, diff and score controls come from annotation-web
     And the application supplies only narrow data and action ports
 
+  @integration
   Scenario: a process composes one annotation capability
     Given the process selects annotation's Postgres or memory repository factory at startup
     When an annotation caller requests a write or projection read
@@ -40,6 +41,7 @@ Feature: Annotation service boundary
     And the annotation is absent after deletion
     And the marker failures are logged
 
+  @unit
   Scenario: annotation persistence stays private
     Given a PostgreSQL row is returned
     When the annotation repository maps the row
@@ -54,6 +56,7 @@ Feature: Annotation service boundary
     And members are read in one OrganizationApi batch
     And invalid project or member references retain the existing 404 or 400 outcome
 
+  @unit
   Scenario: queue-item writes are atomic
     Given a queue command has traces, queues and users
     When the queue-item service upserts its queue items
@@ -66,6 +69,7 @@ Feature: Annotation service boundary
     When the service reads annotations for a trace projection
     Then it returns both comments with their anchor fields
 
+  @integration
   Scenario: queue transport orchestration remains one annotation seam
     Given a compatibility route manages queues or score definitions
     When this extraction is used
@@ -73,6 +77,7 @@ Feature: Annotation service boundary
     And score definitions and queue-item writes use their respective private services
     And it does not create a separate queue or score feature package
 
+  @unit
   Scenario: transport user projections preserve their legacy shape
     Given an annotation result set names users
     When a tRPC transport returns it

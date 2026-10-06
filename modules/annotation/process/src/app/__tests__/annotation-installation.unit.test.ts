@@ -70,6 +70,26 @@ describe("annotation app installation", () => {
     }
   });
 
+  /** @scenario "a process composes one annotation capability" */
+  it("answers every caller with the one AnnotationApi, over the repositories chosen at boot", async () => {
+    const runtime = await process().boot();
+
+    try {
+      const writer = runtime.service(AnnotationApi);
+      const reader = runtime.service(AnnotationApi);
+      const created = await writer.createUnattributed(input);
+
+      expect(reader).toBe(writer);
+      expect(runtime.module(annotationProcessModule).provided).toBe(writer);
+
+      await expect(
+        reader.listForProjection({ projectId: input.projectId, traceIds: [input.traceId] }),
+      ).resolves.toEqual([expect.objectContaining({ id: created.id })]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   it("allocates independent memory repositories for each installation", async () => {
     const first = await process().boot();
     const second = await process().boot();
