@@ -8,7 +8,9 @@
  *
  * @see specs/governance/aggregate-project.feature
  */
+import { execFileSync } from "node:child_process";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { grantFactToRow } from "@langwatch/authz-server";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -23,6 +25,7 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getAuthzEpoch } from "../epoch";
 import { type AuthzGrantsCommandSenders, GrantsLedgerWriter } from "../ledger";
+import { PrismaAuthzGrantsWriteRepository } from "../repositories/authz-grants-write.prisma.repository";
 
 const ns = `authz-shared-read-${nanoid(8)}`;
 
@@ -46,6 +49,7 @@ describe("given a shared project read in the ledger", () => {
   let member: Project;
   let foreign: Project;
   let sharedGrantId: string;
+  let projectedGrantId: string;
   let previousApp: App | null = null;
   let redis: ReturnType<RedisConnectionService["connect"]>;
 
@@ -181,6 +185,75 @@ describe("given a shared project read in the ledger", () => {
     expect(appended).toHaveLength(0);
   });
 
+  it("lands a shared read through the projection's raw upsert with its condition and no legacy head", async () => {
+    projectedGrantId = `grant_${ns}_projected`;
+    await new PrismaAuthzGrantsWriteRepository(prisma).append({
+      kind: "grant.upsert",
+      row: grantFactToRow({
+        organizationId: organization.id,
+        grant: {
+          grantId: projectedGrantId,
+          principal: { type: "project", id: reader.id },
+          roleKey: "project-reader",
+          scope: { type: "PROJECT", id: member.id },
+          condition: CONDITION,
+          source: "aggregate-reconciler",
+          occurredAtMs: Date.now(),
+        },
+      }),
+    });
+
+    const row = await prisma.grant.findUnique({
+      where: { id: projectedGrantId },
+      select: { condition: true, roleKey: true, principalType: true },
+    });
+    expect(row).toEqual({
+      condition: CONDITION,
+      roleKey: "project-reader",
+      principalType: GrantPrincipalType.PROJECT,
+    });
+    // A shared read is neither a membership nor a share link, so the
+    // legacy heads stay silent about it.
+    expect(
+      await prisma.roleBinding.findUnique({ where: { id: projectedGrantId } }),
+    ).toBeNull();
+    expect(
+      await prisma.shareLink.findUnique({ where: { id: projectedGrantId } }),
+    ).toBeNull();
+  });
+
+  /** ADR-144 gate: the migration's documented down path is a statement
+   *  that runs. Executed through psql inside one transaction that is rolled
+   *  back (the app's Prisma client refuses raw statements without tenancy),
+   *  so the column is there again before the next test. */
+  it("can drop the condition column by the documented down path", async () => {
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) throw new Error("DATABASE_URL is not set for this suite");
+    const output = execFileSync(
+      "psql",
+      [
+        databaseUrl,
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-tA",
+        "-c",
+        [
+          "BEGIN;",
+          'ALTER TABLE "Grant" DROP COLUMN "condition";',
+          "SELECT count(*) FROM information_schema.columns WHERE table_name = 'Grant' AND column_name = 'condition';",
+          "ROLLBACK;",
+        ].join(" "),
+      ],
+      { encoding: "utf8" },
+    );
+    expect(output.trim().split("\n")).toContain("0");
+    const after = await prisma.grant.findUnique({
+      where: { id: sharedGrantId },
+      select: { condition: true },
+    });
+    expect(after?.condition).toEqual(CONDITION);
+  });
+
   /** @scenario "Revoking a shared grant keeps its row" */
   it("marks the row with the reason, keeps its condition, and moves the epoch forward", async () => {
     const before =
@@ -194,8 +267,13 @@ describe("given a shared project read in the ledger", () => {
       reason: "rule-narrowed",
     });
 
-    expect(revoked).toEqual([sharedGrantId]);
-    expect(appended.map((call) => call.verb)).toEqual(["revokeGrant"]);
+    expect(new Set(revoked)).toEqual(
+      new Set([sharedGrantId, projectedGrantId]),
+    );
+    expect(appended.map((call) => call.verb)).toEqual([
+      "revokeGrant",
+      "revokeGrant",
+    ]);
 
     const row = await prisma.grant.findUnique({
       where: { id: sharedGrantId },
