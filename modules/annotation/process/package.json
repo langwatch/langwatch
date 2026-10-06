@@ -54,6 +54,7 @@
   },
   "devDependencies": {
     "@langwatch/authorization": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",

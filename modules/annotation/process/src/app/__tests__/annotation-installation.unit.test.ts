@@ -3,7 +3,8 @@ import {
   AnnotationNotFoundError,
   AnnotationQueueItemNotFoundError,
 } from "@langwatch/annotation-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
 import { annotationProcessModule } from "../../annotation.module.ts";
@@ -24,7 +25,8 @@ import {
  */
 function process() {
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(annotationProcessModule)])
+    .withModules([annotationProcessModule])
+    .withStores(memoryStores())
     .provide({
       project: createAnnotationTestProjects(),
       organization: createAnnotationTestOrganizations(),

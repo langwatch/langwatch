@@ -1,10 +1,9 @@
 import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
-import { withMemoryRepositories } from "@langwatch/process";
+import type { ModuleSecretsScope } from "@langwatch/process";
 import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-import { dataPrivacyProcessModule } from "../../data-privacy.module.ts";
 import type { MemoryDataPrivacyDirectoryRepository } from "../../repositories/memory/memory.data-privacy-directory.repository.ts";
 import { MemoryDataPrivacyRepositories } from "../../repositories/memory/memory.data-privacy.repositories.ts";
 import type { DataPrivacyResolutionService } from "../../services/data-privacy-resolution.service.ts";
@@ -86,16 +85,11 @@ export function createDataPrivacyTestProjects(): ProjectApi {
   return createApiFixture<ProjectApi>({ getWithTeam: async () => dataPrivacyTestProject() });
 }
 
-/** The technical inputs a booted data-privacy feature needs from its process. */
-/** `createApp` composes no secrets chain, so the module's one handle is answered here. */
-export function installableDataPrivacy({ googleCredentials }: { googleCredentials?: string } = {}) {
-  const server = withMemoryRepositories(dataPrivacyProcessModule);
-  const secrets = new ScopedSecrets(async (_handle, build) => build(googleCredentials));
-  const installable: typeof server = {
-    ...server,
-    install: (args) => server.install({ ...args, secrets }),
-  };
-  return installable;
+/** `createApp` composes no secrets chain, so the module's one secret is answered here. */
+export function dataPrivacyTestSecrets({
+  googleCredentials,
+}: { googleCredentials?: string } = {}): ModuleSecretsScope {
+  return () => new ScopedSecrets(async (_handle, build) => build(googleCredentials));
 }
 
 /** The app built directly over memory repositories, for a case that seeds the directory. */

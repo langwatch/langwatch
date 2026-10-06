@@ -1,6 +1,7 @@
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -9,7 +10,8 @@ import { describe, expect, it } from "vitest";
 import { topicProcessModule } from "../../topic.module.ts";
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(topicProcessModule)])
+    .withModules([topicProcessModule])
+    .withStores(memoryStores())
     .provide({
       evaluation: createApiFixture<EvaluationApi>({}),
       trace: createApiFixture<TraceApi>({}),

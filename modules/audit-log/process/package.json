@@ -40,6 +40,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@trpc/server": "catalog:",

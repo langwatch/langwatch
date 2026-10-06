@@ -3,7 +3,8 @@ import type { AnnotationApi } from "@langwatch/annotation-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -14,7 +15,8 @@ import { auditLogProcessModule } from "../../audit-log.module.ts";
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(auditLogProcessModule)])
+    .withModules([auditLogProcessModule])
+    .withStores(memoryStores())
     .withConfig({ "audit-log": { maxArgsBytes: 4 * 1024 } })
     .provide({
       project: createApiFixture<ProjectApi>({}),

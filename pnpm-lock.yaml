@@ -5555,6 +5555,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../packages/process-stores
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -5876,6 +5879,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../packages/process-stores
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -14202,9 +14208,9 @@ importers:
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../packages/process
-      '@langwatch/process-stores':
+      '@langwatch/redis-client':
         specifier: workspace:*
-        version: link:../../../packages/process-stores
+        version: link:../../../packages/redis-client
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../packages/task
@@ -14233,6 +14239,9 @@ importers:
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../packages/process-stores
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness

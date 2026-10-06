@@ -9,7 +9,8 @@ import { TrpcHost } from "@langwatch/api/trpc";
 import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { Dataset, DatasetApi } from "@langwatch/dataset-contract";
 import type { Monitor, MonitorApi } from "@langwatch/monitor-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -149,7 +150,8 @@ function owners(): Owners {
 
 async function installed(peers: Owners = owners()) {
   const runtime = await createApp({ role: "api" })
-    .withModules([withMemoryRepositories(auditLogProcessModule)])
+    .withModules([auditLogProcessModule])
+    .withStores(memoryStores())
     .withConfig({ "audit-log": undefined })
     .provide(peers)
     .boot();

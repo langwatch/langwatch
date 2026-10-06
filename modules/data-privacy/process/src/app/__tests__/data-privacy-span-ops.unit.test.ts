@@ -4,14 +4,16 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { dataPrivacyProcessModule } from "../../data-privacy.module.ts";
 import {
   createDataPrivacyTestProjects,
   dataPrivacyTestGraph,
-  installableDataPrivacy,
+  dataPrivacyTestSecrets,
 } from "./data-privacy.fixture.ts";
 
 const PROJECT_ID = dataPrivacyTestGraph.projectId;
@@ -35,8 +37,9 @@ function spanWith(value: string): OtlpSpan {
 }
 
 async function boot({ enforcement }: { enforcement?: string }) {
-  const runtime = await createApp({ role: "worker" })
-    .withModules([installableDataPrivacy()])
+  const runtime = await createApp({ role: "worker", secrets: dataPrivacyTestSecrets() })
+    .withModules([dataPrivacyProcessModule])
+    .withStores(memoryStores())
     .withConfig({
       "data-privacy": { googleDlpDisabled: undefined, enforcement, nodeEnvironment: undefined },
     })
