@@ -53,6 +53,8 @@ Feature: Production HTTP server — static asset and SPA fallback behavior
     And the Content-Type header is text/html
     And the response body is the index.html document (with the asset-base resolver injected)
 
+  # Gap: behaviour question. URL parsing resolves dot segments, so a Request never carries .. and BrowserBundle's 400 guard is not reachable by this address.
+  @unimplemented
   Scenario: Asset path traversal is rejected before touching the filesystem
     When a client requests /assets/../../etc/passwd
     Then the response status is 400

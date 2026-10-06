@@ -1,3 +1,5 @@
+# Untagged scenarios below are @unimplemented: no test opens the workflow target's mapping drawer or saves a mapping from it.
+
 Feature: Workflow agent as an experiment target
   When a user builds a workflow in Optimization Studio and saves it as an agent,
   they can add that agent as a comparison target in the Experiments Workbench
@@ -19,6 +21,7 @@ Feature: Workflow agent as an experiment target
     Given the workflow agent is added as a target in the Experiments Workbench
     Then the target column shows a workflow icon, not a code icon
 
+  @unimplemented
   Scenario: Editing the target opens a mapping drawer, not a dead end
     Given the workflow agent is added as a target in the Experiments Workbench
     When the user opens the target's edit menu and selects Edit Agent
@@ -30,6 +33,7 @@ Feature: Workflow agent as an experiment target
       with mapping controls, matching the mapping UI code and HTTP
       agent targets already get
 
+  @unimplemented
   Scenario: Mapping a dataset column to a workflow input field
     Given the workflow agent target's drawer is open
     And the underlying workflow declares an input field named "question"

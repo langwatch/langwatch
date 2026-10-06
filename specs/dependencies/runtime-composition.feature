@@ -1,6 +1,8 @@
 # See ../../dev/docs/adr/102-runtime-composition-roots.md
 # See ../../dev/docs/adr/111-physical-application-workspaces.md
 
+# The two environment scenarios are @unimplemented: ADR-132 and the config lint rules hold them; no test binds them.
+
 Feature: App and worker runtime encapsulation
   As a platform maintainer
   I want separate API and worker compositions with an explicit development parent
@@ -21,7 +23,7 @@ Feature: App and worker runtime encapsulation
     Then all required capabilities are passed explicitly
     And the feature source does not import getApp, initializeDefaultApp or AppDependencies
 
-  @architecture @environment
+  @architecture @environment @unimplemented
   Scenario: Each runtime validates its environment once
     Given app and worker have separate T3 environment schemas with a small shared base
     When a runtime composition is created
@@ -29,7 +31,7 @@ Feature: App and worker runtime encapsulation
     And each feature receives only its narrow typed configuration
     And feature packages do not read process.env, import.meta.env or the app env module
 
-  @architecture @environment
+  @architecture @environment @unimplemented
   Scenario: JavaScript runtimes share configuration mechanics but not one schema
     Given the app, worker, and standalone services have different configuration requirements
     When each runtime builds its Zod configuration schema

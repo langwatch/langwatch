@@ -50,6 +50,8 @@ Feature: Period selector remembers relative ranges as relative
     Then the period falls back to the default range
     And the period mode is "relative"
 
+  # Gap: no test asserts the selector button label for a relative or an absolute selection.
+  @unimplemented
   Scenario: The selector label reflects the current mode
     When the user has selected "Last 15 minutes"
     Then the selector button shows "Last 15 minutes"

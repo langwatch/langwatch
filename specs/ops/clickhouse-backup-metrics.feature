@@ -57,17 +57,20 @@ Feature: ClickHouse backup status metrics are opt-out
 
   # The Helm chart states the toggle explicitly in both directions, coupled to
   # the backup config, so a chart deployment never depends on the app's default.
+  @e2e
   Scenario: the Helm chart enables backup metrics wherever it runs backups
     Given the langwatch chart is deployed with clickhouse.backup.enabled true
     When the app and worker deployments are rendered
     Then CLICKHOUSE_BACKUP_METRICS_ENABLED is set to true on them
 
+  @e2e
   Scenario: an operator forces backup metrics for out-of-band backups
     Given the langwatch chart is deployed with clickhouse.backup.metricsEnabled true
     And chart-managed backups are disabled
     When the app and worker deployments are rendered
     Then CLICKHOUSE_BACKUP_METRICS_ENABLED is set to true on them
 
+  @e2e
   Scenario: the Helm chart opts out where it knows there are no backups
     Given the langwatch chart is deployed with clickhouse backups disabled
     When the app and worker deployments are rendered

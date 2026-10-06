@@ -157,6 +157,7 @@ Feature: Persona-aware home resolver
     And the resolver does NOT crash
     And the LLMOps majority experience is preserved on transient backend errors
 
+  @unit
   Scenario: User has no project membership AND setupState fails → resolver falls back to /me
     Given the api.governance.setupState query throws on resolve
     And the user belongs to no projects
@@ -169,6 +170,8 @@ Feature: Persona-aware home resolver
   # Integration with `pages/index.tsx`
   # ---------------------------------------------------------------------------
 
+  # Gap: landing.screen.integration.test.tsx proves the replace to the resolver destination, not the LoadingScreen or the absence of any other home.
+  @unimplemented
   Scenario: Authenticated user hits / → client-side query + redirect to resolver destination
     Given a user is authenticated
     And `api.governance.resolveHome` returns a destination path
@@ -178,6 +181,8 @@ Feature: Persona-aware home resolver
     And the client `router.replace`s to the resolver destination
     And no other home is rendered before the redirect
 
+  # Gap: no test covers the signed-out root address.
+  @unimplemented
   Scenario: Unauthenticated user hits / → existing /signin redirect, resolver does not run
     Given a user is not authenticated
     When the user navigates to "/"

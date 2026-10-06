@@ -74,7 +74,8 @@ Feature: Private Prisma table ownership
     Then the operation is rejected
     And the foreign table retains its single original owner
 
-  @pending-isolation
+  # Gap: @pending-isolation, waiting on the AuditLog feature boundary.
+  @pending-isolation @unimplemented
   Scenario: Cross-feature audit writes preserve transactional behavior
     Given an existing operation writes its domain mutation and audit record atomically
     When that operation migrates to the AuditLog feature boundary

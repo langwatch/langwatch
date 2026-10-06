@@ -130,6 +130,7 @@ describe("given the persona matrix", () => {
 
   describe("when the user pinned a home path", () => {
     /** @scenario "A user-pinned lastHomePath wins over persona detection" */
+    /** @scenario "User pin overrides auto-detected persona destination" */
     it("returns the pin over the persona's default", () => {
       const result = personaHomes.resolve({
         ...baseInput,
@@ -149,6 +150,20 @@ describe("given the persona matrix", () => {
       const result = personaHomes.resolveSafe({ firstProjectSlug: "team-prod" });
 
       expect(result.destination).toBe("/team-prod");
+    });
+
+    /** @scenario "User has no project membership AND setupState fails → resolver falls back to /me" */
+    it("falls back to /me when the user belongs to no project either", () => {
+      const unreadable = {
+        firstProjectSlug: null,
+        get setupState(): never {
+          throw new Error("setupState could not be read");
+        },
+      };
+
+      const result = personaHomes.resolveSafe(unreadable);
+
+      expect(result.destination).toBe("/me");
     });
   });
 });

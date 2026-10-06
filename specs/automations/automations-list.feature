@@ -46,6 +46,8 @@ Feature: Seeing what your automations are doing
       Then it shows when it last fired
       And it shows how often it fired recently
 
+    # Gap: only the view drawer asserts the never-fired copy; no test renders the automations list for it.
+    @unimplemented
     Scenario: An automation that has never fired
       Given a newly created automation
       When I look at the automations page
