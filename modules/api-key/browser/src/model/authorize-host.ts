@@ -1,6 +1,7 @@
 // Handoff screen port (/authorize + /mcp/authorize). Switcher is consent control; key asked via
 // port; MCP exchange is app's REST call; redirect-scheme check stays on screen.
 
+import type { Instant } from "@langwatch/time";
 import { createContext, useContext, type ReactNode } from "react";
 
 /** The project a grant is about. */
@@ -73,9 +74,10 @@ export abstract class AuthorizeHostApi {
 
   /**
    * Mints a personal access token for the active project and answers it once, or
-   * `undefined` when there is no active project. Called on a click, never on mount.
+   * `undefined` when there is no active project. Called on a click, never on mount;
+   * `expiresAt` is the reader's choice, `undefined` meaning no expiry.
    */
-  abstract mintProjectToken(): Promise<string | undefined>;
+  abstract mintProjectToken(input: { expiresAt: Instant | undefined }): Promise<string | undefined>;
 
   /**
    * The control that chooses what is being authorized. `null` only if a

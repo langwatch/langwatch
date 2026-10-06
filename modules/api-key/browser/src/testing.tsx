@@ -2,7 +2,7 @@
 // Device flow is programmable (four lookup outcomes, two approve outcomes). Not exported.
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import type { ReactElement, ReactNode } from "react";
 
 import {
@@ -245,7 +245,11 @@ export class FakeAuthorizeHost extends AuthorizeHostApi {
     this.moves.push({ kind: "handOff", to: url });
   }
 
-  mintProjectToken(): Promise<string | undefined> {
+  /** Each mint's expiry, `undefined` meaning "No expiration". */
+  readonly mints: (Instant | undefined)[] = [];
+
+  mintProjectToken({ expiresAt }: { expiresAt: Instant | undefined }): Promise<string | undefined> {
+    this.mints.push(expiresAt);
     return Promise.resolve(this.options.token);
   }
 
