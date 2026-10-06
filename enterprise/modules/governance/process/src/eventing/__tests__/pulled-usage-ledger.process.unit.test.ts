@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** Port of main's `pulledUsageLedger.process.unit.test.ts`. Spec: specs/governance/governance-cost-rollup.feature */
+/**
+ * Port of main's `pulledUsageLedger.process.unit.test.ts`. Spec: specs/governance/governance-cost-rollup.feature,
+ * specs/governance/pulled-usage-cost-reporting.feature */
 import { describe, expect, it } from "vitest";
 
 import type { PulledUsageLedgerState } from "../pulled-usage-ledger.process.ts";
@@ -15,6 +17,30 @@ import {
 } from "./pulled-usage-ledger.fixtures.ts";
 
 const DAY_MS = 86_400_000;
+
+describe("given a pulled observation with a known dollar cost for a team", () => {
+  describe("when the ledger process handles it", () => {
+    /** @scenario "Governance records a priced fact for each pulled observation it can price" */
+    it("records a priced fact in nano-dollars under the team's scope, in the governance tenant", async () => {
+      const { ledger, observe, drainOutbox } = ledgerRuntime();
+
+      await observe(observation());
+      await drainOutbox();
+
+      expect(ledger.rows).toEqual([
+        expect.objectContaining({
+          tenantId: GOV_PROJECT,
+          restatementKey: RESTATEMENT_KEY,
+          organizationId: ORG_ID,
+          scopeId: "team-ledger",
+          amountNanoUsd: 12_000_000_000,
+          occurredAtMs: OCCURRED_AT,
+          observedAtMs: T0,
+        }),
+      ]);
+    });
+  });
+});
 
 describe("resuming an instance persisted before the state carried a filed cell", () => {
   it("treats the missing cell as a first observation and files the charge", async () => {

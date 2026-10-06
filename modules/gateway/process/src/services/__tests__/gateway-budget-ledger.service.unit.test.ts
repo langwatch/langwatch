@@ -12,12 +12,17 @@ import type {
 } from "../../repositories/gateway-change-event.repository.ts";
 import { GatewayBudgetLedgerService } from "../gateway-budget-ledger.service.ts";
 
-class RecordingLedger implements Pick<GatewayBudgetSpendRepository, "insertDebit"> {
+class RecordingLedger implements Pick<
+  GatewayBudgetSpendRepository,
+  "insertDebit" | "insertPulledUsageRows"
+> {
   readonly batches: BudgetDebitRow[][] = [];
 
   async insertDebit(rows: BudgetDebitRow[]): Promise<void> {
     this.batches.push(rows);
   }
+
+  async insertPulledUsageRows(): Promise<void> {}
 }
 
 class RecordingChanges implements Pick<GatewayChangeEventsRepository, "append"> {

@@ -26,12 +26,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
 import {
   PulledUsageLedgerIntent,
+  type PulledUsagePricingDeps,
   type WritePulledUsagePayload,
 } from "../eventing/pulled-usage-ledger.intent.ts";
-import type {
-  PulledUsageLedgerRepository,
-  PulledUsageLedgerRow,
-} from "../repositories/pulled-usage-ledger.repository.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;
@@ -63,14 +60,26 @@ let gateway: GatewayService;
 let writePulledUsage: (payload: WritePulledUsagePayload) => Promise<void>;
 let clickhouse: ClickHouseClient;
 
-/** The ledger as the composition wires it: the intent's port over the
- *  gateway's ClickHouse repository. */
-class LedgerOverGatewayBudgets implements PulledUsageLedgerRepository {
+/** The priced fact, debited into gateway's ClickHouse ledger as gateway's peer subscriber does. */
+class LedgerOverGatewayBudgets implements PulledUsagePricingDeps {
   constructor(private readonly repository: GatewayBudgetSpend) {}
 
-  insert(rows: PulledUsageLedgerRow[]): Promise<void> {
-    return this.repository.insertPulledUsageRows(rows);
-  }
+  sendRecordPulledUsagePriced: PulledUsagePricingDeps["sendRecordPulledUsagePriced"] = (fact) =>
+    this.repository.insertPulledUsageRows([
+      {
+        tenantId: fact.tenantId,
+        scopeId: fact.scopeId,
+        restatementKey: fact.restatementKey,
+        amountNanoUsd: fact.amountNanoUsd,
+        tokensInput: fact.tokensInput,
+        tokensOutput: fact.tokensOutput,
+        tokensCacheRead: fact.tokensCacheRead,
+        tokensCacheWrite: fact.tokensCacheWrite,
+        model: fact.model,
+        occurredAt: Temporal.Instant.fromEpochMilliseconds(fact.occurredAtMs),
+        observedAt: Temporal.Instant.fromEpochMilliseconds(fact.observedAtMs),
+      },
+    ]);
 }
 
 /** The two project reads the decision path makes, answered from this suite's rows. */
