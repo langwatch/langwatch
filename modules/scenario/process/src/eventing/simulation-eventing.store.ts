@@ -25,6 +25,7 @@ import type { SimulationRunMetricsProjectionRecord } from "./simulation-run-metr
 import { SimulationRunMetricsAppendStore } from "./simulation-run-metrics.store.ts";
 import {
   SimulationRunStateFoldProjection,
+  type SimulationRunState,
   type SimulationRunStateData,
 } from "./simulation-run-state.projection.ts";
 
@@ -100,12 +101,12 @@ export class SimulationRunStateStore implements ProjectionStore {
           resolveClient: SimulationEventingClickHouseResolver;
           defaultRetentionDays: () => number;
         }
-      | { type: "memory" },
+      | { type: "memory"; runs?: MemorySimulationRunStateRepository<SimulationRunState> },
   ): SimulationRunStateStore {
     const store =
       options.type === "clickhouse"
         ? ClickHouseSimulationRunStateRepository.create(options)
-        : MemorySimulationRunStateRepository.create();
+        : (options.runs ?? MemorySimulationRunStateRepository.create());
 
     return new SimulationRunStateStore(store);
   }

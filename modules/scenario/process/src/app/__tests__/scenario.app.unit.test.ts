@@ -4,6 +4,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
@@ -21,7 +22,6 @@ import type {
   SimulationQueueRun,
   SimulationService,
 } from "@langwatch/scenario-contract";
-import { ScenarioSimulationsUnavailableError } from "@langwatch/scenario-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
@@ -35,6 +35,7 @@ import {
   scenarioVoicePeers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
+import { simulationRunState } from "../../__tests__/support/simulation-run-state.fixture.ts";
 import { simulationSendersOver } from "../../__tests__/support/simulation-service-fake.fixture.ts";
 import { LiveScenarioRepositories } from "../../repositories/live/live.scenario.repositories.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
@@ -363,9 +364,17 @@ describe("given a run a suite queued", () => {
 
 describe("ScenarioModule.getRunDataForAllSuites", () => {
   describe("given a process on memory stores, which open no ClickHouse", () => {
-    it("refuses the read by name rather than answering empty", async () => {
+    it("answers from the run fold the memory tier processes into", async () => {
+      const repositories = MemoryScenarioRepositories.create();
+      const fold = repositories.simulationRunProcessing.runStateStore({
+        defaultRetentionDays: () => 30,
+      });
+      await fold.store(simulationRunState({ ScenarioRunId: "run-1", ScenarioSetId: "" }), {
+        tenantId: createTenantId("project-1"),
+        aggregateId: "run-1",
+      });
       const app = await ScenarioModule.create({
-        repositories: MemoryScenarioRepositories.create(),
+        repositories,
         dependencies: {
           agents: createApiFixture<AgentApi>(),
           evaluations: createApiFixture<EvaluationApi>(),
@@ -387,9 +396,10 @@ describe("ScenarioModule.getRunDataForAllSuites", () => {
         secrets: scenarioTestSecrets,
       });
 
-      await expect(
-        app.getRunDataForAllSuites({ projectId: "project-1", limit: 20 }),
-      ).rejects.toBeInstanceOf(ScenarioSimulationsUnavailableError);
+      const page = await app.getRunDataForAllSuites({ projectId: "project-1", limit: 20 });
+
+      expect(page).toMatchObject({ changed: true, scenarioSetIds: { "batch-1": "default" } });
+      expect(page.changed && page.runs.map((run) => run.scenarioRunId)).toEqual(["run-1"]);
     });
   });
 });

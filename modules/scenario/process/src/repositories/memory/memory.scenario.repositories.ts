@@ -14,16 +14,19 @@ import { MemoryVoiceNonceRepository } from "./memory.voice-nonce.repository.ts";
 export class MemoryScenarioRepositories {
   static readonly requires = [] as const;
 
+  /** Every run read answers from the one fold the run processing writes into. */
   static create(): ScenarioRepositories {
+    const simulationRunProcessing = MemorySimulationRunProcessingRepository.create();
+    const { runs } = simulationRunProcessing;
     return {
       scenarios: MemoryScenarioRepository.create(),
-      simulationRunProcessing: MemorySimulationRunProcessingRepository.create(),
-      stalledRuns: MemoryStalledSimulationRunRepository.create(),
+      simulationRunProcessing,
+      stalledRuns: MemoryStalledSimulationRunRepository.create({ runs }),
       tabs: MemoryScenarioTabStoreRepository.create(),
       resultAtoms: MemoryResultAtomsRepository.create(),
       runConfigurations: MemoryRunConfigurationsRepository.create(),
       voiceNonces: MemoryVoiceNonceRepository.create(),
-      simulations: MemorySimulationRepository.create(),
+      simulations: MemorySimulationRepository.create({ runs }),
       rateLimits: MemoryScenarioRateLimitRepository.create(),
       cancellations: MemoryScenarioCancellationRepository.create(),
     };
