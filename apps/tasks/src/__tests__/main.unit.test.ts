@@ -89,7 +89,6 @@ describe("given a migration sequence", () => {
   describe("when the first migration fails", () => {
     /** @scenario The tasks run in the order named and stop at the first failure */
     /** @scenario The lock is released even when a task fails */
-    /** @scenario A failed migration stops the boot instead of serving */
     it("stops the sequence and releases the lock", async () => {
       const failure = new Error("migration failed");
       calls.prisma.mockRejectedValueOnce(failure);
