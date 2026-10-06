@@ -7,7 +7,10 @@ if (/@@schema\s*\(/.test(schema)) {
     "Prisma ownership must include schema identity before enabling multiple schemas.",
   );
 }
-const modelBlocks = [...schema.matchAll(/^model\s+(\w+)\s*\{([\s\S]*?)^\}/gm)];
+const modelBlocks = [...schema.matchAll(/^model\s+(\w+)\s*\{([\s\S]*?)^\}/gm)].filter(
+  // An @@ignore model has no client delegate (the upgrade ledger), so no module can claim it.
+  (match) => !/^\s*@@ignore\s*$/m.test(match[2]),
+);
 const modelNames = new Set(modelBlocks.map((match) => match[1]));
 const tables = Object.fromEntries(
   modelBlocks.map((match) => [
