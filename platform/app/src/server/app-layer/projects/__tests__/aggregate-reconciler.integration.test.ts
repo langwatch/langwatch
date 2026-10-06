@@ -8,6 +8,8 @@
  *
  * @see specs/governance/aggregate-project.feature
  */
+
+import { DepartmentService } from "@ee/governance/services/department/department.service";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
@@ -219,6 +221,53 @@ describe("Feature: the reconciler keeps members current", () => {
           },
         });
         expect(await liveMembersOf(aggregate.id)).toContain(personal.id);
+      });
+    });
+  });
+
+  /** @scenario "A department move updates a by-department aggregate" */
+  describe("given an aggregate project with the rule personal projects in department Engineering", () => {
+    describe("when a member in Engineering is moved to department Sales", () => {
+      it("revokes their personal project's read, and a move back restores it", async () => {
+        const departments = new DepartmentService(prisma);
+        await departments.assignUser({
+          organizationId: fixture.organizationId,
+          userId: fixture.engineer.id,
+          departmentId: fixture.departments.engineering.id,
+        });
+        const aggregate = await createAggregate({
+          kind: "personal-by-department",
+          departmentId: fixture.departments.engineering.id,
+        });
+        expect(await liveMembersOf(aggregate.id)).toEqual([
+          fixture.personal.engineer.id,
+        ]);
+
+        try {
+          await departments.assignUser({
+            organizationId: fixture.organizationId,
+            userId: fixture.engineer.id,
+            departmentId: fixture.departments.sales.id,
+          });
+
+          expect(await liveMembersOf(aggregate.id)).toEqual([]);
+
+          // And back: the pair revoked a moment ago reads again, on a new row.
+          await departments.assignUser({
+            organizationId: fixture.organizationId,
+            userId: fixture.engineer.id,
+            departmentId: fixture.departments.engineering.id,
+          });
+          expect(await liveMembersOf(aggregate.id)).toEqual([
+            fixture.personal.engineer.id,
+          ]);
+        } finally {
+          await departments.assignUser({
+            organizationId: fixture.organizationId,
+            userId: fixture.engineer.id,
+            departmentId: fixture.departments.engineering.id,
+          });
+        }
       });
     });
   });

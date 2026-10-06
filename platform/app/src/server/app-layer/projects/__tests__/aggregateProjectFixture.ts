@@ -306,6 +306,7 @@ export async function seedAggregateOrganization(
         ["teamUser", { team: { organizationId } }],
         ["project", { team: { organizationId } }],
         ["team", { organizationId }],
+        ["departmentMembershipHistory", { organizationId }],
         ["department", { organizationId }],
         ["organizationUser", { organizationId }],
         ["organization", { id: organizationId }],
