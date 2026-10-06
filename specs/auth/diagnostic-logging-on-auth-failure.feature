@@ -5,20 +5,20 @@ Feature: Diagnostic logging on auth failure
   Without having to ask the customer to enable debug mode and reproduce
 
   Background:
-    Given the unified auth middleware is mounted on a Hono route
-    And a request reaches the middleware
+    Given the OTLP ingest door resolves the credential of each export
+    And a request reaches the door
 
   @unit
-  Scenario: extractCredentials returns null because no auth header was sent
+  Scenario: A request with no credential header is logged with its fingerprint
     When the request has no Authorization, X-Auth-Token, or X-Project-Id headers
-    Then the middleware emits a single WARN-level log line at "langwatch:api:unified-auth"
-    And the log line contains userAgent, traceparent, x-forwarded-for, path, method
+    Then the door emits a single WARN-level "Authentication failed" log line
+    And the log line contains userAgent, traceparent, forwardedFor, path, method
     And the log line records hasEmptyAuthToken=false (no header at all)
 
   @unit
-  Scenario: extractCredentials returns null because X-Auth-Token was sent empty
+  Scenario: An empty X-Auth-Token is logged as an empty-token submission
     When the request has X-Auth-Token: "" (empty string)
-    Then the middleware emits a single WARN-level log line at "langwatch:api:unified-auth"
+    Then the door emits a single WARN-level log line
     And the log line records hasEmptyAuthToken=true
     And the message specifically calls out an empty-token submission so the
       caller knows their api_key resolved to an empty string
@@ -45,7 +45,6 @@ Feature: Diagnostic logging on auth failure
   Scenario: Diagnostic fields are safe to log
     Then the log NEVER includes the raw token value
     And the log NEVER includes the request body
-    And only the prefix of the token (first 8 chars) is included when the resolver path is taken
 
   @unit
   Scenario: Authorization header from a proxy does not poison X-Auth-Token fallback

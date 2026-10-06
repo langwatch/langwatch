@@ -524,6 +524,7 @@ describe("checking an API key through the shared answers", () => {
 
   describe("when a legacy project key is checked on two pods", () => {
     /** @scenario "A legacy project key's answer is held for five seconds" */
+    /** @scenario A legacy project key still authenticates */
     it("asks the project once until five seconds pass", async () => {
       const { podA, podB, reads, secondsPass } = harness();
 
@@ -544,6 +545,7 @@ describe("checking an API key through the shared answers", () => {
 
   describe("when a revoked legacy key's column value is presented", () => {
     /** @scenario "A revoked legacy key's column value is refused before any lookup" */
+    /** @scenario A revoked legacy key is refused */
     it("is refused without asking Redis or the project", async () => {
       const { podA, reads } = harness();
       reads.legacy.mockResolvedValue("project-acme");

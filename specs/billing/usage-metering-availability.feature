@@ -54,7 +54,7 @@ Feature: Usage decisions when the count cannot be taken
   Scenario: The usage-limit email is skipped rather than sent with zeros
     Given an organization has crossed a usage threshold
     And the counting store cannot report the per-project breakdown
-    When the usage-limit notifier runs
+    When the usage-warning sweep runs
     Then no email is sent
       # its whole premise is that usage is high; sending it with every project
       # reading 0 tells an admin their usage collapsed

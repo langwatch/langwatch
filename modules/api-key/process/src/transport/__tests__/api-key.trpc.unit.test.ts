@@ -127,6 +127,7 @@ describe("the apiKey tRPC transport", () => {
       ).toBeNull();
     });
 
+    /** @scenario No read after the mint carries the token */
     it("declares a list answer with no room for the lookup id or any secret", () => {
       const output = apiKeyTrpc.members.list.output;
       const entry = {
@@ -190,6 +191,7 @@ describe("the apiKey tRPC transport", () => {
     });
 
     /** The one place a plaintext token ever leaves the server. */
+    /** @scenario Minting a key answers its token once */
     it("returns the plaintext token once, with only the key's identity beside it", async () => {
       const { caller } = harness(minted());
 

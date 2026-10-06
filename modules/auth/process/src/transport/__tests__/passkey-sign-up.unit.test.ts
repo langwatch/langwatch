@@ -219,6 +219,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
       expect(resolved.id).not.toContain("@");
     });
 
+    /** @scenario A sign-up that died mid-ceremony leaves the address usable */
     it("hands back the same handle every time, so a retry replaces the credential", async () => {
       const first = await resolveUser({
         ctx: fakeContext().ctx,
@@ -232,6 +233,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
       expect(first.id).toBe(second.id);
     });
 
+    /** @scenario A sign-up that died mid-ceremony leaves the address usable */
     it("creates nothing merely for being asked", async () => {
       await resolveUser({
         ctx: fakeContext().ctx,
@@ -253,6 +255,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
       );
     });
 
+    /** @scenario A sign-up that died mid-ceremony leaves the address usable */
     it("records one sign-up for nurturing, under the new account's id", async () => {
       await afterVerification({ ctx: fakeContext().ctx, context: signUp("someone@example.com") });
 

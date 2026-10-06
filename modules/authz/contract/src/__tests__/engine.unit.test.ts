@@ -630,6 +630,22 @@ describe("authz engine decideWithCeiling()", () => {
     });
   });
 
+  describe("given an owner with no live grant and no organization membership", () => {
+    const ownerGrants = makeGrants({ organizationRole: null, isOrgMember: false, bindings: [] });
+
+    /** @scenario A key cannot regain access from legacy membership */
+    it("refuses what the key's own binding carries, whatever the old membership rows held", () => {
+      const decision = engine.decideWithCeiling({
+        keyGrants,
+        ownerGrants,
+        permission: "traces:view",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("owner-ceiling");
+    });
+  });
+
   describe("given an owner who holds more than the key", () => {
     const ownerGrants = makeGrants({
       bindings: [binding({ roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG })],

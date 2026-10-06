@@ -477,6 +477,7 @@ describe("given a CLI starting a device login", () => {
 
     describe("when the CLI polls after approval", () => {
       /** @scenario A project login answers tokens and the project, never a key */
+      /** @scenario A CLI project login answers a session, never a minted key */
       it("answers a project session and no key", async () => {
         const world = deviceFlowWorld();
         world.project = liveProject();

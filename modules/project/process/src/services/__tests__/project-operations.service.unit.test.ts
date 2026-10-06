@@ -345,4 +345,35 @@ describe("ProjectOperationsService", () => {
       });
     });
   });
+
+  describe("when an admin revokes a project's legacy key", () => {
+    /** @scenario A revoked legacy key is refused */
+    it("replaces the stored key with a value that never authenticates", async () => {
+      const rotations: { projectId: string; token: string }[] = [];
+      const operations = characterizationOperations({
+        projects: {
+          findWithTeam: async () => characterizationProject(false),
+          rotateLegacyApiKey: async (input) => {
+            rotations.push(input);
+
+            return true;
+          },
+          getById: async () => ({
+            ...characterizationProject(false),
+            apiKey: rotations[0]?.token ?? "sk-lw-test",
+          }),
+        },
+        revokeAllTraceShares: async () => undefined,
+      });
+
+      await operations.revokeLegacyProjectKey({ projectId: "project_123" }, MEMBER);
+
+      expect(rotations).toHaveLength(1);
+      expect(rotations[0]?.projectId).toBe("project_123");
+      expect(rotations[0]?.token).toMatch(/^lw-revoked-/);
+      await expect(operations.getLegacyKeyStatus({ projectId: "project_123" })).resolves.toEqual({
+        present: false,
+      });
+    });
+  });
 });

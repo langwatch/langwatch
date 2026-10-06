@@ -78,6 +78,22 @@ describe("UsageWarningSweepService", () => {
     });
   });
 
+  describe("when the counting store cannot report an organization's usage", () => {
+    /** @scenario The usage-limit email is skipped rather than sent with zeros */
+    it("sends no warning for it, and warns again once the counts are real", async () => {
+      const unknown = sweepOver({ isSaas: true, organizations: ["org-unknown"] });
+
+      await unknown.service.sweep();
+
+      expect(unknown.sent).toEqual([]);
+
+      const recovered = sweepOver({ isSaas: true, organizations: ["org-warned"] });
+      await recovered.service.sweep();
+
+      expect(recovered.sent.map((input) => input.organizationId)).toEqual(["org-warned"]);
+    });
+  });
+
   describe("when the deployment is self-hosted", () => {
     /** @scenario "The sweep does nothing off Cloud" */
     it("reads no organization and checks no warning", async () => {

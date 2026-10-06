@@ -79,6 +79,15 @@ describe("reading the credential a project request arrived with", () => {
   });
 });
 
+describe("reading the credential a project request arrived with, when none was resolved", () => {
+  /** @scenario A key route reached with no resolved credential is refused before its handler */
+  it("raises a plain error naming the missing middleware, never a blank principal", () => {
+    expect(() => credentialPrincipalOf(contextWith({}))).toThrow(
+      /project authentication middleware/,
+    );
+  });
+});
+
 describe("reading the credential an organization request arrived with", () => {
   describe("given a resolved organization key", () => {
     it("names the key and the member it acts as", () => {
@@ -121,6 +130,7 @@ describe("reading the credential an organization request arrived with", () => {
   });
 
   describe("when no organization authentication ran", () => {
+    /** @scenario A key route reached with no resolved credential is refused before its handler */
     it("raises rather than answering from a blank principal", () => {
       expect(() => organizationCredentialPrincipalOf(contextWith({}))).toThrow(
         /organization authentication middleware/,

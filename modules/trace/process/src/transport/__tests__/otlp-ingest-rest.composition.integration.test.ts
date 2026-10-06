@@ -245,13 +245,13 @@ function deployment(access: OtlpAccess = {}) {
       ]
     : [];
 
-  const post = async (path: string, body: unknown, headers: Record<string, string> = {}) => {
+  const post = async (path: string, body: unknown, headers: Record<string, string | null> = {}) => {
     for (const family of mounted) {
-      return family.request(path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Auth-Token": TOKEN, ...headers },
-        body: JSON.stringify(body),
-      });
+      const sent: Record<string, string> = { "Content-Type": "application/json" };
+      for (const [name, value] of Object.entries({ "X-Auth-Token": TOKEN, ...headers })) {
+        if (value !== null) sent[name] = value;
+      }
+      return family.request(path, { method: "POST", headers: sent, body: JSON.stringify(body) });
     }
 
     // Nothing mounted: the same 404 an exporter met while this family was
@@ -356,6 +356,63 @@ describe("given the trace module as a process composes it", () => {
           "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
       });
       expect(recordedSpans).toHaveLength(0);
+    });
+  });
+
+  describe("when a refused export is logged for on-call", () => {
+    const refusals = () =>
+      doorLog.lines.filter((line) => line.msg?.startsWith("Authentication failed"));
+
+    /** @scenario A request with no credential header is logged with its fingerprint */
+    it("carries the request's fingerprint and says no empty token was sent", async () => {
+      const { post } = deployment();
+      doorLog.lines.length = 0;
+
+      await post("/api/otel/v1/traces", otlpTraceBody(), {
+        "X-Auth-Token": null,
+        "User-Agent": "otel-exporter/1.2",
+        traceparent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+        "X-Forwarded-For": "203.0.113.9",
+      });
+
+      expect(refusals()).toHaveLength(1);
+      expect(refusals()[0]).toMatchObject({
+        msg: "Authentication failed",
+        level: 40,
+        path: "/api/otel/v1/traces",
+        method: "POST",
+        userAgent: "otel-exporter/1.2",
+        traceparent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+        forwardedFor: "203.0.113.9",
+        hasEmptyAuthToken: false,
+      });
+    });
+
+    /** @scenario An empty X-Auth-Token is logged as an empty-token submission */
+    it("names the empty token so the caller knows its api_key resolved to nothing", async () => {
+      const { post } = deployment();
+      doorLog.lines.length = 0;
+
+      await post("/api/otel/v1/traces", otlpTraceBody(), { "X-Auth-Token": "" });
+
+      expect(refusals()).toHaveLength(1);
+      expect(refusals()[0]).toMatchObject({
+        msg: "Authentication failed: X-Auth-Token sent but empty",
+        hasEmptyAuthToken: true,
+      });
+    });
+
+    /** @scenario Diagnostic fields are safe to log */
+    it("never carries the presented token or the request body", async () => {
+      const { post } = deployment({ resolves: false });
+      doorLog.lines.length = 0;
+
+      await post("/api/otel/v1/traces", { marker: "request-body-marker", ...otlpTraceBody() });
+
+      expect(refusals()).toHaveLength(1);
+      const logged = JSON.stringify(doorLog.lines);
+      expect(logged).not.toContain(TOKEN);
+      expect(logged).not.toContain("request-body-marker");
     });
   });
 

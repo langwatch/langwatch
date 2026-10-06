@@ -38,6 +38,7 @@ describe("<SignInError/>", () => {
 
     /** @scenario "Recovery works the same when the org's required method is not yet known" */
     /** @scenario "Recovery signs the user out of the identity provider before trying again" */
+    /** @scenario A blocked returning user is not trapped bouncing between the app and the IdP */
     it("recovers via a federated logout, not a bare bounce back to sign-in", () => {
       renderError("OAuthAccountNotLinked");
       const recovery = screen.getByRole("link", {
@@ -96,6 +97,7 @@ describe("<SignInError/>", () => {
 
 describe("given the user is on the 'account already exists' sign-in error page", () => {
   /** @scenario "The error page does not auto-redirect back to the identity provider" */
+  /** @scenario A blocked returning user is not trapped bouncing between the app and the IdP */
   it("stays on the page, leaving the sign-out as a link they choose to follow", async () => {
     render(
       <MemoryRouter initialEntries={["/auth/error?error=OAuthAccountNotLinked"]}>

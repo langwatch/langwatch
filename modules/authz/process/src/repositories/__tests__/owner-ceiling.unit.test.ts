@@ -52,6 +52,8 @@ describe("AuthzService and the api-key owner ceiling (ADR-092 §9)", () => {
 
     /** @scenario "Permission decisions are unchanged by the package move" */
     /** @scenario "An API key is capped by its owner's current grants" */
+    /** @scenario An API key's ceiling cannot be dropped by its caller */
+    /** @scenario A key never exceeds its owner after the owner loses a grant */
     it("denies a permission the key's own binding carries", async () => {
       const decision = await makeAuthz(reader()).check({
         principal: key,
