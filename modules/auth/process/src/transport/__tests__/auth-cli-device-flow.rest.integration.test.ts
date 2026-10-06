@@ -900,6 +900,23 @@ describe("given a CLI starting a device login", () => {
       expect(exchangedBody).not.toContain("sk-lw-shared");
     });
 
+    /** @scenario project-login approval allows an org admin who is not a direct team member */
+    it("approves a shared project on a team the admin is not on, returning no key", async () => {
+      const world = deviceFlowWorld();
+      world.memberRole = "ADMIN";
+      world.administersProject = true;
+      world.project = liveProject({ teamId: "team-the-admin-is-not-on" });
+      const api = mount(world);
+      const grant = await pendingProjectKeyCode(api);
+
+      const approved = await approveProject(api, grant, "project-shared");
+      const body = await approved.text();
+
+      expect(approved.status).toBe(200);
+      expect(JSON.parse(body)).toMatchObject({ project: { id: "project-shared" } });
+      expect(body).not.toContain("sk-lw-shared");
+    });
+
     describe("when the caller holds a Developer seat (ADR-171)", () => {
       /** @scenario CLI login refuses a shared project for a Developer */
       /** @scenario project-login approval refuses a shared project for a Developer, naming the seat */

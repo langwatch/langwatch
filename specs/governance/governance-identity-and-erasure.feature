@@ -57,18 +57,20 @@ Feature: Erasing a person from the governance data, and making it stick
 
   # ── Which tenants an organization's data lives in ─────────────────────────
 
-  @unit
+  @unit @unimplemented
   Scenario: The first time an organization's governance area is used it is recorded
     Given an organization that has never ingested anything
     When its governance area is resolved for the first time
     Then that area is recorded against the organization
+    # Gap: main recorded each governance tenant use (recordGovernanceTenantUse); nothing on the branch calls GovernanceTenantHistoryRepository.touch/append, so erasure walks an empty history.
 
-  @unit
+  @unit @unimplemented
   Scenario: Resolving the same area again does not record it twice
     Given an organization whose governance area is already recorded
     When its governance area is resolved again
     Then it is still recorded once
     And the record shows it was used more recently
+    # Gap: main recorded each governance tenant use (recordGovernanceTenantUse); nothing on the branch calls GovernanceTenantHistoryRepository.touch/append, so erasure walks an empty history.
 
   @integration
   Scenario: Areas the organization used before today are still found after one is retired

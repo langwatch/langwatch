@@ -1,6 +1,6 @@
 /** Tests fleet gauges through the OpenTelemetry metrics pipeline. */
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { bindProcessFleetMetricsSource } from "../metrics.ts";
 
@@ -68,6 +68,61 @@ describe("process-manager fleet gauges", () => {
       const perProcess = (await collectOnce()).filter((r) => "process_name" in r.attributes);
 
       expect(perProcess).toEqual([]);
+    });
+  });
+});
+
+describe("process fleet collection freshness", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("given the last successful collection found dead work", () => {
+    describe("when collection fails and then recovers", () => {
+      /** @scenario "A failed fleet collection cannot clear unresolved work" */
+      it("retains unresolved dead work without refreshing its timestamp after a failed read", async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-09-07T10:00:00Z"));
+        const dead = {
+          processName: "triggerSettlement",
+          instances: 1,
+          overdueWakes: 0,
+          pendingMessages: 0,
+          overduePending: 0,
+          lapsedLeases: 0,
+          deadMessages: 1,
+        };
+        const read = vi
+          .fn()
+          .mockResolvedValueOnce([dead])
+          .mockRejectedValueOnce(new Error("database unavailable"))
+          .mockResolvedValueOnce([]);
+        bindProcessFleetMetricsSource(read);
+        const valueOf = (observed: Awaited<ReturnType<typeof collectOnce>>, instrument: string) =>
+          observed.find((r) => r.instrument === instrument)?.value;
+
+        const healthy = await collectOnce();
+        expect(read).toHaveBeenCalledTimes(1);
+        expect(valueOf(healthy, "pm_fleet_collection_success")).toBe(1);
+        expect(valueOf(healthy, "pm_fleet_last_success_timestamp_seconds")).toBe(1788775200);
+
+        vi.advanceTimersByTime(11_000);
+        const failed = await collectOnce();
+        expect(read).toHaveBeenCalledTimes(2);
+        expect(valueOf(failed, "pm_outbox_dead")).toBe(1);
+        expect(valueOf(failed, "pm_fleet_collection_success")).toBe(0);
+        expect(valueOf(failed, "pm_fleet_last_success_timestamp_seconds")).toBe(1788775200);
+
+        await collectOnce();
+        expect(read).toHaveBeenCalledTimes(2);
+
+        vi.advanceTimersByTime(11_000);
+        const recovered = await collectOnce();
+        expect(read).toHaveBeenCalledTimes(3);
+        expect(valueOf(recovered, "pm_fleet_collection_success")).toBe(1);
+        expect(valueOf(recovered, "pm_fleet_last_success_timestamp_seconds")).toBe(1788775222);
+        expect(valueOf(recovered, "pm_outbox_dead")).toBeUndefined();
+      });
     });
   });
 });
