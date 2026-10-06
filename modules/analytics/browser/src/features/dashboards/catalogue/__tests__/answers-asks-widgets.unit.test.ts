@@ -47,7 +47,7 @@ describe("given the Answer quality widgets", () => {
     expect(sql.weekly).toContain("FROM annotations");
     expect(sql.weekly).toContain("ON a.TraceId = e.TraceId");
     expect(sql.weekly).toContain("toMonday(e.OccurredAt)");
-    expect(sql.weekly).toContain("(agreement - chance) / (1 - chance) AS kappa");
+    expect(sql.weekly).toContain("if(chance < 1, (agreement - chance) / (1 - chance), 1) AS kappa");
     expect(tsx).toContain("target: 0.8");
     expect(source).toBe("feedback");
     expect(tsx).toContain('LW.navigate("annotations"');

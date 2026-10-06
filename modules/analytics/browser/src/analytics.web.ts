@@ -6,6 +6,7 @@
 
 import {
   FilterSidebarToken,
+  SavedDashboardsToken,
   analyticsLwqlTrpc,
   analyticsTrpc,
 } from "@langwatch/analytics-contract";
@@ -98,13 +99,13 @@ export const analyticsWeb = defineBrowserModule("analytics")
         default: (await import("./ui/sections/custom-graph.tsx")).CustomGraph,
       }),
     },
-    /** The saved-dashboards list, lent to navigation's sidebar on dashboards pages. */
-    savedDashboards: {
-      load: async () => ({
-        default: (await import("./features/dashboards/ui/sections/saved-dashboards-section.tsx"))
-          .SavedDashboardsSection,
-      }),
-    },
+  })
+  /** The saved-dashboards list, lent to navigation's sidebar on dashboards pages. */
+  .lends(SavedDashboardsToken, {
+    load: async () => ({
+      default: (await import("./features/dashboards/ui/sections/saved-dashboards-section.tsx"))
+        .SavedDashboardsSection,
+    }),
   })
   /** The trace filter sidebar, lent to the evaluator's sample picker (§3.4 rule 7). */
   .lends(FilterSidebarToken, {

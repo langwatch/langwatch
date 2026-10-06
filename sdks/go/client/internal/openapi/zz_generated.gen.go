@@ -20610,6 +20610,36 @@ func (e PostApiV1QueryJSONBodyGranularitySeconds2) Valid() bool {
 	}
 }
 
+// Defines values for PostApiV1QueryJSONBodyGranularitySeconds3.
+const (
+	N86400 PostApiV1QueryJSONBodyGranularitySeconds3 = 86400
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1QueryJSONBodyGranularitySeconds3 enum.
+func (e PostApiV1QueryJSONBodyGranularitySeconds3) Valid() bool {
+	switch e {
+	case N86400:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1QueryJSONBodyGranularitySeconds4.
+const (
+	N604800 PostApiV1QueryJSONBodyGranularitySeconds4 = 604800
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1QueryJSONBodyGranularitySeconds4 enum.
+func (e PostApiV1QueryJSONBodyGranularitySeconds4) Valid() bool {
+	switch e {
+	case N604800:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiV1Query200JSONResponseBodyDiagnosticsCode.
 const (
 	INCOMPLETECOMPARISONPERIOD PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INCOMPLETE_COMPARISON_PERIOD"
@@ -42468,9 +42498,11 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaul
 
 // PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
 type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody struct {
-	Code    string `json:"code"`
-	Name    string `json:"name"`
-	Queries []struct {
+	Code        string  `json:"code"`
+	Description *string `json:"description,omitempty"`
+	Name        string  `json:"name"`
+	Prompt      *string `json:"prompt,omitempty"`
+	Queries     []struct {
 		Name       string `json:"name"`
 		Parameters *[]struct {
 			Default *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Queries_Parameters_Default `json:"default,omitempty"`
@@ -43152,6 +43184,12 @@ type PostApiV1QueryJSONBodyGranularitySeconds1 float32
 
 // PostApiV1QueryJSONBodyGranularitySeconds2 defines parameters for PostApiV1Query.
 type PostApiV1QueryJSONBodyGranularitySeconds2 float32
+
+// PostApiV1QueryJSONBodyGranularitySeconds3 defines parameters for PostApiV1Query.
+type PostApiV1QueryJSONBodyGranularitySeconds3 float32
+
+// PostApiV1QueryJSONBodyGranularitySeconds4 defines parameters for PostApiV1Query.
+type PostApiV1QueryJSONBodyGranularitySeconds4 float32
 
 // PostApiV1QueryJSONBody_GranularitySeconds defines parameters for PostApiV1Query.
 type PostApiV1QueryJSONBody_GranularitySeconds struct {
@@ -89215,6 +89253,58 @@ func (t *PostApiV1QueryJSONBody_GranularitySeconds) FromPostApiV1QueryJSONBodyGr
 
 // MergePostApiV1QueryJSONBodyGranularitySeconds2 performs a merge with any union data inside the PostApiV1QueryJSONBody_GranularitySeconds, using the provided PostApiV1QueryJSONBodyGranularitySeconds2
 func (t *PostApiV1QueryJSONBody_GranularitySeconds) MergePostApiV1QueryJSONBodyGranularitySeconds2(v PostApiV1QueryJSONBodyGranularitySeconds2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiV1QueryJSONBodyGranularitySeconds3 returns the union data inside the PostApiV1QueryJSONBody_GranularitySeconds as a PostApiV1QueryJSONBodyGranularitySeconds3
+func (t PostApiV1QueryJSONBody_GranularitySeconds) AsPostApiV1QueryJSONBodyGranularitySeconds3() (PostApiV1QueryJSONBodyGranularitySeconds3, error) {
+	var body PostApiV1QueryJSONBodyGranularitySeconds3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1QueryJSONBodyGranularitySeconds3 overwrites any union data inside the PostApiV1QueryJSONBody_GranularitySeconds as the provided PostApiV1QueryJSONBodyGranularitySeconds3
+func (t *PostApiV1QueryJSONBody_GranularitySeconds) FromPostApiV1QueryJSONBodyGranularitySeconds3(v PostApiV1QueryJSONBodyGranularitySeconds3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1QueryJSONBodyGranularitySeconds3 performs a merge with any union data inside the PostApiV1QueryJSONBody_GranularitySeconds, using the provided PostApiV1QueryJSONBodyGranularitySeconds3
+func (t *PostApiV1QueryJSONBody_GranularitySeconds) MergePostApiV1QueryJSONBodyGranularitySeconds3(v PostApiV1QueryJSONBodyGranularitySeconds3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiV1QueryJSONBodyGranularitySeconds4 returns the union data inside the PostApiV1QueryJSONBody_GranularitySeconds as a PostApiV1QueryJSONBodyGranularitySeconds4
+func (t PostApiV1QueryJSONBody_GranularitySeconds) AsPostApiV1QueryJSONBodyGranularitySeconds4() (PostApiV1QueryJSONBodyGranularitySeconds4, error) {
+	var body PostApiV1QueryJSONBodyGranularitySeconds4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1QueryJSONBodyGranularitySeconds4 overwrites any union data inside the PostApiV1QueryJSONBody_GranularitySeconds as the provided PostApiV1QueryJSONBodyGranularitySeconds4
+func (t *PostApiV1QueryJSONBody_GranularitySeconds) FromPostApiV1QueryJSONBodyGranularitySeconds4(v PostApiV1QueryJSONBodyGranularitySeconds4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1QueryJSONBodyGranularitySeconds4 performs a merge with any union data inside the PostApiV1QueryJSONBody_GranularitySeconds, using the provided PostApiV1QueryJSONBodyGranularitySeconds4
+func (t *PostApiV1QueryJSONBody_GranularitySeconds) MergePostApiV1QueryJSONBodyGranularitySeconds4(v PostApiV1QueryJSONBodyGranularitySeconds4) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -152468,8 +152558,10 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code    string `json:"code"`
-				Queries []struct {
+				Code        string  `json:"code"`
+				Description *string `json:"description,omitempty"`
+				Prompt      *string `json:"prompt,omitempty"`
+				Queries     []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -152575,8 +152667,10 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		CreatedAt   string  `json:"createdAt"`
 		DashboardId *string `json:"dashboardId"`
 		Definition  struct {
-			Code    string `json:"code"`
-			Queries []struct {
+			Code        string  `json:"code"`
+			Description *string `json:"description,omitempty"`
+			Prompt      *string `json:"prompt,omitempty"`
+			Queries     []struct {
 				Name       string `json:"name"`
 				Parameters *[]struct {
 					Default *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -152776,8 +152870,10 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse stru
 		CreatedAt   string  `json:"createdAt"`
 		DashboardId *string `json:"dashboardId"`
 		Definition  struct {
-			Code    string `json:"code"`
-			Queries []struct {
+			Code        string  `json:"code"`
+			Description *string `json:"description,omitempty"`
+			Prompt      *string `json:"prompt,omitempty"`
+			Queries     []struct {
 				Name       string `json:"name"`
 				Parameters *[]struct {
 					Default *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -152895,8 +152991,10 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse st
 		CreatedAt   string  `json:"createdAt"`
 		DashboardId *string `json:"dashboardId"`
 		Definition  struct {
-			Code    string `json:"code"`
-			Queries []struct {
+			Code        string  `json:"code"`
+			Description *string `json:"description,omitempty"`
+			Prompt      *string `json:"prompt,omitempty"`
+			Queries     []struct {
 				Name       string `json:"name"`
 				Parameters *[]struct {
 					Default *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -153014,8 +153112,10 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRes
 		CreatedAt   string  `json:"createdAt"`
 		DashboardId *string `json:"dashboardId"`
 		Definition  struct {
-			Code    string `json:"code"`
-			Queries []struct {
+			Code        string  `json:"code"`
+			Description *string `json:"description,omitempty"`
+			Prompt      *string `json:"prompt,omitempty"`
+			Queries     []struct {
 				Name       string `json:"name"`
 				Parameters *[]struct {
 					Default *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -181249,8 +181349,10 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *http
 				CreatedAt   string  `json:"createdAt"`
 				DashboardId *string `json:"dashboardId"`
 				Definition  struct {
-					Code    string `json:"code"`
-					Queries []struct {
+					Code        string  `json:"code"`
+					Description *string `json:"description,omitempty"`
+					Prompt      *string `json:"prompt,omitempty"`
+					Queries     []struct {
 						Name       string `json:"name"`
 						Parameters *[]struct {
 							Default *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -181376,8 +181478,10 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *htt
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code    string `json:"code"`
-				Queries []struct {
+				Code        string  `json:"code"`
+				Description *string `json:"description,omitempty"`
+				Prompt      *string `json:"prompt,omitempty"`
+				Queries     []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -181623,8 +181727,10 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code    string `json:"code"`
-				Queries []struct {
+				Code        string  `json:"code"`
+				Description *string `json:"description,omitempty"`
+				Prompt      *string `json:"prompt,omitempty"`
+				Queries     []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -181768,8 +181874,10 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespon
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code    string `json:"code"`
-				Queries []struct {
+				Code        string  `json:"code"`
+				Description *string `json:"description,omitempty"`
+				Prompt      *string `json:"prompt,omitempty"`
+				Queries     []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -181913,8 +182021,10 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code    string `json:"code"`
-				Queries []struct {
+				Code        string  `json:"code"`
+				Description *string `json:"description,omitempty"`
+				Prompt      *string `json:"prompt,omitempty"`
+				Queries     []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`

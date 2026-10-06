@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
     from ..models.post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_response_200_definition_queries_item import (
         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueriesItem,
@@ -22,6 +24,8 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRe
         code (str):
         queries (list[PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueri
             esItem]):
+        description (str | Unset):
+        prompt (str | Unset):
     """
 
     version: float
@@ -29,6 +33,8 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRe
     queries: list[
         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueriesItem
     ]
+    description: str | Unset = UNSET
+    prompt: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         version = self.version
@@ -40,6 +46,10 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRe
             queries_item = queries_item_data.to_dict()
             queries.append(queries_item)
 
+        description = self.description
+
+        prompt = self.prompt
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -49,6 +59,10 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRe
                 "queries": queries,
             }
         )
+        if description is not UNSET:
+            field_dict["description"] = description
+        if prompt is not UNSET:
+            field_dict["prompt"] = prompt
 
         return field_dict
 
@@ -72,10 +86,16 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRe
 
             queries.append(queries_item)
 
+        description = d.pop("description", UNSET)
+
+        prompt = d.pop("prompt", UNSET)
+
         post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_response_200_definition = cls(
             version=version,
             code=code,
             queries=queries,
+            description=description,
+            prompt=prompt,
         )
 
         return post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_response_200_definition

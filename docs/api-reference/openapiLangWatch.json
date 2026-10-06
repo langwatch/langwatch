@@ -15143,6 +15143,14 @@
                       {
                         "type": "number",
                         "const": 3600
+                      },
+                      {
+                        "type": "number",
+                        "const": 86400
+                      },
+                      {
+                        "type": "number",
+                        "const": 604800
                       }
                     ]
                   }
@@ -28786,6 +28794,12 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "prompt": {
+                                "type": "string"
                               }
                             },
                             "required": [
@@ -29238,6 +29252,12 @@
                             ],
                             "additionalProperties": false
                           }
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "prompt": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -29562,7 +29582,7 @@
             }
           }
         },
-        "description": "Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.",
+        "description": "Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget, with an optional description the card shows behind its info icon and an optional prompt Langy is drafted with when asked about it. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.",
         "summary": "Create a dashboard widget",
         "tags": [
           "Analytics / LangWatchQL"
@@ -29673,6 +29693,16 @@
                         "sql"
                       ]
                     }
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
                   }
                 },
                 "required": [
@@ -29777,6 +29807,12 @@
                             ],
                             "additionalProperties": false
                           }
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "prompt": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -30296,6 +30332,12 @@
                             ],
                             "additionalProperties": false
                           }
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "prompt": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -31286,6 +31328,12 @@
                             ],
                             "additionalProperties": false
                           }
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "prompt": {
+                          "type": "string"
                         }
                       },
                       "required": [

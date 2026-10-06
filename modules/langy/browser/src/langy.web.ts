@@ -5,6 +5,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { LangyAskToken } from "@langwatch/langy-contract";
 
 import { langyApi } from "./behavior/langy-api.ts";
 import { langyGuidedOnboarding } from "./behavior/langy-guided-onboarding.capability.ts";
@@ -24,15 +25,9 @@ export const langyWeb = defineBrowserModule("langy")
   })
   // All another module may do to the panel: dock it with a kickoff and hear
   // the scope it entered, or ask it a question with the view it is about. A
-  // consumer's own host reads `langyAsk` by name; nothing else reaches the store.
-  .withCapabilities({
-    guidedOnboarding: langyGuidedOnboarding,
-    langyAsk: {
-      load: async () => ({
-        default: (await import("./behavior/langy-ask.capability.ts")).langyAsk,
-      }),
-    },
-  })
+  // consumer's own host reads the ask by token; nothing else reaches the store.
+  .withCapabilities({ guidedOnboarding: langyGuidedOnboarding })
+  .lends(LangyAskToken, { load: () => import("./behavior/langy-ask.capability.ts") })
   .withHosts({
     requires: ["LangyHostApi"],
     mounts: { LangyHostApi: { load: () => import("./behavior/langy-host-mount.tsx") } },

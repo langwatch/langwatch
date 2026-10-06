@@ -6,14 +6,14 @@
 
 import {
   useUiCapabilities,
-  useUiDeclarations,
   useUiScope,
   type UiFeedback,
   type UiNavigation,
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
-import type { UiDeclarations } from "@langwatch/browser-host/declarations";
+import { useLentOperations } from "@langwatch/browser-host/lent";
+import { LangyAskToken, type LangyAsk } from "@langwatch/langy-contract";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -36,7 +36,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
   private readonly routeCapability: UiRoute;
   private readonly navigationCapability: UiNavigation;
   private readonly feedback: UiFeedback;
-  private readonly declarations: UiDeclarations;
+  private readonly langy: (() => Promise<LangyAsk>) | undefined;
 
   constructor({
     project_,
@@ -45,7 +45,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     routeCapability,
     navigationCapability,
     feedback,
-    declarations,
+    langy,
   }: {
     project_: AnalyticsHostProject | undefined;
     organizationId_: string | undefined;
@@ -53,7 +53,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     routeCapability: UiRoute;
     navigationCapability: UiNavigation;
     feedback: UiFeedback;
-    declarations: UiDeclarations;
+    langy: (() => Promise<LangyAsk>) | undefined;
   }) {
     super();
     this.project_ = project_;
@@ -62,7 +62,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     this.routeCapability = routeCapability;
     this.navigationCapability = navigationCapability;
     this.feedback = feedback;
-    this.declarations = declarations;
+    this.langy = langy;
   }
 
   project(): AnalyticsHostProject | undefined {
@@ -119,11 +119,10 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     this.feedback.failed(failure);
   }
 
-  /** Through what Langy lends by name; with Langy not installed nothing is declared. */
+  /** Through what Langy lends by token; with Langy not installed nothing is lent. */
   askLangy(request: AnalyticsLangyAskRequest): void {
-    const lent = this.declarations.declared("langyAsk")[0]?.capability;
-    if (!lent) return;
-    void lent.load().then(({ default: langy }) => langy.ask(request));
+    if (!this.langy) return;
+    void this.langy().then((langy) => langy.ask(request));
   }
 }
 
@@ -134,7 +133,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
  */
 export default function AnalyticsHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
-  const declarations = useUiDeclarations();
+  const langy = useLentOperations(LangyAskToken);
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeProject = session.snapshot().scope.project;
   const scopeProjectId = scopeProject?.id;
@@ -167,7 +166,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
         routeCapability: route,
         navigationCapability: navigation,
         feedback,
-        declarations,
+        langy,
       }),
     [
       scopeProjectId,
@@ -180,7 +179,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
       route,
       navigation,
       feedback,
-      declarations,
+      langy,
     ],
   );
   return <AnalyticsHostProvider value={host}>{children}</AnalyticsHostProvider>;

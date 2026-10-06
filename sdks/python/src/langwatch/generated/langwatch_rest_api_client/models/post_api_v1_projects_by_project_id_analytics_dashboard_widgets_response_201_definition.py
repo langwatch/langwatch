@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
     from ..models.post_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_201_definition_queries_item import (
         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionQueriesItem,
@@ -21,11 +23,15 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201Definition
         version (float):
         code (str):
         queries (list[PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionQueriesItem]):
+        description (str | Unset):
+        prompt (str | Unset):
     """
 
     version: float
     code: str
     queries: list[PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionQueriesItem]
+    description: str | Unset = UNSET
+    prompt: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         version = self.version
@@ -37,6 +43,10 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201Definition
             queries_item = queries_item_data.to_dict()
             queries.append(queries_item)
 
+        description = self.description
+
+        prompt = self.prompt
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -46,6 +56,10 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201Definition
                 "queries": queries,
             }
         )
+        if description is not UNSET:
+            field_dict["description"] = description
+        if prompt is not UNSET:
+            field_dict["prompt"] = prompt
 
         return field_dict
 
@@ -71,10 +85,16 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201Definition
 
             queries.append(queries_item)
 
+        description = d.pop("description", UNSET)
+
+        prompt = d.pop("prompt", UNSET)
+
         post_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_201_definition = cls(
             version=version,
             code=code,
             queries=queries,
+            description=description,
+            prompt=prompt,
         )
 
         return post_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_201_definition

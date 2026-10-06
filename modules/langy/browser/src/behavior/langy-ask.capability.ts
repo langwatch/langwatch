@@ -1,30 +1,9 @@
-import { useLangyStore, type LangyAttachedContextType } from "./langy.store.ts";
+import type { LangyAsk } from "@langwatch/langy-contract";
 
-/** One reference the asking module hands over with its question. */
-export interface LangyAskContext {
-  kind: LangyAttachedContextType;
-  /** The ref the agent scopes the answer to; it is the chip's id too. */
-  ref: string;
-  label: string;
-}
+import { useLangyStore } from "./langy.store.ts";
 
-/** A question to ask outright, or a sentence for the reader to finish. */
-export interface LangyAskRequest {
-  question?: string;
-  draft?: string;
-  context?: readonly LangyAskContext[];
-}
-
-/**
- * What another module may ask through Langy, and nothing more. A consumer takes
- * this through its own `*HostApi`, which the shell wires from here; Langy's
- * store stays private to Langy.
- */
-export interface LangyAskCapability {
-  ask: (request: LangyAskRequest) => void;
-}
-
-export const langyAsk: LangyAskCapability = {
+/** What another module may ask through Langy, lent by token; the store stays Langy's. */
+export const langyAsk: LangyAsk = {
   ask: ({ question, draft, context = [] }) => {
     const langy = useLangyStore.getState();
     const prompt = question?.trim() ?? "";

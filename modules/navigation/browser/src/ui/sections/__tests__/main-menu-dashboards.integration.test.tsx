@@ -4,11 +4,8 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  uiDeclarations,
-  type UiDeclarations,
-  type UiSavedDashboardsProps,
-} from "@langwatch/browser-host/declarations";
+import { SavedDashboardsToken, type SavedDashboardsProps } from "@langwatch/analytics-contract";
+import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -38,7 +35,7 @@ import { ProductSidebar } from "../product-sidebar.tsx";
 const PROJECT: NavigationProject = { id: "project-1", slug: "demo", name: "Demo" };
 
 /** Stands in for analytics' lent list, echoing the board it was told is open. */
-function LentList({ activeDashboardId }: UiSavedDashboardsProps) {
+function LentList({ activeDashboardId }: SavedDashboardsProps) {
   return (
     <div data-testid="saved-dashboards">Saved dashboards open:{activeDashboardId ?? "none"}</div>
   );
@@ -48,7 +45,8 @@ const analyticsLends = uiDeclarations([
   {
     name: "analytics",
     installation: {
-      capabilities: { savedDashboards: { load: async () => ({ default: LentList }) } },
+      capabilities: {},
+      lends: [{ token: SavedDashboardsToken, load: async () => ({ default: LentList }) }],
     },
   },
 ]);

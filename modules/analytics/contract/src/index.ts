@@ -32,3 +32,4 @@ export * from "./langwatch-ql-violation.ts";
 export * from "./langwatch-ql-validation.errors.ts";
 export * from "./analytics.config.ts";
 export * from "./analytics.filter-field.ts";
+export * from "./analytics.saved-dashboards.ts";

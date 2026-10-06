@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
     from ..models.get_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_queries_item import (
         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItem,
@@ -21,11 +23,15 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200D
         version (float):
         code (str):
         queries (list[GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItem]):
+        description (str | Unset):
+        prompt (str | Unset):
     """
 
     version: float
     code: str
     queries: list[GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItem]
+    description: str | Unset = UNSET
+    prompt: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         version = self.version
@@ -37,6 +43,10 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200D
             queries_item = queries_item_data.to_dict()
             queries.append(queries_item)
 
+        description = self.description
+
+        prompt = self.prompt
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -46,6 +56,10 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200D
                 "queries": queries,
             }
         )
+        if description is not UNSET:
+            field_dict["description"] = description
+        if prompt is not UNSET:
+            field_dict["prompt"] = prompt
 
         return field_dict
 
@@ -69,10 +83,16 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200D
 
             queries.append(queries_item)
 
+        description = d.pop("description", UNSET)
+
+        prompt = d.pop("prompt", UNSET)
+
         get_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition = cls(
             version=version,
             code=code,
             queries=queries,
+            description=description,
+            prompt=prompt,
         )
 
         return get_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition

@@ -693,6 +693,9 @@ export interface LwqlPrismaRows {
     readonly projectId: "String";
     readonly name: "String";
     readonly order: "Int";
+    readonly description: "String?";
+    readonly visibility: "String";
+    readonly createdById: "String?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
@@ -1183,6 +1186,13 @@ export interface LwqlPrismaRows {
     readonly createdById: "String?";
     readonly updatedById: "String?";
     readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly TraceIngestSourceBilling: {
+    readonly organizationId: "String";
+    readonly sourceType: "String";
+    readonly billed: "Boolean";
+    readonly recordedAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
   readonly RetentionPolicy: {

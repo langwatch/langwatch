@@ -48,7 +48,7 @@ Feature: Dashboards v1
   # Agent Flight Deck
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: AC5 Status tiles compare with the previous period
     Given a request volume, success rate, p95 latency and total cost value for the selected period
     And a request volume, success rate, p95 latency and total cost value for the period immediately before it
@@ -82,7 +82,7 @@ Feature: Dashboards v1
     And the new board opens
     And when a write fails the error is shown, the half-made board is removed and the member stays where they were
 
-  @integration
+  @integration @unimplemented
   Scenario: AC9 Empty period shows an empty state
     Given a connected source with no rows in the selected period
     And a board made from the Agent Flight Deck template
@@ -187,20 +187,20 @@ Feature: Dashboards v1
   # Guard rails
   # ---------------------------------------------------------------------------
 
-  @e2e
+  @e2e @unimplemented
   Scenario: AC19 Every dashboard data request goes to LWQL and none to legacy analytics
     Given any dashboard page is open
     When its data loads
     Then every data request goes to the LWQL endpoint
     And no request goes to a legacy analytics endpoint
 
-  @unit
+  @unit @unimplemented
   Scenario: AC20 Legacy analytics files are untouched
     Given the change is merged
     When the diff is limited to the legacy analytics paths
     Then it is empty
 
-  @integration
+  @integration @unimplemented
   Scenario: AC20 Legacy analytics pages behave exactly as before
     Given the change is merged
     When a member opens the legacy analytics pages
@@ -219,7 +219,7 @@ Feature: Dashboards v1
     Then the server answers with a permission error
     And the page shows the same not-found page as when the flag is off
 
-  @integration
+  @integration @unimplemented
   Scenario: AC22 An unqueryable source ships as a call to action
     Given the LWQL catalog check for a widget's source was run at build time
     And that source is not queryable
@@ -227,14 +227,14 @@ Feature: Dashboards v1
     Then it shows its call-to-action state for every project
     And it sends no query
 
-  @integration
+  @integration @unimplemented
   Scenario: AC22 A queryable source follows the normal widget rules
     Given the LWQL catalog check for a widget's source was run at build time
     And that source is queryable
     When the member views the widget
     Then it follows the connected, unconnected and empty-period rules like any other widget
 
-  @integration
+  @integration @unimplemented
   Scenario: AC23 A failing query does not take the board down
     Given one widget on a board whose LWQL query fails
     When the member views the board

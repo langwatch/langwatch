@@ -23,13 +23,13 @@ class PostApiV1QueryBody:
         sql (str):
         parameters (PostApiV1QueryBodyParameters | Unset):
         time_window (PostApiV1QueryBodyTimeWindow | Unset):
-        granularity_seconds (Literal[1] | Literal[3600] | Literal[60] | Unset):
+        granularity_seconds (Literal[1] | Literal[3600] | Literal[604800] | Literal[60] | Literal[86400] | Unset):
     """
 
     sql: str
     parameters: PostApiV1QueryBodyParameters | Unset = UNSET
     time_window: PostApiV1QueryBodyTimeWindow | Unset = UNSET
-    granularity_seconds: Literal[1] | Literal[3600] | Literal[60] | Unset = UNSET
+    granularity_seconds: Literal[1] | Literal[3600] | Literal[604800] | Literal[60] | Literal[86400] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -43,7 +43,7 @@ class PostApiV1QueryBody:
         if not isinstance(self.time_window, Unset):
             time_window = self.time_window.to_dict()
 
-        granularity_seconds: Literal[1] | Literal[3600] | Literal[60] | Unset
+        granularity_seconds: Literal[1] | Literal[3600] | Literal[604800] | Literal[60] | Literal[86400] | Unset
         if isinstance(self.granularity_seconds, Unset):
             granularity_seconds = UNSET
         else:
@@ -87,7 +87,9 @@ class PostApiV1QueryBody:
         else:
             time_window = PostApiV1QueryBodyTimeWindow.from_dict(_time_window)
 
-        def _parse_granularity_seconds(data: object) -> Literal[1] | Literal[3600] | Literal[60] | Unset:
+        def _parse_granularity_seconds(
+            data: object,
+        ) -> Literal[1] | Literal[3600] | Literal[604800] | Literal[60] | Literal[86400] | Unset:
             if isinstance(data, Unset):
                 return data
             granularity_seconds_type_0 = cast(Literal[1], data)
@@ -102,6 +104,18 @@ class PostApiV1QueryBody:
             if granularity_seconds_type_2 != 3600:
                 raise ValueError(f"granularitySeconds_type_2 must match const 3600, got '{granularity_seconds_type_2}'")
             return granularity_seconds_type_2
+            granularity_seconds_type_3 = cast(Literal[86400], data)
+            if granularity_seconds_type_3 != 86400:
+                raise ValueError(
+                    f"granularitySeconds_type_3 must match const 86400, got '{granularity_seconds_type_3}'"
+                )
+            return granularity_seconds_type_3
+            granularity_seconds_type_4 = cast(Literal[604800], data)
+            if granularity_seconds_type_4 != 604800:
+                raise ValueError(
+                    f"granularitySeconds_type_4 must match const 604800, got '{granularity_seconds_type_4}'"
+                )
+            return granularity_seconds_type_4
 
         granularity_seconds = _parse_granularity_seconds(d.pop("granularitySeconds", UNSET))
 

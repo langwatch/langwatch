@@ -459,7 +459,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     origin: "prototype",
     question: "What is the one problem I should look at first this week?",
     title: "Needs attention",
-    why: "Names the single biggest problem and links to its traces. The widget tries four things in order: the topic or customer whose pass rate fell most this week (if the fall is bigger than normal noise); the failure reason that grew most; an automatic grader that stopped agreeing with human reviewers; the step that fails most.",
+    why: "Names the single biggest problem and links to its traces. It tries, in order: the topic or customer whose pass rate fell most this week (beyond normal noise); the failure reason that grew most; an automatic grader that stopped agreeing with human reviewers; the step that fails most.",
     questionId: "answers",
     alsoAnswers: ["change"],
     questionType: "matters",
@@ -469,7 +469,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "What is the one problem I should look at first this week? Answer it with LangWatchQL over the dashboard period. What the answer shows: Names the single biggest problem and links to its traces. The widget tries four things in order: the topic or customer whose pass rate fell most this week (if the fall is bigger than normal noise); the failure reason that grew most; an automatic grader that stopped agreeing with human reviewers; the step that fails most. It needs: evaluator results; labels or metadata or customer id or topics. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What is the one problem I should look at first this week? Answer it with LangWatchQL over the dashboard period. What the answer shows: Names the single biggest problem and links to its traces. It tries, in order: the topic or customer whose pass rate fell most this week (beyond normal noise); the failure reason that grew most; an automatic grader that stopped agreeing with human reviewers; the step that fails most. It needs: evaluator results; labels or metadata or customer id or topics. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "ck-top-ask",
@@ -815,7 +815,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     origin: "prototype",
     question: "Did my agent get worse in production after my last change?",
     title: "Production before and after",
-    why: "Up to 7 days after the last prompt, model or deploy change, against the same weekdays a week earlier: pass rate, errors, response time and cost. The topic mix is evened out, so a change in what users ask does not look like a regression.",
+    why: "Up to 7 days after the last prompt, model or deploy change, against the same weekdays a week earlier: pass rate, errors, response time and cost. Topics are evened out, so new questions do not look like a regression.",
     questionId: "change",
     alsoAnswers: [],
     questionType: "changed",
@@ -828,7 +828,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Did my agent get worse in production after my last change? Answer it with LangWatchQL over the dashboard period. What the answer shows: Up to 7 days after the last prompt, model or deploy change, against the same weekdays a week earlier: pass rate, errors, response time and cost. The topic mix is evened out, so a change in what users ask does not look like a regression. It needs: prompt version on trace or deploy or environment tag; evaluator results or outcome event. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Did my agent get worse in production after my last change? Answer it with LangWatchQL over the dashboard period. What the answer shows: Up to 7 days after the last prompt, model or deploy change, against the same weekdays a week earlier: pass rate, errors, response time and cost. Topics are evened out, so new questions do not look like a regression. It needs: prompt version on trace or deploy or environment tag; evaluator results or outcome event. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "ship-models",

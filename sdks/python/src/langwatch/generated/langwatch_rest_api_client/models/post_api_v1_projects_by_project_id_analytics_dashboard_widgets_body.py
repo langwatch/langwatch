@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
     from ..models.post_api_v1_projects_by_project_id_analytics_dashboard_widgets_body_queries_item import (
         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBodyQueriesItem,
@@ -22,11 +24,15 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBody:
         name (str):
         code (str):
         queries (list[PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBodyQueriesItem]):
+        description (str | Unset):
+        prompt (str | Unset):
     """
 
     name: str
     code: str
     queries: list[PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBodyQueriesItem]
+    description: str | Unset = UNSET
+    prompt: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -39,6 +45,10 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBody:
             queries_item = queries_item_data.to_dict()
             queries.append(queries_item)
 
+        description = self.description
+
+        prompt = self.prompt
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -48,6 +58,10 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBody:
                 "queries": queries,
             }
         )
+        if description is not UNSET:
+            field_dict["description"] = description
+        if prompt is not UNSET:
+            field_dict["prompt"] = prompt
 
         return field_dict
 
@@ -71,10 +85,16 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBody:
 
             queries.append(queries_item)
 
+        description = d.pop("description", UNSET)
+
+        prompt = d.pop("prompt", UNSET)
+
         post_api_v1_projects_by_project_id_analytics_dashboard_widgets_body = cls(
             name=name,
             code=code,
             queries=queries,
+            description=description,
+            prompt=prompt,
         )
 
         post_api_v1_projects_by_project_id_analytics_dashboard_widgets_body.additional_properties = d

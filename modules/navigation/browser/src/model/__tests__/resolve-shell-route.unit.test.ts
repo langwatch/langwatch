@@ -65,6 +65,7 @@ describe("resolveShellRoute", () => {
         isOrgScopeRoute: false,
         isResolverRoute: false,
         activeProductId: "dashboards",
+        seatRefusal: null,
       });
     });
 

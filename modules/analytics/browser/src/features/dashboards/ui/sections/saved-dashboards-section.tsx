@@ -1,11 +1,11 @@
 /**
  * The "Saved dashboards" list navigation draws in the sidebar, lent through
- * `withCapabilities` (§3.4 rule 7): analytics keeps the reads and writes.
+ * `SavedDashboardsToken` (§10.1): analytics keeps the reads and writes.
  * Grouped Mine, Team, Organisation; only stored boards are listed, then the templates library.
  */
 
 import { Box, IconButton, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import type { UiSavedDashboardsProps } from "@langwatch/browser-host/declarations";
+import type { SavedDashboardsProps } from "@langwatch/analytics-contract";
 import type { DashboardVisibility } from "@langwatch/dashboard-contract";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Building2, LayoutTemplate, type LucideIcon, Plus, Star, Users } from "lucide-react";
@@ -46,7 +46,7 @@ function RowIcon({ icon: Icon, color }: { icon: LucideIcon; color?: string }) {
   );
 }
 
-export function SavedDashboardsSection({ activeDashboardId }: UiSavedDashboardsProps) {
+export function SavedDashboardsSection({ activeDashboardId }: SavedDashboardsProps) {
   const host = useAnalyticsHost();
   const saved = useSavedDashboards();
   const [renamingId, setRenamingId] = useState<string | undefined>();

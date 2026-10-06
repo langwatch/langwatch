@@ -431,9 +431,12 @@ describe("a member's board", () => {
         });
 
         expect(await pickerRegions()).toEqual(PICKER_SECTIONS.map(({ title }) => title));
+        // One role query for the whole list: a named query per question timed out in CI.
+        const rows = within(screen.getByRole("dialog")).getAllByRole("button");
         for (const { question, status } of PICKER_SECTIONS.flatMap(({ questions }) => questions)) {
-          const row = screen.getByRole("button", { name: new RegExp(escape(question)) });
-          expect(row.matches(":disabled"), question).toBe(status === "coming-soon");
+          const row = rows.find((button) => button.textContent?.includes(question));
+          expect(row, question).toBeDefined();
+          expect(row?.matches(":disabled"), question).toBe(status === "coming-soon");
         }
         expect(screen.queryByRole("button", { name: "Ask Langy" })).toBeNull();
       },
