@@ -422,7 +422,6 @@ const LEGACY_INERT: string[] = [
   "specs/components/code-block-editor.feature",
   "specs/data-retention/data-size-metering.feature",
   "specs/data-retention/monitoring.feature",
-  "specs/data-retention/plan-gated-retention-menu.feature",
   "specs/data-retention/trace-pinning.feature",
   "specs/data-retention/ttl-activation.feature",
   "specs/data-retention/visibility-window-teaser-redaction.feature",
@@ -511,7 +510,6 @@ const LEGACY_INERT: string[] = [
   "specs/licensing/dual-pricing-model.feature",
   "specs/licensing/enforcement-hono-api.feature",
   "specs/licensing/license-lifecycle-e2e.feature",
-  "specs/licensing/license-page-styling.feature",
   "specs/licensing/license-status-ui.feature",
   // Every scenario is parked @unimplemented: the free-plan scenario-set cap this file
   // describes has no enforcement code on this branch.
@@ -737,10 +735,6 @@ const LEGACY_PARTIAL: string[] = [
   "specs/analytics/dashboard-rest-api.feature",
   "specs/analytics/event-sourced-analytics-materialization.feature",
   "specs/automations/authoring-drawer.feature",
-  // Reason: left LEGACY_INERT when its two default-layout scenarios (trace
-  // excerpts, the default Slack message) gained bindings; the other
-  // nineteen Liquid-template scenarios stay untagged.
-  "specs/automations/notification-templates.feature",
   "specs/automations/process-manager-dispatch.feature",
   "specs/ci/path-filters.feature",
   // Reason: reached this branch from main already partially tagged, and its

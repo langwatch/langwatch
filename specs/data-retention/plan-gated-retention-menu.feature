@@ -58,6 +58,7 @@ Feature: Plan-gated data-retention menu
     Then "apply this change to existing data" is off by default
     So that saving a policy never rewrites existing data unless explicitly chosen
 
+  @unit
   Scenario: A billing event never overwrites an existing retention policy
     Given an organization whose org-level traces retention is set to five years
     When a seat/subscription billing event is processed for that organization
