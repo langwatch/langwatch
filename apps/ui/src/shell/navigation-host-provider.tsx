@@ -4,7 +4,6 @@
  * only the port. The pattern every other `*HostApi` the shell implements copies.
  */
 
-import { trpcQueryKey } from "@langwatch/api/web";
 import { useUiAddress } from "@langwatch/browser-host/address";
 import { useUiCapabilities, useUiRpc, useUiScope } from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/drawer";
@@ -18,7 +17,6 @@ import type {
   NavigationScopeWrite,
   NavigationUser,
 } from "@langwatch/navigation-browser/navigation";
-import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, type ReactNode } from "react";
 
 import { useLangyStore } from "./behavior/langy/langy.store.ts";
@@ -37,8 +35,6 @@ import { useUiShellFailure } from "./ui-shell-failure";
 
 /** The gradient the palette's own Langy mark paints with. */
 const COMMAND_BAR_LANGY_GRADIENT_ID = "command-bar-langy-mark-gradient";
-
-const ORGANIZATIONS_INPUT = {};
 
 /** The shell's host class over navigation's port class, built once per loaded port. */
 const browserHostClasses = new WeakMap<
@@ -138,16 +134,11 @@ function useNavigationHostReading({
   const rpc = useUiRpc();
   const { openDrawer } = useDrawer();
 
-  const organizations = useQuery({
-    queryKey: trpcQueryKey(organizationFacts.UI_ORGANIZATIONS_PROCEDURE, {
-      input: ORGANIZATIONS_INPUT,
-      type: "query",
-    }),
-    queryFn: () =>
-      rpc.query(
-        organizationFacts.UI_ORGANIZATIONS_PROCEDURE,
-        ORGANIZATIONS_INPUT,
-      ) as Promise<NavigationGraphRead>,
+  const organizations = scopeCapability.useUiOrganizations({
+    transport: rpc,
+    isDemo: false,
+    enabled: true,
+    userId: session.currentUser()?.id,
   });
 
   const failure = useUiShellFailure({
@@ -157,7 +148,10 @@ function useNavigationHostReading({
     signInPath: auth.UI_SIGN_IN_PATH,
   });
 
-  const read: NavigationGraphRead = useMemo(() => organizations.data ?? [], [organizations.data]);
+  const read: NavigationGraphRead = useMemo(
+    () => (organizations.data ?? []) as NavigationGraphRead,
+    [organizations.data],
+  );
   const graph = useMemo(() => toNavigationOrganizations(read), [read]);
   const organization = useMemo(
     () => graph.find((candidate) => candidate.id === activeScope.organizationId),
