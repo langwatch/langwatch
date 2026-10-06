@@ -38,6 +38,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@better-auth/sso": "catalog:",
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
