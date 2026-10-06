@@ -78,6 +78,9 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
    */
   readonly app = new Hono();
 
+  /** Which module claims each prefixed namespace mounted so far. */
+  private readonly claims = new Map<string, string>();
+
   private constructor(private readonly options: Parameters<typeof RestHost.create>[0]) {}
 
   /**
@@ -91,6 +94,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     options?: FeatureRestMountOptions,
   ): MountableRestApp {
     const declaration = transport as RestTransportDeclaration<unknown>;
+    this.claimNamespace(declaration);
     const identities = this.identitiesFor(declaration);
     const bindings = options?.facts ?? [];
     const credentials = new Set<RestDoorCredential>();
@@ -139,6 +143,26 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     this.app.route("/", family);
 
     return family;
+  }
+
+  /**
+   * A family that is not literal claims `/api/<namespace>` whole, so a second module's would
+   * run its middleware ahead of the first's routes: it declares a shared path instead (§8, R10).
+   */
+  private claimNamespace(declaration: RestTransportDeclaration<unknown>): void {
+    if (declaration.addressing === "literal") return;
+
+    const serving = declaration.api.name;
+    const claimant = this.claims.get(declaration.namespace);
+
+    if (claimant !== void 0 && claimant !== serving) {
+      throw new Error(
+        `REST "${declaration.namespace}" of ${serving} claims a namespace ${claimant} already claims; ` +
+          `serve its routes from a literal family with .withSharedPath({ owner: "${claimant}", reason, deprecate })`,
+      );
+    }
+
+    this.claims.set(declaration.namespace, serving);
   }
 
   private identitiesFor(

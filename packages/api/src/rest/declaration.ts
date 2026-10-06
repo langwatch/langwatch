@@ -11,7 +11,7 @@ import type {
   PlatformTierPermission,
   ScopeTierField,
 } from "@langwatch/authorization";
-import type { ModuleApiToken } from "@langwatch/module";
+import type { ModuleApiToken, ModuleName } from "@langwatch/module";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type * as httpStatusModule from "hono/utils/http-status";
 import { z } from "zod";
@@ -178,6 +178,15 @@ export type RestDeprecation = Readonly<{
   /** The path of the family or route that replaces this one. */
   readonly successor: string;
   readonly notice?: string;
+}>;
+
+/** A path in another module's namespace, served for the migration only (§8, R10). */
+export type RestSharedPath = Readonly<{
+  /** The module whose namespace the path sits in. */
+  readonly owner: ModuleName;
+  readonly reason: string;
+  /** The plan or release that retires the shared path. */
+  readonly deprecate: string;
 }>;
 
 /**
@@ -547,6 +556,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly middleware?: readonly RestTransportMiddleware[];
   readonly bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
   readonly deprecated?: RestDeprecation;
+  /** Present when the path sits in another module's namespace (R10). */
+  readonly sharedPath?: RestSharedPath;
   /** The door this ONE route answers behind; the family's own when absent. */
   readonly credential?: RestDoorCredential;
   /** The schema the door's session is parsed against; present exactly when one was declared. */
@@ -617,6 +628,7 @@ type RouteState = Readonly<{
   middleware?: readonly RestTransportMiddleware[];
   bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
   deprecated?: RestDeprecation;
+  sharedPath?: RestSharedPath;
   credential?: RestDoorCredential;
   session?: z.ZodType;
   audit?: string;
@@ -1135,6 +1147,34 @@ class RouteBuilder<Api, S extends RouteShape> {
     });
   }
 
+  /**
+   * Serves this path in another module's namespace, for the migration only (§8, R10):
+   * names the owner, why, and the plan that retires it. Only a literal family may.
+   */
+  withSharedPath(sharedPath: RestSharedPath): RouteBuilder<Api, S> {
+    for (const [field, value] of Object.entries({
+      reason: sharedPath.reason,
+      deprecate: sharedPath.deprecate,
+    })) {
+      if (value.trim() === "") {
+        throw new Error(
+          `REST path "${this.path}" shares ${sharedPath.owner}'s namespace with a blank ${field}`,
+        );
+      }
+    }
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        sharedPath,
+      },
+    });
+  }
+
   withOutput<Schema extends OutputSchema>(
     schema: Schema,
   ): RouteBuilder<Api, With<S, { answer: Schema }>> {
@@ -1346,6 +1386,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       ...(this.state.middleware ? { middleware: this.state.middleware } : {}),
       ...(this.state.bodyLimit ? { bodyLimit: this.state.bodyLimit } : {}),
       ...(this.state.deprecated ? { deprecated: this.state.deprecated } : {}),
+      ...(this.state.sharedPath ? { sharedPath: this.state.sharedPath } : {}),
       ...(session ? { session } : {}),
       handler: handler as ErasedHandler,
     });

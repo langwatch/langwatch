@@ -1,5 +1,6 @@
 import type { AccessPolicy, CredentialClass } from "./access-policy.ts";
 import type { Credential } from "./access/access.ts";
+import type { RestSharedPath } from "./rest/declaration.ts";
 
 // The process-wide route-policy registry, populated as each family mounts. The
 // router-introspection guard cross-checks the composed router against it, so any mounted
@@ -38,7 +39,14 @@ export interface RegisteredRoute {
    * in the table, and undocumentable for the same reason a tombstone is.
    */
   readonly isNamespaceGuard?: boolean;
+  /**
+   * Present when the path sits in another module's namespace for the migration (§8, R10):
+   * the owner, the module serving it, why, and the plan that retires it.
+   */
+  readonly sharedPath?: RegisteredSharedPath;
 }
+
+export type RegisteredSharedPath = RestSharedPath & Readonly<{ servedBy: string }>;
 
 const registry = new Map<string, RegisteredRoute>();
 

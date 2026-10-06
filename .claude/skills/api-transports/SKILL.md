@@ -42,6 +42,12 @@ anything; the process mounts every installed module's declarations.
 8. **Paths are `/api/<x>`; `/api/v1/<x>` also answers.** Dated and `latest` versions exist but stay
    hidden (ADR `packages/api/adrs/004-public-rest-v1-and-date-negotiation.md`). A path parameter is named
    for what it identifies (`:triggerId`, never `:id`), except a route main already publishes.
+   **A path in another module's namespace is declared, never borrowed** (record §8, R10, Alex
+   2026-10-06). When a door moves owner with its path unchanged, the new owner serves it from a
+   literal family and declares `.withSharedPath({ owner: "project", reason, deprecate })`: the module
+   whose namespace it is, why, and the plan or release that retires it. A blank reason or plan is
+   refused, a family claiming `/api/<x>` may not carry one, and a second module claiming a namespace is
+   refused at mount. The route registry lists every shared path (`packages/api/specs/shared-path.feature`).
 9. **Auth is the process's.** REST authenticates with API keys, tRPC with the session. A route names a
    permission (`.withPermission("triggers:view")`), never a credential source. The caller arrives as
    `actor`/`scope`; no handler reads headers or looks the key's owner up.
