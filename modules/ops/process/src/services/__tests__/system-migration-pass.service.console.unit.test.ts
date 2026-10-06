@@ -3,6 +3,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { clickhouseRoutesOf } from "@langwatch/process-stores";
 import type { SystemMigration } from "@langwatch/system-migrations";
 /**
  * @vitest-environment node
@@ -13,9 +14,14 @@ import type { SystemMigration } from "@langwatch/system-migrations";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { MemoryMigrationLeaseRepository } from "../../repositories/memory/memory.migration-lease.repository.ts";
+import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
+import type { OpsRepositories } from "../../repositories/ops.repositories.ts";
+import { PostgresOpsRepositories } from "../../repositories/prisma/prisma.ops.repositories.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
-import { buildSystemMigrations } from "../ops-system-migrations-composition.build.ts";
+import { SystemMigrationCohortService } from "../system-migration-cohort.service.ts";
+import { SystemMigrationPassService } from "../system-migration-pass.service.ts";
 
 const migration = (name: string): SystemMigration => ({
   name,
@@ -30,13 +36,19 @@ const migration = (name: string): SystemMigration => ({
 function console({
   routes,
   isSaaS = true,
+  repositories = {
+    ...PostgresOpsRepositories.create({
+      prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
+    }),
+    migrationLease: MemoryMigrationLeaseRepository.create(),
+  },
 }: {
   routes: ReadonlyMap<string, string>;
   isSaaS?: boolean;
+  repositories?: OpsRepositories;
 }) {
-  return buildSystemMigrations({
-    database: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-    redis: null,
+  return SystemMigrationPassService.runner({
+    repositories,
     isSaaS: () => isSaaS,
     routes: () => routes,
     dependencies: {
@@ -80,7 +92,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("buildSystemMigrations", () => {
+describe("SystemMigrationPassService.runner", () => {
   describe("given authz and identity each register an organization-rooted migration", () => {
     /** @scenario "The authorization engine's migration runs ahead of identity's, as on main" */
     it("lists authz's grant import first, then identity's D04", async () => {
@@ -128,6 +140,36 @@ describe("buildSystemMigrations", () => {
       expect(findCohortEligibleOrganizations).toHaveBeenCalledWith(
         expect.objectContaining({ excludeOrganizationIds: [] }),
       );
+    });
+  });
+
+  describe("given CLICKHOUSE_URL__acme__org_1 names an organization's own server", () => {
+    /** @scenario "The migration runner reads the clickhouse member's routes" */
+    it("resolves org_1 as private and every other organization as shared", async () => {
+      const endpoint = "http://private.clickhouse:8123";
+      const family = new Map([["CLICKHOUSE_URL__acme__org_1", endpoint]]);
+      const routes = new Map(
+        clickhouseRoutesOf(family).map((route) => [route.organizationId, route.url]),
+      );
+      const repositories = MemoryOpsRepositories.create();
+      vi.spyOn(repositories.migrationEnrollments, "getOrganizationById").mockImplementation(
+        async ({ organizationId }) => ({ id: organizationId, name: organizationId }),
+      );
+      const admits = vi.spyOn(SystemMigrationCohortService.prototype, "admits");
+      const runner = console({ routes, isSaaS: false, repositories });
+
+      for (const organizationId of ["org_1", "org_2"]) {
+        await runner.runForOrganization({
+          organizationId,
+          migrationName: "authz-grants-genesis-import",
+          actorUserId: "user_ops",
+        });
+      }
+
+      expect(admits.mock.results.map((result) => result.value.dataplane)).toEqual([
+        { kind: "private", endpoint },
+        { kind: "shared" },
+      ]);
     });
   });
 });

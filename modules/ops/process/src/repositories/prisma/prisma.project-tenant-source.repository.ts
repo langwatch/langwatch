@@ -1,7 +1,8 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { TenantSource } from "@langwatch/system-migrations";
 
-export class PrismaProjectTenantSourceRepository implements TenantSource {
+import type { ProjectTenantSourceRepository } from "../project-tenant-source.repository.ts";
+
+export class PrismaProjectTenantSourceRepository implements ProjectTenantSourceRepository {
   readonly #prisma: PrismaClient;
 
   private constructor(prisma: PrismaClient) {

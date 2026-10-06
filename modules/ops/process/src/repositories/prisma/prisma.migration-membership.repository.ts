@@ -1,3 +1,5 @@
+import type { MigrationMembershipRepository } from "../migration-membership.repository.ts";
+
 export type PrismaMigrationMembershipDatabase = {
   user: {
     findUnique(args: {
@@ -12,7 +14,7 @@ export type PrismaMigrationMembershipDatabase = {
  * organization enrolled in this migration. Reads the user's own memberships
  * and intersects them in memory, so no statement grows with the enrolled set.
  */
-export class PrismaMigrationMembershipRepository {
+export class PrismaMigrationMembershipRepository implements MigrationMembershipRepository {
   static create({
     prisma,
   }: {

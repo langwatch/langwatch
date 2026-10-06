@@ -48,7 +48,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { opsProcessModule } from "../../ops.module.ts";
-import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
+import { MemorySystemMigrationStateRepository } from "../../repositories/memory/memory.system-migration-state.repository.ts";
 import {
   SNAPSHOT_EPOCH_KEY,
   SNAPSHOT_LEASE_KEY,
@@ -278,11 +278,11 @@ describe("ops app installation", () => {
     /** @scenario "A migration registered by a peer module appears on the page with its title and description" */
     it("lists each peer's migrations, in running order, with the owner's title and description", async () => {
       vi.spyOn(
-        PrismaSystemMigrationStateRepository.prototype,
+        MemorySystemMigrationStateRepository.prototype,
         "findStatusCounts",
       ).mockResolvedValue({ migrated: 0, finalized: 3, parked: 0, rolled_back: 0 });
       vi.spyOn(
-        PrismaSystemMigrationStateRepository.prototype,
+        MemorySystemMigrationStateRepository.prototype,
         "findRecordsByStatus",
       ).mockResolvedValue([]);
       const runtime = await process("api", [], identity, authz).boot();

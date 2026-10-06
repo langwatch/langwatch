@@ -45,6 +45,7 @@ beforeEach(() => {
 
 describe("given a module task run", () => {
   describe("when LANGWATCH_TASK_MODULES names a module exporting createTasks", () => {
+    /** @scenario "The tasks process hands a plugin's createTasks the booted App" */
     it("hands the factory the booted App and runs its task from the catalogue", async () => {
       const createTasks = vi.fn(() => [new RecordingTask("plugin", booted.ran)]);
       const importModule = vi.fn(async () => ({ createTasks }));

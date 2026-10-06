@@ -1,6 +1,11 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { TERMINAL_TENANT_STATUSES, type TenantSource } from "@langwatch/system-migrations";
 
+import type {
+  OrganizationMemberTenantSourceRepository,
+  UserTenantSourceRepository,
+} from "../user-tenant-source.repository.ts";
+
 /** The rows this source walks, and nothing else it could reach. */
 export type PrismaUserTenantDatabase = {
   user: {
@@ -16,7 +21,7 @@ export type PrismaUserTenantDatabase = {
 
 /** Tenants for USER-rooted migration pass are users walked in id order.
  * Same paging contract as organization source. */
-export class PrismaUserTenantSourceRepository implements TenantSource {
+export class PrismaUserTenantSourceRepository implements UserTenantSourceRepository {
   static create({
     prisma,
   }: {
@@ -92,49 +97,32 @@ export class PrismaUserTenantSourceRepository implements TenantSource {
   }
 }
 
-/** One organization's member users for targeted "run now" on
- * user-rooted migration. */
-export class PrismaOrganizationMemberTenantSourceRepository implements TenantSource {
-  private readonly prisma: PrismaClient;
-  private readonly organizationId: string;
-
+/** One organization's member users, for a targeted run of a user-rooted migration. */
+export class PrismaOrganizationMemberTenantSourceRepository implements OrganizationMemberTenantSourceRepository {
   static create({
     prisma,
-    organizationId,
   }: {
     prisma: PrismaClient;
-    organizationId: string;
   }): PrismaOrganizationMemberTenantSourceRepository {
-    return new PrismaOrganizationMemberTenantSourceRepository({ prisma, organizationId });
+    return new PrismaOrganizationMemberTenantSourceRepository(prisma);
   }
 
-  private constructor({
-    prisma,
-    organizationId,
-  }: {
-    prisma: PrismaClient;
-    organizationId: string;
-  }) {
-    this.prisma = prisma;
-    this.organizationId = organizationId;
-  }
+  private constructor(private readonly prisma: PrismaClient) {}
 
-  async findTenantIdsAfter({
-    cursor,
-    limit,
-  }: {
-    cursor: string | null;
-    limit: number;
-  }): Promise<string[]> {
-    const rows = await this.prisma.organizationUser.findMany({
-      where: {
-        organizationId: this.organizationId,
-        ...(cursor === null ? {} : { userId: { gt: cursor } }),
+  membersOf({ organizationId }: { organizationId: string }): TenantSource {
+    return {
+      findTenantIdsAfter: async ({ cursor, limit }) => {
+        const rows = await this.prisma.organizationUser.findMany({
+          where: {
+            organizationId,
+            ...(cursor === null ? {} : { userId: { gt: cursor } }),
+          },
+          orderBy: { userId: "asc" },
+          select: { userId: true },
+          take: limit,
+        });
+        return rows.map((row) => row.userId);
       },
-      orderBy: { userId: "asc" },
-      select: { userId: true },
-      take: limit,
-    });
-    return rows.map((row) => row.userId);
+    };
   }
 }

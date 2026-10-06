@@ -77,7 +77,10 @@ import { ReplayRetentionService } from "../services/replay-retention.service.ts"
 import { ReplayService } from "../services/replay.service.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import type { StorageStatsInstance } from "../services/storage-stats-collection.service.ts";
-import { buildSystemMigrations } from "./ops-system-migrations-composition.build.ts";
+import {
+  SystemMigrationPassService,
+  type SystemMigrationPassRepositories,
+} from "../services/system-migration-pass.service.ts";
 import type {
   OpsExplorers,
   QueuePayloadDecoder,
@@ -194,6 +197,7 @@ export function buildOpsInfrastructure(input: {
   config: OpsServerConfig;
   resources: ResourceOwnership;
   processStore: ProcessStore;
+  repositories: SystemMigrationPassRepositories;
   rateTracker: AnomalyRateTrackerRepository;
   cloudOps: boolean;
 }): OpsAppInfrastructure {
@@ -294,9 +298,8 @@ export function buildOpsInfrastructure(input: {
     },
     grafana: { findLinkConfig: () => null },
     createSystemMigrations: ({ dependencies, passRequests }) =>
-      buildSystemMigrations({
-        database: members.prisma,
-        redis: members.redis,
+      SystemMigrationPassService.runner({
+        repositories: input.repositories,
         isSaaS: () => members.isSaas,
         routes: () => members.clickhouse.privateRoutes(),
         dependencies,

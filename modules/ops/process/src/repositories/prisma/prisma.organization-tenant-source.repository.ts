@@ -1,5 +1,7 @@
 import { TERMINAL_TENANT_STATUSES, type TenantSource } from "@langwatch/system-migrations";
 
+import type { OrganizationTenantSourceRepository } from "../organization-tenant-source.repository.ts";
+
 /** The rows this source walks, and nothing else it could reach. */
 export type PrismaOrganizationTenantDatabase = {
   organization: {
@@ -17,7 +19,7 @@ export type PrismaOrganizationTenantDatabase = {
  * Tenants for the migration runner are organizations, walked in id order so
  * a pass is stable however often it restarts.
  */
-export class PrismaOrganizationTenantSourceRepository implements TenantSource {
+export class PrismaOrganizationTenantSourceRepository implements OrganizationTenantSourceRepository {
   static create({
     prisma,
   }: {

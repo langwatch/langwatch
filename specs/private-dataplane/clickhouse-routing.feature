@@ -61,10 +61,10 @@ Feature: Private ClickHouse Routing
     Then the clickhouse member answers no private route, and the warning names the variable only
 
   @unit
-  Scenario: The migration runner reads the stores' parse of the route family
+  Scenario: The migration runner reads the clickhouse member's routes
     Given CLICKHOUSE_URL__acme__org_1 names an organization's own server
-    When the migration runner opens its connections
-    Then its dataplane answers org_1 as private and every other organization as shared
+    When ops' migration pass resolves an organization's dataplane
+    Then org_1 answers as private and every other organization as shared
 
   # ---------------------------------------------------------------------------
   # Organization-level routing

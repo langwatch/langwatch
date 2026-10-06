@@ -4,10 +4,11 @@ import type { SystemMigration } from "@langwatch/system-migrations";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { PostgresOpsRepositories } from "../../repositories/prisma/prisma.ops.repositories.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
 import { RedisMigrationLeaseRepository } from "../../repositories/redis/redis.migration-lease.repository.ts";
-import { OpsSystemMigrations } from "../ops-system-migrations-composition.build.ts";
+import { SystemMigrationPassService } from "../system-migration-pass.service.ts";
 
 const IDENTIFIER_BACKFILL = "identity-d01-identifier-backfill";
 
@@ -80,9 +81,8 @@ function stubDatabase({
 function adapterOn(database: PrismaClient, newbornSweep = vi.fn(async () => undefined)) {
   return {
     newbornSweep,
-    adapter: OpsSystemMigrations.create({
-      database,
-      redis: null,
+    adapter: SystemMigrationPassService.create({
+      repositories: passRepositoriesOver(database),
       isSaaS: () => true,
       migrations: () => [],
       userMigrations: () => [migrationOf({ name: IDENTIFIER_BACKFILL })],
@@ -91,7 +91,14 @@ function adapterOn(database: PrismaClient, newbornSweep = vi.fn(async () => unde
   };
 }
 
-describe("OpsSystemMigrations", () => {
+function passRepositoriesOver(database: PrismaClient) {
+  return {
+    ...PostgresOpsRepositories.create({ prisma: database }),
+    migrationLease: RedisMigrationLeaseRepository.create({ redis: null }),
+  };
+}
+
+describe("SystemMigrationPassService", () => {
   describe("when one organization is enrolled in the identifier backfill and another is not", () => {
     /** @scenario "Organization enrollment is what puts a user in the backfill's cohort" */
     it("admits exactly the enrolled organizations' members; org-less users stay out", async () => {
@@ -243,9 +250,8 @@ describe("project-rooted migration composition", () => {
       .mockResolvedValue(true);
     const migrateTenant = vi.fn(async () => ({ status: "finalized" as const }));
     const migration = migrationOf({ name, migrateTenant });
-    const adapter = OpsSystemMigrations.create({
-      database,
-      redis: null,
+    const adapter = SystemMigrationPassService.create({
+      repositories: passRepositoriesOver(database),
       isSaaS: () => true,
       tenantAxis: "project",
       migrations: () => [migration],
@@ -270,9 +276,8 @@ describe("project-rooted migration composition", () => {
 
   it("checks project-scoped startup completion instead of enumerating organizations", async () => {
     const { database, projectFindMany } = stubDatabase({ enrollments: [], memberships: {} });
-    const adapter = OpsSystemMigrations.create({
-      database,
-      redis: null,
+    const adapter = SystemMigrationPassService.create({
+      repositories: passRepositoriesOver(database),
       isSaaS: () => true,
       tenantAxis: "project",
       migrations: () => [

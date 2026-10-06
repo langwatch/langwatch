@@ -41,3 +41,9 @@ Feature: Task modules loader
     Given a specifier that cannot be imported
     When the loader loads it
     Then it throws, naming the module
+
+  @unit
+  Scenario: The tasks process hands a plugin's createTasks the booted App
+    Given LANGWATCH_TASK_MODULES names a module exporting createTasks
+    When a module task runs
+    Then createTasks receives the booted tasks App and its task runs from the catalogue

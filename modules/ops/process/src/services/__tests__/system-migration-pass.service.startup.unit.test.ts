@@ -7,12 +7,13 @@ import {
 } from "@langwatch/system-migrations";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { PostgresOpsRepositories } from "../../repositories/prisma/prisma.ops.repositories.ts";
 import { PrismaOrganizationTenantSourceRepository } from "../../repositories/prisma/prisma.organization-tenant-source.repository.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
 import { RedisMigrationLeaseRepository } from "../../repositories/redis/redis.migration-lease.repository.ts";
-import type { UserStartupMigrationsUnsupportedError } from "../ops-system-migrations-composition.build.ts";
-import { OpsSystemMigrations } from "../ops-system-migrations-composition.build.ts";
+import type { UserStartupMigrationsUnsupportedError } from "../system-migration-pass.service.ts";
+import { SystemMigrationPassService } from "../system-migration-pass.service.ts";
 
 const clients: PrismaClient[] = [];
 
@@ -92,9 +93,8 @@ function harness({
   vi.spyOn(RedisMigrationLeaseRepository.prototype, "renew").mockResolvedValue(true);
   vi.spyOn(RedisMigrationLeaseRepository.prototype, "release").mockResolvedValue();
 
-  const adapter = OpsSystemMigrations.create({
-    database,
-    redis: null,
+  const adapter = SystemMigrationPassService.create({
+    repositories: passRepositoriesOver(database),
     isSaaS: () => true,
     migrations: () => [],
     userMigrations: () => [],
@@ -108,7 +108,14 @@ afterEach(async () => {
   await Promise.all(clients.splice(0).map((client) => client.$disconnect()));
 });
 
-describe("OpsSystemMigrations.runStartup", () => {
+function passRepositoriesOver(database: PrismaClient) {
+  return {
+    ...PostgresOpsRepositories.create({ prisma: database }),
+    migrationLease: RedisMigrationLeaseRepository.create({ redis: null }),
+  };
+}
+
+describe("SystemMigrationPassService.runStartup", () => {
   it("runs startup migrations for enrolled tenants and excludes background migrations and tenants", async () => {
     const startup = migrationOf("stored-object-startup", "startup", false);
     const background = migrationOf("background", "background");
@@ -118,9 +125,8 @@ describe("OpsSystemMigrations.runStartup", () => {
       tenants: ["org_acme", "org_globex"],
       enrollments: new Map([[startup.name, new Set(["org_acme"])]]),
     });
-    const adapter = OpsSystemMigrations.create({
-      database,
-      redis: null,
+    const adapter = SystemMigrationPassService.create({
+      repositories: passRepositoriesOver(database),
       isSaaS: () => true,
       migrations: () => [startup, background],
       userMigrations: () => [],
@@ -140,9 +146,8 @@ describe("OpsSystemMigrations.runStartup", () => {
       report: {},
     }));
     const pendingHarness = harness({ tenants: ["org_acme"] });
-    const pendingAdapter = OpsSystemMigrations.create({
-      database: pendingHarness.database,
-      redis: null,
+    const pendingAdapter = SystemMigrationPassService.create({
+      repositories: passRepositoriesOver(pendingHarness.database),
       isSaaS: () => true,
       migrations: () => [pending],
       userMigrations: () => [],
@@ -154,9 +159,8 @@ describe("OpsSystemMigrations.runStartup", () => {
 
     const finalizedHarness = harness({ tenants: ["org_acme"] });
     const finalized = migrationOf("stored-object-startup");
-    const finalizedAdapter = OpsSystemMigrations.create({
-      database: finalizedHarness.database,
-      redis: null,
+    const finalizedAdapter = SystemMigrationPassService.create({
+      repositories: passRepositoriesOver(finalizedHarness.database),
       isSaaS: () => true,
       migrations: () => [finalized],
       userMigrations: () => [],
@@ -170,9 +174,8 @@ describe("OpsSystemMigrations.runStartup", () => {
   it("refuses startup-mode user migrations before starting an organization pass", async () => {
     const userMigration = migrationOf("user-startup");
     const { database } = harness({ tenants: ["org_acme"] });
-    const adapter = OpsSystemMigrations.create({
-      database,
-      redis: null,
+    const adapter = SystemMigrationPassService.create({
+      repositories: passRepositoriesOver(database),
       isSaaS: () => true,
       migrations: () => [],
       userMigrations: () => [userMigration],

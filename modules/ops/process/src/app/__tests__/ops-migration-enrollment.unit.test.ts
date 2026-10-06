@@ -40,6 +40,10 @@ const service = {
   requiresOperatorConfirmation: vi.fn(
     ({ migrationName }: { migrationName: string }) => migrationName === "authz-grants-cutover",
   ),
+  // The worker's convergence loop: no procedure here reaches it, so a call is a wiring fault.
+  runConvergencePass: vi.fn<OpsSystemMigrationRunner["runConvergencePass"]>(async () => {
+    throw new Error("runConvergencePass was called; no ops procedure reaches it");
+  }),
 } satisfies OpsSystemMigrationRunner;
 
 type MigrationTestContext = { actor: { id: string }; operator: OpsOperator | null };

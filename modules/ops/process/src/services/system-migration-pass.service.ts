@@ -1,5 +1,4 @@
 import { createLogger } from "@langwatch/observability";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
 import {
   type MigrationCohort,
   type MigrationPassSummary,
@@ -8,31 +7,21 @@ import {
   groupByTenantSource,
   runSystemMigrationsAtStartup,
 } from "@langwatch/system-migrations";
-import type { Cluster, Redis } from "ioredis";
 
-import { PrismaMigrationMembershipRepository } from "../repositories/prisma/prisma.migration-membership.repository.ts";
-import { PrismaOrganizationTenantSourceRepository } from "../repositories/prisma/prisma.organization-tenant-source.repository.ts";
-import { PrismaProjectTenantSourceRepository } from "../repositories/prisma/prisma.project-tenant-source.repository.ts";
-import { PrismaSystemMigrationEnrollmentRepository } from "../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
-import { PrismaSystemMigrationStateRepository } from "../repositories/prisma/prisma.system-migration-state.repository.ts";
-import {
-  PrismaOrganizationMemberTenantSourceRepository,
-  PrismaUserTenantSourceRepository,
-} from "../repositories/prisma/prisma.user-tenant-source.repository.ts";
-import { RedisMigrationLeaseRepository } from "../repositories/redis/redis.migration-lease.repository.ts";
-import {
-  migrationRunsOnThisInstallation,
-  userMigrates,
-} from "../rules/ops-system-migration-cohort.rules.ts";
-import { RoutingTableOrganizationDataplaneService } from "../services/organization-dataplane.service.ts";
-import { SystemMigrationCohortService } from "../services/system-migration-cohort.service.ts";
-import type { SystemMigrationPassRequestsService } from "../services/system-migration-pass-requests.service.ts";
-import { SystemMigrationsService } from "../services/system-migrations.service.ts";
 import type {
   OpsAppDependencies,
   OpsSystemMigrationRunner,
   OrganizationDataplaneResolver,
-} from "./ops.app.ts";
+} from "../app/ops.app.ts";
+import type { OpsRepositories } from "../repositories/ops.repositories.ts";
+import {
+  migrationRunsOnThisInstallation,
+  userMigrates,
+} from "../rules/ops-system-migration-cohort.rules.ts";
+import { RoutingTableOrganizationDataplaneService } from "./organization-dataplane.service.ts";
+import { SystemMigrationCohortService } from "./system-migration-cohort.service.ts";
+import type { SystemMigrationPassRequestsService } from "./system-migration-pass-requests.service.ts";
+import { SystemMigrationsService } from "./system-migrations.service.ts";
 
 const logger = createLogger("langwatch:ops:system-migrations:pass");
 
@@ -65,9 +54,21 @@ function mergeSummaries(a: MigrationPassSummary, b: MigrationPassSummary): Migra
   };
 }
 
-export type OpsSystemMigrationsOptions = Readonly<{
-  database: ProcessMembers["prisma"];
-  redis: Redis | Cluster | null;
+/** The ledger, enrollment, membership, tenant walks and lease a pass reads and writes. */
+export type SystemMigrationPassRepositories = Pick<
+  OpsRepositories,
+  | "migrationState"
+  | "migrationEnrollments"
+  | "migrationMemberships"
+  | "migrationLease"
+  | "organizationTenants"
+  | "projectTenants"
+  | "userTenants"
+  | "organizationMemberTenants"
+>;
+
+export type SystemMigrationPassOptions = Readonly<{
+  repositories: SystemMigrationPassRepositories;
   /** Cloud pacing is per-organization enrollment; self-hosted admits everyone. */
   isSaaS: () => boolean;
   /** The organization-rooted migrations this installation registered. */
@@ -94,16 +95,15 @@ export type OpsSystemMigrationsOptions = Readonly<{
 }>;
 
 /**
- * Composes one migration pass over this feature's Prisma state, enrollment and
- * tenant-source repositories and its Redis lease. Was main's
+ * One migration pass over ops' ledger, enrollment and tenant walks and its lease. Was main's
  * `app-layer/system-migrations/runtime.ts`, minus the migration registry.
  */
-export class OpsSystemMigrations {
-  static create(options: OpsSystemMigrationsOptions): OpsSystemMigrations {
-    return new OpsSystemMigrations(options);
+export class SystemMigrationPassService {
+  static create(options: SystemMigrationPassOptions): SystemMigrationPassService {
+    return new SystemMigrationPassService(options);
   }
 
-  private constructor(private readonly options: OpsSystemMigrationsOptions) {}
+  private constructor(private readonly options: SystemMigrationPassOptions) {}
 
   async runStartup({
     signal,
@@ -143,9 +143,7 @@ export class OpsSystemMigrations {
 
   async runPass({ signal }: { signal?: AbortSignal }): Promise<MigrationPassSummary> {
     const isSaaS = this.options.isSaaS();
-    const enrollments = PrismaSystemMigrationEnrollmentRepository.create({
-      prisma: this.options.database,
-    });
+    const enrollments = this.options.repositories.migrationEnrollments;
 
     const organization = await this.organizationRunner({ isSaaS, enrollments });
     const userMigrations = this.released({ migrations: this.options.userMigrations(), isSaaS });
@@ -190,8 +188,7 @@ export class OpsSystemMigrations {
     signal?: AbortSignal;
   }): Promise<MigrationPassSummary> {
     const isSaaS = this.options.isSaaS();
-    const state = PrismaSystemMigrationStateRepository.create({ prisma: this.options.database });
-    const lease = RedisMigrationLeaseRepository.create({ redis: this.options.redis });
+    const { migrationState: state, migrationLease: lease } = this.options.repositories;
     const named = (migration: SystemMigration) => migration.name === migrationName;
     const userMigration = this.released({ migrations: this.options.userMigrations(), isSaaS }).find(
       named,
@@ -200,10 +197,7 @@ export class OpsSystemMigrations {
       return new SystemMigrationRunnerService({
         state,
         lease,
-        tenants: PrismaOrganizationMemberTenantSourceRepository.create({
-          prisma: this.options.database,
-          organizationId,
-        }),
+        tenants: this.options.repositories.organizationMemberTenants.membersOf({ organizationId }),
         cohort: () => true,
         migrations: [userMigration],
       }).runPass({ signal });
@@ -220,9 +214,7 @@ export class OpsSystemMigrations {
       },
       cohort: await this.cohort({
         isSaaS,
-        enrollments: PrismaSystemMigrationEnrollmentRepository.create({
-          prisma: this.options.database,
-        }),
+        enrollments: this.options.repositories.migrationEnrollments,
         migrations,
       }),
       migrations,
@@ -239,9 +231,7 @@ export class OpsSystemMigrations {
       ...this.released({ migrations: this.options.migrations(), isSaaS }),
       ...this.released({ migrations: this.options.userMigrations(), isSaaS }),
     ].map((migration) => migration.name);
-    return PrismaSystemMigrationStateRepository.create({
-      prisma: this.options.database,
-    }).hasTenantAwaitingRedrive({ migrationNames });
+    return this.options.repositories.migrationState.hasTenantAwaitingRedrive({ migrationNames });
   }
 
   /**
@@ -261,10 +251,10 @@ export class OpsSystemMigrations {
     summary: MigrationPassSummary;
     cohort: MigrationCohort;
     migrations: readonly SystemMigration[];
-    state: PrismaSystemMigrationStateRepository;
-    lease: RedisMigrationLeaseRepository;
+    state: SystemMigrationPassRepositories["migrationState"];
+    lease: SystemMigrationPassRepositories["migrationLease"];
   }): Promise<MigrationPassSummary> {
-    const everyUser = PrismaUserTenantSourceRepository.create({ prisma: this.options.database });
+    const everyUser = this.options.repositories.userTenants;
     let merged = summary;
     // Narrowed AFTER grouping, never before: buckets are formed by comparing
     // sources by identity, so a fresh narrowed object per migration would
@@ -293,26 +283,21 @@ export class OpsSystemMigrations {
 
   private async organizationRunner({
     isSaaS,
-    enrollments = PrismaSystemMigrationEnrollmentRepository.create({
-      prisma: this.options.database,
-    }),
+    enrollments = this.options.repositories.migrationEnrollments,
     executionMode,
   }: {
     isSaaS: boolean;
-    enrollments?: PrismaSystemMigrationEnrollmentRepository;
+    enrollments?: SystemMigrationPassRepositories["migrationEnrollments"];
     executionMode?: "background" | "startup";
   }) {
-    const state = PrismaSystemMigrationStateRepository.create({ prisma: this.options.database });
-    const lease = RedisMigrationLeaseRepository.create({ redis: this.options.redis });
+    const { migrationState: state, migrationLease: lease } = this.options.repositories;
     const migrations = this.released({ migrations: this.options.migrations(), isSaaS }).filter(
       (migration) =>
         executionMode === void 0 || (migration.executionMode ?? "background") === executionMode,
     );
     const organizationCohort = await this.cohort({ isSaaS, enrollments, migrations });
     const projectTenants =
-      this.options.tenantAxis === "project"
-        ? PrismaProjectTenantSourceRepository.create(this.options.database)
-        : null;
+      this.options.tenantAxis === "project" ? this.options.repositories.projectTenants : null;
     const cohort: MigrationCohort =
       projectTenants && isSaaS
         ? async ({ tenantId, migrationName }) =>
@@ -328,9 +313,9 @@ export class OpsSystemMigrations {
     // left exactly as it is.
     const tenants =
       projectTenants ??
-      PrismaOrganizationTenantSourceRepository.create({
-        prisma: this.options.database,
-      }).pendingFor({ migrationNames: migrations.map((migration) => migration.name) });
+      this.options.repositories.organizationTenants.pendingFor({
+        migrationNames: migrations.map((migration) => migration.name),
+      });
     return {
       state,
       lease,
@@ -352,15 +337,13 @@ export class OpsSystemMigrations {
     migrations,
   }: {
     isSaaS: boolean;
-    enrollments: PrismaSystemMigrationEnrollmentRepository;
+    enrollments: SystemMigrationPassRepositories["migrationEnrollments"];
     migrations: readonly SystemMigration[];
   }): Promise<MigrationCohort> {
     const automatic = new Set(
       migrations.filter((one) => one.enrolledAutomatically).map((one) => one.name),
     );
-    const memberships = PrismaMigrationMembershipRepository.create({
-      prisma: this.options.database,
-    });
+    const memberships = this.options.repositories.migrationMemberships;
     const enrolled = isSaaS
       ? await enrollments.findEnrolledOrganizationIdsByMigration()
       : new Map<string, Set<string>>();
@@ -418,7 +401,7 @@ export class OpsSystemMigrations {
     migrations,
   }: {
     isSaaS: boolean;
-    enrollments: PrismaSystemMigrationEnrollmentRepository;
+    enrollments: SystemMigrationPassRepositories["migrationEnrollments"];
     migrations: readonly SystemMigration[];
   }): Promise<(args: { tenantId: string; migrationName: string }) => boolean> {
     const enrolled = isSaaS
@@ -443,6 +426,71 @@ export class OpsSystemMigrations {
       return admission.admitted;
     };
   }
+
+  /**
+   * The migrations page and the worker's pass over ops' ledger, enrolment and lease, each peer
+   * answering its own registry (main's `system-migrations/runtime.ts`). A process whose peers
+   * register nothing lists nothing rather than refusing.
+   */
+  static runner({
+    repositories,
+    isSaaS,
+    routes,
+    dependencies,
+    passRequests,
+  }: Pick<SystemMigrationPassOptions, "repositories" | "isSaaS"> & {
+    /** The clickhouse store's private routes (§7), read when a cohort or pass asks, not at boot. */
+    routes: () => ReadonlyMap<string, string>;
+    dependencies: Pick<OpsAppDependencies, "identity" | "authz" | "automations" | "auditLog">;
+    passRequests: Pick<SystemMigrationPassRequestsService, "request">;
+  }): OpsSystemMigrationRunner {
+    const { identity, authz, automations, auditLog } = dependencies;
+    // Main's registry order: authorization's import, identity's D04, then Slack connections.
+    const organizationMigrations = () => [
+      ...authz.registeredMigrations(),
+      ...identity.registeredMigrations(),
+      ...automations.registeredMigrations(),
+    ];
+    const passes = SystemMigrationPassService.create({
+      repositories,
+      isSaaS,
+      migrations: organizationMigrations,
+      userMigrations: () => identity.userMigrations(),
+      newbornSweep: () => identity.newbornSweep().runPass(),
+      dataplane: {
+        dataplaneFor: (organizationId) =>
+          RoutingTableOrganizationDataplaneService.create({ routes: routes() }).dataplaneFor(
+            organizationId,
+          ),
+      },
+    });
+    return SystemMigrationsService.create({
+      state: repositories.migrationState,
+      migrations: () => [
+        ...organizationMigrations().map((migration) =>
+          declarationOf({ migration, tenant: "organization" }),
+        ),
+        ...identity
+          .userMigrations()
+          .map((migration) => declarationOf({ migration, tenant: "user" })),
+      ],
+      isSaaS,
+      enrollments: repositories.migrationEnrollments,
+      privateDataplaneOrganizationIds: () => [...routes().keys()],
+      audit: async ({ userId, organizationId, action, args }) => {
+        await auditLog.record({
+          userId,
+          action,
+          ...(organizationId === undefined ? {} : { organizationId }),
+          ...(args === undefined ? {} : { args }),
+        });
+      },
+      runPass: (input) => passes.runPass(input),
+      runTargetedPass: (target) => passes.runTargetedPass(target),
+      requestPass: (request) => passRequests.request(request),
+      hasTenantAwaitingRedrive: () => passes.hasTenantAwaitingRedrive(),
+    });
+  }
 }
 
 /** What the migrations page reads of one migration: its declaration plus its tenant axis. */
@@ -462,69 +510,4 @@ function declarationOf({
     enrolledAutomatically: migration.enrolledAutomatically,
     tenant,
   };
-}
-
-/**
- * The migrations page and the worker's pass over ops' ledger, enrolment and lease, with each peer
- * answering its own registry (main's `system-migrations/runtime.ts`). Reads are pure Postgres, so a
- * process whose peers register nothing lists nothing rather than refusing.
- */
-export function buildSystemMigrations({
-  database,
-  redis,
-  isSaaS,
-  routes,
-  dependencies,
-  passRequests,
-}: Pick<OpsSystemMigrationsOptions, "database" | "redis" | "isSaaS"> & {
-  /** The clickhouse member's private routes (§7), read when a cohort or pass asks, not at boot. */
-  routes: () => ReadonlyMap<string, string>;
-  dependencies: Pick<OpsAppDependencies, "identity" | "authz" | "automations" | "auditLog">;
-  passRequests: Pick<SystemMigrationPassRequestsService, "request">;
-}): OpsSystemMigrationRunner {
-  const { identity, authz, automations, auditLog } = dependencies;
-  // Main's registry order: authorization's import, identity's D04, then Slack connections.
-  const organizationMigrations = () => [
-    ...authz.registeredMigrations(),
-    ...identity.registeredMigrations(),
-    ...automations.registeredMigrations(),
-  ];
-  const passes = OpsSystemMigrations.create({
-    database,
-    redis,
-    isSaaS,
-    migrations: organizationMigrations,
-    userMigrations: () => identity.userMigrations(),
-    newbornSweep: () => identity.newbornSweep().runPass(),
-    dataplane: {
-      dataplaneFor: (organizationId) =>
-        RoutingTableOrganizationDataplaneService.create({ routes: routes() }).dataplaneFor(
-          organizationId,
-        ),
-    },
-  });
-  return SystemMigrationsService.create({
-    state: PrismaSystemMigrationStateRepository.create({ prisma: database }),
-    migrations: () => [
-      ...organizationMigrations().map((migration) =>
-        declarationOf({ migration, tenant: "organization" }),
-      ),
-      ...identity.userMigrations().map((migration) => declarationOf({ migration, tenant: "user" })),
-    ],
-    isSaaS,
-    enrollments: PrismaSystemMigrationEnrollmentRepository.create({ prisma: database }),
-    privateDataplaneOrganizationIds: () => [...routes().keys()],
-    audit: async ({ userId, organizationId, action, args }) => {
-      await auditLog.record({
-        userId,
-        action,
-        ...(organizationId === undefined ? {} : { organizationId }),
-        ...(args === undefined ? {} : { args }),
-      });
-    },
-    runPass: (input) => passes.runPass(input),
-    runTargetedPass: (target) => passes.runTargetedPass(target),
-    requestPass: (request) => passRequests.request(request),
-    hasTenantAwaitingRedrive: () => passes.hasTenantAwaitingRedrive(),
-  });
 }

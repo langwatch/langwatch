@@ -767,6 +767,7 @@ export class OpsModule implements OpsApi {
       config: setup.config,
       resources: setup.resources,
       processStore: setup.repositories.processStore,
+      repositories: setup.repositories,
       rateTracker,
       cloudOps,
     });
