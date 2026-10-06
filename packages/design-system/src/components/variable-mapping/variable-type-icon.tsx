@@ -1,4 +1,3 @@
-import { Box } from "@langwatch/design-system/primitives";
 import {
   Braces,
   Hash,
@@ -9,6 +8,8 @@ import {
   ToggleLeft,
   Type,
 } from "lucide-react";
+
+import { Box } from "../../primitives.ts";
 
 export const VariableTypeIcon = ({ type, size = 16 }: { type: string; size?: number }) => {
   const iconProps = { size, strokeWidth: 2.5, color: "var(--chakra-colors-gray-500)" };

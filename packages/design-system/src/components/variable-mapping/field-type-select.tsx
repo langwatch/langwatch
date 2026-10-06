@@ -1,7 +1,7 @@
-import { RawMenu as Menu } from "@langwatch/design-system/menu";
-import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown } from "lucide-react";
 
+import { Button, HStack, Text } from "../../primitives.ts";
+import { RawMenu as Menu } from "../menu.tsx";
 import { getTypeLabel, VariableTypeIcon } from "./variable-type-icon.tsx";
 
 export type FieldTypeOption = { value: string; label: string };

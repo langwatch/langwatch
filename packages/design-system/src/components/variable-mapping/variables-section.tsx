@@ -1,27 +1,14 @@
-import { Menu } from "@langwatch/design-system/menu";
-import {
-  Box,
-  Button,
-  HStack,
-  Input,
-  Spacer,
-  Text,
-  Textarea,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { generateUniqueIdentifier, normalizeIdentifier } from "@langwatch/prompt-contract";
 import { Info, Plus, X } from "lucide-react";
 import { useCallback, useState } from "react";
 
-import {
-  type AvailableSource,
-  type FieldMapping,
-  type FieldType,
-  type RenderSourceIcon,
-  VariableMappingInput,
-} from "./variable-mapping-input.tsx";
-import { FieldTypeSelect, TYPE_LABELS, VariableTypeIcon } from "./variable-type/index.ts";
+import { Box, Button, HStack, Input, Spacer, Text, Textarea, VStack } from "../../primitives.ts";
+import { Menu } from "../menu.tsx";
+import { Tooltip } from "../tooltip.tsx";
+import { FieldTypeSelect } from "./field-type-select.tsx";
+import { generateUniqueIdentifier, normalizeIdentifier } from "./identifier.ts";
+import type { AvailableSource, FieldMapping, FieldType } from "./types.ts";
+import { type RenderSourceIcon, VariableMappingInput } from "./variable-mapping-input.tsx";
+import { TYPE_LABELS, VariableTypeIcon } from "./variable-type-icon.tsx";
 
 // ============================================================================
 // Types
@@ -561,5 +548,3 @@ const VariableRow = ({
     </HStack>
   );
 };
-
-export { type AvailableSource, type FieldMapping } from "./variable-mapping-input.tsx";

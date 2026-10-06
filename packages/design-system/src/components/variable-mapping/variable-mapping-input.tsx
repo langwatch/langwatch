@@ -1,10 +1,3 @@
-import { Box, HStack, Input, Portal, Tag, Text, VStack } from "@langwatch/design-system/primitives";
-import type {
-  AvailableSource,
-  FieldMapping,
-  NestedField,
-  SourceType,
-} from "@langwatch/workflow-contract";
 import { Check, ChevronRight, Type } from "lucide-react";
 import {
   type Dispatch,
@@ -19,19 +12,13 @@ import {
   useState,
 } from "react";
 
-import { VariableTypeBadge, VariableTypeIcon } from "./variable-type/index.ts";
+import { Box, HStack, Input, Portal, Tag, Text, VStack } from "../../primitives.ts";
+import type { AvailableSource, FieldMapping, NestedField, SourceType } from "./types.ts";
+import { VariableTypeBadge, VariableTypeIcon } from "./variable-type-icon.tsx";
 
 // ============================================================================
 // Types
 // ============================================================================
-
-export type {
-  AvailableSource,
-  FieldMapping,
-  FieldType,
-  NestedField,
-  SourceType,
-} from "@langwatch/workflow-contract";
 
 export type RenderSourceIcon = (type: SourceType) => ReactNode;
 
