@@ -188,7 +188,7 @@ export class ProcessServer implements ProcessBoot {
         secrets: (owner, declared) => this.resolver.scopeTo(owner, declared),
         operatorReads: (scope) => operatorReadsResolver.scopeTo(scope),
         // The stores answer the declared members; the process facts below extend them
-        // until the last `static reads` module takes each from its config slice (§3.3).
+        // until the last module reading members takes each from its config slice (§3.3).
         members: {
           ...storesBackedMembers(
             {
