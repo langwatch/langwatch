@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { resolveSimulationsRedirect } from "../use-suite-routing.ts";
+import { resolveSimulationsRedirect, runPageAddress, runPageOf } from "../use-suite-routing.ts";
 
 const redirect = (segments: string[], query: Record<string, unknown> = {}) =>
   resolveSimulationsRedirect({ projectSlug: "acme", segments, query });
@@ -59,15 +59,30 @@ describe("resolveSimulationsRedirect", () => {
     });
   });
 
-  describe("given the old per-run URL", () => {
-    it("opens the run's drawer on its batch", () => {
-      expect(redirect(["my-set", "batch_1", "run_1"])).toBe(
-        "/acme/simulations/my-set/batch_1?openRun=run_1",
-      );
+  describe("given the per-run URL", () => {
+    it("renders the standalone run page in place", () => {
+      expect(redirect(["my-set", "batch_1", "run_1"])).toBeNull();
+      expect(runPageOf({ segments: ["my-set", "batch_1", "run_1"] })).toEqual({
+        setId: "my-set",
+        batchRunId: "batch_1",
+        scenarioRunId: "run_1",
+      });
     });
 
     it("leaves a suite batch alone", () => {
       expect(redirect(["run-plans", "nightly", "batch_1"])).toBeNull();
+      expect(runPageOf({ segments: ["run-plans", "nightly", "batch_1"] })).toBeNull();
+    });
+
+    it("builds the run page address back from the run", () => {
+      expect(
+        runPageAddress({
+          projectSlug: "acme",
+          setId: "my-set",
+          batchRunId: "batch_1",
+          scenarioRunId: "run_1",
+        }),
+      ).toBe("/acme/simulations/my-set/batch_1/run_1");
     });
   });
 });

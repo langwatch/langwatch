@@ -37,7 +37,7 @@ export function resolveSimulationsRedirect({
   query: Record<string, unknown>;
 }): string | null {
   const base = `/${projectSlug}/simulations`;
-  const [first, second, third] = segments;
+  const [first, second] = segments;
 
   // The scenario LIBRARY, not a simulation set. `/simulations/scenarios` itself
   // is a route of its own, so only the near-misses reach here.
@@ -57,12 +57,39 @@ export function resolveSimulationsRedirect({
     return base;
   }
 
-  // /setId/batchId/scenarioRunId → the set + batch, with the run's drawer open.
-  if (segments.length === 3 && first !== "run-plans") {
-    return `${base}/${first}/${second}?openRun=${third}`;
-  }
-
   return null;
+}
+
+/** First segments that name a page of their own rather than a simulation set. */
+const NOT_A_SET = new Set(["run-plans", "scenarios", "scenario", "suites"]);
+
+/** The run a three-segment `/simulations/<set>/<batch>/<run>` address names, or null. */
+export function runPageOf({
+  segments,
+}: {
+  segments: string[];
+}): { setId: string; batchRunId: string; scenarioRunId: string } | null {
+  const [setId, batchRunId, scenarioRunId] = segments;
+  if (segments.length !== 3 || NOT_A_SET.has(setId ?? "")) return null;
+  if (!setId || !batchRunId || !scenarioRunId) return null;
+  return { setId, batchRunId, scenarioRunId };
+}
+
+/** The standalone run page's address. */
+export function runPageAddress({
+  projectSlug,
+  setId,
+  batchRunId,
+  scenarioRunId,
+}: {
+  projectSlug: string;
+  setId: string;
+  batchRunId: string;
+  scenarioRunId: string;
+}): string {
+  return [projectSlug, "simulations", setId, batchRunId, scenarioRunId]
+    .map((part) => `/${encodeURIComponent(part)}`)
+    .join("");
 }
 
 /**

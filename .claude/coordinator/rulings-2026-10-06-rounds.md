@@ -44,3 +44,11 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Lent props naming another module's types (Q202, Q203): STRUCTURAL props, restated as portable shapes; no new edges.
 - React-typed lent props (Q202, Q204): Alex asked back "lent components shouldn't be in contracts?"; clarification asked, see round 6b.
 - Round 6b, token home (Q202, Q204): KEEP the record; tokens stay in the owner's contract, React-shaped props become data (text, ids), and render slots are typed unknown and narrowed by browser-host.
+
+## Round 7 (D, lends, graph JSON, SQL ownership)
+
+- Lent hooks (Q204): a HOOKS token read through useLentHooks, like GuidedTourToken.
+- Lend edges (Q202, Q204, Q206): Alex: "maybe we keep using names? idk acyclic is fine, but maybe we use client packages?"; clarification asked, see round 7b.
+- Graph JSON (Q39): a FRAMEWORK helper, a JSON-text field in packages/api; the browser's inferred types stay stable.
+- SQL owners (D3): ATTRIBUTE only; SQL stays central, each migration is attributed to its table's owner, and a check refuses one touching two owners.
+- Round 7b, lend edges (Q202, Q204, Q206): TOKENS move to each owner's <name>-client package; readers' browser packages import it; React-typed props are allowed there. This SUPERSEDES round 6b (tokens in the contract, data-only props) and changes the record's §10.1 "a token lives in its owner's contract".

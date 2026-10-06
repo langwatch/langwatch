@@ -6,13 +6,17 @@ import { useRouter } from "@langwatch/browser-host/use-router";
 import { useEffect } from "react";
 
 import { useAgentTestingRedirect } from "../../../behavior/suites/use-agent-testing-redirect.ts";
-import { resolveSimulationsRedirect } from "../../../behavior/suites/use-suite-routing.ts";
+import {
+  resolveSimulationsRedirect,
+  runPageOf,
+} from "../../../behavior/suites/use-suite-routing.ts";
 import SimulationsPage from "../suites/simulations-page.tsx";
+import { ScenarioRunPage } from "./scenario-run-page.tsx";
 
 function SimulationsRoutePage() {
   const router = useRouter();
   // The catch-all segment, read off the route parameters. `/:project/simulations/*`
-  // is one page serving five addresses, and the splat is how it knows which.
+  // is one page serving six addresses, and the splat is how it knows which.
   const pathSegments = (router.params["*"] ?? "").split("/").filter(Boolean);
   const projectSlug = router.query.project;
 
@@ -33,6 +37,9 @@ function SimulationsRoutePage() {
 
   // Don't render the wrong page for a frame while a redirect is in flight.
   if (deciding || redirect) return null;
+
+  const run = runPageOf({ segments: pathSegments });
+  if (run) return <ScenarioRunPage key={run.scenarioRunId} {...run} />;
 
   return <SimulationsPage />;
 }
