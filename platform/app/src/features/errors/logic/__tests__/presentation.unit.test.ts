@@ -440,6 +440,13 @@ describe("explainHandledError", () => {
       "permission_error",
       "invalid_api_key",
       "AccessDeniedException",
+      "InvalidSignatureException",
+      "UnrecognizedClientException",
+      "ExpiredTokenException",
+      "InvalidClientTokenId",
+      "SignatureDoesNotMatch",
+      "UNAUTHENTICATED",
+      "PERMISSION_DENIED",
     ])("explains the provider's own %s code as a refused credential", (code) => {
       const { description } = explainHandledError(
         shape({ code: "llm_upstream_error", reasons: [reason(code)] }),

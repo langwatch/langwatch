@@ -272,6 +272,15 @@ export const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   "permission_error",
   "invalid_api_key",
   "AccessDeniedException",
+  // A wrong AWS secret, an unknown or expired AWS access key.
+  "InvalidSignatureException",
+  "UnrecognizedClientException",
+  "ExpiredTokenException",
+  "InvalidClientTokenId",
+  "SignatureDoesNotMatch",
+  // Google's statuses for the same two refusals.
+  "UNAUTHENTICATED",
+  "PERMISSION_DENIED",
 ]);
 
 /**

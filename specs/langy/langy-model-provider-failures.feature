@@ -52,6 +52,18 @@ Feature: A turn that the model provider refused says so
       And it offers to open the model settings
       And it does not offer to try again
 
+    # Every provider names a refused key its own way (Bedrock answers a wrong
+    # AWS secret with "InvalidSignatureException"). The proxy files the 401 or
+    # 403 status reason next to the provider's code, so a name the client has
+    # no entry for still reads as a refused credential.
+    @unit
+    Scenario: A refused credential in a dialect the client does not know still reads as a credential to check
+      Given a turn the provider refused with a 401 or 403 and its own code for it
+      When the customer reads the card
+      Then it is the provider card saying the provider refused this key or its access to the model
+      And it offers to open the model settings
+      And it does not offer to try again
+
     @unit
     Scenario: A model the provider does not know reads as a model to check
       Given a turn that failed with the proxy's upstream code carrying the provider's own "model_not_found" code
