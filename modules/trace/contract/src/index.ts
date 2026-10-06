@@ -199,6 +199,7 @@ export * from "./trace-rag-extraction.ts";
 export * from "./trace-pcm-to-wav.ts";
 export * from "./trace-metadata-editable-keys.ts";
 export * from "./trace-viewer-protections.contract.ts";
+export * from "./trace-visibility-teaser.ts";
 export * from "./trace-export.errors.ts";
 export * from "./trace-export.vocabulary.ts";
 export * from "./trace-legacy-read.types.ts";

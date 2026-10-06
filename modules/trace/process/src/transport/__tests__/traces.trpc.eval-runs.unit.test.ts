@@ -52,7 +52,6 @@ function harness() {
     resolveViewerProtections: async () => ({}),
     extractTraceFreeTextTerms: () => [],
     readTraceList: async () => ({ items: [], totalHits: 0, evaluations: {}, nextCursor: null }),
-    readSessionGroups: async () => ({ sessions: [], totalHits: 0, nextCursor: null }),
     readNewCount: async () => 3,
   });
 
@@ -93,23 +92,6 @@ describe("given a read whose query carries an eval chip with a registered run", 
         projectId: PROJECT_ID,
         evalRuns: claim,
       });
-      expect(compileExplorerTraceFilter).toHaveBeenCalledWith(
-        expect.objectContaining({ evalRuns: [RESOLVED] }),
-      );
-    });
-  });
-
-  describe("when the sessions lens reads a page", () => {
-    it("compiles with the dated run", async () => {
-      const { caller, compileExplorerTraceFilter } = harness();
-
-      await caller.sessions({
-        projectId: PROJECT_ID,
-        timeRange: TIME_RANGE,
-        query: 'eval:"the user is annoyed"',
-        evalRuns: claim,
-      });
-
       expect(compileExplorerTraceFilter).toHaveBeenCalledWith(
         expect.objectContaining({ evalRuns: [RESOLVED] }),
       );

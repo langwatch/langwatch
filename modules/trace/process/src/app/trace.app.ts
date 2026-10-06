@@ -73,6 +73,8 @@ import {
   type FacetValuesResult,
   type PromptStudioSpanResult,
   type SessionGroupsResult,
+  type TraceSessionGroupsInput,
+  type TracesSessionsPage,
   type SharedTraceDto,
   type Span,
   type SpanDetail,
@@ -383,11 +385,13 @@ import {
   buildContentPrivacy,
   buildSpanContentRedactions,
   mapSpanToDetail,
+  contentSearchTermsForViewer,
   readDroppedFromParams,
   readPiiIncompleteFromParams,
   redactV2Content,
   toConversationContextTurn,
 } from "../rules/trace-read-mappers.rules.ts";
+import { gateSessionCost } from "../rules/trace-view-gates.rules.ts";
 import {
   TraceCollectorDispatchService,
   type CollectorEvaluationReportInput,
@@ -1063,8 +1067,6 @@ export class TraceModule implements TraceApi, CollectorApp {
         list,
         sessionGroups: SessionGroupsService.create({
           repository: options.repositories.sessionGroups,
-          codingAgentSessions: options.codingAgents,
-          resolveOrganizationId: (projectId) => options.projects.getOrganizationId(projectId),
         }),
         spans: SpanStorageService.create({ repository: spanStorageRepository, blobResolutionDeps }),
         summary: TraceSummaryService.create({
@@ -2417,9 +2419,43 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#dependencies.traces.list.getList(params);
   }
 
-  /** One page of the Sessions lens. */
-  readSessionGroups(params: TraceSessionGroupsReadParams): Promise<SessionGroupsResult> {
-    return this.#dependencies.traces.sessionGroups.getSessionGroups(params);
+  /** One Sessions lens page through the viewer's protections; coding-agent fills `codingAgent`. */
+  async readSessionGroups(
+    input: TraceSessionGroupsInput & { protections: Protections },
+  ): Promise<TracesSessionsPage> {
+    const { protections } = input;
+    const filterWhere = this.compileExplorerTraceFilter({
+      query: input.query ?? "",
+      tenantId: input.projectId,
+      timeRange: input.timeRange,
+      evalRuns: await this.findExplorerEvalRuns({
+        projectId: input.projectId,
+        evalRuns: input.evalRuns,
+      }),
+    });
+    const result = await this.#dependencies.traces.sessionGroups.getSessionGroups({
+      tenantId: input.projectId,
+      timeRange: input.timeRange,
+      sort: input.sort,
+      pageSize: input.pageSize,
+      cursor: input.cursor,
+      filterWhere,
+      contentTerms: contentSearchTermsForViewer({
+        terms: this.extractTraceFreeTextTerms(input.query ?? ""),
+        protections,
+      }),
+      visibilityCutoffMs: protections.visibilityCutoffMs,
+    });
+
+    return {
+      ...result,
+      sessions: gateSessionCost({
+        sessions: result.sessions.map((session) =>
+          redactV2Content(session, protections, traceReadMapperPorts.contentPrivacy),
+        ),
+        protections,
+      }),
+    };
   }
 
   /**

@@ -42,6 +42,10 @@ export class TestCodingAgentService implements CodingAgentApi {
     return this.unused();
   }
 
+  readSessionGroupsForViewer(): Promise<never> {
+    return this.unused();
+  }
+
   linkTraceSessionsToPullRequests(): Promise<never> {
     return this.unused();
   }

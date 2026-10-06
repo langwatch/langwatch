@@ -100,9 +100,14 @@ import type {
   TraceDerivedEventsInput,
   TraceSummaryLookupInput,
 } from "./trace.queries.ts";
-import type { DerivedTraceEvent, TracesConversationContext } from "./trace.responses.ts";
+import type {
+  DerivedTraceEvent,
+  TracesConversationContext,
+  TracesSessionsPage,
+} from "./trace.responses.ts";
 import type { NormalizedSpan } from "./trace.spans.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
+import type { TraceSessionGroupsInput } from "./traces.trpc.ts";
 
 /** A reviewer correction target owned by Trace, shared structurally with Annotation. */
 export type TraceSuggestionTarget =
@@ -620,7 +625,13 @@ export interface TraceApi extends TraceOtlpIngestApi {
     filterWhere?: { sql: string; params: Record<string, unknown> };
     visibilityCutoffMs?: number | null;
   }): Promise<TraceListPage>;
-  readSessionGroups(params: unknown): Promise<unknown>;
+  /**
+   * One page of the Sessions lens through the viewer's protections: content redacted and spend
+   * gated, with `codingAgent` left null for coding-agent, which serves the lens, to fill and gate.
+   */
+  readSessionGroups(
+    input: TraceSessionGroupsInput & { protections: Protections },
+  ): Promise<TracesSessionsPage>;
   /**
    * The sidebar's facets under the active query: descriptors counted in the
    * window the list reads, each facet exempt from its own terms (ADR-139).

@@ -39,7 +39,6 @@ import {
   tracesListEventsSchema,
   tracesListPageSchema,
   tracesNewCountSchema,
-  tracesSessionsPageSchema,
   tracesSpanDetailsSchema,
   tracesSpanLangwatchSignalsSchema,
   tracesSpansDeltaSchema,
@@ -124,6 +123,18 @@ const sortSchema = z.object({
   columnId: z.string(),
   direction: z.enum(["asc", "desc"]),
 });
+
+/** One Sessions lens page request, which coding-agent serves as `codingAgents.sessionGroups`. */
+export const traceSessionGroupsInputSchema = z.object({
+  projectId: z.string(),
+  timeRange: timeRangeSchema,
+  sort: sortSchema.optional(),
+  pageSize: z.number().int().min(1).max(100).default(50),
+  cursor: z.string().optional(),
+  query: z.string().nullish(),
+  evalRuns: explorerInstantEvalRunsSchema,
+});
+export type TraceSessionGroupsInput = z.infer<typeof traceSessionGroupsInputSchema>;
 
 /**
  * Ceiling on one `listEvents` call, matching the list's largest page size.
@@ -267,20 +278,6 @@ export const tracesTrpc = defineTrpcContract("traces")
     }),
   )
   .withOutput(tracesListPageSchema)
-
-  .query("sessions")
-  .withInput(
-    z.object({
-      projectId: z.string(),
-      timeRange: timeRangeSchema,
-      sort: sortSchema.optional(),
-      pageSize: z.number().int().min(1).max(100).default(50),
-      cursor: z.string().optional(),
-      query: z.string().nullish(),
-      evalRuns: explorerInstantEvalRunsSchema,
-    }),
-  )
-  .withOutput(tracesSessionsPageSchema)
 
   .query("listEvents")
   .withInput(

@@ -27,16 +27,16 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
       list: { useQuery: harness.list },
       discover: { useQuery: harness.discover },
       newCount: { useQuery: harness.newCount },
-      sessions: { useQuery: harness.sessions },
       instantEval: { get: (input: unknown) => input },
     },
+    codingAgents: { sessionGroups: { useQuery: harness.sessions } },
     useUtils: () => ({
       traces: {
         list: { invalidate: harness.invalidate.list },
-        sessions: { invalidate: harness.invalidate.sessions },
         facetValues: { invalidate: harness.invalidate.facetValues },
         newCount: { invalidate: harness.invalidate.newCount },
       },
+      codingAgents: { sessionGroups: { invalidate: harness.invalidate.sessions } },
     }),
     useQueries: () => harness.getResults,
   },

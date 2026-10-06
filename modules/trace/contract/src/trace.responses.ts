@@ -120,6 +120,7 @@ export const tracesSessionsPageSchema = z.object({
     }),
   ),
 });
+export type TracesSessionsPage = z.infer<typeof tracesSessionsPageSchema>;
 
 /** `listEvents`: the events column's rollups, keyed by trace id. */
 export const tracesListEventsSchema = z.record(z.string(), traceEventRollupSchema);

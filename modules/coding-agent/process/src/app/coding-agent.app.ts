@@ -39,7 +39,11 @@ import { ValidationError } from "@langwatch/handled-error";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
-import { TraceApi } from "@langwatch/trace-contract";
+import {
+  TraceApi,
+  type TraceSessionGroupsInput,
+  type TracesSessionsPage,
+} from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 
 import {
@@ -67,6 +71,7 @@ import { CodingAgentReceivedFactsService } from "../services/coding-agent-receiv
 import { CodingAgentScopeDirectoryService } from "../services/coding-agent-scope-directory.service.ts";
 import { CodingAgentScopePermissionsService } from "../services/coding-agent-scope-permissions.service.ts";
 import type { CodingAgentScopeCaller } from "../services/coding-agent-scope-permissions.service.ts";
+import { CodingAgentSessionGroupsReadService } from "../services/coding-agent-session-groups-read.service.ts";
 import { CodingAgentViewerVisibilityService } from "../services/coding-agent-viewer-visibility.service.ts";
 import type { CodingAgentViewerVisibilityReader } from "../services/coding-agent-viewer-visibility.service.ts";
 import {
@@ -140,7 +145,7 @@ export class CodingAgentModule implements CodingAgentApi {
   static readonly dependencies: CodingAgentDependencies = {
     projects: ProjectApi,
     github: GithubApi,
-    /** Claude-call classification the session fold prices cache writes by. */
+    /** Claude-call classification the session fold prices cache writes by; Sessions lens pages. */
     traces: TraceApi,
     /** Owns the platform default retention a session's rows are stamped with, read lazily. */
     retention: DataRetentionApi,
@@ -211,6 +216,11 @@ export class CodingAgentModule implements CodingAgentApi {
       traces: dependencies.traces,
       scope,
       visibility: CodingAgentViewerVisibilityService.create({ traces: dependencies.traces }),
+      sessionGroups: CodingAgentSessionGroupsReadService.create({
+        traces: dependencies.traces,
+        sessions: service,
+        findOrganizationForProject: (projectId) => scope.findOrganizationForProject(projectId),
+      }),
       auditLog: dependencies.auditLog,
       processing,
       commands,
@@ -222,6 +232,7 @@ export class CodingAgentModule implements CodingAgentApi {
   readonly #traces: TraceApi;
   readonly #scope: CodingAgentScopeReads;
   readonly #visibility: CodingAgentViewerVisibilityReader;
+  readonly #sessionGroups: CodingAgentSessionGroupsReadService;
   readonly #auditLog: Pick<AuditLogApi, "record">;
   readonly #processing: CodingAgentProcessingPipeline;
   readonly #commands: CodingAgentCommandDispatcherService;
@@ -232,6 +243,7 @@ export class CodingAgentModule implements CodingAgentApi {
     traces,
     scope,
     visibility,
+    sessionGroups,
     auditLog,
     processing,
     commands,
@@ -241,6 +253,7 @@ export class CodingAgentModule implements CodingAgentApi {
     traces: TraceApi;
     scope: CodingAgentScopeReads;
     visibility: CodingAgentViewerVisibilityReader;
+    sessionGroups: CodingAgentSessionGroupsReadService;
     auditLog: Pick<AuditLogApi, "record">;
     processing: CodingAgentProcessingPipeline;
     commands: CodingAgentCommandDispatcherService;
@@ -250,6 +263,7 @@ export class CodingAgentModule implements CodingAgentApi {
     this.#traces = traces;
     this.#scope = scope;
     this.#visibility = visibility;
+    this.#sessionGroups = sessionGroups;
     this.#auditLog = auditLog;
     this.#processing = processing;
     this.#commands = commands;
@@ -292,6 +306,13 @@ export class CodingAgentModule implements CodingAgentApi {
     viewerUserId: string;
   }): Promise<CodingAgentTranscript> {
     return codingAgentTranscriptSchema.parse(await this.#traces.readCodingAgentTranscript(input));
+  }
+
+  /** Port of main's `traces.sessions`: trace reads the page for the viewer, this enriches it. */
+  readSessionGroupsForViewer(
+    input: TraceSessionGroupsInput & { viewerUserId: string },
+  ): Promise<TracesSessionsPage> {
+    return this.#sessionGroups.readForViewer(input);
   }
 
   linkTraceSessionsToPullRequests(

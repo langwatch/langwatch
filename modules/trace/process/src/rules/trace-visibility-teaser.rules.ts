@@ -5,22 +5,7 @@ import type {
   SpanInputOutput,
   Trace,
 } from "@langwatch/trace-contract";
-
-/**
- * Teaser truncation rule: keep the first max(TEASER_MIN_CHARS, min(TEASER_MAX_CHARS, ceil(len *
- * TEASER_FRACTION))) characters of each content field. The floor keeps tiny traces legible as
- * teasers; the cap stops large payloads from leaking meaningful content.
- */
-export const TEASER_FRACTION = 0.1;
-export const TEASER_MIN_CHARS = 50;
-export const TEASER_MAX_CHARS = 300;
-
-/**
- * Truncation marker appended to every teased value — it ships in the API
- * payload itself so every consumer (UI, SDK, exports, REST) sees "there is
- * more data here" without client-side decoration.
- */
-export const TEASER_ELLIPSIS = " …";
+import { teaserOf } from "@langwatch/trace-contract";
 
 const toErrorTeaser = (error: ErrorCapture | null | undefined): ErrorCapture | null | undefined => {
   if (!error) {
@@ -142,15 +127,6 @@ const toParamsTeaser = (
   return Object.fromEntries(
     Object.entries(params).map(([key, value]) => [key, teaseParamValue(value)]),
   );
-};
-
-export const teaserOf = (text: string): string => {
-  const keep = Math.max(
-    TEASER_MIN_CHARS,
-    Math.min(TEASER_MAX_CHARS, Math.ceil(text.length * TEASER_FRACTION)),
-  );
-
-  return text.length <= keep ? text : text.slice(0, keep) + TEASER_ELLIPSIS;
 };
 
 /**
