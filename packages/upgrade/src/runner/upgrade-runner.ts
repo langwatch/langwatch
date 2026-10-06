@@ -19,6 +19,8 @@ import {
 } from "../seed-sources.ts";
 import type { MigrationStep } from "../step/migration-step.ts";
 import { highestRecordedFloor, inferInstalledRelease } from "./installed-release.ts";
+import { UPGRADE_READ_HINT_PATH, type UpgradeReadHintPublish } from "./run-hint.ts";
+import { RunPhases, type UpgradePhaseChange, type UpgradePhaseOutcome } from "./run-phases.ts";
 import { DEFAULT_LEASE_TIMING, holdUpgradeLease, type UpgradeLeaseTiming } from "./runner-lease.ts";
 import { type RegisteredStep, UpgradeRunnerRepository } from "./runner-ledger.repository.ts";
 import type {
@@ -48,6 +50,8 @@ export interface UpgradeRunnerOptions {
   lease?: Partial<UpgradeLeaseTiming>;
   lockTimeoutMs?: number;
   retry?: { attempts: number; backoffMs: number };
+  /** Publishes the read hint for each phase change and the finish (round 8, U2-LIVE). */
+  hints?: UpgradeReadHintPublish;
 }
 
 type LedgerFacts = readonly Pick<UpgradeStep, "id" | "status">[];
@@ -264,9 +268,10 @@ export class UpgradeRunnerService {
     const run = await this.ledger.startRun({ kind: "upgrade", floor });
     await this.runner.recordRunPlan({ runId: run.id, release: this.options.image.release, plan });
     this.options.log.info("upgrade planned", { runId: run.id, installed, fresh: plan.fresh });
+    const phases = this.phasesOf({ runId: run.id });
     try {
-      const report = await this.applyPlan({ plan, before, runId: run.id, signal });
-      await this.ledger.finishRun({ runId: run.id, outcome: "succeeded", report });
+      const report = await this.applyPlan({ plan, before, runId: run.id, signal, phases });
+      await this.finishRun({ runId: run.id, outcome: "succeeded", report, phases });
       const message = `upgraded to ${this.options.image.release ?? "this image"}`;
       return upgradeOutcome({ code: "done", message, runId: run.id, detail: report });
     } catch (error) {
@@ -275,22 +280,74 @@ export class UpgradeRunnerService {
           ? error
           : new UpgradeRunFailure(signal.aborted ? "lease_lost" : "failed", describeError(error));
       const { code, message, detail } = failure;
-      await this.ledger.finishRun({
-        runId: run.id,
-        outcome: "failed",
-        report: { code, error: message, ...detail },
-      });
+      await phases.finish({ outcome: "failed" });
+      const report = { code, error: message, ...detail };
+      await this.finishRun({ runId: run.id, outcome: "failed", report, phases });
       return upgradeOutcome({ code, message, runId: run.id, detail });
+    }
+  }
+
+  /** The run's phases: each change rewrites the moving report and raises a read hint. */
+  private phasesOf({ runId }: { runId: string }): RunPhases {
+    return new RunPhases({
+      runId,
+      now: () => this.runner.databaseNow(),
+      onChange: async ({ phase, phases }: UpgradePhaseChange) => {
+        await this.runner.recordRunReport({ runId, report: { phases } });
+        const { name, release = null, outcome } = phase;
+        await this.hint({ runId, phase: name, release, outcome });
+      },
+    });
+  }
+
+  /** Writes the final report with its phases, then raises the run's last hint. */
+  private async finishRun({
+    runId,
+    outcome,
+    report,
+    phases,
+  }: {
+    runId: string;
+    outcome: "succeeded" | "failed";
+    report: Record<string, unknown>;
+    phases: RunPhases;
+  }): Promise<void> {
+    await this.ledger.finishRun({ runId, outcome, report: { ...report, phases: phases.list() } });
+    await this.hint({ runId, phase: null, release: this.options.image.release, outcome });
+  }
+
+  /** A hint that cannot be published is a warning: the page refreshes on the next one. */
+  private async hint({
+    runId,
+    phase,
+    release,
+    outcome,
+  }: {
+    runId: string;
+    phase: UpgradePhaseChange["phase"]["name"] | null;
+    release: string | null;
+    outcome: UpgradePhaseOutcome;
+  }): Promise<void> {
+    const { hints, log } = this.options;
+    if (!hints) return;
+    try {
+      await hints({ path: UPGRADE_READ_HINT_PATH, runId, phase, release, outcome });
+    } catch (error) {
+      log.warn("upgrade read hint not published", { runId, phase, error: describeError(error) });
     }
   }
 
   private async refuse({ plan }: { plan: Extract<UpgradePlan, { outcome: "refused" }> }) {
     const run = await this.ledger.startRun({ kind: "upgrade" });
     await this.runner.recordRunPlan({ runId: run.id, release: this.options.image.release, plan });
-    await this.ledger.finishRun({
+    const phases = this.phasesOf({ runId: run.id });
+    await phases.start({ name: "preflight" });
+    await phases.finish({ outcome: "failed" });
+    await this.finishRun({
       runId: run.id,
       outcome: "failed",
       report: { refused: plan.code },
+      phases,
     });
     const code =
       plan.code === "below_lts_floor" ? "refused_below_floor" : "refused_image_below_floor";
@@ -307,23 +364,27 @@ export class UpgradeRunnerService {
     before,
     runId,
     signal,
+    phases,
   }: {
     plan: Extract<UpgradePlan, { outcome: "planned" }>;
     before: { steps: UpgradeStep[]; runs: UpgradeRun[] };
     runId: string;
     signal: AbortSignal;
+    phases: RunPhases;
   }): Promise<Record<string, unknown>> {
+    await phases.start({ name: "preflight" });
     const failedPrisma = await this.failedPrismaMigrations();
     if (failedPrisma.length > 0) throw prismaFailure({ names: failedPrisma });
     await this.runner.registerSteps({ steps: this.shipped });
-    const reopened = await this.reopenAfterRollback({ ...before, runId });
+    const reopened = await this.reopenAfterRollback({ ...before });
     await this.runner.setStatus({ ids: plan.notNeeded, status: "not-needed", runId });
+    await phases.end({ name: "preflight", outcome: "succeeded" });
     const recorded = new Map(before.steps.map((step) => [step.id, step]));
     const applied: string[] = [];
     for (const release of plan.releases) {
       signal.throwIfAborted();
       if (release.schema.length > 0) {
-        await this.applySchema({ release, signal, runId });
+        await this.applySchema({ release, signal, runId, phases });
         applied.push(...release.schema);
       }
       for (const id of release.blocking) {
@@ -331,7 +392,9 @@ export class UpgradeRunnerService {
         applied.push(id);
       }
     }
+    await phases.start({ name: "reconcile" });
     await this.runReconcilers({ signal });
+    await phases.end({ name: "reconcile", outcome: "succeeded" });
     return { applied, notNeeded: plan.notNeeded, reopened };
   }
 
@@ -346,15 +409,30 @@ export class UpgradeRunnerService {
     release,
     signal,
     runId,
+    phases,
   }: {
     release: PlannedRelease;
     signal: AbortSignal;
     runId: string;
+    phases: RunPhases;
   }): Promise<void> {
+    const engines = [
+      { name: "postgres-schema", open: release.schema.filter(isPrisma) },
+      { name: "clickhouse-schema", open: release.schema.filter(isGoose) },
+    ] as const;
+    for (const { name, open } of engines) {
+      if (open.length > 0) await phases.start({ name, release: release.release });
+    }
     const reports = await this.applyWithRetry({ release, signal });
-    await this.recordPrisma({ open: release.schema.filter(isPrisma), runId });
-    await this.recordClickHouse({ open: release.schema.filter(isGoose), reports, runId });
+    await this.recordPrisma({ open: engines[0].open, runId });
+    await this.recordClickHouse({ open: engines[1].open, reports, runId });
     const failedPrisma = await this.failedPrismaMigrations();
+    const failedOn = (engine: SchemaTargetReport["engine"]) =>
+      reports.some((report) => report.engine === engine && !report.ok);
+    const postgresFailed = failedPrisma.length > 0 || failedOn("postgres");
+    const outcome = (failed: boolean) => (failed ? "failed" : "succeeded");
+    await phases.end({ name: "postgres-schema", outcome: outcome(postgresFailed) });
+    await phases.end({ name: "clickhouse-schema", outcome: outcome(failedOn("clickhouse")) });
     if (failedPrisma.length > 0) throw prismaFailure({ names: failedPrisma });
     const failing = reports.filter((report) => !report.ok);
     if (failing.length === 0) return;
@@ -480,11 +558,9 @@ export class UpgradeRunnerService {
   private async reopenAfterRollback({
     runs,
     steps,
-    runId,
   }: {
     runs: UpgradeRun[];
     steps: UpgradeStep[];
-    runId: string;
   }): Promise<string[]> {
     const current = this.options.image.release;
     const last = lastRecordedUpgrade({ runs })?.release;
@@ -494,8 +570,8 @@ export class UpgradeRunnerService {
     const reopened = steps
       .filter((step) => step.mode === "background" && step.status === "done" && newer(step.release))
       .map((step) => step.id);
-    await this.runner.setStatus({ ids: reopened, status: "pending", runId });
-    return reopened;
+    const reason = `reopened: image ${current} runs below the last upgrade to ${last}`;
+    return this.runner.reopenDoneSteps({ ids: reopened, reason });
   }
 
   private async runReconcilers({ signal }: { signal: AbortSignal }): Promise<void> {

@@ -6,8 +6,9 @@
 # path of an open operator tab), never per-tenant state. An older release's page reads rows a newer
 # runner wrote, so an unknown step kind or status is passed through raw and never thrown on.
 #
-# The installation state is the first match of: Unsupported, Needs attention, Upgrading, Behind,
-# Rolled back, Finishing in background, Up to date.
+# The installation state is the first match of: Unsupported, Needs attention, Upgrading, Never
+# upgraded, Behind, Rolled back, Finishing in background, Up to date (round 17, U1-a: an empty
+# ledger is its own state, not Behind with a reason).
 
 Feature: The upgrade reader answers the installation state and the ledger's rows
   As an operator of a self-hosted installation
@@ -103,14 +104,14 @@ Feature: The upgrade reader answers the installation state and the ledger's rows
   Scenario: An empty ledger reads as no upgrade recorded yet
     Given a database whose ledger tables hold no rows
     When the status is read
-    Then the state is "behind" with the reason "no-upgrade-recorded"
+    Then the state is "never-upgraded" with the reason "no-upgrade-recorded"
     And the summary reads "No upgrade recorded yet"
 
   @integration
   Scenario: A database without the ledger tables reads as no upgrade recorded yet
     Given a database where the ledger tables do not exist
     When the status is read
-    Then the state is "behind" with the reason "no-upgrade-recorded"
+    Then the state is "never-upgraded" with the reason "no-upgrade-recorded"
 
   @integration
   Scenario: The status carries the installed release, the origin and the last run
@@ -193,6 +194,25 @@ Feature: The upgrade reader answers the installation state and the ledger's rows
     Given a run that recorded two steps
     When the run is read
     Then it carries the plan, the report and both steps
+
+  @integration
+  Scenario: A run's phases are read from its report
+    Given a run whose report holds a preflight, a Postgres schema and a reconcile phase
+    When the run is read
+    Then it carries the three phases in the order the runner wrote them
+
+  @unit
+  Scenario: A run recorded before phases existed reads with no phases
+    Given a run whose report holds no phases
+    When its phases are parsed
+    Then they read as none
+
+  @unit
+  Scenario: A phase with a name or outcome the reader does not know is passed through raw
+    Given a run whose report holds a phase named "drain" with the outcome "skipped"
+    When its phases are parsed
+    Then the phase reads with that name and outcome as written
+    And a phase entry that is not an object is dropped
 
   @integration
   Scenario: Reading a step or a run that does not exist is refused by code

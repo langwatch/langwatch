@@ -9,7 +9,9 @@ import {
   resolveClickHouseMigrationTaskConfig,
   runMigrations,
 } from "@langwatch/clickhouse-migrations";
+import { READ_HINT_BROADCAST_CHANNEL } from "@langwatch/eventing/server";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import { imageSteps, type UpgradeClickHouse } from "@langwatch/upgrade";
 import { loadReleases } from "@langwatch/upgrade/manifest";
 import { formatStatus } from "@langwatch/upgrade/reader";
@@ -18,9 +20,11 @@ import {
   formatPlan,
   gooseAppliedStepIds,
   type SchemaTargetReport,
+  type UpgradeReadHintPublish,
   type UpgradeReconciler,
   type UpgradeRunnerLog,
   type UpgradeSchemaApplier,
+  upgradeReadHintMessage,
 } from "@langwatch/upgrade/runner";
 
 import type { TaskInput } from "./config.ts";
@@ -193,6 +197,17 @@ function reconcilers({ input }: { input: TaskInput }): UpgradeReconciler[] {
   ];
 }
 
+/** The run's read hints on the framework's channel, for the api to relay (round 8, U2-LIVE). */
+function readHints({ input }: { input: TaskInput }): UpgradeReadHintPublish | undefined {
+  const redis = input.connections.redis;
+  if (!redis) return undefined;
+  return (hint) =>
+    redis.publish(
+      READ_HINT_BROADCAST_CHANNEL,
+      upgradeReadHintMessage({ hint, timestamp: nowInstant().epochMilliseconds }),
+    );
+}
+
 function runnerLog(): UpgradeRunnerLog {
   const logger = createLogger("langwatch:tasks:upgrade");
   return {
@@ -236,6 +251,7 @@ export async function runUpgradeCommand({
       reconcilers: reconcilers({ input }),
       identity: { image: newest ?? "unreleased", host: hostname() },
       log: runnerLog(),
+      hints: readHints({ input }),
     });
     if (command.command === "status") {
       const status = await runner.status();

@@ -9,6 +9,7 @@ export const installationStateSchema = z.enum([
   "unsupported",
   "needs-attention",
   "upgrading",
+  "never-upgraded",
   "behind",
   "rolled-back",
   "finishing-in-background",
@@ -101,10 +102,21 @@ export const upgradeRunSummarySchema = z.object({
 });
 export type UpgradeRunSummary = z.infer<typeof upgradeRunSummarySchema>;
 
+/** One phase of a run's report (round 9, U2-PHASES); an unknown name or outcome reads raw. */
+export const upgradeRunPhaseViewSchema = z.object({
+  name: z.string(),
+  release: z.string().nullable(),
+  startedAt: isoInstant,
+  finishedAt: isoInstant.nullable(),
+  outcome: z.string(),
+});
+export type UpgradeRunPhaseView = z.infer<typeof upgradeRunPhaseViewSchema>;
+
 export const upgradeRunDetailSchema = z.object({
   ...upgradeRunSummarySchema.shape,
   plan: z.record(z.string(), z.unknown()).nullable(),
   report: z.record(z.string(), z.unknown()).nullable(),
+  phases: z.array(upgradeRunPhaseViewSchema),
   steps: z.array(upgradeStepViewSchema),
 });
 export type UpgradeRunDetail = z.infer<typeof upgradeRunDetailSchema>;

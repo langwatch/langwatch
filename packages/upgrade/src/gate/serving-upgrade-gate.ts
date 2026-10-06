@@ -22,7 +22,16 @@ export const PRESENCE_TIMING = { staleAfterMs: 60_000, refreshEveryMs: 15_000 } 
 const NO_LEDGER_GATE: UpgradeGate = {
   admit: async () => ({ admitted: true, outcome: "current" }),
   release: async () => undefined,
+  serving: () => true,
 };
+
+/** Where the gate reports what it cannot refuse on: a lapse, a recovery, a rollback, a failure. */
+export type ServingGateWarn = (message: string, fields?: Record<string, unknown>) => void;
+
+const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+const emitWarning: ServingGateWarn = (message, fields) =>
+  process.emitWarning(fields ? `${message} ${JSON.stringify(fields)}` : message, "UpgradeGate");
 
 /**
  * The gate over an open ledger connection: an absent ledger reads as empty, the api's first
@@ -38,6 +47,7 @@ export function upgradeGateOver({
   withClickHouse,
   processId,
   firstInstall,
+  warn = emitWarning,
 }: {
   role: ServingRole;
   postgres: UpgradePostgres;
@@ -47,6 +57,7 @@ export function upgradeGateOver({
   withClickHouse: boolean;
   processId: string;
   firstInstall: FirstInstallUpgrade;
+  warn?: ServingGateWarn;
 }): UpgradeGate {
   const ledger = UpgradeLedgerRepository.create({ postgres });
   const runner = UpgradeRunnerRepository.create({ postgres });
@@ -59,8 +70,25 @@ export function upgradeGateOver({
       findSteps: async () => ((await runner.ledgerExists()) ? ledger.findSteps() : []),
       findRuns: async () => ((await runner.ledgerExists()) ? ledger.findRuns() : []),
     },
-    presence: createPresence({ ledger, ...PRESENCE_TIMING }),
+    presence: createPresence({
+      ledger,
+      ...PRESENCE_TIMING,
+      onRefreshError: (error) =>
+        warn("presence refresh failed", { processId, error: messageOf(error) }),
+      onLapseChange: (lapsed) =>
+        warn(
+          lapsed
+            ? `presence lapsed past ${PRESENCE_TIMING.staleAfterMs} ms: ${processId} stops serving`
+            : `presence written again: ${processId} serves again`,
+          { processId },
+        ),
+    }),
     schemaIsEmpty: async () => !(await runner.prismaHistoryExists()),
+    rollback: {
+      reopen: (input) => runner.reopenDoneSteps(input),
+      onReopened: ({ ids, reason }) => warn(`${reason}; reopened ${ids.join(", ")}`, { processId }),
+      onError: (error) => warn("rollback detection failed", { processId, error: messageOf(error) }),
+    },
   });
   let closed: Promise<void> | null = null;
   const closeOnce = () => (closed ??= close());
@@ -92,6 +120,7 @@ export function upgradeGateOver({
         await closeOnce();
       }
     },
+    serving: () => gate.serving(),
   };
 }
 
@@ -114,9 +143,11 @@ export function gatePoolConfig({ databaseUrl }: { databaseUrl: string }): pg.Poo
 export async function servingUpgradeGate({
   secrets,
   role,
+  warn,
 }: {
   secrets: ScopedSecrets;
   role: ServingRole;
+  warn?: ServingGateWarn;
 }): Promise<UpgradeGate> {
   const tree = readImageTree();
   const release = loadReleases().manifests.at(-1)?.release ?? null;
@@ -134,6 +165,7 @@ export async function servingUpgradeGate({
           withClickHouse: Boolean(clickhouse?.trim()) || routes.size > 0,
           processId: `${hostname()}:${process.pid}:${role}`,
           firstInstall: spawnFirstInstallUpgrade(),
+          warn,
         });
       }),
     ),

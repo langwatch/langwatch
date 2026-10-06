@@ -56,7 +56,18 @@ function gateOver({
       blockingSteps: [PRISMA, GOOSE],
       declaredSteps: ["trace:backfill-cost"],
     },
-    ledger: { findSteps: async () => steps, findRuns: async () => runs },
+    ledger: {
+      findSteps: async () =>
+        steps.map((step) => ({ ...step, mode: "blocking" as const, release: null })),
+      findRuns: async () =>
+        runs.map((run, index) => ({
+          ...run,
+          id: `run_${index}`,
+          kind: "upgrade" as const,
+          outcome: "succeeded" as const,
+          finishedAt: null,
+        })),
+    },
     presence,
     schemaIsEmpty: async () => schemaIsEmpty,
   });

@@ -7,6 +7,7 @@ export const INSTALLATION_STATES: Readonly<
   unsupported: { label: "Unsupported", tone: "danger" },
   "needs-attention": { label: "Needs attention", tone: "danger" },
   upgrading: { label: "Upgrading", tone: "info" },
+  "never-upgraded": { label: "Never upgraded", tone: "warning" },
   behind: { label: "Behind", tone: "warning" },
   "rolled-back": { label: "Rolled back", tone: "warning" },
   "finishing-in-background": { label: "Finishing in background", tone: "info" },

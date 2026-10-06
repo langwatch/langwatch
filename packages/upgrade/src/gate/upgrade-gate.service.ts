@@ -1,6 +1,12 @@
 import type { UpgradeRun, UpgradeStep } from "../ledger.ts";
 import type { Presence } from "../presence/index.ts";
 import {
+  detectRollbacks,
+  type RollbackLedgerRun,
+  type RollbackLedgerStep,
+  rollbackReason,
+} from "../presence/rollback.ts";
+import {
   assertCurrent,
   firstInstallVerdict,
   ledgerFloor,
@@ -13,8 +19,15 @@ import {
 
 /** What the gate reads; `UpgradeLedgerRepository` answers it as it stands. */
 export interface ServingGateLedger {
-  findSteps(): Promise<readonly Pick<UpgradeStep, "id" | "status">[]>;
-  findRuns(): Promise<readonly Pick<UpgradeRun, "floor">[]>;
+  findSteps(): Promise<readonly (Pick<UpgradeStep, "id" | "status"> & RollbackLedgerStep)[]>;
+  findRuns(): Promise<readonly (Pick<UpgradeRun, "floor"> & RollbackLedgerRun)[]>;
+}
+
+/** Reopens done steps and answers the ids it reopened; `onError` hears a reopen that failed. */
+export interface ServingGateRollback {
+  reopen(input: { ids: readonly string[]; reason: string }): Promise<string[]>;
+  onReopened?: (input: { ids: readonly string[]; reason: string }) => void;
+  onError?: (error: unknown) => void;
 }
 
 export type ServingGateImage = ServingImage & {
@@ -27,6 +40,8 @@ export type ServingGateImage = ServingImage & {
 export interface UpgradeGate {
   admit(): Promise<ServingVerdict>;
   release(): Promise<void>;
+  /** Admitted and its own presence not lapsed; false once it lapses, true after a good write. */
+  serving(): boolean;
 }
 
 /**
@@ -41,6 +56,7 @@ export function createUpgradeGate({
   ledger,
   presence,
   schemaIsEmpty,
+  rollback,
 }: {
   role: ServingRole;
   processId: string;
@@ -49,9 +65,12 @@ export function createUpgradeGate({
   presence: Presence;
   /** True when the application schema holds nothing yet (Q10's first install). */
   schemaIsEmpty: () => Promise<boolean>;
+  /** Round 9 (S3-ROLLBACK): absent, an admitted process reopens nothing. */
+  rollback?: ServingGateRollback;
 }): UpgradeGate {
   const gatedRole = servingRoleSchema.parse(role);
   const { release, blockingSteps } = servingImageSchema.parse(image);
+  let admitted = false;
   return {
     async admit() {
       const [steps, runs] = await Promise.all([ledger.findSteps(), ledger.findRuns()]);
@@ -72,8 +91,40 @@ export function createUpgradeGate({
         release,
         steps: [...image.declaredSteps],
       });
+      admitted = true;
+      if (rollback) await reopenAfterRollback({ ledger, presence, rollback });
       return verdict;
     },
-    release: () => presence.stop(),
+    async release() {
+      admitted = false;
+      await presence.stop();
+    },
+    serving: () => admitted && !presence.lapsed(),
   };
+}
+
+/** A reopen never refuses a start: the failure is reported; the next admitted process retries. */
+async function reopenAfterRollback({
+  ledger,
+  presence,
+  rollback,
+}: {
+  ledger: ServingGateLedger;
+  presence: Presence;
+  rollback: ServingGateRollback;
+}): Promise<void> {
+  try {
+    const [steps, runs, live] = await Promise.all([
+      ledger.findSteps(),
+      ledger.findRuns(),
+      presence.live(),
+    ]);
+    for (const sighting of detectRollbacks({ runs, steps, live })) {
+      const reason = rollbackReason({ sighting });
+      const ids = await rollback.reopen({ ids: sighting.stepIds, reason });
+      if (ids.length > 0) rollback.onReopened?.({ ids, reason });
+    }
+  } catch (error) {
+    rollback.onError?.(error);
+  }
 }

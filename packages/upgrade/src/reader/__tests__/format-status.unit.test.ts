@@ -70,8 +70,8 @@ describe("formatStatus", () => {
   it("prints an empty ledger as no upgrade recorded yet", () => {
     const text = formatStatus({
       status: status({
-        state: "behind",
-        label: "Behind",
+        state: "never-upgraded",
+        label: "Never upgraded",
         tone: "warning",
         reason: "no-upgrade-recorded",
         summary: "No upgrade recorded yet. Run the upgrade before this image serves.",

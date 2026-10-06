@@ -125,3 +125,38 @@ Feature: Cloud upgrades run on deploy while old and new builds serve side by sid
     Given a cloud rollback to an earlier image
     When the rollback starts
     Then no upgrade runs and the earlier image serves on the current schema
+
+  # Rollbacks (round 9, S3-ROLLBACK): detected from presence, never ordered by version, so a
+  # git-<sha> rollback is seen too. Reopening touches only done steps: level-triggered work
+  # re-runs, and a second sighting finds nothing left to reopen.
+  @unit
+  Scenario: An older image serving after the last run reopens the background steps it does not declare
+    Given the last upgrade run finished and the background step "trace:backfill-cost" is done
+    When a process whose image does not declare "trace:backfill-cost" is admitted after that run
+    Then "trace:backfill-cost" is reopened as pending, naming the image that was seen
+
+  @unit
+  Scenario: A rollback seen twice reopens the steps once
+    Given an older image's process already reopened "trace:backfill-cost"
+    When a second process of that image is admitted
+    Then nothing is reopened again
+
+  @unit
+  Scenario: A process that declares every done background step reopens nothing
+    Given the last upgrade run finished and the background step "trace:backfill-cost" is done
+    When a process whose image declares "trace:backfill-cost" is admitted
+    Then nothing is reopened
+
+  @unit
+  Scenario: A ledger with no finished upgrade run reopens nothing
+    Given no upgrade run has finished
+    When a process whose image declares no background step is admitted
+    Then nothing is reopened
+
+  @unit
+  Scenario: A reopen that fails does not refuse the start
+    Given an older image's process is admitted after the last run
+    And the ledger refuses the reopen
+    Then the process is admitted
+    And the failure is reported
+

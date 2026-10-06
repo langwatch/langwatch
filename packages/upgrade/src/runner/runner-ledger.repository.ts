@@ -137,6 +137,55 @@ export class UpgradeRunnerRepository {
     );
   }
 
+  /** The database clock as ISO 8601 UTC, so a phase is stamped by the clock every row is. */
+  async databaseNow(): Promise<string> {
+    const { rows } = await this.postgres.query<{ now: string }>(
+      `SELECT to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "now"`,
+    );
+    const now = rows[0]?.now;
+    if (!now) throw new Error("the database answered no time");
+    return now;
+  }
+
+  /** Writes a moving run's report (its phases so far); `finishRun` writes the final one. */
+  async recordRunReport({
+    runId,
+    report,
+  }: {
+    runId: string;
+    report: Record<string, unknown>;
+  }): Promise<void> {
+    await this.postgres.query(
+      `UPDATE "_langwatch_upgrade_run" SET "report" = $2::jsonb
+        WHERE "id" = $1 AND "finished_at" IS NULL`,
+      [runId, JSON.stringify(report)],
+    );
+  }
+
+  /**
+   * Reopens done steps as pending, checkpoint cleared so the re-run is whole, and answers the ids
+   * this call reopened: one already reopened, here or concurrently, is not reopened twice.
+   */
+  async reopenDoneSteps({
+    ids,
+    reason,
+  }: {
+    ids: readonly string[];
+    reason: string;
+  }): Promise<string[]> {
+    if (ids.length === 0) return [];
+    const { rows } = await this.postgres.query<{ id: string }>(
+      `UPDATE "_langwatch_upgrade_step"
+          SET "status" = 'pending', "last_error" = $2, "inferred" = false, "finished_at" = NULL,
+              "report" = NULL,
+              "updated_at" = ${NOW_UTC}
+        WHERE "id" = ANY($1::text[]) AND "status" = 'done'
+       RETURNING "id"`,
+      [ids, reason],
+    );
+    return rows.map((row) => row.id).toSorted();
+  }
+
   /** Records the release the run upgrades to and the plan it printed. */
   async recordRunPlan({
     runId,

@@ -12,6 +12,22 @@ export {
   type UpgradeLeaseTiming,
 } from "./runner-lease.ts";
 export {
+  UPGRADE_READ_HINT_PATH,
+  UPGRADE_READ_HINT_SCOPE,
+  type UpgradeReadHint,
+  type UpgradeReadHintPublish,
+  upgradeReadHintMessage,
+  upgradeReadHintSchema,
+} from "./run-hint.ts";
+export {
+  type UpgradePhaseName,
+  type UpgradePhaseOutcome,
+  type UpgradeRunPhase,
+  upgradePhaseNameSchema,
+  upgradePhaseOutcomeSchema,
+  upgradeRunPhaseSchema,
+} from "./run-phases.ts";
+export {
   gooseAppliedStepIds,
   type SchemaTargetReport,
   type UpgradeReconciler,

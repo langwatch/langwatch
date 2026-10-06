@@ -63,15 +63,18 @@ function checkUpgrading(facts: InstallationFacts): InstallationVerdict | null {
   return { state: "upgrading", reason: "run-in-progress", summary: "An upgrade is running." };
 }
 
+/** Round 17 (U1-a): an empty ledger is its own state, not Behind with a reason. */
+function checkNeverUpgraded(facts: InstallationFacts): InstallationVerdict | null {
+  if (facts.ledgerHoldsRecords) return null;
+  return {
+    state: "never-upgraded",
+    reason: "no-upgrade-recorded",
+    summary: "No upgrade recorded yet. Run the upgrade before this image serves.",
+  };
+}
+
 function checkBehind(facts: InstallationFacts): InstallationVerdict | null {
   const { imageRelease, installed } = facts;
-  if (!facts.ledgerHoldsRecords) {
-    return {
-      state: "behind",
-      reason: "no-upgrade-recorded",
-      summary: "No upgrade recorded yet. Run the upgrade before this image serves.",
-    };
-  }
   if (installed && compareReleases({ left: imageRelease, right: installed }) === "newer") {
     return {
       state: "behind",
@@ -119,14 +122,15 @@ function checkFinishing(facts: InstallationFacts): InstallationVerdict | null {
 
 /**
  * The installation state of the UI plan's section 4. The first match wins, in the order of
- * `INSTALLATION_STATES`: Unsupported, Needs attention, Upgrading, Behind, Rolled back, Finishing
- * in background, Up to date. Pure: it is handed the ledger's facts and looks nothing up.
+ * `INSTALLATION_STATES`: Unsupported, Needs attention, Upgrading, Never upgraded, Behind, Rolled
+ * back, Finishing in background, Up to date. Pure: it is handed the ledger's facts.
  */
 export function computeInstallationState(facts: InstallationFacts): InstallationVerdict {
   return (
     checkUnsupported(facts) ??
     checkNeedsAttention(facts) ??
     checkUpgrading(facts) ??
+    checkNeverUpgraded(facts) ??
     checkBehind(facts) ??
     checkRolledBack(facts) ??
     checkFinishing(facts) ?? {

@@ -140,7 +140,7 @@ describe("computeInstallationState", () => {
     const verdict = computeInstallationState(
       facts({ installed: null, ledgerHoldsRecords: false, steps: [] }),
     );
-    expect(verdict).toMatchObject({ state: "behind", reason: "no-upgrade-recorded" });
+    expect(verdict).toMatchObject({ state: "never-upgraded", reason: "no-upgrade-recorded" });
     expect(verdict.summary).toContain("No upgrade recorded yet");
   });
 });

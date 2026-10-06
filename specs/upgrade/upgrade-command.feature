@@ -122,6 +122,43 @@ Feature: The upgrade command
     When the upgrade runs from a 3.21.0 image at or above the floor
     Then the 3.22.0 background step is recorded pending
 
+  # Run phases (round 9, U2-PHASES): in the run report, a fixed shape the reader parses.
+  @integration
+  Scenario: A finished run's report carries its phases
+    Given an empty database and a 3.21.0 image
+    When the upgrade runs
+    Then the run's report lists preflight, then the Postgres and ClickHouse schema phases, then reconcile
+    And every phase is succeeded with a start and a finish
+
+  @integration
+  Scenario: A run whose schema fails records the failed phase and no later one
+    Given the ClickHouse target fails to apply
+    When the upgrade runs
+    Then the run's report ends with a failed ClickHouse schema phase
+    And no reconcile phase is recorded
+
+  @integration
+  Scenario: A refused upgrade is recorded as a failed run whose report names the refusal
+    Given the ledger records a succeeded upgrade to 3.16.0 and the LTS floor is 3.20.1
+    When the upgrade runs
+    Then the run is recorded failed with the report's refused naming "below_lts_floor"
+    And its only phase is a failed preflight
+
+  # Live status (round 8, U2-LIVE): the runner raises a read hint; the api relays it.
+  @integration
+  Scenario: A read hint is published at each phase change and at the finish
+    Given a hint publisher
+    When the upgrade runs through preflight, one schema release and reconcile
+    Then a hint is published as each phase starts and ends, and once when the run finishes
+    And each hint names the run, the phase and its outcome under the platform upgrade scope
+
+  @integration
+  Scenario: A hint that cannot be published does not fail the run
+    Given a hint publisher that refuses every publish
+    When the upgrade runs
+    Then the run succeeds
+    And each refused publish is reported as a warning
+
   @unit
   Scenario: The Postgres session of a migration carries a lock timeout
     Given a database URL with and without existing session options

@@ -117,3 +117,33 @@ Feature: Serving processes refuse to start when the installation is behind their
     Given the ledger records "clickhouse:00042" as pending
     When the serving gate checks the image
     Then no presence is written
+
+  # Lapsed gate (round 9): a process whose own presence lapses stops serving, so it cannot
+  # serve unseen while a step waits on old writers being gone (ADR-173, Consequences).
+  @unit
+  Scenario: A process whose presence writes keep failing stops serving past the stale bound
+    Given a worker was admitted and recorded its presence
+    And the ledger refuses every later presence write
+    When more than 60 seconds pass since its last good presence write
+    Then the gate says the worker is not serving
+    And the change is reported once
+
+  @unit
+  Scenario: A process that stopped serving on a lapsed presence serves again after a good write
+    Given a worker stopped serving because its presence lapsed
+    When the next presence write succeeds
+    Then the gate says the worker is serving
+    And the change is reported once
+
+  @unit
+  Scenario: A healthy process never stops serving
+    Given a worker was admitted and every presence write succeeds
+    When ten minutes pass
+    Then the gate says the worker is serving throughout
+
+  @unit
+  Scenario: A process that is not admitted is not serving
+    Given the ledger records "clickhouse:00042" as pending
+    When the serving gate checks the image
+    Then the gate says the worker is not serving
+

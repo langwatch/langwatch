@@ -13,6 +13,8 @@ import { createLedgerTables } from "../../ledger-tables.ts";
 import { UpgradeLedgerRepository } from "../../ledger.repository.ts";
 import type { ManifestStep, ReleaseManifest } from "../../manifest/manifest.ts";
 import { defineMigrationStep, type MigrationStep } from "../../step/migration-step.ts";
+import type { UpgradeReadHint } from "../run-hint.ts";
+import type { UpgradeRunPhase } from "../run-phases.ts";
 import { UpgradeRunnerRepository } from "../runner-ledger.repository.ts";
 import type {
   SchemaTargetReport,
@@ -453,6 +455,100 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       );
       expect(outcome).toMatchObject({ code: "done", detail: { reopened: ["trace:reindex"] } });
       expect(await statusOf("trace:reindex")).toBe("pending");
+    });
+  });
+
+  describe("when a run moves through its phases", () => {
+    const phasesOf = async () =>
+      ((await ledger().findRuns()).at(-1)?.report?.phases ?? []) as UpgradeRunPhase[];
+
+    /** @scenario "A finished run's report carries its phases" */
+    it("writes preflight, both schema phases and reconcile, each succeeded", async () => {
+      await run(runnerFor({ release: "3.21.0", applier: fakeApplier({ release: "3.21.0" }) }));
+      const phases = await phasesOf();
+      expect(phases.map((phase) => phase.name)).toEqual([
+        "preflight",
+        "postgres-schema",
+        "clickhouse-schema",
+        "reconcile",
+      ]);
+      for (const phase of phases) {
+        expect(phase).toMatchObject({ outcome: "succeeded" });
+        expect(Date.parse(phase.finishedAt ?? "")).toBeGreaterThanOrEqual(
+          Date.parse(phase.startedAt),
+        );
+      }
+    });
+
+    /** @scenario "A run whose schema fails records the failed phase and no later one" */
+    it("ends with a failed ClickHouse schema phase and records no reconcile", async () => {
+      const applier = fakeApplier({ release: "3.20.1", failOn: ["shared"] });
+      await run(runnerFor({ release: "3.20.1", applier }));
+      const phases = await phasesOf();
+      expect(phases.at(-1)).toMatchObject({ name: "clickhouse-schema", outcome: "failed" });
+      expect(phases.find((phase) => phase.name === "postgres-schema")?.outcome).toBe("succeeded");
+      expect(phases.some((phase) => phase.name === "reconcile")).toBe(false);
+    });
+
+    /** @scenario "A refused upgrade is recorded as a failed run whose report names the refusal" */
+    it("records the refusal as a failed run with one failed preflight", async () => {
+      await createLedgerTables({ postgres: scratch.postgres });
+      const old = await ledger().startRun({ kind: "upgrade" });
+      const runner = UpgradeRunnerRepository.create({ postgres: scratch.postgres });
+      await runner.recordRunPlan({ runId: old.id, release: "3.16.0", plan: {} });
+      await ledger().finishRun({ runId: old.id, outcome: "succeeded", report: {} });
+      await run(runnerFor({ release: "3.21.0", applier: fakeApplier({ release: "3.21.0" }) }));
+      const refused = (await ledger().findRuns()).at(-1);
+      expect(refused).toMatchObject({
+        outcome: "failed",
+        report: { refused: "below_lts_floor" },
+      });
+      expect((await phasesOf()).map(({ name, outcome }) => ({ name, outcome }))).toEqual([
+        { name: "preflight", outcome: "failed" },
+      ]);
+    });
+
+    /** @scenario "A read hint is published at each phase change and at the finish" */
+    it("publishes a hint as each phase starts and ends, then once at the finish", async () => {
+      const hints: UpgradeReadHint[] = [];
+      const outcome = await run(
+        runnerFor({
+          release: "3.21.0",
+          applier: fakeApplier({ release: "3.21.0" }),
+          hints: async (hint) => void hints.push(hint),
+        }),
+      );
+      const moves = hints.map(({ phase, outcome: moved }) => `${phase ?? "run"}:${moved}`);
+      expect(moves).toEqual([
+        "preflight:running",
+        "preflight:succeeded",
+        "postgres-schema:running",
+        "clickhouse-schema:running",
+        "postgres-schema:succeeded",
+        "clickhouse-schema:succeeded",
+        "reconcile:running",
+        "reconcile:succeeded",
+        "run:succeeded",
+      ]);
+      for (const hint of hints)
+        expect(hint).toMatchObject({ path: "upgrade.run", runId: outcome.runId });
+    });
+
+    /** @scenario "A hint that cannot be published does not fail the run" */
+    it("succeeds and warns once per refused publish", async () => {
+      const warnings: string[] = [];
+      const outcome = await run(
+        runnerFor({
+          release: "3.21.0",
+          applier: fakeApplier({ release: "3.21.0" }),
+          hints: async () => {
+            throw new Error("redis is down");
+          },
+          log: { info: () => {}, warn: (message) => void warnings.push(message) },
+        }),
+      );
+      expect(outcome).toMatchObject({ code: "done", exitCode: 0 });
+      expect(warnings.filter((message) => message.includes("read hint"))).toHaveLength(9);
     });
   });
 });

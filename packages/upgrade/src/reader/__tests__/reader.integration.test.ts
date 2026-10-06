@@ -165,10 +165,10 @@ describe.skipIf(!DB_URL)("UpgradeReader over the ledger tables", () => {
 
   describe("when the status is read", () => {
     /** @scenario "An empty ledger reads as no upgrade recorded yet" */
-    it("reads an empty ledger as behind with no upgrade recorded", async () => {
+    it("reads an empty ledger as never upgraded", async () => {
       const status = await readerOver({ scratch }).status();
       expect(status).toMatchObject({
-        state: "behind",
+        state: "never-upgraded",
         reason: "no-upgrade-recorded",
         installed: null,
         origin: "none",
@@ -184,7 +184,7 @@ describe.skipIf(!DB_URL)("UpgradeReader over the ledger tables", () => {
       await scratch.postgres.query(`DROP TABLE "_langwatch_upgrade_run"`);
       const reader = readerOver({ scratch });
       expect(await reader.status()).toMatchObject({
-        state: "behind",
+        state: "never-upgraded",
         reason: "no-upgrade-recorded",
       });
       expect((await reader.listSteps()).items).toEqual([]);
@@ -542,6 +542,35 @@ describe.skipIf(!DB_URL)("UpgradeReader over the ledger tables", () => {
       const run = await readerOver({ scratch }).getRun({ id: "run_up" });
       expect(run).toMatchObject({ id: "run_up", plan: { steps: 2 }, report: { took: "3s" } });
       expect(run.steps.map((step) => step.id)).toEqual(["prisma:1", "prisma:2"]);
+    });
+
+    /** @scenario "A run's phases are read from its report" */
+    it("reads a run's phases from its report in the order written", async () => {
+      const at = (minute: number) => `2026-10-05T10:0${minute}:00.000Z`;
+      const phases = [
+        { name: "preflight", startedAt: at(0), finishedAt: at(1), outcome: "succeeded" },
+        {
+          name: "postgres-schema",
+          release: "3.21.0",
+          startedAt: at(1),
+          finishedAt: at(2),
+          outcome: "succeeded",
+        },
+        { name: "reconcile", startedAt: at(2), outcome: "running" },
+      ];
+      await insertRun({
+        scratch,
+        id: "run_phased",
+        release: "3.21.0",
+        startedAt: "2026-10-05 10:00:00",
+        report: { phases },
+      });
+      const run = await readerOver({ scratch }).getRun({ id: "run_phased" });
+      expect(run.phases).toEqual([
+        { ...phases[0], release: null },
+        phases[1],
+        { ...phases[2], release: null, finishedAt: null },
+      ]);
     });
   });
 

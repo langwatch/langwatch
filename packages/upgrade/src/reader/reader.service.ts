@@ -30,6 +30,7 @@ import type {
   UpgradeStepView,
 } from "./reader.schema.ts";
 import { compareReleasesNewestFirst, pickHighestRelease } from "./release.ts";
+import { parseRunPhases } from "./run-phase-view.ts";
 import { filterSteps, mergeSteps, viewDeclaredStep, viewRecordedStep } from "./step-view.ts";
 
 const DEFAULT_RUN_PAGE = 25;
@@ -305,6 +306,7 @@ export function createUpgradeReader({
       ...summariseRun(run),
       plan: run.plan,
       report: run.report,
+      phases: parseRunPhases({ report: run.report }),
       steps: rows.map((row) => viewRecordedStep({ row, declared: declaredById.get(row.id) })),
     };
   }
