@@ -109,6 +109,7 @@ function compose({ dropsInput = false }: { dropsInput?: boolean } = {}) {
     span.attributes = span.attributes.filter((attribute) => attribute.key !== "langwatch.input");
     return { droppedCount: 1, droppedCategories: ["input"], droppedAttributeKeys: [] };
   });
+  const redactSpan = vi.fn<Peers["dataPrivacy"]["redactSpan"]>(async () => undefined);
   const findById = vi.fn<Peers["projects"]["findById"]>(async () => project());
   const updateMetadata = vi.fn<Peers["projects"]["updateMetadata"]>(async () => undefined);
   const recordFirstTrace = vi.fn<TraceProcessingPipelineInput["milestones"]["recordFirstTrace"]>(
@@ -124,7 +125,7 @@ function compose({ dropsInput = false }: { dropsInput?: boolean } = {}) {
         getPlatformDefaultRetentionDays: () => 30,
       }),
       dataPrivacy: createApiFixture<Peers["dataPrivacy"]>({
-        redactSpan: async () => undefined,
+        redactSpan,
         dropSpanContent,
       }),
       modelProviders: createApiFixture<Peers["modelProviders"]>({ listCosts }),
@@ -153,7 +154,15 @@ function compose({ dropsInput = false }: { dropsInput?: boolean } = {}) {
       recordTraceReceived: async () => undefined,
     }),
   }).build({ participation: "consume" });
-  return { pipeline, listCosts, dropSpanContent, findById, updateMetadata, recordFirstTrace };
+  return {
+    pipeline,
+    listCosts,
+    dropSpanContent,
+    redactSpan,
+    findById,
+    updateMetadata,
+    recordFirstTrace,
+  };
 }
 
 async function foldSpanThroughRecordCommand(pipeline: ReturnType<typeof compose>["pipeline"]) {
@@ -257,6 +266,81 @@ describe("the consumer pipeline composed over the installed peers", () => {
         expect(recordFirstTrace).toHaveBeenCalledWith(
           expect.objectContaining({ userId: "admin-1", projectId: TENANT }),
         );
+      });
+    });
+  });
+
+  describe("given a trace pipeline built over the privacy and model-provider peers", () => {
+    describe("when a span is folded through its record-span command", () => {
+      /** @scenario The record path reads through the peers trace was installed with */
+      it("redacts, drops and prices the span through those peers", async () => {
+        const { pipeline, redactSpan, dropSpanContent, listCosts } = compose();
+
+        await foldSpanThroughRecordCommand(pipeline);
+
+        expect(redactSpan).toHaveBeenCalledOnce();
+        expect(dropSpanContent).toHaveBeenCalledOnce();
+        expect(listCosts).toHaveBeenCalledOnce();
+      });
+    });
+  });
+
+  describe("given a trace pipeline built over the installed peers", () => {
+    describe("when a span's cost rules are listed", () => {
+      /** @scenario The cost rules are asked of the model-provider peer by project alone */
+      it("asks the model-provider peer for the project alone and reads no project", async () => {
+        const { pipeline, listCosts, findById } = compose();
+
+        await foldSpanThroughRecordCommand(pipeline);
+
+        expect(listCosts.mock.calls).toEqual([[{ projectId: TENANT }]]);
+        expect(findById).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a privacy peer whose policy for the project drops the input category", () => {
+    describe("when a span passes through the record-span command", () => {
+      /** @scenario A customer's drop is honoured from the privacy peer's answer */
+      it("asks the privacy peer about that span and records it without the prompt", async () => {
+        const { pipeline, dropSpanContent } = compose({ dropsInput: true });
+
+        const attributes = await foldSpanThroughRecordCommand(pipeline);
+
+        const asked = dropSpanContent.mock.calls[0]?.[0];
+        expect(asked?.projectId).toBe(TENANT);
+        expect(asked?.span.spanId).toBe("span-1");
+        expect(attributes.map((attribute) => attribute.key)).not.toContain("langwatch.input");
+      });
+    });
+  });
+
+  describe("given a model-provider peer holding the project's own rate", () => {
+    describe("when the span passes through the record-span command", () => {
+      /** @scenario A customer's own rate prices the span */
+      it("stamps the customer's input and output rates on the span", async () => {
+        const { pipeline } = compose();
+
+        const attributes = await foldSpanThroughRecordCommand(pipeline);
+
+        const byKey = new Map(attributes.map((attribute) => [attribute.key, attribute.value]));
+        expect(byKey.get("langwatch.model.inputCostPerToken")?.doubleValue).toBe(0.5);
+        expect(byKey.get("langwatch.model.outputCostPerToken")?.doubleValue).toBe(0.25);
+      });
+    });
+  });
+
+  describe("given a composed record-span command", () => {
+    describe("when a span is folded through it", () => {
+      /** @scenario The fold reads the tenant's own project and nothing wider */
+      it("names the command's tenant on every privacy and cost read", async () => {
+        const { pipeline, redactSpan, dropSpanContent, listCosts } = compose();
+
+        await foldSpanThroughRecordCommand(pipeline);
+
+        expect(redactSpan.mock.calls.map(([input]) => input.tenantId)).toEqual([TENANT]);
+        expect(dropSpanContent.mock.calls.map(([input]) => input.projectId)).toEqual([TENANT]);
+        expect(listCosts.mock.calls.map(([input]) => input.projectId)).toEqual([TENANT]);
       });
     });
   });

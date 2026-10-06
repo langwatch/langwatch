@@ -280,6 +280,7 @@ describe("the apiKey tRPC transport", () => {
       expect(app.createKey).not.toHaveBeenCalled();
     });
 
+    /** @scenario Minting and revoking are audited */
     it("records the mint in the audit trail without the token anywhere in it", async () => {
       const { caller, audit } = harness(minted());
 
@@ -328,6 +329,7 @@ describe("the apiKey tRPC transport", () => {
   });
 
   describe("when a member revokes a key", () => {
+    /** @scenario Minting and revoking are audited */
     it("revokes it and records the revocation", async () => {
       const revokeKey = vi.fn(async () => undefined);
       const { caller, audit } = harness({ revokeKey });

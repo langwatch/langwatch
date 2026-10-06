@@ -60,10 +60,10 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And the row holds a hash of the key and a masked hint, never the key itself
 
     @integration
-    Scenario: The legacy key is listed and can only be revoked
+    Scenario: The legacy key is not listed on the keys page
       When "ada" opens the API keys of project "alpha"
-      Then a row "Project key (legacy)" shows its masked hint, created and last used
-      And its row menu offers "Revoke" and nothing else
+      Then no row shows the legacy project key
+      And no control copies or rotates it
 
     @integration
     Scenario: A revoked legacy key is refused
@@ -188,9 +188,9 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then the key expires 30 days from now
 
     @integration
-    Scenario: A key row offers Revoke and nothing else
-      When "ada" opens the row menu of any key
-      Then the only action is "Revoke"
+    Scenario: A key row offers Edit and Revoke
+      When "ada" opens the row menu of a key she may change
+      Then its actions are "Edit" and "Revoke", and nothing else
 
     @integration
     Scenario: A member mints a personal key within their own grants
@@ -221,9 +221,10 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then the key is refused on project "alpha" within the cache bound
 
     @integration
-    Scenario: The mint dialog greys out roles beyond the reader
+    Scenario: The mint drawer offers no role chooser
       When "vic" opens "Create a key" on project "alpha"
-      Then the Admin and Member roles are shown but cannot be chosen
+      Then no role can be chosen
+      And the key is minted with the role of "vic"'s own binding
 
   Rule: a key in another organization does not exist for the caller
 
@@ -297,15 +298,16 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
     @integration
     Scenario: The secret panel shows the token once with ready-to-copy snippets
       Given "ada" minted a key from the mint drawer
-      Then the panel shows the token in a highlighted snippet for .env, Python, TypeScript, curl and OTLP headers
-      And each snippet has a copy button that says "Copied" after a copy
-      And "Done" stays disabled until "I've stored this key" is ticked
+      Then the "Token Created" panel shows the token in highlighted .env, Bearer and Basic Auth snippets
+      And a tab for each coding assistant carries its own command
+      And each snippet's copy button copies the real token even while it is masked
 
     @integration
-    Scenario: Closing the secret panel early asks first
-      Given the secret panel is open and "I've stored this key" is not ticked
-      When "ada" closes the drawer
-      Then she is asked to confirm that the key will not be shown again
+    Scenario: Closing the secret panel needs no confirmation
+      Given the "Token Created" panel is open
+      When "ada" closes it
+      Then it closes at once, with no checkbox or confirmation gating it
+      And the panel warned her beforehand to copy the token now
 
   Rule: a setup token holds the least its screen needs (Alex, 2026-10-01)
 
@@ -369,7 +371,8 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
     @integration
     Scenario: Minting and revoking are audited
       When "ada" mints and then revokes a key
-      Then the audit log has "api-key.created" and "api-key.revoked" entries naming the key id and the actor
+      Then the audit log has an "apiKey.create" entry naming the actor, the key's name and its type
+      And an "apiKey.revoke" entry naming the actor and the key id
       And neither entry carries the token
 
     @unit

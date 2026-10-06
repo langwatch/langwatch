@@ -235,6 +235,18 @@ describe("given the organization has an ingestion key and a regular key", () => 
       expect(screen.queryByRole("button", { name: "Edit API key claude wrapper" })).toBeNull();
     });
 
+    /** @scenario A key row offers Edit and Revoke */
+    it("offers Edit and Revoke on a regular key row, and nothing else", async () => {
+      const user = userEvent.setup();
+      state.members = [{ id: "user-1", name: "Dev", email: "dev@example.com" }];
+      renderWithApiKeyHost(<ApiKeysScreen />);
+
+      await user.click(screen.getByRole("button", { name: "Actions for API key CI Pipeline" }));
+
+      const actions = await screen.findAllByRole("menuitem");
+      expect(actions.map((action) => action.textContent)).toEqual(["Edit", "Revoke"]);
+    });
+
     /** @scenario Deep link opens the page on a specific key */
     it("carries the anchor id a deep link targets on every row", () => {
       const { container } = renderWithApiKeyHost(<ApiKeysScreen />);
@@ -376,6 +388,7 @@ describe("given keys bound at different scopes", () => {
 describe("given the legacy project key exists", () => {
   describe("when the reader can manage the project", () => {
     /** @scenario The legacy project key can no longer be found on the keys page */
+    /** @scenario The legacy key is not listed on the keys page */
     it("shows no project key row, and offers no copy or rotation control", () => {
       renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
       expect(screen.queryByText("Project API Key")).toBeNull();

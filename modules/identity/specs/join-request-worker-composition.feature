@@ -5,53 +5,20 @@ Feature: Composing the join-request ledger in a background worker
   request from PENDING to EXPIRED. Both fire in whichever process holds the
   pipeline's process manager, and both end in an email.
 
-  That email is why this ledger stayed in the application while the identity
-  and directory-sync ones left. Everything else it takes is a Postgres binding
-  — the `JoinRequest` head serving both the fold and its guards, the
-  organization's admins, the requester's own name and address — and the one
-  dependency that was not is now a packaged capability any process can compose
-  from its own configuration.
-
-  The pipeline mounts either way. Its five commands, its state projection and
-  its lifecycle subscriber are named in the checked-in job registry, and the
-  shared queue rejects an unroutable job for redelivery rather than dropping
-  it, so a graph that mounted this only where mail happened to be configured
-  would stall those seven forever with the pods up and the queue depth simply
-  growing. Expiry is a fold besides: a request lapses on time whether or not
-  anybody can be told.
-
-  What can be absent is the mail, and it is absent by name — sends throw, the
-  fan-out logs, and the request stands, which is what a deployment with no
-  email provider already does. A process that claims the shared queue never
-  reaches that state, because it refuses to compose without a gateway.
+  The identity module composes this pipeline itself, from its own repositories
+  and its own event store, and hands its commands back through the senders the
+  process connects (ConnectedIdentityEventing). The email goes out through the
+  notification module, which owns the mail gateway, so identity holds no mail
+  transport and the pipeline mounts in every process that installs identity.
+  Its five commands, its state projection and its lifecycle subscriber are
+  named in the checked-in job registry, and the shared queue rejects an
+  unroutable job for redelivery rather than dropping it.
 
   @unit
-  Scenario: A worker with a mail gateway mounts the join-request ledger itself
-    Given a worker whose deployment named a host and an email provider
-    When the composition is built
-    Then it mounts the join-request ledger
-    And routes exactly the keys the job registry names for it
-    And it takes no join-request pipeline from the application
-
-  @unit
-  Scenario: A producer-only worker without mail still routes every key
-    Given a worker whose deployment named no host
-    When the composition is built
-    Then it still mounts the join-request ledger and routes every key
-    And a notification send is refused by name rather than reported as sent
-
-  @unit
-  Scenario: A consuming worker without mail refuses to compose
-    Given a worker that would claim the shared event-sourcing queue
-    When it has composed no mail gateway
-    Then the composition is refused before anything is registered
-    And the same graph composes once the deployment names its host
-
-  @unit
-  Scenario: The mail capability is closed with the graph that composed it
-    Given a worker that composed a mail gateway
-    When the process resource scope closes
-    Then the mail transport is closed with it
+  Scenario: The identity module composes the join-request ledger itself
+    Given a process that installs the identity module
+    When identity composes its join-request pipeline
+    Then the pipeline registers exactly the commands, fold and lifecycle the job registry names
 
   @unit
   Scenario: The worker builds the join-request ledger from its own client

@@ -103,6 +103,7 @@ describe("given a process holding one typed Prisma client", () => {
      * dropped.
      */
     /** @scenario "The worker builds the join-request ledger from its own client" */
+    /** @scenario "The identity module composes the join-request ledger itself" */
     it("builds the pipeline the legacy registry registers, key for key", () => {
       const { pipeline } = compose();
 

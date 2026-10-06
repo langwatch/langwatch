@@ -103,6 +103,7 @@ afterEach(() => cleanup());
 
 describe("given a member who is not an admin", () => {
   describe("when a named key is created with all permissions", () => {
+    /** @scenario The mint drawer offers no role chooser */
     it("sends a personal key on the current project, role from the reader's binding", async () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();

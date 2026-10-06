@@ -72,6 +72,7 @@ describe("the LangWatchQL request machine", () => {
     describe("when the member runs the query and it succeeds", () => {
       /** @scenario "Run and Reload preserve the intended snapshot" */
       /** @scenario "A run submits the draft exactly and the answer reads as current" */
+      /** @scenario "Named scalar parameters accompany the SQL without rewriting it" */
       it("submits that exact draft and the action then reads Reload", async () => {
         const { calls, controller } = controllerWith({
           sql: "SELECT trace_id FROM analytics.traces_daily",
