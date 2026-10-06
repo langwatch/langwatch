@@ -1,7 +1,6 @@
 /** `POST /api/dspy/log_steps`: the DSPy optimizer's progress log; refusals are handled errors. */
 import { PayloadTooLargeError } from "@langwatch/api";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
-import { zodErrorMessage } from "@langwatch/config";
 import {
   dSPyLogStepsBodySchema,
   dSPyLogStepsResponseSchema,
@@ -22,21 +21,9 @@ const MAX_BODY_BYTES = 20 * 1024 * 1024;
 const SECONDS_TIMESTAMP_MESSAGE =
   "Timestamps should be in milliseconds not in seconds, please multiply it by 1000";
 
-/** The batch the body carries, or the validation refusal naming why it is not one. */
-function stepsOf(raw: string): DSPyStepRESTParams[] {
-  let body: unknown;
-  try {
-    body = JSON.parse(raw);
-  } catch {
-    throw new ValidationError("The body is not valid JSON");
-  }
-
-  const parsed = dSPyLogStepsBodySchema.safeParse(body);
-  if (!parsed.success) throw new ValidationError(zodErrorMessage(parsed.error));
-
-  const inSeconds = parsed.data.find(
-    (param) => param.timestamps.created_at.toString().length === 10,
-  );
+/** The batch as validated, or the refusal naming a step whose timestamps are in seconds. */
+function stepsInMilliseconds(steps: DSPyStepRESTParams[]): DSPyStepRESTParams[] {
+  const inSeconds = steps.find((param) => param.timestamps.created_at.toString().length === 10);
   if (inSeconds) {
     logger.error(
       { stepId: inSeconds.index, runId: inSeconds.run_id },
@@ -47,7 +34,7 @@ function stepsOf(raw: string): DSPyStepRESTParams[] {
     });
   }
 
-  return parsed.data;
+  return steps;
 }
 
 /** Stores each step in order, stopping at the first failure. */
@@ -100,8 +87,7 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
   .withVersion(MANAGEMENT_API_VERSION)
 
   .post("/log_steps", "postApiDspyLogSteps")
-  // Raw because the body is a bare array, which a validated input cannot carry.
-  .withRawBody("text", { mediaType: "application/json" })
+  .withInput(dSPyLogStepsBodySchema, { as: "steps" })
   .withPermission("experiments:manage")
   .withOutput(dSPyLogStepsResponseSchema)
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
@@ -110,15 +96,15 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
     summary: "Report DSPy optimizer steps",
     description:
       "Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores show up in the app. Send the steps as an array; the optimizer typically posts each batch as it finishes. Bodies up to 20MB are accepted.",
-    requestBody: { schema: dSPyLogStepsBodySchema },
     errors: [
+      { status: 400, description: "The body was not valid JSON" },
       { status: 401, description: "Missing or invalid API key" },
       { status: 403, description: "The API key lacks experiments:manage" },
       { status: 413, description: "The body is larger than 20MB" },
       {
         status: 422,
         description:
-          "The body was not valid JSON, failed validation, or carried timestamps in seconds rather than milliseconds",
+          "The body failed validation, or carried timestamps in seconds rather than milliseconds",
       },
       {
         status: 500,
@@ -127,12 +113,12 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
       },
     ],
   })
-  .handle(async ({ app, raw, scope }) => {
+  .handle(async ({ app, input, scope }) => {
     const projectId = scope.id;
-    const input = stepsOf(raw);
+    const steps = stepsInMilliseconds(input.steps);
 
-    logger.info({ stepCount: input.length, projectId }, "Processing DSPy steps");
-    await storeDspySteps({ app, projectId, steps: input });
+    logger.info({ stepCount: steps.length, projectId }, "Processing DSPy steps");
+    await storeDspySteps({ app, projectId, steps });
 
     return { message: "ok" };
   })

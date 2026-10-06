@@ -14,6 +14,7 @@ import {
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { ExecutionSummary, Experiment, ExperimentRun } from "@langwatch/experiment-contract";
 import { NotFoundError } from "@langwatch/handled-error";
+import { resolveRequestBound } from "@langwatch/plans";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -410,6 +411,20 @@ describe("POST /api/experiments/:slug/run", () => {
 
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({ code: "experiment_evaluation_input_invalid" });
+    });
+  });
+
+  describe("when the body is past the route's cap", () => {
+    it("refuses 413 with the framework's payload-too-large code before the experiment is read", async () => {
+      const findBySlugAndType = vi.fn();
+      const { request } = await harness({ experiments: { findBySlugAndType } });
+      const cap = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
+
+      const response = await request("/checkout-eval/run", runOf(" ".repeat(cap + 1)));
+
+      expect(response.status).toBe(413);
+      expect(await response.json()).toMatchObject({ code: "payload_too_large" });
+      expect(findBySlugAndType).not.toHaveBeenCalled();
     });
   });
 

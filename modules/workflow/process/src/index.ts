@@ -41,7 +41,7 @@ export { workflowProcessModule } from "./workflow.module.ts";
 export { workflowTrpcTransport } from "./transport/workflow.trpc.ts";
 export { workflowOptimizationTrpcTransport } from "./transport/workflow-optimization.trpc.ts";
 export { workflowRunRest } from "./transport/workflow-run.rest.ts";
-export { workflowStudioRest, workflowStudioSession } from "./transport/workflow-studio.rest.ts";
+export { workflowStudioRest } from "./transport/workflow-studio.rest.ts";
 export {
   createWorkflowRest,
   workflowEvaluationRunCeiling,
