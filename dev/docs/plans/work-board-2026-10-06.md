@@ -15,6 +15,36 @@ holds the full outlines.
 4. Mark the PR ready when the item's checks pass. The coordinator reviews, merges and ticks the board.
 5. A claim with no push for 24 hours is released.
 
+## Scope is fixed: decisions are not yours to make
+
+An item is a scoped, already-decided piece of work. The decisions in it were made by Alex; the agent
+doing it carries them out and makes none of its own.
+
+- **No new architecture decisions.** Do not add a module, a peer edge (`static dependencies`), an `*Api`
+  operation, a contract or event shape, a fact type, a table or column, a permission, a route, a framework
+  API or a wire change, unless the item's outline names it. If the work seems to need one, stop and say so
+  on your PR with the options; the coordinator takes it to Alex.
+- **No slop.** No changes outside the item's paths, no drive-by refactors or renames, no speculative
+  abstractions or options, no dead code, no TODOs, no comments that restate the code, no duplicated
+  helpers. Write the code the way the surrounding code is written.
+- **Nothing incorrect.** Follow the record (`dev/docs/ARCHITECTURE.md`) and the item's plan as written; if
+  the plan and the code disagree, stop and ask rather than pick one.
+
+## Definition of done (the review checks every line)
+
+1. **Architecture rules pass for what the item fixes.** The findings the item targets are gone
+   (`pnpm lint:architecture --policies <ids>` for the policies it touches, `pnpm lint:changed`), and the
+   PR description shows the before and after counts.
+2. **No new findings anywhere.** `pnpm lint:architecture` and `pnpm lint:changed` report nothing new
+   against the base; the peer-cycles count does not rise; the deleted-spellings test shows no rise.
+3. **Spec first and bound.** Every behaviour the item adds or changes has a scenario in the owning feature
+   file, bound by `/** @scenario "<title>" */` on a test that proves it; `check:feature-parity` shows no new
+   unbound row in touched specs.
+4. **Checks green:** oxfmt and `oxlint --quiet --type-aware` on touched files; the touched packages' tests
+   (`VITEST_MAX_WORKERS=2`); `pnpm --filter <pkg> typecheck` for every touched package; `pnpm check:readmes`.
+5. **The PR description** lists the item id, what changed, the checks with results, and anything stopped
+   on. A PR that adds a finding, widens scope or makes an undecided choice is sent back, not merged.
+
 ## What every item must follow
 
 - Read `CLAUDE.md`, `dev/docs/ARCHITECTURE.md` (§3 modules, §5 peers, §8 routes, §15 deleted spellings) and
