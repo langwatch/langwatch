@@ -582,8 +582,10 @@ secured
 
         const parsed = parseOtlpTraces(body, contentType);
         if (!parsed.ok) {
-          loggerTraces.error(
+          // A body we cannot parse is the client's error: warn, never a PostHog exception (#8481).
+          loggerTraces.warn(
             {
+              error_class: "client",
               error: parsed.error,
               projectId: project.id,
               customerTraceIds,
@@ -591,12 +593,6 @@ secured
             },
             "error parsing traces",
           );
-          captureException(new Error(parsed.error), {
-            extra: {
-              projectId: project.id,
-              customerTraceIds,
-            },
-          });
           span.setStatus({
             code: SpanStatusCode.ERROR,
             message: "Failed to parse traces",
@@ -671,19 +667,15 @@ secured
             message: "Failed to parse logs",
           });
           span.recordException(new Error(parsed.error));
-          loggerLogs.error(
+          loggerLogs.warn(
             {
+              error_class: "client",
               error: parsed.error,
               projectId: project.id,
               ...bodyForensics(body),
             },
             "error parsing logs",
           );
-          captureException(new Error(parsed.error), {
-            extra: {
-              projectId: project.id,
-            },
-          });
           return c.json({ error: "Failed to parse logs" }, { status: 400 });
         }
         const logRequest = parsed.request;
@@ -769,19 +761,15 @@ secured
             message: "Failed to parse metrics",
           });
           span.recordException(new Error(parsed.error));
-          loggerMetrics.error(
+          loggerMetrics.warn(
             {
+              error_class: "client",
               error: parsed.error,
               projectId: project.id,
               ...bodyForensics(body),
             },
             "error parsing metrics",
           );
-          captureException(new Error(parsed.error), {
-            extra: {
-              projectId: project.id,
-            },
-          });
           return c.json({ error: "Failed to parse metrics" }, { status: 400 });
         }
         const metricsRequest = parsed.request;
