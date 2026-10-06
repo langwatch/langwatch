@@ -314,6 +314,19 @@ const runOf = (body: string, accept?: string): RequestInit => ({
 });
 
 /** Each `data:` frame of an event stream, parsed. */
+/** Whether a promise settles inside a window, without waiting on it further. */
+const settlesWithin = ({
+  work,
+  ms,
+}: {
+  work: Promise<unknown>;
+  ms: number;
+}): Promise<"released" | "nothing yet"> =>
+  Promise.race([
+    work.then(() => "released" as const),
+    new Promise<"nothing yet">((resolve) => setTimeout(() => resolve("nothing yet"), ms)),
+  ]);
+
 async function framesOf(response: Response): Promise<{ type: string }[]> {
   const text = await response.text();
 
@@ -1057,6 +1070,34 @@ describe("POST /api/experiments/execute", () => {
       const failed = await (await poll(`/runs/${runId}`)).json();
       expect(failed).toMatchObject({ status: "failed", error: "boom_code" });
       expect(Object.keys(failed)).not.toContain("message");
+    });
+
+    /** @scenario "The run id is not given out before the run API can answer for it" */
+    it("holds the frame that names the run until the run API can answer for it", async () => {
+      const made = await harness({ redis: true, registers: false, worker });
+      let openTheRun = (): void => undefined;
+      const recordRunStart = made.folds.recordRunStart.bind(made.folds);
+      vi.spyOn(made.folds, "recordRunStart").mockImplementationOnce(
+        (input) =>
+          new Promise<void>((resolve) => {
+            openTheRun = () => void recordRunStart(input).then(resolve);
+          }),
+      );
+
+      const reader = (await made.execute(request)).body?.getReader();
+      if (!reader) throw new Error("the response carries no stream");
+      const frame = reader.read();
+
+      expect(await settlesWithin({ work: frame, ms: 100 })).toBe("nothing yet");
+
+      openTheRun();
+      const named = new TextDecoder().decode((await frame).value);
+      const runId = /"runId":"([^"]+)"/.exec(named)?.[1];
+      if (runId === undefined) throw new Error("the first frame does not name the run");
+      const poll = await made.request(`/runs/${runId}`);
+      expect(poll.status).toBe(200);
+      expect(await poll.json()).toMatchObject({ runId, status: "running" });
+      await reader.cancel();
     });
 
     /** @scenario "A run started from the open page is readable by the run API" */

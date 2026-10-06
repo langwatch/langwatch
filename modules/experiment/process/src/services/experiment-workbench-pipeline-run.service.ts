@@ -186,6 +186,8 @@ export class ExperimentWorkbenchPipelineRunService {
     try {
       await this.runs.commands.startExperimentRun(run.start);
       await this.#carryBoard({ run });
+      // The page polls the moment a frame names the run; the run API answers for it first.
+      await this.#recordStart({ run });
 
       let seen = 0;
       let ended = false;
