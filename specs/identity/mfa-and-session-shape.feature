@@ -288,6 +288,13 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then the answer does not reveal the organization's name or requirement
     And no account factor is read for "mallory"
 
+  @unit
+  Scenario: An organization that requires nothing is satisfied after one read
+    Given "acme" does not require two-step verification
+    When "sam", a member of "acme", asks for their standing in "acme"
+    Then the answer says the requirement is not required and satisfied
+    And no membership, session sign-in method or account factor is read
+
   @integration
   Scenario: Setting it up opens the gate on the session they already hold
     Given "sam" is held at the enrollment gate for "acme"
