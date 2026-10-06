@@ -116,8 +116,8 @@ you do not own. Current list (brought current 2026-10-05, after Alex's evening a
   left, from 36).
 - §7's "no mixing" is unenforced: a module's own `withMemoryRepositories` (deleted, §15) still wins
   over the stores' tier. The fail-closed tier and the skipped surface (§4, §7) have landed.
-- §7 gives each module its own event store handle (Alex, 2026-10-05); identity, ops and scim still
-  hold the shared `EventSourcing` client.
+- §7 gives each module its own event store handle (Alex, 2026-10-05); ops still holds the
+  shared `EventSourcing` client.
 - §10.1's `UiFlags` host service is not in the tree: `useFeatureFlag` (kept, off §15's deleted list, Alex 2026-10-05) in
   `packages/browser-host/src/feature-flag.ts` queries `featureFlag.isEnabled` itself.
 - `requestDelivery` (ADR-167, §9) is ruled to be built now on the outbox (Alex, 2026-10-05); no code

@@ -1411,7 +1411,7 @@ an aggregate by sending a command, never by appending events itself: the `eventi
 handing modules the whole EventSourcing, so no module reaches `getEventStore().storeEvents` for an
 arbitrary aggregate. **Each module gets its own event store handle** (Alex, 2026-10-05): `packages/eventing`
 hands each module an append-only event store handle for its own streams, and no module holds the shared
-EventSourcing client; identity, ops and scim hold it today. Operator work over those tables (purge, redrive, lease release, an event
+EventSourcing client; ops holds it today. Operator work over those tables (purge, redrive, lease release, an event
 explorer) is eventing's surface, called through the member, never SQL or a Prisma delegate in the
 calling module. The `eventing-table-access` policy reports raw access by module or application code:
 SQL naming a table, a Prisma delegate over one, the table named as a literal, or a direct
