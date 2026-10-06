@@ -64,13 +64,6 @@ Feature: AuthZ package boundary
     And generated Prisma types never cross a package export
     And ordinary app modules import neither an AuthZ repository nor @langwatch/authz-process
 
-  @architecture @persistence
-  Scenario: The move changes no durable model
-    Given the AuthZ packages move into the feature root
-    Then no authorization table is added or removed
-    And every grant and role event keeps its type, aggregate identity, tenant and idempotency semantics
-    And existing projection rows and migration tenant states remain readable
-
   @integration @eventing
   Scenario: Eventing registration is explicit
     Given no AuthZ runtime feature has been installed

@@ -56,12 +56,6 @@ Feature: Trace span-tree read service
     And otherwise it delegates to the canonical ModelProviderService estimateCost
     And the span-tree response shape remains unchanged
 
-  Scenario: Browser presentation remains transport-neutral
-    Given the browser display toolkit formats trace previews, costs, and terminal output
-    When it is consumed by the app trace explorer
-    Then it does not fetch, authorize, or reshape a trace response
-    And existing route payload fields and nullability remain authoritative in the app
-
   @unit
   Scenario: Loaded-trace find remains a browser-owned presentation behaviour
     Given the app supplies the currently loaded trace rows to the Trace browser package

@@ -1,5 +1,6 @@
 Feature: GitHub service boundary
 
+  @integration
   Scenario: one process composes one GitHub capability
     Given the application supplies GitHub persistence and provider ports
     When the runtime creates the GitHub adapter

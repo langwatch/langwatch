@@ -292,6 +292,33 @@ describe("OrganizationService groups", () => {
     });
   });
 
+  /** @scenario "A group receives scoped access" */
+  it("writes a user-created role at a scope of its organization through the AuthZ grants service", async () => {
+    const { service, grants, groupRepository } = buildService();
+
+    await service.addGroupGrant({
+      organizationId: "org_1",
+      groupId: "group_1",
+      grant: { role: "CUSTOM", customRoleId: "role_1", scopeType: "TEAM", scopeId: "team_1" },
+      caller: { type: "user", id: "actor_1" },
+      actor: { type: "user", id: "actor_1" },
+    });
+
+    expect(grants.attachBindings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bindings: [
+          expect.objectContaining({
+            principal: { groupId: "group_1" },
+            customRoleId: "role_1",
+            scopeType: "TEAM",
+            scopeId: "team_1",
+          }),
+        ],
+      }),
+    );
+    expect(Object.keys(groupRepository).filter((name) => /binding/i.test(name))).toEqual([]);
+  });
+
   /** @scenario "A group bound twice to the same role and scope holds both bindings" */
   it("writes an identical group binding rather than refusing it", async () => {
     const { service, grants } = buildService();

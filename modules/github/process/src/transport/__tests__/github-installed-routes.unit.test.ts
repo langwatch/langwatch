@@ -202,3 +202,23 @@ describe("given the github module installed over memory stores", () => {
     });
   });
 });
+
+describe("given the github module installed over memory repositories", () => {
+  describe("when two callers each ask the process for the GitHub capability", () => {
+    /** @scenario "one process composes one GitHub capability" */
+    it("hands both the one GithubApi the module provided, with no repository member on it", async () => {
+      const runtime = await installedGithub();
+
+      try {
+        const first = runtime.service(GithubApi);
+        const second = runtime.service(GithubApi);
+
+        expect(second).toBe(first);
+        expect(first).toBe(runtime.module(githubProcessModule).provided);
+        expect(Object.keys(first).filter((name) => /repositor|provider/i.test(name))).toEqual([]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+});

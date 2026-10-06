@@ -7,6 +7,7 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 /**
  * @vitest-environment node
@@ -133,6 +134,25 @@ async function call(
 }
 
 describe("given the project module installed over memory repositories", () => {
+  describe("when a feature asks the process for project behaviour", () => {
+    /** @scenario "A feature needs project behaviour" */
+    it("hands it the one ProjectApi the module provided, with no repository member on it", async () => {
+      const { runtime } = await doors();
+
+      try {
+        const first = runtime.service(ProjectApi);
+
+        expect(runtime.service(ProjectApi)).toBe(first);
+        expect(first).toBe(runtime.module(projectProcessModule).provided);
+        expect(
+          Object.keys(first).filter((name) => /repositor|prisma|persistence/i.test(name)),
+        ).toEqual([]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
   describe("when a project admin calls the removed key procedures", () => {
     /** @scenario The procedures that revealed or rotated the project key are gone */
     it.each(["project.getProjectAPIKey", "project.regenerateApiKey"])(

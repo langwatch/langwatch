@@ -61,6 +61,24 @@ describe("organization app installation", () => {
     }
   });
 
+  /** @scenario "A feature needs organization behaviour" */
+  it("hands every feature the one OrganizationApi, with no repository member on it", async () => {
+    const runtime = await process("api").boot();
+
+    try {
+      const first = runtime.service(OrganizationApi);
+      const second = runtime.service(OrganizationApi);
+
+      expect(second).toBe(first);
+      expect(first).toBe(runtime.module(organizationProcessModule).provided);
+      expect(
+        Object.keys(first).filter((name) => /repositor|prisma|persistence/i.test(name)),
+      ).toEqual([]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   it("leaves the dated department-link reads to governance, which owns the table", async () => {
     const runtime = await process("api").boot();
 

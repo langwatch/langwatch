@@ -14,7 +14,7 @@ Feature: API framework boundary and package authoring
       code or Prisma
     And their runtime dependencies are the framework's declared contracts
 
-  @architecture @typecheck
+  @architecture @typecheck @unit
   Scenario: Consumers import only the sealed public API
     Given an application API family
     When it imports from @langwatch/api

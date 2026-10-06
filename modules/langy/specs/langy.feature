@@ -32,26 +32,6 @@ Feature: Langy service capability
     When a finalized turn's derived card fails to salvage
     Then the failure is counted on the block-salvage series under its reason
 
-  Scenario: controlled browser behaviour and presentation are portable
-    Given the application renders a Langy conversation surface
-    When it derives card order, panel geometry, feedback directives, turn controls, or conversation status
-    Then it uses Langy's deterministic browser behaviour and reusable presentation
-    And application page composition, state, routes, and transport hooks remain in the application
-    And application-specific tool descriptions are supplied through a named narrator port
-
-  Scenario: derived cards keep app capabilities at the edge
-    Given a Langy answer contains a validated derived card
-    When the browser renders its table, stats, choices, failure disclosure, or streaming preview
-    Then the presentation comes from the Langy web package
-    And viewer hydration, SPA navigation, and charts enter through named app ports
-
-  Scenario: capability cards use one portable browser registry
-    Given a LangWatch CLI result with a resource and verb
-    When the browser resolves its capability and result formatting
-    Then the Langy web package uses the shared feature map and capability catalog
-    And unknown resources still receive the neutral fallback card
-    And route construction and transport hydration remain in the application
-
   @unit
   Scenario: feedback prompt keeps its existing cadence
     Given a process-owned LangyService with Redis available

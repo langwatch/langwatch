@@ -44,6 +44,7 @@ Feature: Composing durable coding-agent session processing
 
   # Pending: returns once eventing hands its pipelines the process's fold cache
   # TTL (worker-pipelines manifest, WP-4 rulings on foldCacheTtlSeconds).
+  @unimplemented
   Scenario: Producer and consumer honour one fold cache TTL
     Given a fold cache TTL named in the environment
     When the worker composes durable coding-agent session processing

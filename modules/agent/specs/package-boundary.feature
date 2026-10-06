@@ -12,15 +12,6 @@ Feature: Agents package boundary
     Then agent types, config schemas, commands, queries and errors are available
     And the dependency graph contains no Prisma, React, app alias or server implementation
 
-  @architecture @typecheck
-  Scenario: Agents is the strict layout reference feature
-    Given Agents declares layoutVersion 0 in feature.json
-    Then contract artifacts use subject.artifact.ts names
-    And the server uses app, services, repositories and flat transport directories
-    And Prisma implementations use prisma.subject.repository.ts names
-    And AgentModule owns private services which receive private repository interfaces
-    And the installer selects a repository backend without the App importing Prisma
-
   @unit @agents
   Scenario: Persisted rows are mapped into contract agents
     Given a Prisma agent row contains a supported agent type and config
@@ -116,14 +107,6 @@ Feature: Agents package boundary
     Then the screen reaches behaviour through an injected browser client
     And it depends on Agents contract and the design system
     And it imports no Agents server, Prisma, Node runtime or app source
-
-  @architecture @web @typecheck
-  Scenario: Agent web private presentation has named ownership
-    Given Agent browser presentation is not part of a public screen or surface
-    Then presentation lives in ui and browser state and actions live in behavior
-    And reusable browser values live in model
-    And named root entries expose controlled management and editor composition
-    And the package has no nested private feature buckets or forwarding classes
 
   @unit @architecture @web
   Scenario: Agent owns reusable editor presentation

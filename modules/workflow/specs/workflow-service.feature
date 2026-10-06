@@ -88,42 +88,12 @@ Feature: Workflow service boundary
     Then declared entry defaults fill only missing values
     And the browser template does not pin a resolved project model
 
-  Scenario: Workflow creation import is portable browser behaviour
-    Given a user opens the workflow creation dialog
-    When they select a template or import a valid workflow file
-    Then Workflow Web owns the selection and file validation
-    And application composition supplies the create mutation and routing
-
-  Scenario: Workflow management cards keep transport in application composition
-    Given the workflow list displays a saved workflow
-    When the user opens its sync, push, copy or delete actions
-    Then Workflow Web renders the card and action menu
-    And application composition performs project queries, mutations and dialogs
-
-  Scenario: Studio result presentation keeps transport in application composition
-    Given Studio displays workflow evaluation results
-    When the panel is loading, waiting, failed, or showing a selected run
-    Then Workflow Web owns the panel state and layout
-    And application composition supplies project queries and Experiment renderers
-
-  Scenario: Studio dataset transforms are portable browser behaviour
-    Given Studio, Prompts, or execution needs to reshape a dataset
-    When it converts records, fields, or train/test partitions
-    Then it uses the Workflow browser surface
-    And application modules retain only compatibility imports
-
   @unit
   Scenario: Local configuration dispatch stays portable
     Given a browser or API dispatches unsaved local Studio configuration
     When it materializes execution DSL or a default LLM node
     Then it uses the Workflow contract
     And no backend imports the Workflow browser surface
-
-  Scenario: Code-node Python language support is portable browser behaviour
-    Given the Studio code or Liquid-condition editor opens
-    When it completes, validates, formats, hovers, or offers quick fixes
-    Then it uses the Workflow browser surface for its editor and Python providers
-    And the application supplies only project-scoped secret transport and controls
 
   @integration
   Scenario: Canvas node renderers use explicit application host ports

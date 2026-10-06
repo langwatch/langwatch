@@ -23,6 +23,7 @@ Feature: Shared project service
     When a feature asks the project service for it
     Then the portable project value is returned
 
+  @integration
   Scenario: A feature needs project behaviour
     When the feature is composed
     Then it receives the process-owned project service

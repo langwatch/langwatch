@@ -14,7 +14,7 @@ Feature: Group Queue framework boundary
     Then its name and rules are immutable
     And both producer and consumer use that same definition
 
-  @typecheck @architecture
+  @typecheck @architecture @unit
   Scenario: Producer and consumer capabilities cannot be confused
     Given a Group Queue producer
     And a GroupQueueConsumer for the same definition

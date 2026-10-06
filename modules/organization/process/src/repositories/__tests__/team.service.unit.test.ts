@@ -448,6 +448,56 @@ describe("OrganizationService team membership", () => {
   });
 });
 
+describe("given a team form save that adds, changes and removes members", () => {
+  const members = [
+    { userId: "admin", role: "ADMIN" as const },
+    { userId: "kept", role: "VIEWER" as const },
+    { userId: "joiner", role: "MEMBER" as const },
+  ];
+  const accessBindings = () => [
+    accessBinding({ id: "admin", userId: "admin", role: "ADMIN" }),
+    accessBinding({ id: "kept", userId: "kept", role: "MEMBER" }),
+    accessBinding({ id: "leaver", userId: "leaver", role: "MEMBER" }),
+  ];
+  const save = (service: ReturnType<typeof buildService>["service"]) =>
+    service.updateTeamWithMembers({
+      teamId: team.id,
+      name: team.name,
+      members,
+      caller: { type: "user", id: "admin" },
+      actor: { type: "user", id: "admin" },
+    });
+
+  describe("when every write succeeds", () => {
+    /** @scenario "A team membership write partially fails" */
+    it("attaches the replacement access, then changes roles, and revokes removed access last", async () => {
+      const { service, calls } = buildService({ accessBindings: accessBindings() });
+
+      await save(service);
+
+      const order = (call: typeof calls.attach) => call.mock.invocationCallOrder[0] ?? NaN;
+      expect(order(calls.attach)).toBeLessThan(order(calls.change));
+      expect(order(calls.change)).toBeLessThan(order(calls.revoke));
+      expect(calls.revoke).toHaveBeenCalledWith(
+        expect.objectContaining({ bindingIds: ["leaver"] }),
+      );
+    });
+  });
+
+  describe("when the write fails part way", () => {
+    /** @scenario "A team membership write partially fails" */
+    it("has revoked nothing, so access is retained rather than lost", async () => {
+      const { service, calls } = buildService({ accessBindings: accessBindings() });
+      calls.change.mockRejectedValueOnce(new Error("write failed"));
+
+      await expect(save(service)).rejects.toThrow("write failed");
+
+      expect(calls.attach).toHaveBeenCalled();
+      expect(calls.revoke).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe("given a team a seat correction left with no team admin at all", () => {
   describe("when a member is removed from it", () => {
     /** @scenario "A team already without a team admin stays editable" */

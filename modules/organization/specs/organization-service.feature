@@ -14,6 +14,7 @@ Feature: Shared organization service
     When a feature gets the organization's oldest team
     Then the organization service throws the organization-owned no-team error
 
+  @integration
   Scenario: A feature needs organization behaviour
     When the feature is composed
     Then it receives the process-owned organization service
@@ -97,6 +98,7 @@ Feature: Shared organization service
     Then the second edit is refused as stale
     And only the winning edit emits durable grant commands
 
+  @unit
   Scenario: A team membership write partially fails
     When the service changes direct team membership
     Then replacement access is attached before existing access is changed
@@ -108,6 +110,7 @@ Feature: Shared organization service
     Then it delegates to the process-owned organization service
     And it constructs no request-scoped service or repository
 
+  @unit
   Scenario: A group receives scoped access
     Given the group and scope belong to the same organization
     And any custom role is user-created and assignable at that scope

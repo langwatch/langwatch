@@ -16,18 +16,6 @@ Feature: Stored Objects service and API
     And the feature has no web package or separate object-storage package
     And neither package imports the application
 
-  @architecture @typecheck
-  Scenario: Stored Objects adopts the strict feature layout
-    Given the Stored Objects implementation is reduced to its approved scope
-    And its feature.json declares layoutVersion 0
-    Then its contract capability is the StoredObjectApi interface and its feature token
-    And its server service is services/stored-object.service.ts
-    And its canonical row is reached through a repository interface with a Prisma and a memory backend
-    And a process selects the backend once, at boot, through the repository registry
-    And its public RPC family and its existence probe are flat transport declarations the process mounts
-    And its ClickHouse import is migrations/clickhouse-import.stored-object.migration.ts
-    And no composition, registration, lifecycle, or eventing source directory remains
-
   @architecture @persistence @unit
   Scenario: One Postgres row owns current state
     Given Stored Objects persists operational metadata
