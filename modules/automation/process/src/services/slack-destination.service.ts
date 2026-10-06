@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { TriggerSecretSeal } from "../repositories/trigger.repository.ts";
 
 /** Where one Slack delivery goes. A bot posts to the automation's channel. */
-export type SlackDestination =
+type SlackDestination =
   | { kind: "bot"; token: string; channel: string | null }
   | { kind: "webhook"; url: string };
 

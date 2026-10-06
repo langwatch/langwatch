@@ -16,7 +16,7 @@ export interface OrganizationMigrationOutcome {
 }
 
 /** One connection as the ops page reads it: the hint, never the secret. */
-export interface SlackMigrationConnectionReport {
+interface SlackMigrationConnectionReport {
   name: string;
   projectId: string;
   secretHint: string | null;
@@ -24,7 +24,7 @@ export interface SlackMigrationConnectionReport {
 }
 
 /** The outcome's `report`: counts, skip reasons and secret hints only. */
-export interface SlackMigrationReport {
+interface SlackMigrationReport {
   linked: number;
   cleared: number;
   skipped: number;

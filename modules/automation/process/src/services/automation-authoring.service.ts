@@ -89,7 +89,7 @@ const TEST_FIRE_WINDOW_SECONDS = 60;
 const TEST_FIRE_MAX_PER_WINDOW = 10;
 
 /** What the authoring service reaches. */
-export interface AutomationAuthoringCollaborators {
+interface AutomationAuthoringCollaborators {
   automation: AutomationService;
   rules: AutomationRulesService;
   monitors: MonitorApi;

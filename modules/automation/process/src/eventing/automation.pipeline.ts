@@ -419,7 +419,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
 /** The `automations` pipeline definition, as its eventing module registers it. */
 export type AutomationsPipeline = ReturnType<typeof buildAutomationsPipeline>;
 
-export class AutomationsPipelineAdapter {
+class AutomationsPipelineAdapter {
   private constructor(private readonly deps: AutomationsPipelineDeps) {}
 
   static create(deps: AutomationsPipelineDeps): AutomationsPipelineAdapter {

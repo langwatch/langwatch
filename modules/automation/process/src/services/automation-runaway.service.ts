@@ -16,13 +16,13 @@ import {
  * directories. Two collaborators: a project breaches the ceiling, but its
  * admins are named on the ORGANIZATION, so the project directory bridges them.
  */
-export type AutomationRunawayDirectories = Readonly<{
+type AutomationRunawayDirectories = Readonly<{
   projects: Pick<ProjectApi, "getOrganizationId" | "findById">;
   authorization: Pick<AuthzService, "listOrganizationBindings">;
 }>;
 
 /** Which addresses this project has already asked not to hear from again. */
-export type AutomationRunawaySuppression = Readonly<{
+type AutomationRunawaySuppression = Readonly<{
   filterSuppressed(input: {
     projectId: string;
     triggerId: string;
@@ -35,7 +35,7 @@ export type AutomationRunawaySuppression = Readonly<{
  * deployment that composed no self-serve catalogue still contains a runaway
  * automation, it just names no upgrade in the mail.
  */
-export type AutomationNextStepResolver = Readonly<{
+type AutomationNextStepResolver = Readonly<{
   resolve(projectId: string): Promise<AutomationNextStepResolution>;
 }>;
 

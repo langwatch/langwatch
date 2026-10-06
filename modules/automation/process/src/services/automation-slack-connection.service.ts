@@ -19,7 +19,7 @@ const slackSaveFieldsSchema = z.object({
 type SlackSaveFields = z.infer<typeof slackSaveFieldsSchema>;
 
 /** A trigger's side of a claim: whether it holds one, and on which params. */
-export interface SlackClaimState {
+interface SlackClaimState {
   actionParams: unknown;
   active: boolean;
 }

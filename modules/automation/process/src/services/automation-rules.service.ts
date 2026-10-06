@@ -22,7 +22,7 @@ export interface AutomationProjectIdentity {
 }
 
 /** What the shared rules read the world through. */
-export interface AutomationRulesCollaborators {
+interface AutomationRulesCollaborators {
   automation: AutomationService;
   projects: ProjectApi;
 }

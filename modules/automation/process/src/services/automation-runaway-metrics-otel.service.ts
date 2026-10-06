@@ -2,9 +2,9 @@ import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 
 import { AutomationRunawayMetricsSink } from "./automation-runaway.service.ts";
 
-export const AUTOMATION_CEILING_BREACH_METRIC_NAME = "automation_ceiling_breach_total";
-export const AUTOMATION_AUTO_PAUSED_METRIC_NAME = "automation_auto_paused_total";
-export const AUTOMATION_CONTAINMENT_FAILED_METRIC_NAME = "automation_containment_failed_total";
+const AUTOMATION_CEILING_BREACH_METRIC_NAME = "automation_ceiling_breach_total";
+const AUTOMATION_AUTO_PAUSED_METRIC_NAME = "automation_auto_paused_total";
+const AUTOMATION_CONTAINMENT_FAILED_METRIC_NAME = "automation_containment_failed_total";
 
 /** Containment counts, pushed over OTLP. */
 export class AutomationRunawayMetricsOtelService extends AutomationRunawayMetricsSink {

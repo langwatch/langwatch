@@ -23,7 +23,7 @@ const mapFire = (row: unknown): TriggerFire => {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type TriggerFireHistoryDatabase = Pick<PrismaClient, "triggerSent">;
+type TriggerFireHistoryDatabase = Pick<PrismaClient, "triggerSent">;
 
 export class PrismaTriggerFireHistoryRepository extends TriggerFireHistoryRepository {
   private constructor(private readonly database: TriggerFireHistoryDatabase) {

@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { graphAlertSweepIntentSchema } from "./graph-alert-sweep.intent.ts";
 
-export const GRAPH_ALERT_SWEEP_PROCESS_NAME = "graphAlertSweep" as const;
 export const GRAPH_ALERT_SWEEP_INTERVAL_MS = 30_000;
 
 export const sweepSchema = graphAlertSweepIntentSchema;
@@ -11,7 +10,7 @@ export const sweepSchema = graphAlertSweepIntentSchema;
 export const graphAlertSweepStateSchema = z.object({
   lastSweepAt: z.number().nullable(),
 });
-export type GraphAlertSweepState = z.infer<typeof graphAlertSweepStateSchema>;
+type GraphAlertSweepState = z.infer<typeof graphAlertSweepStateSchema>;
 
 type SweepIntents = {
   evaluateGraph: IntentSpec<typeof sweepSchema>;

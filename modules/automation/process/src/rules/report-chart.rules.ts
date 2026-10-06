@@ -81,7 +81,7 @@ export function bucketKeysOf(seriesInputs: AnalyticsSeries[]): string[] {
  * groups (by model, by user, …), each group is a slice; when it does not, each
  * series is its own slice.
  */
-export function pieSegments({
+function pieSegments({
   buckets,
   bucketKeys,
   seriesInputs,

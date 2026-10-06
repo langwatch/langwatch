@@ -3,7 +3,7 @@ import { type SlackActionParams, slackDeliveryMethodOf } from "@langwatch/automa
 import type { TriggerSecretSeal } from "../repositories/trigger.repository.ts";
 import { readableSlackActionParams } from "../rules/automation-slack-read.rules.ts";
 
-export abstract class AutomationSlackProvider {
+abstract class AutomationSlackProvider {
   abstract findDecryptedToken(params: { slackBotToken?: string }): string | null;
 }
 

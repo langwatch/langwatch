@@ -94,7 +94,7 @@ export type AutomationPublicApiRows = Pick<
   | "customGraphExistsInProject"
 >;
 
-export interface AutomationPublicApiCollaborators {
+interface AutomationPublicApiCollaborators {
   automation: AutomationPublicApiRows;
   rules: Pick<AutomationRulesService, "getProjectIdentity">;
   providers: AutomationProviderSecrets;

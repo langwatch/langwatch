@@ -1,6 +1,6 @@
 import type { AutomationLimitNextStep } from "@langwatch/automation-contract";
 
-export type LimitEmailKind = "ceiling_reached" | "paused";
+type LimitEmailKind = "ceiling_reached" | "paused";
 
 /** The mail sent when an automation is capped or auto-paused. */
 export abstract class AutomationRunawayNotice {

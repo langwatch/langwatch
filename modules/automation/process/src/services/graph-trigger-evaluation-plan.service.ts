@@ -233,7 +233,7 @@ export class GraphTriggerEvaluationPlanService {
   }
 }
 
-export type GraphActionParams = {
+type GraphActionParams = {
   members?: string[] | null;
   slackWebhook?: string | null;
   threshold?: number;
@@ -246,12 +246,12 @@ export type GraphActionParams = {
   [key: string]: unknown;
 };
 
-export type TimeseriesFilterValue =
+type TimeseriesFilterValue =
   | string[]
   | Record<string, string[]>
   | Record<string, Record<string, string[]>>;
 
-export type TimeseriesPipeline = {
+type TimeseriesPipeline = {
   field: "trace_id" | "user_id" | "thread_id" | "customer_id";
   aggregation: "sum" | "avg" | "min" | "max";
 };
@@ -292,7 +292,7 @@ export type TimeseriesInputType = {
   timeZone: string;
 };
 
-export type StoredGraphConfig = {
+type StoredGraphConfig = {
   series: GraphSeries[];
   groupBy?: string;
   groupByKey?: string;

@@ -21,11 +21,7 @@ const storedSlackParamsSchema = z.object({
 });
 
 /** The fields that hold an automation's own Slack secret, or say it has one. */
-export const LEGACY_SLACK_SECRET_FIELDS = [
-  "slackWebhook",
-  "slackBotToken",
-  "slackBotTokenSet",
-] as const;
+const LEGACY_SLACK_SECRET_FIELDS = ["slackWebhook", "slackBotToken", "slackBotTokenSet"] as const;
 
 export type SlackMigrationSkipReason =
   | "archived project"
@@ -56,7 +52,7 @@ export interface SkippedAutomation {
 }
 
 /** A secret stored as a connection (found or created by slack); `secret` is never reported. */
-export interface StoredConnection {
+interface StoredConnection {
   action: "store";
   kind: SlackConnectionKind;
   projectId: string;
@@ -67,7 +63,7 @@ export interface StoredConnection {
 }
 
 /** An existing project bot connection that tokenless bot automations join. */
-export interface JoinedConnection {
+interface JoinedConnection {
   action: "join";
   connectionId: string;
   name: string;

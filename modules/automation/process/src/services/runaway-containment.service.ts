@@ -13,10 +13,10 @@ import type { AutomationSlackConnectionService } from "./automation-slack-connec
 
 export { RUNAWAY_PAUSE_REASON };
 
-export const PAUSE_ATTEMPT_CLAIM_SECONDS = 60;
-export const CONTAINMENT_CHECK_CLAIM_SECONDS = 60;
-export const RUNAWAY_TRAFFIC_SHARE = 0.9;
-export const RUNAWAY_MIN_PROJECT_TRACES = 100;
+const PAUSE_ATTEMPT_CLAIM_SECONDS = 60;
+const CONTAINMENT_CHECK_CLAIM_SECONDS = 60;
+const RUNAWAY_TRAFFIC_SHARE = 0.9;
+const RUNAWAY_MIN_PROJECT_TRACES = 100;
 
 /** The full set of collaborator capabilities this service reads. */
 type RunawayCollaborator = AutomationRunawayRepository &

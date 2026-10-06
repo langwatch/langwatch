@@ -75,7 +75,7 @@ export interface ReportDispatchDeps {
 }
 
 /** The project fields a report renders; the row itself is the caller's. */
-export interface ReportProject {
+interface ReportProject {
   id: string;
   name: string;
   slug: string;
