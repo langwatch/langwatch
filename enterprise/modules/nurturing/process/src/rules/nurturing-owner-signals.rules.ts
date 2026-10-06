@@ -204,8 +204,15 @@ export function sessionStartedSignal({
   };
 }
 
-/** A self-service registration: user records it once per user, so it is keyed by the user. */
-export function userRegisteredSignal({ data }: { data: UserLifecycleEventData }): NurturingSignal {
+/**
+ * A person's own sign-up, from user's registration or auth's sign-up fact. Keyed by the person
+ * alone, so a redelivery or a second owner reporting the same person is one signed_up.
+ */
+export function userRegisteredSignal({
+  data,
+}: {
+  data: Pick<UserLifecycleEventData, "tenantId" | "userId" | "occurredAt">;
+}): NurturingSignal {
   return {
     kind: "user_registered",
     sourceEventId: data.userId,

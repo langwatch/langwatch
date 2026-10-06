@@ -177,7 +177,7 @@ export const nurturingSignalSchema = z.discriminatedUnion("kind", [
     organizationName: z.string(),
   }),
   z.object({
-    /** A self-service registration, from user's fact: PostHog's signed_up, never Customer.io's. */
+    /** A person's own sign-up, from user's or auth's fact: PostHog's signed_up, never Customer.io's. */
     kind: z.literal("user_registered"),
     ...signalSource,
     userId: id,

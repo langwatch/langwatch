@@ -20,7 +20,7 @@ function announcementsOver(channel: SignupAnnouncementChannel) {
     announcements: LoggedBetterAuthAnnouncements.create({
       logger,
       signups,
-      lifecycle: { sessionStarted: vi.fn(), ssoAutoAdded: vi.fn() },
+      lifecycle: { signedUp: vi.fn(), sessionStarted: vi.fn(), ssoAutoAdded: vi.fn() },
     }),
     lines,
   };

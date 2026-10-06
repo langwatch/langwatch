@@ -189,7 +189,7 @@ export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
   }: {
     logger: Logger;
     signups: SignupAnnouncementService;
-    lifecycle: Pick<AuthLifecycleNoticeService, "sessionStarted" | "ssoAutoAdded">;
+    lifecycle: Pick<AuthLifecycleNoticeService, "signedUp" | "sessionStarted" | "ssoAutoAdded">;
   }): LoggedBetterAuthAnnouncements {
     return new LoggedBetterAuthAnnouncements(logger, signups, lifecycle);
   }
@@ -197,16 +197,16 @@ export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
   private constructor(
     private readonly logger: Logger,
     private readonly signups: SignupAnnouncementService,
-    private readonly lifecycle: Pick<AuthLifecycleNoticeService, "sessionStarted" | "ssoAutoAdded">,
+    private readonly lifecycle: Pick<
+      AuthLifecycleNoticeService,
+      "signedUp" | "sessionStarted" | "ssoAutoAdded"
+    >,
   ) {
     super();
   }
 
-  trackServerEvent(input: { userId: string; event: string }): void {
-    this.logger.debug(
-      { userId: input.userId, event: input.event },
-      "Product analytics is not composed in this process; the event was not sent",
-    );
+  signUpNurturing(input: { userId: string }): void {
+    this.lifecycle.signedUp(input);
   }
 
   reportError(error: unknown): void {
@@ -336,8 +336,8 @@ export type BuildBetterAuthOptions = Readonly<{
   idTokenIssuerRefusals?: IdTokenIssuerRefusalChannel;
   /** Main's sign-up announcement, for a user who joins through their domain. */
   signupAnnouncements: SignupAnnouncementService;
-  /** Where a session and a domain auto-join are recorded for nurturing. */
-  lifecycle: Pick<AuthLifecycleNoticeService, "sessionStarted" | "ssoAutoAdded">;
+  /** Where a sign-up, a session and a domain auto-join are recorded for nurturing. */
+  lifecycle: Pick<AuthLifecycleNoticeService, "signedUp" | "sessionStarted" | "ssoAutoAdded">;
   /** The typed client every database hook reads and writes through. */
   prisma: ProcessMembers["prisma"];
   /** The deployment's cipher, which the engine's dialing documents are kept

@@ -240,7 +240,7 @@ function createAfterVerification({
     }
 
     const user = await users.createPasskeyUser({ email: resolvedEmail });
-    announcements.trackServerEvent({ userId: user.id, event: "signed_up" });
+    announcements.signUpNurturing({ userId: user.id });
 
     return {
       userId: user.id,

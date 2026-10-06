@@ -232,7 +232,7 @@ const joinSsoOrganization = async ({
 };
 
 /**
- * Called after a new user is created. Fires the `signed_up` analytics event,
+ * Called after a new user is created. Records the sign-up for nurturing,
  * then auto-onboards the user into an SSO-matched organization, granting
  * access via a re-assertable ledger command (ADR-092 delivery-plan PR 2).
  */
@@ -245,9 +245,8 @@ export const afterUserCreate = async ({
   user: { id: string; email: string; name: string; emailVerified: boolean };
   collaborators: BetterAuthHookCollaborators;
 }): Promise<void> => {
-  // Same distinct_id posthog-js identifies with client-side (the user id),
-  // so this server event joins the browser person.
-  collaborators.announcements.trackServerEvent({ userId: user.id, event: "signed_up" });
+  // Nurturing tracks PostHog signed_up under the user id, the distinct_id posthog-js uses.
+  collaborators.announcements.signUpNurturing({ userId: user.id });
 
   // Only a verified email proves the signup controls the mailbox an ssoDomain
   // or invite match would admit; credential signups are always created

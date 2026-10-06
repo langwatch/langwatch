@@ -2,6 +2,8 @@
 import {
   SESSION_STARTED_EVENT_TYPE,
   sessionStartedEventDataSchema,
+  SIGNED_UP_EVENT_TYPE,
+  signedUpEventDataSchema,
   SSO_AUTO_ADDED_EVENT_TYPE,
   ssoAutoAddedEventDataSchema,
 } from "@langwatch/auth-contract";
@@ -228,6 +230,14 @@ export function buildNurturingPipeline(deps: {
     .withPeerSubscriber("userRegistered", {
       eventType: USER_REGISTERED_EVENT_TYPE,
       data: userLifecycleEventDataSchema,
+      handle: (data) => {
+        const signal = userRegisteredSignal({ data });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("authSignedUp", {
+      eventType: SIGNED_UP_EVENT_TYPE,
+      data: signedUpEventDataSchema,
       handle: (data) => {
         const signal = userRegisteredSignal({ data });
         return deps.deliver({ key: nurturingSignalKey(signal), signal });

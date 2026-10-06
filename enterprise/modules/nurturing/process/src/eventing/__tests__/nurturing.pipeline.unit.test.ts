@@ -3,6 +3,7 @@
  * @vitest-environment node
  * @see enterprise/modules/nurturing/specs/nurturing.feature
  */
+import { SIGNED_UP_EVENT_TYPE } from "@langwatch/auth-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -107,6 +108,22 @@ function userFact(type: string): Event {
   } as Event;
 }
 
+/** Auth's sign-up fact for user-1, as its auth_lifecycle pipeline records it. */
+function authSignUpFact(): Event {
+  return {
+    id: "evt-auth-signed-up",
+    aggregateId: "user-1",
+    aggregateType: "user",
+    tenantId: createTenantId("user-1"),
+    createdAt: 1_000,
+    occurredAt: 1_000,
+    type: SIGNED_UP_EVENT_TYPE,
+    version: "2026-09-29",
+    data: { tenantId: "user-1", userId: "user-1", occurredAt: 1_000 },
+    idempotencyKey: "user-1:signed_up",
+  } as Event;
+}
+
 /** Lets the fire-and-forget sends settle before the assertions read them. */
 async function settle(): Promise<void> {
   for (let tick = 0; tick < 3; tick++) await new Promise((resolve) => setTimeout(resolve, 0));
@@ -142,6 +159,37 @@ describe("nurturing's userRegistered peer subscriber", () => {
           .filter(({ eventTypes }) => eventTypes.some((type) => type.startsWith("lw.user.")))
           .map(({ eventTypes }) => eventTypes),
       ).toEqual([[USER_REGISTERED_EVENT_TYPE]]);
+    });
+  });
+});
+
+describe("nurturing's authSignedUp peer subscriber", () => {
+  describe("when auth records a person's sign-up, delivered twice", () => {
+    /** @scenario BetterAuth signup tracks the PostHog signed_up milestone */
+    /** @scenario PostHog signed_up still fires when the SSO auto-add path runs */
+    /** @scenario PostHog signed_up still fires when the email has no parsable domain */
+    /** @scenario PostHog signed_up still fires when the signup is unverified */
+    it("tracks exactly one PostHog signed_up for the user id, with no properties", async () => {
+      const { posthog, customerIoFetch, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(authSignUpFact());
+      await deliverFact(authSignUpFact());
+      await settle();
+
+      expect(posthog.tracked).toEqual([{ userId: "user-1", event: "signed_up", properties: {} }]);
+      expect(customerIoFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when user and auth both report the same person's sign-up", () => {
+    it("tracks one PostHog signed_up for that person", async () => {
+      const { posthog, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(userFact(USER_REGISTERED_EVENT_TYPE));
+      await deliverFact(authSignUpFact());
+      await settle();
+
+      expect(posthog.tracked).toEqual([{ userId: "user-1", event: "signed_up", properties: {} }]);
     });
   });
 });
