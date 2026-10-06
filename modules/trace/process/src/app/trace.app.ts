@@ -207,8 +207,7 @@ import { TraceSummaryStore } from "../eventing/trace-summary.store.ts";
 import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
 import { CLICKHOUSE_FACET_CATALOG } from "../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import {
-  TraceClickHouse,
-  type TraceClickHouseClient,
+  ResolverTraceClickHouse,
   type TraceClickHouseResolver,
 } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
@@ -3487,20 +3486,6 @@ class TraceReadQueryFieldValues extends TraceQueryFieldValuesRepository {
       limit: input.limit,
       offset: input.offset,
     });
-  }
-}
-
-class ResolverTraceClickHouse extends TraceClickHouse {
-  private constructor(private readonly resolveClient: TraceClickHouseResolver) {
-    super();
-  }
-
-  static create(resolveClient: TraceClickHouseResolver): ResolverTraceClickHouse {
-    return new ResolverTraceClickHouse(resolveClient);
-  }
-
-  resolve(tenantId: string): Promise<TraceClickHouseClient> {
-    return this.resolveClient(tenantId);
   }
 }
 

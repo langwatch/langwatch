@@ -103,3 +103,18 @@ export class ClickHouseTraceClientsRepository extends TraceClickHouse {
     );
   }
 }
+
+/** A resolver a composition root hands over, as the TraceClickHouse the read repositories take. */
+export class ResolverTraceClickHouse extends TraceClickHouse {
+  private constructor(private readonly resolveClient: TraceClickHouseResolver) {
+    super();
+  }
+
+  static create(resolveClient: TraceClickHouseResolver): ResolverTraceClickHouse {
+    return new ResolverTraceClickHouse(resolveClient);
+  }
+
+  resolve(tenantId: string): Promise<TraceClickHouseClient> {
+    return this.resolveClient(tenantId);
+  }
+}
