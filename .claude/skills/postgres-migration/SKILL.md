@@ -1,6 +1,6 @@
 ---
 name: postgres-migration
-description: "Change the Postgres schema without breaking any release still in the supported window: the expand/contract recipes for adding a column, removing one, renaming one, changing its type, making it NOT NULL, adding a unique index and splitting a table; the LTS-floor rule for every destructive step and the retirement note the scanner requires; no foreign keys and no @relation (Alex, 2026-10-06); where schema.prisma and packages/prisma-client/prisma/migrations live; the unqualified-table-name rule; why a merged migration is immutable; inline DML as the simplest blocking data step; and how an event-sourced projection table changes (a rebuild beside the old one, never an ALTER). Use whenever someone says 'add a field', 'drop that column', 'rename this table', 'make it required', 'add a relation', 'foreign key', '@relation', 'onDelete Cascade', 'write a migration', 'the migration failed on deploy', or a migration-safety test named their migration."
+description: "Change the Postgres schema without breaking any release still in the supported window: the expand/contract recipes for adding a column, removing one, renaming one, changing its type, making it NOT NULL, adding a unique index and splitting a table; the LTS-floor rule for every destructive step and the retirement note the scanner requires; no new foreign key and no new @relation (Alex, 2026-10-06; existing ones stay); where schema.prisma and packages/prisma-client/prisma/migrations live; the unqualified-table-name rule; why a merged migration is immutable; inline DML as the simplest blocking data step; and how an event-sourced projection table changes (a rebuild beside the old one, never an ALTER). Use whenever someone says 'add a field', 'drop that column', 'rename this table', 'make it required', 'add a relation', 'foreign key', '@relation', 'onDelete Cascade', 'write a migration', 'the migration failed on deploy', or a migration-safety test named their migration."
 user-invocable: true
 argument-hint: "<the schema change, or the migration name the scanner refused>"
 ---
@@ -43,13 +43,12 @@ PR stamps every new folder with the release being cut (plan 6.3).
    `-- contract: retired in <release>`. The scanner checks the note is there; checking `<release>`
    against the declared floor lands with S9 (plan 6.12, enforcement item 1).
 5. **Nothing is renamed in place**, and no type is changed in place.
-6. **No foreign keys and no `@relation`** (Alex, 2026-10-06: "an eventually consistent system has no
-   foreign keys or relations in Prisma"). See below.
+6. **No new foreign key and no new `@relation`** (Alex, 2026-10-06; existing ones stay). See below.
 
 **No floor is declared yet** (S9). Until one is, write the expand and migrate halves and leave
 every contract step out: whether a drop may ship is the coordinator's question, not a lane's.
 
-## No foreign keys, no `@relation`
+## No new foreign keys, no new `@relation`
 
 A reference to another row is a plain scalar column with an index, and nothing else:
 
@@ -61,7 +60,7 @@ model ProjectWidget {
 }
 ```
 
-- **No `@relation` field, on either side.** The datasource runs `relationMode = "prisma"`, so a
+- **No new `@relation` field, on either side.** The datasource runs `relationMode = "prisma"`, so a
   relation already creates no SQL foreign key; what it does create is a client-side join and a
   client-emulated `onDelete: Cascade`. Both go.
 - **Joins happen in the owning repository**, by a second query over its own tables. A table another
@@ -71,10 +70,8 @@ model ProjectWidget {
   subscriber (§9.1).
 - **No `ADD CONSTRAINT ... FOREIGN KEY`** in a new migration. No scanner rule refuses it yet.
 
-The tree still carries about two hundred `@relation` fields and some hand-written foreign keys in
-older migrations; removing them is ruled conversion work (Alex, 2026-10-06), done per model with the
-cascade replaced first. A cascade the code relied on must be explicit before the relation goes, or
-deletes start leaving orphans.
+The tree's existing `@relation` fields and foreign keys stay as they are (Alex, 2026-10-06): do not
+remove them as a side task. The rule binds new models and new references only.
 
 ## Recipe: add a column
 
