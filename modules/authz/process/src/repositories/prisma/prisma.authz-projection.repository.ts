@@ -69,7 +69,7 @@ function isCompatConflict(error: unknown): boolean {
 }
 
 // Structural type for five models; composition root adapts client once.
-export type AuthzProjectionDatabase = Pick<
+type AuthzProjectionDatabase = Pick<
   PrismaClient,
   "grant" | "role" | "roleBinding" | "customRole" | "shareLink" | "$transaction" | "$executeRaw"
 >;

@@ -29,7 +29,7 @@ import type {
 } from "./authz-grant.events.ts";
 
 export const AUTHZ_GRANTS_WRITE_PROJECTION_NAME = "authzGrantsWrite" as const;
-export const AUTHZ_GRANTS_WRITE_EVENT_TYPES = AUTHZ_GRANTS_EVENT_TYPES;
+const AUTHZ_GRANTS_WRITE_EVENT_TYPES = AUTHZ_GRANTS_EVENT_TYPES;
 
 /**
  * Stateless one-event/one-write projection. Writes are guarded by occurredAt

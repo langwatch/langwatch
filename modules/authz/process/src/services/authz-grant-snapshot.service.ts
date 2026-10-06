@@ -21,7 +21,7 @@ type CacheEntry = {
   endsAtMs: number;
 };
 
-export type AuthzGrantSnapshotServiceOptions = {
+type AuthzGrantSnapshotServiceOptions = {
   epoch?: AuthzEpochRepository;
   cacheEnabled?: () => boolean;
   demoProjectId?: () => string | undefined;

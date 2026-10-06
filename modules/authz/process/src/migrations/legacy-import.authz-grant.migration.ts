@@ -110,7 +110,7 @@ export interface AuthzEngineLedger {
   deleteRole(args: DeleteRoleLedgerInput): Promise<void>;
 }
 
-export type LegacyImportAuthzGrantMigrationOptions = {
+type LegacyImportAuthzGrantMigrationOptions = {
   store: AuthzMigrationRepository;
   ledger: AuthzEngineLedger;
   now: () => number;
@@ -523,7 +523,7 @@ function migrationContentId({
 
 /** Whether one binding row covers one user — named directly, or held
  *  through a group the user belongs to. */
-export type BindingCoverage = (args: { row: LegacyBindingRow; userId: string }) => boolean;
+type BindingCoverage = (args: { row: LegacyBindingRow; userId: string }) => boolean;
 
 /**
  * The coverage predicate, built once per organization from its group memberships.
@@ -547,9 +547,9 @@ class AuthzBindingCoverageMapper {
   }
 }
 
-export type ExpectedShareLink = { row: ShareLinkFactRow; fact: GrantFact };
+type ExpectedShareLink = { row: ShareLinkFactRow; fact: GrantFact };
 
-export type ExpectedFacts = {
+type ExpectedFacts = {
   roles: RoleFact[];
   bindingFacts: GrantFact[];
   teamFacts: GrantFact[];
@@ -932,7 +932,7 @@ function shareLinkToFact({
 /** One named disagreement between a head and the legacy row it mirrors.
  *  Missing and extra rows are not diffs: they are `outstanding` — the fold
  *  has not caught up with what this pass stated or revoked. */
-export type AuthzEngineDiff = {
+type AuthzEngineDiff = {
   kind: "grant_revoked" | "grant_changed" | "role_deleted" | "role_changed" | "resource_changed";
   id: string;
   field?: string;
@@ -940,13 +940,13 @@ export type AuthzEngineDiff = {
   actual?: string | null;
 };
 
-export type HeadState = {
+type HeadState = {
   grantRows: GrantHeadRow[];
   roleHeads: RoleHeadRow[];
   resourceRows: ResourceGrantRow[];
 };
 
-export type CheckResult = { outstanding: string[]; diffs: AuthzEngineDiff[] };
+type CheckResult = { outstanding: string[]; diffs: AuthzEngineDiff[] };
 
 function checkGrantHeads({
   expected,

@@ -6,13 +6,13 @@ import {
 } from "../authz-revocation.repository.ts";
 
 /** The one write this repository performs, and no other. */
-export type RevocationDatabase = {
+type RevocationDatabase = {
   grant: {
     updateMany(args: unknown): Promise<unknown>;
   };
 };
 
-export type PrismaAuthzRevocationRepositoryOptions = {
+type PrismaAuthzRevocationRepositoryOptions = {
   database: RevocationDatabase;
 };
 

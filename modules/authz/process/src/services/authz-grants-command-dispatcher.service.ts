@@ -26,7 +26,7 @@ export abstract class AuthzGrantsCommandDispatcher {
   abstract commands(): Promise<{ commands: AuthzGrantsCommandSenders }>;
 }
 
-export const LEDGER_APP_HANDLE_WAIT_MS = 5_000;
+const LEDGER_APP_HANDLE_WAIT_MS = 5_000;
 
 import { AuthzLedgerUnavailableError } from "@langwatch/authz-contract";
 

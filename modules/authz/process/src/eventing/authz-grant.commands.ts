@@ -2,9 +2,6 @@ import {
   ATTACH_GRANT_COMMAND_TYPE,
   type AttachGrantCommandData,
   attachGrantCommandDataSchema,
-  AUTHZ_GRANT_COMMAND_TYPES,
-  AUTHZ_GRANTS_COMMAND_TYPES,
-  AUTHZ_ROLE_COMMAND_TYPES,
   CHANGE_GRANT_ROLE_COMMAND_TYPE,
   CHANGE_ROLE_PERMISSIONS_COMMAND_TYPE,
   type ChangeGrantRoleCommandData,
@@ -48,18 +45,6 @@ import {
   type RoleDeletedEvent,
   type RolePermissionsChangedEvent,
 } from "./authz-grant.events.ts";
-
-export {
-  ATTACH_GRANT_COMMAND_TYPE,
-  AUTHZ_GRANT_COMMAND_TYPES,
-  AUTHZ_GRANTS_COMMAND_TYPES,
-  AUTHZ_ROLE_COMMAND_TYPES,
-  CHANGE_GRANT_ROLE_COMMAND_TYPE,
-  CHANGE_ROLE_PERMISSIONS_COMMAND_TYPE,
-  DEFINE_ROLE_COMMAND_TYPE,
-  DELETE_ROLE_COMMAND_TYPE,
-  REVOKE_GRANT_COMMAND_TYPE,
-};
 
 function authzCommandSchema<Payload, const Type extends string>(
   type: Type,

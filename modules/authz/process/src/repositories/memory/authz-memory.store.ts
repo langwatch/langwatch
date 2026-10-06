@@ -19,7 +19,7 @@ import type {
 } from "../prisma/prisma.authz-grant.mapper.ts";
 
 /** A user's standing as authz folded it from user's and identity's facts. */
-export type AuthzMemoryUserStandingRow = {
+type AuthzMemoryUserStandingRow = {
   deactivated: boolean;
   erased: boolean;
   changedAtMs: number;
@@ -52,7 +52,7 @@ export type AuthzMemoryCustomRoleRow = AuthzAssignableRoleRow & {
  * An OrganizationUser row: the role, the seat, the generation the grant fence
  * compares, and the grant an unfinished single-sign-on admission waits for.
  */
-export type AuthzMemoryMembershipRow = {
+type AuthzMemoryMembershipRow = {
   role: OrganizationRole;
   disabled: boolean;
   membershipStamp: string;
@@ -61,9 +61,9 @@ export type AuthzMemoryMembershipRow = {
 };
 
 /** A Group row; its members are `groupMemberships`. */
-export type AuthzMemoryGroupRow = AuthzUserGroupRow["group"] & { organizationId: string };
+type AuthzMemoryGroupRow = AuthzUserGroupRow["group"] & { organizationId: string };
 
-export type AuthzMemoryApiKeyRow = {
+type AuthzMemoryApiKeyRow = {
   id: string;
   organizationId: string;
   name: string;
@@ -72,7 +72,7 @@ export type AuthzMemoryApiKeyRow = {
 };
 
 /** A TeamUser row; its organization is its team's. */
-export type AuthzMemoryTeamRow = {
+type AuthzMemoryTeamRow = {
   id: string;
   organizationId: string;
   name: string;
@@ -80,13 +80,13 @@ export type AuthzMemoryTeamRow = {
   ownerUserId: string | null;
 };
 
-export type AuthzMemoryInviteRow = {
+type AuthzMemoryInviteRow = {
   organizationId: string;
   email: string;
   status: "PENDING" | "ACCEPTED" | "WAITING_APPROVAL" | "PAYMENT_PENDING" | "REVOKED";
 };
 
-export type AuthzMemoryTeamMembershipRow = {
+type AuthzMemoryTeamMembershipRow = {
   teamId: string;
   userId: string;
   role: TeamUserRole;
@@ -94,7 +94,7 @@ export type AuthzMemoryTeamMembershipRow = {
   createdAt: Instant;
 };
 
-export type AuthzMemoryProjectRow = {
+type AuthzMemoryProjectRow = {
   id: string;
   teamId: string;
   name: string;
@@ -104,14 +104,14 @@ export type AuthzMemoryProjectRow = {
 };
 
 /** A share grant's counted views (GrantUsage). */
-export type AuthzMemoryGrantUsageRow = {
+type AuthzMemoryGrantUsageRow = {
   grantId: string;
   organizationId: string;
   projectId: string;
   viewCount: number;
 };
 
-export type AuthzMemoryCutoverRow = {
+type AuthzMemoryCutoverRow = {
   organizationId: string;
   status: MigrationTenantStatus;
   occurredAt: Instant | null;

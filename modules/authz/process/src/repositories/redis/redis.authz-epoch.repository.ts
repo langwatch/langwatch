@@ -8,7 +8,7 @@ const EPOCH_KEY_PREFIX = "authz:epoch:";
 
 export type AuthzEpochRedis = Pick<RedisConnection, "get" | "incr">;
 
-export type RedisAuthzEpochRepositoryOptions = {
+type RedisAuthzEpochRepositoryOptions = {
   redis: AuthzEpochRedis | null;
 };
 

@@ -48,7 +48,6 @@ export type GrantWrite = {
  * signal (Prisma P2002) onto this; GrantsService names it for the customer.
  */
 export { BindingMissingError, DuplicateBindingError };
-export type { OffboardCounts };
 
 export abstract class AuthzGrantRepository extends ScopeLineageRepository {
   abstract createBinding(args: {

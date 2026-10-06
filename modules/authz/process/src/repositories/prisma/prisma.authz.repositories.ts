@@ -15,7 +15,7 @@ import { PrismaAuthzProjectionRepository } from "./prisma.authz-projection.repos
 import { PrismaAuthzRevocationRepository } from "./prisma.authz-revocation.repository.ts";
 import { PrismaAuthzUserStandingRepository } from "./prisma.authz-user-standing.repository.ts";
 
-export type AuthzPostgresRepositories = Omit<AuthzRepositories, "epoch" | "sessionVersions">;
+type AuthzPostgresRepositories = Omit<AuthzRepositories, "epoch" | "sessionVersions">;
 
 /**
  * The Postgres rows: binding facts, engine cutover, admissions, standings, the audit trail, the

@@ -84,13 +84,7 @@ export function grantWire({
   };
 }
 
-export function matchesGrantQuery({
-  grant,
-  query,
-}: {
-  grant: Grant;
-  query: GrantListQuery;
-}): boolean {
+function matchesGrantQuery({ grant, query }: { grant: Grant; query: GrantListQuery }): boolean {
   return (
     (query.principalType === undefined || grant.principal.type === query.principalType) &&
     (query.principalId === undefined || grant.principal.id === query.principalId) &&
@@ -114,7 +108,7 @@ function compareAscending(a: Position, b: Position): number {
   return a.id > b.id ? 1 : -1;
 }
 
-export function encodeGrantCursor(position: Position): string {
+function encodeGrantCursor(position: Position): string {
   return `${position.createdAtMs}.${Buffer.from(position.id, "utf8").toString("base64url")}`;
 }
 

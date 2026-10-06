@@ -23,7 +23,7 @@ export type AuthzGrantFilter = Record<string, unknown> & {
 
 /** A compat binding filter as the Grant-head predicate it names, or the outcome that it names
  *  none. */
-export type GrantWhereTranslation =
+type GrantWhereTranslation =
   | { kind: "translated"; where: AuthzGrantFilter }
   | { kind: "untranslatable" };
 

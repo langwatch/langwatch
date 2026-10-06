@@ -56,7 +56,7 @@ function rethrowLedgerFailure(error: unknown): never {
   throw error;
 }
 
-export type EventingAuthzGrantRepositoryOptions = {
+type EventingAuthzGrantRepositoryOptions = {
   /** The live Grant and Role heads, the directory's grants and the offboarding transaction. */
   reads: AuthzLedgerReadRepository;
   /** Which team and organization a scope sits in: the decision reads' own lineage. */

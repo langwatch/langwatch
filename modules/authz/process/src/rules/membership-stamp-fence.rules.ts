@@ -6,7 +6,7 @@
 import type { GrantScopeTier, TeamUserRole } from "@langwatch/authz-contract";
 
 /** Exactly the fields the fence reads off a binding about to be attached. */
-export type FencedBindingAttach = {
+type FencedBindingAttach = {
   principal: { userId?: string | undefined };
   role: TeamUserRole;
   customRoleId: string | null;
@@ -17,7 +17,7 @@ export type FencedBindingAttach = {
 };
 
 /** The fence fields a grant entry carries; empty for a principal with no membership. */
-export type MembershipFenceFields = {
+type MembershipFenceFields = {
   membershipStamp?: string;
   membershipBootstrap?: boolean;
 };

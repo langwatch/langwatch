@@ -9,7 +9,7 @@ import type {
 import { type Instant, toDate } from "@langwatch/time";
 
 /** One binding as both the list and the writes report it. */
-export type BindingWire = {
+type BindingWire = {
   id: string;
   principal: {
     type: "user" | "group" | "apiKey";
@@ -28,7 +28,7 @@ export type BindingWire = {
 };
 
 /** The principal a create names — exactly one of the three id fields. */
-export type CreatedPrincipal = {
+type CreatedPrincipal = {
   userId?: string | undefined;
   groupId?: string | undefined;
   apiKeyId?: string | undefined;

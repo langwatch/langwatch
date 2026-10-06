@@ -4,7 +4,7 @@ import { z } from "zod";
 import { AuthzUserStandingRepository } from "../authz-user-standing.repository.ts";
 
 /** The raw statements the standing table is written in: each upsert is one statement. */
-export type PrismaAuthzUserStandingDatabase = {
+type PrismaAuthzUserStandingDatabase = {
   $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<number>;
   $queryRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
 };

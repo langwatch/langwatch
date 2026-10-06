@@ -37,7 +37,7 @@ export type RoleHolderRow = {
   principalId: string | null;
 };
 
-export function isBindingScope(scopeType: string): scopeType is GrantScopeTier {
+function isBindingScope(scopeType: string): scopeType is GrantScopeTier {
   return (BINDING_SCOPE_TYPES as readonly string[]).includes(scopeType);
 }
 

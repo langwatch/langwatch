@@ -11,7 +11,7 @@ export type AuthzMembershipStampTransaction = {
 };
 
 /** One interactive transaction, one statement: the lock is the point. */
-export type AuthzMembershipStampDatabase = {
+type AuthzMembershipStampDatabase = {
   $transaction<Result>(
     run: (tx: AuthzMembershipStampTransaction) => Promise<Result>,
   ): Promise<Result>;

@@ -53,7 +53,7 @@ const storedPermissionsSchema = z.array(z.string());
 /**
  * Which writer authored a runtime fact — the event's `source` field.
  */
-export type LedgerWriteSource = GrantEventSource;
+type LedgerWriteSource = GrantEventSource;
 
 // A background caller waiting on this read-your-writes poll is not being
 // watched by a person — the only cost of a lazy poll is a job slot, and the
@@ -77,7 +77,7 @@ export type LedgerBindingAttach = Omit<GrantWrite, "organizationId"> & {
  * vocabulary — PUBLIC is "anyone" (id null, because there is nobody to name), and the
  * other two name the organization or project whose members the link is for.
  */
-export type LedgerResourcePrincipal =
+type LedgerResourcePrincipal =
   | { type: "anyone"; id: null }
   | { type: "organization"; id: string }
   | { type: "project"; id: string };
@@ -87,14 +87,14 @@ export type LedgerResourcePrincipal =
  * optional columns (the legacy row shape); the ledger carries a union that makes "two
  * principals on one row" unrepresentable, and this is the single place the two meet.
  */
-export type AttachOutcome = {
+type AttachOutcome = {
   /** Binding ids actually emitted (duplicates skipped when asked to). */
   attached: string[];
   /** Binding ids of pre-existing identical rows the write skipped. */
   duplicates: string[];
 };
 
-export type EventingAuthzLedgerAdapterOptions = {
+type EventingAuthzLedgerAdapterOptions = {
   /** The live Grant and Role heads every read-your-writes hold polls. */
   reads: AuthzLedgerReadRepository;
   dispatcher: AuthzGrantsCommandDispatcher;

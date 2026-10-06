@@ -4,7 +4,7 @@ import { nowInstant } from "@langwatch/time";
 type CacheEntry = { isOn: boolean; expiresAt: number };
 type InFlightEntry = { promise: Promise<boolean>; isStale: boolean };
 
-export const MAX_CACHE_ENTRIES = 5_000;
+const MAX_CACHE_ENTRIES = 5_000;
 
 export type PerOrganizationCachedGateServiceOptions = {
   name: string;
