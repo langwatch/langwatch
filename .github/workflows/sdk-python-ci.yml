@@ -271,6 +271,9 @@ jobs:
         working-directory: sdks/python
         env:
           LANGWATCH_DEBUG: "true"
+          # The job-level DATABASE_URL belongs to the stack. Left set, chainlit
+          # loads its Postgres data layer and imports asyncpg, which is not installed.
+          DATABASE_URL: ""
           # The branch's own stack, seeded above; never production.
           LANGWATCH_ENDPOINT: http://localhost:5560
           LANGWATCH_API_KEY: sk-lw-local-development-key
