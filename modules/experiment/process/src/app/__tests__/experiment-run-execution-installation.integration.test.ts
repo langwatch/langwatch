@@ -295,6 +295,8 @@ describe.skipIf(!connection)("given a saved workbench with one row and one promp
   };
 
   /** @scenario "A polled run answers at once and is read back completed from the fold" */
+  /** @scenario "A run started with no browser covers what the workbench holds" */
+  /** @scenario "A run started with no browser fills the cells the workbench shows" */
   it("answers the run at once, writes the board, then reads it completed", async () => {
     const boardHeldAtCompletion: boolean[] = [];
     await withPair(

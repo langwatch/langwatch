@@ -87,6 +87,7 @@ describe("connectRefusalOf", () => {
 
   /** @scenario "An ingestion key cannot connect" */
   /** @scenario "A Langy session key cannot connect" */
+  /** @scenario "Unsupported credentials cannot discover projects" */
   it("answers an ingestion or Langy session key as key_type_not_allowed at 403", () => {
     for (const kind of ["ingestion_key", "langy_session_key"] as const) {
       expect(connectRefusalOf(new KeyKindRefusedError(kind))).toMatchObject({
