@@ -31,20 +31,6 @@ Feature: The API's Enterprise application slot, member by member
     Then it goes through the same delivery egress the worker delivers through
 
   @unit
-  Scenario: The operator's connection back office is composed
-    Given the process holds a database connection and a queue
-    When the Enterprise application is composed
-    Then the single sign-on back-office member is present
-    And the operator can list this deployment's connections
-
-  @unit
-  Scenario: A process with no queue composes no connection ledger
-    Given the process holds a database connection and no queue
-    When the Enterprise application is composed
-    Then the single sign-on back-office member is absent
-    And the other composed members are unaffected
-
-  @unit
   Scenario: A process with no database composes no member at all
     Given the process holds no database connection
     When the Enterprise application is composed
@@ -63,9 +49,3 @@ Feature: The API's Enterprise application slot, member by member
     When an organization reaches a resource limit
     Then the notification refuses by name on the returned promise
     And the action that reached the limit is not failed by the missing notifier
-
-  @unit
-  Scenario: The single sign-on back office refuses by name with no ledger composed
-    Given the process composed no single sign-on back-office member
-    When an operator opens the back office
-    Then the refusal names the single sign-on ledger

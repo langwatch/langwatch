@@ -86,4 +86,15 @@ describe.skipIf(!DB_URL)("the walk a migration pass drives, on Postgres", () => 
       await expect(visited()).resolves.toEqual([]);
     });
   });
+
+  describe("given an organization an operator rolled back for every migration the pass drives", () => {
+    /** @scenario "A tenant an operator rolled back is not visited again" */
+    it("is not walked at all, because the pin is as final as a finalized record", async () => {
+      await prisma.systemMigrationTenantState.deleteMany({ where: { tenantId: ORGANIZATION } });
+      await record(DRIVEN[0]!, "rolled_back");
+      await record(DRIVEN[1]!, "rolled_back");
+
+      await expect(visited()).resolves.toEqual([]);
+    });
+  });
 });

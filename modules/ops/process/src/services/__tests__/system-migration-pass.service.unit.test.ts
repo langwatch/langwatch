@@ -223,6 +223,79 @@ describe("SystemMigrationPassService", () => {
   });
 });
 
+describe("a pass's user-rooted leg", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  describe("given one migration declares its own candidate tenants and another is driven over every user", () => {
+    /** @scenario "A migration that declares its own tenants keeps them" */
+    it("drives the declaring migration over its candidates and the other over the users with work left", async () => {
+      const { database } = stubDatabase({ enrollments: [], memberships: {} });
+      vi.spyOn(RedisMigrationLeaseRepository.prototype, "acquire").mockResolvedValue(true);
+      vi.spyOn(RedisMigrationLeaseRepository.prototype, "release").mockResolvedValue();
+      vi.spyOn(PrismaSystemMigrationStateRepository.prototype, "getRecord").mockImplementation(
+        async (args) => {
+          throw new SystemMigrationRecordNotFoundError(args);
+        },
+      );
+      vi.spyOn(
+        PrismaSystemMigrationStateRepository.prototype,
+        "upsertRecordUnlessRolledBack",
+      ).mockResolvedValue(true);
+      const migrateDrifted = vi.fn(async () => ({ status: "finalized" as const }));
+      const migrateEveryone = vi.fn(async () => ({ status: "finalized" as const }));
+      const declaring: SystemMigration = {
+        ...migrationOf({
+          name: "heal",
+          enrolledAutomatically: true,
+          migrateTenant: migrateDrifted,
+        }),
+        candidateTenants: pageOf(["user_drifted"]),
+      };
+      const everyone = migrationOf({
+        name: "backfill",
+        enrolledAutomatically: true,
+        migrateTenant: migrateEveryone,
+      });
+      const pendingFor = vi.fn(() => pageOf(["user_with_work_left"]));
+      const adapter = SystemMigrationPassService.create({
+        repositories: {
+          ...passRepositoriesOver(database),
+          userTenants: {
+            findTenantIdsAfter: async () => ["user_a", "user_b", "user_with_work_left"],
+            pendingFor,
+          },
+        },
+        isSaaS: () => true,
+        migrations: () => [],
+        userMigrations: () => [everyone, declaring],
+        newbornSweep: async () => {},
+      });
+
+      await adapter.runPass({});
+
+      expect(migrateDrifted).toHaveBeenCalledTimes(1);
+      expect(migrateDrifted).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: "user_drifted" }),
+      );
+      expect(migrateEveryone).toHaveBeenCalledTimes(1);
+      expect(migrateEveryone).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: "user_with_work_left" }),
+      );
+      // The narrowing is asked for the migrations the bucket drives, never the declaring one's.
+      expect(pendingFor).toHaveBeenCalledTimes(1);
+      expect(pendingFor).toHaveBeenCalledWith({ migrationNames: ["backfill"] });
+    });
+  });
+});
+
+function pageOf(ids: string[]) {
+  return {
+    async findTenantIdsAfter({ cursor }: { cursor: string | null }): Promise<string[]> {
+      return cursor === null ? ids : [];
+    },
+  };
+}
+
 /** The pass's own enrollment reader, over the same faked storage. */
 function enrollmentsOf(database: PrismaClient) {
   return PrismaSystemMigrationEnrollmentRepository.create({ prisma: database });
