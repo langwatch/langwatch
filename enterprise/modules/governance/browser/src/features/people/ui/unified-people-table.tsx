@@ -113,12 +113,14 @@ export function UnifiedPeopleTable({
       size="sm"
       tableLayout="fixed"
       width="full"
-      minWidth="62rem"
+      minWidth="92rem"
       containerProps={{ overflowX: "auto" }}
     >
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Person</Table.ColumnHeader>
+          <Table.ColumnHeader width="11rem">Provider</Table.ColumnHeader>
+          <Table.ColumnHeader width="8rem">Kind</Table.ColumnHeader>
           <Table.ColumnHeader width="9.5rem">Department</Table.ColumnHeader>
           <Table.ColumnHeader width="7.5rem" textAlign="end">
             <MeasuredHeading>Spend</MeasuredHeading>
@@ -127,7 +129,10 @@ export function UnifiedPeopleTable({
             <MeasuredHeading>Requests</MeasuredHeading>
           </Table.ColumnHeader>
           <Table.ColumnHeader width="7.25rem">Last active</Table.ColumnHeader>
+          <Table.ColumnHeader width="7.25rem">First seen</Table.ColumnHeader>
+          <Table.ColumnHeader width="7.25rem">Last seen</Table.ColumnHeader>
           <Table.ColumnHeader width="10rem">Status</Table.ColumnHeader>
+          <Table.ColumnHeader width="11rem">Link proof</Table.ColumnHeader>
           {assignable && (
             <Table.ColumnHeader width="4rem" textAlign="end">
               Actions
@@ -163,21 +168,33 @@ function personNames(row: PeopleRow): { primary: string; avatarName: string } {
   };
 }
 
-/**
- * Who we decided the account is, and what proved it, as one phrase. The name
- * is dropped when it repeats the row's own name.
- */
-function matchSummary({
-  row,
-  primary,
-}: {
-  row: PeopleRow;
-  /** The name already on the row, so the phrase does not repeat it. */
-  primary: string;
-}): string | null {
-  const memberName = row.matchDetail && row.matchDetail !== primary ? row.matchDetail : null;
-  const evidence = row.evidenceKind ? (EVIDENCE_LABEL[row.evidenceKind] ?? row.evidenceKind) : null;
-  return [memberName, evidence].filter(Boolean).join(" · ") || null;
+/** What proved the link, in the reader's words; null when there is no link proof. */
+function proofLabel(row: PeopleRow): string | null {
+  return row.evidenceKind ? (EVIDENCE_LABEL[row.evidenceKind] ?? row.evidenceKind) : null;
+}
+
+/** "service_account" read as "Service account". */
+function kindLabel(kind: string): string {
+  const words = kind.replaceAll("_", " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** A moment a provider named someone, relative with the exact time on hover. */
+function SeenCell({ iso }: { iso: string | null }) {
+  return (
+    <Table.Cell color="fg.muted" whiteSpace="nowrap" title={iso ?? undefined}>
+      {iso === null ? notMeasured : formatRelativeTime(iso)}
+    </Table.Cell>
+  );
+}
+
+/** The provider that named the person, or a dash for someone only the gateway saw. */
+function PersonProviderCell({ row }: { row: PeopleRow }) {
+  return (
+    <Table.Cell color="fg.muted" truncate title={row.provider ?? undefined}>
+      {row.provider === null ? notMeasured : providerLabel(row.provider)}
+    </Table.Cell>
+  );
 }
 
 /** One person, one row, its cells split out by what each one answers. */
@@ -193,7 +210,8 @@ function PersonRow({
   const router = useGovernanceRouter();
   const href = personHref(row);
   const { primary, avatarName } = personNames(row);
-  const matchDetail = matchSummary({ row, primary });
+  const matchDetail = row.matchDetail && row.matchDetail !== primary ? row.matchDetail : null;
+  const proof = proofLabel(row);
 
   return (
     <Table.Row
@@ -209,6 +227,12 @@ function PersonRow({
         source={source}
       />
 
+      <PersonProviderCell row={row} />
+
+      <Table.Cell color="fg.muted" truncate title={row.kind ?? undefined}>
+        {row.kind === null ? notMeasured : kindLabel(row.kind)}
+      </Table.Cell>
+
       <PersonDepartmentCell row={row} />
 
       <Table.Cell textAlign="end" fontWeight="semibold" whiteSpace="nowrap">
@@ -223,7 +247,14 @@ function PersonRow({
         {row.lastActiveIso === null ? notMeasured : formatRelativeTime(row.lastActiveIso)}
       </Table.Cell>
 
+      <SeenCell iso={row.firstSeenIso} />
+      <SeenCell iso={row.lastSeenIso} />
+
       <PersonStatusCell row={row} matchDetail={matchDetail} />
+
+      <Table.Cell color="fg.muted" truncate title={proof ?? undefined}>
+        {proof ?? notMeasured}
+      </Table.Cell>
 
       {onAssignDepartment && (
         <PersonActionsCell row={row} primary={primary} onAssignDepartment={onAssignDepartment} />
@@ -394,7 +425,7 @@ function PersonIdentityLine({
 }) {
   const showsIdentifier = row.identifier !== null && row.identifier !== primary;
 
-  if (!showsIdentifier && row.provider === null && !row.mostUsedTarget) {
+  if (!showsIdentifier && !row.mostUsedTarget) {
     return null;
   }
 
@@ -414,18 +445,6 @@ function PersonIdentityLine({
           {row.identifier}
         </Text>
       )}
-      {row.provider !== null &&
-        (row.status === "unmatched" ? (
-          <ShrinkingBadge
-            label={`Seen at ${providerLabel(row.provider)}`}
-            variant="surface"
-            colorPalette="gray"
-          />
-        ) : (
-          <Text fontSize="xs" color="fg.muted" flexShrink={0} whiteSpace="nowrap">
-            {providerLabel(row.provider)}
-          </Text>
-        ))}
       {row.mostUsedTarget &&
         (source ? (
           <Link
