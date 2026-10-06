@@ -16,14 +16,17 @@ const PACKAGE_ROOT = resolve(__dirname, "../..");
 const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
 
 /**
- * Packages on TypeScript 6 as a library: sdks/typescript, mcp/typescript,
- * packages/ksuid (tsup and publish builds), architecture-enforcer (parser).
+ * On TypeScript 6: sdks/typescript, mcp/typescript, packages/ksuid and
+ * packages/webhook-verify (publish builds), architecture-enforcer (parser) and
+ * the readmegen extractor, which runs inside it (tools/readmegen/extract.go).
  */
 const HELD_ON_SIX = new Set([
   "sdks/typescript",
   "mcp/typescript",
   "packages/ksuid",
   "packages/architecture-enforcer",
+  "packages/webhook-verify",
+  "tools/readmegen/extract",
 ]);
 
 /**
