@@ -13994,6 +13994,9 @@ importers:
 
   modules/suite/contract:
     dependencies:
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
@@ -14794,6 +14797,9 @@ importers:
 
   modules/usage/contract:
     dependencies:
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
