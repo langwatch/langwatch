@@ -1,5 +1,6 @@
 Feature: SaaS browser integrations
 
+  @integration
   Scenario: Third-party scripts stay dormant off SaaS
     Given the SaaS footer receives isSaas false
     When it renders

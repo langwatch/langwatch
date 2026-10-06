@@ -63,4 +63,35 @@ describe("ExtraFooterComponents", () => {
     );
     expect(identify).toHaveBeenCalledOnce();
   });
+
+  describe("when the deployment is not SaaS", () => {
+    /** @scenario "Third-party scripts stay dormant off SaaS" */
+    it("renders no third-party script and turns the chat bubble off", () => {
+      const scripts = vi.fn();
+      const configureCrispBubble = vi.fn();
+      function RecordingScript(props: { id: string }) {
+        scripts(props.id);
+        return null;
+      }
+
+      const { container } = render(
+        <ExtraFooterComponents
+          isSaas={false}
+          user={{ id: "user-1", email: "user@example.com", name: "User", impersonator: null }}
+          organization={{ id: "org-1", name: "Acme" }}
+          project={{ id: "project-1", name: "Main" }}
+          environment="test"
+          pathname="/"
+          runtime={new TestRuntime()}
+          analytics={SaasBrowserAnalytics.create({ identifyPostHog: vi.fn(), intervalMs: 10 })}
+          Script={RecordingScript}
+          configureCrispBubble={configureCrispBubble}
+        />,
+      );
+
+      expect(scripts).not.toHaveBeenCalled();
+      expect(container.innerHTML).toBe("");
+      expect(configureCrispBubble).toHaveBeenCalledWith(false);
+    });
+  });
 });

@@ -5,7 +5,7 @@ Feature: Agents package boundary
   I want one portable contract and one implementation behind internal RPC and legacy REST
   So that agent definitions can move out of the app without duplicating behaviour
 
-  @architecture @typecheck
+  @unit @architecture @typecheck
   Scenario: Agent contract values are portable
     Given a browser or another feature needs an agent definition
     When it imports @langwatch/agent-contract
@@ -110,7 +110,7 @@ Feature: Agents package boundary
     Then it invokes the complete WorkflowApi supplied by the composition root
     And Agents server imports no Workflows server or repository implementation
 
-  @architecture @web @typecheck
+  @unit @architecture @web @typecheck
   Scenario: Agents web is browser safe
     Given the app composes an Agents screen
     Then the screen reaches behaviour through an injected browser client
@@ -179,7 +179,7 @@ Feature: Agents package boundary
       Then that team's projects are listed and cannot be chosen
       And a team the reader holds no membership on contributes no projects at all
 
-  @web @http-agent
+  @integration @web @http-agent
   Scenario: HTTP editor preserves stored and default scenario mappings
     Given an existing HTTP agent has persisted scenario mappings
     When its editor opens
@@ -240,7 +240,7 @@ Feature: Agents package boundary
     When they select Test agent
     Then the browser client invokes the declared test-run procedure for the active project
 
-  @architecture
+  @unit @architecture
   Scenario: Coding-agent observability remains a separate feature
     Given the Agents package is extracted
     Then coding-agent sessions, projections, trace normalization and pull-request usage do not move into it

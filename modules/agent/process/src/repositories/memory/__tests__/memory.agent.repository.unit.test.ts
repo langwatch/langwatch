@@ -30,6 +30,7 @@ function connected(id: string, projectId = "project-a"): RegisterPersistedAgentI
 }
 
 describe("MemoryAgentRepository", () => {
+  /** @scenario "Workflow mapping updates cannot bypass Agent ownership" */
   it("scopes workflow configs and keeps detached metadata when mappings change", async () => {
     const repository = MemoryAgentRepository.create();
     await repository.create({ ...agent("a"), workflowId: "workflow-a" });

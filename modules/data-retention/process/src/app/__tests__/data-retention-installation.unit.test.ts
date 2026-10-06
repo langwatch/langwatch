@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import {
   DataRetentionApi,
   PLATFORM_DEFAULT_RETENTION_DAYS,
@@ -16,15 +19,18 @@ import {
   retentionTestGraph,
 } from "./data-retention.fixture.ts";
 
-function process(role: "api" | "worker") {
+function process(
+  role: "api" | "worker",
+  config: { platformDefaultDays?: string; nodeEnvironment?: string } = {},
+) {
   return createApp({ role })
     .withModules([dataRetentionProcessModule])
     .withStores(memoryStores())
     .withConfig({
       "data-retention": {
-        platformDefaultDays: undefined,
+        platformDefaultDays: config.platformDefaultDays,
         isSaas: true,
-        nodeEnvironment: undefined,
+        nodeEnvironment: config.nodeEnvironment,
       },
     })
     .provide({
@@ -64,5 +70,41 @@ describe("data retention app installation", () => {
     } finally {
       await runtime.stop();
     }
+  });
+
+  describe("when boot validates a platform default named in its configuration", () => {
+    /** @scenario "Boot supplies the platform default" */
+    it("resolves every project to that default, with the contract reading no environment", async () => {
+      const runtime = await process("api", {
+        platformDefaultDays: "7",
+        nodeEnvironment: "test",
+      }).boot();
+
+      try {
+        await expect(
+          runtime
+            .service(DataRetentionApi)
+            .getResolvedForProject({ projectId: retentionTestGraph.projectId }),
+        ).resolves.toEqual({ traces: 7, scenarios: 7, experiments: 7 });
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("when the contract is imported", () => {
+    /** @scenario "Boot supplies the platform default" */
+    it("holds no read of the process environment", () => {
+      const contractSrc = join(import.meta.dirname, "..", "..", "..", "..", "contract", "src");
+      const readers = readdirSync(contractSrc)
+        .filter((file) => file.endsWith(".ts"))
+        .filter((file) =>
+          readFileSync(join(contractSrc, file), "utf8")
+            .split("\n")
+            .some((line) => !/^\s*(\/\/|\/?\*)/.test(line) && /process\.env\b/.test(line)),
+        );
+
+      expect(readers).toEqual([]);
+    });
   });
 });

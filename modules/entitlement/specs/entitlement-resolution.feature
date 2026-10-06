@@ -5,7 +5,7 @@ Feature: Provider-neutral entitlement resolution
   I want one provider-neutral plan contract
   So that limits work in SaaS and self-hosted deployments without importing enterprise code
 
-  @architecture @typecheck
+  @unit @architecture @typecheck
   Scenario: Core consumers import only the entitlement contract
     Given a core feature needs an organization's plan
     Then it depends on @langwatch/entitlement-contract
@@ -71,7 +71,7 @@ Feature: Provider-neutral entitlement resolution
     Then the resulting value contains only Entitlements contract fields
     And no Stripe identifier, signed-license payload or database record is exposed
 
-  @architecture @typecheck
+  @unit @architecture @typecheck
   Scenario: The entitlement installer constructs its private service
     Given Entitlements contract schemas are compiled independently
     When a runtime installs entitlementProcessModule

@@ -166,6 +166,7 @@ describe("SpendSpikeAnomalyEvaluatorService", () => {
     expect(spend.findSpendTotals).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Spend spike evaluation does not expose storage syntax" */
   it("passes a source scope as structured data rather than SQL", async () => {
     const repository = new MemoryAnomalyRepository([
       rule({ scope: "source", scopeId: "source-1" }),

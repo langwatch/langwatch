@@ -66,6 +66,7 @@ Feature: Analytics timeseries service
 
   Rule: Keep feature ownership narrow
 
+    @unit
     Scenario: Analytics does not own product lifecycles
       Given Dashboard owns saved charts and Topic owns clustering
       When those features need timeseries data

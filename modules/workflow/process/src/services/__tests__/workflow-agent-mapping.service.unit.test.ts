@@ -283,6 +283,7 @@ describe("WorkflowAgentMappingService", () => {
 
   describe("when existing scenarioMappings reference stale fields", () => {
     /** @scenario Re-computes mappings when existing mappings reference stale fields */
+    /** @scenario "Workflow mapping updates cannot bypass Agent ownership" */
     it("re-computes mappings against the current workflow inputs", async () => {
       // Workflow now has "prompt" — but agent still maps "old_query"
       const dsl = buildDSL({ inputs: ["prompt"], output: "response" });
@@ -308,7 +309,9 @@ describe("WorkflowAgentMappingService", () => {
         dsl,
       });
 
-      expect(mocks.updateWorkflowConfig).toHaveBeenCalled();
+      expect(mocks.updateWorkflowConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "agent-1", projectId: "proj-1", workflowId: "wf-1" }),
+      );
       const config = updatedConfigs["agent-1"];
       expect(config).toBeDefined();
       const mappings = config!.scenarioMappings as Record<string, unknown>;

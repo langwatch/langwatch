@@ -8,6 +8,7 @@ Feature: Data Privacy service
     And essential PII redaction is enabled
     And secrets redaction is enabled
 
+  @unit
   Scenario: The nearest scope wins while patterns accumulate
     Given an organization rule and a narrower team rule
     When the data privacy service resolves a project in that team

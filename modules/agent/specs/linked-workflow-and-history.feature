@@ -50,7 +50,7 @@ Feature: Agent coordinates linked workflows and history through their owners
     And UserApi supplies each available author's id, name and email
     And an entry without an available author contains no user
 
-  @architecture @agents
+  @unit @architecture @agents
   Scenario: Workflow mapping updates cannot bypass Agent ownership
     Given Workflow recomputes a linked agent's field mappings
     When it persists the configuration

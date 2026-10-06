@@ -80,6 +80,7 @@ describe("entitlement app installation", () => {
   /**
    * @scenario "The core baseline works without enterprise sources"
    * @scenario "An organization's month volume is counted from its projects in its metering unit"
+   * @scenario "The entitlement installer constructs its private service"
    * `EntitlementModule` reads no members and declares no subscription
    * dependency at all, and its declared `license` dependency is answered
    * here with a source that never grants — so a plain boot, with no

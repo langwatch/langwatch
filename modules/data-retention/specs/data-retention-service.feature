@@ -91,6 +91,7 @@ Feature: Data Retention service boundary
     When a retention rule is written at the organization or at the governance project's team
     Then the resolved policy of the governance project is invalidated too
 
+  @unit
   Scenario: Boot supplies the platform default
     Given the process has validated its retention configuration
     When it composes the Data Retention service
