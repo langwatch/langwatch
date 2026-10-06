@@ -1,7 +1,7 @@
 /**
- * The "Add a block" picker: every catalogue widget, narrowed by the templates library's search
- * and filters (kept only while open), in branch sections marked by trunk. Choosing one adds it,
- * then drafts its prompt in Langy when available. A pinned footer asks Langy anything else.
+ * The "Add a block" picker: every catalogue widget, filtered as the library is (only while
+ * open), in branch sections by trunk. Choosing one adds it and drafts its widget's prompt in
+ * Langy, as Ask Langy on its card does (AC141). A pinned footer asks Langy anything else.
  */
 
 import { Dialog } from "@langwatch/design-system/dialog";
@@ -31,12 +31,13 @@ import {
   type PickerQuestion,
   type PickerSection,
   pickerSections,
+  pickerWidgets,
 } from "../../catalogue/index.ts";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import {
   type BoardSubject,
-  boardPromptDraft,
   boardQuestion,
+  widgetPromptDraft,
 } from "../../langy/model/board-langy.ts";
 import type { BlockQuestion, BlockQuestionIcon } from "../../model/block-questions.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
@@ -101,7 +102,9 @@ export function BlockPickerDialog({
     // A failed write is reported by the host; leave the picker open and seed nothing.
     if (!(await onAddWidgets(question))) return;
     if (langy.enabled) {
-      langy.ask(boardPromptDraft({ prompt: question.prompt, board, period }));
+      for (const widget of pickerWidgets(question.id)) {
+        langy.ask(widgetPromptDraft({ widget, board, period }));
+      }
     }
     onClose();
   };

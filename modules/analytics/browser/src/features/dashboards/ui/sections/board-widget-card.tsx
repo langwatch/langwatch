@@ -12,6 +12,7 @@ import type { DashboardWidgetDraft } from "../../../../model/dashboard-widget-de
 import { CHART_GRID_DRAG_HANDLE_CLASS } from "../../../../ui/sections/chart-grid.tsx";
 import { DashboardWidgetFrameOverWindow } from "../../../../ui/sections/dashboard-widget-frame.tsx";
 import { DashboardWidgetInPlaceEditor } from "../../../../ui/sections/dashboard-widget-in-place-editor.tsx";
+import type { WidgetSetup } from "../../langy/model/board-langy.ts";
 import { boardCardHeightPx } from "../../model/board-grid.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
@@ -36,6 +37,7 @@ export function BoardWidgetCard({
   onDelete,
   onSave,
   onAskLangy,
+  onSetUp,
 }: {
   widget: BoardWidget;
   projectId: string;
@@ -49,6 +51,8 @@ export function BoardWidgetCard({
   onSave: (input: { draft: DashboardWidgetDraft; onSaved: () => void }) => void;
   /** Drafts this widget's prompt in Langy; absent when Langy is not available. */
   onAskLangy?: () => void;
+  /** Drafts an alert or report on this widget in Langy; absent when Langy is not available. */
+  onSetUp?: (setup: WidgetSetup) => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const { periodStart, periodEnd, granularitySeconds } = period;
@@ -124,6 +128,8 @@ export function BoardWidgetCard({
             disabled={isWriting}
             onEdit={() => setIsEditing(true)}
             onDuplicate={onDuplicate}
+            onSetAlert={onSetUp && (() => onSetUp("alert"))}
+            onSendReport={onSetUp && (() => onSetUp("report"))}
             onDelete={onDelete}
           />
         </HStack>

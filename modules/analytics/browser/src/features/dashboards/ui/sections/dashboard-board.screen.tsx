@@ -22,7 +22,11 @@ import { useBoardVisibility } from "../../behavior/use-board-visibility.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
-import { boardSubject, widgetPromptDraft } from "../../langy/model/board-langy.ts";
+import {
+  boardSubject,
+  widgetPromptDraft,
+  widgetSetupDraft,
+} from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
 import { dashboardTemplatesPath } from "../../model/boards.ts";
 import { AddBlockCard, BlankBoard } from "../blocks/blank-board.tsx";
@@ -143,6 +147,12 @@ function OpenBoard({ board }: { board: SavedBoard }) {
               onAskLangy={
                 langy.enabled
                   ? (widget) => langy.ask(widgetPromptDraft({ widget, board: subject, period }))
+                  : undefined
+              }
+              onSetUp={
+                langy.enabled
+                  ? ({ widget, setup }) =>
+                      langy.ask(widgetSetupDraft({ setup, widget, board: subject, period }))
                   : undefined
               }
             />

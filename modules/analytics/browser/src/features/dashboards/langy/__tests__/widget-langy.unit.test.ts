@@ -7,7 +7,12 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { boardSubject, MAX_WIDGET_DRAFT_LENGTH, widgetPromptDraft } from "../model/board-langy.ts";
+import {
+  boardSubject,
+  MAX_WIDGET_DRAFT_LENGTH,
+  widgetPromptDraft,
+  widgetSetupDraft,
+} from "../model/board-langy.ts";
 
 const PERIOD = {
   periodStart: Temporal.Instant.from("2026-09-01T00:00:00Z").epochMilliseconds,
@@ -101,6 +106,36 @@ describe("widgetPromptDraft", () => {
       expect(request.draft).toContain("Quote the real numbers");
       expect(request.draft).toContain("Name: Traffic");
       expect(request.draft).not.toContain("Description:");
+    });
+  });
+});
+
+describe("widgetSetupDraft", () => {
+  describe.each([
+    ["alert", 'Set up an alert on my "Traffic" dashboard widget.'],
+    ["report", 'Send my "Traffic" dashboard widget as a scheduled report.'],
+  ] as const)("given the member picks the %s action", (setup, opening) => {
+    /**
+     * @scenario "AC142 Widget menu: Set an alert drafts Langy to alert on that widget"
+     * @scenario "AC143 Widget menu: Send as a report drafts Langy to schedule that widget"
+     */
+    it("drafts what to set up, then the widget and the window, with the board attached", () => {
+      const request = widgetSetupDraft({
+        setup,
+        widget: widget({ prompt: PROMPT }),
+        board: BOARD,
+        period: PERIOD,
+      });
+
+      expect(request.question).toBeUndefined();
+      expect(request.draft?.startsWith(opening)).toBe(true);
+      expect(request.draft).not.toContain(PROMPT);
+      expect(request.draft).toContain("Name: Traffic");
+      expect(request.draft).toContain("SELECT count() FROM trace_metrics_by_minute");
+      expect(request.draft).toContain("Dashboard period:");
+      expect(request.context).toEqual([
+        expect.objectContaining({ kind: "dashboard", label: "Weekly review" }),
+      ]);
     });
   });
 });
