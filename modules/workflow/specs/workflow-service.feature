@@ -75,6 +75,7 @@ Feature: Workflow service boundary
     Then it uses the Workflow contract migration
     And both paths produce the same current DSL shape
 
+  @unit
   Scenario: Studio execution events use one portable wire contract
     Given Studio dispatches a component, flow, evaluation, or optimization event
     When a browser or server consumes the event
@@ -111,6 +112,7 @@ Feature: Workflow service boundary
     Then it uses the Workflow browser surface
     And application modules retain only compatibility imports
 
+  @unit
   Scenario: Local configuration dispatch stays portable
     Given a browser or API dispatches unsaved local Studio configuration
     When it materializes execution DSL or a default LLM node
@@ -123,11 +125,13 @@ Feature: Workflow service boundary
     Then it uses the Workflow browser surface for its editor and Python providers
     And the application supplies only project-scoped secret transport and controls
 
+  @integration
   Scenario: Canvas node renderers use explicit application host ports
     Given Studio renders workflow nodes or palette entries
     When a node needs application-only execution or dataset data
     Then Workflow uses its injected browser host port
 
+  @integration
   Scenario: The canvas resolves its renderers from the Workflow browser surface
     Given the Workflow browser surface mounts the React Flow canvas
     When it resolves node or default-edge renderers
@@ -162,6 +166,7 @@ Feature: Workflow service boundary
     Then it calls the canonical Dataset service
     And it does not access the Dataset repository
 
+  @unit
   Scenario: Evaluation remains application composition
     Given a caller requests `/workflows/:id/evaluate`
     When the API handles the request

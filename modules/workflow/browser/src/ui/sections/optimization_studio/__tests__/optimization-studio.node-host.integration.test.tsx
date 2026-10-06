@@ -21,6 +21,23 @@ const storeState: Record<string, unknown> = {
   getWorkflow: () => ({ nodes: [], edges: [] }),
 };
 
+const canvasProps = vi.hoisted(() => ({
+  seen: [] as { nodeTypes?: unknown; edgeTypes?: unknown }[],
+}));
+
+vi.mock("@xyflow/react", async (importOriginal) => {
+  const original = await importOriginal<typeof ReactFlowModule>();
+  const Original = original.ReactFlow;
+
+  return {
+    ...original,
+    ReactFlow: (props: React.ComponentProps<typeof Original>) => {
+      canvasProps.seen.push({ nodeTypes: props.nodeTypes, edgeTypes: props.edgeTypes });
+      return <Original {...props} />;
+    },
+  };
+});
+
 vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     selector(
@@ -142,11 +159,14 @@ vi.mock("react-dnd", async (importOriginal) => ({
 }));
 
 import type { Component } from "@langwatch/workflow-contract";
+import type * as ReactFlowModule from "@xyflow/react";
 import type { Node } from "@xyflow/react";
 import type React from "react";
 
 import { MODULES } from "../../../../model/studio-registry.ts";
+import { WorkflowEdge } from "../../workflow-edge.tsx";
 import { ComponentExecutionButton } from "../../workflow-node-execution.tsx";
+import { workflowNodeComponents } from "../../workflow-nodes.registry.ts";
 import OptimizationStudio from "../optimization-studio.tsx";
 
 const dragItemNode: Node<Component> & { type: "signature" } = {
@@ -171,12 +191,29 @@ afterEach(cleanup);
 
 describe("given the workflow studio shell", () => {
   describe("when it loads with the node panel, a node being dragged and a drawer button", () => {
+    /** @scenario "Canvas node renderers use explicit application host ports" */
     it("renders every node consumer inside the one node host without throwing", () => {
       renderWithDesignSystem(<OptimizationStudio />);
 
       expect(screen.getAllByText("Components").length).toBeGreaterThan(0);
       expect(screen.getByTestId("workflow-node-signature")).toBeTruthy();
       expect(screen.getByTestId("workflow-node-execution-status")).toBeTruthy();
+    });
+  });
+});
+
+describe("given the Workflow browser surface mounts the canvas", () => {
+  describe("when it resolves node and default-edge renderers", () => {
+    /** @scenario "The canvas resolves its renderers from the Workflow browser surface" */
+    it("takes node renderers from the node registry and wraps the one default edge inline", () => {
+      canvasProps.seen.length = 0;
+      renderWithDesignSystem(<OptimizationStudio />);
+
+      const canvas = canvasProps.seen.at(-1);
+
+      expect(canvas?.nodeTypes).toBe(workflowNodeComponents);
+      expect(canvas?.edgeTypes).toEqual({ default: WorkflowEdge });
+      expect(Object.keys(canvas?.edgeTypes as object)).toEqual(["default"]);
     });
   });
 });

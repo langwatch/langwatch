@@ -39,6 +39,7 @@ Feature: Trace span-tree read service
     Then whole-tree, shared, REST and full-detail routes remain authoritative in the app
     And their migration waits for a complete byte-and-field characterization fixture
 
+  @unit
   Scenario: Full-read characterization preserves storage and projected summary distinctions
     Given a trace has a frozen storage anchor, an earlier span start, topic identities, and reserved token metrics
     When the legacy viewer or export read maps its trace summary

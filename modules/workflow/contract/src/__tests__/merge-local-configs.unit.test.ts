@@ -106,6 +106,7 @@ describe("mergeLocalConfigsIntoDsl", () => {
     expect(mergeLocalConfigsIntoDsl(nodes)).toEqual(nodes);
   });
 
+  /** @scenario "Local configuration dispatch stays portable" */
   it("merges a local signature without mutating the source node", () => {
     const node = signatureNode(localPromptConfig);
     const original = structuredClone(node);
