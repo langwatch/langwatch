@@ -60,7 +60,13 @@
       "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/onboarding/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/onboarding/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/project/client/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/project/contract/tsconfig.build.json"

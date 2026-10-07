@@ -61,7 +61,13 @@
       "path": "../../identity/contract/tsconfig.build.json"
     },
     {
+      "path": "../client/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/client/tsconfig.build.json"
     },
     {
       "path": "../../project/contract/tsconfig.build.json"

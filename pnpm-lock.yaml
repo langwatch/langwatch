@@ -2143,6 +2143,9 @@ importers:
       '@langwatch/onboarding-browser':
         specifier: workspace:*
         version: link:../../modules/onboarding/browser
+      '@langwatch/onboarding-client':
+        specifier: workspace:*
+        version: link:../../modules/onboarding/client
       '@langwatch/ops-browser':
         specifier: workspace:*
         version: link:../../modules/ops/browser
@@ -3462,9 +3465,15 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../../../modules/model-provider/contract
+      '@langwatch/onboarding-client':
+        specifier: workspace:*
+        version: link:../../../../modules/onboarding/client
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../../../../modules/onboarding/contract
+      '@langwatch/project-client':
+        specifier: workspace:*
+        version: link:../../../../modules/project/client
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../../../modules/project/contract
@@ -5682,6 +5691,12 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/organization-client':
+        specifier: workspace:*
+        version: link:../../organization/client
+      '@langwatch/project-client':
+        specifier: workspace:*
+        version: link:../../project/client
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -8949,6 +8964,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/onboarding-client':
+        specifier: workspace:*
+        version: link:../../onboarding/client
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../../onboarding/contract
@@ -9889,6 +9907,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/langy-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../contract
@@ -9901,6 +9922,9 @@ importers:
       '@langwatch/notification-contract':
         specifier: workspace:*
         version: link:../../notification/contract
+      '@langwatch/onboarding-client':
+        specifier: workspace:*
+        version: link:../../onboarding/client
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../../onboarding/contract
@@ -10001,6 +10025,19 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/langy/client:
+    dependencies:
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   modules/langy/contract:
     dependencies:
@@ -10899,9 +10936,15 @@ importers:
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract
+      '@langwatch/navigation-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../ops/contract
+      '@langwatch/organization-client':
+        specifier: workspace:*
+        version: link:../../organization/client
       '@langwatch/prompt-client':
         specifier: workspace:*
         version: link:../../prompt/client
@@ -10972,6 +11015,16 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/navigation/client:
+    dependencies:
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   modules/notification/browser:
     dependencies:
@@ -11164,6 +11217,9 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
+      '@langwatch/langy-client':
+        specifier: workspace:*
+        version: link:../../langy/client
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract
@@ -11173,9 +11229,18 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/navigation-client':
+        specifier: workspace:*
+        version: link:../../navigation/client
+      '@langwatch/onboarding-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/organization-client':
+        specifier: workspace:*
+        version: link:../../organization/client
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
@@ -11258,6 +11323,19 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/onboarding/client:
+    dependencies:
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
+      '@langwatch/onboarding-contract':
+        specifier: workspace:*
+        version: link:../contract
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   modules/onboarding/contract:
     dependencies:
@@ -11776,9 +11854,15 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
+      '@langwatch/organization-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/project-client':
+        specifier: workspace:*
+        version: link:../../project/client
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -11858,6 +11942,25 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/organization/client:
+    dependencies:
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../contract
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+    devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   modules/organization/contract:
     dependencies:
@@ -12300,9 +12403,21 @@ importers:
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract
+      '@langwatch/navigation-client':
+        specifier: workspace:*
+        version: link:../../navigation/client
+      '@langwatch/onboarding-client':
+        specifier: workspace:*
+        version: link:../../onboarding/client
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../../onboarding/contract
+      '@langwatch/organization-client':
+        specifier: workspace:*
+        version: link:../../organization/client
+      '@langwatch/project-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../contract
@@ -12403,6 +12518,19 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/project/client:
+    dependencies:
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../contract
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   modules/project/contract:
     dependencies:
@@ -13547,6 +13675,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/project-client':
+        specifier: workspace:*
+        version: link:../../project/client
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -15058,6 +15189,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/onboarding-client':
+        specifier: workspace:*
+        version: link:../../onboarding/client
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time

@@ -59,6 +59,9 @@
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
+      "path": "../client/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {
@@ -69,6 +72,9 @@
     },
     {
       "path": "../../notification/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../onboarding/client/tsconfig.build.json"
     },
     {
       "path": "../../onboarding/contract/tsconfig.build.json"

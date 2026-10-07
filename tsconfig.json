@@ -430,6 +430,9 @@
       "path": "modules/langy/browser/tsconfig.json"
     },
     {
+      "path": "modules/langy/client/tsconfig.json"
+    },
+    {
       "path": "modules/langy/contract/tsconfig.json"
     },
     {
@@ -487,6 +490,9 @@
       "path": "modules/navigation/browser/tsconfig.json"
     },
     {
+      "path": "modules/navigation/client/tsconfig.json"
+    },
+    {
       "path": "modules/notification/browser/tsconfig.json"
     },
     {
@@ -500,6 +506,9 @@
     },
     {
       "path": "modules/onboarding/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/onboarding/client/tsconfig.json"
     },
     {
       "path": "modules/onboarding/contract/tsconfig.json"
@@ -518,6 +527,9 @@
     },
     {
       "path": "modules/organization/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/organization/client/tsconfig.json"
     },
     {
       "path": "modules/organization/contract/tsconfig.json"
@@ -566,6 +578,9 @@
     },
     {
       "path": "modules/project/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/project/client/tsconfig.json"
     },
     {
       "path": "modules/project/contract/tsconfig.json"
