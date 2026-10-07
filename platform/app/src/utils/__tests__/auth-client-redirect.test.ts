@@ -170,7 +170,10 @@ describe("safeRedirectTarget", () => {
 });
 
 const AGENT_TESTING_PATH =
-  "/p/agent-testing/results/external:set/batch?drawer.open=scenarioRunDetail";
+  "/acme-x7f2/agent-testing/results/external:scenario_tests/scenariobatch_01K6ZQ8M3V?drawer.open=scenarioRunDetail&drawer.variant=agent-testing&drawer.scenarioRunId=scenariorun_01K6ZQ8N2B&drawer.batchRunId=scenariobatch_01K6ZQ8M3V&drawer.scenarioSetId=scenario_tests";
+
+const AGENT_TESTING_PATH_QUERY_LESS =
+  "/acme-x7f2/agent-testing/results/external:scenario_tests/scenariobatch_01K6ZQ8M3V";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -198,6 +201,7 @@ describe("betterAuthCallbackURL and parkReturnTo", () => {
     /** @scenario "Addresses better-auth refuses are carried through the resume page" */
     it.each([
       AGENT_TESTING_PATH,
+      AGENT_TESTING_PATH_QUERY_LESS,
       "/a#frag",
       "/a~b",
       "/a,b",
