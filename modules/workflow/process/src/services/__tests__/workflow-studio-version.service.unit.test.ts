@@ -81,19 +81,49 @@ function build(
   const workflows = new RecordingWorkflowService();
   const studioDsl = new RenamingDsl();
   const agentMappings = options.agentMappings ?? new RecordingAgentMapping();
+  const versionsSaved: {
+    projectId: string;
+    workflowId: string;
+    versionId: string;
+    authorId: string;
+  }[] = [];
   const service = WorkflowStudioVersionService.create({
     workflows: workflows as never,
     studioDsl,
     httpSecrets: options.httpSecrets ?? new UnchangedHttpSecrets(),
     agentMappings,
+    recordVersionSaved: (input) => versionsSaved.push(input),
   });
 
-  return { service, workflows, studioDsl, agentMappings };
+  return { service, workflows, studioDsl, agentMappings, versionsSaved };
 }
 
 describe("WorkflowStudioVersionService", () => {
   describe("given a Studio graph to commit", () => {
     describe("when it is saved", () => {
+      /** @scenario Saving a Studio graph records the version as a fact agents react to */
+      it("records the saved version as a fact, attributed to the caller", async () => {
+        const { service, versionsSaved } = build();
+
+        await service.saveOrCommit({
+          projectId: "project-1",
+          workflowId: "wf-1",
+          dsl: graph("draft"),
+          autoSaved: false,
+          commitMessage: "first",
+          authorId: "user-1",
+        });
+
+        expect(versionsSaved).toEqual([
+          {
+            projectId: "project-1",
+            workflowId: "wf-1",
+            versionId: "version-1",
+            authorId: "user-1",
+          },
+        ]);
+      });
+
       it("writes the prepared graph rather than the one it was handed", async () => {
         const { service, workflows } = build();
 

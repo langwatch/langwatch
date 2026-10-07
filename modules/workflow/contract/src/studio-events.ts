@@ -128,3 +128,16 @@ export const workflowCreatedEventDataSchema = z.object({
   occurredAt: z.number().int().nonnegative(),
 });
 export type WorkflowCreatedEventData = z.infer<typeof workflowCreatedEventDataSchema>;
+
+/** Agent re-derives its scenario mappings from its own side on this fact (§9). */
+export const WORKFLOW_VERSION_SAVED_EVENT_TYPE = "lw.workflow.version_saved" as const;
+
+/** A Studio graph was saved as a version of a workflow, by whom and when. */
+export const workflowVersionSavedEventDataSchema = z.object({
+  workflowId: z.string(),
+  projectId: z.string(),
+  versionId: z.string(),
+  authorId: z.string(),
+  occurredAt: z.number().int().nonnegative(),
+});
+export type WorkflowVersionSavedEventData = z.infer<typeof workflowVersionSavedEventDataSchema>;
