@@ -4,6 +4,8 @@ import { defineProcessModule } from "@langwatch/process";
 import { LicensingModule } from "./app/licensing.app.ts";
 import { licenseSyncEventing } from "./eventing/license-sync.pipeline.ts";
 import { licensingRepositories } from "./repositories/licensing-repositories.registry.ts";
+import { LicenseMintService } from "./services/license-mint.service.ts";
+import { GenerateLicenseTask } from "./tasks/generate-license.task.ts";
 import { connectHostRest } from "./transport/connect-host.rest.ts";
 import { connectHostedRest } from "./transport/connect-hosted.rest.ts";
 import { connectTrpcTransport } from "./transport/connect.trpc.ts";
@@ -18,4 +20,13 @@ export const licensingProcessModule = defineProcessModule("licensing")
   .withTransportFacts(({ dependencies }) => [
     bindRestCredential("internal_secret", () => dependencies.gateway.internalDoor()),
   ])
-  .withEventing(licenseSyncEventing);
+  .withEventing(licenseSyncEventing)
+  .withTasks(({ app, dependencies, repositories }) => [
+    GenerateLicenseTask.create({
+      mint: LicenseMintService.create({
+        licenses: app,
+        organizations: dependencies.organizations,
+        registry: repositories.issuedLicenses,
+      }),
+    }),
+  ]);

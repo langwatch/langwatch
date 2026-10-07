@@ -6,7 +6,7 @@ The server half of [licensing](../README.md). Licences: validating and storing a
 
 ## Installation
 
-`defineProcessModule("licensing").withRepositories(licensingRepositories).withApi(LicensingModule).withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostedRest, connectHostRest).withTransportFacts(…).withEventing(licenseSyncEventing)`, `src/licensing.module.ts:12`.
+`defineProcessModule("licensing").withRepositories(licensingRepositories).withApi(LicensingModule).withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostedRest, connectHostRest).withTransportFacts(…).withEventing(licenseSyncEventing).withTasks(…)`, `src/licensing.module.ts:14`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -552,6 +552,14 @@ Declared at `src/eventing/license-sync.pipeline.ts:57`.
 | --------------- | --------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------ |
 | process manager | `licenseSync`               | every 2 min (`LICENSE_SYNC_FIRST_DELAY_MS = 2 * 60 * 1000`); intents `sync` (outbox)        | `src/eventing/license-sync.pipeline.ts:63` |
 | peer subscriber | `configuredLicenseOnSignUp` | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md) | `src/eventing/license-sync.pipeline.ts:62` |
+
+### Tasks
+
+Run by the tasks process, before serve.
+
+| Task               | Class                 | Declared at                             |
+| ------------------ | --------------------- | --------------------------------------- |
+| `generate-license` | `GenerateLicenseTask` | `src/tasks/generate-license.task.ts:17` |
 
 ## Configuration
 
