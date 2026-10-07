@@ -110,7 +110,7 @@ export class InstantEvalFreeBudgetExhaustedError extends HandledError {
   constructor({ spentUsd, budgetUsd }: { readonly spentUsd: number; readonly budgetUsd: number }) {
     super(
       "instant_eval_free_budget_exhausted",
-      "This organization has used its free Instant Evals allowance. Upgrade to a paid plan to keep judging.",
+      `This organization has used its $${budgetUsd} of free Instant Evals. To keep judging, pick another model for this judge or contact us to turn on usage billing.`,
       {
         httpStatus: 402,
         fault: "customer",
