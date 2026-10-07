@@ -11,9 +11,9 @@ Projects: finding them, their summaries and paths, and the departments they are 
 | Classification | core (`modules/catalogue.json`)                                                                        |
 | Subjects       | project                                                                                                |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)            |
-| Api token      | `ProjectApi` = `moduleApi<ProjectApi>()("project")`, `contract/src/project.api.ts:171` (40 operations) |
+| Api token      | `ProjectApi` = `moduleApi<ProjectApi>()("project")`, `contract/src/project.api.ts:166` (39 operations) |
 | Other token    | `ProjectManagementApi`, `process/src/transport/project.rest.ts:116`                                    |
-| Other token    | `ProjectBrowserApi`, `process/src/transport/project.trpc.ts:76`                                        |
+| Other token    | `ProjectBrowserApi`, `process/src/transport/project.trpc.ts:70`                                        |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                             |
 
 ## What project owns
@@ -35,8 +35,6 @@ Anything else project needs belongs to another module and is reached through its
 | `authorization` | `AuthzApi`        | [authz](../authz/README.md)               |
 | `dataPrivacy`   | `DataPrivacyApi`  | [data-privacy](../data-privacy/README.md) |
 | `organizations` | `OrganizationApi` | [organization](../organization/README.md) |
-| `share`         | `ShareApi`        | [share](../share/README.md)               |
-| `topics`        | `TopicApi`        | [topic](../topic/README.md)               |
 | `trace`         | `TraceApi`        | [trace](../trace/README.md)               |
 
 ## Who depends on project

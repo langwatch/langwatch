@@ -25,12 +25,12 @@ Anything else monitor needs belongs to another module and is reached through its
 
 ## Peers (static dependencies)
 
-| Name          | Token           | Module                                |
-| ------------- | --------------- | ------------------------------------- |
-| `evaluation`  | `EvaluationApi` | [evaluation](../evaluation/README.md) |
-| `evaluators`  | `EvaluatorApi`  | [evaluator](../evaluator/README.md)   |
-| `permissions` | `AuthzApi`      | [authz](../authz/README.md)           |
-| `workflows`   | `WorkflowApi`   | [workflow](../workflow/README.md)     |
+| Name           | Token            | Module                                    |
+| -------------- | ---------------- | ----------------------------------------- |
+| `evaluators`   | `EvaluatorApi`   | [evaluator](../evaluator/README.md)       |
+| `featureFlags` | `FeatureFlagApi` | [feature-flag](../feature-flag/README.md) |
+| `permissions`  | `AuthzApi`       | [authz](../authz/README.md)               |
+| `workflows`    | `WorkflowApi`    | [workflow](../workflow/README.md)         |
 
 ## Who depends on monitor
 

@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ProjectApi`)
 
-Peers call these through the token, declared at `../contract/src/project.api.ts:40`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/project.api.ts:39`; nothing else in this package is public.
 
 #### `listPaths`
 
@@ -176,12 +176,6 @@ Whose personal workspace a scope is: the team's own owner, or the owner of the t
 findPersonalWorkspaceOwner(input: Readonly<{ organizationId: string; scopeId: string }>): Promise<{ ownerUserId: string | null } | null>;
 ```
 
-#### `requestTopicClustering`
-
-```typescript
-requestTopicClustering(input: Readonly<{ projectId: string }>, by: Readonly<{ id: string }>): Promise<TopicClusteringRequest>;
-```
-
 #### `touchCodingAgentPullRequestSeen`
 
 ```typescript
@@ -320,7 +314,7 @@ Answers at `/api/projects`; also, undocumented, `/api/projects/2026-08-07`, `/ap
 
 ```typescript
 type Query = z.infer<typeof projectRestPaginationQuerySchema>; // ../contract/src/project-rest.schemas.ts:4
-type Response = z.infer<typeof projectRestPageSchema>; // ../contract/src/project.responses.ts:99
+type Response = z.infer<typeof projectRestPageSchema>; // ../contract/src/project.responses.ts:92
 ```
 
 #### `POST /` · `createProject`
@@ -333,7 +327,7 @@ Answers at `/api/projects`; also, undocumented, `/api/projects/2026-08-07`, `/ap
 
 ```typescript
 type Body = z.infer<typeof projectRestCreateSchema>; // ../contract/src/project-rest.schemas.ts:9
-type Response = z.infer<typeof projectRestCreatedSchema>; // ../contract/src/project.responses.ts:118
+type Response = z.infer<typeof projectRestCreatedSchema>; // ../contract/src/project.responses.ts:111
 ```
 
 #### `GET /:id` · `getProject`
@@ -346,7 +340,7 @@ Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:i
 
 ```typescript
 type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:42
-type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:85
+type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:78
 ```
 
 #### `PATCH /:id` · `updateProject`
@@ -360,7 +354,7 @@ Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:i
 ```typescript
 type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:42
 type Body = z.infer<typeof projectRestUpdateSchema>; // ../contract/src/project-rest.schemas.ts:32
-type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:85
+type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:78
 ```
 
 #### `DELETE /:id` · `archiveProject`
@@ -373,7 +367,7 @@ Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:i
 
 ```typescript
 type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:42
-type Response = z.infer<typeof projectRestArchivedSchema>; // ../contract/src/project.responses.ts:125
+type Response = z.infer<typeof projectRestArchivedSchema>; // ../contract/src/project.responses.ts:118
 ```
 
 #### `GET /:id/api-key` · `getProjectApiKey`
@@ -407,7 +401,7 @@ type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/
 
 ### `project`
 
-Contract `../contract/src/project.trpc.ts:26`, router `src/transport/project.trpc.ts:87`.
+Contract `../contract/src/project.trpc.ts:25`, router `src/transport/project.trpc.ts:81`.
 
 | Procedure                         | Kind     | Gate                                                                                                                                                                                                                                                                | Input                           | Output                              |
 | --------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ----------------------------------- |
@@ -418,7 +412,6 @@ Contract `../contract/src/project.trpc.ts:26`, router `src/transport/project.trp
 | `project.update`                  | mutation | Permission `project:update`                                                                                                                                                                                                                                         | `projectUpdateInputSchema`      | `projectSettingsSavedSchema`        |
 | `project.getFieldRedactionStatus` | query    | Permission `project:view`                                                                                                                                                                                                                                           | `projectScopeSchema`            | `projectFieldRedactionStatusSchema` |
 | `project.archiveById`             | mutation | Permission `project:delete`                                                                                                                                                                                                                                         | `projectArchiveByIdInputSchema` | `projectArchivedSchema`             |
-| `project.triggerTopicClustering`  | mutation | Permission `project:update`                                                                                                                                                                                                                                         | `projectScopeSchema`            | `topicClusteringRequestSchema`      |
 
 ## Sockets
 
@@ -428,16 +421,17 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `project_lifecycle` (aggregate `project`)
 
-Declared at `src/eventing/project-lifecycle.pipeline.ts:36`. Events: `projectCreatedEventSchema`, `projectLegacyKeyRevokedEventSchema`, `projectPresenceSettingChangedEventSchema`, `projectMovedEventSchema`, `projectArchivedEventSchema`, `projectDepartmentAssignedEventSchema`.
+Declared at `src/eventing/project-lifecycle.pipeline.ts:38`. Events: `projectCreatedEventSchema`, `projectLegacyKeyRevokedEventSchema`, `projectPresenceSettingChangedEventSchema`, `projectMovedEventSchema`, `projectArchivedEventSchema`, `projectDepartmentAssignedEventSchema`, `projectTraceSharingDisabledEventSchema`.
 
-| Kind    | Name                              | Handles | Declared at                                     |
-| ------- | --------------------------------- | ------- | ----------------------------------------------- |
-| command | `recordProjectCreated`            | –       | `src/eventing/project-lifecycle.pipeline.ts:48` |
-| command | `recordProjectLegacyKeyRevoked`   | –       | `src/eventing/project-lifecycle.pipeline.ts:49` |
-| command | `recordPresenceSettingChanged`    | –       | `src/eventing/project-lifecycle.pipeline.ts:50` |
-| command | `recordProjectMoved`              | –       | `src/eventing/project-lifecycle.pipeline.ts:51` |
-| command | `recordProjectArchived`           | –       | `src/eventing/project-lifecycle.pipeline.ts:52` |
-| command | `recordProjectDepartmentAssigned` | –       | `src/eventing/project-lifecycle.pipeline.ts:53` |
+| Kind    | Name                                | Handles | Declared at                                     |
+| ------- | ----------------------------------- | ------- | ----------------------------------------------- |
+| command | `recordProjectCreated`              | –       | `src/eventing/project-lifecycle.pipeline.ts:51` |
+| command | `recordProjectLegacyKeyRevoked`     | –       | `src/eventing/project-lifecycle.pipeline.ts:52` |
+| command | `recordPresenceSettingChanged`      | –       | `src/eventing/project-lifecycle.pipeline.ts:53` |
+| command | `recordProjectMoved`                | –       | `src/eventing/project-lifecycle.pipeline.ts:54` |
+| command | `recordProjectArchived`             | –       | `src/eventing/project-lifecycle.pipeline.ts:55` |
+| command | `recordProjectDepartmentAssigned`   | –       | `src/eventing/project-lifecycle.pipeline.ts:56` |
+| command | `recordProjectTraceSharingDisabled` | –       | `src/eventing/project-lifecycle.pipeline.ts:57` |
 
 ### Tasks
 

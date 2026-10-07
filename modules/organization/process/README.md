@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:227`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:228`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -104,6 +104,36 @@ getSessionPolicy(input: { organizationId: string }): Promise<{ maxSessionDuratio
 
 ```typescript
 saveSessionPolicy(input: { organizationId: string; maxSessionDurationDays: number; }): Promise<void>;
+```
+
+#### `getSignInSecurityPolicy`
+
+This organization's sign-in security rules (GAC-09, GAC-10). Throws OrganizationNotFoundError.
+
+```typescript
+getSignInSecurityPolicy(input: { organizationId: string }): Promise<SignInSecurityPolicy>;
+```
+
+#### `updateSignInSecurityPolicy`
+
+```typescript
+updateSignInSecurityPolicy(input: { organizationId: string; policy: SignInSecurityPolicy; }): Promise<void>;
+```
+
+#### `findSignInSecurityPoliciesForUser`
+
+The rules of the organizations this person belongs to and is not disabled in; read on every session.
+
+```typescript
+findSignInSecurityPoliciesForUser(input: { userId: string }): Promise<SignInSecurityPolicy[]>;
+```
+
+#### `findConfiguredSignInSecurityPolicies`
+
+Cross-tenant by design: every organization that set any rule, for an address resolving to nobody and the session path's early-out.
+
+```typescript
+findConfiguredSignInSecurityPolicies(): Promise<SignInSecurityPolicy[]>;
 ```
 
 #### `getPricing`
@@ -510,6 +540,14 @@ Main's `updateSentPlanLimitAlert`.
 
 ```typescript
 updateSentPlanLimitAlert(input: Readonly<{ organizationId: string; sentAt: Instant }>): Promise<void>;
+```
+
+#### `setLicense`
+
+Main's mint script write: the licence and its expiry, the validated stamp cleared.
+
+```typescript
+setLicense(input: Readonly<{ organizationId: string; licenseKey: string; expiresAt: Instant }>): Promise<void>;
 ```
 
 #### `claimBillingCustomerId`
@@ -1704,7 +1742,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:350`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:351`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |

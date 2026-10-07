@@ -64,13 +64,14 @@ None: this module declares no REST family.
 
 ### `topics`
 
-Contract `../contract/src/topic.trpc.ts:20`, router `src/transport/topic.trpc.ts:11`.
+Contract `../contract/src/topic.trpc.ts:21`, router `src/transport/topic.trpc.ts:29`.
 
-| Procedure                        | Kind  | Gate                      | Input                     | Output                        |
-| -------------------------------- | ----- | ------------------------- | ------------------------- | ----------------------------- |
-| `topics.getAll`                  | query | Permission `traces:view`  | `topicProjectScopeSchema` | inline                        |
-| `topics.getClusteringStatus`     | query | Permission `project:view` | `topicProjectScopeSchema` | `topicClusteringStatusSchema` |
-| `topics.getClusteringRunHistory` | query | Permission `project:view` | `topicProjectScopeSchema` | inline                        |
+| Procedure                        | Kind     | Gate                        | Input                     | Output                               |
+| -------------------------------- | -------- | --------------------------- | ------------------------- | ------------------------------------ |
+| `topics.getAll`                  | query    | Permission `traces:view`    | `topicProjectScopeSchema` | inline                               |
+| `topics.getClusteringStatus`     | query    | Permission `project:view`   | `topicProjectScopeSchema` | `topicClusteringStatusSchema`        |
+| `topics.getClusteringRunHistory` | query    | Permission `project:view`   | `topicProjectScopeSchema` | inline                               |
+| `topics.triggerTopicClustering`  | mutation | Permission `project:update` | `topicProjectScopeSchema` | `topicClusteringTriggerResultSchema` |
 
 ## Sockets
 

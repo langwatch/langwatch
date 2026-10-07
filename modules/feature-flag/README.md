@@ -33,6 +33,6 @@ Anything else feature-flag needs belongs to another module and is reached throug
 
 ## Who depends on feature-flag
 
-[agent](../agent/README.md), [analytics](../analytics/README.md), [auth](../auth/README.md), [data-privacy](../data-privacy/README.md), [evaluation](../evaluation/README.md), [gateway](../gateway/README.md), [governance](../../enterprise/modules/governance/README.md), [instant-eval](../instant-eval/README.md), [langy](../langy/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [sso](../../enterprise/modules/sso/README.md), [suite](../suite/README.md), [trace](../trace/README.md) (as a peer).
+[agent](../agent/README.md), [analytics](../analytics/README.md), [auth](../auth/README.md), [data-privacy](../data-privacy/README.md), [evaluation](../evaluation/README.md), [gateway](../gateway/README.md), [governance](../../enterprise/modules/governance/README.md), [instant-eval](../instant-eval/README.md), [langy](../langy/README.md), [monitor](../monitor/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [sso](../../enterprise/modules/sso/README.md), [suite](../suite/README.md), [trace](../trace/README.md) (as a peer).
 
 <!-- readme:generated:end -->

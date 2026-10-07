@@ -6,7 +6,7 @@ The server half of [scim](../README.md). SCIM provisioning: directory connection
 
 ## Installation
 
-`defineProcessModule("scim").withRepositories(scimRepositories).withApi(ScimModule).withTransports(scimTokenRest, scimTokenTrpcTransport, scimReconciliationTrpcTransport, scimOversightTrpcTransport, scimProtocolRest, scimWebhookRest).withTransportFacts(…).withEventing(scimEventing).withEventing(scimDirectoryEventing).withEventing(scimSyncEventing).withEventing(scimCostCenterEventing).withEventing(scimSsoConnectionEventing)`, `src/scim.module.ts:30`.
+`defineProcessModule("scim").withRepositories(scimRepositories).withApi(ScimModule).withTransports(scimTokenRest, scimTokenTrpcTransport, scimReconciliationTrpcTransport, scimOversightTrpcTransport, scimProtocolRest, scimWebhookRest).withTransportFacts(…).withEventing(scimEventing).withEventing(scimDirectoryEventing).withEventing(scimSyncEventing).withEventing(scimCostCenterEventing).withEventing(scimSsoConnectionEventing).withMigrations(…)`, `src/scim.module.ts:35`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
