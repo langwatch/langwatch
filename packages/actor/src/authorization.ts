@@ -164,10 +164,13 @@ export function isSealedAuthorization(value: unknown): value is Authorization {
 
 /**
  * The same proof, narrowed to one of the projects its grants name. A proof
- * can be narrowed and never widened: the grants, the expiry and the purpose
- * are copied unchanged, and the result reads a subset of what the original
- * did. A project the proof does not name returns `null`, so the caller says
- * what that means at its own door (a detail route answers not found).
+ * can be narrowed and never widened: the result keeps only the own grant,
+ * which names the project every read is sent through, and the grants on the
+ * narrowed project, so nothing reading the grants later can widen it back to
+ * a project it was cut away from. The expiry and the purpose are copied
+ * unchanged, and `narrowedTo` marks the cut for the store client's fence. A
+ * project the proof does not name returns `null`, so the caller says what
+ * that means at its own door (a detail route answers not found).
  *
  * Only a sealed proof is narrowed; a forged one is refused here as it would
  * be by the store client.
@@ -187,7 +190,13 @@ export function narrowAuthorization({
   }
   if (authorization.narrowedTo === projectId) return authorization;
   if (authorization.narrowedTo !== undefined) return null;
-  return sealAuthorization({ ...authorization, narrowedTo: projectId });
+  return sealAuthorization({
+    ...authorization,
+    grants: authorization.grants.filter(
+      (grant) => grant.kind === "own" || grant.projectId === projectId,
+    ),
+    narrowedTo: projectId,
+  });
 }
 
 export class ForgedAuthorizationError extends Error {

@@ -151,8 +151,19 @@ describe("the authorization proof", () => {
   });
 
   describe("when a proof is narrowed to one of its projects", () => {
-    it("reads that project alone and keeps the grants, expiry and purpose", () => {
-      const authorization = sealAuthorization(proof());
+    it("keeps only the own grant and that project's, with the expiry and purpose", () => {
+      const [own, member] = proof().grants;
+      const other = {
+        projectId: "proj_other_member",
+        permissions: ["traces:view"],
+        via: ["grant_shared_2"],
+        kind: "shared" as const,
+        condition: { type: "trace" as const, from: NOW - 1_000, until: null },
+      };
+      if (!own || !member) throw new Error("the fixture proof has two grants");
+      const authorization = sealAuthorization(
+        proof({ grants: [own, member, other] }),
+      );
       const narrowed = narrowAuthorization({
         authorization,
         projectId: "proj_member",
@@ -161,10 +172,13 @@ describe("the authorization proof", () => {
       expect(narrowed).not.toBeNull();
       expect(isSealedAuthorization(narrowed)).toBe(true);
       expect(narrowed?.narrowedTo).toBe("proj_member");
-      expect(narrowed?.grants).toEqual(authorization.grants);
+      // A structural cut: a later reader of the grants cannot widen the
+      // narrowed proof back to the member it was cut away from.
+      expect(narrowed?.grants).toEqual([own, member]);
       expect(narrowed?.expiresAt).toBe(authorization.expiresAt);
       expect(narrowed?.purpose).toEqual(authorization.purpose);
       expect(authorization.narrowedTo).toBeUndefined();
+      expect(authorization.grants).toHaveLength(3);
     });
 
     it("returns null for a project the proof does not name", () => {
