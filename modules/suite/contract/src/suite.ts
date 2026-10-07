@@ -241,7 +241,7 @@ export type SuiteRunResult = {
   }[];
 };
 
-export type SuiteRunAllResult = SuiteRunResult & { suiteId: string };
+export type SuiteRunAllResult = SuiteRunResult & { suiteId: string; planSlug: string };
 
 /** The durable fold state exposed by the Suite run read model. */
 export const suiteRunStateDataSchema = z

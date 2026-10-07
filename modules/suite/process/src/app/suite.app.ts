@@ -558,7 +558,9 @@ export class SuiteModule implements SuiteApi {
   /**
    * Schedules one suite's runs, resolving the project's organization first.
    */
-  async run(input: Omit<SuiteRunInput, "organizationId">): Promise<SuiteRunResult> {
+  async run(
+    input: Omit<SuiteRunInput, "organizationId">,
+  ): Promise<SuiteRunResult & { planSlug: string }> {
     const organizationId = await this.getOrganizationId(input.projectId);
     return this.#dependencies.suites.run({ ...input, organizationId });
   }

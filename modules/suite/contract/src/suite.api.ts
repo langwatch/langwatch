@@ -78,7 +78,7 @@ export interface SuiteApi {
    * evaluators attached to it. Send only what changes.
    */
   updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite>;
-  run(input: Omit<SuiteRunInput, "organizationId">): Promise<SuiteRunResult>;
+  run(input: Omit<SuiteRunInput, "organizationId">): Promise<SuiteRunResult & { planSlug: string }>;
   runAll(input: Omit<SuiteRunAllInput, "organizationId">): Promise<SuiteRunAllResult>;
   runPlan(input: Omit<SuiteRunPlanInput, "organizationId">): Promise<SuiteRunPlanResult>;
   getOrganizationId(projectId: string): Promise<string>;

@@ -86,7 +86,7 @@ export class SuiteRunService {
     return this.deps.get(input);
   }
 
-  async run(input: SuiteRunInput): Promise<SuiteRunResult> {
+  async run(input: SuiteRunInput): Promise<SuiteRunResult & { planSlug: string }> {
     const parsed = suiteRunInputSchema.parse(input);
     const suite = await this.get({
       id: parsed.id,
@@ -138,7 +138,7 @@ export class SuiteRunService {
       }),
     });
 
-    return this.execute({
+    const result = await this.execute({
       suite,
       parsed,
       scenarioResolution,
@@ -146,6 +146,8 @@ export class SuiteRunService {
       scenarioConfigs,
       activeTargets: targetResolution.active,
     });
+
+    return { ...result, planSlug: suite.slug };
   }
 
   /**
