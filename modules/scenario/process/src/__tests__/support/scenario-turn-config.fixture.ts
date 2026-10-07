@@ -34,9 +34,6 @@ export function createMockDepsForTurnConfig(overrides: {
     scenarioFetcher: {
       getById: vi.fn().mockResolvedValue(overrides.scenario),
     },
-    suiteConfigFetcher: {
-      getBySetId: vi.fn().mockResolvedValue(null),
-    },
     promptFetcher: {
       findByIdOrHandle: vi.fn().mockResolvedValue(defaultPrompt),
     },

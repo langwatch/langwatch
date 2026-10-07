@@ -10,6 +10,7 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
@@ -132,7 +133,6 @@ import {
 } from "@langwatch/scenario-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { credentialsSecret, nlpInternalSecret, sessionSecret } from "@langwatch/secrets";
-import { SuiteApi } from "@langwatch/suite-contract";
 /**
  * The scenario feature's application: what all of its doors call.
  */
@@ -165,6 +165,7 @@ import { ScenarioFailureHandlerService } from "../services/scenario-failure-hand
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
 import { ScenarioGenerationService } from "../services/scenario-generation.service.ts";
 import { ScenarioPlatformLinkService } from "../services/scenario-platform-link.service.ts";
+import { ScenarioRunAttachmentsService } from "../services/scenario-run-attachments.service.ts";
 import { ScenarioRunExportDownloadService } from "../services/scenario-run-export-download.service.ts";
 import { ScenarioRunExportService } from "../services/scenario-run-export.service.ts";
 import { ScenarioRunLaunchService } from "../services/scenario-run-launch.service.ts";
@@ -236,8 +237,8 @@ const scenarioAppDependencyTokens = {
   traces: TraceApi,
   /** The platform default a simulation run row is stamped with, read per write. */
   retention: DataRetentionApi,
-  /** Where a suite set's scenario runs are recorded against their suite run. */
-  suites: SuiteApi,
+  /** The saved evaluators a run its test suite grades is scored with (cut S2, R-A option 1). */
+  evaluators: EvaluatorApi,
   /** Runs and reports the evaluators a finished run is graded with. */
   evaluations: EvaluationApi,
   /** A run's prompt, secret and workflow targets, resolved before its child starts. */
@@ -373,7 +374,6 @@ export class ScenarioModule implements ScenarioApi {
         runSecretSeal,
         config: prefetchConfig,
         scenarios,
-        suites: peers.suites,
         prompts: peers.prompts,
         agents: peers.agents,
         workflows: peers.workflows,
@@ -449,11 +449,10 @@ export class ScenarioModule implements ScenarioApi {
         },
         grading: {
           scenarios: { getById: (input) => scenarios.getById(input) },
-          suites: {
-            getRunAttachments: (input) => setup.dependencies.suites.getRunAttachments(input),
-            getAttachedEvaluators: (input) =>
-              setup.dependencies.suites.getAttachedEvaluators(input),
-          },
+          suites: ScenarioRunAttachmentsService.create({
+            scenarios,
+            evaluators: setup.dependencies.evaluators,
+          }),
           evaluations: {
             runEvaluator: (input) => setup.dependencies.evaluations.runEvaluator(input),
             reportEvaluation: (data) => setup.dependencies.evaluations.reportEvaluation(data),
@@ -904,7 +903,13 @@ export class ScenarioModule implements ScenarioApi {
       name: input.name,
       metadata,
       ...(secretParameterNames.length > 0 ? { secretParameters: input.secretParameters } : {}),
-      target: { type: target.type, referenceId: target.referenceId },
+      target: {
+        type: target.type,
+        referenceId: target.referenceId,
+        ...(input.target.scenarioMappings
+          ? { scenarioMappings: input.target.scenarioMappings }
+          : {}),
+      },
       ...(input.evaluators ? { evaluators: input.evaluators } : {}),
       occurredAt: nowInstant().epochMilliseconds,
     });

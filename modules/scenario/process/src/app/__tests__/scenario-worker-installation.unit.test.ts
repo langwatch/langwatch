@@ -12,6 +12,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -23,7 +24,6 @@ import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -67,7 +67,7 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       "data-retention": createApiFixture<DataRetentionApi>({
         getResolvedForProject: async () => RETAINED,
       }),
-      suite: createApiFixture<SuiteApi>(),
+      evaluator: createApiFixture<EvaluatorApi>(),
       evaluation: createApiFixture<EvaluationApi>(),
       prompt: createApiFixture<PromptApi>(),
       secret: createApiFixture<SecretApi>(),

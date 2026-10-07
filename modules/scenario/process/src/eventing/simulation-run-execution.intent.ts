@@ -33,6 +33,7 @@ export function createExecuteRunHandler(
       setId: payload.scenarioSetId,
       ...(payload.name !== undefined ? { scenarioName: payload.name } : {}),
       target: payload.target,
+      ...(payload.plan !== undefined ? { plan: payload.plan } : {}),
       ...(payload.parameters !== undefined ? { parameters: payload.parameters } : {}),
       ...(payload.secretParameters !== undefined
         ? { secretParameters: payload.secretParameters }

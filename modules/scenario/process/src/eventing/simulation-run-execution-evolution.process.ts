@@ -11,7 +11,7 @@ import {
   runSecretCiphertextSchema,
   ScenarioRunStatus,
 } from "@langwatch/scenario-contract";
-import type { SimulationProcessingEvent } from "@langwatch/scenario-contract";
+import type { RunPlanModels, SimulationProcessingEvent } from "@langwatch/scenario-contract";
 import { z } from "zod";
 
 import {
@@ -142,6 +142,7 @@ export const handleRunQueued: EventHandler<
         scenarioSetId: view.scenarioSetId,
         ...(view.name !== null ? { name: view.name } : {}),
         target: view.target,
+        ...(Object.keys(view.plan).length > 0 ? { plan: view.plan } : {}),
         ...(view.parameters !== null ? { parameters: view.parameters } : {}),
         ...(view.secretParameters !== null ? { secretParameters: view.secretParameters } : {}),
         ...(view.startedByUserId !== null ? { startedByUserId: view.startedByUserId } : {}),
@@ -457,6 +458,13 @@ function wakeEvaluating(
   };
 }
 
+/** The plan models a suite records in the queued event's reserved namespace; empty for none. */
+function getRunPlanModels(reserved: Record<string, unknown>): RunPlanModels {
+  const simulatorModel = typeof reserved.simulatorModel === "string" ? reserved.simulatorModel : "";
+  const judgeModel = typeof reserved.judgeModel === "string" ? reserved.judgeModel : "";
+  return { ...(simulatorModel && { simulatorModel }), ...(judgeModel && { judgeModel }) };
+}
+
 /**
  * The evaluators a finished event says the run is graded with, narrowed to
  * ids and required flags. Null when absent or unreadable: the fold and the
@@ -507,9 +515,9 @@ export function buildSimulationRunEventView(
   const parsedSecretNames = secretParameterNamesSchema.safeParse(metadata.secretParameterNames);
   const secretParameterNames =
     parsedSecretNames.success && parsedSecretNames.data.length > 0 ? parsedSecretNames.data : null;
-  const reserved = unknownRecordSchema.safeParse(metadata.langwatch);
-  const actorId = reserved.success ? str(reserved.data.actorId) : null;
-  const actorApiKeyId = reserved.success ? str(reserved.data.actorApiKeyId) : null;
+  const reserved = unknownRecordSchema.safeParse(metadata.langwatch).data ?? {};
+  const actorId = str(reserved.actorId);
+  const actorApiKeyId = str(reserved.actorApiKeyId);
   return {
     eventType: event.type,
     occurredAt: event.occurredAt,
@@ -519,6 +527,7 @@ export function buildSimulationRunEventView(
     scenarioSetId: str(data.scenarioSetId),
     name: str(data.name),
     target,
+    plan: getRunPlanModels(reserved),
     parameters,
     secretParameters,
     secretParameterNames,

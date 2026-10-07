@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { FieldMappingSchema } from "./field-mapping.ts";
 import { runActorLabelSchema } from "./run-actor.ts";
 import { scenarioCriterionResultSchema } from "./scenario-criterion-result.ts";
 import { scenarioEvaluationResultSchema } from "./scenario-evaluation-result.ts";
@@ -277,3 +278,9 @@ export const simulationTargetSchema = z.object({
 });
 
 export type SimulationTarget = z.infer<typeof simulationTargetSchema>;
+
+/** A queued run's target, with the field mappings a suite's prompt target pins on it. */
+export const simulationQueuedTargetSchema = z.object({
+  ...simulationTargetSchema.shape,
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+});

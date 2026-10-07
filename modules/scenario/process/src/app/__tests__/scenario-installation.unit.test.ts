@@ -16,6 +16,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -26,7 +27,6 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -99,7 +99,7 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       "audit-log": createApiFixture<AuditLogApi>(),
       trace: createApiFixture<TraceApi>(),
       "data-retention": createApiFixture<DataRetentionApi>(),
-      suite: createApiFixture<SuiteApi>(),
+      evaluator: createApiFixture<EvaluatorApi>(),
       evaluation: createApiFixture<EvaluationApi>(),
       prompt: createApiFixture<PromptApi>(),
       secret: createApiFixture<SecretApi>(),

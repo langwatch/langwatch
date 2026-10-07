@@ -3,7 +3,6 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type * as observability from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { SimulationService } from "@langwatch/scenario-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -42,7 +41,6 @@ function harness({
     peers: {
       ...scenarioExecutorPeers(),
       agents: createApiFixture<AgentApi>(),
-      suites: createApiFixture<SuiteApi>(),
       traces: createApiFixture<TraceApi>(),
       projects: createApiFixture<ProjectApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),

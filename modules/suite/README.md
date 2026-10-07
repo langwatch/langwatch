@@ -39,6 +39,6 @@ Anything else suite needs belongs to another module and is reached through its `
 
 ## Who depends on suite
 
-[platform-health](../platform-health/README.md), [scenario](../scenario/README.md) (as a peer).
+[platform-health](../platform-health/README.md) (as a peer).
 
 <!-- readme:generated:end -->

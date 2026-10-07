@@ -274,6 +274,34 @@ describe("the worker process installation", () => {
     }
   });
 
+  it("hosts suite's peer lanes on scenario's run facts, and no suite sync on scenario", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const byName = new Map(
+        eventing.definitions.map((definition) => [definition.metadata.name, definition]),
+      );
+      expect([
+        ...(byName
+          .get("simulation_processing")
+          ?.open((definition) => [...definition.eventSubscribers.keys()]) ?? []),
+      ]).not.toContain("suiteRunSync");
+      expect(
+        byName
+          .get("suite_run_processing")
+          ?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
+      ).toEqual(
+        expect.arrayContaining([
+          "suite_run_processing.scenarioRunStarted",
+          "suite_run_processing.scenarioRunFinished",
+          "suite_run_processing.scenarioRunEvaluated",
+        ]),
+      );
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   /** @scenario "The worker hosts the gateway's spend settlement sweeper" */
   it("hosts the gateway's settlement sweeper on the spend pipeline", async () => {
     const { runtime, eventing } = await bootWorker();

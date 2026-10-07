@@ -134,9 +134,6 @@
       "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
-      "path": "../../suite/process/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ]

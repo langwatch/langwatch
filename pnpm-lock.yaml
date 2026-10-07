@@ -13682,9 +13682,6 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
-      '@langwatch/suite-process':
-        specifier: workspace:*
-        version: link:../../suite/process
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness

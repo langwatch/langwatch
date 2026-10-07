@@ -36,6 +36,6 @@ Anything else evaluator needs belongs to another module and is reached through i
 
 ## Who depends on evaluator
 
-[automation](../automation/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [langy](../langy/README.md), [monitor](../monitor/README.md), [suite](../suite/README.md), [trace](../trace/README.md), [workflow](../workflow/README.md) (as a peer).
+[automation](../automation/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [langy](../langy/README.md), [monitor](../monitor/README.md), [scenario](../scenario/README.md), [suite](../suite/README.md), [trace](../trace/README.md), [workflow](../workflow/README.md) (as a peer).
 
 <!-- readme:generated:end -->

@@ -10,12 +10,12 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ResourceOwnership } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -47,7 +47,7 @@ async function buildProductionApp(publicBaseUrl: string | undefined, emitter = n
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(),
       retention: createApiFixture<DataRetentionApi>(),
-      suites: createApiFixture<SuiteApi>(),
+      evaluators: createApiFixture<EvaluatorApi>(),
       ...scenarioExecutorPeers(),
       ...scenarioVoicePeers(),
       featureFlags: createApiFixture<FeatureFlagApi>(),

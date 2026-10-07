@@ -11,7 +11,6 @@ import type {
   ScenarioExecutionPreparation,
 } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
@@ -47,7 +46,6 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   runSecretSeal: ScenarioRunSecretSeal;
   config: ScenarioExecutionPrefetchConfig;
   scenarios: ScenarioService;
-  suites: SuiteApi;
   prompts: PromptApi;
   agents: AgentApi;
   workflows: WorkflowApi;
@@ -72,7 +70,6 @@ export class ScenarioExecutionPrefetcherService {
     const lookups = ScenarioExecutionLookupService.create({
       scenarios: options.scenarios,
       projects: options.projects,
-      suites: options.suites,
       modelProviders: options.modelProviders,
     });
     const workflowHydrator = ScenarioWorkflowHydratorService.create(modelParameters);
@@ -190,6 +187,7 @@ export class ScenarioExecutionPrefetcherService {
       result: this.completion.complete({
         context,
         target,
+        plan: input.plan,
         lookups,
         runKey,
         startedByUserId: input.startedByUserId,
@@ -238,7 +236,6 @@ export class ScenarioExecutionPrefetcherService {
         target,
         runSecretValues,
       }),
-      suite: this.lookups.getRunSuite({ setId: context.setId, projectId: context.projectId }),
     };
   }
 }
