@@ -97,19 +97,12 @@ function assertMoveStaysOutOfPersonalWorkspaces({
  * organisation role alone (ADR-144 decision 5), so creation asks the same
  * question rather than leaving a creator locked out of what they made.
  */
-async function assertCanOpenAggregates({
-  userId,
-  organizationId,
-}: {
-  userId: string;
-  organizationId: string;
-}): Promise<void> {
+function assertCanOpenAggregates(
+  organizationRole: string | null | undefined,
+): void {
   const violation = aggregateProjectRouteViolation({
     kind: AGGREGATE_PROJECT_KIND,
-    organizationRole: await getApp().organizations.getUserOrgRole({
-      userId,
-      organizationId,
-    }),
+    organizationRole,
   });
   if (violation) throw new AggregateProjectAdminOnlyError();
 }
@@ -165,25 +158,18 @@ export const projectRouter = createTRPCRouter({
         },
         async ({ ctx, input, next }) => {
           // An aggregate reads other people's personal projects, so whichever
-          // team it attaches to, only someone who manages the organisation
-          // may create one (ADR-144 decision 5). A member of the organisation
-          // who is not an admin is refused as admin only, the same way the
-          // rule edit refuses; someone outside it still gets the shared check.
+          // team it attaches to, only an organisation admin may create one
+          // (ADR-144 decision 5), whatever a custom role grants. A member of
+          // the organisation who is not an admin is refused as admin only,
+          // the same way the rule edit refuses; someone outside it has no
+          // role to judge and still gets the shared check.
           if (isAggregateProjectKind(input.kind)) {
             const organizationRole =
               await getApp().organizations.getUserOrgRole({
                 userId: ctx.session.user.id,
                 organizationId: input.organizationId,
               });
-            if (
-              organizationRole &&
-              aggregateProjectRouteViolation({
-                kind: AGGREGATE_PROJECT_KIND,
-                organizationRole,
-              })
-            ) {
-              throw new AggregateProjectAdminOnlyError();
-            }
+            if (organizationRole) assertCanOpenAggregates(organizationRole);
             return checkOrganizationPermission("organization:manage")({
               ctx,
               input,
@@ -220,13 +206,8 @@ export const projectRouter = createTRPCRouter({
         organizationId: input.organizationId,
       });
 
+      // The middleware refused anyone who may not open an aggregate.
       const isAggregate = isAggregateProjectKind(input.kind);
-      if (isAggregate) {
-        await assertCanOpenAggregates({
-          userId,
-          organizationId: input.organizationId,
-        });
-      }
       // Validated before the team is created, so a refused rule writes nothing.
       const kindFields = await getApp().projects.createKindFields({
         kind: input.kind,
@@ -345,10 +326,12 @@ export const projectRouter = createTRPCRouter({
         });
       }
       const organizationId = current.team.organizationId;
-      await assertCanOpenAggregates({
-        userId: ctx.session.user.id,
-        organizationId,
-      });
+      assertCanOpenAggregates(
+        await getApp().organizations.getUserOrgRole({
+          userId: ctx.session.user.id,
+          organizationId,
+        }),
+      );
       try {
         const { members } = await getApp().projects.updateAggregateRule({
           projectId: input.projectId,

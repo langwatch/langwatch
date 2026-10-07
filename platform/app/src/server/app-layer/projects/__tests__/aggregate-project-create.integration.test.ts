@@ -151,6 +151,45 @@ describe("Feature: an admin creates an aggregate project", () => {
     });
   });
 
+  describe("when someone outside the organisation asks to create one", () => {
+    it("keeps the shared permission refusal, not the admin-only one, and writes nothing", async () => {
+      // An outsider has no organisation role to judge, so the request is
+      // refused by the organisation permission check exactly as before
+      // ADR-144, and is never told aggregates are admin only.
+      const foreign = await seedAggregateOrganization(prisma, {
+        label: "agg-create-outsider",
+      });
+      try {
+        const before = await prisma.project.count({
+          where: { teamId: fixture.team.id },
+        });
+
+        const refusal = await callerFor(foreign.admin.id)
+          .project.create({
+            organizationId: fixture.organizationId,
+            teamId: fixture.team.id,
+            name: "Outsider view",
+            language: "other",
+            framework: "other",
+            kind: AGGREGATE_PROJECT_KIND,
+          })
+          .then(() => null)
+          .catch((error: { code?: string; cause?: { code?: string } }) => ({
+            code: error.code,
+            causeCode: error.cause?.code,
+          }));
+
+        expect(refusal?.code).toBe("UNAUTHORIZED");
+        expect(refusal?.causeCode).not.toBe("aggregate_project_admin_only");
+        expect(
+          await prisma.project.count({ where: { teamId: fixture.team.id } }),
+        ).toBe(before);
+      } finally {
+        await foreign.cleanup();
+      }
+    });
+  });
+
   describe("when a member whose custom role grants organization:manage asks to create one", () => {
     it("is refused as admin only and nothing is written", async () => {
       // The role passes the organisation permission check, so only the
