@@ -48,8 +48,8 @@ function withRateLimits(
   memory: MemoryAuthRepositories,
   rateLimits: AuthRepositories["rateLimits"],
 ): AuthRepositories {
-  const { sessions, cliSessions, signUpTokens, signInLocks, signInSecurity } = memory;
-  return { sessions, cliSessions, signUpTokens, signInLocks, signInSecurity, rateLimits };
+  const { sessions, cliSessions, signUpTokens, signInLocks } = memory;
+  return { sessions, cliSessions, signUpTokens, signInLocks, rateLimits };
 }
 
 async function appFor(

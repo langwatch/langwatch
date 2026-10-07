@@ -87,6 +87,7 @@ import type {
   PersonalWorkspaceFeaturesInput,
 } from "./personal-workspace.ts";
 import type { ScopeGraphOrganization } from "./scope-graph.ts";
+import type { SignInSecurityPolicy } from "./sign-in-security-policy.ts";
 import type { SignUpVerdict } from "./sign-up-policy.ts";
 import type { TeamWithProjects } from "./team.responses.ts";
 import type {
@@ -292,6 +293,25 @@ export interface OrganizationApi {
     organizationId: string;
     maxSessionDurationDays: number;
   }): Promise<void>;
+  /**
+   * This organization's sign-in security rules (GAC-09, GAC-10).
+   * Throws OrganizationNotFoundError.
+   */
+  getSignInSecurityPolicy(input: { organizationId: string }): Promise<SignInSecurityPolicy>;
+  updateSignInSecurityPolicy(input: {
+    organizationId: string;
+    policy: SignInSecurityPolicy;
+  }): Promise<void>;
+  /**
+   * The rules of the organizations this person belongs to and is not
+   * disabled in; read on every session.
+   */
+  findSignInSecurityPoliciesForUser(input: { userId: string }): Promise<SignInSecurityPolicy[]>;
+  /**
+   * Cross-tenant by design: every organization that set any rule, for an
+   * address resolving to nobody and the session path's early-out.
+   */
+  findConfiguredSignInSecurityPolicies(): Promise<SignInSecurityPolicy[]>;
   /**
    * The organization's pricing model and currency, for workers deciding on its behalf. A system
    * read: no caller. An unknown organization has no model and the schema's default currency.

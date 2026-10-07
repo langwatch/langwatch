@@ -43,6 +43,11 @@ export interface MemoryOrganizationRow {
   joinerRole?: "MEMBER" | "DEVELOPER";
   /** The CLI/device session ceiling in days; absent reads as unbounded. */
   maxSessionDurationDays?: number;
+  /** The sign-in security columns (GAC-09, GAC-10); absent reads as no rule. */
+  lockoutAfterFailedAttempts?: number;
+  lockoutMinutes?: number;
+  sessionIdleTimeoutMinutes?: number;
+  sessionMaxLifetimeMinutes?: number;
   /** The per-file dataset limit an operator set, in mebibytes. */
   datasetAttachmentMaxMb?: number | null;
   /** The organization's own Instant Evals consent; absent reads as not given. */

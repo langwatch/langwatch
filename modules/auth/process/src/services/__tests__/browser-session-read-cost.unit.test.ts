@@ -40,7 +40,7 @@ function harness() {
   const reads = {
     row: vi.spyOn(rows, "findById"),
     person: vi.spyOn(users, "findById"),
-    rules: vi.spyOn(fixture.settings, "findConfigured"),
+    rules: vi.spyOn(fixture.organizations, "findConfiguredSignInSecurityPolicies"),
   };
   const service = BrowserSessionService.create({
     sessions: rows,
@@ -142,11 +142,13 @@ describe("reading a browser session", () => {
           : row,
       );
 
-      await fixture.settings.save({
+      await fixture.organizations.updateSignInSecurityPolicy({
         organizationId: "acme",
-        rule: {
-          lockout: NO_LOCKOUT,
-          sessionBound: { idleTimeoutMinutes: 60, maxLifetimeMinutes: 0 },
+        policy: {
+          lockoutAfterFailedAttempts: NO_LOCKOUT.afterFailedAttempts,
+          lockoutMinutes: NO_LOCKOUT.lockMinutes,
+          sessionIdleTimeoutMinutes: 60,
+          sessionMaxLifetimeMinutes: 0,
         },
       });
 

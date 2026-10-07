@@ -4,7 +4,6 @@ import { MemoryAuthSessionRepository } from "./memory.auth-session.repository.ts
 import { MemoryAuthDatabase } from "./memory.auth.database.ts";
 import { MemoryCliDeviceSessionRepository } from "./memory.cli-device-session.repository.ts";
 import { MemorySignInAttemptLockRepository } from "./memory.sign-in-attempt-lock.repository.ts";
-import { MemorySignInSecuritySettingsRepository } from "./memory.sign-in-security-settings.repository.ts";
 import { MemorySignUpVerificationTokenRepository } from "./memory.signup-verification-token.repository.ts";
 
 /** Both twins over ONE store, so a session written here is read back here. */
@@ -21,7 +20,6 @@ export class MemoryAuthRepositories {
   readonly cliSessions: MemoryCliDeviceSessionRepository;
   readonly signUpTokens: AuthRepositories["signUpTokens"];
   readonly signInLocks: MemorySignInAttemptLockRepository;
-  readonly signInSecurity: MemorySignInSecuritySettingsRepository;
   readonly rateLimits: MemoryAuthRateLimitRepository;
 
   private constructor(memory: MemoryAuthDatabase) {
@@ -29,7 +27,6 @@ export class MemoryAuthRepositories {
     this.cliSessions = MemoryCliDeviceSessionRepository.create();
     this.signUpTokens = MemorySignUpVerificationTokenRepository.create({ memory });
     this.signInLocks = MemorySignInAttemptLockRepository.create();
-    this.signInSecurity = MemorySignInSecuritySettingsRepository.create();
     this.rateLimits = MemoryAuthRateLimitRepository.create();
   }
 }

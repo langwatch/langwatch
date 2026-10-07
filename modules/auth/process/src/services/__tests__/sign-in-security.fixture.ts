@@ -1,8 +1,8 @@
 import type { LockoutPolicy, SessionBound } from "@langwatch/auth-contract";
+import type { OrganizationApi, SignInSecurityPolicy } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
 
 import { MemorySignInAttemptLockRepository } from "../../repositories/memory/memory.sign-in-attempt-lock.repository.ts";
-import { MemorySignInSecuritySettingsRepository } from "../../repositories/memory/memory.sign-in-security-settings.repository.ts";
 import { SessionBoundService } from "../session-bound.service.ts";
 import { SignInLockoutService, type SignInLockoutEvidence } from "../sign-in-lockout.service.ts";
 
@@ -12,6 +12,45 @@ export type RecordedEvidence = {
   escalated: { userId: string | null; consecutiveLockouts: number }[];
 };
 
+type SignInSecurityOrganizations = Pick<
+  OrganizationApi,
+  | "getSignInSecurityPolicy"
+  | "updateSignInSecurityPolicy"
+  | "findSignInSecurityPoliciesForUser"
+  | "findConfiguredSignInSecurityPolicies"
+>;
+
+const NO_RULE: SignInSecurityPolicy = {
+  lockoutAfterFailedAttempts: 0,
+  lockoutMinutes: 30,
+  sessionIdleTimeoutMinutes: 0,
+  sessionMaxLifetimeMinutes: 0,
+};
+
+const asksSomething = (policy: SignInSecurityPolicy): boolean =>
+  policy.lockoutAfterFailedAttempts > 0 ||
+  policy.sessionIdleTimeoutMinutes > 0 ||
+  policy.sessionMaxLifetimeMinutes > 0;
+
+/**
+ * OrganizationApi's four sign-in security operations, answering as the
+ * organization's own twin does (memory.organization.sign-in-security-policy test).
+ */
+function signInSecurityOrganizations(
+  memberships: Map<string, Set<string>>,
+): SignInSecurityOrganizations {
+  const policies = new Map<string, SignInSecurityPolicy>();
+  return {
+    getSignInSecurityPolicy: async ({ organizationId }) => policies.get(organizationId) ?? NO_RULE,
+    updateSignInSecurityPolicy: async ({ organizationId, policy }) => {
+      policies.set(organizationId, policy);
+    },
+    findSignInSecurityPoliciesForUser: async ({ userId }) =>
+      [...(memberships.get(userId) ?? [])].map((id) => policies.get(id) ?? NO_RULE),
+    findConfiguredSignInSecurityPolicies: async () => [...policies.values()].filter(asksSomething),
+  };
+}
+
 /**
  * The sign-in security services over their own memory twins - the same
  * repositories a process booted without a database composes, so a test here
@@ -20,7 +59,7 @@ export type RecordedEvidence = {
 export function signInSecurityFixture({ now }: { now: () => Instant }) {
   const locks = MemorySignInAttemptLockRepository.create({ now });
   const memberships = new Map<string, Set<string>>();
-  const settings = MemorySignInSecuritySettingsRepository.create({ memberships });
+  const organizations = signInSecurityOrganizations(memberships);
   /** Puts a person in an organization, as the Postgres twin's membership row does. */
   const join = ({ userId, organizationId }: { userId: string; organizationId: string }) => {
     memberships.set(userId, new Set([...(memberships.get(userId) ?? []), organizationId]));
@@ -40,7 +79,7 @@ export function signInSecurityFixture({ now }: { now: () => Instant }) {
 
   return {
     locks,
-    settings,
+    organizations,
     recorded,
     touched,
     join,
@@ -56,7 +95,15 @@ export function signInSecurityFixture({ now }: { now: () => Instant }) {
       sessionBound: SessionBound;
       members?: string[];
     }) => {
-      await settings.save({ organizationId: id, rule: { lockout, sessionBound } });
+      await organizations.updateSignInSecurityPolicy({
+        organizationId: id,
+        policy: {
+          lockoutAfterFailedAttempts: lockout.afterFailedAttempts,
+          lockoutMinutes: lockout.lockMinutes,
+          sessionIdleTimeoutMinutes: sessionBound.idleTimeoutMinutes,
+          sessionMaxLifetimeMinutes: sessionBound.maxLifetimeMinutes,
+        },
+      });
       for (const userId of members) join({ userId, organizationId: id });
     },
     /** Gives an address an account, which an unknown address never gets. */
@@ -66,7 +113,7 @@ export function signInSecurityFixture({ now }: { now: () => Instant }) {
     },
     lockout: SignInLockoutService.create({
       locks,
-      settings,
+      organizations,
       directory: {
         findUserIdFor: async ({ identifier }) => accounts.get(identifier) ?? null,
       },
@@ -77,7 +124,7 @@ export function signInSecurityFixture({ now }: { now: () => Instant }) {
       now,
     }),
     sessionBound: SessionBoundService.create({
-      settings,
+      organizations,
       activity: {
         touch: async (entry) => {
           touched.push(entry);

@@ -60,6 +60,7 @@ import {
   type OrganizationUsageCount,
   OrganizationNotFoundForTeamError,
   type PricingModel,
+  type SignInSecurityPolicy,
 } from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
@@ -248,6 +249,25 @@ export class OrganizationService extends OrganizationServiceContract {
 
   getSessionPolicy(input: { organizationId: string }): Promise<{ maxSessionDurationDays: number }> {
     return this.repository.getSessionPolicy(input);
+  }
+
+  getSignInSecurityPolicy(input: { organizationId: string }): Promise<SignInSecurityPolicy> {
+    return this.repository.getSignInSecurityPolicy(input);
+  }
+
+  updateSignInSecurityPolicy(input: {
+    organizationId: string;
+    policy: SignInSecurityPolicy;
+  }): Promise<void> {
+    return this.repository.updateSignInSecurityPolicy(input);
+  }
+
+  findSignInSecurityPoliciesForUser(input: { userId: string }): Promise<SignInSecurityPolicy[]> {
+    return this.repository.findSignInSecurityPoliciesForUser(input);
+  }
+
+  findConfiguredSignInSecurityPolicies(): Promise<SignInSecurityPolicy[]> {
+    return this.repository.findConfiguredSignInSecurityPolicies();
   }
 
   saveSessionPolicy(input: {

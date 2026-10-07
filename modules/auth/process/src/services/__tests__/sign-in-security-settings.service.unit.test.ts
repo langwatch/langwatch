@@ -59,7 +59,7 @@ function harness({
     entitlements,
     released,
     service: SignInSecuritySettingsService.create({
-      settings: fixture.settings,
+      organizations: fixture.organizations,
       locks: fixture.locks,
       members: {
         findMemberUserIds: async () => members,

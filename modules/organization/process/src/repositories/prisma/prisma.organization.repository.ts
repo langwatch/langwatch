@@ -18,6 +18,7 @@ import {
   type PersonalWorkspace,
   type OrganizationUsageCount,
   type PricingModel,
+  type SignInSecurityPolicy,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
@@ -34,6 +35,13 @@ import { PrismaOrganizationAuditStore } from "./prisma.organization-audit.store.
 type Client = Prisma.TransactionClient | PrismaClient;
 
 const BYTES_PER_MEBIBYTE = 1024 * 1024;
+
+const signInSecurityPolicySelect = {
+  lockoutAfterFailedAttempts: true,
+  lockoutMinutes: true,
+  sessionIdleTimeoutMinutes: true,
+  sessionMaxLifetimeMinutes: true,
+} as const;
 
 export class PrismaOrganizationRepository extends OrganizationRepository {
   private constructor(
@@ -145,6 +153,55 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     await this.database.organization.update({
       where: { id: organizationId },
       data: { maxSessionDurationDays },
+    });
+  }
+
+  async getSignInSecurityPolicy({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<SignInSecurityPolicy> {
+    const row = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: signInSecurityPolicySelect,
+    });
+    if (!row) throw new OrganizationNotFoundError();
+    return row;
+  }
+
+  async updateSignInSecurityPolicy({
+    organizationId,
+    policy,
+  }: {
+    organizationId: string;
+    policy: SignInSecurityPolicy;
+  }): Promise<void> {
+    await this.database.organization.update({ where: { id: organizationId }, data: policy });
+  }
+
+  async findSignInSecurityPoliciesForUser({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<SignInSecurityPolicy[]> {
+    // Through `Organization` filtered by membership, never `OrganizationUser`
+    // keyed only by `userId`: the org-tenancy guard refuses that (ADR-021).
+    return this.database.organization.findMany({
+      where: { members: { some: { userId, disabledAt: null } } },
+      select: signInSecurityPolicySelect,
+    });
+  }
+
+  async findConfiguredSignInSecurityPolicies(): Promise<SignInSecurityPolicy[]> {
+    return this.database.organization.findMany({
+      where: {
+        OR: [
+          { lockoutAfterFailedAttempts: { gt: 0 } },
+          { sessionIdleTimeoutMinutes: { gt: 0 } },
+          { sessionMaxLifetimeMinutes: { gt: 0 } },
+        ],
+      },
+      select: signInSecurityPolicySelect,
     });
   }
 

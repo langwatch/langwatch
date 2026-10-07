@@ -71,6 +71,20 @@ class StubRepository extends OrganizationRepository {
 
   async saveSessionPolicy(): Promise<void> {}
 
+  async getSignInSecurityPolicy(): Promise<never> {
+    throw new Error("not used");
+  }
+
+  async updateSignInSecurityPolicy(): Promise<void> {}
+
+  async findSignInSecurityPoliciesForUser(): Promise<[]> {
+    return [];
+  }
+
+  async findConfiguredSignInSecurityPolicies(): Promise<[]> {
+    return [];
+  }
+
   async getPricing(): Promise<{ pricingModel: PricingModel | null; currency: "USD" | "EUR" }> {
     return { pricingModel: null, currency: "EUR" };
   }

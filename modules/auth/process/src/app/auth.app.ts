@@ -448,7 +448,7 @@ export class AuthModule implements AuthApiContract {
       identityEmails: members.identityEmails,
       users: dependencies.users,
       sessionBound: SessionBoundService.create({
-        settings: repositories.signInSecurity,
+        organizations: dependencies.organizations,
         activity: repositories.sessions,
         now,
       }),
@@ -516,7 +516,7 @@ export class AuthModule implements AuthApiContract {
         organizations: dependencies.organizations,
       }),
       signInSecurity: SignInSecuritySettingsService.create({
-        settings: repositories.signInSecurity,
+        organizations: dependencies.organizations,
         locks: repositories.signInLocks,
         members: signInSecurityMembers(dependencies.organizations),
         entitlements: dependencies.entitlements,
@@ -638,7 +638,7 @@ export class AuthModule implements AuthApiContract {
             lifecycle: app.#lifecycle,
             signInLockout: SignInLockoutService.create({
               locks: repositories.signInLocks,
-              settings: repositories.signInSecurity,
+              organizations: dependencies.organizations,
               directory: {
                 findUserIdFor: async ({ identifier }) =>
                   (await dependencies.users.findByEmail({ email: identifier }))?.id ?? null,

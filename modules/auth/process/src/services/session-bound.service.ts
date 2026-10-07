@@ -7,12 +7,10 @@ import {
   type SessionBoundVerdict,
 } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
+import type { OrganizationApi, SignInSecurityPolicy } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
 
-import type {
-  OrganizationSignInSecurityRule,
-  SignInSecuritySettingsRepository,
-} from "../repositories/sign-in-security-settings.repository.ts";
+import { toSessionBound } from "../rules/sign-in-security.rules.ts";
 
 const logger = createLogger("langwatch:auth:session-bound");
 
@@ -48,7 +46,11 @@ interface SessionActivityWriter {
 }
 
 interface SessionBoundDeps {
-  settings: SignInSecuritySettingsRepository;
+  /** The rules organizations set, read from their owner. */
+  organizations: Pick<
+    OrganizationApi,
+    "findConfiguredSignInSecurityPolicies" | "findSignInSecurityPoliciesForUser"
+  >;
   activity: SessionActivityWriter;
   now: () => Instant;
 }
@@ -58,7 +60,7 @@ export class SessionBoundService {
     return new SessionBoundService(deps);
   }
 
-  #configured: Remembered<readonly OrganizationSignInSecurityRule[]> | null = null;
+  #configured: Remembered<readonly SignInSecurityPolicy[]> | null = null;
   readonly #governing = new Map<string, Remembered<SessionBound | null>>();
 
   private constructor(private readonly deps: SessionBoundDeps) {}
@@ -120,14 +122,14 @@ export class SessionBoundService {
     nowMs: number;
   }): Promise<SessionBound | null> {
     if (!this.#configured || this.#configured.until <= nowMs) {
-      const rules = await this.deps.settings.findConfigured();
+      const rules = await this.deps.organizations.findConfiguredSignInSecurityPolicies();
       this.#configured = { value: rules, until: nowMs + SESSION_RULES_TTL_MS };
     }
-    const anybody = strictestSessionBound(this.#configured.value.map((rule) => rule.sessionBound));
+    const anybody = strictestSessionBound(this.#configured.value.map(toSessionBound));
     if (boundsNothing(anybody)) return null;
 
-    const governing = await this.deps.settings.findForUser({ userId });
-    const bound = strictestSessionBound(governing.map((rule) => rule.sessionBound));
+    const governing = await this.deps.organizations.findSignInSecurityPoliciesForUser({ userId });
+    const bound = strictestSessionBound(governing.map(toSessionBound));
 
     return boundsNothing(bound) ? null : bound;
   }
