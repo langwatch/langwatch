@@ -7966,6 +7966,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
