@@ -25,7 +25,18 @@ import type {
   StoredAggregateProject,
 } from "../repositories/aggregate-rule.repository";
 
-const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
+const { captureException, logged } = vi.hoisted(() => ({
+  captureException: vi.fn(),
+  logged: { error: vi.fn() },
+}));
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => ({
+    info: () => undefined,
+    warn: () => undefined,
+    debug: () => undefined,
+    error: logged.error,
+  }),
+}));
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException,
   toError: (error: unknown) =>
@@ -203,6 +214,7 @@ function reconcilerFor({
 describe("AggregateReconciler", () => {
   beforeEach(() => {
     captureException.mockClear();
+    logged.error.mockClear();
   });
 
   describe("given an aggregate whose rule wants two members and holds none", () => {
@@ -529,6 +541,40 @@ describe("AggregateReconciler", () => {
             aggregateProjectId: "agg_1",
           }),
         ).resolves.toBeUndefined();
+        expect(logged.error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            aggregateProjectId: "agg_1",
+            trigger: "aggregate-created",
+            error: expect.objectContaining({ message: "ledger unavailable" }),
+          }),
+          expect.stringContaining("failed to reconcile a new aggregate project"),
+        );
+        expect(captureException).toHaveBeenCalledWith(
+          expect.objectContaining({ message: "ledger unavailable" }),
+          { extra: { aggregateProjectId: "agg_1" } },
+        );
+      });
+
+      it("still reconciles, and does not throw, when scheduling its sweep fails", async () => {
+        const { ledger, rows } = inMemoryLedger();
+        const { schedule } = inMemorySchedule();
+        const failingSchedule: AggregateSweepSchedule = {
+          ...schedule,
+          async upsertForTarget() {
+            throw new Error("scheduler unavailable");
+          },
+        };
+
+        await expect(
+          reconcilerFor({ ledger, schedule: failingSchedule }).start({
+            aggregateProjectId: "agg_1",
+          }),
+        ).resolves.toBeUndefined();
+        expect(rows.map((row) => row.memberProjectId)).toEqual(["p_a", "p_b"]);
+        expect(logged.error).toHaveBeenCalledWith(
+          expect.objectContaining({ aggregateProjectId: "agg_1" }),
+          expect.stringContaining("failed to schedule"),
+        );
       });
     });
   });

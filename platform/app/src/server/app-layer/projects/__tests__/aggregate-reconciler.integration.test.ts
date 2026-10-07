@@ -10,13 +10,20 @@
  */
 
 import { DepartmentService } from "@ee/governance/services/department/department.service";
-import { AuthzCollectorService, AuthzService } from "@langwatch/authz-server";
+import {
+  AuthzCollectorService,
+  AuthzService,
+  roleFactToRow,
+} from "@langwatch/authz-server";
+import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   GrantPrincipalType,
   GrantScopeType,
   OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
 } from "~/generated/prisma/client";
 import { NullLwqlKeyMapRepository } from "~/server/analytics/lwql/lwqlKeyMap.repository";
 import { appRouter } from "~/server/api/root";
@@ -33,7 +40,9 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { PrismaScheduledJobRepository } from "~/server/app-layer/scheduler/scheduled-job.repository";
 import { SchedulerRegistry } from "~/server/app-layer/scheduler/scheduler.registry";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   AGGREGATE_ARCHIVED,
   AGGREGATE_RECONCILE_SWEEP,
@@ -364,11 +373,175 @@ describe("Feature: the reconciler keeps members current", () => {
               projectIds: [fixture.shared.id],
             },
           }),
-        ).rejects.toThrow();
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          cause: { code: "permission_denied" },
+        });
 
         expect(await liveMembersOf(aggregate.id)).toEqual(
           [fixture.shared.id, fixture.personal.seller.id].sort(),
         );
+      });
+    });
+
+    describe("when a member whose custom role grants organization:manage, but who is not an admin, asks to edit the rule", () => {
+      it("is refused because only an organisation admin opens an aggregate", async () => {
+        const aggregate = await createAggregate({
+          kind: "explicit",
+          projectIds: [fixture.shared.id, fixture.personal.seller.id],
+        });
+        const manager = await fixture.makeUser({
+          handle: `manager-${nanoid(6)}`,
+          organizationRole: OrganizationUserRole.MEMBER,
+        });
+        const permissions = ["organization:manage"];
+        const customRole = await prisma.customRole.create({
+          data: {
+            organizationId: fixture.organizationId,
+            name: `Organisation manager ${fixture.ns}-${nanoid(4)}`,
+            permissions,
+          },
+        });
+        await prisma.role.create({
+          data: roleFactToRow({
+            organizationId: fixture.organizationId,
+            role: {
+              roleId: customRole.id,
+              name: customRole.name,
+              permissions,
+              kind: "custom",
+              occurredAtMs: customRole.createdAt.getTime(),
+            },
+          }),
+        });
+        await seedRoleBinding(prisma, {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: fixture.organizationId,
+          userId: manager.id,
+          role: TeamUserRole.CUSTOM,
+          customRoleId: customRole.id,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: fixture.organizationId,
+        });
+
+        // The role does grant organization:manage: on an ordinary project the
+        // permission check lets the manager through to the kind check.
+        await expect(
+          callerFor(manager.id).project.updateAggregateRule({
+            projectId: fixture.shared.id,
+            aggregateRule: { kind: "all-personal" },
+          }),
+        ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+        // On the aggregate the permission check itself refuses: a project
+        // permission on an aggregate is gated on the organisation admin role
+        // (ADR-144 decision 5), ahead of the mutation's own admin check.
+        await expect(
+          callerFor(manager.id).project.updateAggregateRule({
+            projectId: aggregate.id,
+            aggregateRule: {
+              kind: "explicit",
+              projectIds: [fixture.shared.id],
+            },
+          }),
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          cause: { code: "permission_denied" },
+        });
+
+        expect(await liveMembersOf(aggregate.id)).toEqual(
+          [fixture.shared.id, fixture.personal.seller.id].sort(),
+        );
+      });
+    });
+
+    describe("when ana asks to edit the rule of a project that is not an aggregate", () => {
+      it("is refused as not found and the project keeps no rule", async () => {
+        await expect(
+          callerFor(fixture.admin.id).project.updateAggregateRule({
+            projectId: fixture.shared.id,
+            aggregateRule: { kind: "all-personal" },
+          }),
+        ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+        expect(
+          (
+            await prisma.project.findUniqueOrThrow({
+              where: { id: fixture.shared.id },
+            })
+          ).aggregateRule,
+        ).toBeNull();
+      });
+    });
+
+    describe("when ana asks to edit the rule of an archived aggregate", () => {
+      it("is refused and attaches nothing", async () => {
+        const aggregate = await createAggregate({
+          kind: "explicit",
+          projectIds: [fixture.shared.id],
+        });
+        await getApp().projects.archive({
+          id: aggregate.id,
+          organizationId: fixture.organizationId,
+        });
+
+        await expect(
+          callerFor(fixture.admin.id).project.updateAggregateRule({
+            projectId: aggregate.id,
+            aggregateRule: { kind: "all-personal" },
+          }),
+        ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+        expect(await liveMembersOf(aggregate.id)).toEqual([]);
+        expect(
+          (
+            await prisma.project.findUniqueOrThrow({
+              where: { id: aggregate.id },
+            })
+          ).aggregateRule,
+        ).toEqual({ kind: "explicit", projectIds: [fixture.shared.id] });
+      });
+    });
+
+    describe("when ana asks to edit the rule of an aggregate in another organisation", () => {
+      it("is refused and the other organisation's rule and reads stay as they were", async () => {
+        const foreign = await seedAggregateOrganization(prisma, {
+          label: "agg-reconcile-foreign",
+        });
+        try {
+          const foreignAggregate = await foreign.makeAggregate("foreign-view");
+
+          await expect(
+            callerFor(fixture.admin.id).project.updateAggregateRule({
+              projectId: foreignAggregate.id,
+              aggregateRule: {
+                kind: "explicit",
+                projectIds: [foreign.shared.id],
+              },
+            }),
+          ).rejects.toMatchObject({
+            code: "FORBIDDEN",
+            cause: { code: "permission_denied" },
+          });
+
+          expect(
+            (
+              await prisma.project.findUniqueOrThrow({
+                where: { id: foreignAggregate.id },
+              })
+            ).aggregateRule,
+          ).toEqual({ kind: "all-personal" });
+          expect(
+            await prisma.grant.count({
+              where: {
+                organizationId: foreign.organizationId,
+                principalId: foreignAggregate.id,
+              },
+            }),
+          ).toBe(0);
+        } finally {
+          await foreign.cleanup();
+        }
       });
     });
   });
