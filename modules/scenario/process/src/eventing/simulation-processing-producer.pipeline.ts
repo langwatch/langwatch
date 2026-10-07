@@ -223,14 +223,6 @@ function buildSimulationProcessingProducerPipeline(input: {
       broadcastUpdate: () =>
         Promise.reject(producerOnly(processName, "broadcast a simulation update")),
     },
-    suiteRunSync: {
-      recordSuiteRunItemStarted: () =>
-        Promise.reject(producerOnly(processName, "record a suite run item start")),
-      completeSuiteRunItem: () =>
-        Promise.reject(producerOnly(processName, "complete a suite run item")),
-      regradeSuiteRunItem: () =>
-        Promise.reject(producerOnly(processName, "regrade a suite run item")),
-    },
     traceMetricsSync: {
       computeRunMetrics: () =>
         Promise.reject(producerOnly(processName, "compute a run's trace metrics")),

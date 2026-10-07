@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { scenarioCriterionResultSchema } from "./scenario-criterion-result.ts";
+import { runEvaluatorsSchema } from "./scenario-run-evaluators.ts";
 import { scenarioEvaluationResultSchema } from "./schemas/event-schemas.ts";
 import { simulationTargetSchema, simulationMessageSchema } from "./simulation.ts";
 
@@ -24,6 +25,8 @@ export const simulationQueueRunSchema = z.object({
   ...simulationRunDetailsSchema.shape,
   secretParameters: z.record(z.string(), z.string()).optional(),
   target: simulationTargetSchema.optional(),
+  /** The evaluators the queuing owner pinned; absent, the run reads its own when queued. */
+  evaluators: runEvaluatorsSchema.optional(),
 });
 export type SimulationQueueRun = z.infer<typeof simulationQueueRunSchema>;
 

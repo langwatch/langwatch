@@ -42,7 +42,6 @@ import {
   simulationRunExecutionPM,
 } from "./simulation-run-execution.process.ts";
 import type { SnapshotUpdateBroadcastSubscriberDeps } from "./snapshot-update-broadcast.subscriber.ts";
-import type { SuiteRunSyncSubscriberDeps } from "./suite-run-sync.subscriber.ts";
 
 type SimulationTraceReads = Pick<
   TraceApi,
@@ -99,7 +98,6 @@ export class SimulationProcessingRuntimeAdapter {
       >;
       commands: SimulationCommandDispatcherService;
       simulations: SimulationService;
-      suiteRuns: SuiteRunSyncSubscriberDeps;
       snapshotUpdates: SnapshotUpdateBroadcastSubscriberDeps;
       executor: ScenarioExecutorService;
       grading: SimulationGradingPeers;
@@ -115,7 +113,6 @@ export class SimulationProcessingRuntimeAdapter {
     retention: Pick<DataRetentionApi, "getPlatformDefaultRetentionDays" | "getResolvedForProject">;
     commands: SimulationCommandDispatcherService;
     simulations: SimulationService;
-    suiteRuns: SuiteRunSyncSubscriberDeps;
     snapshotUpdates: SnapshotUpdateBroadcastSubscriberDeps;
     executor: ScenarioExecutorService;
     grading: SimulationGradingPeers;
@@ -185,7 +182,6 @@ export class SimulationProcessingRuntimeAdapter {
       },
       simulations,
       snapshotUpdateBroadcast: this.input.snapshotUpdates,
-      suiteRunSync: this.input.suiteRuns,
       traceMetricsSync: { computeRunMetrics: (data) => commands.computeRunMetrics(data) },
       traceSpanMetricsSync: {
         findSummary: (input) => traces.findSummary(input),

@@ -77,7 +77,6 @@ function build(traceSpanMetricsSync: TraceSpanMetricsSyncDeps = {} as never) {
     },
     simulations,
     snapshotUpdateBroadcast: {} as never,
-    suiteRunSync: {} as never,
     traceMetricsSync: {} as never,
     traceSpanMetricsSync,
   });

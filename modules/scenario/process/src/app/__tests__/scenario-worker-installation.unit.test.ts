@@ -128,7 +128,6 @@ const SIMULATION_KEYS = [
   "subscriber:pm:scenario_evaluations",
   "subscriber:pm:simulation_run_execution",
   "subscriber:snapshotUpdateBroadcast",
-  "subscriber:suiteRunSync",
   "subscriber:traceMetricsSync",
 ].map((key) => `simulation_processing:${key}`);
 
@@ -158,13 +157,6 @@ describe("given the scenario module installed on the worker role", () => {
     const { keys } = await installedOn("worker");
 
     expect(keys).toContain("simulation_processing:subscriber:snapshotUpdateBroadcast");
-  });
-
-  /** @scenario "The worker hosts the subscriber that reports a run into its suite run" */
-  it("hosts the suite run sync subscriber", async () => {
-    const { keys } = await installedOn("worker");
-
-    expect(keys).toContain("simulation_processing:subscriber:suiteRunSync");
   });
 
   /** @scenario "The worker runs the run-execution process manager itself" */

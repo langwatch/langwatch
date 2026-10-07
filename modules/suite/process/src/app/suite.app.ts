@@ -23,6 +23,7 @@ import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, type ProjectApi as ProjectApiType } from "@langwatch/project-contract";
 import { PromptApi, type PromptApi as PromptApiType } from "@langwatch/prompt-contract";
 import {
+  loadRunAttachments,
   ScenarioApi,
   ScenarioTestSuiteNotFoundError,
   type EvaluatorAttachment,
@@ -78,13 +79,17 @@ import {
   type ConnectedPresenceReader,
 } from "../services/connected-target.service.ts";
 import { RunPlanReadService } from "../services/run-plan-read.service.ts";
-import { SuiteExecutionService } from "../services/suite-execution.service.ts";
+import {
+  SuiteExecutionService,
+  type SuiteRunEvaluatorsResolver,
+} from "../services/suite-execution.service.ts";
 import { SuitePlatformLinkService } from "../services/suite-platform-link.service.ts";
 import { SuiteRunItemCommandsService } from "../services/suite-run-item-commands.service.ts";
 import {
   SuiteRunModelsService,
   type SuiteRunModelsResolver,
 } from "../services/suite-run-models.service.ts";
+import { SuiteRunScenarioFactsService } from "../services/suite-run-scenario-facts.service.ts";
 import { SuiteService } from "../services/suite.service.ts";
 
 /**
@@ -147,6 +152,14 @@ export class SuiteModule implements SuiteApi {
         scenarios: dependencies.scenarios,
         modelProviders: dependencies.modelProviders,
       }).resolve,
+      // Read through the suite service below once it exists; a run is queued only after.
+      resolveRunEvaluators: ({ projectId, scenarioId, planId }) =>
+        loadRunAttachments({
+          deps: { scenarios: dependencies.scenarios, suites },
+          projectId,
+          scenarioId,
+          planId,
+        }),
       publicBaseUrl: config.publicBaseUrl,
     });
     const defaultRetentionDays = () => dependencies.retention.getPlatformDefaultRetentionDays();
@@ -180,6 +193,7 @@ export class SuiteModule implements SuiteApi {
           resolve: (tenantId) =>
             dependencies.retention.getResolvedForProject({ projectId: tenantId }),
         },
+        scenarioRunFacts: SuiteRunScenarioFactsService.create(runItems),
       }),
     });
   }
@@ -188,6 +202,7 @@ export class SuiteModule implements SuiteApi {
   private static buildEventingPipeline(options: {
     suiteRunStateFoldStore: FoldProjectionStore<SuiteRunStateData>;
     retention: RetentionPolicyResolver;
+    scenarioRunFacts: SuiteRunScenarioFactsService;
   }) {
     return buildSuiteRunProcessingPipeline(options);
   }
@@ -216,6 +231,7 @@ export class SuiteModule implements SuiteApi {
     scenarios: Pick<ScenarioApiType, "resolveRunParametersForScenarios" | "queueSimulationRun">;
     commands: SuiteRunCommands;
     resolveRunModels?: SuiteRunModelsResolver;
+    resolveRunEvaluators?: SuiteRunEvaluatorsResolver;
     publicBaseUrl: string | undefined;
   }): SuiteAppInfrastructure {
     return {
@@ -223,6 +239,7 @@ export class SuiteModule implements SuiteApi {
         commands: input.commands,
         scenarios: input.scenarios,
         ...(input.resolveRunModels ? { resolveRunModels: input.resolveRunModels } : {}),
+        ...(input.resolveRunEvaluators ? { resolveRunEvaluators: input.resolveRunEvaluators } : {}),
       }),
       connectedPresence: (presenceInput) => input.agents.getPresence(presenceInput),
       publicBaseUrl: input.publicBaseUrl,

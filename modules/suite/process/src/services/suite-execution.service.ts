@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type {
   ResolvedRunModels,
   RunActor,
+  RunEvaluators,
   ScenarioRunConfig,
   ScenarioApi,
 } from "@langwatch/scenario-contract";
@@ -54,6 +55,13 @@ type SuiteExecutionScenarios = Pick<
   "resolveRunParametersForScenarios" | "queueSimulationRun"
 >;
 
+/** One scenario's evaluators in a suite run: its test suite's, then the plan's own (§9 S2). */
+export type SuiteRunEvaluatorsResolver = (params: {
+  projectId: string;
+  scenarioId: string;
+  planId: string;
+}) => Promise<RunEvaluators>;
+
 /** Starts the suite run on its own pipeline, then has the scenario owner queue each run of it. */
 export class SuiteExecutionService implements SuiteExecution {
   static create(input: {
@@ -65,15 +73,28 @@ export class SuiteExecutionService implements SuiteExecution {
      * same as a run recorded before the field existed.
      */
     resolveRunModels?: SuiteRunModelsResolver;
+    /** Pins each run's evaluators as it is queued; absent, scenario reads them when it queues. */
+    resolveRunEvaluators?: SuiteRunEvaluatorsResolver;
   }): SuiteExecutionService {
-    return new SuiteExecutionService(input.commands, input.scenarios, input.resolveRunModels);
+    return new SuiteExecutionService(input);
   }
 
-  private constructor(
-    private readonly commands: SuiteRunCommands,
-    private readonly scenarios: SuiteExecutionScenarios,
-    private readonly resolveRunModels?: SuiteRunModelsResolver,
-  ) {}
+  private readonly commands: SuiteRunCommands;
+  private readonly scenarios: SuiteExecutionScenarios;
+  private readonly resolveRunModels: SuiteRunModelsResolver | undefined;
+  private readonly resolveRunEvaluators: SuiteRunEvaluatorsResolver | undefined;
+
+  private constructor(input: {
+    commands: SuiteRunCommands;
+    scenarios: SuiteExecutionScenarios;
+    resolveRunModels?: SuiteRunModelsResolver;
+    resolveRunEvaluators?: SuiteRunEvaluatorsResolver;
+  }) {
+    this.commands = input.commands;
+    this.scenarios = input.scenarios;
+    this.resolveRunModels = input.resolveRunModels;
+    this.resolveRunEvaluators = input.resolveRunEvaluators;
+  }
 
   async execute(input: SuiteExecutionRequest): Promise<SuiteRunResult> {
     const { parameters, secrets } = await this.resolveParameters(input);
@@ -201,6 +222,32 @@ export class SuiteExecutionService implements SuiteExecution {
    * Settles rather than races: one scenario failing to queue must not strand
    * the rest of the suite. Answers the items that were queued.
    */
+  /** Each scenario's evaluators, read once per batch; one not read is left to scenario. */
+  private async pinRunEvaluators({
+    input,
+  }: {
+    input: SuiteExecutionRequest;
+  }): Promise<Map<string, RunEvaluators>> {
+    const resolve = this.resolveRunEvaluators;
+    if (!resolve) return new Map();
+    const read = await Promise.allSettled(
+      input.activeScenarioIds.map((scenarioId) =>
+        resolve({ projectId: input.projectId, scenarioId, planId: input.suiteId }),
+      ),
+    );
+    return new Map(
+      input.activeScenarioIds.flatMap((scenarioId, index) => {
+        const outcome = read[index];
+        if (outcome?.status === "fulfilled") return [[scenarioId, outcome.value] as const];
+        logger.warn(
+          { projectId: input.projectId, scenarioId, error: outcome?.reason },
+          "Could not pin a suite run's evaluators; scenario reads them when it queues the run",
+        );
+        return [];
+      }),
+    );
+  }
+
   private async queueAll({
     input,
     items,
@@ -227,6 +274,7 @@ export class SuiteExecutionService implements SuiteExecution {
           judgeModel: input.judgeModel,
         },
       })) ?? new Map();
+    const evaluatorsByScenarioId = await this.pinRunEvaluators({ input });
 
     const enqueued = await Promise.allSettled(
       items.map((item) => {
@@ -250,6 +298,7 @@ export class SuiteExecutionService implements SuiteExecution {
           simulatorModel: input.simulatorModel,
           judgeModel: input.judgeModel,
           resolvedModels: resolvedModelsByScenarioId.get(item.scenarioId) ?? null,
+          evaluators: evaluatorsByScenarioId.get(item.scenarioId),
         });
       }),
     );

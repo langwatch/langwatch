@@ -74,6 +74,31 @@ describe("suite app installation", () => {
     }
   });
 
+  /** @scenario "The worker hosts the subscriber that reports a run into its suite run" */
+  it("hosts suite's peer lanes on scenario's run facts on the worker", async () => {
+    const eventing = new EventSourcing({
+      enabled: false,
+      processStore: InMemoryProcessStore.createForTesting(),
+    });
+    const runtime = await process("worker").withEventing(eventing).boot();
+
+    try {
+      const lanes = eventing.definitions
+        .find((definition) => definition.metadata.name === "suite_run_processing")
+        ?.open((definition) => definition.globalProjections?.map(({ name }) => name));
+
+      expect(lanes).toEqual(
+        expect.arrayContaining([
+          "suite_run_processing.scenarioRunStarted",
+          "suite_run_processing.scenarioRunFinished",
+          "suite_run_processing.scenarioRunEvaluated",
+        ]),
+      );
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
     const runtime = await process(role).boot();
 

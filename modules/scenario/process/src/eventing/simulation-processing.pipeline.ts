@@ -49,10 +49,6 @@ import {
   type SnapshotUpdateBroadcastSubscriberDeps,
 } from "./snapshot-update-broadcast.subscriber.ts";
 import {
-  createSuiteRunSyncSubscriber,
-  type SuiteRunSyncSubscriberDeps,
-} from "./suite-run-sync.subscriber.ts";
-import {
   createTraceMetricsSyncSubscriber,
   createTraceSpanMetricsSyncHandler,
   TRACE_SPAN_METRICS_SETTLE_MS,
@@ -76,7 +72,6 @@ export interface SimulationProcessingPipelineDeps {
   scenarioEvaluations: { name: string; process: ProcessManagerApplier<SimulationProcessingEvent> };
   simulations: SimulationService;
   snapshotUpdateBroadcast: SnapshotUpdateBroadcastSubscriberDeps;
-  suiteRunSync: SuiteRunSyncSubscriberDeps;
   traceMetricsSync: TraceMetricsSyncSubscriberDeps;
   traceSpanMetricsSync: TraceSpanMetricsSyncDeps;
   /** Each tenant's retention, stamped on the run rows in place of the default (§9). */
@@ -120,7 +115,6 @@ function buildSimulationProcessingPipelineDefinition(
       "snapshotUpdateBroadcast",
       createSnapshotUpdateBroadcastSubscriber(deps.snapshotUpdateBroadcast),
     )
-    .withEventSubscriber("suiteRunSync", createSuiteRunSyncSubscriber(deps.suiteRunSync))
     .withEventSubscriber(
       "traceMetricsSync",
       createTraceMetricsSyncSubscriber(deps.traceMetricsSync),

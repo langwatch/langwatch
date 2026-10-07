@@ -3,6 +3,8 @@ import type { SuiteRunStateData } from "@langwatch/suite-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { RedisSuiteRunProcessingRepository } from "../../repositories/redis/redis.suite-run-processing.repository.ts";
+import { SuiteRunItemCommandsService } from "../../services/suite-run-item-commands.service.ts";
+import { SuiteRunScenarioFactsService } from "../../services/suite-run-scenario-facts.service.ts";
 import {
   buildSuiteRunProcessingPipeline,
   type SuiteRunProcessingPipeline,
@@ -60,6 +62,7 @@ function compose(
   }).openRunStateFoldStore({ defaultRetentionDays: () => 49 });
   const pipeline: SuiteRunProcessingPipeline = buildSuiteRunProcessingPipeline({
     suiteRunStateFoldStore,
+    scenarioRunFacts: SuiteRunScenarioFactsService.create(SuiteRunItemCommandsService.create()),
   });
 
   return { pipeline, suiteRunStateFoldStore, insert, clickhouse, redis, set };

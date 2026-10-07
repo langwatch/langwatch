@@ -23,6 +23,7 @@ import type {
   ScenarioGenerateResponse,
 } from "./scenario-generate.schemas.ts";
 import type { ScenarioEvent } from "./scenario-run-data.ts";
+import type { RunEvaluators } from "./scenario-run-evaluators.ts";
 import type {
   ScenarioRunExportDownload,
   ScenarioRunExportDownloadInput,
@@ -218,6 +219,8 @@ export interface QueueSimulationRunInput {
   /** The models the suite's plan was configured with; each is recorded only when set. */
   simulatorModel?: string | null | undefined;
   judgeModel?: string | null | undefined;
+  /** A suite run's evaluators, its test suite's and its plan's, pinned as the suite queues it. */
+  evaluators?: RunEvaluators | undefined;
 }
 
 /**

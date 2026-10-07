@@ -439,12 +439,6 @@ export class ScenarioModule implements ScenarioApi {
         retention: setup.dependencies.retention,
         commands: simulationCommands,
         simulations,
-        suiteRuns: {
-          recordSuiteRunItemStarted: (data) =>
-            setup.dependencies.suites.recordSuiteRunItemStarted(data),
-          completeSuiteRunItem: (data) => setup.dependencies.suites.completeSuiteRunItem(data),
-          regradeSuiteRunItem: (data) => setup.dependencies.suites.regradeSuiteRunItem(data),
-        },
         snapshotUpdates: {
           broadcastUpdate: ({ tenantId, payload }) =>
             broadcast.publishProjectEvent({
@@ -911,6 +905,7 @@ export class ScenarioModule implements ScenarioApi {
       metadata,
       ...(secretParameterNames.length > 0 ? { secretParameters: input.secretParameters } : {}),
       target: { type: target.type, referenceId: target.referenceId },
+      ...(input.evaluators ? { evaluators: input.evaluators } : {}),
       occurredAt: nowInstant().epochMilliseconds,
     });
   }
