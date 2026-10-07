@@ -56,7 +56,7 @@ export const FREE_PLAN_FEATURES = [
   "50,000 events included",
   "14 days data retention",
   "2 users",
-  "Unlimited scenarios, simulations & evals",
+  "Scenarios, simulations & evals",
   "Community support",
 ];
 

@@ -138,6 +138,7 @@ export const mockGetPendingInvites = vi.fn(() => ({
     email?: string;
     role: string;
     status: string;
+    displayStatus: string;
   }>,
   isLoading: false,
 }));

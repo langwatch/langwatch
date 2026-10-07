@@ -11,6 +11,8 @@ export const isValidEmail = (value: string) =>
   z.string().email().safeParse(value).success;
 export const countFullMembers = (list: { memberType: MemberType }[]) =>
   list.filter((u) => u.memberType === "FullMember").length;
+export const countLiteMembers = (list: { memberType: MemberType }[]) =>
+  list.filter((u) => u.memberType === "LiteMember").length;
 export const isSupportedCurrency = (value: unknown): value is Currency =>
   Object.values(PrismaCurrency).includes(value as PrismaCurrency);
 
