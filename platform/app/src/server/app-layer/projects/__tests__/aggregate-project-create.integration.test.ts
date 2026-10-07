@@ -11,6 +11,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { roleFactToRow } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -140,6 +141,67 @@ describe("Feature: an admin creates an aggregate project", () => {
           kind: AGGREGATE_PROJECT_KIND,
         }),
       ).rejects.toThrow();
+
+      expect(
+        await prisma.project.count({ where: { teamId: fixture.team.id } }),
+      ).toBe(before);
+    });
+  });
+
+  describe("when a member whose custom role grants organization:manage asks to create one", () => {
+    it("is refused as admin only and nothing is written", async () => {
+      // The role passes the organisation permission check, so only the
+      // organisation-role rule of ADR-144 decision 5 can refuse this.
+      const manager = await fixture.makeUser({
+        handle: "org-manager",
+        organizationRole: OrganizationUserRole.MEMBER,
+      });
+      const permissions = ["organization:manage"];
+      const customRole = await prisma.customRole.create({
+        data: {
+          organizationId: fixture.organizationId,
+          name: `Organisation manager ${fixture.ns}`,
+          permissions,
+        },
+      });
+      await prisma.role.create({
+        data: roleFactToRow({
+          organizationId: fixture.organizationId,
+          role: {
+            roleId: customRole.id,
+            name: customRole.name,
+            permissions,
+            kind: "custom",
+            occurredAtMs: customRole.createdAt.getTime(),
+          },
+        }),
+      });
+      await seedRoleBinding(prisma, {
+        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        organizationId: fixture.organizationId,
+        userId: manager.id,
+        role: TeamUserRole.CUSTOM,
+        customRoleId: customRole.id,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: fixture.organizationId,
+      });
+      const before = await prisma.project.count({
+        where: { teamId: fixture.team.id },
+      });
+
+      await expect(
+        callerFor(manager.id).project.create({
+          organizationId: fixture.organizationId,
+          teamId: fixture.team.id,
+          name: "Team admin view",
+          language: "other",
+          framework: "other",
+          kind: AGGREGATE_PROJECT_KIND,
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        cause: { code: "aggregate_project_admin_only" },
+      });
 
       expect(
         await prisma.project.count({ where: { teamId: fixture.team.id } }),

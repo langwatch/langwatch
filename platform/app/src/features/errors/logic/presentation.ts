@@ -1454,6 +1454,14 @@ const presentations = {
   },
 
   // ---- access, org & limits ----
+  aggregate_project_admin_only: {
+    // Reached from the new-project flow or the rule editor by someone whose
+    // role lets them manage projects but who is not an organization admin.
+    // Nothing was written, so the copy says who can do it.
+    title: "Only organization admins can do this",
+    describe: () =>
+      "This project reads traces from every member project, including personal ones, so only an organization admin can create it or change what it reads.",
+  },
   aggregate_project_has_no_credential: {
     // Reached by an SDK or exporter pointed at the aggregate, so the answer is
     // where the traces should go instead. The key is not the problem.

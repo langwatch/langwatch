@@ -13,7 +13,6 @@
  *
  * @see specs/governance/aggregate-project.feature
  */
-import { TRPCError } from "@trpc/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Project } from "~/generated/prisma/client";
 import { appRouter } from "~/server/api/root";
@@ -137,12 +136,16 @@ describe("Feature: the aggregate project receives no traces", () => {
       it("is refused both, and the switcher payload carries no key for it", async () => {
         const admin = callerFor(fixture.admin.id);
 
+        const refusedAsKeyless = {
+          code: "FORBIDDEN",
+          cause: { code: "aggregate_project_has_no_credential" },
+        };
         await expect(
           admin.project.getProjectAPIKey({ projectId: aggregate.id }),
-        ).rejects.toBeInstanceOf(TRPCError);
+        ).rejects.toMatchObject(refusedAsKeyless);
         await expect(
           admin.project.regenerateApiKey({ projectId: aggregate.id }),
-        ).rejects.toBeInstanceOf(TRPCError);
+        ).rejects.toMatchObject(refusedAsKeyless);
 
         const organizations = await admin.organization.getAll({});
         const listed = organizations

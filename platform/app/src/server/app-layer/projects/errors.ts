@@ -21,3 +21,22 @@ export class AggregateProjectIsReadOnlyError extends HandledError {
     this.name = "AggregateProjectIsReadOnlyError";
   }
 }
+
+/**
+ * Someone who is not an organisation admin asked to create an aggregate or
+ * edit its rule (ADR-144 decision 5). An aggregate reads other people's
+ * personal projects, so opening one is decided on the organisation role
+ * alone, and whoever creates one has to be able to open it.
+ */
+export class AggregateProjectAdminOnlyError extends HandledError {
+  declare readonly code: "aggregate_project_admin_only";
+
+  constructor() {
+    super(
+      "aggregate_project_admin_only",
+      "Only organization admins can open an aggregate project",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "AggregateProjectAdminOnlyError";
+  }
+}

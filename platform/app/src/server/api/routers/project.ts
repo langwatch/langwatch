@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { AggregateProjectHasNoCredentialError } from "~/server/api-key/errors";
 import { getApp } from "~/server/app-layer/app";
 import {
   checkOrganizationPermission,
@@ -13,6 +14,7 @@ import {
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { aggregateRuleSchema } from "~/server/app-layer/projects/aggregate-rule";
+import { AggregateProjectAdminOnlyError } from "~/server/app-layer/projects/errors";
 import {
   governanceProjectRouteViolation,
   ProjectNotFoundError,
@@ -21,7 +23,6 @@ import {
   personalWorkspaceMoveViolation,
 } from "~/server/app-layer/projects/project.service";
 import {
-  AGGREGATE_PROJECT_INGEST_REFUSAL,
   AGGREGATE_PROJECT_KIND,
   APPLICATION_PROJECT_KIND,
   aggregateProjectRouteViolation,
@@ -109,9 +110,7 @@ async function assertCanOpenAggregates({
       organizationId,
     }),
   });
-  if (violation) {
-    throw new TRPCError({ code: "FORBIDDEN", message: violation });
-  }
+  if (violation) throw new AggregateProjectAdminOnlyError();
 }
 
 /**
@@ -134,10 +133,7 @@ function assertNotGovernanceProject(kind: string | null | undefined): void {
  */
 function assertProjectHoldsACredential(kind: string | null | undefined): void {
   if (isAggregateProjectKind(kind)) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: AGGREGATE_PROJECT_INGEST_REFUSAL,
-    });
+    throw new AggregateProjectHasNoCredentialError();
   }
 }
 

@@ -52,6 +52,7 @@ export const APP_ERROR_CODES = [
   "agent_report_rate_limited",
   "agent_session_unknown",
   "agent_test_refused",
+  "aggregate_project_admin_only",
   "aggregate_project_has_no_credential",
   "aggregate_project_is_read_only",
   "aggregate_rule_outside_organization",
