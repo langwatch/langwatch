@@ -308,11 +308,6 @@ export class ProjectService {
     return this.repo.getById(id);
   }
 
-  /** The project's kind, or null when no project has this id. */
-  async getKindById(id: string): Promise<string | null> {
-    return this.repo.findKindById(id);
-  }
-
   /**
    * The kind fields a new project is stored with, checked before anything is
    * written: none for an ordinary project, the kind and its validated rule

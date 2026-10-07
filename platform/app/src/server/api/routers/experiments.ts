@@ -11,7 +11,6 @@ import {
   ExperimentType,
   type Prisma,
 } from "~/generated/prisma/client";
-import { assertProjectRunsMonitors } from "~/server/app-layer/monitors/monitor-project-guard";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { persistedEvaluationsV3StateSchema } from "../../../experiments-v3/types/persistence";
 import {
@@ -472,11 +471,6 @@ export const experimentsRouter = createTRPCRouter({
     )
     .permission("workflows:create")
     .mutation(async ({ input }) => {
-      await assertProjectRunsMonitors({
-        projects: getApp().projects,
-        projectId: input.projectId,
-      });
-
       const experiment =
         await experimentService().findByIdWithWorkflowCurrentVersion({
           projectId: input.projectId,

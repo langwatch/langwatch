@@ -1,7 +1,6 @@
 import type { Project, Team } from "~/generated/prisma/client";
 import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 import type { AggregateRule } from "../aggregate-rule";
-import type { ProjectKindRepository } from "./project-kind.prisma.repository";
 
 export type ProjectWithTeam = Project & { team: Team };
 
@@ -99,7 +98,7 @@ export interface TraceSharingConfig {
   projectEnabled: boolean;
 }
 
-export interface ProjectRepository extends ProjectKindRepository {
+export interface ProjectRepository {
   getById(id: string): Promise<Project | null>;
   getWithTeam(id: string): Promise<ProjectWithTeam | null>;
   updateMetadata({ id, data }: UpdateProjectMetadataInput): Promise<void>;
@@ -227,14 +226,6 @@ export class NullProjectRepository implements ProjectRepository {
     userId: string;
   }): Promise<string | null> {
     return null;
-  }
-
-  async findKindById(_id: string): Promise<string | null> {
-    return null;
-  }
-
-  async findKindsByIds(_ids: readonly string[]): Promise<Map<string, string>> {
-    return new Map();
   }
 
   async getWithTeam(_id: string): Promise<ProjectWithTeam | null> {

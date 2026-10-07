@@ -1,8 +1,8 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 
 /**
- * A project's kind by id: the one read the aggregate admin gate and the
- * monitor guard make (ADR-144). Kept apart from the full project repository
+ * A project's kind by id: the read the aggregate admin gate makes, cached
+ * behind the App's `projectKinds` reader (ADR-144). Kept apart from the full project repository
  * so the permission adapters can read a kind without pulling that
  * repository's grants-ledger writer onto their import graph.
  */

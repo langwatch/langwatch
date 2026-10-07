@@ -28,28 +28,15 @@ import type {
   UpdateProjectInput,
   UpdateProjectMetadataInput,
 } from "./project.repository";
-import { PrismaProjectKindRepository } from "./project-kind.prisma.repository";
 
 export class PrismaProjectRepository implements ProjectRepository {
-  private readonly kinds: PrismaProjectKindRepository;
-
   constructor(
     private readonly prisma: PrismaClient,
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-  ) {
-    this.kinds = new PrismaProjectKindRepository(prisma);
-  }
+  ) {}
 
   async getById(id: string): Promise<Project | null> {
     return this.prisma.project.findUnique({ where: { id } });
-  }
-
-  findKindById(id: string): Promise<string | null> {
-    return this.kinds.findKindById(id);
-  }
-
-  findKindsByIds(ids: readonly string[]): Promise<Map<string, string>> {
-    return this.kinds.findKindsByIds(ids);
   }
 
   async getWithTeam(id: string): Promise<ProjectWithTeam | null> {

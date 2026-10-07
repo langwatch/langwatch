@@ -17,8 +17,6 @@ import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
-import { ProjectService } from "../project.service";
-import { PrismaProjectRepository } from "../repositories/project.prisma.repository";
 import {
   type AggregateFixture,
   realOrganizationService,
@@ -39,9 +37,6 @@ describe("Feature: the aggregate project is read only", () => {
   beforeAll(async () => {
     globalForApp.__langwatch_app = createTestApp({
       organizations: realOrganizationService(prisma),
-      // The monitor guard reads the project's kind through the project
-      // service, which the test App otherwise leaves empty.
-      projects: new ProjectService(new PrismaProjectRepository(prisma)),
     });
     fixture = await seedAggregateOrganization(prisma, { label: "agg-ro" });
     aggregate = await fixture.makeAggregate("company-view");
@@ -109,6 +104,20 @@ describe("Feature: the aggregate project is read only", () => {
             monitorId: "monitor_does_not_matter",
             projectId: aggregate.id,
             sourceProjectId: fixture.shared.id,
+          })
+          .then(() => null)
+          .catch((error: unknown) => error);
+
+        expect(handledCodeOf(refusal)).toBe("aggregate_project_is_read_only");
+      });
+    });
+
+    describe("when an experiment is saved as a monitor on the aggregate", () => {
+      it("is refused as well", async () => {
+        const refusal = await admin.experiments
+          .saveAsMonitor({
+            projectId: aggregate.id,
+            experimentId: "experiment_does_not_matter",
           })
           .then(() => null)
           .catch((error: unknown) => error);
