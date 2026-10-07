@@ -78,7 +78,14 @@ export type NoCommands = never;
 export interface GlobalProjection {
   readonly name: string;
   readonly register: (registry: ProjectionRegistry<Event>) => void;
+  /** Set on a peer fold or map: the lane as registered, which a projection replay rebuilds. */
+  readonly peer?: PeerLane;
 }
+
+/** A peer projection's lane, its owner events parsed by the contract (§9). */
+export type PeerLane =
+  | { readonly kind: "fold"; readonly projection: SealedFoldProjection<Event> }
+  | { readonly kind: "map"; readonly projection: SealedMapProjection<Event> };
 
 export interface StaticPipelineDefinition<
   EventType extends Event = Event,

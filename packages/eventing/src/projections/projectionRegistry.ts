@@ -11,9 +11,15 @@ import { type JobRegistryEntry, QueueManager } from "../services/queues/queueMan
 import type { EventStoreReadContext } from "../stores/eventStore.types.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
+import {
+  type AggregateEventLog,
+  wireFoldEventLoaders,
+  wireMapEventLoader,
+} from "./eventLogLoaders.ts";
 import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
 import type { MapProjectionDefinition } from "./mapProjection.types.ts";
 import { ProjectionRouter } from "./projectionRouter.ts";
+import type { ReplayMarkerChecker } from "./replayMarkerCheck.ts";
 import {
   type SealedFoldProjection,
   type SealedMapProjection,
@@ -38,26 +44,40 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     { mapName: string; definition: SubscriberDispatchDefinition<EventType> }
   >();
   private readonly eventSubscribers = new Map<string, EventSubscriberDefinition<EventType>>();
+  private readonly peerLanes = new Map<
+    string,
+    { kind: "fold" | "map"; eventTypes: readonly string[] }
+  >();
   private router?: ProjectionRouter<EventType>;
   private queueManager?: QueueManager<EventType>;
   private closed = false;
 
   private readonly parseEvent: (value: unknown) => EventType;
   private readonly start?: () => void;
+  private readonly peerEventLog?: PeerEventLogResolver;
+  private readonly replayMarkerChecker?: ReplayMarkerChecker;
 
   constructor({
     parseEvent,
     start,
+    peerEventLog,
+    replayMarkerChecker,
     logger = createLogger("langwatch:event-sourcing:projection-registry"),
   }: {
     /** Parses a queued event with the schema its own pipeline declared for its type (§9). */
     parseEvent: (value: unknown) => EventType;
     /** Initializes the registry on its first dispatch, once every lane has registered. */
     start?: () => void;
+    /** The owner's event log a peer projection re-folds from; refuses an unknown owner. */
+    peerEventLog?: PeerEventLogResolver;
+    /** Consulted for peer lanes only, the global lanes a projection replay rebuilds. */
+    replayMarkerChecker?: ReplayMarkerChecker;
     logger?: Logger;
   }) {
     this.parseEvent = parseEvent;
     this.start = start;
+    this.peerEventLog = peerEventLog;
+    this.replayMarkerChecker = replayMarkerChecker;
     this.logger = logger;
   }
 
@@ -101,6 +121,20 @@ export class ProjectionRegistry<EventType extends Event = Event> {
       projection.name,
       sealMapProjection<MapRecord, Own, EventType>(projection),
     );
+  }
+
+  /** A peer fold (§9): the host's fold over an owner's events, re-folded from the owner's log. */
+  registerPeerFoldProjection<State>(projection: FoldProjectionDefinition<State, EventType>): void {
+    this.registerFoldProjection(projection);
+    this.peerLanes.set(projection.name, { kind: "fold", eventTypes: projection.eventTypes });
+  }
+
+  /** A peer map (§9): the host's map over an owner's events, deduped from the owner's log. */
+  registerPeerMapProjection<MapRecord, Own extends Event>(
+    projection: MapProjectionDefinition<MapRecord, Own>,
+  ): void {
+    this.registerMapProjection(projection);
+    this.peerLanes.set(projection.name, { kind: "map", eventTypes: projection.eventTypes });
   }
 
   registerSubscriber(foldName: string, subscriber: SubscriberDispatchDefinition<EventType>): void {
@@ -174,6 +208,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
       );
     }
 
+    this.wirePeerEventLogs();
     const aggregateType: AggregateType = "global";
     this.queueManager = new QueueManager<EventType>({
       aggregateType,
@@ -189,6 +224,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
       pipelineName: "global",
       queueManager: this.queueManager,
       executionTarget,
+      replayMarkerChecker: this.peerReplayMarkerChecker(),
     });
     this.router = router;
 
@@ -226,6 +262,30 @@ export class ProjectionRegistry<EventType extends Event = Event> {
 
     this.router.initializeSubscriberQueues();
     this.closed = false;
+  }
+
+  /** Each peer lane's owner log, resolved once every pipeline registered; unknown refuses. */
+  private wirePeerEventLogs(): void {
+    const resolve = this.peerEventLog;
+    if (!resolve) return;
+    for (const [lane, { kind, eventTypes }] of this.peerLanes) {
+      const log = resolve({ lane, eventTypes });
+      if (kind === "fold") {
+        this.foldProjections.get(lane)?.open((fold) => wireFoldEventLoaders({ fold, log }));
+      } else {
+        this.mapProjections.get(lane)?.open((map) => wireMapEventLoader({ map, log }));
+      }
+    }
+  }
+
+  /** The replay markers, asked for peer lanes only: no other global lane is ever replayed. */
+  private peerReplayMarkerChecker(): ReplayMarkerChecker | undefined {
+    const checker = this.replayMarkerChecker;
+    if (!checker) return undefined;
+    return {
+      check: (lane, event) =>
+        this.peerLanes.has(lane) ? checker.check(lane, event) : Promise.resolve("process"),
+    };
   }
 
   get isInitialized(): boolean {
@@ -334,3 +394,9 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     await this.queueManager?.waitUntilReady();
   }
 }
+
+/** Resolves the one owner pipeline declaring a peer lane's event types to its event log. */
+export type PeerEventLogResolver = (peer: {
+  lane: string;
+  eventTypes: readonly string[];
+}) => AggregateEventLog;

@@ -7,6 +7,7 @@ import { DisabledPipeline } from "./disabledPipeline.ts";
 import { createEventCatalogue } from "./domain/definitions.ts";
 import type { Event, Projection } from "./domain/types.ts";
 import type { EventingParticipation, ReadHintMap } from "./pipeline/feature-eventing.ts";
+import { peerOwnerOf } from "./pipeline/peerOwner.ts";
 import {
   type SealedPipelineDefinition,
   sealPipelineDefinition,
@@ -23,6 +24,7 @@ import type {
 } from "./process-manager/outbox/outboxDispatcherService.ts";
 import { ProcessRuntime } from "./process-manager/processRuntime.ts";
 import type { ProcessStore } from "./process-manager/stores/processStore.types.ts";
+import type { AggregateEventLog } from "./projections/eventLogLoaders.ts";
 import { ProjectionRegistry } from "./projections/projectionRegistry.ts";
 import type { ReplayMarkerChecker } from "./projections/replayMarkerCheck.ts";
 import { DispatchError } from "./queues/dispatchError.ts";
@@ -187,6 +189,8 @@ export class EventSourcing {
     this.projectionRegistry = new ProjectionRegistry<Event>({
       parseEvent: (value) => this.parseRegisteredEvent(value),
       start: () => this.startGlobalRegistry(),
+      peerEventLog: (peer) => this.peerEventLog(peer),
+      replayMarkerChecker: this._replayMarkerChecker,
     });
     options.configureGlobalProjections?.(this.projectionRegistry);
   }
@@ -330,6 +334,27 @@ export class EventSourcing {
       ),
     );
     return this._readHints({ hinted, declaredEventTypes });
+  }
+
+  /** A peer lane's owner log (§9): the pipeline declaring its types, read as that one reads. */
+  private peerEventLog(peer: { lane: string; eventTypes: readonly string[] }): AggregateEventLog {
+    const owner = peerOwnerOf({ definitions: this.definitions, ...peer });
+    const store = this._eventStore;
+    if (!store) {
+      throw new ConfigurationError(
+        "EventSourcing",
+        `Peer projection "${peer.lane}" has no event log to re-fold from: this runtime holds no EventStore.`,
+        { projection: peer.lane },
+      );
+    }
+    return owner.open((definition) => ({
+      aggregateType: definition.metadata.aggregateType,
+      eventStore: upcastEventStore({
+        store,
+        upcaster: EventUpcaster.of(definition.upcasts),
+        parseEvent: definition.parseEvent,
+      }),
+    }));
   }
 
   /** A queued event parsed with the schema of whichever registered pipeline declares its type. */
@@ -1022,10 +1047,12 @@ export class EventSourcing {
     retentionPolicyResolver?: RetentionPolicyResolver;
     warnWhenProjectionsRunInline?: boolean;
     processStore?: ProcessStore;
+    configureGlobalProjections?: (registry: ProjectionRegistry<Event>) => void;
   }): EventSourcing {
     const es = new EventSourcing({
       enabled: true,
       eventStore: options.eventStore,
+      configureGlobalProjections: options.configureGlobalProjections,
       executionTarget: options.executionTarget,
       retentionPolicyResolver: options.retentionPolicyResolver,
       warnWhenProjectionsRunInline: options.warnWhenProjectionsRunInline,

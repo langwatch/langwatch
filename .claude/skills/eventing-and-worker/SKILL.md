@@ -86,6 +86,32 @@ For a plain subscriber on the module's own events see
 see `modules/authz/process/src/eventing/authz-grant.pipeline.ts` (`.withClickHouseMapProjection`,
 `.withProjectionSubscriber`); the framework specs are in `packages/eventing/specs/`.
 
+## Peer projections: folding or mapping a peer's events into your own state
+
+When the state is yours but the facts are a peer's (analytics hosting trace's span projections),
+declare a peer projection on your own pipeline. The owner changes nothing and never learns of you;
+your one edge is its contract (§9, §5: the cycle is cut from the reactor's side).
+
+```ts
+const spanReceived = [{ type: SPAN_RECEIVED, data: spanReceivedDataSchema }] as const; // owner contract
+definePipeline({ name: "analytics", aggregate })
+  .withEvents([])
+  .withPeerFoldProjection({ events: spanReceived, fold: myFold }) // fold over PeerEvent<typeof spanReceived>
+  .withPeerMapProjection({ events: spanReceived, map: myMap });
+```
+
+- Lane `<your pipeline>.<projection name>` on the global registry. Each event's data is parsed with
+  the schema you named; a fold or map consuming a type it did not name is refused at build.
+- Ordering is per source aggregate (the owner's `aggregateType:aggregateId`, or your `key` /
+  `groupKeyFn`); dedupe by event id needs a store with `getWithApplied`, as for a local fold.
+- Out-of-order and store-miss re-folds, and map idempotency-key dedupe, read the owner's event log
+  through the owner pipeline's upcasts. `replayProjectionsOf` lists the lane under the owner's
+  aggregate type, paused as `global/projection|handler/<lane>`, so an operator replay rebuilds it.
+- Routing refuses to start when no registered pipeline declares a consumed type, or the types span
+  several owners: declare one peer projection per owner, and install the owner in the same process.
+- Your store is yours; never read the owner's projection tables. Spec:
+  `packages/eventing/specs/peer-projection.feature`.
+
 ## Reads, hints and cursors (the pipeline's side)
 
 - A contract names what makes a read stale: `.query(name, { invalidatedBy: [EVENT_TYPE] })`. One

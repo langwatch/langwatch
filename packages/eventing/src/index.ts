@@ -103,6 +103,12 @@ export type {
   MapProjectionDefinition,
   MapProjectionOptions,
 } from "./projections/mapProjection.types.ts";
+export type {
+  PeerEvent,
+  PeerEventSchema,
+  PeerFoldProjectionDeclaration,
+  PeerMapProjectionDeclaration,
+} from "./projections/peerProjection.ts";
 export { RepositoryFoldStore } from "./projections/repositoryFoldStore.ts";
 export type {
   SealedCommand,
