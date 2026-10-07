@@ -14,6 +14,16 @@ export type UpgradeRunSummaryView = {
   outcome: string | null;
 };
 
+/** One phase of a run's report (round 9, U2-PHASES); an unknown name or outcome reads raw. */
+export type UpgradeRunPhaseView = {
+  name: string;
+  release: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  outcome: string;
+};
+
+/** `state` includes `never-upgraded` (round 17, U1-a), labelled "Never upgraded" by the reader. */
 export type UpgradeStatusView = {
   state: string;
   label: string;
@@ -69,5 +79,6 @@ export type UpgradeStepDetailView = UpgradeStepView & { targets: UpgradeTargetVi
 export type UpgradeRunDetailView = UpgradeRunSummaryView & {
   plan: Record<string, unknown> | null;
   report: Record<string, unknown> | null;
+  phases: UpgradeRunPhaseView[];
   steps: UpgradeStepView[];
 };

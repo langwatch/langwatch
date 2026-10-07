@@ -256,6 +256,7 @@ describe("UpgradeRunPhases", () => {
         outcome: "succeeded",
         plan: null,
         report: null,
+        phases: [],
         steps: [
           stepWith({ id: "prisma:a", release: "3.22.0" }),
           stepWith({ id: "clickhouse:00042", kind: "clickhouse", release: "3.22.0" }),
