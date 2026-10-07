@@ -144,10 +144,10 @@ const PENDING = {
   "clickhouse-schema": { code: "checkup_clickhouse_migrations_pending" },
 } as const;
 
-/** ClickHouse has no failed code of its own: a failed step is a migration not applied. */
+/** Each engine's failed step has its own code (round 18, U3-a). */
 const FAILED = {
   "postgres-schema": { code: "checkup_postgres_migration_failed" },
-  "clickhouse-schema": { code: "checkup_clickhouse_migrations_pending" },
+  "clickhouse-schema": { code: "checkup_clickhouse_migration_failed" },
 } as const;
 
 const UPGRADE_FIX =

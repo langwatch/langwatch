@@ -38,6 +38,12 @@ Feature: The checkup's migration rows and the doctor command read the upgrade le
     And its fix names "pnpm task upgrade" and "/ops/upgrades"
 
   @unit
+  Scenario: A failed ClickHouse step refuses the ClickHouse row with its own failed code
+    Given a ClickHouse schema step that failed on one target
+    When the checkup runs
+    Then the ClickHouse migrations row is refused with checkup_clickhouse_migration_failed and the step id
+
+  @unit
   Scenario: A pending ClickHouse step refuses only the ClickHouse row
     Given a blocking ClickHouse step the ledger has not run
     When the checkup runs

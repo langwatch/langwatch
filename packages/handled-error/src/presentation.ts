@@ -364,6 +364,15 @@ const presentations = {
         : "Split the request into smaller batches.";
     },
   },
+  trace_page_size_too_large: {
+    title: "Too many traces requested in one page",
+    describe: (error) => {
+      const maxPageSize = str(error, "maxPageSize", "");
+      return maxPageSize
+        ? `This plan reads at most ${maxPageSize} traces in one page. Ask for a smaller page and page forward.`
+        : "Ask for a smaller page and page forward.";
+    },
+  },
   span_not_found: {
     title: "Span not found",
     describe: () => "It may have been deleted along with its trace.",
@@ -5038,6 +5047,11 @@ const presentations = {
   request_abandoned: {
     title: "The request was cancelled before the provider answered",
     describe: () => "Send it again if you still need the answer.",
+  },
+  checkup_clickhouse_migration_failed: {
+    title: "A ClickHouse migration failed",
+    describe: () =>
+      "A ClickHouse migration failed on at least one target. Fix the cause it names, then run the upgrade again.",
   },
   checkup_clickhouse_migrations_pending: {
     title: "ClickHouse migrations are pending",

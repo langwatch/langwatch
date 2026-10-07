@@ -406,6 +406,23 @@ describe("CheckupService", () => {
       expect(verdict.fix).toContain("/ops/upgrades");
     });
 
+    /** @scenario "A failed ClickHouse step refuses the ClickHouse row with its own failed code" */
+    it("refuses a failed ClickHouse step with the ClickHouse failed code", async () => {
+      const upgrade = ledgerOf([
+        stepOf({ id: "prisma:a" }),
+        stepOf({ id: "clickhouse:00099", kind: "clickhouse-schema", status: "failed" }),
+      ]);
+      const { rows } = await CheckupService.create(healthyDeps({ upgrade })).cheap();
+      const verdict = rowOf(rows, "clickhouse_migrations");
+
+      expect(verdict).toMatchObject({
+        outcome: "refused",
+        code: "checkup_clickhouse_migration_failed",
+      });
+      expect(verdict.detail).toContain("clickhouse:00099");
+      expect(rowOf(rows, "postgres_migrations").outcome).toBe("verified");
+    });
+
     /** @scenario "A pending ClickHouse step refuses only the ClickHouse row" */
     it("refuses only the ClickHouse row for a pending ClickHouse step", async () => {
       const upgrade = ledgerOf([
