@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useExplorerStore } from "../stores/explorerStore";
@@ -88,27 +89,33 @@ export function useLensSync(): void {
     },
   );
 
-  const createMutation = api.savedViews.create.useMutation({
-    onSuccess: () => {
-      if (projectId) {
-        void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
-      }
+  // Every lens write reloads the strip from the server once it settles. On
+  // success that picks up the saved row; on a refusal it drops the lens the
+  // store added locally, so nothing lingers that the server never kept. A
+  // refusal also tells the user, since the store wrote first and showed it as
+  // done.
+  const reloadLenses = () => {
+    if (projectId) {
+      void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
+    }
+  };
+  const lensWriteOptions = (fallbackTitle: string) => ({
+    onSuccess: reloadLenses,
+    onError: (error: unknown) => {
+      showErrorToast({ error, fallbackTitle });
+      reloadLenses();
     },
   });
-  const renameMutation = api.savedViews.rename.useMutation({
-    onSuccess: () => {
-      if (projectId) {
-        void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
-      }
-    },
-  });
-  const deleteMutation = api.savedViews.delete.useMutation({
-    onSuccess: () => {
-      if (projectId) {
-        void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
-      }
-    },
-  });
+
+  const createMutation = api.savedViews.create.useMutation(
+    lensWriteOptions("Couldn't save the lens"),
+  );
+  const renameMutation = api.savedViews.rename.useMutation(
+    lensWriteOptions("Couldn't rename the lens"),
+  );
+  const deleteMutation = api.savedViews.delete.useMutation(
+    lensWriteOptions("Couldn't delete the lens"),
+  );
 
   // Refs so the bridge closures stay stable across renders — `set...Bridge`
   // is called once on mount, but the mutate functions identity changes

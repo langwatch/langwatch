@@ -387,6 +387,13 @@ Feature: An aggregate project reads its member projects
     Then no lens is added to the strip and nothing is sent to save one
     And on an ordinary project the same request still creates the lens and saves it
 
+  @integration
+  Scenario: A lens the server refuses to save says so and leaves no phantom
+    Given any project whose server refuses to save, rename or delete a lens
+    When ana makes that change in the trace list
+    Then she sees an error saying the lens change was not saved
+    And the lens strip reloads from the server, so no unsaved lens lingers
+
   # ── H. The aggregate in the app ──────────────────────────────────────────
   # The server refuses every write; these keep the app from inviting one, and
   # from waiting on ingestion an aggregate never receives.
