@@ -11,7 +11,7 @@ Feature: Settings Plans Comparison Page
   # — detail tables rendered as feature tag lists, not structured detail/value rows — and need the scenarios
   # rewritten before binding (tracked under #3458):
   #   - "Free plan column shows default limits"
-  #   - "Growth plan column shows seat and usage pricing"
+  #   - "Growth plan column shows seat and usage pricing in the selected currency"
   #   - "Enterprise plan column shows custom commercial option"
   #   - "Plan details are visually comparable by row"
 
