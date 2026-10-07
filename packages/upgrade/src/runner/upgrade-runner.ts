@@ -20,6 +20,7 @@ import {
 import type { MigrationStep } from "../step/migration-step.ts";
 import { highestRecordedFloor, inferInstalledRelease } from "./installed-release.ts";
 import { UPGRADE_READ_HINT_PATH, type UpgradeReadHintPublish } from "./run-hint.ts";
+import { redactSecrets, UpgradeRunLog } from "./run-log.ts";
 import { RunPhases, type UpgradePhaseChange, type UpgradePhaseOutcome } from "./run-phases.ts";
 import { DEFAULT_LEASE_TIMING, holdUpgradeLease, type UpgradeLeaseTiming } from "./runner-lease.ts";
 import { type RegisteredStep, UpgradeRunnerRepository } from "./runner-ledger.repository.ts";
@@ -59,7 +60,8 @@ type TargetStatus = Extract<UpgradeStepStatus, "done" | "failed" | "pending">;
 
 const isPrisma = (id: string) => id.startsWith("prisma:");
 const isGoose = (id: string) => id.startsWith("clickhouse:");
-const describeError = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const describeError = (error: unknown) =>
+  redactSecrets(error instanceof Error ? error.message : String(error));
 
 /** Every step the image ships, each with the release that shipped it (null: unreleased). */
 function shippedSteps({
@@ -120,6 +122,7 @@ export class UpgradeRunnerService {
   private readonly timing: UpgradeLeaseTiming;
   private readonly codeSteps: ReadonlyMap<string, MigrationStep>;
   private readonly shipped: RegisteredStep[];
+  private readonly narrate: UpgradeRunLog;
 
   private constructor(private readonly options: UpgradeRunnerOptions) {
     this.ledger = UpgradeLedgerRepository.create({ postgres: options.postgres });
@@ -127,14 +130,30 @@ export class UpgradeRunnerService {
     this.timing = { ...DEFAULT_LEASE_TIMING, ...options.lease };
     this.codeSteps = new Map((options.codeSteps ?? []).map((step) => [step.id, step]));
     this.shipped = shippedSteps({ image: options.image, manifests: options.releases.manifests });
+    this.narrate = new UpgradeRunLog(options.log);
   }
 
   static create(options: UpgradeRunnerOptions): UpgradeRunnerService {
     return new UpgradeRunnerService(options);
   }
 
+  /** Narrated from first line to last: specs/upgrade/upgrade-logging.feature. */
   async run({ signal }: { signal: AbortSignal }): Promise<UpgradeOutcome> {
+    this.narrate.begin();
     const fresh = !(await this.runner.prismaHistoryExists());
+    if (fresh) this.narrate.firstRun();
+    const outcome = await this.runOnce({ signal, fresh });
+    this.narrate.finished({ outcome, fresh });
+    return outcome;
+  }
+
+  private async runOnce({
+    signal,
+    fresh,
+  }: {
+    signal: AbortSignal;
+    fresh: boolean;
+  }): Promise<UpgradeOutcome> {
     const bootstrapFailed = await this.bootstrapFreshDatabase({ signal });
     if (bootstrapFailed) return bootstrapFailed;
     await this.ledger.createTables();
@@ -145,7 +164,7 @@ export class UpgradeRunnerService {
       runner: this.runner,
       identity: { ...identity, owner },
       timing: this.timing,
-      log: this.options.log,
+      log: this.narrate,
       signal,
       work: (args) => this.upgradeUnderLease({ ...args, fresh }),
     });
@@ -159,13 +178,18 @@ export class UpgradeRunnerService {
   private async bootstrapFreshDatabase({ signal }: { signal: AbortSignal }) {
     const { applier } = this.options;
     if (!applier.bootstrapPostgres || (await this.runner.prismaHistoryExists())) return null;
-    this.options.log.info("no Prisma history: applying the Postgres schema before the ledger");
+    this.narrate.info("first run: applying the Postgres schema before the ledger exists", {
+      phase: "first-run",
+      waitingOn: "prisma migrate deploy on Postgres (DATABASE_URL)",
+    });
+    const startedAt = performance.now();
     const lockTimeoutMs = this.options.lockTimeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS;
     const report = await applier.bootstrapPostgres({ lockTimeoutMs, signal });
+    this.narrate.bootstrapped({ ok: report.ok, startedAt });
     if (report.ok) return null;
     return upgradeOutcome({
       code: "schema_failed",
-      message: `the Postgres schema failed before the ledger existed: ${report.error ?? "no error given"}`,
+      message: `the Postgres schema failed before the ledger existed: ${redactSecrets(report.error ?? "no error given")}`,
       detail: { targets: [{ target: report.target, error: report.error }] },
     });
   }
@@ -267,7 +291,7 @@ export class UpgradeRunnerService {
     const floor = this.options.releases.floor.release;
     const run = await this.ledger.startRun({ kind: "upgrade", floor });
     await this.runner.recordRunPlan({ runId: run.id, release: this.options.image.release, plan });
-    this.options.log.info("upgrade planned", { runId: run.id, installed, fresh: plan.fresh });
+    this.narrate.planned({ runId: run.id, installed, plan });
     const phases = this.phasesOf({ runId: run.id });
     try {
       const report = await this.applyPlan({ plan, before, runId: run.id, signal, phases });
@@ -293,6 +317,7 @@ export class UpgradeRunnerService {
       runId,
       now: () => this.runner.databaseNow(),
       onChange: async ({ phase, phases }: UpgradePhaseChange) => {
+        this.narrate.phase({ phase });
         await this.runner.recordRunReport({ runId, report: { phases } });
         const { name, release = null, outcome } = phase;
         await this.hint({ runId, phase: name, release, outcome });
@@ -328,7 +353,8 @@ export class UpgradeRunnerService {
     release: string | null;
     outcome: UpgradePhaseOutcome;
   }): Promise<void> {
-    const { hints, log } = this.options;
+    const { hints } = this.options;
+    const log = this.narrate;
     if (!hints) return;
     try {
       await hints({ path: UPGRADE_READ_HINT_PATH, runId, phase, release, outcome });
@@ -436,9 +462,14 @@ export class UpgradeRunnerService {
     if (failedPrisma.length > 0) throw prismaFailure({ names: failedPrisma });
     const failing = reports.filter((report) => !report.ok);
     if (failing.length === 0) return;
-    const named = failing.map((report) => `${report.target} (${report.error ?? "no error given"})`);
+    const named = failing.map(
+      (report) => `${report.target} (${redactSecrets(report.error ?? "no error given")})`,
+    );
     throw new UpgradeRunFailure("schema_failed", `schema failed on ${named.join(", ")}`, {
-      targets: failing.map(({ target, error }) => ({ target, error })),
+      targets: failing.map(({ target, error }) => ({
+        target,
+        error: error === null ? null : redactSecrets(error),
+      })),
     });
   }
 
@@ -450,7 +481,8 @@ export class UpgradeRunnerService {
     release: PlannedRelease;
     signal: AbortSignal;
   }): Promise<readonly SchemaTargetReport[]> {
-    const { applier, log } = this.options;
+    const { applier } = this.options;
+    const log = this.narrate;
     const lockTimeoutMs = this.options.lockTimeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS;
     const retry = this.options.retry ?? DEFAULT_RETRY;
     for (let attempt = 1; ; attempt++) {
@@ -458,7 +490,13 @@ export class UpgradeRunnerService {
       if (reports.every((report) => report.ok) || attempt >= retry.attempts) return reports;
       if ((await this.failedPrismaMigrations()).length > 0) return reports;
       const waitMs = retry.backoffMs * 2 ** (attempt - 1);
-      log.warn("schema apply failed without a failed migration; retrying", { attempt, waitMs });
+      log.warn(`schema apply failed without a failed migration; retrying in ${waitMs} ms`, {
+        phase: "schema",
+        waitingOn: "the retry backoff",
+        attempt,
+        waitMs,
+        next: "nothing to do yet: a transient failure is retried",
+      });
       await sleep(waitMs, undefined, { signal });
     }
   }
@@ -535,6 +573,8 @@ export class UpgradeRunnerService {
       throw new UpgradeRunFailure("step_failed", lastError, { step: id });
     }
     await this.runner.markRunning({ id, runId });
+    const resuming = (recorded?.report ?? null) !== null;
+    this.narrate.stepStarted({ id, description: step.description, resuming });
     try {
       const report = await step.run({
         checkpoint: {
@@ -545,8 +585,10 @@ export class UpgradeRunnerService {
         signal,
       });
       await this.runner.setStatus({ ids: [id], status: "done", runId, report });
+      this.narrate.stepEnded({ id, error: null });
     } catch (error) {
       const lastError = describeError(error);
+      this.narrate.stepEnded({ id, error: lastError });
       await this.runner.setStatus({ ids: [id], status: "failed", runId, lastError });
       throw new UpgradeRunFailure("step_failed", `blocking step ${id} failed: ${lastError}`, {
         step: id,
@@ -581,9 +623,11 @@ export class UpgradeRunnerService {
       try {
         await reconciler.run({ signal });
       } catch (error) {
-        this.options.log.warn("reconciler failed", {
+        this.narrate.warn(`reconciler ${reconciler.name} failed`, {
+          phase: "reconcile",
           reconciler: reconciler.name,
           error: describeError(error),
+          next: "the run fails after the remaining reconcilers; fix the named store, then run again",
         });
         failed.push(reconciler.name);
       }

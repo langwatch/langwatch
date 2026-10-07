@@ -23,6 +23,9 @@ export const DEFAULT_LEASE_TIMING: UpgradeLeaseTiming = {
   pollMs: 5_000,
 };
 
+/** How often a runner waiting for the lease says so again. */
+export const LEASE_WAIT_REPORT_EVERY_MS = 30_000;
+
 export type LeaseOutcome<Result> =
   | { acquired: true; lost: boolean; result: Result }
   | { acquired: false; holder: UpgradeLease | null };
@@ -45,20 +48,33 @@ async function waitForLease({
 }): Promise<{ acquired: true } | { acquired: false; holder: UpgradeLease | null }> {
   const name = UPGRADE_LEASE_NAME;
   const startedAt = performance.now();
+  let reportedAt = 0;
   for (let attempt = 0; ; attempt++) {
     signal.throwIfAborted();
     if (await ledger.acquireLease({ name, ...identity, ttlMs: timing.ttlMs })) {
       return { acquired: true };
     }
     const holder = await runner.findLease({ name });
-    if (performance.now() - startedAt >= timing.waitMs) return { acquired: false, holder };
-    if (attempt === 0) {
-      log.info("waiting for the upgrade lease", {
-        holder: holder?.owner,
-        host: holder?.host,
-        image: holder?.image,
-        waitMs: timing.waitMs,
-      });
+    const waitedMs = Math.round(performance.now() - startedAt);
+    if (waitedMs >= timing.waitMs) return { acquired: false, holder };
+    if (attempt === 0 || waitedMs >= reportedAt + LEASE_WAIT_REPORT_EVERY_MS) {
+      reportedAt = attempt === 0 ? 0 : waitedMs;
+      const held = holder
+        ? `${holder.owner} on ${holder.host} (${holder.image})`
+        : "another runner";
+      log.info(
+        `waiting for the upgrade lease held by ${held}: ${waitedMs} ms of ${timing.waitMs} ms`,
+        {
+          phase: "lease",
+          waitingOn: "the upgrade lease",
+          holder: holder?.owner,
+          host: holder?.host,
+          image: holder?.image,
+          waitedMs,
+          waitMs: timing.waitMs,
+          next: "nothing to do: this run starts when the holder finishes; `pnpm task upgrade status` shows its run",
+        },
+      );
     }
     await sleep(timing.pollMs, undefined, { signal });
   }

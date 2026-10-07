@@ -20,6 +20,13 @@ export {
   upgradeReadHintSchema,
 } from "./run-hint.ts";
 export {
+  redactSecrets,
+  UPGRADE_NEXT_ACTION,
+  UPGRADE_RUN_COMMAND,
+  UPGRADE_STATUS_COMMAND,
+  UpgradeRunLog,
+} from "./run-log.ts";
+export {
   type UpgradePhaseName,
   type UpgradePhaseOutcome,
   type UpgradeRunPhase,

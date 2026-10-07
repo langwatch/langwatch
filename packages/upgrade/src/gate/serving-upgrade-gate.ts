@@ -14,7 +14,7 @@ import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
 import { isMigrationStep } from "../step/migration-step.ts";
 import { type FirstInstallUpgrade, spawnFirstInstallUpgrade } from "./first-install-upgrade.ts";
 import { imageGateSteps, readImageTree } from "./image-tree.ts";
-import type { ServingRole, ServingVerdict } from "./serving-gate.ts";
+import { type ServingRole, type ServingVerdict, UPGRADE_COMMAND } from "./serving-gate.ts";
 import { createUpgradeGate, type UpgradeGate } from "./upgrade-gate.service.ts";
 
 /** Presence refresh and stale bound (held question "cloud presence timings", default taken). */
@@ -87,7 +87,8 @@ export function upgradeGateOver({
     onLapseChange: (lapsed) =>
       warn(
         lapsed
-          ? `presence lapsed past ${PRESENCE_TIMING.staleAfterMs} ms: ${processId} stops serving`
+          ? `presence lapsed past ${PRESENCE_TIMING.staleAfterMs} ms: ${processId} stops serving; ` +
+              "readiness answers 503 until a presence write succeeds (check DATABASE_URL reaches Postgres)"
           : `presence written again: ${processId} serves again`,
         { processId },
       ),
@@ -113,7 +114,7 @@ export function upgradeGateOver({
   return {
     async admit(): Promise<ServingVerdict> {
       try {
-        const verdict = await admitAfterFirstInstall({ gate, firstInstall });
+        const verdict = await admitAfterFirstInstall({ gate, firstInstall, warn });
         if (!verdict.admitted) await closeOnce();
         return verdict;
       } catch (error) {
@@ -144,16 +145,27 @@ export function upgradeGateOver({
   };
 }
 
-/** The api's first install runs `upgrade` once and asks again (Q10). */
-async function admitAfterFirstInstall({
+/** The api's first install runs `upgrade` once and asks again (Q10), saying so first. */
+export async function admitAfterFirstInstall({
   gate,
   firstInstall,
+  warn,
 }: {
   gate: Pick<UpgradeGate, "admit">;
   firstInstall: FirstInstallUpgrade;
+  warn: ServingGateWarn;
 }): Promise<ServingVerdict> {
   const verdict = await gate.admit();
   if (verdict.outcome !== "first-install") return verdict;
+  warn(
+    `first install: the ledger and the schema are empty, so this api runs \`${UPGRADE_COMMAND}\` ` +
+      "once before it serves; its lines follow",
+    {
+      phase: "first-install",
+      waitingOn: `\`${UPGRADE_COMMAND}\``,
+      next: "nothing to do: the api serves when the upgrade finishes",
+    },
+  );
   const exitCode = await firstInstall();
   if (exitCode === 0) return gate.admit();
   return { ...verdict, refusal: `${verdict.refusal} The api ran it; it exited ${exitCode}.` };
