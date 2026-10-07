@@ -341,11 +341,19 @@ Model providers for evaluators, including Azure OpenAI, are configured per proje
 
 The app and the workers never migrate on startup: `pnpm task upgrade` does, before they start, and they refuse to start until it has run. See [Run the upgrade](/self-hosting/upgrade#run-the-upgrade).
 
-| Variable                  | Description                                                                                                         | Default |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------- |
-| `SKIP_PRISMA_MIGRATE`     | `true` makes `pnpm task upgrade` leave PostgreSQL alone. The app and workers refuse to start until an upgrade runs without it | `false` |
-| `SKIP_CLICKHOUSE_MIGRATE` | `true` makes `pnpm task upgrade` leave ClickHouse alone, with the same consequence                                    | `false` |
-| `SKIP_LWQL_PROVISION`     | `true` makes `pnpm task upgrade` skip LangWatchQL provisioning                                                        | `false` |
+| Variable | Description | Default |
+| --- | --- | --- |
+| `SKIP_PRISMA_MIGRATE` | `1` or `true` makes `pnpm task upgrade` leave PostgreSQL alone, and unable to mark a failed migration rolled back. The app and workers refuse to start until an upgrade runs without it | `false` |
+| `SKIP_CLICKHOUSE_MIGRATE` | `true` (only) makes `pnpm task upgrade` leave ClickHouse alone, with the same consequence | `false` |
+| `SKIP_LWQL_PROVISION` | `1` or `true` makes `pnpm task upgrade` skip LangWatchQL provisioning | `false` |
+| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Listed under [Core Configuration](#core-configuration) | `180` |
+| `CLICKHOUSE_CLUSTER` | Cluster name. When set, the upgrade creates Replicated engines and replicates DDL across nodes | - |
+| `CLICKHOUSE_COLD_STORAGE_ENABLED` | `true` makes the upgrade's reconcile phase write TTLs that move aged data to the cold volume | `false` |
+| `CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS` | Hot days for every table without its own `CLICKHOUSE_COLD_STORAGE_<TABLE>_TTL_DAYS` | each table's built-in default |
+| `BASE_HOST` | The upgrade's last log line reads it to say where the UI is | - |
+| `BUILD_TIME` | Set while building an image: the upgrade applies nothing to ClickHouse. Leave unset at runtime | unset |
+
+Exit codes, outcome codes and the log lines are in [Upgrade Guide](/self-hosting/upgrade#exit-codes-and-what-to-do).
 
 ## Cloud admin
 

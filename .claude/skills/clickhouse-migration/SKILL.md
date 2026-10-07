@@ -9,8 +9,10 @@ argument-hint: "<the schema change, or the migration name the scanner refused>"
 
 **The rule** (ADR-155, widened to the floor; ADR-173): every release from the LTS floor
 (`packages/upgrade/releases/lts-floor.json`, `3.20.1`) to head keeps running on every later schema.
-`upgrade` steps an installation release by release (goose `up-to` each release's last version) while
-the old pods keep serving, and a rollback puts an older image on the new schema. Every change is
+`upgrade` runs under a lease while the old pods keep serving, and a rollback puts an older image on
+the new schema. (Today's task runs goose `up` to the head on each target in one pass; the stepping
+applier, goose `up-to` each release's last version, is proven in `specs/upgrade/stepping.feature`
+and not wired, `oneReleaseApplier` in `apps/tasks/src/upgrade.ts`.) Every change is
 expand/contract, and a destructive step may only remove what **no release at or above the floor**
 reads. Which recipe applies at all: the `migration` skill.
 
@@ -29,12 +31,22 @@ each private dataplane endpoint), then fails the release if any target failed (r
 `CLICKHOUSE_MIGRATE_WAIT_SECONDS` (default 180) for ClickHouse to accept connections. ClickHouse is
 mandatory: a serving process with no ClickHouse refuses (round 20).
 
+**What a failed migration looks like.** goose runs once per target; a target that fails is reported
+after the others have run and the run exits 1 with code `schema_failed`, naming the target (`shared`
+or `private:<organizationId>`) and its error with the URL redacted. The ledger keeps one row per step
+and target (`done`, `failed` or `pending`), so `pnpm task upgrade status` shows which target stopped
+at which `clickhouse:<NNNNN>`. The retry is `pnpm task upgrade` again: every statement is
+`IF [NOT] EXISTS`, so goose re-runs the failed file from its first statement. Other settings it reads:
+`CLICKHOUSE_CLUSTER` (set, every engine is Replicated), `SKIP_CLICKHOUSE_MIGRATE=true` (the app then
+refuses until an upgrade runs without it) and, in the reconcile phase, the cold-storage TTL variables
+(`packages/clickhouse-migrations/src/ttl.reconciler.ts`).
+
 **Numbering and collisions.** The step id is `clickhouse:<NNNNN>`. Take one above the highest on
 `origin/main`, not one above your branch: goose runs only above the version a database is on, so a
 lower number never runs there. The `migration-order` workflow (`cmd/migrationorder`,
 `specs/ci/migration-order.feature`) fails a number below main's newest, a number main took while
 your PR was open, two files sharing a number, and any change to a merged file, and prints the `git mv`
-to a free number. Under stepping, a version in a later release that sorts below an earlier release's
+to a free number. Once stepping is wired, a version in a later release that sorts below an earlier release's
 last version is refused outright.
 
 **One owner.** Every table the file touches belongs to one module;

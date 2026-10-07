@@ -196,16 +196,39 @@ cd /app/apps/api && pnpm --silent run start:prepare:db
 
 That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one lease, so a second run waits for the first) and then the system-migrations pass. It is safe to run again: on a current installation it applies no step and leaves the schema as it is. To see what it would do first, run `cd /app/apps/tasks && pnpm task upgrade plan`; `pnpm task upgrade status` shows the ledger. Both take `--json`.
 
-`upgrade` exits non-zero and names the cause when it cannot proceed: `1` a step failed, `2` the installation is below this release's supported floor, `3` another upgrade holds the lease. A refused or failed run is recorded, so the Upgrades page and `upgrade status` show it.
+### Exit codes and what to do
 
-When a Prisma migration fails, `upgrade` marks it rolled back and retries it itself if it was written after re-runnable migrations became the rule; it exits `rerunnable_migration_failed` only when every attempt failed. An older migration is named with the `prisma migrate resolve --rolled-back` command to clear it.
+`pnpm task upgrade` exits `0` when it is done and otherwise one of three non-zero codes, and its last two log lines name the cause and the next action. A refused or failed run is recorded, so **Ops > Upgrades** and `upgrade status` show it.
+
+| Exit | Outcome code | Meaning | What to do |
+| --- | --- | --- | --- |
+| `0` | `done` | Every step the image needs is applied | Start or restart the app and the workers |
+| `1` | `failed_prisma_migration` | A PostgreSQL migration failed and cannot be retried by the upgrade (written before re-runnable migrations became the rule, or not shipped in this image) | Run the `prisma migrate resolve` command the message names, then run the upgrade again |
+| `1` | `rerunnable_migration_failed` | A re-runnable migration still failed on its last attempt | Fix what its error names (often a lock another session holds), then run the upgrade again. No resolve command is needed |
+| `1` | `schema_failed` | A PostgreSQL or ClickHouse target could not be applied, or the ledger schema could not be created | Check the named target is reachable (`DATABASE_URL`, `CLICKHOUSE_URL`) and that the `DATABASE_URL` user has `CREATE` on the database, then run the upgrade again |
+| `1` | `step_failed` | A blocking data step failed | Read its error with `pnpm task upgrade status`, fix the cause, then run the upgrade again. The step resumes from its checkpoint |
+| `1` | `reconciler_failed` | The ClickHouse TTL or LangWatchQL reconciler failed | Fix the store it names (`CLICKHOUSE_URL`), then run the upgrade again |
+| `1` | `lease_lost` | This run lost the upgrade lease part-way (it stopped renewing it) | Run the upgrade again. It resumes from the ledger |
+| `1` | `failed` | Any other failure | Read the error and `upgrade status`, fix the cause, then run it again |
+| `2` | `refused_below_floor` | The installation is older than the long-term-support floor | Run the floor release the message names first, then this image |
+| `2` | `refused_image_below_floor` | This image is older than the floor the database was already upgraded to | Deploy an image at or above that floor, then run the upgrade |
+| `3` | `lease_not_acquired` | Another upgrade holds the lease and did not finish within 10 minutes | Wait for it (`upgrade status` shows its run), then run the upgrade again. A dead holder's lease expires by itself after 60 seconds |
+
+Every `1` is safe to retry: the ledger remembers what is done.
+
+### When a PostgreSQL migration fails
+
+PostgreSQL applies a migration one statement at a time, so a statement cancelled by the 10 second `lock_timeout` leaves its earlier statements applied and a failed row in `_prisma_migrations`. Every migration written after `20261006180001_gateway_realtime_session_metering` is written to survive a second run. For those, `upgrade` marks the failed row rolled back itself (`prisma migrate resolve --rolled-back <migration>`), waits and applies it again, up to 3 attempts with a 2 second then 4 second wait. A failed row an earlier run left is cleared the same way before the schema is applied.
+
+An older migration, or a failed one this image does not ship, stops the run with `failed_prisma_migration`. Check what it left behind, run `prisma migrate resolve --rolled-back <migration>` if nothing of it remains (or `--applied <migration>` if you finished it by hand) with the app's `DATABASE_URL`, then run the upgrade again. Nothing has rolled forward, so the previous version keeps serving.
 
 ### What the upgrade does
 
-- **Release by release.** From the release the ledger records to the release of the image, each release's PostgreSQL migrations, then its ClickHouse migrations on every ClickHouse target (the shared one and each private dataplane), then its blocking data steps. A ClickHouse target that fails is reported after the others have run, and fails the upgrade.
+- **In release order.** From the release the ledger records to the release of the image, the upgrade plans each release's PostgreSQL migrations, then its ClickHouse migrations on every ClickHouse target (the shared one and each private dataplane), then its blocking data steps. Today it applies all of the schema in the first pass and then runs each release's blocking steps in release order. A ClickHouse target that fails is reported after the others have run, and fails the upgrade.
 - **Its own record first.** The upgrade keeps its ledger, its lease and the list of running processes in their own PostgreSQL schema, `<your schema>_upgrade_ledger` (`public_upgrade_ledger` by default), which it creates before anything else. The database user in `DATABASE_URL` needs `CREATE` on the database for that; if it has none, create the schema beforehand with that user as its owner.
 - **Never below the floor.** Each release names a long-term-support floor. An installation older than the floor is refused by name (exit code `2`): upgrade to the floor release first, then to this one.
-- **Short locks.** PostgreSQL statements run with a 10 second `lock_timeout`. A statement that waits longer fails the upgrade instead of blocking your traffic; the previous version keeps serving, and running the upgrade again resumes where it stopped.
+- **Short locks and retries.** PostgreSQL statements run with a 10 second `lock_timeout`. A statement that waits longer fails instead of blocking your traffic. The upgrade makes up to 3 attempts at a failed schema apply (waiting 2 seconds, then 4), then exits; the previous version keeps serving, and running it again resumes where it stopped.
+- **One run at a time.** The upgrade holds a lease in its ledger, renews it every 15 seconds and loses it after 60 seconds without a renewal. A second run waits up to 10 minutes for a live holder, saying so every 30 seconds, then exits `3`.
 - **Background steps.** Data copies that do not block the release run on the workers after the upgrade. A step that must not run while an older version still writes waits until every running app and worker is on a version that knows it.
 
 ### ClickHouse is required
@@ -227,16 +250,49 @@ To follow an upgrade:
 
 The installation is in one of eight states: **Up to date**, **Finishing in background** (blocking steps done, background steps still running), **Behind** (this image declares steps the ledger has not run), **Never upgraded** (an empty ledger), **Upgrading**, **Rolled back** (an older version is running beside newer steps), **Needs attention** (a step or run failed) and **Unsupported** (below the floor).
 
+### Reading the console
+
+The upgrade logs as `langwatch:tasks:upgrade`. Every progress line carries four fields next to its message: `phase`, `waitingOn` (what it is blocked on, or `nothing`), `elapsedMs` since the run began, and `next` (what you can do). A password, token or connection-string credential is masked in every line. These are the line families, in the order a run writes them:
+
+| Line starts with | When | What it tells you |
+| --- | --- | --- |
+| `first run: this database holds no LangWatch schema` | The database is empty | The upgrade creates its ledger, applies every migration, then exits so the app can serve |
+| `no ClickHouse target is configured` (warning) | `CLICKHOUSE_URL` and every private route are unset | The upgrade applies PostgreSQL only; the app and workers refuse to serve until you set it |
+| `upgrade ledger ready in Postgres schema <schema> after N ms` | Start of every run | Where the ledger lives. `the upgrade ledger could not be created` (warning) ends the run with `schema_failed` |
+| `waiting for the upgrade lease held by <owner> on <host> (<image>)` | Another run holds the lease | Who holds it and how long you have waited, every 30 seconds |
+| `upgrade planned from <release>: N schema migrations (a Postgres, b ClickHouse) and N blocking steps across <releases>` | After the plan | What this run will do. `nothing to apply, the ledger is current` means it will do none |
+| `phase <name> started: waiting on ...`, then `succeeded in N ms` or `failed after N ms` (warning) | Each phase | The phases are `preflight`, `postgres-schema`, `clickhouse-schema` (per release) and `reconcile` |
+| `blocking step <id> started (from the start \| resuming from its checkpoint): <description>`, then `done in N ms` or `failed after N ms: <error>` | Each blocking data step | The step's id and its one-line description |
+| `Prisma migration <name> failed ... and is re-runnable: marked it rolled back` (warning), then `applied on attempt N` | A migration cancelled by a lock | Which migration, which attempt of 3, and the wait before the next. `schema apply failed without a failed migration; retrying in N ms` is the same retry for a transient failure |
+| `upgrade finished in N ms` or `first run finished in N ms`; or `upgrade stopped after N ms (<outcome code>)` (warning) | End of the run | The outcome code from the table above |
+| `upgrade complete; the UI is at <BASE_HOST> ...` or `upgrade exited <code>; ...` | Last line | Where the UI is, and that `pnpm task upgrade status` shows every step and run. With `BASE_HOST` unset it says so |
+
+A serving app or worker writes its own lines before it serves:
+
+| Line | Meaning |
+| --- | --- |
+| `<app> (<role>) refuses to serve: the installation is behind this image: blocking steps not done: <ids>. Run `pnpm task upgrade` ...` | The upgrade has not run for this image |
+| `... refuses to serve: release <x> is below the installation's floor <y>` | This image is older than the floor the database was upgraded to |
+| `... refuses to serve: ClickHouse is required and no ClickHouse target is configured` | Set `CLICKHOUSE_URL`, run the upgrade, start again |
+| `first install: the ledger and the schema are empty, so this api runs `pnpm task upgrade` once before it serves` | The Helm first-install path; the upgrade's lines follow |
+| `roster entry lapsed past 60000 ms: <process> stops serving; readiness answers 503 until a roster write succeeds` | The process cannot write to PostgreSQL. Check `DATABASE_URL`. `roster entry written again: <process> serves again` reports the recovery |
+
+A serving process that cannot read the ledger names `DATABASE_URL` in its refusal.
+
 ### Upgrade settings
 
 | Variable or value | Effect |
 | --- | --- |
 | `app.migrations.preRoll` (Helm, default `true`) | Runs the upgrade in a pre-upgrade Job. `false` leaves it to you; until you run it, new pods refuse to start. |
 | `app.migrations.preRollTimeoutSeconds` (Helm, default `2100`) | How long that Job may run. |
-| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` (default `180`) | How long the upgrade waits for ClickHouse to accept connections. `0` fails on the first refused connection. |
-| `SKIP_PRISMA_MIGRATE=true` | The upgrade leaves PostgreSQL alone. The app and the workers then refuse to start until an upgrade runs without it. |
-| `SKIP_CLICKHOUSE_MIGRATE=true` | The upgrade leaves ClickHouse alone, with the same consequence. |
-| `SKIP_LWQL_PROVISION=true` | The upgrade skips LangWatchQL provisioning. |
+| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` (default `180`) | How long the upgrade waits for ClickHouse to accept connections. `0` fails on the first refused connection. A value that is not a number of seconds, 0 or more, is refused with `Invalid CLICKHOUSE_MIGRATE_WAIT_SECONDS`. |
+| `SKIP_PRISMA_MIGRATE` (`1` or `true`) | The upgrade leaves PostgreSQL alone, and cannot mark a failed migration rolled back. The app and the workers then refuse to start until an upgrade runs without it. |
+| `SKIP_CLICKHOUSE_MIGRATE` (`true` only) | The upgrade leaves ClickHouse alone, with the same consequence. |
+| `SKIP_LWQL_PROVISION` (`1` or `true`) | The upgrade skips LangWatchQL provisioning. |
+| `CLICKHOUSE_CLUSTER` | Names the ClickHouse cluster. When set, the upgrade creates Replicated engines and replicates DDL across nodes. |
+| `CLICKHOUSE_COLD_STORAGE_ENABLED` (`true`) | The reconcile phase writes table TTLs that move aged data to the cold volume. Hot days come from `CLICKHOUSE_COLD_STORAGE_<TABLE>_TTL_DAYS`, else `CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS`, else the table's built-in default. |
+| `BASE_HOST` | Only the upgrade's last log line reads it, to say where the UI is. |
+| `BUILD_TIME` | Set while building an image: the upgrade finds no ClickHouse target and applies nothing there. Leave it unset at runtime. |
 
 For the split into api, worker and tasks applications, see [the chart's upgrade notes](https://github.com/langwatch/langwatch/tree/main/charts/langwatch#upgrading-to-the-split-api-worker-and-tasks-applications). `app.features.skipEnvValidation` is inert: no process reads `SKIP_ENV_VALIDATION` any more.
 

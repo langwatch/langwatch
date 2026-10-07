@@ -29,40 +29,42 @@ until the serving roster says every live api and worker declares this step (ADR-
 
 ## 2. Declare it
 
-Exemplar: `modules/identity/process/src/identity.module.ts` (`identity:reopen-unproven-accounts`).
-The binder gets the module's own `repositories`, `dependencies` (peer `*Api`s) and config, never
-another module's tables.
+Exemplars, both declared in the module file: `modules/suite/process/src/suite.module.ts`
+(`suite:replay-scenario-facts-for-open-runs`, background, `needsOldWritersGone`, per-tenant checkpoint)
+and `modules/identity/process/src/identity.module.ts` (`identity:reopen-unproven-accounts`, blocking,
+one repository call, dry run reports `wouldReopen`). The binder gets the module's own `repositories`,
+`dependencies` (peer `*Api`s) and `app`, never another module's tables.
 
 ```ts
+// modules/suite/process/src/suite.module.ts (abridged)
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
-export const datasetProcessModule = defineProcessModule("dataset")
-  .withRepositories(datasetRepositories)
+export const suiteProcessModule = defineProcessModule("suite")
   // ...
-  .withMigrations(({ repositories }) => [
+  .withMigrations(({ app, dependencies, repositories }) => [
     defineMigrationStep({
-      id: "dataset:copy-records-to-object-storage",
+      id: "suite:replay-scenario-facts-for-open-runs",
       kind: "data",
       mode: "background",
-      description: "Copies each dataset's records to object storage; the Postgres rows stay.",
+      description: "Counts scenario runs that suite runs open at deploy missed during the cut.",
       needsOldWritersGone: true,
       run: async ({ checkpoint, dryRun, signal }) => {
-        const resumed = checkpoint.resumeFrom?.after;
-        let after = typeof resumed === "string" ? resumed : null;
-        let copied = 0;
-        while (!signal.aborted) {
-          const batch = await repositories.migration.findUncopied({ after, limit: 500 });
-          if (batch.length === 0) break;
-          if (!dryRun) await repositories.migration.copy({ ids: batch.map((row) => row.id) });
-          copied += batch.length;
-          after = batch.at(-1)?.id ?? after;
-          if (!dryRun) await checkpoint.save({ report: { after, copied } });
-        }
-        return dryRun ? { wouldCopy: copied } : { copied };
+        const resumed = checkpoint.resumeFrom?.afterTenantId;
+        return SuiteRunReplayService.create({/* repositories, peer Api, app */}).replayOpenRuns({
+          dryRun,
+          signal,
+          afterTenantId: typeof resumed === "string" ? resumed : null,
+          onTenantDone: ({ tenantId, report }) =>
+            checkpoint.save({ report: { afterTenantId: tenantId, ...report } }),
+        });
       },
     }),
   ]);
 ```
+
+The step body is a thin call into a service in the module's `services/` (behaviour never lives in
+the module class). `run` is the whole loop: read where `resumeFrom` left off, do one committed unit,
+`checkpoint.save`, stop when `signal.aborted`, write nothing when `dryRun`.
 
 What each field must be (`packages/upgrade/src/step/migration-step.ts`; spec
 `packages/process/specs/module-migrations.feature`):
@@ -76,9 +78,11 @@ What each field must be (`packages/upgrade/src/step/migration-step.ts`; spec
   progress. Save after each committed batch, never before. Stop when `signal` aborts.
 - **The dry run writes nothing**, not even a checkpoint, and reports what it would do.
 
-Today the step is declared and collected by the tasks and worker roles, but no app hands the steps
-to the runner yet (no `.migrationSteps(...)` caller). Declare it anyway, test it over twins, and
-name the gap in the handoff; do not add a runner call from a module lane.
+The tasks process collects every installed module's steps (`app.migrationSteps(isMigrationStep)`,
+`apps/tasks/src/upgrade.ts`) and hands them to the runner, which runs the blocking ones inside
+`pnpm task upgrade`; a worker collects the background ones and runs them in its runtime
+(`packages/process/src/process-server.ts`, `packages/upgrade/src/background/background-steps.service.ts`).
+A module lane declares the step and tests it; it adds no runner call.
 
 ## 3. Blocking steps are frozen SQL
 
@@ -144,10 +148,23 @@ const run = (dryRun: boolean) =>
 - **Old writer after the run**: write through the old path, re-run, the new place caught up.
 - **Source intact** after the run.
 - **Blocking**: the SQL runs against a fixture at its own release's schema (integration, local
-  services named in your manifest).
+  services named in your manifest). Today's task applies all schema before the first blocking step
+  (`oneReleaseApplier`, `apps/tasks/src/upgrade.ts`), so a blocking step also runs on head schema:
+  name every column and rely on nothing a later release adds.
 - **Declaration**: an installation test asserts the module's steps collect (`migrationStepsOf`,
   `packages/process/src/__tests__/migration-steps.unit.test.ts`).
 - **End to end**: the live api and worker suites run `upgrade` once per process
   (`apps/api/src/__tests__/live-upgrade.fixture.ts`); never call the runner from a unit test.
+
+## 7. What fails, and what the operator sees
+
+A blocking step that throws ends the run `step_failed` (exit 1); the ledger keeps its error and
+checkpoint, `pnpm task upgrade status` and the Upgrades page show both, and the next `upgrade`
+resumes it. The console names it before and after: `blocking step <id> started (from the start |
+resuming from its checkpoint): <description>`, then `done in N ms` or `failed after N ms: <error>`
+(`packages/upgrade/src/runner/run-log.ts`). A background step runs on the worker, which logs `background step started`, `done` or
+`failed` (with `step`, `module` and the error) and records `failed` with its error in the ledger. Your `description` and error message are what an operator reads:
+write both in operator words and name no secret (the console masks URLs and `key=value` secrets, not
+prose).
 
 Testing discipline: `.claude/skills/core/testing-rules.md`.
