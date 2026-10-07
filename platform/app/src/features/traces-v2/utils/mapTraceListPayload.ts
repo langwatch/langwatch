@@ -1,9 +1,9 @@
-import type { TraceEvalResult, TraceListItem } from "../types/trace";
+import type {
+  TraceEvalResult,
+  TraceListItem,
+  TraceListRow,
+} from "../types/trace";
 import { NO_TRACE_EVENTS } from "../types/trace";
-
-interface TraceListPayload {
-  items: unknown[];
-}
 
 /**
  * Normalize the raw `tracesV2.list` payload into `TraceListItem` rows:
@@ -19,21 +19,23 @@ interface TraceListPayload {
  * reads them separately (`useTraceListEvents`) and merges them in.
  */
 export function mapTraceListPayload(
-  data: TraceListPayload | undefined,
+  data: { items: TraceListRow[] } | undefined,
 ): TraceListItem[] {
   if (!data) return [];
-  return (data.items as TraceListItem[]).map((item) => ({
+  return data.items.map((item) => ({
     ...item,
     spanCount: item.spanCount ?? 0,
     sizeBytes: item.sizeBytes ?? 0,
-    evaluations: ((item.evaluations ?? []) as TraceEvalResult[]).map((e) => ({
-      evaluatorId: e.evaluatorId,
-      evaluatorName: e.evaluatorName,
-      status: e.status,
-      score: e.score,
-      passed: e.passed,
-      label: e.label,
-    })),
-    events: item.events ?? NO_TRACE_EVENTS,
+    evaluations: (item.evaluations ?? []).map(
+      (e): TraceEvalResult => ({
+        evaluatorId: e.evaluatorId,
+        evaluatorName: e.evaluatorName,
+        status: e.status,
+        score: e.score,
+        passed: e.passed,
+        label: e.label,
+      }),
+    ),
+    events: NO_TRACE_EVENTS,
   }));
 }
