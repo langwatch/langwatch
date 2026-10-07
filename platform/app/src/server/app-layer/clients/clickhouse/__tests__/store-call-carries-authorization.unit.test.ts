@@ -106,13 +106,21 @@ const FRAGMENT_EXPANDER_CALLERS = new Set([
   "src/test-utils/authorizationProofs.ts",
 ]);
 
-/** The routers whose reads reach a converted repository. */
+/**
+ * Where trace routes live: the tRPC routers, the legacy Hono routes and the
+ * REST app. Every gate below reads all three, so a route reaching a trace
+ * read is checked wherever it is written.
+ */
+const ROUTE_ROOTS = ["server/api/routers", "server/routes", "app/api"];
+
+/** The routes whose reads reach a converted repository. */
 const TRACE_ROUTERS = [
-  "server/api/routers/tracesV2.ts",
-  "server/api/routers/traces.ts",
-  "server/api/routers/sharedTrace.ts",
+  "app/api/traces/[[...route]]/app.v1.ts",
   "server/api/routers/llmModelCosts.ts",
+  "server/api/routers/sharedTrace.ts",
   "server/api/routers/traceEditOverlay.ts",
+  "server/api/routers/traces.ts",
+  "server/api/routers/tracesV2.ts",
 ];
 
 /**
@@ -150,12 +158,19 @@ const PROOF_TAKING_CALL =
   /\b(?:traces\.(?:list|summary|spans|sessionGroups)|evaluations\.runs)\.(\w+)\s*\(/g;
 
 /**
- * Trace reads a router still hands a tenant by hand, kept behind the
- * baseline on purpose. Each entry names the router, the service, how many
- * references it holds today, the owner and the reason. A router that gains
+ * Trace reads a route still hands a tenant by hand, kept behind the
+ * baseline on purpose. Each entry names the route, the service, how many
+ * references it holds today, the owner and the reason. A route that gains
  * a reference fails; one that loses its last, or drops below the count,
  * fails as stale, so the list can only shrink. This list is the answer to
  * ADR-144's open question on which trace reads take the proof in v1.
+ *
+ * `TraceService`, `EvaluationService` and `ClickHouseTraceService` take a
+ * project id for every trace read they make, so a route that imports one
+ * hands a tenant by hand however it calls it. None of them is reachable
+ * with an aggregate's data: the REST routes and the share link resolve a
+ * project from an API key or a share token, which an aggregate never has,
+ * and an aggregate's own id holds no member's rows.
  */
 const HAND_TENANT_READS: Array<{
   file: string;
@@ -180,10 +195,98 @@ const HAND_TENANT_READS: Array<{
       "the coding-agent session tables have no proof-reading repository yet; on an aggregate the Session view finds no session for a member trace.",
     owner: "follow-up to block F",
   },
+  {
+    file: "app/api/coding-agent/[[...route]]/app.ts",
+    service: "codingAgents.sessions",
+    references: 1,
+    reason:
+      "the coding-agent REST route reads one session's events for the API key's project; an aggregate has no API key, and the session tables have no proof-reading repository yet.",
+    owner: "follow-up to block F (coding-agent sessions)",
+  },
+  {
+    file: "server/api/routers/codingAgents.ts",
+    service: "codingAgents.sessions",
+    references: 2,
+    reason:
+      "the coding-agent usage totals and recent sessions read the URL project; on an aggregate they read its own tenant and find none, the same gap as the Session view.",
+    owner: "follow-up to block F (coding-agent sessions)",
+  },
+  {
+    file: "app/api/traces/[[...route]]/app.v1.ts",
+    service: "TraceService",
+    references: 4,
+    reason:
+      "the REST v1 trace reads (get, list, search with evaluations) take the API key's project; an aggregate has no API key, so these never read one.",
+    owner: "follow-up to block F (REST surfaces)",
+  },
+  {
+    file: "server/api/routers/annotation.ts",
+    service: "ClickHouseTraceService",
+    references: 3,
+    reason:
+      "annotation queues check that trace ids exist in the queue's own project; an annotation queue is never created on an aggregate.",
+    owner: "follow-up to block F (annotations)",
+  },
+  {
+    file: "server/api/routers/annotation.ts",
+    service: "TraceService",
+    references: 2,
+    reason:
+      "annotation rows decorate their traces from the queue's own project; an annotation queue is never created on an aggregate.",
+    owner: "follow-up to block F (annotations)",
+  },
+  {
+    file: "server/api/routers/sharedTrace.ts",
+    service: "TraceService",
+    references: 2,
+    reason:
+      "the share link's evaluations read the shared trace's own project through TraceService.getEvaluationsMultiple; a share link is minted on one project, never on an aggregate.",
+    owner: "follow-up to block F (share link)",
+  },
+  {
+    file: "server/api/routers/spans.ts",
+    service: "TraceService",
+    references: 3,
+    reason:
+      "the v1 span reads hand the URL project to TraceService; on an aggregate they read the aggregate's own tenant and find none. The drawer reads spans through tracesV2.",
+    owner: "follow-up to block F (v1 trace router)",
+  },
+  {
+    file: "server/api/routers/traces.ts",
+    service: "TraceService",
+    references: 16,
+    reason:
+      "the v1 trace router's other procedures (getById, getAllForProject, getEvaluationsMultiple, the thread, topic, sample and download reads) hand the URL project to TraceService; on an aggregate they find none. getEvaluations and getEvaluationInputs, the two the drawer calls, read through the proof since block F.",
+    owner: "follow-up to block F (v1 trace router)",
+  },
+  {
+    file: "server/routes/traces-legacy.ts",
+    service: "TraceService",
+    references: 4,
+    reason:
+      "the legacy REST trace routes take the API key's project; an aggregate has no API key, so these never read one.",
+    owner: "follow-up to block F (REST surfaces)",
+  },
 ];
 
 /** Services whose reads take a tenant by hand; see {@link HAND_TENANT_READS}. */
-const HAND_TENANT_SERVICE = /\b(traces\.logRecords|codingAgents\.sessions)\b/g;
+const HAND_TENANT_SERVICE =
+  /\b(traces\.logRecords|codingAgents\.sessions|TraceService|EvaluationService|ClickHouseTraceService)\b/g;
+
+/** An import of a service that takes a project id for every trace read. */
+const IMPORTS_HAND_TENANT_SERVICE =
+  /import\s*(?:type\s*)?\{[^}]*\b(?:TraceService|EvaluationService|ClickHouseTraceService)\b[^}]*\}\s*from/;
+
+/**
+ * A trace or evaluations service taken apart or held under another name:
+ * `const { spans } = app.traces` or `const list = getApp().traces.list`.
+ * Either moves the call out of reach of the checks above, which read
+ * `traces.<service>.<method>(` at the call, so a route may do neither.
+ */
+const SERVICE_TAKEN_APART =
+  /\}\s*=\s*(?:await\s+)?[\w$.()]*\b(?:traces|evaluations)\s*(?:;|\n|$)/;
+const SERVICE_HELD_BY_NAME =
+  /=\s*(?:await\s+)?[\w$.()]*\b(?:traces\.(?:list|summary|spans|sessionGroups|logRecords)|evaluations\.runs)\s*(?:;|\n|$)/;
 
 function read(relativeToSrc: string): string {
   return readFileSync(path.join(SRC, relativeToSrc), "utf8");
@@ -577,21 +680,48 @@ function handTenantReferencesIn(source: string): Record<string, number> {
   return counts;
 }
 
-/**
- * Every router under `server/api/routers` that calls, or hands over, a
- * proof-taking service: a router passing `traces.spans` to a helper reaches
- * it as surely as one calling it.
- */
-function routersReachingProofTakingServices(): string[] {
-  return sourceFilesUnder(path.join(SRC, "server/api/routers"))
+/** Every non-test route source under {@link ROUTE_ROOTS}, relative to `SRC`. */
+function routeSources(): string[] {
+  return ROUTE_ROOTS.flatMap((root) => sourceFilesUnder(path.join(SRC, root)))
     .filter((file) => !isTestFile(file))
-    .filter((file) =>
-      CONVERTED_SERVICE_READ.test(
-        withoutComments(readFileSync(path.join(APP, file), "utf8")),
-      ),
-    )
     .map((file) => path.relative(SRC, path.join(APP, file)))
     .sort();
+}
+
+/**
+ * Every route that calls, or hands over, a proof-taking service: a router
+ * passing `traces.spans` to a helper reaches it as surely as one calling it.
+ */
+function routersReachingProofTakingServices(): string[] {
+  return routeSources().filter((file) =>
+    CONVERTED_SERVICE_READ.test(withoutComments(read(file))),
+  );
+}
+
+/** Every route that imports a service taking a project id for trace reads. */
+function routesImportingHandTenantServices(): string[] {
+  return routeSources().filter((file) =>
+    IMPORTS_HAND_TENANT_SERVICE.test(read(file)),
+  );
+}
+
+/** Every place a source takes a trace service apart or holds it by name. */
+function servicesTakenApartIn({
+  file,
+  source,
+}: {
+  file: string;
+  source: string;
+}): string[] {
+  const code = withoutComments(source);
+  return code.split("\n").flatMap((line, index) => {
+    // Each line with the next, so a binding split before its `;` is read
+    // whole.
+    const text = `${line}\n`;
+    return SERVICE_TAKEN_APART.test(text) || SERVICE_HELD_BY_NAME.test(text)
+      ? [`${file}:${index + 1} ${line.trim()}`]
+      : [];
+  });
 }
 
 describe("store calls carry authorization", () => {
@@ -977,19 +1107,85 @@ describe("store calls carry authorization", () => {
     });
 
     it("keeps the hand-tenant reads to the baseline, and the baseline to what is still there", () => {
-      const counted = TRACE_ROUTERS.flatMap((file) =>
-        Object.entries(handTenantReferencesIn(read(file))).map(
-          ([service, references]) => ({ file, service, references }),
-        ),
-      );
+      const byFileAndService = (
+        a: { file: string; service: string },
+        b: { file: string; service: string },
+      ) => a.file.localeCompare(b.file) || a.service.localeCompare(b.service);
+      const counted = routeSources()
+        .flatMap((file) =>
+          Object.entries(handTenantReferencesIn(read(file))).map(
+            ([service, references]) => ({ file, service, references }),
+          ),
+        )
+        .sort(byFileAndService);
 
       expect(counted).toEqual(
         HAND_TENANT_READS.map(({ file, service, references }) => ({
           file,
           service,
           references,
-        })),
+        })).sort(byFileAndService),
       );
+    });
+
+    it("lists every route that imports a service taking a project id", () => {
+      // The baseline above counts what a route holds; this keeps a new route
+      // importing one of those services from going uncounted.
+      const listed = new Set(
+        HAND_TENANT_READS.filter(({ service }) => /Service$/.test(service)).map(
+          ({ file }) => file,
+        ),
+      );
+
+      expect(routesImportingHandTenantServices()).toEqual([...listed].sort());
+    });
+  });
+
+  describe("given a route could move a trace service out of the checks' sight", () => {
+    it("takes no trace service apart and holds none under another name", () => {
+      const found = routeSources().flatMap((file) =>
+        servicesTakenApartIn({ file, source: read(file) }),
+      );
+
+      expect(found).toEqual([]);
+    });
+
+    it.each([
+      {
+        shape: "a service destructured out of the app",
+        source: [
+          "const { spans } = app.traces;",
+          "return spans.getSpansByTraceId(input.projectId, input.traceId);",
+        ],
+        expected: ["fixture.ts:1 const { spans } = app.traces;"],
+      },
+      {
+        shape: "a service destructured out of an awaited call",
+        source: [
+          "const { runs } = getApp().evaluations",
+          "return runs.findByTraceId({ tenantId: input.projectId });",
+        ],
+        expected: ["fixture.ts:1 const { runs } = getApp().evaluations"],
+      },
+      {
+        shape: "a service held under another name",
+        source: [
+          "const list = getApp().traces.list;",
+          "return list.getList({ tenantId: input.projectId });",
+        ],
+        expected: ["fixture.ts:1 const list = getApp().traces.list;"],
+      },
+      {
+        shape: "a service called where it is reached",
+        source: [
+          "return getApp().traces.list.getList({ authorization, timeRange });",
+        ],
+        expected: [],
+      },
+    ])("reports $shape", ({ source, expected }) => {
+      expect(
+        servicesTakenApartIn({ file: "fixture.ts", source: source.join("\n") }),
+      ).toEqual(expected);
     });
   });
 });

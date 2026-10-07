@@ -986,14 +986,13 @@ function registerFacetsRoute(
           to: endDate === undefined ? now : facetWindowBound(endDate),
         };
 
-        const list = getApp().traces.list;
         const authorization = await authorizeTraceRead({
           projectId: project.id,
           route: "api/v1/traces/facets",
         });
 
         if (field === undefined) {
-          const discover = await list.getDiscover({
+          const discover = await getApp().traces.list.getDiscover({
             authorization,
             timeRange,
           });
@@ -1004,7 +1003,7 @@ function registerFacetsRoute(
           projectId: project.id,
         });
         const facetKey = resolveFacetKey({ field, protections });
-        const result = await list.getFacetValues({
+        const result = await getApp().traces.list.getFacetValues({
           authorization,
           timeRange: visibleWindow({ timeRange, facetKey, protections }),
           facetKey,

@@ -388,9 +388,19 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   pull request reusing this grant? Owner: the seat's author.
 - Which trace routes outside `tracesV2` (REST, share links, exports) take
   the proof in v1 and which keep their hand-written tenant behind the lint
-  baseline. Settled in block F (v4.5): every trace read carries a proof;
-  REST and share links mint an own-only internal one, and the reads still
-  handing a tenant by hand are named in the gate's counted baseline.
+  baseline. Settled in block F (v4.5, corrected after review): every read
+  behind the trace list and the trace drawer carries a proof, the drawer's
+  evaluations panel (`traces.getEvaluations` and `getEvaluationInputs`)
+  included. The routes that still hand a tenant are named, with an owner
+  and a reason, in the gate's counted baseline: the REST v1 trace reads
+  (`app.v1.ts`), the legacy REST trace routes (`traces-legacy.ts`) and the
+  coding-agent REST route, which take an API key's project, and an
+  aggregate has no API key; the share link's evaluations, read for the
+  shared trace's own project, since a share link is never minted on an
+  aggregate; annotation queues, never created on an aggregate; and the
+  v1 trace and span routers' other procedures, the coding-agent usage
+  routes and the log records, which on an aggregate read its own tenant
+  and find none.
 - Whether to admit `TimeUnixMs` (log records) and `BucketStart` (the
   analytics rollup) as time columns the client may window on. Until then
   an aggregate's logs and analytics read the aggregate's own tenant and
@@ -543,4 +553,9 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   their caller-minted ids: the only content-derived ones are the
   migration's and the legacy key mint's, and stepping a legacy key's id
   past a revoked row would re-mint a revoked credential, so the block E
-  rule does not carry over.
+  rule does not carry over. Corrected after review: the drawer's
+  evaluations panel called `traces.getEvaluations`, which handed the
+  tenant by hand, so it now reads through the narrowed proof, and the
+  gate reads every route under the tRPC, legacy and REST roots, refuses a
+  trace service taken apart or held under another name, and counts each
+  route still handing a tenant rather than claiming none does.
