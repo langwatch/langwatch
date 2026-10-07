@@ -80,6 +80,9 @@ export const NO_TRACE_EVENTS: TraceListEvents = {
  */
 export interface TraceListItem {
   traceId: string;
+  /** The project that owns the trace; on an aggregate, the member it was
+   *  listed from. Absent on sample rows. */
+  projectId?: string;
   timestamp: number;
   name: string;
   serviceName: string;

@@ -46,11 +46,17 @@ import type {
   TraceListSortColumn,
 } from "./repositories/trace-list.repository";
 import { scopeTraceFilterToTable } from "./trace-filter-scope";
-import type { TraceSummaryData } from "./types";
 import { teaserOf } from "./visibility-window.service";
 
 export interface TraceListItem {
   traceId: string;
+  /**
+   * The project that owns the trace (ADR-144 block F). On an aggregate it is
+   * the member the row was read from: two members may hold the same trace
+   * id, so the id alone does not say which trace a row is, and the drawer
+   * hands this back on every read it makes for the row.
+   */
+  projectId: string;
   timestamp: number;
   name: string;
   serviceName: string;
@@ -110,12 +116,17 @@ export interface TraceListItem {
   ttft: number | null;
   traceName: string;
   rootSpanType: string | null;
+  /**
+   * The evaluations already scored on this row's trace, matched by project
+   * and trace id together, so a member's evaluation never decorates another
+   * member's row of the same id.
+   */
+  evaluations: EvalSummary[];
 }
 
 export interface TraceListPage {
   items: TraceListItem[];
   totalHits: number;
-  evaluations: Record<string, EvalSummary[]>;
   nextCursor: TraceListCursor | null;
 }
 
@@ -597,17 +608,18 @@ export class TraceListService {
     const visibleRows = hasMore
       ? result.rows.slice(0, params.pageSize)
       : result.rows;
-    const items = visibleRows.map((row) => mapToTraceListItem(row));
-    const traceIds = items.map((item) => item.traceId);
-
-    const evaluations = evaluationsByListedTrace({
-      rows: visibleRows,
-      evaluations: await this.evaluationRunService.findSummariesByTraceIds({
+    const evaluations = evaluationsByListedRow(
+      await this.evaluationRunService.findSummariesByTraceIds({
         authorization: params.authorization,
-        traceIds,
+        // Two members may list the same id; the read needs it once.
+        traceIds: [...new Set(visibleRows.map((row) => row.traceId))],
         since: params.timeRange.from,
       }),
-    });
+    );
+    const items = visibleRows.map((row) => ({
+      ...mapToTraceListItem(row),
+      evaluations: evaluations.get(listedRowKey(row)) ?? [],
+    }));
 
     // Tease input/output/error previews and user-authored labels of items
     // beyond the caller's visibility window — existence and counts stay
@@ -632,7 +644,6 @@ export class TraceListService {
     return {
       items: gatedItems,
       totalHits: result.totalHits,
-      evaluations,
       nextCursor:
         hasMore && visibleRows.length > 0
           ? cursorForTraceRow(visibleRows[visibleRows.length - 1]!, sortColumn)
@@ -1434,31 +1445,28 @@ export function parseLabels(raw: string | undefined): string[] {
   }
 }
 
+/** A listed row's identity: its tenant and trace id together. */
+function listedRowKey(row: { tenantId: string; traceId: string }): string {
+  return `${row.tenantId}:${row.traceId}`;
+}
+
 /**
- * The evaluations of each listed trace, keyed by trace id for the page.
+ * The evaluations of a page's rows, keyed by tenant and trace id together.
  *
  * The read is fenced by the proof, so on an aggregate it returns every
- * tenant's evaluations under the listed ids, and two members may hold the
- * same id (ADR-144 v4.1). Each evaluation is matched to the listed row by
- * tenant and trace id together, so an evaluation of one member's trace never
- * decorates another's row of the same id. The page's map is still keyed by
- * trace id alone, which is what the client reads: on a collision it carries
- * both rows' evaluations under the one id.
+ * member's evaluations under the listed ids, and two members may hold the
+ * same id (ADR-144 v4.1). Keying by the pair is what keeps one member's
+ * evaluation off another member's row of the same id.
  */
-function evaluationsByListedTrace({
-  rows,
-  evaluations,
-}: {
-  rows: readonly TraceListRow[];
-  evaluations: readonly TenantEvalSummary[];
-}): Record<string, EvalSummary[]> {
-  const listed = new Set(rows.map((row) => `${row.tenantId}:${row.traceId}`));
-  const byTrace: Record<string, EvalSummary[]> = {};
+function evaluationsByListedRow(
+  evaluations: readonly TenantEvalSummary[],
+): Map<string, EvalSummary[]> {
+  const byRow = new Map<string, EvalSummary[]>();
   for (const { tenantId, ...summary } of evaluations) {
-    if (!listed.has(`${tenantId}:${summary.traceId}`)) continue;
-    (byTrace[summary.traceId] ??= []).push(summary);
+    const key = listedRowKey({ tenantId, traceId: summary.traceId });
+    byRow.set(key, [...(byRow.get(key) ?? []), summary]);
   }
-  return byTrace;
+  return byRow;
 }
 
 /** Keep this normalization in lockstep with `cursorSortExpression` in the CH repository. */
@@ -1513,7 +1521,9 @@ function presentMediaRefs(
   return refs.length > 0 ? refs : undefined;
 }
 
-export function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
+export function mapToTraceListItem(
+  row: TraceListRow,
+): Omit<TraceListItem, "evaluations"> {
   const status = deriveTraceStatus(row);
 
   const totalTokens =
@@ -1521,6 +1531,7 @@ export function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
 
   return {
     traceId: row.traceId,
+    projectId: row.tenantId,
     timestamp: deriveTraceTimestamp({
       occurredAt: row.occurredAt,
       storageAnchorMs: row.storageAnchorMs,

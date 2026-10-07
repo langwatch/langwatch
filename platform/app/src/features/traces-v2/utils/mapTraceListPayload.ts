@@ -3,12 +3,14 @@ import { NO_TRACE_EVENTS } from "../types/trace";
 
 interface TraceListPayload {
   items: unknown[];
-  evaluations?: Record<string, TraceEvalResult[]> | null;
 }
 
 /**
  * Normalize the raw `tracesV2.list` payload into `TraceListItem` rows:
- * attach each trace's evaluations and default the optional spanCount field.
+ * narrow each row's evaluations to what a cell renders and default the
+ * optional spanCount field. Each row carries its own evaluations, matched
+ * by project and trace id on the server, so two rows with the same trace id
+ * (an aggregate's members) never share them.
  * Shared by the full /traces list (`useTraceListQuery`) and the compact
  * personal recent-activity table so both render identical rows from the
  * same source.
@@ -20,12 +22,11 @@ export function mapTraceListPayload(
   data: TraceListPayload | undefined,
 ): TraceListItem[] {
   if (!data) return [];
-  const evalMap = (data.evaluations ?? {}) as Record<string, TraceEvalResult[]>;
   return (data.items as TraceListItem[]).map((item) => ({
     ...item,
     spanCount: item.spanCount ?? 0,
     sizeBytes: item.sizeBytes ?? 0,
-    evaluations: (evalMap[item.traceId] ?? []).map((e) => ({
+    evaluations: ((item.evaluations ?? []) as TraceEvalResult[]).map((e) => ({
       evaluatorId: e.evaluatorId,
       evaluatorName: e.evaluatorName,
       status: e.status,

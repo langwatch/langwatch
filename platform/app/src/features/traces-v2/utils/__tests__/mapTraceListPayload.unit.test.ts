@@ -24,35 +24,26 @@ describe("mapTraceListPayload", () => {
     });
   });
 
-  describe("when the evaluations map has entries for a trace", () => {
-    it("attaches that trace's evaluations by id", () => {
+  describe("when two rows hold the same trace id under different projects", () => {
+    it("keeps each row's own evaluations", () => {
+      const toxicity = {
+        evaluatorId: "e1",
+        evaluatorName: "Toxicity",
+        status: "processed",
+        score: 0.9,
+        passed: true,
+        label: "safe",
+      };
       const rows = mapTraceListPayload({
-        items: [{ traceId: "t1" }, { traceId: "t2" }],
-        evaluations: {
-          t1: [
-            {
-              evaluatorId: "e1",
-              evaluatorName: "Toxicity",
-              status: "processed",
-              score: 0.9,
-              passed: true,
-              label: "safe",
-            },
-          ],
-        },
+        items: [
+          { traceId: "t1", projectId: "member-a", evaluations: [toxicity] },
+          { traceId: "t1", projectId: "member-b", evaluations: [] },
+        ],
       });
-      expect(rows[0]?.evaluations).toEqual([
-        {
-          evaluatorId: "e1",
-          evaluatorName: "Toxicity",
-          status: "processed",
-          score: 0.9,
-          passed: true,
-          label: "safe",
-        },
-      ]);
-      // t2 has no entry in the map, so it gets an empty list, not undefined.
+      expect(rows[0]?.evaluations).toEqual([toxicity]);
+      // The second row has none of its own, so it gets an empty list.
       expect(rows[1]?.evaluations).toEqual([]);
+      expect(rows.map((row) => row.projectId)).toEqual(["member-a", "member-b"]);
     });
   });
 
