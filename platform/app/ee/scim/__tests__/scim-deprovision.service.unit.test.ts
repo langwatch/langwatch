@@ -13,12 +13,15 @@
  * `scim-offboard-postcondition.integration.test.ts`.
  */
 import { OffboardIncompleteError } from "@langwatch/authz-server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import type { AggregateReconciler } from "~/server/app-layer/projects/aggregate-reconciler.service";
 import {
   CannotDisableLastAdminError,
   CannotRemoveLastAdminError,
 } from "~/server/app-layer/organizations/errors";
 import { ScimDeprovisionService } from "../scim-deprovision.service";
+
+type Reconcile = AggregateReconciler["reconcileOrganizationOrLog"];
 
 const ORGANIZATION = "org_acme";
 const CONNECTION = "conn_okta_primary";
@@ -46,13 +49,13 @@ function createSyncLifecycle() {
 describe("ScimDeprovisionService", () => {
   let grants: ReturnType<typeof createGrants>;
   let syncLifecycle: ReturnType<typeof createSyncLifecycle>;
-  let aggregateMembers: { reconcileOrganizationOrLog: ReturnType<typeof vi.fn> };
+  let aggregateMembers: { reconcileOrganizationOrLog: Mock<Reconcile> };
 
   beforeEach(() => {
     grants = createGrants();
     syncLifecycle = createSyncLifecycle();
     aggregateMembers = {
-      reconcileOrganizationOrLog: vi.fn().mockResolvedValue(undefined),
+      reconcileOrganizationOrLog: vi.fn<Reconcile>().mockResolvedValue(undefined),
     };
   });
 
