@@ -243,7 +243,7 @@ on the Postgres side.
 | Proof expires | A proof past `expiresAt` is refused; a revoked grant is absent from the next mint | `AuthorizationExpiredError` test; revoke-then-mint test |
 | No leak outside the proof | A tenant not named in the proof returns zero rows from every ClickHouse trace read | integration test per repository: list, summary, spans, analytics with a foreign tenant holding rows |
 | Repositories write no tenant | No trace repository query text contains `TenantId`; the client adds it | lint rule `store-call-carries-authorization` scoped to the trace repositories, plus a grep assertion in the repository tests |
-| Same organisation only | A member project in another organisation is never attached, and the door reads shared rows only from the reader project's own organisation | reconciler test; refinement test; the rule edit refusing another organisation's project. `TenantMismatchError` is defined in `@langwatch/actor` for ADR-166 and never thrown here: the door takes the organisation from the project it mints for, so no proof can name another |
+| Same organisation only | A member project in another organisation is never attached, and the door reads shared rows only from the reader project's own organisation | reconciler test; refinement test; the rule edit refusing another organisation's project. Nothing compares a proof's organisation at read time, and nothing needs to: the door takes the organisation from the project it mints for and looks up shared reads within that organisation only, and the ledger refuses a shared grant on another organisation's project, so no proof names a project outside its own organisation |
 | Hidden governance project never a member | `internal_governance` is excluded by every rule kind | reconciler test |
 | Admins only | A non-admin, including a Developer seat, is refused at the route guard and the tRPC guard | `projectFilter.invariant.integration.test.ts` extension plus guard unit test |
 | Reconciler is idempotent | Two runs, or a replay, produce the same grant ids and no duplicate rows | reconciler test comparing ledger state after two runs |
@@ -721,3 +721,7 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   block F's landing rule holds on the client's remembered-selection path
   too. The client's permission check asks `writesUnderProject` on an
   aggregate, so no control offers a write decision 8's guard refuses.
+- v4.9 (2026-10-07, implementation note after the second review, no
+  decision changed). `TenantMismatchError` is deleted from `@langwatch/actor`:
+  nothing threw or caught it, and the same-organisation invariant above
+  says how the door keeps a proof inside one organisation without it.

@@ -250,14 +250,6 @@ export class AccessNotGrantedError extends Error {
   }
 }
 
-export class TenantMismatchError extends Error {
-  readonly code = "authorization_tenant_mismatch" as const;
-  constructor(readonly organizationId: string) {
-    super("The authorization does not cover the requested tenant");
-    this.name = "TenantMismatchError";
-  }
-}
-
 /**
  * The two checks every store client runs before touching a proof, returning
  * the proof narrowed to the sealed type. Forged is checked before expired:

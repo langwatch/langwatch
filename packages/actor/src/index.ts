@@ -119,5 +119,4 @@ export {
   isSealedAuthorization,
   narrowAuthorization,
   sealAuthorization,
-  TenantMismatchError,
 } from "./authorization";
