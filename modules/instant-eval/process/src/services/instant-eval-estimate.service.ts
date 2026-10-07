@@ -15,6 +15,7 @@ import {
   InstantEvalRowCapExceededError,
 } from "@langwatch/instant-eval-contract";
 import {
+  estimateInstantEvalRequestTokens,
   type InstantEvalClassifierLimits,
   type InstantEvalPricing,
 } from "@langwatch/instant-eval-judge-contract";
@@ -22,7 +23,6 @@ import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval
 import { createLogger } from "@langwatch/observability";
 
 import { instantEvalAverageTextBytes } from "../rules/instant-eval-run-sizing.rules.ts";
-import { estimateInstantEvalRequestTokens } from "../rules/instant-eval-token-budget.rules.ts";
 import type { InstantEvalRowSourceService } from "./instant-eval-row-source.service.ts";
 import type { AcceptedInstantEvalStatement } from "./instant-eval-statement.service.ts";
 

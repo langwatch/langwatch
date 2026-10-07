@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { InstantEvalFreeBudgetExhaustedError } from "../instant-eval.errors.ts";
+import { InstantEvalFreeBudgetExhaustedError } from "../instant-eval-judge.errors.ts";
 
 describe("free budget refusal", () => {
   describe("given a paid organization the meter does not bill has spent one dollar", () => {

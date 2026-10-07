@@ -4,13 +4,14 @@
  * @see modules/instant-eval/specs/classifier.feature
  */
 
+import { z } from "zod";
+
 import type {
   InstantEvalCategoryQuestion,
   InstantEvalQuestion,
   InstantEvalScoreQuestion,
   InstantEvalVerdict,
-} from "@langwatch/instant-eval-judge-contract";
-import { z } from "zod";
+} from "./instant-eval-judge.api.ts";
 
 /** The levels a score question offers, low to high. */
 function instantEvalScoreLevels(question: InstantEvalScoreQuestion): number[] {

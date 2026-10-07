@@ -10,18 +10,16 @@ import {
   InstantEvalQuestionsTooLongError,
 } from "@langwatch/instant-eval-contract";
 import {
+  estimateInstantEvalRequestTokens,
   type InstantEvalClassifierLimits,
   type InstantEvalQuestion,
+  instantEvalQuestionTokens,
+  instantEvalTextBudget,
   type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
 
 import { instantEvalRowText } from "./instant-eval-row-keys.rules.ts";
 import type { InstantEvalRunQuestion } from "./instant-eval-run-questions.rules.ts";
-import {
-  estimateInstantEvalRequestTokens,
-  instantEvalQuestionTokens,
-  instantEvalTextBudget,
-} from "./instant-eval-token-budget.rules.ts";
 import { instantEvalJudgedCellFor } from "./instant-eval-verdicts.rules.ts";
 
 /** One text of one row, and every question asked about that text. */

@@ -203,7 +203,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the stored evaluation is an error
       And its error text names the free budget exhausted code
 
-    @unit @unimplemented
+    @unit
     Scenario: Off LangWatch cloud a judge call is not configured
       Given an install that is not LangWatch cloud
       And a classifier key is set
@@ -251,7 +251,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
 
   Rule: One judge call is one spend row, once
 
-    @unit @unimplemented
+    @unit
     Scenario: A judge call records one spend row priced for the customer
       Given a judge call that classified five hundred input tokens
       When it finishes
@@ -264,13 +264,13 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When the result is mapped
       Then the result's cost is that price in USD
 
-    @unit @unimplemented
+    @unit
     Scenario: A judge call that used no tokens records nothing
       Given a judge call the classifier skipped
       When it finishes
       Then no spend row is recorded
 
-    @unit @unimplemented
+    @unit
     Scenario: The same retry key gives the same spend id
       Given two judge calls with the same retry key
       When each records its spend
@@ -283,7 +283,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When the command is delivered again
       Then the ledger holds one spend row for it
 
-    @unit @unimplemented
+    @unit
     Scenario: A judge call with no retry key gets a fresh spend id
       Given two judge calls with no retry key
       When each records its spend
@@ -295,7 +295,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When the gateway checks a request
       Then the judge call carries no retry key
 
-    @unit @unimplemented
+    @unit
     Scenario: A judge call cancelled after the classifier answered still records its spend
       Given a judge call whose caller cancels after the classifier answered
       When it finishes
@@ -307,7 +307,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When the gateway checks a request
       Then one guardrail cost row is written with the customer price
 
-    @unit @unimplemented
+    @unit
     Scenario: A too-large text retried smaller is billed for the attempt that answered
       Given a text the classifier refuses as too large once and answers when cut
       When it is classified
@@ -321,28 +321,28 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
 
   Rule: Only usage-billed organizations judge past one dollar
 
-    @unit @unimplemented
+    @unit
     Scenario: A free organization past one dollar is refused before classifying
       Given a free organization that has spent one dollar
       When a judge call arrives
       Then it is refused with the free budget exhausted error
       And the classifier is not called
 
-    @unit @unimplemented
+    @unit
     Scenario: A paid organization on tiered pricing is capped at one dollar
       Given a paid organization the meter does not bill
       And it has spent one dollar
       When a judge call arrives
       Then it is refused with the free budget exhausted error
 
-    @unit @unimplemented
+    @unit
     Scenario: A usage-billed organization is not capped
       Given an organization the meter bills
       And it has spent one dollar
       When a judge call arrives
       Then it is classified
 
-    @unit @unimplemented
+    @unit
     Scenario: A project the judge does not know yet is refused, never judged free
       Given a LangWatch cloud install
       And a project the Instant Evals judge has not learned
@@ -377,13 +377,13 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
         | run          |
         | judged query |
 
-    @unit @unimplemented
+    @unit
     Scenario: A judge call that crosses one dollar is recorded in full
       Given a free organization that has spent $0.99
       When a judge call priced $0.05 is classified
       Then one spend row of $0.05 is recorded
 
-    @unit @unimplemented
+    @unit
     Scenario: Two judge calls that arrive together just under one dollar are both answered
       Given a free organization one millionth of a dollar under one dollar
       When two judge calls, each priced more than one millionth of a dollar, arrive together

@@ -26,17 +26,16 @@ import {
   isInstantEvalBounded,
 } from "@langwatch/instant-eval-contract";
 import {
+  InstantEvalJudgeApi,
   type InstantEvalJudgement,
   type InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
-import { Secret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 
-import { HttpInstantEvalJudgeChannel } from "../channels/http/http.instant-eval-judge.channel.ts";
 import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judge.channel.ts";
 import {
   DeterministicInstantEvalJudgeChannel,
@@ -50,7 +49,10 @@ import {
 import { InstantEvalRunProjectionStore } from "../eventing/instant-eval-run.store.ts";
 import type { InstantEvalCancellationRepository } from "../repositories/instant-eval-cancellation.repository.ts";
 import type { InstantEvalRepositories } from "../repositories/instant-eval.repositories.ts";
-import { instantEvalJudgeKind } from "../rules/instant-eval-judge-choice.rules.ts";
+import {
+  instantEvalJudgeKind,
+  isInstantEvalJudgeChosenOnFirstCall,
+} from "../rules/instant-eval-judge-choice.rules.ts";
 import {
   toInstantEvalEstimateWire,
   toInstantEvalJudgmentWire,
@@ -59,6 +61,7 @@ import {
 import { InstantEvalAccessService } from "../services/instant-eval-access.service.ts";
 import { InstantEvalCancelService } from "../services/instant-eval-cancel.service.ts";
 import { InstantEvalClassifyService } from "../services/instant-eval-classify.service.ts";
+import { InstantEvalCloudJudgeService } from "../services/instant-eval-cloud-judge.service.ts";
 import { InstantEvalCommandDispatcherService } from "../services/instant-eval-command-dispatcher.service.ts";
 import { InstantEvalConnectJudgeService } from "../services/instant-eval-connect-judge.service.ts";
 import { InstantEvalCreateService } from "../services/instant-eval-create.service.ts";
@@ -68,12 +71,12 @@ import {
 } from "../services/instant-eval-estimate.service.ts";
 import { InstantEvalFinishService } from "../services/instant-eval-finish.service.ts";
 import { InstantEvalFreeBudgetService } from "../services/instant-eval-free-budget.service.ts";
+import { InstantEvalJudgeChoiceService } from "../services/instant-eval-judge-choice.service.ts";
 import { InstantEvalJudgePageService } from "../services/instant-eval-judge-page.service.ts";
 import { InstantEvalJudgeRowsService } from "../services/instant-eval-judge-rows.service.ts";
 import { InstantEvalOptInService } from "../services/instant-eval-opt-in.service.ts";
 import { InstantEvalPlanService } from "../services/instant-eval-plan.service.ts";
 import { InstantEvalQueryJudgingService } from "../services/instant-eval-query-judging.service.ts";
-import { InstantEvalRateLimiterService } from "../services/instant-eval-rate-limiter.service.ts";
 import { InstantEvalReadsService } from "../services/instant-eval-reads.service.ts";
 import { InstantEvalRowSourceService } from "../services/instant-eval-row-source.service.ts";
 import { InstantEvalRunContextService } from "../services/instant-eval-run-context.service.ts";
@@ -84,9 +87,6 @@ import {
   type InstantEvalSpendPeers,
 } from "../services/instant-eval-spend.service.ts";
 import { InstantEvalStatementService } from "../services/instant-eval-statement.service.ts";
-
-/** Seconds of refill a bucket holds as burst, at the sustained rate. */
-const BUCKET_BURST_SECONDS = 2;
 
 /** The project's organization and team, which every judgement's spend is billed against. */
 function spendAttributionOf(
@@ -118,6 +118,8 @@ type InstantEvalDependencies = Readonly<{
   organizations: typeof OrganizationApi;
   /** Asks whether a member may throw the organization's switch, as `enable` declares. */
   authz: typeof AuthzApi;
+  /** LangWatch's classifier client and its key, which the Instant Evals judge owns. */
+  judges: typeof InstantEvalJudgeApi;
 }>;
 
 type InstantEvalSetup = FeatureSetup<
@@ -139,12 +141,9 @@ export class InstantEvalModule implements InstantEvalApiContract {
     licensing: LicensingApi,
     organizations: OrganizationApi,
     authz: AuthzApi,
+    judges: InstantEvalJudgeApi,
   };
   static readonly config = instantEvalConfig;
-  /** LangWatch's own judge credential; a deployment without one judges nothing. */
-  static readonly secrets = {
-    classifierApiKey: Secret.load("JEV_API_KEY", { optional: true }),
-  } as const;
 
   private readonly access: InstantEvalAccessService;
   private readonly optIns: InstantEvalOptInService;
@@ -179,17 +178,8 @@ export class InstantEvalModule implements InstantEvalApiContract {
   }
 
   static async create(setup: InstantEvalSetup): Promise<InstantEvalModule> {
-    return setup.secrets.into(InstantEvalModule.secrets.classifierApiKey, (apiKey) =>
-      InstantEvalModule.withSecrets(setup, apiKey),
-    );
-  }
-
-  private static withSecrets(
-    setup: InstantEvalSetup,
-    apiKey: string | undefined,
-  ): InstantEvalModule {
     const repositories = setup.repositories;
-    const judge = InstantEvalModule.judgeOf(setup, apiKey);
+    const judge = InstantEvalModule.judgeOf(setup);
     setup.resources.own("Instant Evals judge", () => judge.close?.() ?? Promise.resolve());
 
     const { analytics, projects, plans, gateway, traces } = setup.dependencies;
@@ -200,7 +190,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
         isOptedIn: (organizationId) =>
           setup.dependencies.organizations.isInstantEvalsOptedIn({ organizationId }),
       },
-      isJudgeConfigured: () => !(judge instanceof MemoryInstantEvalJudgeChannel),
+      isJudgeConfigured: () => setup.config.classifier !== "null",
       judge,
     });
     const optIns = InstantEvalModule.optInsOf({ setup, access });
@@ -468,38 +458,32 @@ export class InstantEvalModule implements InstantEvalApiContract {
     this.dispatcher.connect(commands);
   }
 
-  /** The judge `instantEvalJudgeKind` names; `none` skips every question, refusing none. */
-  private static judgeOf(
-    setup: InstantEvalSetup,
-    apiKey: string | undefined,
-  ): InstantEvalJudgeChannel {
-    const kind = instantEvalJudgeKind({
-      classifier: setup.config.classifier,
-      hasOwnKey: Boolean(apiKey),
-      isProduction: setup.config.nodeEnvironment === "production",
-    });
-    if (kind === "none") return MemoryInstantEvalJudgeChannel.create();
-    if (kind === "memory") return DeterministicInstantEvalJudgeChannel.create();
-    if (kind === "connect" || !apiKey) {
-      return InstantEvalConnectJudgeService.create({
+  /**
+   * The judge `instantEvalJudgeKind` names; `none` skips every question, refusing none. Where the
+   * key decides, the choice waits for the first call: the key is the Instant Evals judge's.
+   */
+  private static judgeOf(setup: InstantEvalSetup): InstantEvalJudgeChannel {
+    const { classifier } = setup.config;
+    const isProduction = setup.config.nodeEnvironment === "production";
+    const connect = () =>
+      InstantEvalConnectJudgeService.create({
         licensing: setup.dependencies.licensing,
         projects: setup.dependencies.projects,
       });
+    if (isInstantEvalJudgeChosenOnFirstCall({ classifier })) {
+      const { judges } = setup.dependencies;
+      return InstantEvalJudgeChoiceService.create({
+        choose: async () => {
+          const hasOwnKey = await judges.isClassifierConfigured();
+          const kind = instantEvalJudgeKind({ classifier, hasOwnKey, isProduction });
+          return kind === "own_key" ? InstantEvalCloudJudgeService.create({ judges }) : connect();
+        },
+      });
     }
-    const tokensPerSecond = setup.config.globalTokensPerSecond;
-    const tenantTokensPerSecond = Math.min(tokensPerSecond, setup.config.tenantTokensPerSecond);
-    return HttpInstantEvalJudgeChannel.create({
-      apiKey,
-      ...(setup.config.classifierBaseUrl ? { baseUrl: setup.config.classifierBaseUrl } : {}),
-      ...(setup.config.classifierModel ? { model: setup.config.classifierModel } : {}),
-      limiter: InstantEvalRateLimiterService.create({
-        buckets: setup.repositories.rateLimits,
-        tokensPerSecond,
-        capacity: tokensPerSecond * BUCKET_BURST_SECONDS,
-        tenantTokensPerSecond,
-        tenantCapacity: tenantTokensPerSecond * BUCKET_BURST_SECONDS,
-      }),
-    });
+    const kind = instantEvalJudgeKind({ classifier, hasOwnKey: false, isProduction });
+    if (kind === "none") return MemoryInstantEvalJudgeChannel.create();
+    if (kind === "memory") return DeterministicInstantEvalJudgeChannel.create();
+    return connect();
   }
 
   async isEnabled(input: { projectId: string }): Promise<boolean> {

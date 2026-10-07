@@ -27,7 +27,6 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/instant-eval-judge-contract": "workspace:*",
     "@langwatch/module": "workspace:*",
-    "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },

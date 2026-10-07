@@ -7,7 +7,23 @@
 import { InstantEvalMemoryJudgeInProductionError } from "@langwatch/instant-eval-contract";
 import { describe, expect, it } from "vitest";
 
-import { instantEvalJudgeKind } from "../instant-eval-judge-choice.rules.ts";
+import {
+  instantEvalJudgeKind,
+  isInstantEvalJudgeChosenOnFirstCall,
+} from "../instant-eval-judge-choice.rules.ts";
+
+describe("isInstantEvalJudgeChosenOnFirstCall", () => {
+  it("waits for the first call where the key decides", () => {
+    expect(isInstantEvalJudgeChosenOnFirstCall({ classifier: undefined })).toBe(true);
+    expect(isInstantEvalJudgeChosenOnFirstCall({ classifier: "jev" })).toBe(true);
+  });
+
+  it("chooses at startup where the operator named the judge", () => {
+    for (const classifier of ["connect", "null", "memory"] as const) {
+      expect(isInstantEvalJudgeChosenOnFirstCall({ classifier })).toBe(false);
+    }
+  });
+});
 
 describe("instantEvalJudgeKind", () => {
   /** @scenario "An install with its own judge key keeps using it" */

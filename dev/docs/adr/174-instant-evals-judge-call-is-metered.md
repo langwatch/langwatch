@@ -90,6 +90,7 @@
     - A run records every attempt under one request id, `run:<runId>` (`instant-eval-spend-outcome.rules.ts`). A finish confirmed by an old pod and retried on a new one is one ledger row and one leaf row.
     - Nothing runs module tasks on deploy today (`dev/docs/plans/migrations-rethink-2026-10-06.md`, K4). The release runs the three jobs by hand right after the rollout, in this order: usage billing, spend, then projects. The flag is already on for organizations that use Instant Evals, so the picker shows at deploy. Until the project job finishes, the judge refuses calls for existing projects as unknown, so they are not judged against an empty total or an empty billing copy. A project created live during that window is learned at once and judges against what the leaf holds so far, which can give an organization that already spent its dollar up to one more dollar until the spend job has run. Every such call writes its spend row, and the overshoot stops at one dollar per organization. This is the accepted overshoot: recorded, never free. Runs and judged queries keep working through that window, since they pass their organization and keep main's free-plan rule.
     - A project whose created fact is lost is refused until someone re-runs the project job. The failure log names `backfill-project-created`, and the judge's unknown-project refusal logs the project, so the gap shows on its first refused call.
+    - Two billing changes send no usage-billing fact today: an operator setting the self-hosted flag, which lives in the organization module, and the tiered-to-usage pricing task, which moves only organizations with no subscription, so their answer stays "not billed". A re-run of the usage-billing catch-up corrects both.
 
 ## Constants
 
@@ -275,3 +276,4 @@ The score judge's settings gain an optional `min` and `max` in the langevals set
   - The newest billing fact wins, and a real fact wins a tie. Billing stamps a real fact after its write commits, and the catch-up covers every organization with a key per read, so a re-run fixes a change the leaf missed during a rollback. This replaces "a real fact always wins", which kept a stale fact forever (decision 17).
   - A project created live before the spend job runs can overshoot by up to one dollar, recorded (decision 17).
   - The cloud client's settings move to the leaf with it, and Instant Evals chooses cloud or Connect on the first call (decision 13).
+  - Two billing changes send no usage-billing fact, and the usage-billing catch-up re-run corrects them (decision 17).

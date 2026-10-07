@@ -5,32 +5,27 @@
  * @see modules/instant-eval/specs/classifier.feature
  */
 
-import { InstantEvalClassifierUnavailableError } from "@langwatch/instant-eval-contract";
 import {
+  estimateJudgedTextTokens,
+  estimateTokensFromBytes,
   INSTANT_EVAL_CLASSIFIER_LIMITS,
+  InstantEvalClassifierUnavailableError,
+  instantEvalQuestionTokens,
+  instantEvalTextBudget,
   type InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
 import { MockAgent } from "undici";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
-  estimateJudgedTextTokens,
-  estimateTokensFromBytes,
-  instantEvalQuestionTokens,
-  instantEvalTextBudget,
-} from "../../rules/instant-eval-token-budget.rules.ts";
-import {
-  HttpInstantEvalJudgeChannel,
+  HttpInstantEvalClassifierChannel,
   JEV_DEFAULT_BASE_URL,
-} from "../http/http.instant-eval-judge.channel.ts";
+} from "../http/http.instant-eval-classifier.channel.ts";
 import type {
   InstantEvalPermit,
   InstantEvalRateLimiterChannel,
-} from "../instant-eval-judge.channel.ts";
-import {
-  MemoryInstantEvalJudgeChannel,
-  MemoryInstantEvalRateLimiterChannel,
-} from "../memory/memory.instant-eval-judge.channel.ts";
+} from "../instant-eval-classifier.channel.ts";
+import { MemoryInstantEvalRateLimiterChannel } from "../memory/memory.instant-eval-rate-limiter.channel.ts";
 
 const QUESTION: InstantEvalQuestion = {
   id: "annoyed",
@@ -52,7 +47,7 @@ let waits: number[];
 function judge(
   limiter: InstantEvalRateLimiterChannel = MemoryInstantEvalRateLimiterChannel.create(),
 ) {
-  return HttpInstantEvalJudgeChannel.create({
+  return HttpInstantEvalClassifierChannel.create({
     apiKey: "test-key",
     limiter,
     dispatcher: agent,
@@ -245,6 +240,22 @@ describe("given a text the judge refuses as too large", () => {
       expect(judgement.verdicts).toHaveLength(1);
       expect(judgement.isTextTruncated).toBe(true);
     });
+
+    /** @scenario "A too-large text retried smaller is billed for the attempt that answered" */
+    it("carries the input tokens of the answered attempt alone", async () => {
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(400, { ...TOO_LARGE, usage: { input_tokens: 900, output_tokens: 0 } });
+      endpoint().intercept({ path: "/v1/systemone", method: "POST" }).reply(200, ANSWER);
+
+      const judgement = await judge().classify({
+        projectId: "project-1",
+        text: "x".repeat(400),
+        questions: [QUESTION],
+      });
+
+      expect(judgement.inputTokens).toBe(ANSWER.usage.input_tokens);
+    });
   });
 
   describe("when it is refused twice", () => {
@@ -374,22 +385,6 @@ describe("given a judge that refuses the credential", () => {
         judge().classify({ projectId: "project-1", text: "text", questions: [QUESTION] }),
       ).rejects.toBeInstanceOf(InstantEvalClassifierUnavailableError);
       expect(attempts).toBe(1);
-    });
-  });
-});
-
-describe("given a deployment with no judge", () => {
-  describe("when a question is asked", () => {
-    /** @scenario "The null classifier answers every question as skipped" */
-    it("skips it without sending anything", async () => {
-      const judgement = await MemoryInstantEvalJudgeChannel.create().classify();
-
-      expect(judgement).toEqual({
-        verdicts: [],
-        skippedReason: "classifier_not_configured",
-        inputTokens: 0,
-        isTextTruncated: false,
-      });
     });
   });
 });

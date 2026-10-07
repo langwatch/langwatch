@@ -10,7 +10,7 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import type {
   InstantEvalPermit,
   InstantEvalRateLimiterChannel,
-} from "../channels/instant-eval-judge.channel.ts";
+} from "../channels/instant-eval-classifier.channel.ts";
 import type {
   InstantEvalRateLimitBuckets,
   InstantEvalRateLimitRepository,

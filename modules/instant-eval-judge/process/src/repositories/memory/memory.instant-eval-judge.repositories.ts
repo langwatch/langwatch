@@ -16,6 +16,7 @@ import {
   InstantEvalJudgeUsageBillingRepository,
 } from "../instant-eval-judge-usage-billing.repository.ts";
 import type { InstantEvalJudgeRepositories } from "../instant-eval-judge.repositories.ts";
+import { MemoryInstantEvalRateLimitRepository } from "./memory.instant-eval-rate-limit.repository.ts";
 
 type MemoryInstantEvalJudgeProjectRow = { organizationId: string; createdAtMs: number };
 
@@ -118,6 +119,7 @@ export class MemoryInstantEvalJudgeRepositories {
       projects: MemoryInstantEvalJudgeProjectRepository.create(),
       usageBilling: MemoryInstantEvalJudgeUsageBillingRepository.create(),
       spend: MemoryInstantEvalJudgeSpendRepository.create(),
+      rateLimits: MemoryInstantEvalRateLimitRepository.create(),
     };
   }
 }

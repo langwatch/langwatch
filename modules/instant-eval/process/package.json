@@ -43,12 +43,10 @@
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
-    "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "hono": "catalog:",
     "hono-openapi": "catalog:",
-    "undici": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

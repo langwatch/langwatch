@@ -20,6 +20,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/config": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",
     "zod": "catalog:"
   },

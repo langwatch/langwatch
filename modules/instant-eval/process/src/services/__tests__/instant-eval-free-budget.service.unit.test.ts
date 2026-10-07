@@ -5,11 +5,11 @@
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
+import { INSTANT_EVAL_FREE_BUDGET_USD } from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryInstantEvalBudgetReservationsRepository } from "../../repositories/memory/memory.instant-eval-budget-reservations.repository.ts";
-import { INSTANT_EVAL_FREE_BUDGET_USD } from "../../rules/instant-eval-budget.rules.ts";
 import { InstantEvalFreeBudgetService } from "../instant-eval-free-budget.service.ts";
 
 const NANO = 1_000_000_000;

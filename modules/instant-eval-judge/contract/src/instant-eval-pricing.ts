@@ -11,6 +11,18 @@ export const INSTANT_EVAL_PRICING: InstantEvalPricing = {
   markup: 1.3,
 };
 
+/** The model the ledger names for a judgement: the shipped classifier. */
+export const INSTANT_EVAL_SPEND_MODEL = "jev";
+
+/**
+ * The rate identity stamped on an outcome. A judgement has no model registry,
+ * so it stamps the two published numbers it was priced with: a price change
+ * changes the stamp, which tells a replay from a re-rating.
+ */
+export function instantEvalRateVersion(pricing: InstantEvalPricing = INSTANT_EVAL_PRICING): string {
+  return `instant_eval@${pricing.usdPerMillionInputTokens}x${pricing.markup}`;
+}
+
 const TOKENS_PER_MILLION = 1_000_000;
 
 /** The ledger keeps integer nano-USD, so amounts round to nine decimals. */
@@ -42,3 +54,9 @@ export function instantEvalPriceUsd({
 }): number {
   return toNanoUsdPrecision(costUsd * pricing.markup);
 }
+
+/**
+ * The one dollar an organization the meter does not bill may spend on Instant Evals. The judge
+ * owns the check (ADR-174 decisions 12, 13); runs and judged queries read the same figure.
+ */
+export const INSTANT_EVAL_FREE_BUDGET_USD = 1;

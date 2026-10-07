@@ -1,37 +1,34 @@
 /**
- * The shipped judge: one POST per text, with LangWatch's own key — a customer
- * key is never sent here. @see modules/instant-eval/specs/classifier.feature
+ * The cloud classifier: one POST per text, with LangWatch's own key. A customer key is never sent
+ * here; the judge owns it (ADR-174 decision 13). @see modules/instant-eval/specs/classifier.feature
  */
 
-import { InstantEvalClassifierUnavailableError } from "@langwatch/instant-eval-contract";
 import {
+  classifierResponseSchema,
+  estimateJudgedTextTokens,
   INSTANT_EVAL_CLASSIFIER_LIMITS,
+  InstantEvalClassifierUnavailableError,
+  instantEvalQuestionTokens,
+  instantEvalSkipped,
+  instantEvalTextBudget,
+  readClassifierVerdicts,
+  toClassifierQuestions,
   type InstantEvalClassifierLimits,
   type InstantEvalJudgement,
-  instantEvalSkipped,
 } from "@langwatch/instant-eval-judge-contract";
-import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { type Dispatcher, Pool, fetch as undiciFetch } from "undici";
 
 import {
-  classifierResponseSchema,
-  readClassifierVerdicts,
-  toClassifierQuestions,
-} from "../../rules/instant-eval-judge-wire.rules.ts";
-import {
   cutInstantEvalTextForRetry,
-  estimateJudgedTextTokens,
-  instantEvalQuestionTokens,
-  instantEvalTextBudget,
   prepareInstantEvalText,
-} from "../../rules/instant-eval-token-budget.rules.ts";
+} from "../../rules/instant-eval-classifier-text.rules.ts";
 import type {
+  InstantEvalClassifierChannel,
   InstantEvalClassifyRequest,
-  InstantEvalJudgeChannel,
   InstantEvalRateLimiterChannel,
-} from "../instant-eval-judge.channel.ts";
+} from "../instant-eval-classifier.channel.ts";
 
 const logger = createLogger("langwatch:instant-evals:jev");
 
@@ -55,7 +52,7 @@ const REQUEST_TIMEOUT_MS = 120_000;
 /** At least the classifications one page keeps in flight. */
 const POOL_CONNECTIONS = 128;
 
-interface HttpInstantEvalJudgeOptions {
+interface HttpInstantEvalClassifierOptions {
   readonly apiKey: string;
   /** Origin only; the path is this channel's own. */
   readonly baseUrl?: string;
@@ -73,9 +70,8 @@ type Attempt =
   | { readonly kind: "too_large" }
   | { readonly kind: "permanent"; readonly error: Error };
 
-export class HttpInstantEvalJudgeChannel implements InstantEvalJudgeChannel {
-  readonly limits = INSTANT_EVAL_CLASSIFIER_LIMITS;
-  readonly pricing = INSTANT_EVAL_PRICING;
+export class HttpInstantEvalClassifierChannel implements InstantEvalClassifierChannel {
+  private readonly limits = INSTANT_EVAL_CLASSIFIER_LIMITS;
 
   private readonly endpoint: string;
   private readonly model: string;
@@ -83,7 +79,7 @@ export class HttpInstantEvalJudgeChannel implements InstantEvalJudgeChannel {
   private readonly ownsDispatcher: boolean;
   private readonly sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
 
-  private constructor(private readonly options: HttpInstantEvalJudgeOptions) {
+  private constructor(private readonly options: HttpInstantEvalClassifierOptions) {
     const baseUrl = options.baseUrl?.trim() ?? JEV_DEFAULT_BASE_URL;
     this.endpoint = new URL(JEV_PATH, baseUrl).toString();
     this.model = options.model?.trim() ?? JEV_DEFAULT_MODEL;
@@ -101,8 +97,8 @@ export class HttpInstantEvalJudgeChannel implements InstantEvalJudgeChannel {
     this.sleep = options.sleep ?? abortableSleep;
   }
 
-  static create(options: HttpInstantEvalJudgeOptions): HttpInstantEvalJudgeChannel {
-    return new HttpInstantEvalJudgeChannel(options);
+  static create(options: HttpInstantEvalClassifierOptions): HttpInstantEvalClassifierChannel {
+    return new HttpInstantEvalClassifierChannel(options);
   }
 
   async close(): Promise<void> {

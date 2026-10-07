@@ -5,8 +5,8 @@
  * @see specs/lwql/eval-functions.feature
  */
 
-import { InstantEvalClassifierUnavailableError } from "@langwatch/instant-eval-contract";
 import {
+  InstantEvalClassifierUnavailableError,
   type InstantEvalJudgement,
   type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";

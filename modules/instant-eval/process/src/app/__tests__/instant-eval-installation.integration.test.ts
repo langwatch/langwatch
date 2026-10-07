@@ -24,16 +24,18 @@ import {
   InstantEvalMemoryJudgeInProductionError,
   type InstantEvalRunInput,
 } from "@langwatch/instant-eval-contract";
-import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
+import {
+  INSTANT_EVAL_PRICING,
+  type InstantEvalJudgeApi,
+} from "@langwatch/instant-eval-judge-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApp, type ModuleSecretsScope } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import {
   type ProjectApi,
   type ProjectWithTeam,
   projectWithTeamSchema,
 } from "@langwatch/project-contract";
-import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -80,14 +82,6 @@ function planFor({ free }: { free: boolean }): Plan {
     canPublish: !free,
     prices: { USD: free ? 0 : 199, EUR: free ? 0 : 199 },
   };
-}
-
-/** The judge credential, from a chain over a fake environment, scoped as boot scopes it. */
-function judgeSecrets(judgeKey: string | undefined): ModuleSecretsScope {
-  const resolver = SecretsResolver.over(
-    SecretsChain.start({ environment: { JEV_API_KEY: judgeKey } }).withEnv(),
-  );
-  return (owner, declared) => resolver.scopeTo(owner, declared);
 }
 
 const CREATED = new Date("2026-01-01T00:00:00.000Z");
@@ -160,7 +154,7 @@ function installation({
   isOptedIn?: boolean;
   isFreePlan?: boolean;
   classifier?: "jev" | "null" | "memory" | undefined;
-  /** `null` is an install that configured no key of its own. */
+  /** `null` is an install whose Instant Evals judge holds no classifier key. */
   judgeKey?: string | null;
   /** `"unset"` is a deployment that never set `INSTANT_EVAL_BOUNDED`. */
   isBounded?: boolean | "unset";
@@ -179,15 +173,11 @@ function installation({
   recordOptIn?: OrganizationApi["recordInstantEvalsOptIn"];
 } = {}) {
   return (
-    createApp({ role: "api", secrets: judgeSecrets(judgeKey ?? undefined) })
+    createApp({ role: "api" })
       .withModules([instantEvalProcessModule])
       .withConfig({
         "instant-eval": {
           classifier,
-          classifierBaseUrl: undefined,
-          classifierModel: undefined,
-          globalTokensPerSecond: 300_000,
-          tenantTokensPerSecond: 150_000,
           isBounded: isBounded === "unset" ? undefined : isBounded,
           queryTokenBudget: 4_000_000,
           isSaas,
@@ -242,6 +232,10 @@ function installation({
         authz: createApiFixture<AuthzApi>({ can: async () => mayManageOrganization }),
         "feature-flag": createApiFixture<FeatureFlagApi>({
           isEnabled: async () => isReleased,
+        }),
+        // The key is the judge's: Instant Evals asks for it on its first call (ADR-174 d. 13).
+        "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>({
+          isClassifierConfigured: async () => judgeKey !== null,
         }),
       })
   );

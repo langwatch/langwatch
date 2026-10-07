@@ -6,18 +6,23 @@ import type {
 import type { InstantEvalJudgeUsageBilling } from "../repositories/instant-eval-judge-usage-billing.repository.ts";
 import type { InstantEvalJudgeRepositories } from "../repositories/instant-eval-judge.repositories.ts";
 
+type InstantEvalJudgeFactRepositories = Pick<
+  InstantEvalJudgeRepositories,
+  "projects" | "usageBilling" | "spend"
+>;
+
 /**
  * Folds the facts the judge checks before each call into its own tables, and reads them back
  * (ADR-174 decisions 13, 17). Every fold is safe to repeat: a peer event is delivered at least
  * once and never deduplicated for a subscriber.
  */
 export class InstantEvalJudgeFactsService {
-  private constructor(private readonly repositories: InstantEvalJudgeRepositories) {}
+  private constructor(private readonly repositories: InstantEvalJudgeFactRepositories) {}
 
   static create({
     repositories,
   }: {
-    repositories: InstantEvalJudgeRepositories;
+    repositories: InstantEvalJudgeFactRepositories;
   }): InstantEvalJudgeFactsService {
     return new InstantEvalJudgeFactsService(repositories);
   }

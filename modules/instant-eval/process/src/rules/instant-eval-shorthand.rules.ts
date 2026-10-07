@@ -18,6 +18,8 @@ import {
 import {
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   type InstantEvalQuestion,
+  instantEvalTextBudget,
+  instantEvalTranscriptRenderTokens,
 } from "@langwatch/instant-eval-judge-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 
@@ -28,10 +30,6 @@ import {
   sqlString,
   sqlStringArray,
 } from "./instant-eval-sql.rules.ts";
-import {
-  instantEvalTextBudget,
-  instantEvalTranscriptRenderTokens,
-} from "./instant-eval-token-budget.rules.ts";
 
 /** A column name: a letter or underscore, then letters, digits or underscores. */
 const QUESTION_ID_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;

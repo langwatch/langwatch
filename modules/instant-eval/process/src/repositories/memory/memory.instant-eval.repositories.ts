@@ -2,7 +2,6 @@ import type { InstantEvalCancellationRepository } from "../instant-eval-cancella
 import type { InstantEvalRepositories } from "../instant-eval.repositories.ts";
 import { MemoryInstantEvalBudgetReservationsRepository } from "./memory.instant-eval-budget-reservations.repository.ts";
 import { MemoryInstantEvalJudgmentsRepository } from "./memory.instant-eval-judgments.repository.ts";
-import { MemoryInstantEvalRateLimitRepository } from "./memory.instant-eval-rate-limit.repository.ts";
 /**
  * The cancellation hint held in this process alone: what a deployment with no
  * Redis gets, where a run stops one page later off its recorded cancellation,
@@ -38,7 +37,6 @@ export class MemoryInstantEvalRepositories {
       judgments: MemoryInstantEvalJudgmentsRepository.create(),
       cancellations: MemoryInstantEvalCancellationRepository.create(),
       budgetReservations: MemoryInstantEvalBudgetReservationsRepository.create(),
-      rateLimits: MemoryInstantEvalRateLimitRepository.create(),
     };
   }
 }

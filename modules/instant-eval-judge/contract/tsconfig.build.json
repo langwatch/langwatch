@@ -21,6 +21,12 @@
   ],
   "references": [
     {
+      "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/module/tsconfig.build.json"
     }
   ]

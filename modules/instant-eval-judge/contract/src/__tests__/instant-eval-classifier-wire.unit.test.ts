@@ -4,14 +4,14 @@
  * @see modules/instant-eval/specs/classifier.feature
  */
 
-import type { InstantEvalQuestion } from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   classifierResponseSchema,
   readClassifierVerdicts,
   toClassifierQuestions,
-} from "../instant-eval-judge-wire.rules.ts";
+} from "../instant-eval-classifier-wire.ts";
+import type { InstantEvalQuestion } from "../instant-eval-judge.api.ts";
 
 const BOOLEAN: InstantEvalQuestion = {
   id: "annoyed",

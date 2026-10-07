@@ -8,10 +8,64 @@
 import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
-/** No ops yet: the judge call arrives with the module's process half (ADR-174 decision 10). */
-export interface InstantEvalJudgeApi {}
+/**
+ * The judge call and the cloud classifier behind it (ADR-174 decisions 10, 13). It calls no
+ * peer: what it checks before each call comes from its own copies of its peers' facts.
+ */
+export interface InstantEvalJudgeApi {
+  /**
+   * Whether this deployment holds LangWatch's classifier key. A peer Api cannot be called at
+   * startup, so Instant Evals asks this on its first call to choose the key or Connect.
+   */
+  isClassifierConfigured(): Promise<boolean>;
+  /**
+   * One classification with LangWatch's key, priced by nobody: runs, judged queries and the search
+   * bar record their own spend. Skips as `classifier_not_configured` where there is no key.
+   */
+  classify(input: InstantEvalClassification): Promise<InstantEvalJudgement>;
+  /**
+   * One metered judge call: unknown project, cloud only, budget, classify, price, priced event.
+   * A refusal is returned, never thrown, and calls no classifier.
+   */
+  judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer>;
+}
 
 export const InstantEvalJudgeApi = moduleApi<InstantEvalJudgeApi>()("instant-eval-judge");
+
+/** One text and every question about it, judged for a project. */
+export interface InstantEvalClassification {
+  /** Names the share of the rate the request draws on; the classifier never sees it. */
+  readonly projectId: string;
+  /** As long as the caller has it: the classifier cuts it to its own budget. */
+  readonly text: string;
+  readonly questions: readonly InstantEvalQuestion[];
+  readonly signal?: AbortSignal;
+}
+
+/** One judge call. A signal stops the classifier, never the record of what it was paid. */
+export interface InstantEvalJudgeCall extends InstantEvalClassification {
+  /** The evaluation's retry key: the same key gives the same spend id (ADR-174 decision 9). */
+  readonly requestKey?: string;
+}
+
+/** Why a judge call was refused before the classifier was called (ADR-174 decision 7). */
+export const INSTANT_EVAL_JUDGE_REFUSAL_CODES = [
+  "instant_eval_project_unknown",
+  "classifier_not_configured",
+  "instant_eval_free_budget_exhausted",
+] as const;
+
+export type InstantEvalJudgeRefusalCode = (typeof INSTANT_EVAL_JUDGE_REFUSAL_CODES)[number];
+
+/** A judgement and what it was priced at, or a refusal naming its code. */
+export type InstantEvalJudgeAnswer =
+  | Readonly<{
+      outcome: "judged";
+      judgement: InstantEvalJudgement;
+      /** The customer price in USD, which the evaluation's cost carries. Zero for no tokens. */
+      priceUsd: number;
+    }>
+  | Readonly<{ outcome: "refused"; code: InstantEvalJudgeRefusalCode; message: string }>;
 
 /** What a question asks for, which decides how its answer is read. */
 export const INSTANT_EVAL_QUESTION_KINDS = ["boolean", "score", "category"] as const;

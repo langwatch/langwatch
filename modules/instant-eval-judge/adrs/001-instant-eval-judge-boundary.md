@@ -17,21 +17,35 @@ gateway and trace. Evaluation depending on Instant Evals would close a peer cycl
 
 `instant-eval-judge` owns what a judge is asked and answers (questions, verdicts, skip reasons,
 the classifier's limits) and the pricing rule, moved from Instant Evals unchanged. Instant Evals and
-evaluation import them from this module's contract. Later steps of ADR-174 add the cloud classifier
-client, the module's own tables, the $1 check and the judge method.
+evaluation import them from this module's contract. It also owns LangWatch's cloud classifier client,
+its key, rate limits and settings, its own tables, the $1 check and the metered judge method
+(ADR-174 decisions 10, 13 and 14).
 
 ## Public surfaces and transports
 
 `@langwatch/instant-eval-judge-contract` exports the question, verdict and judgement types, the skip
-reasons, the classifier limits, `INSTANT_EVAL_PRICING`, `instantEvalCostUsd` and
-`instantEvalPriceUsd`. `InstantEvalJudgeApi` is declared with no methods yet. The judge method lands
-on it later (ADR-174 decision 10). There is no transport.
+reasons, the classifier limits and wire format, the token estimates, the pricing rule, the $1 free
+budget, the two judge errors, the config slice and the priced event's schema. There is no transport.
+
+`InstantEvalJudgeApi` has three methods:
+
+- `judge` is the metered call. In order, it refuses a project it has not learned
+  (`instant_eval_project_unknown`), refuses off LangWatch cloud (`classifier_not_configured`),
+  refuses an organization that is not usage-billed once its spend rows reach $1
+  (`instant_eval_free_budget_exhausted`), classifies, prices, and appends the priced fact. A refusal
+  is returned, never thrown, and calls no classifier. The spend id comes from the caller's retry key.
+- `classify` is the unmetered call Instant Evals uses for its own runs and queries, which keep their
+  own spend rule in wave 1.
+- `isClassifierConfigured` tells Instant Evals whether LangWatch's key is set, so it can choose this
+  classifier or Connect on its first call.
 
 `@langwatch/instant-eval-judge-process` exports the process module only.
 
 ## Dependencies
 
-No peer `*Api`. The contract depends on `zod` only. The process half reads two peers' event
+No peer `*Api`. The contract depends on `zod`, `@langwatch/config` and `@langwatch/handled-error`.
+It cannot import the trace contract, which depends on it through Instant Evals' contract, so the
+text cuts that need trace's helper live in the process half. The process half reads two peers' event
 contracts, never their Apis: project's `lw.project.created` and billing's
 `lw.billing.usage_billing_changed`. A peer subscriber is not a dependency edge.
 
@@ -58,24 +72,40 @@ the organization. Each write is safe to repeat, since a peer event is delivered 
 ## Runtime and registration
 
 `defineProcessModule("instant-eval-judge")` with its repositories, `InstantEvalJudgeModule` as its
-Api and one eventing module. Installed by api, worker and tasks from each app's generated list.
+Api and two eventing modules. Installed by api, worker and tasks from each app's generated list.
 
 The pipeline `instant_eval_judge_facts` (aggregate `global`) appends no events. Its two peer
-subscribers fold project's created fact and billing's usage-billing fact into the tables above. The
-spend rows have no event source yet. The judge's priced event lands with the judge method.
+subscribers fold project's created fact and billing's usage-billing fact into the tables above.
+
+The pipeline `instant_eval_judge_spend` (aggregate per organization) has one command,
+`recordSpendPriced`, which appends `lw.instant_eval_judge.spend_priced` keyed by organization and
+request id. Its own subscriber writes the spend row from it. Gateway's ledger row will follow from
+the same fact (ADR-174 decision 13), so the two never disagree on a price.
+
+The cloud classifier is an HTTP channel built only when the key is set, wrapped in a Redis token
+bucket per project and one for the deployment. The module owns and closes it.
 
 ## Environment and configuration
 
-None yet.
+Moved from Instant Evals with the client, under the same names:
+
+- `JEV_API_KEY` (secret, optional): LangWatch's classifier key. Unset, the judge answers
+  `classifier_not_configured`.
+- `JEV_BASE_URL` (https only) and `JEV_MODEL`.
+- `INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND` and `INSTANT_EVAL_TENANT_TOKENS_PER_SECOND`.
+- Whether the install is LangWatch cloud, from the shared config.
 
 ## Errors
 
-None yet. The judge's refusal codes are listed in ADR-174 decision 7.
+`InstantEvalClassifierUnavailableError` and `InstantEvalFreeBudgetExhaustedError`, moved from
+Instant Evals with their codes. The judge returns its three refusal codes as answers, never throws
+them (ADR-174 decision 7).
 
 ## Contracts and validation
 
 The question schemas are Zod. The scenarios under `specs/` are bound by the contract's unit tests.
-The process half binds the fold scenarios of Instant Evals' judge model spec. Its repository
+The process half binds the fold, judge call and spend scenarios of Instant Evals' judge model
+spec, and the classifier scenarios moved with the client. Its repository
 contract test runs every case against memory and Postgres.
 
 ## Consequences

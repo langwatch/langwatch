@@ -5,11 +5,9 @@
  */
 
 import {
+  INSTANT_EVAL_CLASSIFIER_LIMITS,
   InstantEvalClassifierUnavailableError,
   InstantEvalFreeBudgetExhaustedError,
-} from "@langwatch/instant-eval-contract";
-import {
-  INSTANT_EVAL_CLASSIFIER_LIMITS,
   type InstantEvalJudgement,
 } from "@langwatch/instant-eval-judge-contract";
 import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";

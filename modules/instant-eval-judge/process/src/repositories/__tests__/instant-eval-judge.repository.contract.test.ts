@@ -22,8 +22,11 @@ import type { InstantEvalJudgeRepositories } from "../instant-eval-judge.reposit
 import { MemoryInstantEvalJudgeRepositories } from "../memory/memory.instant-eval-judge.repositories.ts";
 import { PostgresInstantEvalJudgeRepositories } from "../prisma/prisma.instant-eval-judge.repositories.ts";
 
+/** The three tables; the classifier's buckets have their own suite. */
+type FactRepositories = Pick<InstantEvalJudgeRepositories, "projects" | "usageBilling" | "spend">;
+
 type Backend = Readonly<{
-  repositories: () => InstantEvalJudgeRepositories;
+  repositories: () => FactRepositories;
   namespace: () => string;
 }>;
 
@@ -169,7 +172,7 @@ function contractCases(backend: Backend): void {
 }
 
 describe("given the judge's memory repositories", () => {
-  let repositories: InstantEvalJudgeRepositories;
+  let repositories: FactRepositories;
   beforeEach(() => {
     repositories = MemoryInstantEvalJudgeRepositories.create();
   });

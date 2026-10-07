@@ -5,15 +5,15 @@
  */
 
 import {
+  estimateInstantEvalRequestTokens,
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   type InstantEvalJudgement,
   type InstantEvalQuestion,
-  type InstantEvalVerdict,
   instantEvalSkipped,
+  type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
 import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
 
-import { estimateInstantEvalRequestTokens } from "../../rules/instant-eval-token-budget.rules.ts";
 import type {
   InstantEvalClassifyRequest,
   InstantEvalJudgeChannel,
@@ -89,17 +89,4 @@ function verdictOf({
       question.options.map(({ name }) => [name, name === chosen ? 1 : 0]),
     ),
   };
-}
-
-/** A limiter that never waits, for the memory judge and for suites. */
-export class MemoryInstantEvalRateLimiterChannel {
-  private constructor() {}
-
-  static create(): MemoryInstantEvalRateLimiterChannel {
-    return new MemoryInstantEvalRateLimiterChannel();
-  }
-
-  async acquire(): Promise<void> {
-    // Nothing is sent, so nothing has to be paced.
-  }
 }

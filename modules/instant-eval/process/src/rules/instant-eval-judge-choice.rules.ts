@@ -12,6 +12,18 @@ import {
 
 type InstantEvalJudgeKind = "none" | "own_key" | "connect" | "memory";
 
+/**
+ * Whether the choice waits for the first call: only a setting that lets the key decide does, since
+ * the key is the Instant Evals judge's and a peer Api cannot be asked at startup (ADR-174 d. 13).
+ */
+export function isInstantEvalJudgeChosenOnFirstCall({
+  classifier,
+}: {
+  classifier: InstantEvalServerConfig["classifier"];
+}): boolean {
+  return classifier === undefined || classifier === "jev";
+}
+
 export function instantEvalJudgeKind({
   classifier,
   hasOwnKey,
