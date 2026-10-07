@@ -30,11 +30,13 @@ import {
   useFieldArray,
   useFormContext,
   type UseFormRegister,
+  useWatch,
 } from "react-hook-form";
 import { type ZodType, z } from "zod";
 
 import { ModelSelector } from "../../../behavior/lent-model-provider.tsx";
 import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
+import { isSettingShownForModel } from "../../../model/instant-eval-only-settings.ts";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 import { EvaluatorLLMConfigField } from "./evaluator-llm-config-field.tsx";
 
@@ -334,6 +336,7 @@ const DynamicZodForm = ({
 }) => {
   const { control, register } = useFormContext();
   const { project } = useOrganizationTeamProject();
+  const chosenModel: unknown = useWatch({ control, name: `${prefix}.model` });
 
   // Cascade-resolved defaults for evaluator model + embeddings fields.
   const { resolvedDefaultModel, resolvedDefaultEmbeddings } = useEvaluatorDefaultModels({
@@ -381,6 +384,9 @@ const DynamicZodForm = ({
       const renderedFields = fieldsToRender
         .filter((key) => !skipFields?.includes(key))
         .filter((key) => (onlyFields ? onlyFields.includes(key) : true))
+        .filter((key) =>
+          isSettingShownForModel({ evaluatorType, settingKey: key, model: chosenModel }),
+        )
         .map((key) => (
           <SettingsFieldRow
             key={key}

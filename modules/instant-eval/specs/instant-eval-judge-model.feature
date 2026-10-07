@@ -528,27 +528,33 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When the finish is retried, under another finish reason or on another pod
       Then the spend it records again carries the same request id as the first attempt
 
-  Rule: The picker offers Instant Evals behind the release flag
+  Rule: The picker offers Instant Evals behind the release flag or the organization's opt-in
 
-    @integration @unimplemented
+    @integration
     Scenario: The judge model picker shows Instant Evals when released
       Given a project with release_instant_evals on
       When a member opens the model picker on an LLM judge
       Then Instant Evals is one of the options
 
-    @integration @unimplemented
+    @integration
+    Scenario: The judge model picker shows Instant Evals to an organization that opted in
+      Given a project with release_instant_evals off, in an organization that opted in to Instant Evals
+      When a member opens the model picker on an LLM judge
+      Then Instant Evals is one of the options
+
+    @integration
     Scenario: The judge model picker hides Instant Evals when not released
-      Given a project with release_instant_evals off
+      Given a project with release_instant_evals off, in an organization that has not opted in
       When a member opens the model picker on an LLM judge
       Then Instant Evals is not an option
 
-    @integration @unimplemented
+    @integration
     Scenario: A project with no model provider can still pick Instant Evals
       Given a project with release_instant_evals on and no model provider configured
       When a member opens the model picker on an LLM judge
       Then Instant Evals is one of the options
 
-    @integration @unimplemented
+    @integration
     Scenario: The score range shows only for Instant Evals
       Given a score judge
       When a member picks Instant Evals as its model

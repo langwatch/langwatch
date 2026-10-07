@@ -7,8 +7,16 @@ import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "./mod
 
 export type ModelOptionGroup = {
   provider: string;
+  /** The group's heading when it is not the provider's own name. */
+  label?: string;
   models: ModelOption[];
 };
+
+/** A model LangWatch serves itself, so a project needs no provider of its own to pick it. */
+export type BuiltInModel = { value: string; label: string };
+
+/** The heading built-in models are listed under. */
+export const BUILT_IN_MODELS_GROUP_LABEL = "LangWatch";
 
 export type GroupedModelOptions = ModelOptionGroup[];
 
@@ -186,17 +194,22 @@ export const getCustomModels = (
   return [...customModelIds, ...registryModelIds];
 };
 
-/** The picker's options for `mode`, flat and grouped by provider, custom models first. */
+/**
+ * The picker's options for `mode`, flat and grouped by provider, custom models first.
+ * Built-in models come before every provider's, under their own heading.
+ */
 export function modelSelectionFrom({
   providers,
   options,
   mode,
   featureKey,
+  builtInModels = [],
 }: {
   providers: readonly MaybeStoredModelProvider[];
   options: string[];
   mode: "chat" | "embedding";
   featureKey: string | undefined;
+  builtInModels?: readonly BuiltInModel[];
 }): { selectOptions: ModelOption[]; groupedByProvider: GroupedModelOptions } {
   const providersByKey = mergeProviderRowsByKey(providers);
   const customModelIdSet = allCustomModelIds(providersByKey, mode);
@@ -217,5 +230,30 @@ export function modelSelectionFrom({
     mode,
     isCustom: customModelIdSet.has(modelValue),
   }));
-  return { selectOptions, groupedByProvider: groupOptionsByProvider(selectOptions) };
+  const builtInOptions: ModelOption[] = builtInModels.map(({ value, label }) => ({
+    label,
+    value,
+    isDisabled: false,
+    mode,
+  }));
+  const builtInGroups: GroupedModelOptions = builtInOptions.map((option) => ({
+    provider: option.value.split("/")[0]!,
+    label: BUILT_IN_MODELS_GROUP_LABEL,
+    models: [option],
+  }));
+  return {
+    selectOptions: [...builtInOptions, ...selectOptions],
+    groupedByProvider: [...mergeGroups(builtInGroups), ...groupOptionsByProvider(selectOptions)],
+  };
+}
+
+/** Built-in models sharing a provider prefix read as one group. */
+function mergeGroups(groups: GroupedModelOptions): GroupedModelOptions {
+  const byProvider = new Map<string, ModelOptionGroup>();
+  for (const group of groups) {
+    const existing = byProvider.get(group.provider);
+    if (existing) existing.models.push(...group.models);
+    else byProvider.set(group.provider, { ...group, models: [...group.models] });
+  }
+  return [...byProvider.values()];
 }

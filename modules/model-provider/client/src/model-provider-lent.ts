@@ -17,10 +17,15 @@ export type EditModelProviderFormProps = {
   onFailed?: (failure: { provider: string; code: string }) => void;
 };
 
+/** A model LangWatch serves itself, offered without a provider of the project's own. */
+export type LentBuiltInModel = { value: string; label: string };
+
 /** What a screen hands model-provider's display of one chosen model. */
 export type ModelDisplayProps = {
   model: string;
   fontSize?: string;
+  /** Built-in models the chosen one may be, so it reads by its label. */
+  builtInModels?: readonly LentBuiltInModel[];
 };
 
 /** What a screen hands model-provider's model picker. */
@@ -34,6 +39,8 @@ export type ModelSelectorProps = {
   showConfigureAction?: boolean;
   /** Names the feature in the callout shown when no model is available. */
   forFeatureLabel?: string;
+  /** Models listed first, even for a project with no provider configured. */
+  builtInModels?: readonly LentBuiltInModel[];
 };
 
 export const EditModelProviderFormToken =

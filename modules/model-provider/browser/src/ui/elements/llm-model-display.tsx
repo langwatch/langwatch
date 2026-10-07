@@ -2,7 +2,7 @@ import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-tex
 import { Box, HStack, type StackProps, Text, VStack } from "@langwatch/design-system/primitives";
 import { inferProvider, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { allModelOptions } from "@langwatch/model-provider-contract";
+import { allModelOptions, type BuiltInModel } from "@langwatch/model-provider-contract";
 import { MODEL_ICON_SIZE } from "@langwatch/prompt-contract/llm-config-constants";
 import { AlertTriangle } from "lucide-react";
 import type { ReactNode } from "react";
@@ -14,6 +14,8 @@ export interface LLMModelDisplayProps extends StackProps {
   fontSize?: string;
   /** Optional subtitle to display below the model name (e.g., "Temp 0.7") */
   subtitle?: string;
+  /** Built-in models the chosen one may be, so it reads by its label. */
+  builtInModels?: readonly BuiltInModel[];
 }
 
 function getModelDisplayState({
@@ -53,12 +55,14 @@ export function LLMModelDisplay({
   model,
   fontSize = "14px",
   subtitle,
+  builtInModels,
   ...props
 }: LLMModelDisplayProps) {
   const { modelOption, groupedByProvider, isLoading } = useModelSelectionOptions({
     options: allModelOptions,
     model,
     mode: "chat",
+    builtInModels,
   });
 
   // Model is disabled if explicitly marked or if provider is disabled

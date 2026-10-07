@@ -101,7 +101,7 @@
 | Judge model id              | `langwatch/instant-evals`              | What the picker stores as the judge's model                |
 | Boolean threshold           | 0.5 (`INSTANT_EVAL_DEFAULT_THRESHOLD`) | `passed` on `llm_boolean`                                  |
 | Free budget                 | $1 (`INSTANT_EVAL_FREE_BUDGET_USD`)    | Unchanged, per free organization                           |
-| Flag                        | `release_instant_evals`                | Shows the picker entry                                     |
+| Flag                        | `release_instant_evals`                | Shows the picker entry, as does the organization's opt-in  |
 | Unknown project code        | `instant_eval_project_unknown`         | Refusal before the leaf knows a project (decision 15)      |
 | Skipped guardrail direction | `stream_chunk`                         | The guardrail check never judges it (decision 16)          |
 
@@ -280,3 +280,6 @@ The score judge's settings gain an optional `min` and `max` in the langevals set
 - v14, 2026-10-07, after the runs and judged queries were moved onto the leaf. Captain: Sergio Esteban.
   - A run's request id is `instanteval_<runId>`, the id main already writes, not `run:<runId>`. Keeping main's id is what makes a finish confirmed by an old pod and retried on a new one one ledger row (decision 17, Invariants).
   - A hosted Connect call keeps writing the gateway ledger itself, since its row names the calling key. The leaf's total does not count it until the spend catch-up copies it (decision 13).
+- v15, 2026-10-07, after the picker entry was built. Captain: Sergio Esteban.
+  - The picker shows Instant Evals when the flag is on or the organization opted in, the same answer the access check gives. The flag alone hid it from organizations that opted in (decisions 11 and 13).
+  - The score range fields show only while Instant Evals is the judge's model, since no other model reads them (decision 4).

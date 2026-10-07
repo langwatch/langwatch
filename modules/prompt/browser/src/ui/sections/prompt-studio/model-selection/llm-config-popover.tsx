@@ -31,6 +31,8 @@ type LLMConfigPopoverProps = {
   onOutputsChange?: (outputs: Output[]) => void;
   /** Whether to show the structured outputs section */
   showStructuredOutputs?: boolean;
+  /** Models LangWatch serves itself, offered first even with no provider configured. */
+  builtInModels?: readonly { value: string; label: string }[];
 };
 
 // ============================================================================
@@ -49,6 +51,7 @@ export function LLMConfigPopover({
   outputs,
   onOutputsChange,
   showStructuredOutputs = false,
+  builtInModels,
 }: LLMConfigPopoverProps) {
   const { project } = usePromptProject();
   const {
@@ -92,6 +95,7 @@ export function LLMConfigPopover({
             mode="chat"
             size="full"
             showConfigureAction={true}
+            {...(builtInModels ? { builtInModels } : {})}
           />
         </Box>
 

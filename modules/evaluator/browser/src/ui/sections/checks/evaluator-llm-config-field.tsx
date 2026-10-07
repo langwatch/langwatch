@@ -1,4 +1,3 @@
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { NoModelsConfiguredCallout } from "@langwatch/design-system/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
@@ -11,6 +10,7 @@ import { useFormContext, useWatch } from "react-hook-form";
 
 import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
 import { LLMConfigPopover } from "../../../behavior/lent-peers.tsx";
+import { useInstantEvalJudgeModels } from "../../../behavior/use-instant-eval-judge-models.ts";
 import { useModelSelection } from "../../../behavior/use-model-selection.ts";
 import { toInternalKey } from "../prompt/llm-parameters/parameter-config.ts";
 
@@ -82,22 +82,23 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
   // playground and workflow LLM-node pickers. While the providers
   // query is in flight, render a skeleton so the empty state doesn't
   // flash before the data resolves.
+  // Instant Evals needs no provider, so a released project keeps the picker.
+  const { project, organization } = useOrganizationTeamProject();
+  const instantEvals = useInstantEvalJudgeModels({
+    projectId: project?.id,
+    organizationId: organization?.id,
+  });
+  const { builtInModels } = instantEvals;
   const { isEmpty, isLoading } = useModelSelection({
     options: allModelOptions,
     model: llmConfig.model,
     mode: "chat",
-  });
-  // Instant Evals needs no provider, so a released project keeps the picker.
-  const { project, organization } = useOrganizationTeamProject();
-  const instantEvals = useFeatureFlag("release_instant_evals", {
-    projectId: project?.id,
-    organizationId: organization?.id,
-    enabled: !!project?.id && !!organization?.id,
+    builtInModels,
   });
   if (isLoading || (isEmpty && instantEvals.isLoading)) {
     return <Skeleton width="full" height="40px" borderRadius="md" />;
   }
-  if (isEmpty && !instantEvals.enabled) {
+  if (isEmpty) {
     return <NoModelsConfiguredCallout size="sm" />;
   }
 
@@ -116,13 +117,13 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
           transition="background 0.15s"
           justify="space-between"
         >
-          <LLMModelDisplay model={llmConfig.model} />
+          <LLMModelDisplay model={llmConfig.model} builtInModels={builtInModels} />
           <Box color="fg.muted">
             <ChevronDown size={16} />
           </Box>
         </HStack>
       </Popover.Trigger>
-      <LLMConfigPopover values={llmConfig} onChange={handleChange} />
+      <LLMConfigPopover values={llmConfig} onChange={handleChange} builtInModels={builtInModels} />
     </Popover.Root>
   );
 };
