@@ -21,7 +21,7 @@
  * and the rest wait in memory, holding nothing.
  */
 import type { PrismaClient } from "~/generated/prisma/client";
-import { createSemaphore } from "~/server/experiments-v3/execution/semaphore";
+import { createSemaphore } from "~/server/utils/semaphore";
 import type { AggregateReconcileLock } from "./aggregate-rule.repository";
 
 /**
