@@ -13,6 +13,7 @@ import {
   DataPrivacyPolicyRepository,
   type DataPrivacyScope,
 } from "./dataPrivacyPolicy.repository";
+import { strictestDataPrivacy } from "./strictestDataPrivacy";
 
 export class ScopeTargetNotFoundError extends Error {
   name = "ScopeTargetNotFoundError" as const;
@@ -162,6 +163,30 @@ export class DataPrivacyPolicyService {
   }): Promise<ResolvedDataPrivacy> {
     const resolved = await this.cache.resolve(projectId);
     return resolved ?? PLATFORM_DEFAULT_DATA_PRIVACY;
+  }
+
+  /**
+   * The strictest policy across several projects (ADR-144 decision 9): what
+   * one read spanning an aggregate's members applies. Each project resolves
+   * through its own cached entry and the fold runs per call, so no entry is
+   * keyed on the set and a member's rule change reaches the next read. One
+   * project is that project's policy, read exactly as `getResolvedForProject`.
+   */
+  async getResolvedForProjects({
+    projectIds,
+  }: {
+    projectIds: readonly string[];
+  }): Promise<ResolvedDataPrivacy> {
+    const distinct = [...new Set(projectIds)];
+    const [only] = distinct;
+    if (distinct.length === 1 && only !== undefined) {
+      return this.getResolvedForProject({ projectId: only });
+    }
+    return strictestDataPrivacy(
+      await Promise.all(
+        distinct.map((projectId) => this.getResolvedForProject({ projectId })),
+      ),
+    );
   }
 
   /** Every privacy rule row in the organization (unfiltered). */

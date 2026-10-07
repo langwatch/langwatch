@@ -307,8 +307,7 @@ Feature: An aggregate project reads its member projects
 
   # ── G. Privacy and audit ─────────────────────────────────────────────────
 
-  # Unimplemented: block G.
-  @integration @unimplemented
+  @integration
   Scenario: The strictest member privacy policy applies
     Given an aggregate project with one member on a loose privacy policy
     And another member on a strict privacy policy
