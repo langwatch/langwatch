@@ -4,7 +4,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
   I want to pick Instant Evals as the judge's model
   So that the judge runs without my own provider key and is billed per trace judged
 
-  Issue: tasks#915, wave 1. ADR-173.
+  Issue: tasks#915, wave 1. ADR-174.
 
   The shape:
   - The evaluation module turns the judge's settings into one classifier question, and maps

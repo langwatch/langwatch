@@ -15,7 +15,7 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
     metadata beside it, so the margin is recoverable without recomputing a rate that will change.
   - A Stripe meter, `langwatch_instant_eval_usd`, receives the month's price per organization.
   - An organization the meter does not bill may spend one dollar on Instant Evals in total: a free
-    plan, or a paid plan on tiered pricing (ADR-173 decision 12).
+    plan, or a paid plan on tiered pricing (ADR-174 decision 12).
 
   Rule: A judged query or run is one spend record
 
