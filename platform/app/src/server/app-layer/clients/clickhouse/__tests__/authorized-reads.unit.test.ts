@@ -19,8 +19,8 @@ import {
   fenceExpression,
   fenceFor,
   ownProjectIdOf,
-  singleTenantOf,
   StatementScopeError,
+  singleTenantOf,
   tenantScope,
   tenantScopeKey,
   tenantSet,
@@ -419,9 +419,9 @@ describe("AuthorizedClickHouse", () => {
     describe("when the reader resolves its client", () => {
       it("still sends the read through the own project's client", async () => {
         const { clickhouse, resolveClient, query } = clientWith();
-        await clickhouse
-          .as(narrowedTo(A), { reads: "traces" })
-          .query({ query: `SELECT 1 FROM t WHERE ${tenantScope("OccurredAt")}` });
+        await clickhouse.as(narrowedTo(A), { reads: "traces" }).query({
+          query: `SELECT 1 FROM t WHERE ${tenantScope("OccurredAt")}`,
+        });
 
         expect(resolveClient).toHaveBeenCalledWith(AGG);
         expect(query.mock.calls[0]?.[0].query_params).toEqual({
@@ -433,8 +433,12 @@ describe("AuthorizedClickHouse", () => {
 
     describe("when the one project it reads is asked for", () => {
       it("names the member it was narrowed to, and the own project stays put", () => {
-        expect(singleTenantOf({ authorization: narrowedTo(B), reads: "traces" })).toBe(B);
-        expect(ownProjectIdOf({ authorization: narrowedTo(B), reads: "traces" })).toBe(AGG);
+        expect(
+          singleTenantOf({ authorization: narrowedTo(B), reads: "traces" }),
+        ).toBe(B);
+        expect(
+          ownProjectIdOf({ authorization: narrowedTo(B), reads: "traces" }),
+        ).toBe(AGG);
       });
 
       it("names none while the proof still spans its members", () => {

@@ -624,9 +624,9 @@ describe("SessionGroupsClickHouseRepository", () => {
           },
         }),
       );
-      expect(
-        [firstRow.tenantId, second.rows[0]?.tenantId].sort(),
-      ).toEqual([memberX, memberY].sort());
+      expect([firstRow.tenantId, second.rows[0]?.tenantId].sort()).toEqual(
+        [memberX, memberY].sort(),
+      );
     });
   });
 

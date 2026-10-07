@@ -8,7 +8,6 @@
  * costing whole seconds per lookup for evaluations scheduled minutes earlier.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   type ResolvedRetention,

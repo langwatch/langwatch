@@ -12,10 +12,10 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { narrowAuthorization } from "@langwatch/actor";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
-import { narrowAuthorization } from "@langwatch/actor";
 import { aggregateProof, ownProof } from "~/test-utils/authorizationProofs";
 import { evaluationRunRepositoryFor } from "~/test-utils/evaluationRunRepository";
 import { getTestClickHouseClient } from "../../../../event-sourcing/__tests__/integration/testContainers";
@@ -276,15 +276,24 @@ describe("EvaluationRunClickHouseRepository.findByTraceId under an aggregate's p
 
   beforeAll(async () => {
     await repo.upsert(
-      makeEval(`eval-a-${nanoid()}`, { traceId: sharedTraceId, evaluatorId: "monitor-a" }),
+      makeEval(`eval-a-${nanoid()}`, {
+        traceId: sharedTraceId,
+        evaluatorId: "monitor-a",
+      }),
       memberA,
     );
     await repo.upsert(
-      makeEval(`eval-b-${nanoid()}`, { traceId: sharedTraceId, evaluatorId: "monitor-b" }),
+      makeEval(`eval-b-${nanoid()}`, {
+        traceId: sharedTraceId,
+        evaluatorId: "monitor-b",
+      }),
       memberB,
     );
     await repo.upsert(
-      makeEval(`eval-out-${nanoid()}`, { traceId: sharedTraceId, evaluatorId: "monitor-out" }),
+      makeEval(`eval-out-${nanoid()}`, {
+        traceId: sharedTraceId,
+        evaluatorId: "monitor-out",
+      }),
       outsider,
     );
   }, 60_000);

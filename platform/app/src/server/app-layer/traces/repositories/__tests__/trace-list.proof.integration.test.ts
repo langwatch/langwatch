@@ -347,7 +347,11 @@ describe("TraceListClickHouseRepository through the proof", () => {
       it("names each trace by its tenant, once, even when two versions tie", async () => {
         const tieA = `proof-tie-a-${nanoid()}`;
         const tieB = `proof-tie-b-${nanoid()}`;
-        const tied = summaryRow({ tenantId: tieA, traceId: "tie", occurredAt: TODAY });
+        const tied = summaryRow({
+          tenantId: tieA,
+          traceId: "tie",
+          occurredAt: TODAY,
+        });
         // Two inserts, so the tied versions land in two parts no merge has
         // folded yet.
         await insert([

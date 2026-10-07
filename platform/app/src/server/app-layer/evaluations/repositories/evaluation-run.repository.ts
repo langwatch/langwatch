@@ -87,7 +87,9 @@ export class NullEvaluationRunRepository implements EvaluationRunRepository {
     return null;
   }
 
-  async findByTraceId(_params: FindByTraceIdParams): Promise<EvaluationRunData[]> {
+  async findByTraceId(
+    _params: FindByTraceIdParams,
+  ): Promise<EvaluationRunData[]> {
     return [];
   }
 

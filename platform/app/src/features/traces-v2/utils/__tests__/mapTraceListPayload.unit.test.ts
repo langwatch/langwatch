@@ -43,7 +43,10 @@ describe("mapTraceListPayload", () => {
       expect(rows[0]?.evaluations).toEqual([toxicity]);
       // The second row has none of its own, so it gets an empty list.
       expect(rows[1]?.evaluations).toEqual([]);
-      expect(rows.map((row) => row.projectId)).toEqual(["member-a", "member-b"]);
+      expect(rows.map((row) => row.projectId)).toEqual([
+        "member-a",
+        "member-b",
+      ]);
     });
   });
 

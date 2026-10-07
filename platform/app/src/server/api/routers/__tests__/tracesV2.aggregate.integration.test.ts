@@ -233,7 +233,9 @@ beforeAll(async () => {
     _eventSourcing: createAuthzTestEventSourcing(prisma),
     traces: {
       ...defaults.traces,
-      summary: new TraceSummaryService(traceSummaryRepositoryFor(resolveClient)),
+      summary: new TraceSummaryService(
+        traceSummaryRepositoryFor(resolveClient),
+      ),
       list: new TraceListService(
         new TraceListClickHouseRepository(clickhouse),
         evaluationRuns,

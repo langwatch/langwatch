@@ -321,9 +321,9 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         const spanRead = vi.mocked(spanRepo.getNormalizedSpansByTraceId).mock
           .calls[0]?.[0];
         expect(spanRead?.authorization.narrowedTo).toBe("member-1");
-        expect(vi.mocked(blobStore.getFromEventLog).mock.calls[0]?.[0]).toMatchObject(
-          { tenantId: "member-1" },
-        );
+        expect(
+          vi.mocked(blobStore.getFromEventLog).mock.calls[0]?.[0],
+        ).toMatchObject({ tenantId: "member-1" });
       });
     });
   });
