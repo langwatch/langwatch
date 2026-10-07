@@ -39,9 +39,10 @@ vi.mock("../../../behavior/use-guided-onboarding.ts", () => ({
   useGuidedOnboarding: () => ({ state: guided.state }),
 }));
 
+let ambientProject: { id: string; name: string; slug: string } | undefined;
 vi.mock("../../../../../model/onboarding-host.ts", () => ({
   useOnboardingHost: () => ({
-    scope: () => ({ organization: { id: "org_1", name: "Acme" } }),
+    scope: () => ({ organization: { id: "org_1", name: "Acme" }, project: ambientProject }),
     currentUser: () => ({ id: "u1", name: "Ada Lovelace" }),
     failed,
     langy: () => ({
@@ -175,6 +176,26 @@ describe("GuidedOnboardingOffer", () => {
     /** @scenario a personal home with a personal key or usage is not offered the guided onboarding */
     it("stays hidden on a personal home that is in use", () => {
       renderOffer({ space: "me", spaceInUse: true });
+      expect(pill()).toBeNull();
+    });
+  });
+
+  describe("given the governance home renders with some project ambient", () => {
+    beforeEach(() => {
+      ambientProject = { id: "proj_1", name: "Checkout bot", slug: "checkout-bot" };
+    });
+    afterEach(() => {
+      ambientProject = undefined;
+    });
+
+    /** @scenario the gateway, governance and personal homes read the organization's guided state */
+    it("follows the organization's guided state and the space's own use, never the project's", () => {
+      const { unmount } = renderOffer({ space: "governance", spaceInUse: false });
+      expect(pill()).toHaveTextContent("Start guided onboarding");
+      unmount();
+
+      guided.state = guidedState({ donePaths: ["governance"] });
+      renderOffer({ space: "governance", spaceInUse: false });
       expect(pill()).toBeNull();
     });
   });
