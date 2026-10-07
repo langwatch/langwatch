@@ -325,9 +325,7 @@ export class ModelProviderRepository {
         customEmbeddingsModels: data.customEmbeddingsModels as
           | Prisma.InputJsonValue
           | undefined,
-        ...(data.lastListedModelIds !== undefined && {
-          lastListedModelIds: data.lastListedModelIds,
-        }),
+        lastListedModelIds: data.lastListedModelIds,
         extraHeaders: data.extraHeaders ?? [],
         ...routingHandleWrite({ routingHandle: data.routingHandle }),
         ...(data.rateLimitRpm !== undefined && {
