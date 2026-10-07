@@ -2280,6 +2280,7 @@ export function initializeDefaultApp(options?: {
     aggregateReadAudit: workspaceViewAggregateReadAudit({
       prisma,
       ocsfRepository: governanceOcsfEventsRepository,
+      kinds: projectKindReaderFor(prisma),
     }),
     projectKinds: projectKindReaderFor(prisma),
     tokenizer,

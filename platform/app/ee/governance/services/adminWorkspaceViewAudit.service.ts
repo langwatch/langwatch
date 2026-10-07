@@ -29,6 +29,10 @@ import { createLogger } from "@langwatch/observability";
  *       specs/governance/aggregate-project.feature, section G
  */
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+import {
+  type ProjectKindReader,
+  projectKindReaderFor,
+} from "~/server/app-layer/permissions/aggregate-admin-gate";
 import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import {
   type GovernanceOcsfEventsClickHouseRepository,
@@ -90,6 +94,11 @@ export interface AdminWorkspaceViewAuditDeps {
   prisma: PrismaClient;
   ocsfRepository?: GovernanceOcsfEventsClickHouseRepository;
   /**
+   * How an aggregate target's kind is read: the cached reader the aggregate
+   * admin gate uses, the Prisma handle's own by default.
+   */
+  kinds?: ProjectKindReader;
+  /**
    * The clock the dedup window and the row's time are read from. Injectable
    * so a test crosses the window without waiting; the real clock otherwise.
    */
@@ -101,9 +110,11 @@ type ResolvedTarget = { targetId: string; name: string };
 
 export class AdminWorkspaceViewAuditService {
   private readonly now: () => Date;
+  private readonly kinds: ProjectKindReader;
 
   constructor(private readonly deps: AdminWorkspaceViewAuditDeps) {
     this.now = deps.now ?? (() => new Date());
+    this.kinds = deps.kinds ?? projectKindReaderFor(deps.prisma);
   }
 
   static create(
@@ -305,20 +316,17 @@ export class AdminWorkspaceViewAuditService {
     organizationId: string;
     targetProjectId: string;
   }): Promise<ResolvedTarget | null> {
+    const kind = await this.kinds.kindOf(targetProjectId);
+    if (kind === null || !isAggregateProjectKind(kind)) return null;
     const project = await this.deps.prisma.project.findUnique({
       where: { id: targetProjectId },
       select: {
         id: true,
         name: true,
-        kind: true,
         team: { select: { organizationId: true } },
       },
     });
-    if (
-      !project ||
-      !isAggregateProjectKind(project.kind) ||
-      project.team.organizationId !== organizationId
-    ) {
+    if (!project || project.team.organizationId !== organizationId) {
       return null;
     }
     return { targetId: project.id, name: project.name };

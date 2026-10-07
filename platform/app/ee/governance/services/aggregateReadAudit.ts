@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PrismaClient } from "~/generated/prisma/client";
+import type { ProjectKindReader } from "~/server/app-layer/permissions/aggregate-admin-gate";
 import {
   type AggregateReadAudit,
   DedupedAggregateReadAudit,
@@ -20,15 +21,18 @@ import type { GovernanceOcsfEventsClickHouseRepository } from "./governanceOcsfE
 export function workspaceViewAggregateReadAudit({
   prisma,
   ocsfRepository,
+  kinds,
   now = () => new Date(),
 }: {
   prisma: PrismaClient;
   ocsfRepository?: GovernanceOcsfEventsClickHouseRepository;
+  kinds?: ProjectKindReader;
   now?: () => Date;
 }): AggregateReadAudit {
   const service = AdminWorkspaceViewAuditService.create({
     prisma,
     ocsfRepository,
+    kinds,
     now,
   });
   return new DedupedAggregateReadAudit({

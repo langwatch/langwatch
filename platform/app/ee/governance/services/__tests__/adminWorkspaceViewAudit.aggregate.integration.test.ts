@@ -154,6 +154,31 @@ describe("AdminWorkspaceViewAuditService, aggregate kind", () => {
     });
   });
 
+  describe("when the project kind reader does not know the project as an aggregate", () => {
+    it("writes nothing, so the kind comes from the reader and not a raw read", async () => {
+      const kinds = {
+        kindOf: vi.fn(async () => "standard"),
+        kindsOf: vi.fn(async () => new Map<string, string>()),
+      };
+      const readingKinds = AdminWorkspaceViewAuditService.create({
+        prisma,
+        ocsfRepository: ocsf,
+        kinds,
+        now: () => new Date(nowMs),
+      });
+
+      const result = await readingKinds.recordView({
+        actorUserId: fixture.member.id,
+        organizationId: fixture.organizationId,
+        kind: "aggregate",
+        targetProjectId: aggregate.id,
+      });
+
+      expect(kinds.kindOf).toHaveBeenCalledWith(aggregate.id);
+      expect(result).toEqual({ recorded: false, auditLogId: null });
+    });
+  });
+
   describe("when an admin opens another user's personal workspace", () => {
     /** @scenario "Audit rows for personal and team workspace views are unchanged" */
     it("writes a row of kind personal and none of kind aggregate", async () => {
