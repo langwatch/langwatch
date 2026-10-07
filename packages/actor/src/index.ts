@@ -115,6 +115,7 @@ export {
   authorizationSchema,
   ForgedAuthorizationError,
   isSealedAuthorization,
+  narrowAuthorization,
   sealAuthorization,
   TenantMismatchError,
 } from "./authorization";

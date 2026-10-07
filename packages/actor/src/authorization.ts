@@ -119,8 +119,26 @@ export const authorizationSchema = z
      *  by the minter's own ceiling. */
     expiresAt: z.number().int(),
     purpose: authorizationPurposeSchema,
+    /**
+     * The one project of the grants this proof reads, when it has been
+     * narrowed to it (ADR-144 block F). A detail page opened from an
+     * aggregate's list reads one member's trace, and two members may hold
+     * the same trace id, so every read behind that page is narrowed to the
+     * member the trace was found in. Absent: the proof reads every project
+     * its grants name. Set only by {@link narrowAuthorization}.
+     */
+    narrowedTo: z.string().min(1).optional(),
   })
   .strict()
+  .refine(
+    (proof) =>
+      proof.narrowedTo === undefined ||
+      proof.grants.some((grant) => grant.projectId === proof.narrowedTo),
+    {
+      message: "a narrowed proof names a project one of its grants reads",
+      path: ["narrowedTo"],
+    },
+  )
   .readonly();
 export type AuthorizationInput = z.input<typeof authorizationSchema>;
 
@@ -142,6 +160,34 @@ export function sealAuthorization(input: AuthorizationInput): Authorization {
 
 export function isSealedAuthorization(value: unknown): value is Authorization {
   return typeof value === "object" && value !== null && sealed.has(value);
+}
+
+/**
+ * The same proof, narrowed to one of the projects its grants name. A proof
+ * can be narrowed and never widened: the grants, the expiry and the purpose
+ * are copied unchanged, and the result reads a subset of what the original
+ * did. A project the proof does not name returns `null`, so the caller says
+ * what that means at its own door (a detail route answers not found).
+ *
+ * Only a sealed proof is narrowed; a forged one is refused here as it would
+ * be by the store client.
+ */
+export function narrowAuthorization({
+  authorization,
+  projectId,
+}: {
+  authorization: Authorization;
+  projectId: string;
+}): Authorization | null {
+  if (!isSealedAuthorization(authorization)) {
+    throw new ForgedAuthorizationError();
+  }
+  if (!authorization.grants.some((grant) => grant.projectId === projectId)) {
+    return null;
+  }
+  if (authorization.narrowedTo === projectId) return authorization;
+  if (authorization.narrowedTo !== undefined) return null;
+  return sealAuthorization({ ...authorization, narrowedTo: projectId });
 }
 
 export class ForgedAuthorizationError extends Error {

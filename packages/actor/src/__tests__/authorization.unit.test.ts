@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  type Authorization,
   AuthorizationExpiredError,
   type AuthorizationInput,
   usableAuthorization,
   ForgedAuthorizationError,
   isSealedAuthorization,
+  narrowAuthorization,
   sealAuthorization,
 } from "../index";
 
@@ -144,6 +146,61 @@ describe("the authorization proof", () => {
             purpose: { kind: "batch", route: "x" } as unknown as AuthorizationInput["purpose"],
           }),
         ),
+      ).toThrow();
+    });
+  });
+
+  describe("when a proof is narrowed to one of its projects", () => {
+    it("reads that project alone and keeps the grants, expiry and purpose", () => {
+      const authorization = sealAuthorization(proof());
+      const narrowed = narrowAuthorization({
+        authorization,
+        projectId: "proj_member",
+      });
+
+      expect(narrowed).not.toBeNull();
+      expect(isSealedAuthorization(narrowed)).toBe(true);
+      expect(narrowed?.narrowedTo).toBe("proj_member");
+      expect(narrowed?.grants).toEqual(authorization.grants);
+      expect(narrowed?.expiresAt).toBe(authorization.expiresAt);
+      expect(narrowed?.purpose).toEqual(authorization.purpose);
+      expect(authorization.narrowedTo).toBeUndefined();
+    });
+
+    it("returns null for a project the proof does not name", () => {
+      const authorization = sealAuthorization(proof());
+
+      expect(
+        narrowAuthorization({ authorization, projectId: "proj_outsider" }),
+      ).toBeNull();
+    });
+
+    it("never moves a narrowed proof onto another project", () => {
+      const narrowed = narrowAuthorization({
+        authorization: sealAuthorization(proof()),
+        projectId: "proj_member",
+      });
+      if (!narrowed) throw new Error("expected a narrowed proof");
+
+      expect(
+        narrowAuthorization({ authorization: narrowed, projectId: "proj_aggregate" }),
+      ).toBeNull();
+      expect(
+        narrowAuthorization({ authorization: narrowed, projectId: "proj_member" }),
+      ).toBe(narrowed);
+    });
+
+    it("refuses to narrow a proof assembled by hand", () => {
+      const byHand = { ...sealAuthorization(proof()) } as Authorization;
+
+      expect(() =>
+        narrowAuthorization({ authorization: byHand, projectId: "proj_member" }),
+      ).toThrow(ForgedAuthorizationError);
+    });
+
+    it("refuses a seal that names a project outside its grants", () => {
+      expect(() =>
+        sealAuthorization({ ...proof(), narrowedTo: "proj_outsider" }),
       ).toThrow();
     });
   });

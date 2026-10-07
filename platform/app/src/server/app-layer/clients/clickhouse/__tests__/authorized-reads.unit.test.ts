@@ -8,6 +8,7 @@ import {
   type Authorization,
   AuthorizationExpiredError,
   ForgedAuthorizationError,
+  narrowAuthorization,
   sealAuthorization,
 } from "@langwatch/actor";
 import { describe, expect, it, vi } from "vitest";
@@ -17,6 +18,8 @@ import {
   expandStatement,
   fenceExpression,
   fenceFor,
+  ownProjectIdOf,
+  singleTenantOf,
   StatementScopeError,
   tenantScope,
   tenantScopeKey,
@@ -371,6 +374,73 @@ describe("AuthorizedClickHouse", () => {
         });
         expect(sql).toBe("(TenantId IN ({tenantScope_own:Array(String)}))");
         expect(params).toEqual({ tenantScope_own: [AGG] });
+      });
+    });
+  });
+
+  describe("given an aggregate's proof narrowed to one member", () => {
+    const narrowedTo = (projectId: string): Authorization => {
+      const narrowed = narrowAuthorization({
+        authorization: proof(),
+        projectId,
+      });
+      if (!narrowed) throw new Error(`expected ${projectId} in the proof`);
+      return narrowed;
+    };
+
+    describe("when the fence is built", () => {
+      it("fences that member alone, inside its grant's window", () => {
+        const { sql, params } = fenceExpression({
+          fence: fenceFor({ authorization: narrowedTo(A), reads: "traces" }),
+          column: "OccurredAt",
+        });
+        expect(sql).toBe(
+          "((TenantId = {tenantScope_s0:String} AND OccurredAt >= fromUnixTimestamp64Milli({tenantScope_s0_from:Int64})))",
+        );
+        expect(params).toEqual({
+          tenantScope_s0: A,
+          tenantScope_s0_from: NOW - 1000,
+        });
+      });
+
+      it("fences the own project alone when narrowed to it", () => {
+        expect(
+          fenceFor({ authorization: narrowedTo(AGG), reads: "traces" }),
+        ).toEqual({ own: [AGG], shared: [] });
+      });
+
+      it("refuses a resource the member's grant does not carry", () => {
+        expect(() =>
+          fenceFor({ authorization: narrowedTo(A), reads: "analytics" }),
+        ).toThrow(AccessNotGrantedError);
+      });
+    });
+
+    describe("when the reader resolves its client", () => {
+      it("still sends the read through the own project's client", async () => {
+        const { clickhouse, resolveClient, query } = clientWith();
+        await clickhouse
+          .as(narrowedTo(A), { reads: "traces" })
+          .query({ query: `SELECT 1 FROM t WHERE ${tenantScope("OccurredAt")}` });
+
+        expect(resolveClient).toHaveBeenCalledWith(AGG);
+        expect(query.mock.calls[0]?.[0].query_params).toEqual({
+          tenantScope_s0: A,
+          tenantScope_s0_from: NOW - 1000,
+        });
+      });
+    });
+
+    describe("when the one project it reads is asked for", () => {
+      it("names the member it was narrowed to, and the own project stays put", () => {
+        expect(singleTenantOf({ authorization: narrowedTo(B), reads: "traces" })).toBe(B);
+        expect(ownProjectIdOf({ authorization: narrowedTo(B), reads: "traces" })).toBe(AGG);
+      });
+
+      it("names none while the proof still spans its members", () => {
+        expect(
+          singleTenantOf({ authorization: proof(), reads: "traces" }),
+        ).toBeUndefined();
       });
     });
   });

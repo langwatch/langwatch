@@ -150,7 +150,10 @@ function describe(violation: StatementScopeViolation): string {
 type SharedWindow = { projectId: string; from: number; until: number | null };
 
 export type TenantFence = {
-  /** The own projects, read outright. Never empty. */
+  /**
+   * The own projects, read outright. Empty only on a proof narrowed to one
+   * of its shared projects, where the fence is that project's window alone.
+   */
   own: readonly string[];
   shared: readonly SharedWindow[];
 };
@@ -167,12 +170,14 @@ export function fenceExpression({
   fence: TenantFence;
   column: TenantScopeTimeColumn;
 }): { sql: string; params: Record<string, unknown> } {
-  const params: Record<string, unknown> = {
-    [`${TENANT_SCOPE_PARAM_PREFIX}_own`]: [...fence.own],
-  };
-  const parts = [
-    `TenantId IN ({${TENANT_SCOPE_PARAM_PREFIX}_own:Array(String)})`,
-  ];
+  const params: Record<string, unknown> = {};
+  const parts: string[] = [];
+  if (fence.own.length > 0) {
+    params[`${TENANT_SCOPE_PARAM_PREFIX}_own`] = [...fence.own];
+    parts.push(
+      `TenantId IN ({${TENANT_SCOPE_PARAM_PREFIX}_own:Array(String)})`,
+    );
+  }
   fence.shared.forEach((window, index) => {
     const id = `${TENANT_SCOPE_PARAM_PREFIX}_s${index}`;
     params[id] = window.projectId;
@@ -211,6 +216,11 @@ export function setExpression(fence: TenantFence): {
  * The fence a proof allows for one resource. The own grant must carry the
  * resource's permission or the read is not granted at all; a shared grant
  * without it was minted for something else and contributes nothing.
+ *
+ * A proof narrowed to one of its projects (ADR-144 block F) fences that
+ * project alone: the own project outright, or a shared one inside its
+ * grant's window. Narrowed to a shared grant that does not carry the
+ * resource, it reads nothing and is refused as not granted.
  */
 export function fenceFor({
   authorization,
@@ -235,13 +245,24 @@ export function fenceFor({
       from: grant.condition?.from ?? 0,
       until: grant.condition?.until ?? null,
     }));
-  return { own, shared };
+  const narrowedTo = authorization.narrowedTo;
+  if (narrowedTo === undefined) return { own, shared };
+  const narrowed = {
+    own: own.filter((projectId) => projectId === narrowedTo),
+    shared: shared.filter((window) => window.projectId === narrowedTo),
+  };
+  if (narrowed.own.length === 0 && narrowed.shared.length === 0) {
+    throw new AccessNotGrantedError(permission);
+  }
+  return narrowed;
 }
 
 /**
  * The own project behind a proof: the one a route minted it for, which is
- * where its Postgres rows (topic names, broadcast channels) live. One own
- * grant by construction; a proof with none is refused before anything reads.
+ * where its Postgres rows (topic names, broadcast channels) live and whose
+ * ClickHouse client every read is sent through. One own grant by
+ * construction, and narrowing does not move it; a proof whose own grant
+ * does not carry the resource is refused before anything reads.
  */
 export function ownProjectIdOf({
   authorization,
@@ -250,11 +271,38 @@ export function ownProjectIdOf({
   authorization: Authorization;
   reads: ReadResource;
 }): string {
-  const own = fenceFor({ authorization, reads }).own[0];
-  if (own === undefined) {
-    throw new Error("a proof reached a read with no own project to act for");
-  }
+  const permission = READ_RESOURCES[reads];
+  const own = authorization.grants.find(
+    (grant) =>
+      grant.kind === "own" &&
+      grant.projectId !== undefined &&
+      grant.permissions.includes(permission),
+  )?.projectId;
+  if (own === undefined) throw new AccessNotGrantedError(permission);
   return own;
+}
+
+/**
+ * The one project a proof reads, when it reads exactly one: the project it
+ * was narrowed to, or its own project when no shared grant carries the
+ * resource. Undefined while the proof still spans several projects, as an
+ * aggregate's list proof does. For data a proof cannot fence because it
+ * lives outside ClickHouse under one project id, such as an offloaded span
+ * body: a caller reads it for this project, or not at all.
+ */
+export function singleTenantOf({
+  authorization,
+  reads,
+}: {
+  authorization: Authorization;
+  reads: ReadResource;
+}): string | undefined {
+  const fence = fenceFor({ authorization, reads });
+  const tenants = [
+    ...fence.own,
+    ...fence.shared.map((window) => window.projectId),
+  ];
+  return tenants.length === 1 ? tenants[0] : undefined;
 }
 
 /**
@@ -429,7 +477,7 @@ export class AuthorizedClickHouse {
       now: this.deps.now?.() ?? Date.now(),
     });
     const fence = fenceFor({ authorization: proof, reads });
-    const ownProjectId = fence.own[0] as string;
+    const ownProjectId = ownProjectIdOf({ authorization: proof, reads });
     return new TenantScopedReader({
       client: () => this.deps.resolveClient(ownProjectId),
       fence,
