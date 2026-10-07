@@ -119,6 +119,12 @@ Feature: Import a custom provider's models on save
     Then "model-a" is not a custom model
 
   @integration
+  Scenario: An unchanged provider that imports can be saved to re-import
+    Given a saved custom provider whose drawer I open without editing anything
+    Then the Save button is enabled
+    And pressing it saves the provider, which imports any models the endpoint added
+
+  @integration
   Scenario: An endpoint that fails to list does not block the save
     Given an OpenAI-compatible endpoint that answers 500, or answers 200 with a body that is not JSON
     When I save a custom provider pointed at it
