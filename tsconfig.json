@@ -241,6 +241,9 @@
       "path": "enterprise/modules/governance/browser/tsconfig.json"
     },
     {
+      "path": "enterprise/modules/governance/client/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/governance/contract/tsconfig.json"
     },
     {
