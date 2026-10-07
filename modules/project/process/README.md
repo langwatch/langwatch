@@ -445,7 +445,7 @@ Run by the tasks process, before serve.
 
 | Task                                   | Class                                   | Declared at                                                 |
 | -------------------------------------- | --------------------------------------- | ----------------------------------------------------------- |
-| `backfill-project-created`             | `ProjectCreatedBackfillTask`            | `src/tasks/project-created-backfill.task.ts:15`             |
+| `backfill-project-created`             | `ProjectCreatedBackfillTask`            | `src/tasks/project-created-backfill.task.ts:20`             |
 | `backfill-project-presence-setting`    | `ProjectPresenceSettingBackfillTask`    | `src/tasks/project-presence-setting-backfill.task.ts:16`    |
 | `backfill-project-department-assigned` | `ProjectDepartmentAssignedBackfillTask` | `src/tasks/project-department-assigned-backfill.task.ts:16` |
 

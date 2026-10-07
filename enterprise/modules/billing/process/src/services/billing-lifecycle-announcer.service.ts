@@ -94,21 +94,29 @@ export class BillingLifecycleAnnouncerService {
    * read: a later change's fact always out-stamps it (ADR-174 decision 17).
    */
   async usageBillingChanged({ organizationId }: { organizationId: string }): Promise<void> {
-    await this.#record(organizationId, (commands) =>
-      this.#sendUsageBilling({ commands, organizationId, fromCatchUp: false }),
-    );
+    await this.#record(organizationId, async (commands) => {
+      await this.#sendUsageBilling({ commands, organizationId, fromCatchUp: false });
+    });
   }
 
   /**
    * The usage-billing catch-up's fact for one organization, stamped when it reads billing and
    * keyed by that read, so a re-run is a new fact (ADR-174 decision 17). Throws, unlike the
-   * real fact, so the hand-run task stops on the organization it could not record.
+   * real fact, so the hand-run task stops on the organization it could not record. A dry run
+   * reads billing and answers what it would record, recording nothing.
    */
-  async usageBillingCaughtUp({ organizationId }: { organizationId: string }): Promise<void> {
+  async usageBillingCaughtUp({
+    organizationId,
+    isDryRun = false,
+  }: {
+    organizationId: string;
+    isDryRun?: boolean;
+  }): Promise<{ usageBilled: boolean }> {
+    if (isDryRun) return this.#usageBilledOf({ organizationId });
     if (!this.#commands) {
       throw new Error("billing_lifecycle pipeline senders are not connected yet");
     }
-    await this.#sendUsageBilling({ commands: this.#commands, organizationId, fromCatchUp: true });
+    return this.#sendUsageBilling({ commands: this.#commands, organizationId, fromCatchUp: true });
   }
 
   /** Stamped before billing is read, and answered by the meter's one rule. */
@@ -120,16 +128,22 @@ export class BillingLifecycleAnnouncerService {
     commands: EventingCommands<BillingLifecyclePipeline>;
     organizationId: string;
     fromCatchUp: boolean;
-  }): Promise<void> {
+  }): Promise<{ usageBilled: boolean }> {
     const occurredAt = (this.deps.now ?? nowInstant)().epochMilliseconds;
-    const lookup = await this.deps.billingOrganizations.getOrganizationForBilling(organizationId);
+    const { usageBilled } = await this.#usageBilledOf({ organizationId });
     await commands.recordUsageBillingChanged.send({
       tenantId: organizationId,
       occurredAt,
       organizationId,
-      usageBilled: usageBilledOf({ lookup }).usageBilled,
+      usageBilled,
       fromCatchUp,
     });
+    return { usageBilled };
+  }
+
+  async #usageBilledOf({ organizationId }: { organizationId: string }) {
+    const lookup = await this.deps.billingOrganizations.getOrganizationForBilling(organizationId);
+    return { usageBilled: usageBilledOf({ lookup }).usageBilled };
   }
 
   async checkoutCompleted(input: {

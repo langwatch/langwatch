@@ -77,13 +77,16 @@ function catchUpBesideJudge({ ledger }: { ledger: LedgerRow[] }) {
       judges: judge.judges,
     },
   });
+  const logger = { info: vi.fn() };
   const task = InstantEvalJudgeSpendCatchUpTask.create({
     organizations: { findAllIds: async () => [ORGANIZATION, "org-without-projects"] },
     instantEvals: { copyLedgerSpendToJudge: (input) => service.copyLedgerSpend(input) },
+    logger,
   });
-  const runTask = () => task.run({ args: [], signal: new AbortController().signal });
+  const runTask = ({ args = [] }: { args?: string[] } = {}) =>
+    task.run({ args, signal: new AbortController().signal });
   const spendOf = () => judge.spendNanoUsdOf({ organizationId: ORGANIZATION });
-  return { judge, eventing, spend, runTask, spendOf };
+  return { judge, eventing, spend, runTask, spendOf, logger };
 }
 
 describe("InstantEvalJudgeSpendCatchUpTask", () => {
@@ -174,5 +177,60 @@ describe("InstantEvalJudgeSpendCatchUpTask", () => {
         expect(judge.rows.spend.size).toBe(1);
       },
     );
+  });
+
+  describe("given $0.40 of Instant Evals spend in the gateway ledger over two requests", () => {
+    const ledger = () => [
+      ledgerRow({ requestId: "instanteval_run-1", cents: 15 }),
+      ledgerRow({ requestId: "instanteval_run-2", cents: 25, tenantId: "project-2" }),
+    ];
+
+    describe("when the spend catch-up runs with --dry-run", () => {
+      it("copies nothing and logs the ledger rows and spend it would offer the judge", async () => {
+        const { judge, eventing, runTask, spendOf, logger } = catchUpBesideJudge({
+          ledger: ledger(),
+        });
+        close = () => eventing.close();
+
+        await runTask({ args: ["--dry-run"] });
+
+        expect(logger.info).toHaveBeenCalledWith(
+          {
+            isDryRun: true,
+            organizations: 2,
+            ledgerRows: 2,
+            ledgerNanoUsd: 40 * CENTS,
+            copied: 0,
+            alreadyHeld: 0,
+          },
+          expect.any(String),
+        );
+        expect(judge.rows.spend.size).toBe(0);
+        expect(await spendOf()).toBe(0n);
+      });
+    });
+
+    describe("when it runs for real after one request was already held", () => {
+      it("logs the rows it read, copied and found held", async () => {
+        const { eventing, runTask, logger } = catchUpBesideJudge({ ledger: ledger() });
+        close = () => eventing.close();
+        await runTask();
+        logger.info.mockClear();
+
+        await runTask();
+
+        expect(logger.info).toHaveBeenCalledWith(
+          {
+            isDryRun: false,
+            organizations: 2,
+            ledgerRows: 2,
+            ledgerNanoUsd: 40 * CENTS,
+            copied: 0,
+            alreadyHeld: 2,
+          },
+          expect.any(String),
+        );
+      });
+    });
   });
 });

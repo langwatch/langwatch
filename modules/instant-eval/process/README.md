@@ -291,7 +291,7 @@ Run by the tasks process, before serve.
 
 | Task                                | Class                              | Declared at                                              |
 | ----------------------------------- | ---------------------------------- | -------------------------------------------------------- |
-| `instant-eval-judge-spend-catch-up` | `InstantEvalJudgeSpendCatchUpTask` | `src/tasks/instant-eval-judge-spend-catch-up.task.ts:19` |
+| `instant-eval-judge-spend-catch-up` | `InstantEvalJudgeSpendCatchUpTask` | `src/tasks/instant-eval-judge-spend-catch-up.task.ts:21` |
 
 ## Configuration
 

@@ -458,6 +458,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
   copyLedgerSpendToJudge(input: {
     organizationId: string;
     signal?: AbortSignal;
+    isDryRun?: boolean;
   }): Promise<InstantEvalJudgeSpendCatchUp> {
     return this.spendCatchUp.copyLedgerSpend(input);
   }

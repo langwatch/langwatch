@@ -20,8 +20,16 @@ type InstantEvalJudgeSpendCatchUpPeers = Readonly<{
   judges: Pick<InstantEvalJudgeApi, "copyLedgerSpend">;
 }>;
 
-/** How many of the organization's ledger rows were copied, and how many the judge held. */
-export type InstantEvalJudgeSpendCatchUp = Readonly<{ copied: number; alreadyHeld: number }>;
+/**
+ * The organization's ledger rows read and their spend, and of those how many were copied and how
+ * many the judge held. A dry run reads the rows and copies none, so both of the latter are 0.
+ */
+export type InstantEvalJudgeSpendCatchUp = Readonly<{
+  ledgerRows: number;
+  ledgerNanoUsd: number;
+  copied: number;
+  alreadyHeld: number;
+}>;
 
 export class InstantEvalJudgeSpendCatchUpService {
   private constructor(private readonly peers: InstantEvalJudgeSpendCatchUpPeers) {}
@@ -37,11 +45,15 @@ export class InstantEvalJudgeSpendCatchUpService {
   async copyLedgerSpend({
     organizationId,
     signal,
+    isDryRun = false,
   }: {
     organizationId: string;
     signal?: AbortSignal;
+    isDryRun?: boolean;
   }): Promise<InstantEvalJudgeSpendCatchUp> {
     const tenantIds = await this.peers.listProjectIds({ organizationId });
+    let ledgerRows = 0;
+    let ledgerNanoUsd = 0;
     let copied = 0;
     let alreadyHeld = 0;
     let cursor: string | null = null;
@@ -54,6 +66,9 @@ export class InstantEvalJudgeSpendCatchUpService {
         limit: LEDGER_PAGE_SIZE,
       });
       for (const row of page.rows) {
+        ledgerRows += 1;
+        ledgerNanoUsd += row.costNanoUsd;
+        if (isDryRun) continue;
         const { outcome } = await this.peers.judges.copyLedgerSpend({
           organizationId,
           requestId: row.requestId,
@@ -65,6 +80,6 @@ export class InstantEvalJudgeSpendCatchUpService {
       }
       cursor = page.nextCursor;
     } while (cursor !== null);
-    return { copied, alreadyHeld };
+    return { ledgerRows, ledgerNanoUsd, copied, alreadyHeld };
   }
 }

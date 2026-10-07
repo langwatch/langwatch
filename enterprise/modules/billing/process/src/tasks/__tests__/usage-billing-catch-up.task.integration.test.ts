@@ -51,18 +51,20 @@ function billingBesideJudge({ billed }: { billed: Set<string> }) {
   });
   announcer.connect(eventing.register(announcer.pipeline).commands);
   eventing.register(judge.factsPipeline());
+  const logger = { info: vi.fn() };
   const task = UsageBillingCatchUpTask.create({
     organizations: { findAllIds: async () => [BILLED, NOT_BILLED] },
     billing: { catchUpUsageBilling: (input) => announcer.usageBillingCaughtUp(input) },
+    logger,
   });
-  const runTask = async () => {
+  const runTask = async ({ args = [] }: { args?: string[] } = {}) => {
     nowMs += 60_000;
-    await task.run({ args: [], signal: new AbortController().signal });
+    await task.run({ args, signal: new AbortController().signal });
   };
   const advance = () => {
     nowMs += 60_000;
   };
-  return { announcer, judge, eventing, runTask, advance };
+  return { announcer, judge, eventing, runTask, advance, logger };
 }
 
 describe("UsageBillingCatchUpTask", () => {
@@ -120,6 +122,41 @@ describe("UsageBillingCatchUpTask", () => {
 
         await vi.waitFor(async () =>
           expect(await judge.usageBilledOf({ organizationId: BILLED })).toBe(false),
+        );
+      });
+    });
+  });
+
+  describe("given an organization the meter bills and one it does not", () => {
+    describe("when the usage-billing catch-up runs with --dry-run", () => {
+      it("records nothing and logs how many organizations it would mark each way", async () => {
+        const { judge, eventing, runTask, logger } = billingBesideJudge({
+          billed: new Set([BILLED]),
+        });
+        close = () => eventing.close();
+
+        await runTask({ args: ["--dry-run"] });
+
+        expect(logger.info).toHaveBeenCalledWith(
+          { isDryRun: true, organizations: 2, usageBilled: 1, notUsageBilled: 1 },
+          expect.any(String),
+        );
+        // Give a stray fact the time a real one takes to fold, then check none arrived.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(judge.rows.usageBilling.size).toBe(0);
+      });
+    });
+
+    describe("when it runs for real", () => {
+      it("logs the same counts it recorded", async () => {
+        const { eventing, runTask, logger } = billingBesideJudge({ billed: new Set([BILLED]) });
+        close = () => eventing.close();
+
+        await runTask();
+
+        expect(logger.info).toHaveBeenCalledWith(
+          { isDryRun: false, organizations: 2, usageBilled: 1, notUsageBilled: 1 },
+          expect.any(String),
         );
       });
     });

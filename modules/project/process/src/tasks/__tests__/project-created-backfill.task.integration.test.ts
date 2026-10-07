@@ -72,11 +72,14 @@ function projectBesideJudge() {
       },
     },
   });
+  const taskLogger = { info: vi.fn() };
   const task = ProjectCreatedBackfillTask.create({
     organizations: { findAllIds: async () => [ORGANIZATION, OTHER_ORGANIZATION] },
     projects: { recordExistingProjectsCreated: (input) => notice.recordExisting(input) },
+    logger: taskLogger,
   });
-  const runTask = () => task.run({ args: [], signal: new AbortController().signal });
+  const runTask = ({ args = [] }: { args?: string[] } = {}) =>
+    task.run({ args, signal: new AbortController().signal });
   const loseNextCreated = async ({ projectId }: { projectId: string }) => {
     failCreated = true;
     await notice.created({
@@ -88,7 +91,7 @@ function projectBesideJudge() {
     });
     failCreated = false;
   };
-  return { judge, eventing, runTask, loseNextCreated, logger };
+  return { judge, eventing, runTask, loseNextCreated, logger, taskLogger };
 }
 
 const JUDGE_CALL = {
@@ -148,6 +151,39 @@ describe("ProjectCreatedBackfillTask beside the Instant Evals judge", () => {
           outcome: "judged",
           judgement: { verdicts: [{ questionId: "polite", probability: 1 }] },
         });
+      });
+    });
+  });
+
+  describe("given four existing projects over two organizations", () => {
+    describe("when the project catch-up runs with --dry-run", () => {
+      it("records nothing and logs how many projects it would record", async () => {
+        const { judge, eventing, runTask, taskLogger } = projectBesideJudge();
+        close = () => eventing.close();
+
+        await runTask({ args: ["--dry-run"] });
+
+        expect(taskLogger.info).toHaveBeenCalledWith(
+          { isDryRun: true, organizations: 2, projects: 4 },
+          expect.any(String),
+        );
+        // Give a stray fact the time a real one takes to fold, then check none arrived.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(judge.rows.projects.size).toBe(0);
+      });
+    });
+
+    describe("when it runs for real", () => {
+      it("logs the projects it recorded", async () => {
+        const { eventing, runTask, taskLogger } = projectBesideJudge();
+        close = () => eventing.close();
+
+        await runTask();
+
+        expect(taskLogger.info).toHaveBeenCalledWith(
+          { isDryRun: false, organizations: 2, projects: 4 },
+          expect.any(String),
+        );
       });
     });
   });

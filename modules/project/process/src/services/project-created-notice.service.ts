@@ -89,14 +89,21 @@ export class ProjectCreatedNoticeService {
 
   /**
    * Records every project of one organization again, marked as backfilled. Idempotent: the
-   * event keeps its key, and every peer treats a repeat as the same fact.
+   * event keeps its key, and every peer treats a repeat as the same fact. A dry run counts the
+   * projects it would record, recording nothing.
    */
-  async recordExisting(input: Readonly<{ organizationId: string }>): Promise<number> {
+  async recordExisting(
+    input: Readonly<{ organizationId: string; isDryRun?: boolean }>,
+  ): Promise<number> {
     const projectIds = await this.dependencies.projects.findIdsByOrganization(input.organizationId);
     let recorded = 0;
     for (const projectId of projectIds) {
       const found = await this.dependencies.projects.findWithOrgAdmin(projectId);
       if (!found?.organizationId) continue;
+      if (input.isDryRun) {
+        recorded += 1;
+        continue;
+      }
       await this.#send({
         projectId,
         organizationId: found.organizationId,

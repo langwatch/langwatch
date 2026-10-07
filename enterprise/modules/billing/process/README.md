@@ -212,7 +212,7 @@ Run by the tasks process, before serve.
 
 | Task                     | Class                     | Declared at                                   |
 | ------------------------ | ------------------------- | --------------------------------------------- |
-| `usage-billing-catch-up` | `UsageBillingCatchUpTask` | `src/tasks/usage-billing-catch-up.task.ts:20` |
+| `usage-billing-catch-up` | `UsageBillingCatchUpTask` | `src/tasks/usage-billing-catch-up.task.ts:22` |
 | `stripe-prices-sync`     | `StripePricesSyncTask`    | `src/tasks/stripe-prices-sync.task.ts:467`    |
 
 ## Configuration

@@ -216,7 +216,9 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   }
 
   /** Records one organization's existing projects as created, for the backfill task. */
-  recordExistingProjectsCreated(input: Readonly<{ organizationId: string }>): Promise<number> {
+  recordExistingProjectsCreated(
+    input: Readonly<{ organizationId: string; isDryRun?: boolean }>,
+  ): Promise<number> {
     return this.#lifecycle.recordExisting(input);
   }
 
