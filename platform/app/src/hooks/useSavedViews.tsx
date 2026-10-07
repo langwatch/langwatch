@@ -25,6 +25,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { showErrorToast } from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
 import { availableFilters } from "../server/filters/registry";
 import type { FilterField } from "../server/filters/types";
@@ -243,26 +244,32 @@ function useSavedViewsInternal() {
   }, [projectId, rawViews]);
 
   // -- tRPC mutations ------------------------------------------------------
-  const createMutation = api.savedViews.create.useMutation({
-    onSuccess: () => {
-      void utils.savedViews.getAll.invalidate({ projectId });
+  // Every change below edits the cached list before the server answers. On
+  // success the list is read again to pick up server ids and order; on
+  // failure the user is told and the same read puts back what the server
+  // kept, so a refused edit does not stick on screen.
+  const reloadViews = useCallback(() => {
+    void utils.savedViews.getAll.invalidate({ projectId });
+  }, [utils.savedViews.getAll, projectId]);
+  const writeOptions = (fallbackTitle: string) => ({
+    onSuccess: reloadViews,
+    onError: (error: unknown) => {
+      showErrorToast({ error, fallbackTitle });
+      reloadViews();
     },
   });
-  const deleteMutation = api.savedViews.delete.useMutation({
-    onSuccess: () => {
-      void utils.savedViews.getAll.invalidate({ projectId });
-    },
-  });
-  const renameMutation = api.savedViews.rename.useMutation({
-    onSuccess: () => {
-      void utils.savedViews.getAll.invalidate({ projectId });
-    },
-  });
-  const reorderMutation = api.savedViews.reorder.useMutation({
-    onSuccess: () => {
-      void utils.savedViews.getAll.invalidate({ projectId });
-    },
-  });
+  const createMutation = api.savedViews.create.useMutation(
+    writeOptions("Couldn't save the view"),
+  );
+  const deleteMutation = api.savedViews.delete.useMutation(
+    writeOptions("Couldn't delete the view"),
+  );
+  const renameMutation = api.savedViews.rename.useMutation(
+    writeOptions("Couldn't rename the view"),
+  );
+  const reorderMutation = api.savedViews.reorder.useMutation(
+    writeOptions("Couldn't reorder the views"),
+  );
 
   // -- Filter actions -------------------------------------------------------
 
