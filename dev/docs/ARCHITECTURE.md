@@ -77,6 +77,8 @@ each runtime owns the declaration vocabulary for its own half, so weight is
 imported the rest of the way down, never from the top. This stays strict and gains a lint; the date and
 hosting helpers move where a contract may import them (Alex, 2026-10-05). Until they do, analytics' and
 trace's contracts import `@langwatch/api/dates` and gateway's `@langwatch/api/hosting`.
+A contract may also import `@langwatch/span-normalisation`, the span attribute vocabulary and
+canonicalisers that trace and analytics share; it never stores what it normalises (Alex, 2026-10-07).
 
 - **`@langwatch/module`** — the light core, and ONLY what a contract needs:
   the `moduleApi` token factory, module ids, UI tokens and

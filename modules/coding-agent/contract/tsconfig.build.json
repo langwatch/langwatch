@@ -27,6 +27,9 @@
       "path": "../../../packages/module/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/span-normalisation/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {

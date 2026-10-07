@@ -688,6 +688,9 @@
       "path": "modules/slack/process/tsconfig.json"
     },
     {
+      "path": "packages/span-normalisation/tsconfig.json"
+    },
+    {
       "path": "apps/storagesim-web/tsconfig.json"
     },
     {

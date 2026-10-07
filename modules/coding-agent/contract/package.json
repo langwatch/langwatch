@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@langwatch/module": "workspace:*",
+    "@langwatch/span-normalisation": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "zod": "catalog:"

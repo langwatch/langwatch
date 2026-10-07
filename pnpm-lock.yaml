@@ -4491,6 +4491,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../../packages/upgrade
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../../../modules/user/contract
@@ -6158,6 +6161,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../organization/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -6912,6 +6918,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -13976,6 +13985,9 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../data-retention/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -14608,6 +14620,9 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -14992,6 +15007,9 @@ importers:
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../prompt/contract
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -15146,6 +15164,9 @@ importers:
       '@langwatch/share-contract':
         specifier: workspace:*
         version: link:../../share/contract
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/stored-object-contract':
         specifier: workspace:*
         version: link:../../stored-object/contract
