@@ -35,16 +35,17 @@ func speechRequest(body string) *domain.Request {
 	return &domain.Request{Type: domain.RequestTypeSpeech, Model: "gpt-4o-mini-tts", Body: []byte(body)}
 }
 
-// gatedChunks writes each chunk, flushes it, and waits for the test to ask
-// for the next one, so a test can prove where the bytes are at each step.
+// gatedChunks counts, writes and flushes each chunk, then waits for the test
+// to ask for the next. Counting before the write means a caller holding chunk
+// N always reads exactly N: the gate keeps the count from going further.
 func gatedChunks(
 	w http.ResponseWriter, r *http.Request, chunks []string, produced *atomic.Int32, next <-chan struct{},
 ) {
 	flusher, _ := w.(http.Flusher)
 	for i, chunk := range chunks {
+		produced.Add(1)
 		_, _ = w.Write([]byte(chunk))
 		flusher.Flush()
-		produced.Add(1)
 		if i == len(chunks)-1 {
 			return
 		}
