@@ -4,7 +4,7 @@
  * `audit` is not on it, since that peer is resolved via `withAudit`.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { EventSourcing } from "@langwatch/eventing";
+import type { EventReadSeat, EventSourcing } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -172,7 +172,7 @@ export type DatabaseTarget =
     }>;
 
 /**
- * What the process hands a module: one record, fifteen keys. `clickhouse`
+ * What the process hands a module: one record, sixteen keys. `clickhouse`
  * and `objectStorage` are each ONE client that routes internally, so "every
  * statement names its tenant" is structural, not a rule to remember.
  */
@@ -183,6 +183,8 @@ export interface ProcessMembers {
   readonly databaseTarget: DatabaseTarget;
   readonly redis: RedisConnection;
   readonly eventing: EventSourcing;
+  /** One event of a tenant's stream by id (Q209): eventing's seat, or one refusing each read. */
+  readonly eventReadSeat: EventReadSeat;
   readonly objectStorage: ObjectStorage;
   readonly clock: Clock;
   readonly encryption: Encryption;
@@ -218,6 +220,7 @@ export const MEMBER_NAMES = [
   "idempotency",
   "rateLimiter",
   "eventing",
+  "eventReadSeat",
 ] as const satisfies readonly MemberName[];
 
 /** The record a module is handed for the names it declared in `static readonly reads`. */

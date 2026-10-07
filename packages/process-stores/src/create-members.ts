@@ -3,6 +3,7 @@
  * same client would split one process into duplicate caches and dedup
  * keyspaces. An unconfigured member REFUSES BY NAME, never a silent omission.
  */
+import type { EventReadSeat } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { OperatorReadMint } from "@langwatch/prisma-client";
 
@@ -217,6 +218,34 @@ function eventingMember({
   });
 }
 
+/** A role whose eventing reads no event log still hands a seat: only a read through it refuses. */
+function refusingEventReadSeat(): EventReadSeat {
+  return {
+    getEvent: () =>
+      Promise.reject(
+        new MemberNotConfiguredError(
+          "eventReadSeat",
+          "give this role's eventing the event log (set CLICKHOUSE_URL)",
+        ),
+      ),
+  };
+}
+
+/** Eventing's seat where this role's eventing reads the event log; a refusing one otherwise. */
+function eventReadSeatMember({
+  config,
+  supplied,
+  read,
+}: {
+  config: ProcessConfig;
+  supplied: { readonly [Name in MemberName]?: ProcessMembers[Name] };
+  read: ReadMember;
+}): BuiltMember<EventReadSeat> {
+  const eventingAvailable = config.eventing !== undefined || supplied.eventing !== undefined;
+  const seat = eventingAvailable ? read("eventing").eventReadSeat : undefined;
+  return { value: seat ?? refusingEventReadSeat() };
+}
+
 /** What each member is built from, and what closing it means. */
 type MemberBuilders = {
   readonly [Member in MemberName]: () => BuiltMember<ProcessMembers[Member]>;
@@ -308,6 +337,7 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
       return buildRedis(config.redis);
     },
     eventing: () => eventingMember({ config, read }),
+    eventReadSeat: () => eventReadSeatMember({ config, supplied, read }),
 
     // Redis-backed, so each inherits Redis's own refusal rather than repeating
     // it, and each is built over the ONE connection this process opened.
