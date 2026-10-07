@@ -70,9 +70,9 @@ describe("Feature: billing stays with the owning project", () => {
     await fixture?.cleanup();
   });
 
-  /** @scenario "Billing stays with the owning project" */
   describe("given an aggregate project with a member holding traces", () => {
     describe("when usage is counted", () => {
+      /** @scenario "Billing stays with the owning project" */
       it("leaves the member's count unchanged and counts zero for the aggregate", async () => {
         const member = fixture.personal.engineer.id;
         const before = await countFor([member]);

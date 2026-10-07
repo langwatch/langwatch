@@ -58,9 +58,9 @@ describe("Feature: the aggregate project is read only", () => {
     await fixture?.cleanup();
   });
 
-  /** @scenario "Test, Build and Online Evals are hidden on the aggregate" */
   describe("given an organisation admin opening the aggregate", () => {
     describe("when its navigation is built", () => {
+      /** @scenario "Test, Build and Online Evals are hidden on the aggregate" */
       it("shows Traces and Analytics, and no Prompts, Experiments or Online Evaluations", async () => {
         const organizations = await admin.organization.getAll({});
         const opened = organizations

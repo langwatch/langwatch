@@ -160,7 +160,8 @@ describe("given a shared project read in the ledger", () => {
     ]);
   });
 
-  /** @scenario "Only the project-reader shape lifts the foreign-project refusal" (across two organisations) */
+  // The refusal across two organisations.
+  /** @scenario "Only the project-reader shape lifts the foreign-project refusal" */
   it("refuses a shared read on a project in another organisation against real lineage", async () => {
     await expect(
       writer().attachSharedProjectGrant({

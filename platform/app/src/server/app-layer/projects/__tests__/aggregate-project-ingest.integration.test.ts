@@ -76,9 +76,9 @@ describe("Feature: the aggregate project receives no traces", () => {
     await fixture?.cleanup();
   });
 
-  /** @scenario "The aggregate project cannot receive traces" */
   describe("given an aggregate project", () => {
     describe("when a trace is sent over OTLP with the aggregate's API key", () => {
+      /** @scenario "The aggregate project cannot receive traces" */
       it("is refused with a 403 that names why", async () => {
         const response = await otelApp.request("/api/otel/v1/traces", {
           method: "POST",

@@ -70,9 +70,9 @@ describe("Feature: only organisation admins open an aggregate project", () => {
     await fixture?.cleanup();
   });
 
-  /** @scenario "A non-admin on the aggregate's team is refused" */
   describe("given an aggregate project whose team includes a member who is not an admin", () => {
     describe("when the member opens the aggregate project", () => {
+      /** @scenario "A non-admin on the aggregate's team is refused" */
       it("is refused, though the same member opens an ordinary project on that team", async () => {
         const member = callerFor(fixture.member.id);
 
@@ -338,9 +338,9 @@ describe("Feature: only organisation admins open an aggregate project", () => {
     });
   });
 
-  /** @scenario "A Developer seat never sees the aggregate project" */
   describe("given a member holding only a Developer seat, put on the aggregate's team", () => {
     describe("when they list the projects they can open", () => {
+      /** @scenario "A Developer seat never sees the aggregate project" */
       it("does not list the aggregate", async () => {
         const ids = await listedProjectIds(
           fixture.developer.id,

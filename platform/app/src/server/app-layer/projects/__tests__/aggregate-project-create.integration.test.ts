@@ -109,8 +109,8 @@ describe("Feature: an admin creates an aggregate project", () => {
     await fixture?.cleanup();
   });
 
-  /** @scenario "An admin creates an aggregate project from the new-project flow" */
   describe("when the admin creates a project of kind aggregate without a rule", () => {
+    /** @scenario "An admin creates an aggregate project from the new-project flow" */
     it("stores the all-personal rule and attaches the project to the chosen team", async () => {
       const aggregate = await createAggregate();
 
@@ -123,8 +123,8 @@ describe("Feature: an admin creates an aggregate project", () => {
     });
   });
 
-  /** @scenario "An admin creates an aggregate project from the new-project flow" */
   describe("when a member who is not an admin asks to create one on their own team", () => {
+    /** @scenario "An admin creates an aggregate project from the new-project flow" */
     it("is refused and nothing is written", async () => {
       const before = await prisma.project.count({
         where: { teamId: fixture.team.id },
@@ -213,8 +213,8 @@ describe("Feature: an admin creates an aggregate project", () => {
     });
   });
 
-  /** @scenario "The rule may be narrowed to one department" */
   describe("when the admin narrows the rule to the Engineering department", () => {
+    /** @scenario "The rule may be narrowed to one department" */
     it("reads only personal projects whose owner is in Engineering today", async () => {
       const aggregate = await createAggregate({
         aggregateRule: {
@@ -263,8 +263,8 @@ describe("Feature: an admin creates an aggregate project", () => {
     });
   });
 
-  /** @scenario "The rule may name an explicit list of any projects" */
   describe("when the admin names an explicit list of two projects", () => {
+    /** @scenario "The rule may name an explicit list of any projects" */
     it("reads exactly those two, one of which is not personal", async () => {
       const aggregate = await createAggregate({
         aggregateRule: {

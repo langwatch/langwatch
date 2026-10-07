@@ -122,7 +122,8 @@ describe("attachSharedProjectGrant", () => {
   });
 
   describe("when the member project belongs to another organisation", () => {
-    /** @scenario "Only the project-reader shape lifts the foreign-project refusal" (across two organisations) */
+    // The refusal across two organisations.
+    /** @scenario "Only the project-reader shape lifts the foreign-project refusal" */
     it("refuses before anything is appended", async () => {
       const { writer, db, sent } = harness({});
       db.project.findMany.mockResolvedValue(

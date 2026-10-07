@@ -107,8 +107,8 @@ describe("given a rule that names a project in another organisation", () => {
     projectIds: ["p_team", "p_foreign"],
   };
 
-  /** @scenario "A rule that names a project in another organisation is refused" */
   describe("when the rule is validated", () => {
+    /** @scenario "A rule that names a project in another organisation is refused" */
     it("is refused with a named error", async () => {
       await expect(
         service.assertValid({ rule: foreignRule, organizationId: "org_a" }),
@@ -125,8 +125,8 @@ describe("given a rule that names a project in another organisation", () => {
     });
   });
 
-  /** @scenario "A rule that names a project in another organisation is refused" */
   describe("when an aggregate project is created with it", () => {
+    /** @scenario "A rule that names a project in another organisation is refused" */
     it("writes no team, no project and no grant", async () => {
       const repo = {
         findActiveTeamInOrganization: vi

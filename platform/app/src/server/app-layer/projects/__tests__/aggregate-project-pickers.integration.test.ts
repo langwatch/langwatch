@@ -89,8 +89,8 @@ describe("Feature: the aggregate project is no place to send traces", () => {
     await fixture?.cleanup();
   });
 
-  /** @scenario "The aggregate project is absent from every send-traces-here picker" */
   describe("given an aggregate project the admin can see in the switcher", () => {
+    /** @scenario "The aggregate project is absent from every send-traces-here picker" */
     it("is in the admin's switcher, so its absence below is the pickers' doing", async () => {
       const ids = (await adminTeams()).flatMap((team) =>
         team.projects.map((project) => project.id),
