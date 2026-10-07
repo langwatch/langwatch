@@ -257,6 +257,12 @@ export function useOpenTraceDrawer() {
       // happened once the real data landed.
       useDrawerStore.getState().openTrace(trace.traceId, trace.timestamp, {
         expectedSpanCount: trace.spanCount,
+        // On an aggregate the row names its member; every read the drawer
+        // makes stays on it (ADR-144 block F).
+        tenantId:
+          trace.projectId && trace.projectId !== project?.id
+            ? trace.projectId
+            : null,
       });
       // Preview-mode traces always open on the waterfall view —
       // it's the most visual tab, the one the onboarding journey
