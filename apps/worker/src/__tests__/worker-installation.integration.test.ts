@@ -173,6 +173,8 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("experiment_run_processing");
       expect(pipelines).toContain("coding_agent_processing");
       expect(pipelines).toContain("github_lifecycle");
+      expect(pipelines).toContain("evaluator_lifecycle");
+      expect(pipelines).toContain("monitor_evaluator_cleanup");
       expect(pipelines).toContain("topic_clustering_processing");
       expect(pipelines).toContain("automations");
       expect(pipelines).toContain("evaluation_processing");

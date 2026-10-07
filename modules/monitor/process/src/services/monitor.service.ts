@@ -211,6 +211,14 @@ export class MonitorService {
     await this.options.repository.deleteForExperiment(input);
   }
 
+  /** Removes the monitors still running a deleted evaluator; a rerun finds none left. */
+  async deleteByEvaluator(input: { projectId: string; evaluatorId: string }): Promise<void> {
+    const monitors = await this.findByEvaluator(input);
+    for (const monitor of monitors) {
+      await this.options.repository.delete({ id: monitor.id, projectId: input.projectId });
+    }
+  }
+
   async upsertForExperiment(input: MonitorExperimentUpsertInput): Promise<Monitor> {
     const parsed = monitorExperimentUpsertInputSchema.parse(input);
 

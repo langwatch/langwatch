@@ -93,7 +93,7 @@ export interface EvaluatorApi {
   listByWorkflow(input: { workflowId: string; projectId: string }): Promise<Evaluator[]>;
   /** The entry-node fields a workflow evaluator maps trace data onto. */
   getWorkflowFields(input: EvaluatorScope): Promise<EvaluatorWorkflowFields>;
-  /** The workflow and monitors a cascade archive would take with the evaluator. */
+  /** The workflow a cascade archive would take with the evaluator. */
   getRelatedEntities(input: EvaluatorScope): Promise<EvaluatorRelatedEntities>;
   /** The replicas of this evaluator the caller may read. */
   getCopies(input: EvaluatorLineageScope & { actorId: string }): Promise<EvaluatorCopy[]>;
@@ -117,7 +117,7 @@ export interface EvaluatorApi {
   update(input: EvaluatorUpdateInput): Promise<Evaluator>;
   /** Soft-deletes an evaluator. */
   archive(input: EvaluatorScope): Promise<Evaluator>;
-  /** Archives the evaluator, archives its workflow and deletes its monitors. */
+  /** Archives the evaluator and its workflow, and records `lw.evaluator.deleted`. */
   cascadeArchive(input: EvaluatorScope): Promise<EvaluatorCascadeArchive>;
   /** Replicates the evaluator, and the workflow backing it, into another project. */
   copy(input: {

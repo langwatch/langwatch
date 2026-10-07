@@ -39,7 +39,6 @@ import { preconditionMatchInputSchema } from "@langwatch/evaluator-contract/eval
 import { ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { ModelNotConfiguredError, ModelProviderApi } from "@langwatch/model-provider-contract";
-import { MonitorApi } from "@langwatch/monitor-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import type { Trace } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
@@ -49,25 +48,21 @@ import type { EvaluatorRepositories } from "../repositories/evaluator.repositori
 import { evaluatorPlatformUrl } from "../rules/evaluator-platform-url.rules.ts";
 import { findTraceIdsPassingPreconditions } from "../rules/precondition-trace-data.rules.ts";
 import { EvaluatorCodeExecutionService } from "../services/evaluator-code-execution.service.ts";
+import {
+  EvaluatorDeletionFactsService,
+  type EvaluatorLifecycleSenders,
+} from "../services/evaluator-deletion-facts.service.ts";
 import { EvaluatorHistoryService } from "../services/evaluator-history.service.ts";
 import { EvaluatorLinkedRowsService } from "../services/evaluator-linked-rows.service.ts";
 import { EvaluatorReplicationService } from "../services/evaluator-replication.service.ts";
 import { EvaluatorService as EvaluatorRuntimeService } from "../services/evaluator.service.ts";
 
-/** The workflow and monitor rows an evaluator is entangled with, read through their owners. */
+/** The workflow rows an evaluator is entangled with, read through their owner. */
 export interface EvaluatorGraph {
   /** The evaluator's linked workflow, scoped to the project and not archived. */
   findLinkedWorkflow: (
     input: Readonly<{ workflowId: string; projectId: string }>,
   ) => Promise<{ id: string; name: string } | null>;
-  /** The monitors in the project that run this evaluator. */
-  findMonitorsUsingEvaluator(
-    input: Readonly<{ evaluatorId: string; projectId: string }>,
-  ): Promise<{ id: string; name: string }[]>;
-  /** Hard-deletes those monitors, and answers how many went. */
-  deleteMonitorsUsingEvaluator(
-    input: Readonly<{ evaluatorId: string; projectId: string }>,
-  ): Promise<{ count: number }>;
   /** Archives the evaluator's linked workflow. */
   archiveLinkedWorkflow(
     input: Readonly<{ workflowId: string; projectId: string }>,
@@ -100,6 +95,7 @@ type EvaluatorAppParts = Readonly<{
   modelProviders: ModelProviderApi;
   permissions: AuthzApi;
   graph: EvaluatorGraph;
+  deletionFacts: EvaluatorDeletionFactsService;
   publicBaseUrl: string | undefined;
 }>;
 
@@ -117,22 +113,17 @@ export class EvaluatorModule implements EvaluatorApi {
     workflows: WorkflowApi,
     /** Resolves the project's default and embeddings models. */
     modelProviders: ModelProviderApi,
-    /** The monitors that run an evaluator, read and removed with its cascade. */
-    monitors: MonitorApi,
   };
 
   static create(setup: EvaluatorSetup): EvaluatorModule {
-    const graph = EvaluatorLinkedRowsService.create({
-      workflows: setup.dependencies.workflows,
-      monitors: setup.dependencies.monitors,
-    });
+    const graph = EvaluatorLinkedRowsService.create({ workflows: setup.dependencies.workflows });
 
     return EvaluatorModule.createWithGraph(setup, graph);
   }
 
   /**
    * Split from {@link create} so a test can substitute a recording double for
-   * the workflow/monitor graph without a real database — the graph interface
+   * the workflow graph without a real database — the graph interface
    * is this module's own seam, not a process member.
    */
   static createWithGraph(setup: EvaluatorSetup, graph: EvaluatorGraph): EvaluatorModule {
@@ -152,8 +143,14 @@ export class EvaluatorModule implements EvaluatorApi {
       modelProviders: dependencies.modelProviders,
       permissions: dependencies.permissions,
       graph,
+      deletionFacts: EvaluatorDeletionFactsService.create(),
       publicBaseUrl: config.publicBaseUrl,
     });
+  }
+
+  /** evaluator_lifecycle's senders, once the pipeline registers in this process. */
+  connectLifecycle(senders: EvaluatorLifecycleSenders): void {
+    this.#dependencies.deletionFacts.connect(senders);
   }
 
   #dependencies: EvaluatorAppParts;
@@ -266,7 +263,7 @@ export class EvaluatorModule implements EvaluatorApi {
     return this.#dependencies.evaluators.getWorkflowFields(input);
   }
 
-  /** The workflow and monitors a cascade archive would take with the evaluator. */
+  /** The workflow a cascade archive would take with the evaluator. */
   async getRelatedEntities(input: {
     id: string;
     projectId: string;
@@ -278,12 +275,8 @@ export class EvaluatorModule implements EvaluatorApi {
           projectId: input.projectId,
         })
       : null;
-    const monitors = await this.#dependencies.graph.findMonitorsUsingEvaluator({
-      evaluatorId: input.id,
-      projectId: input.projectId,
-    });
 
-    return { workflow, monitors };
+    return { workflow };
   }
 
   /**
@@ -391,16 +384,11 @@ export class EvaluatorModule implements EvaluatorApi {
   }
 
   /**
-   * Archives the evaluator and everything that only exists to run it: the
-   * monitors go (hard, they are configuration), the linked workflow is archived
-   * beside the evaluator.
+   * Archives the evaluator and its linked workflow, then records `lw.evaluator.deleted`:
+   * monitor removes the monitors that ran it from its own side, after a lag (R7).
    */
   async cascadeArchive(input: { id: string; projectId: string }): Promise<EvaluatorCascadeArchive> {
     const evaluator = await this.#dependencies.evaluators.getById(input);
-    const deletedMonitors = await this.#dependencies.graph.deleteMonitorsUsingEvaluator({
-      evaluatorId: input.id,
-      projectId: input.projectId,
-    });
     const archivedEvaluator = await this.#dependencies.evaluators.archive(input);
     const archivedWorkflow = evaluator.workflowId
       ? await this.#dependencies.graph.archiveLinkedWorkflow({
@@ -408,12 +396,12 @@ export class EvaluatorModule implements EvaluatorApi {
           projectId: input.projectId,
         })
       : null;
+    await this.#dependencies.deletionFacts.recordEvaluatorDeleted({
+      projectId: input.projectId,
+      evaluatorId: input.id,
+    });
 
-    return {
-      evaluator: archivedEvaluator,
-      archivedWorkflow,
-      deletedMonitorsCount: deletedMonitors.count,
-    };
+    return { evaluator: archivedEvaluator, archivedWorkflow };
   }
 
   /** Replicates the evaluator, and the workflow backing it, into another project. */

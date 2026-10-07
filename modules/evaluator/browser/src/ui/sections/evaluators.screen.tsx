@@ -21,6 +21,21 @@ import { EvaluatorReplicateDialog } from "./evaluator-replicate-dialog.tsx";
 
 type EvaluatorRef = { id: string; name: string };
 
+/** What else a cascade took, counted from the confirmation's preview of monitor's rows. */
+function cascadeDescription({
+  archivedWorkflow,
+  monitorCount,
+}: {
+  archivedWorkflow: boolean;
+  monitorCount: number;
+}): string | undefined {
+  const parts: string[] = [];
+  if (archivedWorkflow) parts.push("1 workflow");
+  if (monitorCount > 0)
+    parts.push(`${monitorCount} online evaluation${monitorCount > 1 ? "s" : ""}`);
+  return parts.length > 0 ? `Also deleted: ${parts.join(", ")}` : undefined;
+}
+
 export default function EvaluatorsScreen() {
   const host = useEvaluatorHost();
   const { projectId } = host.scope();
@@ -62,6 +77,14 @@ export default function EvaluatorsScreen() {
     { id: evaluatorToDelete?.id ?? "", projectId: projectId ?? "" },
     { enabled: !!evaluatorToDelete && !!projectId },
   );
+  // Monitor answers for its own rows; it removes them once evaluator records the delete.
+  const projectMonitorsQuery = evaluatorApi.monitors.getAllForProject.useQuery(
+    { projectId: projectId ?? "" },
+    { enabled: !!evaluatorToDelete && !!projectId },
+  );
+  const linkedMonitors = (projectMonitorsQuery.data ?? [])
+    .filter((monitor) => monitor.evaluatorId === evaluatorToDelete?.id)
+    .map(({ id, name }) => ({ id, name }));
 
   const deleteMutation = evaluatorClient.evaluators.delete.useMutation({
     onSuccess: () => {
@@ -72,24 +95,14 @@ export default function EvaluatorsScreen() {
 
   const cascadeArchiveMutation = evaluatorClient.evaluators.cascadeArchive.useMutation({
     onSuccess: (result) => {
+      const description = cascadeDescription({
+        archivedWorkflow: result.archivedWorkflow !== null,
+        monitorCount: linkedMonitors.length,
+      });
       setEvaluatorToDelete(null);
       void evaluatorUtils.evaluators.getAll.invalidate({ projectId: projectId ?? "" });
       void utils.licenseEnforcement.checkLimit.invalidate();
-
-      const parts: string[] = [];
-      if (result.archivedWorkflow) parts.push("1 workflow");
-      if (result.deletedMonitorsCount > 0) {
-        parts.push(
-          `${result.deletedMonitorsCount} online evaluation${
-            result.deletedMonitorsCount > 1 ? "s" : ""
-          }`,
-        );
-      }
-
-      host.succeeded({
-        title: "Evaluator deleted",
-        description: parts.length > 0 ? `Also deleted: ${parts.join(", ")}` : undefined,
-      });
+      host.succeeded({ title: "Evaluator deleted", description });
     },
     onError: (error) => host.failed({ error, fallbackTitle: "Couldn't delete evaluator" }),
   });
@@ -121,7 +134,7 @@ export default function EvaluatorsScreen() {
     if (!evaluatorToDelete || !projectId) return;
 
     const related = relatedEntitiesQuery.data;
-    const hasRelated = !!related?.workflow || (related?.monitors.length ?? 0) > 0;
+    const hasRelated = !!related?.workflow || linkedMonitors.length > 0;
 
     if (hasRelated) {
       cascadeArchiveMutation.mutate({ id: evaluatorToDelete.id, projectId });
@@ -205,10 +218,10 @@ export default function EvaluatorsScreen() {
         onClose={() => setEvaluatorToDelete(null)}
         onConfirm={confirmDelete}
         isLoading={cascadeArchiveMutation.isPending || deleteMutation.isPending}
-        isLoadingRelated={relatedEntitiesQuery.isLoading}
+        isLoadingRelated={relatedEntitiesQuery.isLoading || projectMonitorsQuery.isLoading}
         evaluatorName={evaluatorToDelete?.name ?? ""}
         workflow={relatedEntitiesQuery.data?.workflow ?? null}
-        monitors={relatedEntitiesQuery.data?.monitors ?? []}
+        monitors={linkedMonitors}
       />
 
       <EvaluatorReplicateDialog

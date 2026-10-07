@@ -43,6 +43,10 @@ import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import {
+  buildMonitorEvaluatorCleanupPipeline,
+  type MonitorEvaluatorCleanupPipeline,
+} from "../eventing/monitor-evaluator-cleanup.pipeline.ts";
 import type { MonitorRepositories } from "../repositories/monitor.repositories.ts";
 import { previousPeriodStartMs } from "../rules/monitor-performance-window.rules.ts";
 import { monitorPlatformUrl } from "../rules/monitor-platform-url.rules.ts";
@@ -109,6 +113,11 @@ export class MonitorModule implements MonitorApi {
 
   static create(setup: MonitorSetup): MonitorModule {
     return new MonitorModule(setup.repositories, setup.dependencies, setup.config.publicBaseUrl);
+  }
+
+  /** Removes the monitors that ran an evaluator once evaluator records it deleted. */
+  evaluatorCleanupPipeline(): MonitorEvaluatorCleanupPipeline {
+    return buildMonitorEvaluatorCleanupPipeline({ monitors: this.#monitors });
   }
 
   list(input: Readonly<{ projectId: string }>): Promise<MonitorWithEvaluator[]> {

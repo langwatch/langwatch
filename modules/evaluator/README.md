@@ -29,7 +29,6 @@ Anything else evaluator needs belongs to another module and is reached through i
 | ---------------- | ------------------ | --------------------------------------------- |
 | `auditLog`       | `AuditLogApi`      | [audit-log](../audit-log/README.md)           |
 | `modelProviders` | `ModelProviderApi` | [model-provider](../model-provider/README.md) |
-| `monitors`       | `MonitorApi`       | [monitor](../monitor/README.md)               |
 | `permissions`    | `AuthzApi`         | [authz](../authz/README.md)                   |
 | `users`          | `UserApi`          | [user](../user/README.md)                     |
 | `workflows`      | `WorkflowApi`      | [workflow](../workflow/README.md)             |

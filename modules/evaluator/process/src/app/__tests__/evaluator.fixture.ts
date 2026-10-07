@@ -5,7 +5,6 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ModelProviderResolution, ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -16,12 +15,10 @@ import { vi } from "vitest";
 import { MemoryEvaluatorRepository } from "../../repositories/memory/memory.evaluator.repository.ts";
 import { EvaluatorModule, type EvaluatorGraph } from "../evaluator.app.ts";
 
-/** The workflow and monitor rows, as recording doubles. */
+/** The workflow rows, as recording doubles. */
 export function testEvaluatorGraph(overrides: Partial<EvaluatorGraph> = {}): EvaluatorGraph {
   return {
     findLinkedWorkflow: vi.fn(async () => ({ id: "workflow-1", name: "Judge" })),
-    findMonitorsUsingEvaluator: vi.fn(async () => []),
-    deleteMonitorsUsingEvaluator: vi.fn(async () => ({ count: 0 })),
     archiveLinkedWorkflow: vi.fn(async () => ({ id: "workflow-1" })),
     replicateEvaluatorWorkflow: vi.fn(async () => "workflow-2"),
     deleteReplicatedWorkflow: vi.fn(async () => void 0),
@@ -89,7 +86,6 @@ export function createEvaluatorTestApp(
         users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
         workflows: createApiFixture<WorkflowApi>({ assertInProject: async () => void 0 }),
         modelProviders,
-        monitors: createApiFixture<MonitorApi>(),
       },
       config: { publicBaseUrl: "https://langwatch.test" },
       resources: new ResourceScope(),

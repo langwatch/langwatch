@@ -6,7 +6,7 @@ The server half of [monitor](../README.md). Monitors: the checks that run an eva
 
 ## Installation
 
-`defineProcessModule("monitor").withRepositories(monitorRepositories).withApi(MonitorModule).withTransports(…, monitorTrpcTransport)`, `src/monitor.module.ts:8`.
+`defineProcessModule("monitor").withRepositories(monitorRepositories).withApi(MonitorModule).withTransports(…, monitorTrpcTransport).withEventing(monitorEvaluatorCleanupEventing)`, `src/monitor.module.ts:9`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -285,7 +285,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
-None: monitor declares no pipeline, process manager, subscriber or task.
+### Pipeline `monitor_evaluator_cleanup` (aggregate `global`)
+
+Declared at `src/eventing/monitor-evaluator-cleanup.pipeline.ts:33`.
+
+| Kind            | Name                      | Handles                                                            | Declared at                                             |
+| --------------- | ------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------- |
+| peer subscriber | `monitorEvaluatorDeleted` | `lw.evaluator.deleted` from [evaluator](../../evaluator/README.md) | `src/eventing/monitor-evaluator-cleanup.pipeline.ts:40` |
 
 ## Configuration
 

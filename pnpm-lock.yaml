@@ -7705,9 +7705,6 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
-      '@langwatch/experiment-contract':
-        specifier: workspace:*
-        version: link:../../experiment/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -8328,9 +8325,6 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
-      '@langwatch/monitor-contract':
-        specifier: workspace:*
-        version: link:../../monitor/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
