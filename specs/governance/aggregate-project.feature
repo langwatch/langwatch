@@ -434,6 +434,19 @@ Feature: An aggregate project reads its member projects
     Then the page shows its heading and says "Analytics across member projects is not available yet. Open Trace Explorer to see member traces."
     And it draws no chart and runs no analytics query
 
+  @integration
+  Scenario: The aggregate's reports offer no chart to add
+    Given an aggregate project
+    When ana opens a link to its reports or to the chart editor
+    Then neither offers "Add chart" nor a Save button
+
+  @integration
+  Scenario: A chart save the server refuses says why
+    Given a project whose server refuses a new chart, as an aggregate does
+    When ana saves the chart from the chart editor
+    Then an error toast shows the server's reason
+    And the editor stays open
+
   @unit
   Scenario: The aggregate's home points at its traces instead of saying no data
     When ana opens the aggregate project's home

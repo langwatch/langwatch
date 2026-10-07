@@ -65,6 +65,7 @@ import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { type FilterParam, useFilterParams } from "~/hooks/useFilterParams";
 import { useRouter } from "~/utils/compat/next-router";
@@ -742,6 +743,10 @@ function CustomGraphForm({
             : `/${project?.slug}/analytics/reports`;
           void router.push(dashboardUrl);
         },
+        // A refused save (an aggregate project is read only, a plan limit,
+        // a lost permission) leaves the editor open; say why.
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't save the graph" }),
       },
     );
   };
@@ -774,6 +779,8 @@ function CustomGraphForm({
             : `/${project?.slug}/analytics/reports`;
           void router.push(dashboardUrl);
         },
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't save the graph" }),
       },
     );
   };
