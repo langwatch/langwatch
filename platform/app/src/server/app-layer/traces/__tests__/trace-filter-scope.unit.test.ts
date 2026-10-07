@@ -42,6 +42,18 @@ describe("scopeTraceFilterToTable", () => {
     });
   });
 
+  describe("given another table under a fence over several tenants", () => {
+    it("matches membership on the tenant and trace id together", () => {
+      const { sql } = scopeTraceFilterToTable({
+        table: "stored_spans",
+        filterWhere: FILTER,
+      });
+      expect(sql).toMatch(
+        /^\(\(TenantId, TraceId\) IN \(\s*SELECT TenantId, TraceId\s/,
+      );
+    });
+  });
+
   describe("given another table and a live window", () => {
     /** @scenario "A live window leaves the facet membership uncapped" */
     it("leaves the upper bound off, as the reads around it do", () => {

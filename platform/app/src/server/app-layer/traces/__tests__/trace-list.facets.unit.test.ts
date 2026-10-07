@@ -158,7 +158,7 @@ describe("TraceListService.getFacets", () => {
       const evaluator = repository.findCategoricalFacetRaw.mock.calls
         .map(([params]) => params.query as { sql: string; params: unknown })
         .find((q) => q.sql.includes("FROM evaluation_runs"));
-      expect(evaluator?.sql).toContain("TraceId IN (");
+      expect(evaluator?.sql).toContain("(TenantId, TraceId) IN (");
       expect(evaluator?.sql).toContain(compiled(query));
     });
 
@@ -225,7 +225,7 @@ describe("TraceListService.getFacets", () => {
       const evaluator = repository.findCategoricalFacetRaw.mock.calls
         .map(([params]) => params.query as { sql: string })
         .find((q) => q.sql.includes("FROM evaluation_runs"));
-      expect(evaluator?.sql).not.toContain("TraceId IN (");
+      expect(evaluator?.sql).not.toContain("(TenantId, TraceId) IN (");
     });
   });
 

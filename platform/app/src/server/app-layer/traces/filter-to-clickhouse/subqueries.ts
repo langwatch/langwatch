@@ -22,12 +22,20 @@ function tenantMarkerFor(table: string): string {
   }
 }
 
+/**
+ * A fence can span several tenants (an aggregate project reads its members),
+ * and two of them may hold the same trace id. Every subquery here therefore
+ * matches the outer row on its (tenant, key) pair, never on the key alone, so
+ * a match in one tenant never selects another tenant's row with the same id.
+ * Each is parenthesised whole, because ClickHouse reads `NOT (a, b) IN (...)`
+ * as `not(a, b) IN (...)`.
+ */
 export function boundedSubquery(
   table: string,
   timeCol: string,
   innerWhere: string,
 ): string {
-  return `TraceId IN (SELECT DISTINCT TraceId FROM ${table} WHERE ${tenantMarkerFor(table)} AND ${timeCol} >= fromUnixTimestamp64Milli({timeFrom:Int64}) AND ${timeCol} <= fromUnixTimestamp64Milli({timeTo:Int64}) AND ${innerWhere})`;
+  return `((TenantId, TraceId) IN (SELECT DISTINCT TenantId, TraceId FROM ${table} WHERE ${tenantMarkerFor(table)} AND ${timeCol} >= fromUnixTimestamp64Milli({timeFrom:Int64}) AND ${timeCol} <= fromUnixTimestamp64Milli({timeTo:Int64}) AND ${innerWhere}))`;
 }
 
 /**
@@ -62,13 +70,13 @@ export function instantEvalJudgmentsSubquery({
     ` AND CreatedAt <= fromUnixTimestamp64Milli({${untilParam}:Int64})`;
   if (by === "conversation") {
     return (
-      `Attributes['gen_ai.conversation.id'] IN (SELECT argMax(ThreadId, UpdatedAt) AS MatchedThreadId FROM instant_eval_judgments WHERE ${where}` +
-      ` GROUP BY TraceId, SpanId, QuestionId HAVING argMax(Passed, UpdatedAt) = 1 AND MatchedThreadId != '')`
+      `((TenantId, Attributes['gen_ai.conversation.id']) IN (SELECT TenantId, argMax(ThreadId, UpdatedAt) AS MatchedThreadId FROM instant_eval_judgments WHERE ${where}` +
+      ` GROUP BY TenantId, TraceId, SpanId, QuestionId HAVING argMax(Passed, UpdatedAt) = 1 AND MatchedThreadId != ''))`
     );
   }
   return (
-    `TraceId IN (SELECT TraceId FROM instant_eval_judgments WHERE ${where}` +
-    ` GROUP BY TraceId, SpanId, QuestionId HAVING argMax(Passed, UpdatedAt) = 1)`
+    `((TenantId, TraceId) IN (SELECT TenantId, TraceId FROM instant_eval_judgments WHERE ${where}` +
+    ` GROUP BY TenantId, TraceId, SpanId, QuestionId HAVING argMax(Passed, UpdatedAt) = 1))`
   );
 }
 
@@ -91,8 +99,8 @@ export function latestEvaluationRunsSubquery({
 }): string {
   const bounds = `${tenantSet()} AND ${timeCol} >= fromUnixTimestamp64Milli({timeFrom:Int64}) AND ${timeCol} <= fromUnixTimestamp64Milli({timeTo:Int64}) AND ${scopeWhere}`;
   return (
-    `TraceId IN (SELECT DISTINCT TraceId FROM evaluation_runs WHERE ${bounds} AND ${innerWhere}` +
-    ` AND (TenantId, EvaluationId, UpdatedAt) IN (SELECT TenantId, EvaluationId, max(UpdatedAt) FROM evaluation_runs WHERE ${bounds} GROUP BY TenantId, EvaluationId))`
+    `((TenantId, TraceId) IN (SELECT DISTINCT TenantId, TraceId FROM evaluation_runs WHERE ${bounds} AND ${innerWhere}` +
+    ` AND (TenantId, EvaluationId, UpdatedAt) IN (SELECT TenantId, EvaluationId, max(UpdatedAt) FROM evaluation_runs WHERE ${bounds} GROUP BY TenantId, EvaluationId)))`
   );
 }
 
@@ -102,8 +110,8 @@ export function latestEvaluationRunsSubquery({
  * IN-tuple dedup pattern (no FINAL) and bounds StartedAt for partition pruning.
  */
 export function scenarioRunSubquery(innerWhere: string): string {
-  return `Attributes['scenario.run_id'] IN (
-    SELECT ScenarioRunId
+  return `((TenantId, Attributes['scenario.run_id']) IN (
+    SELECT TenantId, ScenarioRunId
     FROM simulation_runs
     WHERE ${tenantSet()}
       AND StartedAt >= fromUnixTimestamp64Milli({timeFrom:Int64})
@@ -117,5 +125,5 @@ export function scenarioRunSubquery(innerWhere: string): string {
           AND StartedAt <= fromUnixTimestamp64Milli({timeTo:Int64})
         GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
       )
-  )`;
+  ))`;
 }

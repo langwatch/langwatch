@@ -16,6 +16,11 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
+import {
+  type ResolvedInstantEvalRun,
+  translateFilterToClickHouse,
+  translateFilterWithEvalRuns,
+} from "../../filter-to-clickhouse";
 import { TraceListClickHouseRepository } from "../trace-list.clickhouse.repository";
 import type { TraceListCursor } from "../trace-list.repository";
 
@@ -149,6 +154,49 @@ async function listTraceIds(
     offset: 0,
   });
   return page.rows.map((row) => row.traceId);
+}
+
+/** One span carrying `marker`, named after its tenant. */
+async function insertMarkedSpan({
+  tenantId,
+  traceId,
+  marker,
+  startTimeMs,
+}: {
+  tenantId: string;
+  traceId: string;
+  marker: string;
+  startTimeMs: number;
+}) {
+  await ch.insert({
+    table: "stored_spans",
+    values: [
+      {
+        ProjectionId: `proj-${nanoid()}`,
+        TenantId: tenantId,
+        TraceId: traceId,
+        SpanId: `span-${nanoid()}`,
+        ParentSpanId: null,
+        ParentTraceId: null,
+        ParentIsRemote: null,
+        Sampled: 1,
+        StartTime: new Date(startTimeMs),
+        EndTime: new Date(startTimeMs + 100),
+        DurationMs: 100,
+        SpanName: `span-of-${tenantId}`,
+        SpanKind: 1,
+        ServiceName: "t",
+        ResourceAttributes: {},
+        SpanAttributes: { marker },
+        StatusCode: 1,
+        StatusMessage: "",
+        EventCount: 0,
+        LinkCount: 0,
+      },
+    ],
+    format: "JSONEachRow",
+    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+  });
 }
 
 const rowKey = (row: { tenantId: string; traceId: string }) =>
@@ -379,6 +427,108 @@ describe("TraceListClickHouseRepository through the proof", () => {
           `${TWIN_B}:${TWIN_TRACE_ID}`,
         ]);
         expect(page.totalHits).toBe(4);
+      });
+    });
+
+    describe("when a filter matches a span only member A's trace holds", () => {
+      it("keeps member A's row and leaves member B's row of the same id out", async () => {
+        await insertMarkedSpan({
+          tenantId: TWIN_A,
+          traceId: TWIN_TRACE_ID,
+          marker: "only-in-a",
+          startTimeMs: TODAY,
+        });
+        await insertMarkedSpan({
+          tenantId: TWIN_B,
+          traceId: TWIN_TRACE_ID,
+          marker: "in-b",
+          startTimeMs: TODAY,
+        });
+        const authorization = twinProof();
+        const filterWhere =
+          translateFilterToClickHouse(
+            "span.attribute.marker:only-in-a",
+            WINDOW,
+          ) ?? undefined;
+
+        const page = await repo.findAll({
+          authorization,
+          timeRange: WINDOW,
+          sort: { column: "OccurredAt", direction: "desc" },
+          limit: 10,
+          offset: 0,
+          filterWhere,
+        });
+        expect(page.rows.map(rowKey)).toEqual([`${TWIN_A}:${TWIN_TRACE_ID}`]);
+
+        const count = await repo.findCount({
+          authorization,
+          timeRange: WINDOW,
+          since: WINDOW.from,
+          filterWhere,
+        });
+        expect(count).toBe(1);
+
+        const facets = await repo.findBatchedFacets({
+          authorization,
+          timeRange: WINDOW,
+          table: "stored_spans",
+          timeColumn: "StartTime",
+          categoricalSpecs: [{ key: "span", expression: "SpanName" }],
+          rangeSpecs: [],
+          topN: 50,
+          filterWhere,
+        });
+        expect(facets.categoricals.span?.values.map((v) => v.value)).toEqual([
+          `span-of-${TWIN_A}`,
+        ]);
+      });
+    });
+
+    describe("when filters reach side tables no twin row has a match in", () => {
+      it("runs each one across the members and matches by tenant and id", async () => {
+        const evalRuns: ResolvedInstantEvalRun[] = [
+          {
+            question: "is it twinned",
+            target: "traces",
+            runId: `run-${run}`,
+            writtenFrom: WINDOW.from,
+            writtenUntil: WINDOW.to,
+          },
+          {
+            question: "is the thread twinned",
+            target: "threads",
+            runId: `thread-run-${run}`,
+            writtenFrom: WINDOW.from,
+            writtenUntil: WINDOW.to,
+          },
+        ];
+        const twinIds = async (queryText: string) => {
+          const page = await repo.findAll({
+            authorization: twinProof(),
+            timeRange: WINDOW,
+            sort: { column: "OccurredAt", direction: "desc" },
+            limit: 10,
+            offset: 0,
+            filterWhere:
+              translateFilterWithEvalRuns({
+                queryText,
+                timeRange: WINDOW,
+                evalRuns,
+              }) ?? undefined,
+          });
+          return page.rows.length;
+        };
+
+        for (const field of [
+          "scenarioVerdict:success",
+          "evaluator:nobody",
+          'eval:"is it twinned"',
+          'eval.conversation:"is the thread twinned"',
+        ]) {
+          expect(await twinIds(field)).toBe(0);
+          expect(await twinIds(`NOT ${field}`)).toBe(4);
+        }
       });
     });
 

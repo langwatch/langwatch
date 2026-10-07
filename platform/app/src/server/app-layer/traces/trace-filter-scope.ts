@@ -34,6 +34,9 @@ function traceWindowWhere(isLiveWindow: boolean): string {
  * the traces the filter selects, read at their latest version so a trace
  * whose older row matched the filter is not counted by what it used to say.
  *
+ * Membership is on the (tenant, trace id) pair: a fence can span several
+ * tenants, and two of them may hold the same trace id.
+ *
  * The parameters are the compiled filter's own: the window predicate reuses
  * the names the compiler already bound.
  */
@@ -52,8 +55,8 @@ export function scopeTraceFilterToTable({
   }
   const window = traceWindowWhere(isLiveWindow);
   return {
-    sql: `TraceId IN (
-      SELECT TraceId
+    sql: `((TenantId, TraceId) IN (
+      SELECT TenantId, TraceId
       FROM trace_summaries
       WHERE ${window}
         AND (TenantId, TraceId, UpdatedAt) IN (
@@ -63,7 +66,7 @@ export function scopeTraceFilterToTable({
           GROUP BY TenantId, TraceId
         )
         AND (${filterWhere.sql})
-    )`,
+    ))`,
     params: filterWhere.params,
   };
 }
