@@ -16,7 +16,9 @@ import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import {
   type AuthorizedClickHouse,
+  ownProjectIdOf,
   tenantScope,
+  tenantScopeKey,
 } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { safeJsonParse } from "~/utils/safeJsonParse";
@@ -222,10 +224,10 @@ export class TraceEvaluationsClickHouseRepository
    * Keyed by `EvaluationId` — the table's second sort column — so ClickHouse
    * prunes to the matching granule(s) and the read stays bounded. Grouped by
    * tenant and ordered by it, so on an aggregate the read names one project,
-   * the same one every time. Returns null when no project the proof reads
-   * holds the evaluation, or the (already-pruned) read still hits the memory
-   * ceiling: both are "nothing to show", not errors worth failing the caller
-   * over.
+   * the same one every time. Returns null when ClickHouse is unreachable for
+   * the project, no project the proof reads holds the evaluation, or the
+   * (already-pruned) read still hits the memory ceiling: all three are
+   * "nothing to show", not errors worth failing the caller over.
    */
   async findInputsByEvaluationId({
     authorization,
@@ -233,6 +235,9 @@ export class TraceEvaluationsClickHouseRepository
   }: FindInputsByEvaluationIdInput): Promise<EvaluationInputsRead | null> {
     try {
       const reader = this.clickhouse.as(authorization, { reads: "traces" });
+      if (!(await this.#clientResolves({ authorization, evaluationId }))) {
+        return null;
+      }
       const result = await reader.query({
         query: `
           SELECT TenantId, argMax(Inputs, UpdatedAt) AS Inputs
@@ -272,6 +277,34 @@ export class TraceEvaluationsClickHouseRepository
         "Failed to fetch evaluation inputs from ClickHouse",
       );
       throw new Error("Failed to fetch evaluation inputs");
+    }
+  }
+
+  /**
+   * An unreachable ClickHouse means "nothing to show" for the inputs read,
+   * not a failure worth surfacing: the caller renders an empty inputs panel.
+   * Resolves the client of the project the reader queries through, ahead of
+   * the query, so a failed lookup is told apart from a failed query.
+   */
+  async #clientResolves({
+    authorization,
+    evaluationId,
+  }: FindInputsByEvaluationIdInput): Promise<boolean> {
+    try {
+      await this.resolveClient(
+        ownProjectIdOf({ authorization, reads: "traces" }),
+      );
+      return true;
+    } catch (error) {
+      logger.warn(
+        {
+          evaluationId,
+          scope: tenantScopeKey({ authorization, reads: "traces" }),
+          error: error instanceof Error ? error.message : error,
+        },
+        "ClickHouse client unavailable for evaluation inputs read",
+      );
+      return false;
     }
   }
 
