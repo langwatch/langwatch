@@ -54,6 +54,7 @@ const SORT_EXPRESSIONS: Record<SessionGroupSortColumn, string> = {
 // INSTEAD of the column inside sibling aggregates, which reads as an
 // aggregate nested in an aggregate and fails the whole query.
 interface ClickHouseSessionGroupRow {
+  TenantId: string;
   ConversationId: string;
   TraceCount: number | string;
   SessionCost: number | string;
@@ -137,21 +138,30 @@ export class SessionGroupsClickHouseRepository
     const sortDir = query.sort.direction === "asc" ? "ASC" : "DESC";
     const cursorComparison = query.sort.direction === "asc" ? ">" : "<";
     // Keyset over the GROUP BY output lives in HAVING: the sort value is an
-    // aggregate, so it does not exist before grouping. ConversationId ASC is
-    // the unique tie-breaker regardless of sort direction, matching the trace
-    // list's TraceId tie-break convention.
+    // aggregate, so it does not exist before grouping. (ConversationId,
+    // TenantId) ASC is the unique tie-breaker regardless of sort direction,
+    // matching the trace list's (tenant, trace) convention: a session is a
+    // conversation within one project (ADR-144 block F). A cursor minted
+    // before the tenant was carried pages on the conversation id alone.
+    const tieBreak =
+      query.cursor?.tenantId !== undefined
+        ? "(ConversationId, TenantId) > ({cursorConversationId:String}, {cursorTenantId:String})"
+        : "ConversationId > {cursorConversationId:String}";
     const havingClause = query.cursor
       ? `HAVING (
               ${sortExpression} ${cursorComparison} {cursorSortValue:Float64}
               OR (
                 ${sortExpression} = {cursorSortValue:Float64}
-                AND ConversationId > {cursorConversationId:String}
+                AND ${tieBreak}
               )
             )`
       : "";
     if (query.cursor) {
       params.cursorSortValue = query.cursor.sortValue;
       params.cursorConversationId = query.cursor.conversationId;
+      if (query.cursor.tenantId !== undefined) {
+        params.cursorTenantId = query.cursor.tenantId;
+      }
     }
 
     const client = this.clickhouse.as(query.authorization, { reads: "traces" });
@@ -163,6 +173,7 @@ export class SessionGroupsClickHouseRepository
       client.query({
         query: `
         SELECT
+          TenantId,
           ${CONVERSATION_ID_EXPR} AS ConversationId,
           count() AS TraceCount,
           ${SORT_EXPRESSIONS.cost} AS SessionCost,
@@ -186,9 +197,9 @@ export class SessionGroupsClickHouseRepository
           AND ${CONVERSATION_ID_EXPR} != ''
           AND ${dedupFilter}
           ${sessionMatchClause}
-        GROUP BY ConversationId
+        GROUP BY TenantId, ConversationId
         ${havingClause}
-        ORDER BY ${sortExpression} ${sortDir}, ConversationId ASC
+        ORDER BY ${sortExpression} ${sortDir}, ConversationId ASC, TenantId ASC
         LIMIT {limit:UInt32}
       `,
         query_params: { ...params, limit: query.limit },
@@ -196,7 +207,7 @@ export class SessionGroupsClickHouseRepository
       }),
       client.query({
         query: `
-        SELECT uniqExact(${CONVERSATION_ID_EXPR}) AS totalHits
+        SELECT uniqExact(TenantId, ${CONVERSATION_ID_EXPR}) AS totalHits
         FROM ${TABLE_NAME}
         WHERE ${baseWhere}
           AND ${CONVERSATION_ID_EXPR} != ''
@@ -249,7 +260,7 @@ export class SessionGroupsClickHouseRepository
       // filter and drags its session into the page, even when the current
       // version no longer matches.
       branches.push(`
-            SELECT DISTINCT ${CONVERSATION_ID_EXPR} AS SessionId
+            SELECT DISTINCT TenantId, ${CONVERSATION_ID_EXPR} AS SessionId
             FROM ${TABLE_NAME}
             WHERE ${baseWhere}
               AND ${CONVERSATION_ID_EXPR} != ''
@@ -282,7 +293,7 @@ export class SessionGroupsClickHouseRepository
         params.logTimeTo = query.timeRange.to + LOG_WINDOW_BUFFER_MS;
       }
       branches.push(`
-            SELECT DISTINCT ProviderSessionId AS SessionId
+            SELECT DISTINCT TenantId, ProviderSessionId AS SessionId
             FROM log_records
             WHERE ${tenantSet()}
               AND TimeUnixMs >= fromUnixTimestamp64Milli({logTimeFrom:Int64})
@@ -294,7 +305,7 @@ export class SessionGroupsClickHouseRepository
     if (branches.length === 0) return { sql: "", params };
 
     return {
-      sql: `AND ${CONVERSATION_ID_EXPR} IN (${branches.join("\n            UNION DISTINCT\n")}
+      sql: `AND (TenantId, ${CONVERSATION_ID_EXPR}) IN (${branches.join("\n            UNION DISTINCT\n")}
           )`,
       params,
     };
@@ -365,6 +376,7 @@ export class SessionGroupsClickHouseRepository
     );
     return {
       conversationId: row.ConversationId,
+      tenantId: row.TenantId,
       traceCount: Number(row.TraceCount),
       totalCost: Number(row.SessionCost),
       totalTokens: Number(row.SessionTokens),

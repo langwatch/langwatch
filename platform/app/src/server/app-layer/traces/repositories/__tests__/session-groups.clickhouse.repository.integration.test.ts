@@ -557,6 +557,79 @@ describe("SessionGroupsClickHouseRepository", () => {
     });
   });
 
+  describe("given two members whose sessions share one conversation id", () => {
+    it("lists one session per member and pages through both", async () => {
+      const sharedConversation = `shared-conversation-${nanoid()}`;
+      const memberX = `${TWIN_MEMBER_X}-shared`;
+      const memberY = `${TWIN_MEMBER_Y}-shared`;
+      await insertTraceSummaries([
+        {
+          ...sessionTrace({
+            sessionId: sharedConversation,
+            traceId: `shared-x-${nanoid()}`,
+            occurredAtMs: baseMs + 5_000,
+            cost: 1,
+            promptTokens: 1,
+            completionTokens: 1,
+          }),
+          TenantId: memberX,
+        },
+        {
+          ...sessionTrace({
+            sessionId: sharedConversation,
+            traceId: `shared-y-${nanoid()}`,
+            occurredAtMs: baseMs + 5_000,
+            cost: 2,
+            promptTokens: 2,
+            completionTokens: 2,
+          }),
+          TenantId: memberY,
+        },
+      ]);
+      const authorization = aggregateProof({
+        projectId: TWIN_AGGREGATE,
+        members: [
+          { projectId: memberX, from: 0 },
+          { projectId: memberY, from: 0 },
+        ],
+        now: baseMs,
+      });
+
+      const page = await repository.findSessionGroups(query({ authorization }));
+      expect(
+        page.rows
+          .map((row) => ({ tenantId: row.tenantId, cost: row.totalCost }))
+          .sort((a, b) => a.cost - b.cost),
+      ).toEqual([
+        { tenantId: memberX, cost: 1 },
+        { tenantId: memberY, cost: 2 },
+      ]);
+      expect(page.totalHits).toBe(2);
+
+      // Walking one row per page on the tie: same sort value, same
+      // conversation id, so only the tenant tells the pages apart.
+      const first = await repository.findSessionGroups(
+        query({ authorization, limit: 1 }),
+      );
+      const firstRow = first.rows[0];
+      if (!firstRow) throw new Error("expected a first session");
+      const second = await repository.findSessionGroups(
+        query({
+          authorization,
+          limit: 1,
+          cursor: {
+            sortValue: firstRow.lastActivityMs,
+            conversationId: firstRow.conversationId,
+            tenantId: firstRow.tenantId,
+          },
+        }),
+      );
+      expect(
+        [firstRow.tenantId, second.rows[0]?.tenantId].sort(),
+      ).toEqual([memberX, memberY].sort());
+    });
+  });
+
   describe("given more sessions than one page", () => {
     /** @scenario Session keyset pagination walks every session exactly once */
     it("walks every session exactly once in descending last-activity order", async () => {

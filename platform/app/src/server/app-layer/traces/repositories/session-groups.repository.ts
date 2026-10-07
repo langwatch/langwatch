@@ -27,6 +27,13 @@ export interface SessionGroupSort {
 export interface SessionGroupCursor {
   sortValue: number;
   conversationId: string;
+  /**
+   * The tenant of the boundary session (ADR-144 block F). On an aggregate two
+   * members may share a conversation id, so the pair is the tie-breaker.
+   * Absent on a cursor minted before the tenant was carried, which pages on
+   * the conversation id alone.
+   */
+  tenantId?: string;
 }
 
 export interface SessionGroupsQuery {
@@ -52,6 +59,12 @@ export interface SessionGroupsQuery {
 
 export interface SessionGroupRow {
   conversationId: string;
+  /**
+   * The project the session's traces belong to. A session is a conversation
+   * within one project: two members of an aggregate sharing a conversation id
+   * are two sessions, not one (ADR-144 block F).
+   */
+  tenantId: string;
   traceCount: number;
   totalCost: number;
   totalTokens: number;

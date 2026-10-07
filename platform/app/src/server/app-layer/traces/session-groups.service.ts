@@ -100,6 +100,8 @@ export interface SessionGroupCodingAgentDto {
 
 export interface SessionGroupDto {
   conversationId: string;
+  /** The project the session belongs to; on an aggregate, the member. */
+  projectId: string;
   traceCount: number;
   totalCost: number;
   totalTokens: number;
@@ -176,6 +178,7 @@ export function mapSessionGroupRowToDto({
 }): SessionGroupDto {
   return {
     conversationId: row.conversationId,
+    projectId: row.tenantId,
     traceCount: row.traceCount,
     totalCost: row.totalCost,
     totalTokens: row.totalTokens,
@@ -254,17 +257,15 @@ export class SessionGroupsService {
       ? page.rows.slice(0, params.pageSize)
       : page.rows;
 
-    // Coding-agent sessions and pull request links live in Postgres under
-    // the project the proof was minted for; on an aggregate that is the
-    // aggregate itself, not a member.
+    // A session's coding-agent counters live under the project that owns
+    // it, which on an aggregate is the member the fenced read found it in.
+    // Pull request links resolve the organisation, which every member of an
+    // aggregate shares with the project the proof was minted for.
     const projectId = ownProjectIdOf({
       authorization: params.authorization,
       reads: "traces",
     });
-    const enrichments = await this.enrich({
-      tenantId: projectId,
-      rows: visibleRows,
-    });
+    const enrichments = await this.enrich({ rows: visibleRows });
     await this.linkPullRequests({
       tenantId: projectId,
       rows: visibleRows,
@@ -294,6 +295,7 @@ export class SessionGroupsService {
                 column: sortColumn,
               }),
               conversationId: lastRow.conversationId,
+              tenantId: lastRow.tenantId,
               sortColumn,
               sortDirection,
             })
@@ -307,10 +309,8 @@ export class SessionGroupsService {
    * conversations, and a failed lookup must not take the whole list down.
    */
   private async enrich({
-    tenantId,
     rows,
   }: {
-    tenantId: string;
     rows: SessionGroupRow[];
   }): Promise<(SessionGroupCodingAgentDto | null)[]> {
     const results: (SessionGroupCodingAgentDto | null)[] = [];
@@ -320,7 +320,7 @@ export class SessionGroupsService {
         chunk.map((row) =>
           this.codingAgentSessions
             .getBySessionId({
-              projectId: tenantId,
+              projectId: row.tenantId,
               sessionId: row.conversationId,
               startedAtMs: row.startedAtMs,
             })
