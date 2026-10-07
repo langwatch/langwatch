@@ -99,8 +99,18 @@ Feature: Every entry point runs the upgrade once; serving processes never migrat
     When the worker's gate asks
     Then it refuses, naming `pnpm task upgrade`, and runs nothing
 
-  @integration
-  Scenario: A process with no ClickHouse configured does not wait on ClickHouse steps
-    Given an installation whose Postgres steps are done and whose ClickHouse steps are pending
-    When a gate with no ClickHouse target asks
-    Then it is admitted
+  # ClickHouse is mandatory (rounds 20 and 22, S3-NO-CLICKHOUSE): an installation with a
+  # database and no ClickHouse refuses by name. A memory-tier harness has no database and no
+  # installation, so its gate admits without reading a ledger.
+  @unit
+  Scenario: A process with no ClickHouse configured refuses to serve, naming ClickHouse
+    Given an installation whose Postgres steps are done
+    When a gate with a database and no ClickHouse target asks
+    Then it refuses, naming CLICKHOUSE_URL as required
+    And no presence is written
+
+  @unit
+  Scenario: A process with no database configured has no installation to gate
+    Given no DATABASE_URL and no CLICKHOUSE_URL
+    When the gate asks
+    Then it is admitted without reading a ledger

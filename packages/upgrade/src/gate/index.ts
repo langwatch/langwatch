@@ -26,3 +26,4 @@ export {
   servingUpgradeGate,
   upgradeGateOver,
 } from "./serving-upgrade-gate.ts";
+export { NO_CLICKHOUSE_REFUSAL } from "./serving-upgrade-gate.ts";

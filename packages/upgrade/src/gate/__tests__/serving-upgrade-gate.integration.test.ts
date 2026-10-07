@@ -176,15 +176,4 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
       expect(runs).toBe(0);
     });
   });
-
-  describe("given no ClickHouse target configured", () => {
-    /** @scenario "A process with no ClickHouse configured does not wait on ClickHouse steps" */
-    it("admits with the ClickHouse steps still pending", async () => {
-      await recordSteps({ [PRISMA]: "done", [GOOSE]: "pending" });
-      const gate = gateFor({ role: "worker", withClickHouse: false });
-
-      await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
-      await gate.release();
-    });
-  });
 });

@@ -40,7 +40,8 @@ export type ServingVerdict =
       outcome: "first-install";
       command: typeof UPGRADE_COMMAND;
       refusal: string;
-    }>;
+    }>
+  | Readonly<{ admitted: false; outcome: "no-clickhouse"; refusal: string }>;
 
 /** The highest floor any upgrade run recorded, or null when none did (plan 3.2). */
 export function ledgerFloor({
