@@ -317,18 +317,33 @@ function baseUrlOf(server: Server): string {
 
 /**
  * Reads a streamed body until `marker` appears or the stream ends, and
- * returns the text read so far. An SSE stream never ends on its own, so the
- * caller aborts the request once it has what it needs.
+ * returns the text read so far. An SSE stream never ends on its own, so a
+ * response that never sends the marker would keep the read waiting until the
+ * vitest timeout. After `timeoutMs` the read is abandoned through `abort`
+ * (the request's controller), and the caller's assertion then shows what did
+ * arrive.
  */
-async function readStreamUntil(res: Response, marker: string): Promise<string> {
+async function readStreamUntil(
+  res: Response,
+  marker: string,
+  { abort, timeoutMs = 5_000 }: { abort: AbortController; timeoutMs?: number },
+): Promise<string> {
   const reader = res.body?.getReader();
   if (!reader) return "";
   const decoder = new TextDecoder();
   let text = "";
-  while (!text.includes(marker)) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    text += decoder.decode(value, { stream: true });
+  const deadline = setTimeout(() => abort.abort(), timeoutMs);
+  try {
+    while (!text.includes(marker)) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+    }
+  } catch (error) {
+    // Aborting the request rejects the pending read; that is the deadline.
+    if (!abort.signal.aborted) throw error;
+  } finally {
+    clearTimeout(deadline);
   }
   return text;
 }
@@ -1887,7 +1902,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
           expect(res.headers.get("content-type")).toContain(
             "text/event-stream",
           );
-          const streamed = await readStreamUntil(res, "\n\n");
+          const streamed = await readStreamUntil(res, "\n\n", { abort });
           expect(streamed).toMatch(
             /^event: endpoint\ndata: \/messages\?sessionId=\S+\n\n/,
           );
