@@ -16,7 +16,6 @@ describe("cloudClassifierKeyOf", () => {
   });
 
   describe("given a self-hosted install that sets a judge key", () => {
-    /** @scenario "A self-hosted install never judges with a judge key it sets" */
     it("ignores the key, so the install judges through Connect or not at all", () => {
       expect(cloudClassifierKeyOf({ isCloud: false, apiKey: "install-key" })).toBeUndefined();
     });
