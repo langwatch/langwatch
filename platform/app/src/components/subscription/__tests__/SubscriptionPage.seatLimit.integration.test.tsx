@@ -29,7 +29,7 @@ const renderSubscriptionPage = () => {
 };
 
 // ---------------------------------------------------------------------------
-// vi.mock declarations (hoisted — must be at module top-level)
+// vi.mock declarations (hoisted, so they must be at module top-level)
 // ---------------------------------------------------------------------------
 vi.mock("~/hooks/useOrganizationTeamProject", async () => {
   const setup = await import("./subscription-test-setup");
