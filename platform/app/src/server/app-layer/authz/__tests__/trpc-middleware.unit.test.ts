@@ -14,6 +14,7 @@
  * named.
  */
 import { BlankScopeIdError, PermissionDeniedError } from "@langwatch/authz";
+import { HandledError } from "@langwatch/handled-error";
 import type { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -717,6 +718,79 @@ describe("ADR-144: an aggregate read is audited at the door", () => {
       await run();
 
       expect(record).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("ADR-144: a write under an aggregate is refused at the door", () => {
+  const setup = ({
+    kind = "aggregate",
+    type = "mutation",
+  }: {
+    kind?: string;
+    type?: "query" | "mutation";
+  } = {}) => {
+    const params = paramsFor({ projectId: "proj-1" });
+    Object.assign(params.ctx, {
+      app: {
+        permissions: {
+          getDecision: vi
+            .fn()
+            .mockResolvedValue({ permitted: true, organizationRole: "ADMIN" }),
+        },
+        authorization: { authorize: vi.fn() },
+      },
+      projectKinds: {
+        kindOf: vi.fn().mockResolvedValue(kind),
+        kindsOf: vi.fn(),
+      },
+    });
+    const run = (
+      permission: Parameters<typeof checkDeclaredPermission>[0]["permission"],
+    ) => checkDeclaredPermission({ permission })({ ...params, type } as any);
+    return { params, run };
+  };
+
+  describe("when a mutation writes data under an aggregate", () => {
+    it("refuses with the read-only code before the handler runs", async () => {
+      const { params, run } = setup();
+
+      const refusal = await rejection(() => run("workflows:create"));
+
+      expect(HandledError.isHandled(refusal) && refusal.code).toBe(
+        "aggregate_project_is_read_only",
+      );
+      expect(params.next).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a mutation manages the aggregate itself", () => {
+    it("lets it through", async () => {
+      const { params, run } = setup();
+
+      await run("project:update");
+
+      expect(params.next).toHaveBeenCalled();
+    });
+  });
+
+  describe("when a query is declared under a write permission on an aggregate", () => {
+    it("lets it through", async () => {
+      const { params, run } = setup({ type: "query" });
+
+      await run("workflows:create");
+
+      expect(params.next).toHaveBeenCalled();
+    });
+  });
+
+  describe("when the mutation writes under any other kind of project", () => {
+    it("lets it through", async () => {
+      const { params, run } = setup({ kind: "application" });
+
+      await run("workflows:create");
+
+      expect(params.next).toHaveBeenCalled();
     });
   });
 });

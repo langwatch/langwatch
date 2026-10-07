@@ -333,3 +333,11 @@ Feature: An aggregate project reads its member projects
     Given ana opens sam's personal workspace
     Then one audit row of kind personal exists, as before
     And no row of kind aggregate exists
+
+  @integration
+  Scenario: Every write under the aggregate's tenant is refused on the server
+    Given an aggregate project and one of its members
+    When ana creates an experiment, a dataset, an annotation or a prompt on the aggregate, or edits one of its traces
+    Then each is refused as read only and nothing is written
+    And the same calls on the member are not refused
+    And ana can still edit the aggregate's rule, rename it and archive it

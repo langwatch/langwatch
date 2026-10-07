@@ -54,6 +54,10 @@ import {
 } from "../permissions/errors";
 import { isAggregateProjectKind } from "../projects/project-kinds";
 import {
+  assertProjectAcceptsWrites,
+  writesUnderProject,
+} from "../projects/project-write-guard";
+import {
   permissionDecisionRecord,
   principalOfSession,
   recordPermissionDecision,
@@ -98,6 +102,8 @@ type MiddlewareParams = {
   input: ScopeInput;
   /** The procedure path tRPC hands every middleware; the proof's purpose. */
   path?: string;
+  /** The procedure type tRPC hands every middleware. */
+  type?: "query" | "mutation" | "subscription";
   next: () => any;
 };
 
@@ -138,6 +144,33 @@ async function mintRouteAuthorization({
 }
 
 /**
+ * ADR-144 decision 8: nothing is written under an aggregate's tenant. Every
+ * mutation declared under a write permission on a project-tier resource is
+ * refused on an aggregate here, after the permission (so a caller with no
+ * business on the project is refused for that reason first) and before the
+ * handler (so no route has to remember to ask). Queries and the permissions
+ * that manage the project itself are untouched.
+ */
+async function refuseWriteUnderAggregate({
+  ctx,
+  type,
+  permission,
+  scope,
+}: {
+  ctx: MiddlewareParams["ctx"];
+  type: MiddlewareParams["type"];
+  permission: AuthzPermission;
+  scope: { tier: string; id: string };
+}): Promise<void> {
+  if (type !== "mutation" || scope.tier !== "project") return;
+  if (!writesUnderProject(permission)) return;
+  await assertProjectAcceptsWrites({
+    kinds: projectKindsOf(ctx),
+    projectId: scope.id,
+  });
+}
+
+/**
  * ADR-144 decision 9: a read of an aggregate project is audited where its
  * proof is minted, so a deep link, a prefetch or a direct call is audited
  * as surely as a rendered page. Only a proof that reads shared grants on an
@@ -151,14 +184,16 @@ async function mintRouteAuthorization({
 async function auditAggregateRead({
   ctx,
   session,
-  projectId,
+  scope,
 }: {
   ctx: MiddlewareParams["ctx"];
   session: Session;
-  projectId: string;
+  scope: { tier: string; id: string };
 }): Promise<void> {
   const authorization = ctx.authorization;
+  if (scope.tier !== "project") return;
   if (!authorization?.grants.some((grant) => grant.kind === "shared")) return;
+  const projectId = scope.id;
   try {
     const kind = await projectKindsOf(ctx).kindOf(projectId);
     if (!isAggregateProjectKind(kind)) return;
@@ -224,7 +259,7 @@ export const checkDeclaredPermission = ({
 }): DeclaredMiddleware =>
   declareAuthzMiddleware(
     { kind: "permission", permission, via, nondisclosure },
-    async ({ ctx, input, path, next }: MiddlewareParams) => {
+    async ({ ctx, input, path, type, next }: MiddlewareParams) => {
       // `publicProcedure` exposes `.permission()` too, so a session is not a
       // given. Answering "unauthenticated" before any id is looked at keeps
       // an anonymous caller from learning anything about the scope.
@@ -278,6 +313,8 @@ export const checkDeclaredPermission = ({
         scope,
       });
 
+      await refuseWriteUnderAggregate({ ctx, type, permission, scope });
+
       // Legacy parity: the organization tier never carried a role onto the
       // context, so only the project/team resolutions (non-null role) do.
       if (organizationRole !== null) {
@@ -291,9 +328,7 @@ export const checkDeclaredPermission = ({
         permission,
         scope,
       });
-      if (scope.tier === "project") {
-        await auditAggregateRead({ ctx, session, projectId: scope.id });
-      }
+      await auditAggregateRead({ ctx, session, scope });
 
       ctx.permissionChecked = true;
       return next();

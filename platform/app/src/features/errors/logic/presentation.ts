@@ -1468,6 +1468,14 @@ const presentations = {
     describe: () =>
       "It reads traces from other projects and accepts no API key of its own. Send traces to one of its member projects instead.",
   },
+  aggregate_project_is_read_only: {
+    // Reached from any save, create or edit aimed at an aggregate, often a
+    // form opened before the project was switched, so the copy says where
+    // the change belongs rather than what went wrong.
+    title: "This project can't be changed",
+    describe: () =>
+      "It reads traces from other projects and keeps nothing of its own. Open the project the data belongs to and make the change there.",
+  },
   aggregate_rule_outside_organization: {
     // Raised before anything is written, so the form is still open with the
     // rule in it: the copy says what to change there. One answer for a

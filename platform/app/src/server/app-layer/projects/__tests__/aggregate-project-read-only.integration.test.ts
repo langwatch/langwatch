@@ -93,7 +93,9 @@ describe("Feature: the aggregate project is read only", () => {
           .then(() => null)
           .catch((error: unknown) => error);
 
-        expect(handledCodeOf(refusal)).toBe("monitor_on_aggregate_project");
+        // Refused at the door with the general read-only answer (block G),
+        // before the monitor route's own aggregate check is reached.
+        expect(handledCodeOf(refusal)).toBe("aggregate_project_is_read_only");
         expect(
           await prisma.monitor.count({ where: { projectId: aggregate.id } }),
         ).toBe(0);
@@ -111,7 +113,7 @@ describe("Feature: the aggregate project is read only", () => {
           .then(() => null)
           .catch((error: unknown) => error);
 
-        expect(handledCodeOf(refusal)).toBe("monitor_on_aggregate_project");
+        expect(handledCodeOf(refusal)).toBe("aggregate_project_is_read_only");
       });
     });
   });
