@@ -95,31 +95,38 @@ describe("experiments.copy", () => {
 
   afterAll(async () => {
     globalForApp.__langwatch_app = previousApp;
-    await prisma.experiment
-      .deleteMany({
-        where: {
-          OR: [{ id: originalId }, { id: { in: seededIds } }],
-        },
-      })
-      .catch(() => {});
-    await prisma.llmPromptConfig
-      .deleteMany({ where: { id: { in: seededPromptIds } } })
-      .catch(() => {});
-    await prisma.dataset
-      .deleteMany({
-        where: {
-          OR: [
-            { id: { in: seededDatasetIds } },
-            { projectId: { in: createdProjectIds } },
-          ],
-        },
-      })
-      .catch(() => {});
+    // Delete experiments from main project
+    await prisma.experiment.deleteMany({
+      where: {
+        projectId: PROJECT_ID,
+        id: { in: [originalId, ...seededIds] },
+      },
+    });
+    // Delete experiments from created projects
     for (const pid of createdProjectIds) {
-      await prisma.experiment
-        .deleteMany({ where: { projectId: pid } })
-        .catch(() => {});
-      await prisma.project.delete({ where: { id: pid } }).catch(() => {});
+      await prisma.experiment.deleteMany({ where: { projectId: pid } });
+    }
+    // Delete prompts from main project
+    await prisma.llmPromptConfig.deleteMany({
+      where: {
+        projectId: PROJECT_ID,
+        id: { in: seededPromptIds },
+      },
+    });
+    // Delete datasets from main project
+    await prisma.dataset.deleteMany({
+      where: {
+        projectId: PROJECT_ID,
+        id: { in: seededDatasetIds },
+      },
+    });
+    // Delete datasets from created projects
+    for (const pid of createdProjectIds) {
+      await prisma.dataset.deleteMany({ where: { projectId: pid } });
+    }
+    // Delete created projects
+    for (const pid of createdProjectIds) {
+      await prisma.project.delete({ where: { id: pid } });
     }
   });
 
@@ -225,6 +232,9 @@ describe("experiments.copy", () => {
       where: { id: PROJECT_ID },
       select: { team: { select: { organizationId: true } } },
     });
+    if (!project.team?.organizationId) {
+      throw new Error("test fixture: project has no organizationId");
+    }
     const id = `prompt_${nanoid(10)}`;
     seededPromptIds.push(id);
     await prisma.llmPromptConfig.create({
@@ -232,7 +242,7 @@ describe("experiments.copy", () => {
         id,
         name: `Prompt ${id}`,
         projectId: PROJECT_ID,
-        organizationId: project.team?.organizationId ?? "",
+        organizationId: project.team.organizationId,
       },
     });
     return id;
