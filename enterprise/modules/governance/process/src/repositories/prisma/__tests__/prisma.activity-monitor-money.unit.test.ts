@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const query = vi.fn();
 
 import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
+import type { ActivityMonitorTraces } from "../../../services/ingestion-source-activity.service.ts";
 import type { GovernanceClickHouseResolver } from "../../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 
 class FakeClickHouseResolver implements GovernanceClickHouseResolver {
@@ -16,10 +17,11 @@ class FakeClickHouseResolver implements GovernanceClickHouseResolver {
   }
 }
 
-function activityMonitor(prisma: unknown) {
+function activityMonitor(prisma: unknown, traces: Partial<ActivityMonitorTraces> = {}) {
   return createActivityMonitorTestService({
     prisma: prisma as never,
     clickhouse: new FakeClickHouseResolver(),
+    traces,
   });
 }
 
@@ -40,26 +42,25 @@ describe("money type lossless round-trip", () => {
 
   describe("when a pushed event carries a sub-cent cost", () => {
     it("preserves the cost as a string, not a lossy Number()", async () => {
-      query.mockImplementation(async () => ({
-        json: async () => [
-          {
-            eventId: "trace-1",
-            eventType: "otel_generic",
-            actor: "user@example.com",
-            target: "gpt-5",
-            costUsd: CH_FLOAT64_SPEND,
-            tokensInput: 10,
-            tokensOutput: 4,
-            occurredMs: "1786619810000",
-            createdMs: "1786619811000",
-          },
-        ],
-      }));
+      query.mockImplementation(async () => ({ json: async () => [] }));
 
       const prisma = {
         project: { findFirst: vi.fn(async () => ({ id: "gov-project" })) },
       };
-      const service = activityMonitor(prisma);
+      const service = activityMonitor(prisma, {
+        findAttributedTracesBefore: async () => [
+          {
+            traceId: "trace-1",
+            attributes: { "langwatch.user_id": "user@example.com" },
+            firstModel: "gpt-5",
+            costUsd: Number(CH_FLOAT64_SPEND),
+            promptTokens: 10,
+            completionTokens: 4,
+            occurredAtMs: 1786619810000,
+            createdAtMs: 1786619811000,
+          },
+        ],
+      });
 
       const rows = await service.eventsForSource({
         organizationId: "org",
@@ -106,7 +107,7 @@ describe("money type lossless round-trip", () => {
       const prisma = {
         project: { findFirst: vi.fn(async () => ({ id: "gov-project" })) },
       };
-      const service = activityMonitor(prisma);
+      const service = activityMonitor(prisma, { findAttributedTracesBefore: async () => [] });
 
       const rows = await service.eventsForSource({
         organizationId: "org",
@@ -119,24 +120,22 @@ describe("money type lossless round-trip", () => {
     });
   });
 
-  describe("when spendByUser returns CH spend strings", () => {
+  describe("when spendByUser reads trace's spend strings", () => {
     it("keeps spendUsd as a string, not Number()", async () => {
-      query.mockImplementation(async () => ({
-        json: async () => [
-          {
-            actor: "user@example.com",
-            spendUsdStr: CH_FLOAT64_SPEND,
-            requests: "5",
-            lastActivityMs: "1786619810000",
-            mostUsedTarget: "gpt-5",
-          },
-        ],
-      }));
-
       const prisma = {
         project: { findFirst: vi.fn(async () => ({ id: "gov-project" })) },
       };
-      const service = activityMonitor(prisma);
+      const service = activityMonitor(prisma, {
+        findAttributedSpendByValue: async () => [
+          {
+            value: "user@example.com",
+            spentUsd: CH_FLOAT64_SPEND,
+            requests: 5,
+            lastOccurredAtMs: 1786619810000,
+            firstModel: "gpt-5",
+          },
+        ],
+      });
 
       const rows = await service.spendByUser({
         organizationId: "org",
@@ -154,14 +153,10 @@ describe("money type lossless round-trip", () => {
       // 0.000044999999999999996 × 3 drifts; nano accumulation is exact.
       const depRows = Array.from({ length: 3 }, (_, i) => ({
         projectId: "proj-1",
-        actor: "",
-        spendUsdStr: CH_FLOAT64_SPEND,
-        requests: "1",
-        lastActivityMs: String(1786619810000 + i),
-      }));
-
-      query.mockImplementation(async () => ({
-        json: async () => depRows,
+        value: "",
+        spentUsd: CH_FLOAT64_SPEND,
+        requests: 1,
+        lastOccurredAtMs: 1786619810000 + i,
       }));
 
       const prisma = {
@@ -174,7 +169,7 @@ describe("money type lossless round-trip", () => {
           findMany: vi.fn(async () => [{ id: "dep-1", name: "Engineering" }]),
         },
       };
-      const service = activityMonitor(prisma);
+      const service = activityMonitor(prisma, { findSpendByProjectAndValue: async () => depRows });
 
       const rows = await service.spendByDepartment({
         organizationId: "org",

@@ -255,7 +255,10 @@ import { IngestionPullMetricsService } from "../services/ingestion-pull-metrics.
 import { IngestionPullWorkerService } from "../services/ingestion-pull-worker.service.ts";
 import type { PulledUsageDispatcher } from "../services/ingestion-pull-worker.service.ts";
 import { IngestionPullService } from "../services/ingestion-pull.service.ts";
-import { ActivityMonitorService } from "../services/ingestion-source-activity.service.ts";
+import {
+  ActivityMonitorService,
+  type ActivityMonitorTraces,
+} from "../services/ingestion-source-activity.service.ts";
 import { IngestionSourceReadService } from "../services/ingestion-source-read.service.ts";
 import {
   IngestionSecretConfiguration,
@@ -333,6 +336,7 @@ export interface GovernanceAppDependencies {
     | "findTraceCountsByAttribute"
     | "compileLangWatchQLTraceFilter"
     | "listTraceSummaries"
+    | keyof ActivityMonitorTraces
   >;
   apiKeys: Pick<
     ApiKeyApi,
@@ -549,6 +553,7 @@ export class GovernanceModule implements GovernanceRestApi {
     this.activityMonitor = ActivityMonitorService.create({
       repository: repositories.activityMonitor,
       projects: dependencies.projects,
+      traces: dependencies.traces,
     });
     this.planGate = GovernancePlanGateService.create({ entitlements: dependencies.entitlements });
     this.costAttributionPolicy = PostgresGovernancePolicyService.create(

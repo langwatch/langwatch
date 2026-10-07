@@ -2,22 +2,25 @@
 
 import type {
   ActivityEventDetailRow,
-  ActivityMonitorPagedWindowQuery,
-  ActivityMonitorSummary,
-  ActivityMonitorWindowQuery,
   IngestionSourceHealthRow,
   RecentAnomalyRow,
-  SourceHealthMetrics,
-  SpendByDepartmentRow,
-  SpendByTeamRow,
-  SpendByUserRow,
-  SpendOverTimeGroupBy,
-  SpendOverTimeResult,
 } from "@langwatch/enterprise-governance-contract";
 
-/** The organization's hidden governance project, resolved by the caller from its owner. */
-export type ActivityMonitorTenant = { govProjectId: string | null };
+import type { DepartmentDirectory, SourceTeam } from "../rules/activity-monitor-spend.rules.ts";
 
+/** Open anomaly alerts counted per severity. */
+export type AnomalyBreakdown = { critical: number; warning: number; info: number };
+
+/** One table's event counts since 24h, 7d and 30d ago, and its newest event (0 when none). */
+export type SourceEventWindows = { c24: number; c7: number; c30: number; lastMs: number };
+
+/** A source's events stored outside trace: governance's pulled OCSF rows and pushed log records. */
+type SourceEventsScope = { organizationId: string; tenantId: string };
+
+/**
+ * The activity monitor's own state: Postgres rows (sources, anomalies, departments) and the
+ * pulled and logged events in ClickHouse. Trace spend is read through TraceApi by the service.
+ */
 export interface ActivityMonitorRepository {
   sourceDataCoverage(input: {
     organizationId: string;
@@ -29,36 +32,31 @@ export interface ActivityMonitorRepository {
     lastSuccessfulPullIso: string | null;
     days: { dayStartIso: string; covered: boolean }[];
   }>;
-  summary(
-    input: ActivityMonitorWindowQuery & ActivityMonitorTenant,
-  ): Promise<ActivityMonitorSummary>;
-  spendByUser(
-    input: ActivityMonitorPagedWindowQuery & ActivityMonitorTenant,
-  ): Promise<SpendByUserRow[]>;
-  spendByTeam(
-    input: ActivityMonitorPagedWindowQuery & ActivityMonitorTenant,
-  ): Promise<SpendByTeamRow[]>;
-  spendByDepartment(input: ActivityMonitorWindowQuery): Promise<SpendByDepartmentRow[]>;
-  spendOverTime(
-    input: {
-      organizationId: string;
-      windowDays: number;
-      groupBy: SpendOverTimeGroupBy;
-    } & ActivityMonitorTenant,
-  ): Promise<SpendOverTimeResult>;
   recentAnomalies(input: { organizationId: string; limit?: number }): Promise<RecentAnomalyRow[]>;
-  ingestionSourcesHealth(
-    input: { organizationId: string } & ActivityMonitorTenant,
-  ): Promise<IngestionSourceHealthRow[]>;
-  eventsForSource(
-    input: {
-      organizationId: string;
-      sourceId: string;
-      limit?: number;
-      beforeIso?: string;
-    } & ActivityMonitorTenant,
+  getOpenAnomalyBreakdown(input: { organizationId: string }): Promise<AnomalyBreakdown>;
+  /** The organisation's live projects, members' departments and active department names. */
+  getDepartmentDirectory(input: { organizationId: string }): Promise<DepartmentDirectory>;
+  findSourceTeams(input: {
+    organizationId: string;
+    sourceIds: readonly string[];
+  }): Promise<{ sourceId: string; team: SourceTeam }[]>;
+  /** Unarchived sources by name; `eventsLast24h` is the caller's to count. */
+  findActiveSources(input: {
+    organizationId: string;
+  }): Promise<Omit<IngestionSourceHealthRow, "eventsLast24h">[]>;
+  countLoggedAndPulledEventsBySource(
+    input: SourceEventsScope & { sourceIds: readonly string[]; sinceMs: number },
+  ): Promise<{ sourceId: string; count: number }[]>;
+  findPulledEventsForSource(
+    input: SourceEventsScope & { sourceId: string; beforeMs: number; limit: number },
   ): Promise<ActivityEventDetailRow[]>;
-  sourceHealthMetrics(
-    input: { organizationId: string; sourceId: string } & ActivityMonitorTenant,
-  ): Promise<SourceHealthMetrics>;
+  /** The logged and pulled tables' windows for one source, one entry per table that answered. */
+  findLoggedAndPulledEventWindows(
+    input: SourceEventsScope & {
+      sourceId: string;
+      since24h: number;
+      since7d: number;
+      since30d: number;
+    },
+  ): Promise<SourceEventWindows[]>;
 }
