@@ -218,6 +218,42 @@ describe("AuthorizedClickHouse", () => {
     });
   });
 
+  describe("given a shared grant whose window applies to spans, not traces", () => {
+    describe("when the fence for a traces read is built", () => {
+      it("leaves that grant out, so its window never opens trace rows", () => {
+        const authorization = proof({
+          grants: [
+            {
+              projectId: AGG,
+              permissions: ["traces:view"],
+              via: [],
+              kind: "own",
+            },
+            {
+              projectId: A,
+              permissions: ["traces:view"],
+              via: ["grant_a"],
+              kind: "shared",
+              condition: { type: "trace", from: NOW - 1000, until: null },
+            },
+            {
+              projectId: B,
+              permissions: ["traces:view"],
+              via: ["grant_b"],
+              kind: "shared",
+              condition: { type: "span", from: 0, until: null },
+            },
+          ],
+        });
+
+        expect(fenceFor({ authorization, reads: "traces" })).toEqual({
+          own: [AGG],
+          shared: [{ projectId: A, from: NOW - 1000, until: null }],
+        });
+      });
+    });
+  });
+
   describe("given a proof built outside the authorizer or past its expiry", () => {
     describe("when a reader is requested", () => {
       // @scenario "A proof built outside the authorizer is refused"

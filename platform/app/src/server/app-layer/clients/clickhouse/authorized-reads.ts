@@ -27,17 +27,25 @@ import type {
 import {
   AccessNotGrantedError,
   type Authorization,
+  type AuthorizationConditionType,
   type AuthorizationGrant,
   usableAuthorization,
 } from "@langwatch/actor";
 import type { AuthzPermission } from "@langwatch/authz";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 
-/** What a reader may be asked for, and the permission each one needs. */
+/**
+ * What a reader may be asked for: the permission each one needs, and the
+ * resource a shared grant's window must apply to for that grant to open
+ * rows of it. Both read trace rows, so both take a `trace` window.
+ */
 const READ_RESOURCES = {
-  traces: "traces:view",
-  analytics: "analytics:view",
-} as const satisfies Record<string, AuthzPermission>;
+  traces: { permission: "traces:view", condition: "trace" },
+  analytics: { permission: "analytics:view", condition: "trace" },
+} as const satisfies Record<
+  string,
+  { permission: AuthzPermission; condition: AuthorizationConditionType }
+>;
 export type ReadResource = keyof typeof READ_RESOURCES;
 
 /**
@@ -47,7 +55,7 @@ export type ReadResource = keyof typeof READ_RESOURCES;
  * this to every route is the foundation branch's job (PR 7536).
  */
 export const PROOF_BEARING_PERMISSIONS: ReadonlySet<AuthzPermission> = new Set(
-  Object.values(READ_RESOURCES),
+  Object.values(READ_RESOURCES).map((resource) => resource.permission),
 );
 
 /**
@@ -256,7 +264,9 @@ function setExpression(fence: TenantFence): {
 /**
  * The fence a proof allows for one resource. The own grant must carry the
  * resource's permission or the read is not granted at all; a shared grant
- * without it was minted for something else and contributes nothing.
+ * without it, or whose window applies to another resource (a span or log
+ * window on a trace read), was minted for something else and contributes
+ * nothing.
  *
  * A proof narrowed to one of its projects (ADR-144 block F) fences that
  * project alone: the own project outright, or a shared one inside its
@@ -270,7 +280,7 @@ export function fenceFor({
   authorization: Authorization;
   reads: ReadResource;
 }): TenantFence {
-  const permission = READ_RESOURCES[reads];
+  const { permission, condition } = READ_RESOURCES[reads];
   const carries = (grant: AuthorizationGrant) =>
     grant.permissions.includes(permission);
   const own = authorization.grants
@@ -279,7 +289,9 @@ export function fenceFor({
     .map((grant) => grant.projectId as string);
   if (own.length === 0) throw new AccessNotGrantedError(permission);
   const shared = authorization.grants
-    .filter((grant) => grant.kind === "shared" && grant.condition !== undefined)
+    .filter(
+      (grant) => grant.kind === "shared" && grant.condition?.type === condition,
+    )
     .filter(carries)
     .map((grant) => ({
       projectId: grant.projectId as string,
@@ -312,7 +324,7 @@ export function ownProjectIdOf({
   authorization: Authorization;
   reads: ReadResource;
 }): string {
-  const permission = READ_RESOURCES[reads];
+  const { permission } = READ_RESOURCES[reads];
   const own = authorization.grants.find(
     (grant) =>
       grant.kind === "own" &&

@@ -727,4 +727,7 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   says how the door keeps a proof inside one organisation without it. The
   door's memory of each project's organisation for internal mints is
   capped, oldest first, as its shared-read cache already was: its time limit
-  bounds staleness, and only the cap bounds memory.
+  bounds staleness, and only the cap bounds memory. The store client keeps
+  a shared grant in a fence only when its window applies to the resource
+  read: a trace or analytics read takes `trace` windows, so a `span` or
+  `log` window a later minter writes can never open trace rows.
