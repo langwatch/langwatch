@@ -31,13 +31,19 @@ export function strictestDataPrivacy(
   if (first === undefined) return PLATFORM_DEFAULT_DATA_PRIVACY;
   if (rest.length === 0) return first;
 
+  // Every category is overwritten below; starting from a full record keeps
+  // the type without a cast, the way the resolver fills its defaults.
+  const categories: Record<ContentCategory, ResolvedCategory> = {
+    ...first.categories,
+  };
+  for (const category of CONTENT_CATEGORIES) {
+    categories[category] = strictestCategory(
+      policies.map((p) => p.categories[category]),
+    );
+  }
+
   return {
-    categories: Object.fromEntries(
-      CONTENT_CATEGORIES.map((category) => [
-        category,
-        strictestCategory(policies.map((p) => p.categories[category])),
-      ]),
-    ) as Record<ContentCategory, ResolvedCategory>,
+    categories,
     pii: {
       ...strictestPii(policies.map((p) => p.pii)),
       // An exception removes redaction, so only one every member allows
