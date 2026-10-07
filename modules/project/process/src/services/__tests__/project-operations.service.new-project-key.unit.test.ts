@@ -72,6 +72,7 @@ function operationsOver({ project }: { project: Project }): ProjectOperationsSer
     lifecycle: {
       legacyKeyRevoked: async () => undefined,
       presenceSettingChanged: async () => undefined,
+      traceSharingDisabled: async () => undefined,
     },
     logger: { error: () => undefined },
     now: () => 0,

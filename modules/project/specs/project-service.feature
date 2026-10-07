@@ -144,6 +144,19 @@ Feature: Shared project service
     And it is not marked as backfilled
 
   @unit
+  Scenario: Switching trace sharing off is recorded as project's fact
+    Given a project whose trace sharing is on
+    When a member saves the project settings with trace sharing off
+    Then project records a trace-sharing-disabled fact with the project's organization
+    And the fact carries the id of the member who switched it off
+
+  @unit
+  Scenario: Saving project settings with trace sharing already off records no sharing fact
+    Given a project whose trace sharing is off
+    When a member saves the project settings with trace sharing off
+    Then no trace-sharing-disabled fact is recorded
+
+  @unit
   Scenario: Saving project settings without changing presence records no presence fact
     Given a project whose presence setting is on
     When a member saves the project settings with presence on, or without the presence field

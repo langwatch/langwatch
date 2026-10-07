@@ -36,7 +36,7 @@ type ProjectOperationsDependencies = Readonly<{
   readonly auditLog: AuditLogApi;
   readonly lifecycle: Pick<
     ProjectCreatedNoticeService,
-    "legacyKeyRevoked" | "presenceSettingChanged"
+    "legacyKeyRevoked" | "presenceSettingChanged" | "traceSharingDisabled"
   >;
   /** Where a best-effort failure is reported when nothing can be done about it. */
   readonly logger: Readonly<{
@@ -124,6 +124,11 @@ export class ProjectOperationsService {
 
     if (input.traceSharingEnabled === false && project.traceSharingEnabled === true) {
       await this.dependencies.share.revokeAllTraceShares(input.projectId);
+      await this.dependencies.lifecycle.traceSharingDisabled({
+        projectId: input.projectId,
+        organizationId,
+        disabledByUserId: by.id,
+      });
     }
     if (input.presenceEnabled !== undefined && input.presenceEnabled !== project.presenceEnabled) {
       await this.dependencies.lifecycle.presenceSettingChanged({

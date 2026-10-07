@@ -130,12 +130,14 @@ function characterizationProject(traceSharingEnabled: boolean): ProjectWithTeam 
 const MEMBER = { id: "user_1" };
 
 type PresenceSettingChange = Parameters<ProjectCreatedNoticeService["presenceSettingChanged"]>[0];
+type TraceSharingDisabled = Parameters<ProjectCreatedNoticeService["traceSharingDisabled"]>[0];
 
 function characterizationOperations(options: {
   projects: Partial<ProjectOperationsDirectory>;
   storageSettings?: ProjectStorageSettingsRepository["update"];
   revokeAllTraceShares: ShareApi["revokeAllTraceShares"];
   presenceChanges?: PresenceSettingChange[];
+  sharingDisabled?: TraceSharingDisabled[];
 }): ProjectOperationsService {
   return ProjectOperationsService.create({
     projects: new CharacterizationProjectDirectory(options.projects),
@@ -152,6 +154,9 @@ function characterizationOperations(options: {
       presenceSettingChanged: async (change) => {
         options.presenceChanges?.push(change);
       },
+      traceSharingDisabled: async (fact) => {
+        options.sharingDisabled?.push(fact);
+      },
     },
     logger: { error: () => undefined },
     now: () => 0,
@@ -160,13 +165,16 @@ function characterizationOperations(options: {
 
 describe("ProjectOperationsService", () => {
   describe("when the settings form turns trace sharing off", () => {
+    /** @scenario Switching trace sharing off is recorded as project's fact */
     it("revokes outstanding trace shares", async () => {
       const revokeAllTraceShares = vi.fn(async () => {});
       const updated = characterizationProject(false);
       const update = vi.fn(async () => updated);
+      const sharingDisabled: TraceSharingDisabled[] = [];
       const operations = characterizationOperations({
         projects: { findWithTeam: async () => characterizationProject(true), update },
         revokeAllTraceShares,
+        sharingDisabled,
       });
 
       await operations.updateSettings(
@@ -178,18 +186,24 @@ describe("ProjectOperationsService", () => {
         expect.objectContaining({ id: "project_123", organizationId: "org-1" }),
       );
       expect(revokeAllTraceShares).toHaveBeenCalledWith("project_123");
+      expect(sharingDisabled).toEqual([
+        { projectId: "project_123", organizationId: "org-1", disabledByUserId: MEMBER.id },
+      ]);
     });
   });
 
   describe("given trace sharing was already off", () => {
+    /** @scenario Saving project settings with trace sharing already off records no sharing fact */
     it("leaves the shares alone", async () => {
       const revokeAllTraceShares = vi.fn(async () => {});
+      const sharingDisabled: TraceSharingDisabled[] = [];
       const operations = characterizationOperations({
         projects: {
           findWithTeam: async () => characterizationProject(false),
           update: async () => characterizationProject(false),
         },
         revokeAllTraceShares,
+        sharingDisabled,
       });
 
       await operations.updateSettings(
@@ -198,6 +212,7 @@ describe("ProjectOperationsService", () => {
       );
 
       expect(revokeAllTraceShares).not.toHaveBeenCalled();
+      expect(sharingDisabled).toEqual([]);
     });
   });
 

@@ -106,6 +106,7 @@ function noticeOver() {
         departments.push(payload);
       },
     },
+    recordProjectTraceSharingDisabled: { send: async () => undefined },
   });
   return { notice, sent, presence, departments };
 }

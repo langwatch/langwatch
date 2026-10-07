@@ -8,6 +8,7 @@ import type {
   RecordProjectDepartmentAssignedCommandData,
   RecordProjectLegacyKeyRevokedCommandData,
   RecordProjectPresenceSettingChangedCommandData,
+  RecordProjectTraceSharingDisabledCommandData,
 } from "../eventing/project-lifecycle.events.ts";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 
@@ -25,6 +26,10 @@ export type ProjectLifecycleSenders = Readonly<{
   recordProjectArchived: Pick<EventingCommandSender<RecordProjectArchivedCommandData>, "send">;
   recordProjectDepartmentAssigned: Pick<
     EventingCommandSender<RecordProjectDepartmentAssignedCommandData>,
+    "send"
+  >;
+  recordProjectTraceSharingDisabled: Pick<
+    EventingCommandSender<RecordProjectTraceSharingDisabledCommandData>,
     "send"
   >;
 }>;
@@ -145,6 +150,17 @@ export class ProjectCreatedNoticeService {
         "recording the presence setting change failed; presence keeps the previous value",
       );
     }
+  }
+
+  /** Throws: share revokes the project's links only from this fact, so a lost one must surface. */
+  async traceSharingDisabled(
+    input: Readonly<{ projectId: string; organizationId: string; disabledByUserId: string }>,
+  ): Promise<void> {
+    await this.#connected().recordProjectTraceSharingDisabled.send({
+      tenantId: input.projectId,
+      occurredAt: nowInstant().epochMilliseconds,
+      ...input,
+    });
   }
 
   /** Best effort: the move is saved, so a failed record is logged; held lineage ages out. */

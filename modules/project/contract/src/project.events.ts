@@ -103,3 +103,19 @@ export const projectDepartmentAssignedEventDataSchema = z.object({
 export type ProjectDepartmentAssignedEventData = z.infer<
   typeof projectDepartmentAssignedEventDataSchema
 >;
+
+export const PROJECT_TRACE_SHARING_DISABLED_EVENT_TYPE =
+  "lw.project.trace_sharing_disabled" as const;
+export const PROJECT_TRACE_SHARING_DISABLED_EVENT_VERSION = "2026-10-07" as const;
+
+/** A project's trace sharing was switched off; share revokes its links from its own side (R7). */
+export const projectTraceSharingDisabledEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  organizationId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  disabledByUserId: z.string().min(1),
+});
+export type ProjectTraceSharingDisabledEventData = z.infer<
+  typeof projectTraceSharingDisabledEventDataSchema
+>;

@@ -62,6 +62,7 @@ describe.skipIf(!DB_URL)("the live project repositories over Postgres", () => {
     lifecycle: {
       legacyKeyRevoked: async () => undefined,
       presenceSettingChanged: async () => undefined,
+      traceSharingDisabled: async () => undefined,
     },
     logger: { error: () => undefined },
     share: createApiFixture<ShareApi>({}, "share"),
