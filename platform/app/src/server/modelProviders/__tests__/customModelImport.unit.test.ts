@@ -38,6 +38,24 @@ describe("mergeListedModels", () => {
       expect(merged.listedModelIds).toEqual(["model-a", "model-b"]);
     });
 
+    it("adds new entries sorted by id after the existing ones", () => {
+      const merged = mergeListedModels({
+        listed: [{ id: "zeta" }, { id: "alpha" }, { id: "mid" }],
+        customModels: [
+          { modelId: "zz-manual", displayName: "zz-manual", mode: "chat" },
+        ],
+        customEmbeddingsModels: [],
+        previouslyListedIds: null,
+      });
+
+      expect(merged.customModels.map((m) => m.modelId)).toEqual([
+        "zz-manual",
+        "alpha",
+        "mid",
+        "zeta",
+      ]);
+    });
+
     it("adds an entry marked as embeddings to the embeddings list", () => {
       const merged = mergeListedModels({
         listed: [{ id: "embed-a", embedding: true }],

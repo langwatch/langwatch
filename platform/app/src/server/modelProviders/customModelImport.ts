@@ -64,12 +64,18 @@ export function mergeListedModels({
     }
   }
 
+  // Listings come in no useful order (OpenAI's is not sorted), so new entries
+  // are added sorted by id to keep a long list scannable.
   return {
-    customModels: [...chat, ...addedChat],
-    customEmbeddingsModels: [...embeddings, ...addedEmbeddings],
+    customModels: [...chat, ...sortById(addedChat)],
+    customEmbeddingsModels: [...embeddings, ...sortById(addedEmbeddings)],
     added: addedChat.length + addedEmbeddings.length,
     listedModelIds: listed.map((model) => model.id),
   };
+}
+
+function sortById(entries: CustomModelEntry[]): CustomModelEntry[] {
+  return [...entries].sort((a, b) => a.modelId.localeCompare(b.modelId));
 }
 
 function toChatEntry(model: ListedModel): CustomModelEntry {
