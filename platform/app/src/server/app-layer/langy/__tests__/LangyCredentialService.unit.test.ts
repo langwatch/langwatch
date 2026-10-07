@@ -307,9 +307,9 @@ describe("LangyCredentialService", () => {
           .getOrProvision({ projectId: "p1", session: SESSION })
           .catch((error: unknown) => error);
 
-        expect(
-          HandledError.isHandled(refusal) ? refusal.code : refusal,
-        ).toBe("aggregate_project_has_no_credential");
+        expect(HandledError.isHandled(refusal) ? refusal.code : refusal).toBe(
+          "aggregate_project_has_no_credential",
+        );
         expect(captureException).not.toHaveBeenCalled();
       });
     });
