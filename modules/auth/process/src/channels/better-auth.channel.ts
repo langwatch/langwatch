@@ -6,15 +6,6 @@ import type { SignInMethodPolicy } from "@langwatch/identity-contract";
  */
 
 /**
- * Better Auth's storage engine. Typed as library option (adapter factory, not
- * client) to support per-user routing without package knowledge.
- */
-export abstract class BetterAuthStorage {
-  /** The value handed to `betterAuth({ database })`. */
-  abstract adapter(): unknown;
-}
-
-/**
  * ADR-027 SSO gate and ADR-117 method policy. federationCapable is synchronous
  * by contract; other two may read (licensing store).
  */

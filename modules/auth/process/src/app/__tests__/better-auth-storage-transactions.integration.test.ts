@@ -25,7 +25,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 
-import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
+import { LiveAuthRepositories } from "../../repositories/live/live.auth.repositories.ts";
 import { AuthModule } from "../auth.app.ts";
 import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
@@ -58,7 +58,12 @@ async function storage() {
       publicBaseUrl: undefined,
       nodeEnvironment: undefined,
     },
-    repositories: MemoryAuthRepositories.create(),
+    repositories: LiveAuthRepositories.create({
+      prisma,
+      redis: null as never,
+      rateLimiter: {} as never,
+      encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+    }),
     dependencies: {
       projects: createApiFixture<ProjectApi>(),
       users: new TestUserApi({}) as never,

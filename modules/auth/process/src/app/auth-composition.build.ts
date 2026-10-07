@@ -17,27 +17,21 @@ import {
 import {
   IdentityVerificationExpiredError,
   SignInMethodPolicyService,
-  sealedProviderConfigCipher,
   type IdentityApi,
   type RoutingDecision,
   type SignInMethodPolicy,
   type SsoArrivalAdmission,
   type SsoArrivalApi,
-  type SsoProviderConfigCipher,
 } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserApi } from "@langwatch/user-contract";
-import { prismaAdapter } from "better-auth/adapters/prisma";
-import type { BetterAuthOptions } from "better-auth/types";
 
 import {
   BetterAuthAnnouncements,
   BetterAuthFederation,
   BetterAuthIdentityCeremonies,
-  BetterAuthStorage,
   type BetterAuthAccountPin,
   type BetterAuthAccountRow,
 } from "../channels/better-auth.channel.ts";
@@ -56,11 +50,8 @@ import type {
 import { SignInRouterShadow } from "../channels/http/http.sign-in-router-shadow.channel.ts";
 import type { SignUpAddressConfirmation } from "../channels/http/http.sign-up-confirmation.channel.ts";
 import type { PasswordResetMailChannel } from "../channels/password-reset-mail.channel.ts";
-import { MemoryBetterAuthSecondaryStorageRepository } from "../repositories/memory/memory.better-auth-secondary-storage.repository.ts";
-import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
-import { RedisBetterAuthSecondaryStorageRepository } from "../repositories/redis/redis.better-auth-secondary-storage.repository.ts";
+import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
-import { openingSsoProviderConfigs } from "../rules/sso-provider-config.rules.ts";
 import type { AuthLifecycleNoticeService } from "../services/auth-lifecycle-notice.service.ts";
 import { CredentialSignInPolicyService } from "../services/credential-sign-in-policy.service.ts";
 import type { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
@@ -75,34 +66,6 @@ export type BetterAuthDeploymentIdentity = Readonly<{
   passkeysEnabled: boolean;
   passkeyHandleSecret: string;
 }>;
-
-/** Better Auth's storage engine: the stock Prisma adapter over the module's
- *  own client, with the engine's sealed dialing documents opened on the way
- *  out — this is the one seam that dials with them (D09). */
-class PrismaBetterAuthStorage extends BetterAuthStorage {
-  static create(
-    database: ProcessMembers["prisma"],
-    encryption: ProcessMembers["encryption"],
-  ): PrismaBetterAuthStorage {
-    return new PrismaBetterAuthStorage(database, sealedProviderConfigCipher(encryption));
-  }
-
-  private constructor(
-    private readonly database: ProcessMembers["prisma"],
-    private readonly providerConfig: SsoProviderConfigCipher,
-  ) {
-    super();
-  }
-
-  adapter(): unknown {
-    // The SSO plugin refuses every callback when a `resolveUser` is set and the
-    // adapter has no native transactions.
-    const engine = prismaAdapter(this.database, { provider: "postgresql", transaction: true });
-    const cipher = this.providerConfig;
-    return (options: BetterAuthOptions) =>
-      openingSsoProviderConfigs({ adapter: engine(options), cipher });
-  }
-}
 
 /**
  * ADR-027's licence questions, answered by licensing as main's
@@ -347,12 +310,12 @@ type BuildBetterAuthOptions = Readonly<{
   signupAnnouncements: SignupAnnouncementService;
   /** Where a sign-up, a session and a domain auto-join are recorded for nurturing. */
   lifecycle: Pick<AuthLifecycleNoticeService, "signedUp" | "sessionStarted" | "ssoAutoAdded">;
-  /** The typed client every database hook reads and writes through. */
-  prisma: ProcessMembers["prisma"];
-  /** The deployment's cipher, which the engine's dialing documents are kept
-   *  under at rest. */
-  encryption: ProcessMembers["encryption"];
-  /** Better Auth's session cache lives here when this process has a Redis. */
+  /** Auth's repositories: Better Auth's storage, its session cache and the hooks' rows. */
+  repositories: Pick<
+    AuthRepositories,
+    "betterAuthStorage" | "betterAuthSecondaryStorage" | "betterAuthHooks"
+  >;
+  /** Whether this process has a Redis, which decides Better Auth's rate-limit storage. */
   redis: RedisConnection | null;
   /** The Auth application whose sessions this instance mints and revokes. */
   auth: AuthApi;
@@ -412,14 +375,6 @@ type BuildBetterAuthOptions = Readonly<{
   logger: Logger;
 }>;
 
-export function createSecondaryStorage(
-  redis: RedisConnection | null,
-): NonNullable<BetterAuthOptions["secondaryStorage"]> {
-  return redis
-    ? RedisBetterAuthSecondaryStorageRepository.create(redis)
-    : MemoryBetterAuthSecondaryStorageRepository.create();
-}
-
 /**
  * Builds this deployment's Better Auth instance on first use, never during
  * construction, because it asks the SSO peer. Built ONCE per process: a second
@@ -429,7 +384,6 @@ export async function buildBetterAuth(
   options: BuildBetterAuthOptions,
 ): Promise<BetterAuthTransport> {
   const { identity, logger, signInRouting } = options;
-  const secondaryStorage = createSecondaryStorage(options.redis);
 
   logger.warn(
     {
@@ -455,10 +409,10 @@ export async function buildBetterAuth(
     auth: options.auth,
     idTokenIssuerRefusals: options.idTokenIssuerRefusals,
     users: options.users,
-    database: PrismaBetterAuthHooksRepository.create(options.prisma),
-    secondaryStorage,
+    database: options.repositories.betterAuthHooks,
+    secondaryStorage: options.repositories.betterAuthSecondaryStorage,
     redis: options.redis,
-    storage: PrismaBetterAuthStorage.create(options.prisma, options.encryption),
+    storage: options.repositories.betterAuthStorage,
     deployment: {
       baseUrl: identity.baseUrl,
       publicBaseUrl: identity.publicBaseUrl,

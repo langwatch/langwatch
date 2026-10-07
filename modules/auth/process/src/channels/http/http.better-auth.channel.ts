@@ -34,6 +34,7 @@ import type { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
+import type { BetterAuthStorageRepository } from "../../repositories/better-auth-storage.repository.ts";
 import { findRegisteredRefusals } from "../../rules/better-auth-error-code.rules.ts";
 import {
   findSubmittedAddresses,
@@ -44,7 +45,6 @@ import type {
   BetterAuthAnnouncements,
   BetterAuthFederation,
   BetterAuthIdentityCeremonies,
-  BetterAuthStorage,
 } from "../better-auth.channel.ts";
 import {
   afterAccountCreate,
@@ -364,7 +364,7 @@ export const createAuthOptions = ({
 }: {
   repo: BetterAuthHooksRepository;
   deployment: BetterAuthDeploymentConfiguration;
-  storage: BetterAuthStorage;
+  storage: BetterAuthStorageRepository;
   federation: BetterAuthFederation;
   identity: BetterAuthIdentityCeremonies;
   shadow: SignInRouterShadow;
@@ -868,8 +868,8 @@ type BetterAuthTransportOptions = Readonly<{
   idTokenIssuerRefusals?: IdTokenIssuerRefusalChannel;
   /** The persistence boundary every database hook reads and writes through. */
   database: BetterAuthHooksRepository;
-  /** The instance's storage engine — see {@link BetterAuthStorage}. */
-  storage: BetterAuthStorage;
+  /** The instance's storage engine — see {@link BetterAuthStorageRepository}. */
+  storage: BetterAuthStorageRepository;
   deployment: BetterAuthDeploymentConfiguration;
   federation: BetterAuthFederation;
   identity: BetterAuthIdentityCeremonies;

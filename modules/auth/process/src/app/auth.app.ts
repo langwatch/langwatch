@@ -89,8 +89,6 @@ import {
 } from "../eventing/auth-lifecycle.pipeline.ts";
 import type { AuthRateLimitRepository } from "../repositories/auth-rate-limit.repository.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
-import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
-import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
@@ -438,7 +436,7 @@ export class AuthModule implements AuthApiContract {
     /** Every mail auth sends goes out through notification, which owns the gateway. */
     const mailer: MailSender = { send: (content) => dependencies.notifications.sendEmail(content) };
     const now = members.now ?? nowInstant;
-    const accountRows = PrismaBetterAuthHooksRepository.create(members.prisma);
+    const accountRows = repositories.betterAuthHooks;
 
     const sessions = BrowserSessionService.create({
       sessions: repositories.sessions,
@@ -463,7 +461,7 @@ export class AuthModule implements AuthApiContract {
     });
 
     const cliDeviceDirectory = CliDeviceDirectoryService.create({
-      people: PrismaAuthDirectoryRepository.create(members.prisma),
+      people: repositories.directory,
       organizations: dependencies.organizations,
       projects: dependencies.projects,
     });
@@ -649,8 +647,7 @@ export class AuthModule implements AuthApiContract {
             }),
             signUpProofs: app.#signUp,
             passkeySignUpEligibility: app.#signUpEnrollment,
-            prisma: members.prisma,
-            encryption: members.encryption,
+            repositories,
             redis: members.redis,
             auth: app,
             grants: dependencies.authz,

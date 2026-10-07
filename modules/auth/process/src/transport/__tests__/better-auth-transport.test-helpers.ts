@@ -15,12 +15,12 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { memoryAdapter } from "better-auth/adapters/memory";
 
-import { createSecondaryStorage } from "../../app/auth-composition.build.ts";
 import {
   createBetterAuthTransport,
   type BetterAuthDeploymentConfiguration,
 } from "../../channels/http/http.better-auth.channel.ts";
 import { CredentialSessionGuard } from "../../channels/http/http.credential-session-guard.channel.ts";
+import { MemoryBetterAuthSecondaryStorageRepository } from "../../repositories/memory/memory.better-auth-secondary-storage.repository.ts";
 import { signInSecurityFixture } from "../../services/__tests__/sign-in-security.fixture.ts";
 import { CredentialSignInPolicyService } from "../../services/credential-sign-in-policy.service.ts";
 
@@ -116,7 +116,7 @@ export function betterAuthTransportFor(
     ),
     sendResetPassword: async () => undefined,
     redis: null,
-    secondaryStorage: createSecondaryStorage(null),
+    secondaryStorage: MemoryBetterAuthSecondaryStorageRepository.create(),
     signUpVerification: {
       completeVerification: async () => {
         throw new IdentityVerificationExpiredError();

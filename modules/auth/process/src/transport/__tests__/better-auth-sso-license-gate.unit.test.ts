@@ -12,7 +12,6 @@ import type {
   BetterAuthFederation,
   BetterAuthIdentityCeremonies,
   BetterAuthAccountPin,
-  BetterAuthStorage,
 } from "../../channels/better-auth.channel.ts";
 import {
   createAuthOptions,
@@ -20,6 +19,7 @@ import {
 } from "../../channels/http/http.better-auth.channel.ts";
 import { CredentialSessionGuard } from "../../channels/http/http.credential-session-guard.channel.ts";
 import type { SignInRouterShadow } from "../../channels/http/http.sign-in-router-shadow.channel.ts";
+import type { BetterAuthStorageRepository } from "../../repositories/better-auth-storage.repository.ts";
 import { signInSecurityFixture } from "../../services/__tests__/sign-in-security.fixture.ts";
 import { CredentialSignInPolicyService } from "../../services/credential-sign-in-policy.service.ts";
 
@@ -59,7 +59,7 @@ class StubShadow implements SignInRouterShadow {
   }
 }
 
-class StubStorage implements BetterAuthStorage {
+class StubStorage implements BetterAuthStorageRepository {
   adapter(): unknown {
     return {};
   }
