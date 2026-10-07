@@ -39,11 +39,12 @@ describe("refusedOnAggregate", () => {
   });
 
   describe("given a read or a write that manages the project itself", () => {
-    it.each(["traces:view", "project:update", "organization:manage"] as const)(
-      "does not refuse %s",
-      (permission) => {
-        expect(refusedOnAggregate(permission)).toBe(false);
-      },
-    );
+    it.each([
+      "traces:view",
+      "project:update",
+      "organization:manage",
+    ] as const)("does not refuse %s", (permission) => {
+      expect(refusedOnAggregate(permission)).toBe(false);
+    });
   });
 });

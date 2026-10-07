@@ -1,7 +1,7 @@
 import { z } from "zod";
+import type { Prisma } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { projectAcceptsWrites } from "~/server/app-layer/projects/project-write-guard";
-import type { Prisma } from "~/generated/prisma/client";
 import { savedViewErrorHandler } from "../../saved-views/middleware";
 import { SavedViewService } from "../../saved-views/saved-view.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

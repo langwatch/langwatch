@@ -51,7 +51,11 @@ describe("CustomReportsSection", () => {
   describe("given a project with no dashboards", () => {
     describe("when the project is an ordinary one", () => {
       it("invites the reader to build a dashboard", () => {
-        projectRef.current = { id: "proj-1", slug: "acme", kind: "application" };
+        projectRef.current = {
+          id: "proj-1",
+          slug: "acme",
+          kind: "application",
+        };
 
         renderSection();
 
