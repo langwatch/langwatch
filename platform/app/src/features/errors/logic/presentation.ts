@@ -178,6 +178,13 @@ const SEAT_LIMIT_LABELS: Record<string, string> = {
   membersLite: "Lite Member seats",
 };
 
+/** Creation caps the cloud Free plan sets, named as the pricing page does. */
+const CREATION_LIMIT_LABELS: Record<string, string> = {
+  scenarios: "scenarios",
+  scenarioSets: "simulations",
+  evaluators: "custom evaluators",
+};
+
 /**
  * Registered migration names, in the operator's words rather than the
  * column's. Stable identifiers (renaming one orphans its state rows), so
@@ -2256,7 +2263,14 @@ const presentations = {
     // avoid. Most seat refusals arrive as the upgrade modal rather than a toast,
     // and it says the same thing.
     describe: (error) => {
-      const label = SEAT_LIMIT_LABELS[str(error, "limitType", "")];
+      const limitType = str(error, "limitType", "");
+      const creationLabel = CREATION_LIMIT_LABELS[limitType];
+      if (creationLabel) {
+        const max = num(error, "max", 0);
+        const included = max > 0 ? `${max} ${creationLabel}` : creationLabel;
+        return `Your plan includes ${included}. Upgrade to create more. Everything you already have keeps working.`;
+      }
+      const label = SEAT_LIMIT_LABELS[limitType];
       if (!label) return "Upgrade your plan to raise it.";
       return `Your plan's ${label} are all in use. Upgrade to raise the allowance, or disable a membership from the members page to free one, which is reversible.`;
     },

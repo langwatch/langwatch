@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fireScenarioCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { enforceCreationLimit } from "~/server/license-enforcement";
 import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
 import { onboardingExperimentProperties } from "~/server/onboarding/guided-onboarding.experiment";
 import { readOnboardingVariantForProject } from "~/server/onboarding/onboarding-variant";
@@ -73,6 +74,13 @@ export const scenarioCrudRouter = createTRPCRouter({
     .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
       logger.info({ projectId: input.projectId }, "Creating scenario");
+
+      await enforceCreationLimit({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        limitType: "scenarios",
+        user: ctx.session.user,
+      });
 
       const service = ScenarioService.create(ctx.prisma);
       const result = await service.create(

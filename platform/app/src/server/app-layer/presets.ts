@@ -738,6 +738,7 @@ export function initializeDefaultApp(options?: {
     eventUsageService,
     planResolver,
     orgRepo,
+    simulationReads,
   );
 
   const planProvider = config.isSaas

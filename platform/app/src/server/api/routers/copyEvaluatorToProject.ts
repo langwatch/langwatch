@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
+import { enforceCreationLimit } from "../../license-enforcement";
 import {
   copyWorkflowWithDatasets,
   saveOrCommitWorkflowVersion,
@@ -109,6 +110,13 @@ export async function copyEvaluatorToProject({
   targetProjectId: string;
   newEvaluatorId?: string;
 }) {
+  await enforceCreationLimit({
+    prisma: ctx.prisma,
+    projectId: targetProjectId,
+    limitType: "evaluators",
+    user: ctx.session.user,
+  });
+
   const source = await loadSourceEvaluator(ctx, evaluatorId, sourceProjectId);
   const newWorkflowId = await copyWorkflowForEvaluator(
     ctx,

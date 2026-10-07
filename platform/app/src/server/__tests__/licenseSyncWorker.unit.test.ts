@@ -118,6 +118,8 @@ function fakeRepository(
     getMemberCount: vi.fn().mockResolvedValue(members),
     getMembersLiteCount: vi.fn().mockResolvedValue(liteMembers),
     getMembersDeveloperCount: vi.fn().mockResolvedValue(0),
+    getActiveScenarioCount: vi.fn().mockResolvedValue(0),
+    getEvaluatorCount: vi.fn().mockResolvedValue(0),
     getCurrentMonthCost: vi.fn(),
     getCurrentMonthCostForProjects: vi.fn(),
   };

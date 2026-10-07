@@ -210,6 +210,33 @@ describe("explainHandledError", () => {
       expect(description).toContain("full member seats");
     });
 
+    /** @scenario The refusal copy names the cap and keeps existing items */
+    it("names the cloud Free creation cap and keeps what was already created", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "resource_limit_exceeded",
+          httpStatus: 403,
+          meta: { limitType: "evaluators", current: 3, max: 3 },
+        }),
+      );
+
+      expect(description).toBe(
+        "Your plan includes 3 custom evaluators. Upgrade to create more. Everything you already have keeps working.",
+      );
+    });
+
+    it("names simulations for a scenario set refusal", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "resource_limit_exceeded",
+          httpStatus: 403,
+          meta: { limitType: "scenarioSets", current: 3, max: 3 },
+        }),
+      );
+
+      expect(description).toContain("3 simulations");
+    });
+
     it("keeps the generic plan-limit line for every other allowance", () => {
       const { description } = explainHandledError(
         shape({
