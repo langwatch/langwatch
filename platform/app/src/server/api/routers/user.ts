@@ -30,7 +30,6 @@ import {
 } from "~/server/app-layer/identity/signin-method-policy";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
-import { AGGREGATE_PROJECT_KIND } from "~/server/app-layer/projects/project-kinds";
 import {
   AuthRateLimitedError,
   DirectRegistrationUnavailableError,
@@ -1384,29 +1383,20 @@ export const userRouter = createTRPCRouter({
     .permission("organization:view")
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      const [user, firstProject] = await Promise.all([
+      const [user, firstProjectSlug] = await Promise.all([
         ctx.prisma.user.findUnique({
           where: { id: userId },
           select: { lastHomePath: true },
         }),
-        ctx.prisma.project.findFirst({
-          where: {
-            team: {
-              organizationId: input.organizationId,
-              members: { some: { userId } },
-            },
-            archivedAt: null,
-            // An aggregate is opened on purpose, never landed on (ADR-144
-            // block F).
-            kind: { not: AGGREGATE_PROJECT_KIND },
-          },
-          orderBy: { createdAt: "asc" },
-          select: { slug: true },
+        // Never an aggregate: the landing rule lives with the projects.
+        getApp().projects.getLandingProjectSlug({
+          organizationId: input.organizationId,
+          userId,
         }),
       ]);
       return {
         lastHomePath: user?.lastHomePath ?? null,
-        firstProjectSlug: firstProject?.slug ?? null,
+        firstProjectSlug,
         // The governance-home option is shown for any user who could
         // possibly land there via auto-detection — gate on the resolver's
         // own conjunctive check instead of duplicating the logic here.

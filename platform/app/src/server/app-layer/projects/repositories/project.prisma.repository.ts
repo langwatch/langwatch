@@ -269,6 +269,27 @@ export class PrismaProjectRepository implements ProjectRepository {
     return this.prisma.project.findUnique({ where: { id } });
   }
 
+  async findLandingProjectSlug({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string | null> {
+    const project = await this.prisma.project.findFirst({
+      where: {
+        team: { organizationId, members: { some: { userId } } },
+        archivedAt: null,
+        // An aggregate is opened on purpose, never landed on (ADR-144
+        // block F).
+        kind: { not: AGGREGATE_PROJECT_KIND },
+      },
+      orderBy: { createdAt: "asc" },
+      select: { slug: true },
+    });
+    return project?.slug ?? null;
+  }
+
   async findAllByOrganization({
     organizationId,
     page,

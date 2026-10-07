@@ -722,6 +722,17 @@ export class ProjectService {
     }
   }
 
+  /**
+   * The slug of the project the app lands a member on when they chose none;
+   * never an aggregate. See {@link ProjectRepository.findLandingProjectSlug}.
+   */
+  async getLandingProjectSlug(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string | null> {
+    return this.repo.findLandingProjectSlug(params);
+  }
+
   async listByOrganization(params: {
     organizationId: string;
     page: number;

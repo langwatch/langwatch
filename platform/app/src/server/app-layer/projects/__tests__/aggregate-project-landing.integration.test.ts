@@ -15,6 +15,8 @@ import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
+import { ProjectService } from "~/server/app-layer/projects/project.service";
+import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { prisma } from "~/server/db";
 import { landingProjectOf } from "../project-kinds";
 import {
@@ -31,6 +33,8 @@ describe("Feature: an aggregate is never the default landing project", () => {
   beforeAll(async () => {
     globalForApp.__langwatch_app = createTestApp({
       organizations: realOrganizationService(prisma),
+      // The landing pick is the project repository's to make.
+      projects: new ProjectService(new PrismaProjectRepository(prisma)),
     });
     fixture = await seedAggregateOrganization(prisma, { label: "agg-land" });
     // Older than every other project on the team, so a plain "first by

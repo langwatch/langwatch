@@ -155,6 +155,15 @@ export interface ProjectRepository extends ProjectKindRepository {
     organizationId: string;
     aggregateRule: AggregateRule;
   }): Promise<Project | null>;
+  /**
+   * The slug of the project the app lands a member of an organization on
+   * when they chose none: their oldest unarchived project in it that is not
+   * an aggregate (ADR-144 block F). Null when they have none.
+   */
+  findLandingProjectSlug(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string | null>;
   findAllByOrganization(params: {
     organizationId: string;
     page: number;
@@ -201,6 +210,13 @@ export interface ProjectRepository extends ProjectKindRepository {
 
 export class NullProjectRepository implements ProjectRepository {
   async getById(_id: string): Promise<Project | null> {
+    return null;
+  }
+
+  async findLandingProjectSlug(_params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string | null> {
     return null;
   }
 
