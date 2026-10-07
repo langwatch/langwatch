@@ -4,15 +4,15 @@
 
 **Status:** Accepted
 
-> One line: when an LLM-as-a-judge evaluator names Instant Evals as its model, the **evaluation module** turns its settings into one classifier **question** and maps the verdict back to today's result shape, and a new leaf module, the Instant Evals judge, answers it with a **budget check, a classification and one spend record keyed by the evaluation's own retry key**.
+> One line: when an LLM-as-a-judge evaluator names Instant Evals as its model, the **evaluation module** turns its settings into one classifier **question** and maps the verdict back to today's result shape, and a new leaf module, the Instant Evals judge, answers it with a **budget check, a classification and one spend record keyed by the evaluation's own retry key**. The meter, the pricing rule and the $1 budget check already exist in Instant Evals and are reused; wave 1 only connects the judge to them.
 
 ## Context
 
 - tasks#915 makes Instant Evals a judge model on every LLM-as-a-judge evaluator. tasks#902 asks for the same thing and says every call goes through the gateway on purpose. The two issues are to be merged before wave 2.
 - This record covers wave 1 only: question building, result mapping, the metered call and the picker entry. Wave 1 calls the classifier the way the search bar and runs already do, inside the app. Whether the call later travels out through a Lambda and back through the gateway is wave 2. Self-hosted installs are wave 3.
 - Hard rule (the user, 2026-10-08): customers use LangWatch's servers and never supply their own classifier key. The judge runs on cloud only in wave 1 (decision 14).
-- Instant Evals is on main today, under `platform/app`. This pull request stacks on #7536, which moves it into `modules/instant-eval` and lands on main first. Nobody is charged for Instant Evals yet: the meter's code exists, but neither Stripe catalogue holds an Instant Evals price.
-- ADR-144 says a search-bar classification is "counted, not metered". That stays true for the search bar. A judge call is a customer's evaluation, so it is metered. This record is the exception, and ADR-144 is unchanged.
+- Instant Evals is on main today, under `platform/app`. This pull request stacks on #7536, which moves it into `modules/instant-eval` and lands on main first. Nobody is charged for Instant Evals yet: the meter (`langwatch_instant_eval_usd`), its pricing rule and the $1 budget check exist, but neither Stripe catalogue holds an Instant Evals price.
+- ADR-144 says a search-bar classification is "counted, not metered". That stays true for the search bar. A judge call is a customer's evaluation, so it is metered, by the existing Instant Evals meter. This record is the exception, and ADR-144 is unchanged.
 - ADR-153 (the run is a judgment job) holds a budget reservation per run. A judge call is not a run.
 - What breaks if this is wrong: customer money, and guardrails that block the wrong outputs.
 
@@ -47,9 +47,9 @@
    - The error code survives into the stored result. Today `executionResultOf` (`evaluation-execution-result.rules.ts`) drops `error_type`, so wave 1 carries it through.
 
 8. **One call is check, classify, record.**
-   - Check the organization's spend against the free budget. A spent budget refuses here, before the classifier is called.
+   - Check the organization's spend against the free budget, with the existing $1 check. A spent budget refuses here, before the classifier is called.
    - Classify the text.
-   - Price the tokens the classifier billed.
+   - Price the tokens the classifier billed, with the existing Instant Evals pricing rule.
    - Record one spend row. A call with no input tokens records nothing.
    - A call cancelled after the classifier answered still records its spend, because the classifier was paid.
    - A spend row that cannot be written is logged and the verdict kept, as a judged query does today.
@@ -65,10 +65,10 @@
 12. **Only usage-billed organizations judge without a cap.** The $1 cap applies to every organization the meter does not bill: free plans, and paid plans on tiered pricing. Before, the cap read only the plan's free flag and the meter read only the pricing model, so a paid tiered organization was neither capped nor charged. Nobody had decided that overlap. Billing keeps the rule for whether the meter bills an organization: usage pricing, a Stripe customer and an active subscription, or a connected self-hosted account. Billing now publishes that rule as an event the judge leaf folds (decision 13), and the monthly report reads the same rule. The Instant Evals run row cap reads the same fold, so the two caps agree. Kept in v8 after a review against main: capping every organization would cap Growth customers, who have no cap today. Until the Stripe price for Instant Evals exists, usage-billed organizations judge uncapped and uncharged, and every call still writes its spend row, so it can be charged once the price exists. Consequence: a paying tiered customer stops at $1 until top-up lands in wave 3, then uses their own provider key. This also closes the gap for Instant Evals runs, which share the check. A tiered organization already past $1 is refused for runs as well as judges on the day this ships. The refusal message must not tell an organization that already pays to upgrade to a paid plan, so its copy changes in wave 1 to fit both free and paid tiered organizations.
 13. **The judge call lives in a leaf module, so wave 1 adds no peer cycle and cuts no edge.**
     - Why: evaluation calling Instant Evals closes a loop through gateway, and a second one through trace. The policy allows no new cycle. Cutting an existing edge needs a ruling first (ARCHITECTURE, peer cycles), and the leaf alone breaks the new loop, so wave 1 cuts none.
-    - Shape: a new module, the Instant Evals judge (`modules/instant-eval-judge`), with no peer Api dependency. It owns the cloud classifier client (LangWatch's own key), the pricing rule, the budget check and the judge method. Evaluation and Instant Evals both depend on it. This is the shape the guardrail ruling gives the evaluation runtime: a dependency leaf.
+    - Shape: a new module, the Instant Evals judge (`modules/instant-eval-judge`), with no peer Api dependency. It owns the cloud classifier client (LangWatch's own key), the pricing rule (moved from Instant Evals unchanged), the existing $1 budget check and the judge method. Evaluation and Instant Evals both depend on it. This is the shape the guardrail ruling gives the evaluation runtime: a dependency leaf.
     - The Connect classifier stays in Instant Evals. Connect goes through licensing, and licensing lists Instant Evals as a dependency (`licensing.app.ts`), so the leaf calling it would close a loop. Instant Evals keeps choosing between the cloud key and Connect for its runs and search bar, as today.
     - Own tables: the leaf keeps its own copy of the facts it needs, in its own tables (Schema). This is the documented pattern: "A peer subscriber writes its own read-model row" (ARCHITECTURE, eventing), and authz learns who is deactivated "into its own table, never from the User table". Data privacy, authz and nurturing already do this.
-    - Own total: the leaf appends one priced event per call on the organization's aggregate and folds them into that organization's Instant Evals spend. The judge's $1 check reads that total before the classifier is called, so the check stays as immediate as today. This follows entitlement counting from its own meters.
+    - Own total: the leaf appends one priced event per call on the organization's aggregate and folds them into its own copy of that organization's Instant Evals spend. The judge's $1 check reads that total before the classifier is called, so the check stays as immediate as today. This follows entitlement counting from its own meters.
     - Gateway learns by event: the priced event carries the project, organization, model, tokens, price and request id. Gateway peer-subscribes and writes the spend row the meter already reads, looking up the team through the project dependency it already has. The request id makes a repeated event one row. This is how gateway already handles governance's priced pulled usage. The meter does not change.
     - Organization lookup: the leaf folds project's `lw.project.created` into its own project to organization map, as data privacy does. A project move stays inside its organization, so the map never changes after creation. Callers pass only the project.
     - Usage billing: the leaf folds a billing event that says whether the meter bills the organization. Billing's current events carry only whether there is a subscription, so billing adds this event in wave 1.
@@ -129,21 +129,21 @@
 
 ## Gates
 
-| Path                         | Reversible?                    | Blast radius                              | Gate                                                                                                                   |
-| ---------------------------- | ------------------------------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Spend row per judge call     | No, it feeds the monthly meter | Large                                     | Human review of the judge method and the redelivery test before merge                                                  |
-| Budget check                 | Yes                            | Large                                     | Unit tests that a refusal happens before the classifier is called and becomes an `error` result                        |
-| Cap moves to `isUsageBilled` | Yes                            | Large, paying tiered customers stop at $1 | Unit tests for usage billed, tiered and free organizations, and the monthly report reading the same rule               |
-| Builder and result mapping   | Yes                            | Large for guardrails                      | Unit tests against the generated schemas, plus the polarity check                                                      |
-| Picker entry                 | Yes                            | Large, customer-visible                   | Ships with wave 1 behind `release_instant_evals`. Reviewer confirms the bounded flag in the deploy config before merge |
-| Judge leaf                   | Yes                            | Medium                                    | The peer-cycle policy shows no new finding and no removed edge before merge                                            |
-| Leaf tables migration        | No, it is a schema migration   | Medium, new tables only                   | Human review of the migration. It only creates tables, so rollback is dropping them                                    |
-| Catch-up jobs                | Yes, each is safe to re-run    | Large, they set every organization's cap  | Re-run tests, then a dry run on staging that prints counts before production                                           |
-| Flag on in production        | Yes                            | Large, customer-visible                   | Only after the three catch-up jobs report done                                                                         |
+| Path                         | Reversible?                             | Blast radius                              | Gate                                                                                                                   |
+| ---------------------------- | --------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Spend row per judge call     | No, it feeds the existing monthly meter | Large                                     | Human review of the judge method and the redelivery test before merge                                                  |
+| Budget check                 | Yes                                     | Large                                     | Unit tests that a refusal happens before the classifier is called and becomes an `error` result                        |
+| Cap moves to `isUsageBilled` | Yes                                     | Large, paying tiered customers stop at $1 | Unit tests for usage billed, tiered and free organizations, and the monthly report reading the same rule               |
+| Builder and result mapping   | Yes                                     | Large for guardrails                      | Unit tests against the generated schemas, plus the polarity check                                                      |
+| Picker entry                 | Yes                                     | Large, customer-visible                   | Ships with wave 1 behind `release_instant_evals`. Reviewer confirms the bounded flag in the deploy config before merge |
+| Judge leaf                   | Yes                                     | Medium                                    | The peer-cycle policy shows no new finding and no removed edge before merge                                            |
+| Leaf tables migration        | No, it is a schema migration            | Medium, new tables only                   | Human review of the migration. It only creates tables, so rollback is dropping them                                    |
+| Catch-up jobs                | Yes, each is safe to re-run             | Large, they set every organization's cap  | Re-run tests, then a dry run on staging that prints counts before production                                           |
+| Flag on in production        | Yes                                     | Large, customer-visible                   | Only after the three catch-up jobs report done                                                                         |
 
 ## Schema
 
-Three new Postgres tables, owned by the judge leaf. Each is a fold of another module's facts or of the leaf's own priced events. They ship in one migration under `packages/prisma-client/prisma/migrations/`, claimed in the table catalogue.
+Three new Postgres tables, owned by the judge leaf. Each holds a copy of facts the judge needs before each call, folded from another module's events or from the leaf's own priced events. None of them is a meter: the monthly report still reads the gateway ledger. They ship in one migration under `packages/prisma-client/prisma/migrations/`, claimed in the table catalogue.
 
 | Table                          | Key              | Columns                       | Fed by                                  |
 | ------------------------------ | ---------------- | ----------------------------- | --------------------------------------- |
@@ -229,7 +229,7 @@ The score judge's settings gain an optional `min` and `max` in the langevals set
   - Instant Evals keeps its gateway dependency, since cutting an edge needs a ruling. Runs and judged queries record through the leaf instead (decision 13).
   - Gateway looks up the team itself. The leaf folds only project creation, since a move stays inside the organization (decision 13).
   - The picker checks the opt-in and the judge call does not recheck it (decision 13). The spend row lag joins the overshoot (decision 8).
-- v8, 2026-10-08, after a review against main. Captain: Sergio Esteban.
+- v8, 2026-10-07, after a review against main. Captain: Sergio Esteban.
   - The leaf owns three tables. This replaces "no database change" (Schema, decision 13).
   - The Connect classifier stays in Instant Evals, since the leaf calling it would loop through licensing (decision 13).
   - Cloud only, no customer key, self-hosted in wave 3. The own-key lines leave the public docs (decision 14).
@@ -239,3 +239,5 @@ The score judge's settings gain an optional `min` and `max` in the langevals set
   - Decision 12 kept. Capping every organization was rejected because it would cap Growth customers, who have no cap today.
   - The base branch must default `INSTANT_EVAL_BOUNDED` to `IS_SAAS` before it lands (Assumptions).
   - `error_type` survives into the stored result (decision 7).
+- v9, 2026-10-07, wording only. Captain: Sergio Esteban.
+  - Wording clarified: the meter, the pricing rule and the $1 budget check are reused. Wave 1 only connects the judge to them (summary, Context, decisions 8 and 13, Gates, Schema). No decision changed.
