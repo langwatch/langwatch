@@ -66,6 +66,7 @@ import { bumpAuthzEpoch } from "./epoch";
 import { AuthzGrantNotConfirmedError } from "./errors";
 import { PrismaAuthzRevocationRepository } from "./repositories/authz-revocation.prisma.repository";
 import { liveGrants, liveRoles } from "./repositories/live-rows";
+import { sharedProjectReadsOf } from "./repositories/shared-reads.grants.repository";
 
 const logger = createLogger("langwatch:authz:ledger");
 
@@ -713,12 +714,8 @@ export class GrantsLedgerWriter {
       }
     }
     const identity = {
-      organizationId,
-      principalType: STORED_PRINCIPAL_KIND.project,
-      principalId: readerProjectId,
-      scopeType: "PROJECT" as const,
+      ...sharedProjectReadsOf({ organizationId, readerProjectId }),
       scopeId: memberProjectId,
-      roleKey: PROJECT_READER_ROLE_KEY,
     };
     const existing = await liveGrants(this.prisma).findFirst({
       where: identity,
@@ -1321,23 +1318,6 @@ export class GrantsLedgerWriter {
       await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
     }
   }
-}
-
-/** The rows that are one reader project's shared reads (ADR-144). */
-function sharedProjectReadsOf({
-  organizationId,
-  readerProjectId,
-}: {
-  organizationId: string;
-  readerProjectId: string;
-}) {
-  return {
-    organizationId,
-    principalType: STORED_PRINCIPAL_KIND.project,
-    principalId: readerProjectId,
-    scopeType: "PROJECT" as const,
-    roleKey: PROJECT_READER_ROLE_KEY,
-  };
 }
 
 /** The writer over the app's Prisma singleton, composed per call. */
