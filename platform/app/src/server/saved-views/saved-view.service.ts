@@ -44,12 +44,16 @@ export class SavedViewService {
     projectId,
     userId,
     kind,
-    acceptsWrites = true,
+    acceptsWrites,
   }: {
     projectId: string;
     userId?: string;
-    /** False on a project nothing may be written under; skips the seed. */
-    acceptsWrites?: boolean;
+    /**
+     * False on a project nothing may be written under; skips the seed.
+     * Required, as on DashboardService, so a caller that forgets it fails
+     * to compile instead of seeding under an aggregate.
+     */
+    acceptsWrites: boolean;
     /**
      * Storage shape to read. Omit for the legacy default
      * ("v1-traces-filter"). The new traces v2 lens UI passes

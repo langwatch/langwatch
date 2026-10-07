@@ -358,6 +358,13 @@ Feature: An aggregate project reads its member projects
     And no dashboard or saved view row exists under the aggregate
     And opening the member the same way still creates its first dashboard and default views
 
+  @unit
+  Scenario: A read that seeds defaults must be told whether the project takes writes
+    Given the services that seed a first dashboard or default views on read
+    When a caller reads without saying whether the project takes writes
+    Then the call does not compile, so no default is ever seeded by omission
+    And a project that takes no writes gets what exists and nothing is seeded
+
   @integration
   Scenario: Saving, renaming, reordering or deleting a view is refused on the aggregate
     Given an aggregate project and one of its members
