@@ -409,7 +409,7 @@ Feature: An aggregate project reads its member projects
     When ana opens the aggregate project
     Then no control offers to comment, suggest an edit, edit a trace, automate or add a dashboard
     And its analytics overview offers no card to build a dashboard
-    And its datasets and automations pages say "Data can't be added to this project" instead of offering to create one
+    And its datasets, automations and prompts pages say "Data can't be added to this project" instead of offering to create one
     And managing the aggregate itself stays available
 
   @unit
