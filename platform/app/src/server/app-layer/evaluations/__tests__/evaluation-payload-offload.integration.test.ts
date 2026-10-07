@@ -27,6 +27,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
+import { AuthorizedClickHouse } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import { TraceEvaluationsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
@@ -49,6 +50,7 @@ import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import { evaluationRunRepositoryFor } from "~/test-utils/evaluationRunRepository";
 import { getTestClickHouseClient } from "../../../event-sourcing/__tests__/integration/testContainers";
 import {
@@ -332,10 +334,15 @@ describe("evaluation inputs offload (integration)", () => {
       const service = new EvaluationService({
         resolveInputsMarker: ({ projectId, inputs }) =>
           resolveInputsMarker({ projectId, inputs, storedObjects }),
-        repository: new TraceEvaluationsClickHouseRepository(async () => ch),
+        repository: new TraceEvaluationsClickHouseRepository({
+          resolveClient: async () => ch,
+          clickhouse: new AuthorizedClickHouse({
+            resolveClient: async () => ch,
+          }),
+        }),
       });
       const readInputs = await service.getEvaluationInputs({
-        projectId: tenantId,
+        authorization: ownProof({ projectId: tenantId }),
         evaluationId,
       });
 

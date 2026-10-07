@@ -1,11 +1,9 @@
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Evaluation } from "~/server/tracer/types";
 import { api } from "~/utils/api";
 import { useSharedTrace } from "../context/SharedTraceContext";
-import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
-import { useDrawerStore } from "../stores/drawerStore";
 import type { EvalSummary } from "../types/trace";
+import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
 export type RichEval = EvalSummary & {
   evaluationId: string;
@@ -96,32 +94,23 @@ export function mapScore(ev: Evaluation): number | boolean | null {
 
 export function useTraceEvaluations(): TraceEvaluationsResult {
   const shared = useSharedTrace();
-  const { project } = useOrganizationTeamProject();
-  const storeTraceId = useDrawerStore((s) => s.traceId);
-  const traceId = shared?.header.traceId ?? storeTraceId;
+  const { isReady, hintReady, queryArgs } = useTraceQueryArgs();
 
   // TODO(traces-v2): migrate to `tracesV2.evals` once the v2 schema carries
   // `spanId`, `errorStacktrace`, and `retries` — the rich evaluations panel
   // surfaces all three. Until then, keep the v1 endpoint but split it off
   // the drawer batch so it doesn't block the 7 other v2 procedures the
-  // drawer fires on open.
-  // Preview traces live entirely client-side — sending them to the
-  // real evaluations endpoint either errors (unknown trace id) or
-  // returns nothing useful. Match the other v2 drawer hooks that
-  // already gate on `!isPreviewTraceId(traceId)`; the drawer's
-  // evaluations tab will read whatever was seeded into the cache by
-  // `useOpenTraceDrawer` instead (empty for synthesised previews,
-  // a hand-built set for the rich arrival trace).
-  const isPreview = !!traceId && isPreviewTraceId(traceId);
-  const query = api.traces.getEvaluations.useQuery(
-    { projectId: project?.id ?? "", traceId: traceId ?? "" },
-    {
-      enabled: !!project?.id && !!traceId && !isPreview && !shared,
-      staleTime: 30_000,
-      refetchOnWindowFocus: false,
-      trpc: { context: { skipBatch: true } },
-    },
-  );
+  // drawer fires on open. It takes the same arguments as every other
+  // per-trace read, so on an aggregate it reads the member the drawer is on
+  // (ADR-144 block F). Preview traces live entirely client-side and are
+  // gated out by `isReady`; the evaluations tab reads whatever
+  // `useOpenTraceDrawer` seeded instead.
+  const query = api.traces.getEvaluations.useQuery(queryArgs, {
+    enabled: isReady && hintReady && !shared,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    trpc: { context: { skipBatch: true } },
+  });
 
   const rawEvaluations = shared?.evaluations ?? query.data;
 

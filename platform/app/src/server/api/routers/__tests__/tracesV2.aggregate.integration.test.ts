@@ -24,6 +24,7 @@ import {
 } from "~/server/app-layer/authz/ledger";
 import { AuthorizedClickHouse } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import { TraceEvaluationsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
@@ -72,6 +73,8 @@ let admin: ReturnType<typeof appRouter.createCaller>;
 /** Every row is written after the grants attached, inside their window. */
 let occurredAt: number;
 let window: { from: number; to: number };
+/** The engineer's evaluation, which recorded the inputs it judged. */
+let engineerEvaluationId: string;
 
 const handledCodeOf = (error: unknown): string | undefined => {
   const cause = (error as { cause?: unknown } | null)?.cause;
@@ -245,7 +248,14 @@ beforeAll(async () => {
         new SpanStorageClickHouseRepository({ resolveClient, clickhouse }),
       ),
     },
-    evaluations: { ...defaults.evaluations, runs: evaluationRuns },
+    evaluations: {
+      ...defaults.evaluations,
+      runs: evaluationRuns,
+      traceEvaluations: new TraceEvaluationsClickHouseRepository({
+        resolveClient,
+        clickhouse,
+      }),
+    },
   });
 
   fixture = await seedAggregateOrganization(prisma, { label: "agg-route" });
@@ -297,13 +307,15 @@ beforeAll(async () => {
   await insert("trace_summaries", holders.map(summaryRow));
   await insert("stored_spans", holders.map(spanRow));
   const repository = evaluationRunRepositoryFor({ resolveClient });
-  await repository.upsert(
-    evaluationOf({
+  const engineerEvaluation = {
+    ...evaluationOf({
       traceId: traceIdOf("engineer"),
       evaluatorId: "monitor-of-engineer",
     }),
-    memberId("engineer"),
-  );
+    inputs: { input: `question of ${memberId("engineer")}` },
+  };
+  engineerEvaluationId = engineerEvaluation.evaluationId;
+  await repository.upsert(engineerEvaluation, memberId("engineer"));
   await repository.upsert(
     evaluationOf({ traceId: TWIN_TRACE, evaluatorId: "monitor-of-engineer" }),
     memberId("engineer"),
@@ -414,7 +426,6 @@ describe("Feature: trace routes carry the proof", () => {
 
   describe("given a member trace that an online evaluation already scored", () => {
     describe("when ana opens that trace from the aggregate", () => {
-      /** @scenario "The owner's existing evaluation results show on a member trace" */
       it("shows the owner's evaluation and runs none from the aggregate", async () => {
         const evaluations = await admin.tracesV2.evals({
           projectId: aggregate.id,
@@ -439,6 +450,59 @@ describe("Feature: trace routes carry the proof", () => {
         });
         const [counted] = await aggregateRuns.json<{ runs: string | number }>();
         expect(Number(counted?.runs)).toBe(0);
+      });
+    });
+  });
+
+  describe("given a member trace that an online evaluation already scored", () => {
+    describe("when ana opens the drawer's evaluations panel from the aggregate", () => {
+      /** @scenario "The owner's existing evaluation results show on a member trace" */
+      it("shows the owner's evaluation through the route the panel calls", async () => {
+        const evaluations = await admin.traces.getEvaluations({
+          projectId: aggregate.id,
+          traceId: traceIdOf("engineer"),
+          tenantId: memberId("engineer"),
+        });
+
+        expect(evaluations?.map((run) => run.evaluator_id)).toEqual([
+          "monitor-of-engineer",
+        ]);
+      });
+
+      it("finds the member from the proof when no member is named", async () => {
+        const evaluations = await admin.traces.getEvaluations({
+          projectId: aggregate.id,
+          traceId: traceIdOf("engineer"),
+        });
+
+        expect(evaluations?.map((run) => run.evaluator_id)).toEqual([
+          "monitor-of-engineer",
+        ]);
+      });
+
+      it("reads the inputs an evaluation recorded under the member", async () => {
+        const inputs = await admin.traces.getEvaluationInputs({
+          projectId: aggregate.id,
+          evaluationId: engineerEvaluationId,
+          tenantId: memberId("engineer"),
+        });
+
+        expect(inputs).toEqual({
+          input: `question of ${memberId("engineer")}`,
+        });
+      });
+
+      it("refuses a member the proof does not read", async () => {
+        const refusal = await admin.traces
+          .getEvaluations({
+            projectId: aggregate.id,
+            traceId: traceIdOf("outsider"),
+            tenantId: outsider.id,
+          })
+          .then(() => null)
+          .catch((error: unknown) => error);
+
+        expect(handledCodeOf(refusal)).toBe("trace_not_found");
       });
     });
   });

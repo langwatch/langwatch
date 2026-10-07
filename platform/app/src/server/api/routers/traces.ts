@@ -5,6 +5,7 @@ import shuffle from "lodash-es/shuffle";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { EvaluationNotFoundError } from "~/server/app-layer/evaluations/errors";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
@@ -15,6 +16,11 @@ import {
   evaluatePreconditions,
 } from "../../evaluations/preconditions";
 import { checkPreconditionSchema } from "../../evaluations/types";
+import {
+  namedTenantAuthorization,
+  spanReadHintShape,
+  traceDetailAuthorization,
+} from "../trace-detail-authorization";
 import { getUserProtectionsForProject } from "../utils";
 import { getAllForProjectInput, tracesFilterInput } from "./traces.schemas";
 
@@ -76,22 +82,26 @@ export const tracesRouter = createTRPCRouter({
       return trace;
     }),
 
+  /**
+   * The evaluations panel of the trace drawer. Read through the detail proof
+   * (ADR-144 block F): on an aggregate the proof is narrowed to the member
+   * that holds the trace, the one the list row or the header named, so the
+   * panel shows that member's evaluations next to its spans.
+   */
   getEvaluations: protectedProcedure
-    .input(z.object({ projectId: z.string(), traceId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        ...spanReadHintShape,
+      }),
+    )
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
+      return TraceService.create(ctx.prisma).getEvaluationsForTrace({
+        authorization: await traceDetailAuthorization({ ctx, input }),
+        traceId: input.traceId,
       });
-
-      const traceService = TraceService.create(ctx.prisma);
-      const evaluations = await traceService.getEvaluationsMultiple(
-        input.projectId,
-        [input.traceId],
-        protections,
-      );
-
-      return evaluations[input.traceId];
     }),
 
   // Protected (not public-share): the read is keyed by evaluationId, which is
@@ -99,21 +109,26 @@ export const tracesRouter = createTRPCRouter({
   // public-share token is scoped to a single trace and could otherwise be used
   // to read any evaluation's inputs in the project by supplying another
   // evaluationId. Public-shared trace drawers already get inputs eagerly from
-  // the public `getEvaluations`; this lazy fallback stays project-gated.
+  // the public `getEvaluations`; this lazy fallback stays project-gated. On an
+  // aggregate the drawer names the member, and the proof is narrowed to it.
   getEvaluationInputs: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         evaluationId: z.string(),
+        tenantId: spanReadHintShape.tenantId,
       }),
     )
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      const traceService = TraceService.create(ctx.prisma);
-      return traceService.getEvaluationInputs(
-        input.projectId,
-        input.evaluationId,
-      );
+      return TraceService.create(ctx.prisma).getEvaluationInputs({
+        authorization: namedTenantAuthorization({
+          ctx,
+          tenantId: input.tenantId,
+          notFound: () => new EvaluationNotFoundError(input.evaluationId),
+        }),
+        evaluationId: input.evaluationId,
+      });
     }),
 
   getEvaluationsMultiple: protectedProcedure

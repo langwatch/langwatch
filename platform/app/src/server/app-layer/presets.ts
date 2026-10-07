@@ -765,9 +765,10 @@ export function initializeDefaultApp(options?: {
     // Unconditional on `clickhouseEnabled` for the same reason the analytics
     // service is: the resolver throws at query time when ClickHouse isn't
     // configured, and this repository already degrades that to an empty read.
-    traceEvaluations: new TraceEvaluationsClickHouseRepository(
-      resolveClickHouseClient,
-    ),
+    traceEvaluations: new TraceEvaluationsClickHouseRepository({
+      resolveClient: resolveClickHouseClient,
+      clickhouse: authorizedClickHouse,
+    }),
   };
 
   const planResolver = (organizationId: string) =>
@@ -2514,9 +2515,15 @@ export function createTestApp(overrides?: TestAppOverrides): App {
       performance: new MonitorPerformanceService(
         new NullMonitorPerformanceRepository(),
       ),
-      traceEvaluations: new TraceEvaluationsClickHouseRepository(async () => {
-        throw new Error("ClickHouse is not available in the test app");
-      }),
+      traceEvaluations: (() => {
+        const resolveClient = async (): Promise<never> => {
+          throw new Error("ClickHouse is not available in the test app");
+        };
+        return new TraceEvaluationsClickHouseRepository({
+          resolveClient,
+          clickhouse: new AuthorizedClickHouse({ resolveClient }),
+        });
+      })(),
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     analytics: {

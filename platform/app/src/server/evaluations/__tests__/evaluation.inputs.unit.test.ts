@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import {
   serviceOver,
   serviceOverUnavailable,
@@ -19,14 +20,17 @@ describe("EvaluationService.getEvaluationInputs", () => {
             query_params: Record<string, unknown>;
           }) => ({
             json: async () => [
-              { Inputs: '{"input":"hello","output":"world"}' },
+              {
+                TenantId: "project_test",
+                Inputs: '{"input":"hello","output":"world"}',
+              },
             ],
           }),
         );
         const service = serviceOver({ query });
 
         const result = await service.getEvaluationInputs({
-          projectId: "project_test",
+          authorization: ownProof({ projectId: "project_test" }),
           evaluationId: "eval-1",
         });
 
@@ -37,10 +41,10 @@ describe("EvaluationService.getEvaluationInputs", () => {
         const sql = query.mock.calls[0]?.[0]?.query ?? "";
         expect(sql).toContain("EvaluationId = {evaluationId:String}");
         expect(sql).not.toContain("TraceId");
-        expect(query.mock.calls[0]?.[0]?.query_params).toMatchObject({
-          tenantId: "project_test",
-          evaluationId: "eval-1",
-        });
+        const params = query.mock.calls[0]?.[0]?.query_params ?? {};
+        expect(params).toMatchObject({ evaluationId: "eval-1" });
+        // The tenant comes from the proof's fence, not from the caller.
+        expect(JSON.stringify(params)).toContain("project_test");
       });
     });
   });
@@ -49,12 +53,12 @@ describe("EvaluationService.getEvaluationInputs", () => {
     describe("when its inputs are requested", () => {
       it("returns null", async () => {
         const query = vi.fn(async () => ({
-          json: async () => [{ Inputs: null }],
+          json: async () => [{ TenantId: "project_test", Inputs: null }],
         }));
         const service = serviceOver({ query });
 
         const result = await service.getEvaluationInputs({
-          projectId: "project_test",
+          authorization: ownProof({ projectId: "project_test" }),
           evaluationId: "eval-1",
         });
 
@@ -74,7 +78,23 @@ describe("EvaluationService.getEvaluationInputs", () => {
         const service = serviceOver({ query });
 
         const result = await service.getEvaluationInputs({
-          projectId: "project_test",
+          authorization: ownProof({ projectId: "project_test" }),
+          evaluationId: "eval-1",
+        });
+
+        expect(result).toBeNull();
+      });
+    });
+  });
+
+  describe("given no project the proof reads holds the evaluation", () => {
+    describe("when its inputs are requested", () => {
+      it("returns null", async () => {
+        const query = vi.fn(async () => ({ json: async () => [] }));
+        const service = serviceOver({ query });
+
+        const result = await service.getEvaluationInputs({
+          authorization: ownProof({ projectId: "project_test" }),
           evaluationId: "eval-1",
         });
 
@@ -85,17 +105,17 @@ describe("EvaluationService.getEvaluationInputs", () => {
 
   describe("given ClickHouse is not enabled for the project", () => {
     describe("when its inputs are requested", () => {
-      it("returns null without querying", async () => {
+      it("fails the read like any other read that cannot reach ClickHouse", async () => {
         const service = serviceOverUnavailable(
           new Error("ClickHouse not available for tenant project_test"),
         );
 
-        const result = await service.getEvaluationInputs({
-          projectId: "project_test",
-          evaluationId: "eval-1",
-        });
-
-        expect(result).toBeNull();
+        await expect(
+          service.getEvaluationInputs({
+            authorization: ownProof({ projectId: "project_test" }),
+            evaluationId: "eval-1",
+          }),
+        ).rejects.toThrow("Failed to fetch evaluation inputs");
       });
     });
   });

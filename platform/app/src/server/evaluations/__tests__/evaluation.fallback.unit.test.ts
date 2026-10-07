@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import { serviceOver } from "./support/evaluationServiceOver";
 
 /**
@@ -50,7 +51,7 @@ describe("EvaluationService memory-limit fallback", () => {
         const service = serviceOver(client);
 
         const result = await service.getEvaluationsForTrace({
-          projectId: "project_test",
+          authorization: ownProof({ projectId: "project_test" }),
           traceId: "trace-1",
         });
 

@@ -43,6 +43,7 @@ const CONVERTED_REPOSITORIES = [
   "server/app-layer/traces/repositories/trace-analytics.clickhouse.repository.ts",
   "server/app-layer/traces/repositories/session-groups.clickhouse.repository.ts",
   "server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository.ts",
+  "server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository.ts",
 ];
 
 /**
@@ -74,7 +75,15 @@ const NOT_YET_CONVERTED: Array<{
   method: string;
   reason: string;
   owner: string;
-}> = [];
+}> = [
+  {
+    file: "server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository.ts",
+    method: "findManyByTraceIdsForTenant",
+    reason:
+      "the REST trace surfaces, the share link and the evaluation worker still hand a project id to TraceService.getEvaluationsMultiple; the drawer reads through findManyByTraceIds and the proof.",
+    owner: "follow-up to block F",
+  },
+];
 
 function notYetConvertedMethodsOf(file: string): string[] {
   return NOT_YET_CONVERTED.filter((entry) => entry.file === file).map(
@@ -100,6 +109,7 @@ const FRAGMENT_EXPANDER_CALLERS = new Set([
 /** The routers whose reads reach a converted repository. */
 const TRACE_ROUTERS = [
   "server/api/routers/tracesV2.ts",
+  "server/api/routers/traces.ts",
   "server/api/routers/sharedTrace.ts",
   "server/api/routers/llmModelCosts.ts",
   "server/api/routers/traceEditOverlay.ts",
@@ -108,10 +118,12 @@ const TRACE_ROUTERS = [
 /**
  * A call into, or a hand-over of, a service whose repository reads through
  * the proof: the trace list, summary, spans and session groups services, and
- * the evaluation runs service that owns the evaluation summaries.
+ * the evaluation runs service that owns the evaluation summaries. Narrowing
+ * the detail proof reaches the summary service too, so a router that only
+ * calls `traceDetailAuthorization` reaches a converted read as surely.
  */
 const CONVERTED_SERVICE_READ =
-  /\b(?:traces\.(?:list|summary|spans|sessionGroups)|evaluations\.runs)\b/;
+  /\b(?:traces\.(?:list|summary|spans|sessionGroups)|evaluations\.runs|traceDetailAuthorization)\b/;
 
 /**
  * Router chunks that reach one of those services and carry no proof. Every

@@ -1,5 +1,5 @@
 import { on } from "node:events";
-import { type Authorization, narrowAuthorization } from "@langwatch/actor";
+import type { Authorization } from "@langwatch/actor";
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
@@ -104,6 +104,12 @@ import {
   RESERVED_OUTPUT_MEDIA_REFS,
 } from "~/shared/traces/media-refs";
 import { requireRouteAuthorization } from "../authorization";
+import {
+  namedTenantAuthorization,
+  occurredAtFromInput,
+  spanReadHintShape,
+  traceDetailAuthorization,
+} from "../trace-detail-authorization";
 import { getUserProtectionsForProject } from "../utils";
 import {
   gateHeaderCost,
@@ -130,33 +136,6 @@ import { spanTreeCursorSchema } from "./tracesV2.schemas";
 // ---------------------------------------------------------------------------
 
 /**
- * Reusable Zod fields for span-read endpoints that accept the partition-
- * pruning hint. The drawer carries the trace's approximate timestamp in
- * the URL, so callers thread it through every span query that targets
- * `stored_spans`. Spread into a procedure's input shape with `...`.
- */
-const spanReadHintShape = {
-  /**
-   * Approximate trace timestamp (ms since epoch) used as a partition-
-   * pruning hint on `stored_spans`. Supplying it narrows the scan from
-   * every weekly partition (incl. cold S3) down to a ±2-day window.
-   * Optional — missing/invalid values fall back to the unconstrained
-   * scan path on the server.
-   */
-  occurredAtMs: z.number().int().optional(),
-  /** The project that owns the trace; see {@link traceTenantShape}. */
-  tenantId: z.string().min(1).optional(),
-} as const;
-
-function occurredAtFromInput(input: {
-  occurredAtMs?: number;
-}): { occurredAtMs: number } | Record<string, never> {
-  return input.occurredAtMs !== undefined
-    ? { occurredAtMs: input.occurredAtMs }
-    : {};
-}
-
-/**
  * The project that owns the trace a detail read is for, as the list row or
  * the header named it (ADR-144 block F). Spread into every per-trace input.
  * Optional: a plain project's reads never need it, and an aggregate's reads
@@ -165,51 +144,6 @@ function occurredAtFromInput(input: {
 const traceTenantShape = {
   tenantId: z.string().min(1).optional(),
 } as const;
-
-/**
- * The proof one trace's detail reads are fenced by: the route's own, narrowed
- * on an aggregate to the member that holds the trace (ADR-144 block F), so
- * the spans, evaluations and events behind one drawer all come from the same
- * member. A named member the proof does not read is answered as not found,
- * the same answer a trace outside the proof gets.
- */
-async function traceDetailAuthorization({
-  ctx,
-  input,
-}: {
-  ctx: Parameters<typeof requireRouteAuthorization>[0];
-  input: { traceId: string; occurredAtMs?: number; tenantId?: string };
-}): Promise<Authorization> {
-  const authorization = await getApp().traces.summary.authorizationForTrace({
-    authorization: requireRouteAuthorization(ctx),
-    traceId: input.traceId,
-    ...occurredAtFromInput(input),
-    ...(input.tenantId !== undefined ? { tenantId: input.tenantId } : {}),
-  });
-  if (!authorization) throw new TraceNotFoundError(input.traceId);
-  return authorization;
-}
-
-/**
- * The route's proof, narrowed to the member a caller named, for a read that
- * picks the member itself when none is named (the header's summary read, a
- * conversation's turns). A member outside the proof is answered as not found.
- */
-function namedTenantAuthorization({
-  ctx,
-  tenantId,
-  notFound,
-}: {
-  ctx: Parameters<typeof requireRouteAuthorization>[0];
-  tenantId?: string;
-  notFound: string;
-}): Authorization {
-  const authorization = requireRouteAuthorization(ctx);
-  if (tenantId === undefined) return authorization;
-  const narrowed = narrowAuthorization({ authorization, projectId: tenantId });
-  if (!narrowed) throw new TraceNotFoundError(notFound);
-  return narrowed;
-}
 
 /**
  * The Instant Eval runs the Explorer registered for the query's `eval`
@@ -1508,7 +1442,7 @@ export const tracesV2Router = createTRPCRouter({
         authorization: namedTenantAuthorization({
           ctx,
           tenantId: input.tenantId,
-          notFound: input.conversationId,
+          notFound: () => new TraceNotFoundError(input.conversationId),
         }),
         timeRange,
         sort: { columnId: "time", direction: "asc" },
@@ -1711,7 +1645,7 @@ export const tracesV2Router = createTRPCRouter({
         authorization: namedTenantAuthorization({
           ctx,
           tenantId: input.tenantId,
-          notFound: input.traceId,
+          notFound: () => new TraceNotFoundError(input.traceId),
         }),
         traceId: input.traceId,
         ...(input.occurredAtMs !== undefined

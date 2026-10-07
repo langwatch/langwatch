@@ -5,9 +5,19 @@
  * retry — all facts about this table's storage shape — live behind a
  * repository instead of in a service that also owns tracing and the
  * stored-object inputs resolution.
+ *
+ * The drawer's reads take the proof (ADR-144 block F), so on an aggregate
+ * they read the member that holds the trace. The by-tenant read stays for
+ * the callers that still hand a project id: the REST surfaces, the share
+ * link and the evaluation worker.
  */
 
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
+import {
+  type AuthorizedClickHouse,
+  tenantScope,
+} from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { safeJsonParse } from "~/utils/safeJsonParse";
 import type { ClickHouseEvaluationRunRow } from "../../../evaluations/evaluation-run.mappers";
@@ -62,34 +72,109 @@ function isMemoryLimitError(error: unknown): boolean {
 }
 
 export interface FindManyByTraceIdsInput {
+  authorization: Authorization;
+  traceIds: string[];
+}
+
+export interface FindManyByTraceIdsForTenantInput {
   tenantId: string;
   traceIds: string[];
 }
 
 export interface FindInputsByEvaluationIdInput {
-  tenantId: string;
+  authorization: Authorization;
   evaluationId: string;
 }
 
+/**
+ * One evaluation's raw parsed `Inputs` JSON, with the project the row was
+ * read from: an offloaded marker lives under that project, which on an
+ * aggregate is a member rather than the aggregate.
+ */
+export interface EvaluationInputsRead {
+  tenantId: string;
+  inputs: Record<string, unknown> | null;
+}
+
+type ReadEvaluationRows = (
+  columns: string,
+) => Promise<ClickHouseEvaluationRunRow[]>;
+
 export interface TraceEvaluationsRepository {
+  /** The evaluations the proof reads, grouped by trace. */
   findManyByTraceIds(
     input: FindManyByTraceIdsInput,
+  ): Promise<Record<string, TraceEvaluation[]>>;
+  /** The same read for a caller that still hands a project id. */
+  findManyByTraceIdsForTenant(
+    input: FindManyByTraceIdsForTenantInput,
   ): Promise<Record<string, TraceEvaluation[]>>;
   /** Raw parsed `Inputs` JSON — the caller resolves ADR-040 offload markers. */
   findInputsByEvaluationId(
     input: FindInputsByEvaluationIdInput,
-  ): Promise<Record<string, unknown> | null>;
+  ): Promise<EvaluationInputsRead | null>;
 }
 
 export class TraceEvaluationsClickHouseRepository
   implements TraceEvaluationsRepository
 {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  private readonly resolveClient: ClickHouseClientResolver;
+  private readonly clickhouse: AuthorizedClickHouse;
 
+  constructor({
+    resolveClient,
+    clickhouse,
+  }: {
+    resolveClient: ClickHouseClientResolver;
+    clickhouse: AuthorizedClickHouse;
+  }) {
+    this.resolveClient = resolveClient;
+    this.clickhouse = clickhouse;
+  }
+
+  /**
+   * The fence is the only tenant predicate, in the outer scope and in the
+   * dedup subquery alike, on `ScheduledAt`, the table's partition column.
+   * Nothing here projects a column under the name of a raw one, so the bare
+   * `ScheduledAt` the fence writes is the stored column in both scopes.
+   */
   async findManyByTraceIds({
-    tenantId,
+    authorization,
     traceIds,
   }: FindManyByTraceIdsInput): Promise<Record<string, TraceEvaluation[]>> {
+    if (traceIds.length === 0) return {};
+    const reader = this.clickhouse.as(authorization, { reads: "traces" });
+    return this.#readGrouped({
+      traceIds,
+      read: async (columns) => {
+        const result = await reader.query({
+          query: `
+            SELECT ${columns}
+            FROM evaluation_runs
+            WHERE ${tenantScope("ScheduledAt")}
+              AND TraceId IN ({traceIds:Array(String)})
+              AND (TenantId, EvaluationId, UpdatedAt) IN (
+                SELECT TenantId, EvaluationId, max(UpdatedAt)
+                FROM evaluation_runs
+                WHERE ${tenantScope("ScheduledAt")}
+                  AND TraceId IN ({traceIds:Array(String)})
+                GROUP BY TenantId, EvaluationId
+              )
+          `,
+          query_params: { traceIds },
+          format: "JSONEachRow",
+        });
+        return (await result.json()) as ClickHouseEvaluationRunRow[];
+      },
+    });
+  }
+
+  async findManyByTraceIdsForTenant({
+    tenantId,
+    traceIds,
+  }: FindManyByTraceIdsForTenantInput): Promise<
+    Record<string, TraceEvaluation[]>
+  > {
     if (traceIds.length === 0) return {};
 
     // Resolution failure is a read failure like any other. Left outside the
@@ -104,89 +189,128 @@ export class TraceEvaluationsClickHouseRepository
       throw new Error("Failed to fetch evaluations for multiple traces");
     }
 
+    return this.#readGrouped({
+      traceIds,
+      tenantId,
+      read: async (columns) => {
+        const result = await client.query({
+          query: `
+            SELECT ${columns}
+            FROM evaluation_runs
+            WHERE TenantId = {tenantId:String}
+              AND TraceId IN ({traceIds:Array(String)})
+              AND (TenantId, EvaluationId, UpdatedAt) IN (
+                SELECT TenantId, EvaluationId, max(UpdatedAt)
+                FROM evaluation_runs
+                WHERE TenantId = {tenantId:String}
+                  AND TraceId IN ({traceIds:Array(String)})
+                GROUP BY TenantId, EvaluationId
+              )
+          `,
+          query_params: { tenantId, traceIds },
+          format: "JSONEachRow",
+        });
+        return (await result.json()) as ClickHouseEvaluationRunRow[];
+      },
+    });
+  }
+
+  /**
+   * Fetch the heavy `Inputs` blob for one evaluation, on demand, from the
+   * project the proof reads it in.
+   *
+   * Keyed by `EvaluationId` — the table's second sort column — so ClickHouse
+   * prunes to the matching granule(s) and the read stays bounded. Grouped by
+   * tenant and ordered by it, so on an aggregate the read names one project,
+   * the same one every time. Returns null when no project the proof reads
+   * holds the evaluation, or the (already-pruned) read still hits the memory
+   * ceiling: both are "nothing to show", not errors worth failing the caller
+   * over.
+   */
+  async findInputsByEvaluationId({
+    authorization,
+    evaluationId,
+  }: FindInputsByEvaluationIdInput): Promise<EvaluationInputsRead | null> {
     try {
-      const rows = await this.#read({
-        client,
-        tenantId,
-        traceIds,
-        columns: EVAL_COLUMNS_WITH_INPUTS,
+      const reader = this.clickhouse.as(authorization, { reads: "traces" });
+      const result = await reader.query({
+        query: `
+          SELECT TenantId, argMax(Inputs, UpdatedAt) AS Inputs
+          FROM evaluation_runs
+          WHERE ${tenantScope("ScheduledAt")}
+            AND EvaluationId = {evaluationId:String}
+          GROUP BY TenantId
+          ORDER BY TenantId
+          LIMIT 1
+        `,
+        query_params: { evaluationId },
+        format: "JSONEachRow",
       });
-      return this.#groupByTrace(rows, traceIds);
+      const rows = (await result.json()) as {
+        TenantId: string;
+        Inputs: string | null;
+      }[];
+      const row = rows[0];
+      if (!row) return null;
+      return {
+        tenantId: row.TenantId,
+        inputs: asPlainObject(safeJsonParse(row.Inputs ?? null)),
+      };
     } catch (error) {
-      // Only the memory ceiling earns a second attempt. Anything else - a
-      // syntax error, a dead connection - fails now, exactly as before:
-      // retrying it would just spend the same budget to fail identically.
-      if (!isMemoryLimitError(error)) {
-        this.#reportReadFailure({ tenantId, traceIds, error });
-        throw new Error("Failed to fetch evaluations for multiple traces");
+      if (isMemoryLimitError(error)) {
+        logger.warn(
+          { evaluationId },
+          "Evaluation inputs read hit the ClickHouse memory limit even when keyed by EvaluationId",
+        );
+        return null;
       }
-      return this.#retryWithoutInputs({ client, tenantId, traceIds });
+      logger.warn(
+        {
+          evaluationId,
+          error: error instanceof Error ? error.message : error,
+        },
+        "Failed to fetch evaluation inputs from ClickHouse",
+      );
+      throw new Error("Failed to fetch evaluation inputs");
     }
   }
 
   /**
-   * The same read with only the light columns.
+   * One evaluations read, grouped by trace, with the memory-limit retry.
    *
-   * `Inputs` is the heavy one, and dropping it is what brings a read that hit
-   * the server's memory ceiling back inside it. Split out so the first attempt
-   * reads as one statement rather than a try nested in a catch.
+   * Only the memory ceiling earns a second attempt, with only the light
+   * columns: `Inputs` is the heavy one, and dropping it is what brings a read
+   * that hit the ceiling back inside it. Anything else - a syntax error, a
+   * dead connection - fails now: retrying it would just spend the same budget
+   * to fail identically.
    */
-  async #retryWithoutInputs({
-    client,
-    tenantId,
+  async #readGrouped({
     traceIds,
+    tenantId,
+    read,
   }: {
-    client: Awaited<ReturnType<ClickHouseClientResolver>>;
-    tenantId: string;
     traceIds: string[];
+    tenantId?: string;
+    read: ReadEvaluationRows;
   }): Promise<Record<string, TraceEvaluation[]>> {
+    try {
+      return this.#groupByTrace(await read(EVAL_COLUMNS_WITH_INPUTS), traceIds);
+    } catch (error) {
+      if (!isMemoryLimitError(error)) {
+        this.#reportReadFailure({ tenantId, traceIds, error });
+        throw new Error("Failed to fetch evaluations for multiple traces");
+      }
+    }
     logger.warn(
       { tenantId, traceIdCount: traceIds.length },
       "Evaluations read hit the ClickHouse memory limit; retrying without Inputs",
     );
     try {
-      const rows = await this.#read({
-        client,
-        tenantId,
-        traceIds,
-        columns: EVAL_COLUMNS_LIGHT,
-      });
-      return this.#groupByTrace(rows, traceIds);
+      return this.#groupByTrace(await read(EVAL_COLUMNS_LIGHT), traceIds);
     } catch (error) {
       this.#reportReadFailure({ tenantId, traceIds, error, isRetry: true });
       throw new Error("Failed to fetch evaluations for multiple traces");
     }
-  }
-
-  async #read({
-    client,
-    tenantId,
-    traceIds,
-    columns,
-  }: {
-    client: Awaited<ReturnType<ClickHouseClientResolver>>;
-    tenantId: string;
-    traceIds: string[];
-    columns: string;
-  }): Promise<ClickHouseEvaluationRunRow[]> {
-    const result = await client.query({
-      query: `
-          SELECT ${columns}
-          FROM evaluation_runs
-          WHERE TenantId = {tenantId:String}
-            AND TraceId IN ({traceIds:Array(String)})
-            AND (TenantId, EvaluationId, UpdatedAt) IN (
-              SELECT TenantId, EvaluationId, max(UpdatedAt)
-              FROM evaluation_runs
-              WHERE TenantId = {tenantId:String}
-                AND TraceId IN ({traceIds:Array(String)})
-              GROUP BY TenantId, EvaluationId
-            )
-        `,
-      query_params: { tenantId, traceIds },
-      format: "JSONEachRow",
-    });
-    return (await result.json()) as ClickHouseEvaluationRunRow[];
   }
 
   /** Every requested trace gets a key, so a caller can index without a guard. */
@@ -214,7 +338,7 @@ export class TraceEvaluationsClickHouseRepository
     error,
     isRetry = false,
   }: {
-    tenantId: string;
+    tenantId?: string;
     traceIds: string[];
     error: unknown;
     isRetry?: boolean;
@@ -229,80 +353,6 @@ export class TraceEvaluationsClickHouseRepository
         ? "Failed to fetch evaluations for multiple traces from ClickHouse after light-projection retry"
         : "Failed to fetch evaluations for multiple traces from ClickHouse",
     );
-  }
-
-  /**
-   * Fetch the heavy `Inputs` blob for one evaluation, on demand.
-   *
-   * Keyed by `EvaluationId` — the table's second sort column — so ClickHouse
-   * prunes to the matching granule(s) and the read stays bounded. Returns
-   * null when the evaluation recorded no inputs, the client is unavailable,
-   * or the (already-pruned) read still hits the memory ceiling: all three
-   * are "nothing to show", not errors worth failing the caller over.
-   */
-  async findInputsByEvaluationId({
-    tenantId,
-    evaluationId,
-  }: FindInputsByEvaluationIdInput): Promise<Record<string, unknown> | null> {
-    const client = await this.#resolveOrNull({ tenantId, evaluationId });
-    if (!client) return null;
-
-    try {
-      const result = await client.query({
-        query: `
-          SELECT argMax(Inputs, UpdatedAt) AS Inputs
-          FROM evaluation_runs
-          WHERE TenantId = {tenantId:String}
-            AND EvaluationId = {evaluationId:String}
-        `,
-        query_params: { tenantId, evaluationId },
-        format: "JSONEachRow",
-      });
-      const rows = (await result.json()) as { Inputs: string | null }[];
-      return asPlainObject(safeJsonParse(rows[0]?.Inputs ?? null));
-    } catch (error) {
-      if (isMemoryLimitError(error)) {
-        logger.warn(
-          { tenantId, evaluationId },
-          "Evaluation inputs read hit the ClickHouse memory limit even when keyed by EvaluationId",
-        );
-        return null;
-      }
-      logger.warn(
-        {
-          tenantId,
-          evaluationId,
-          error: error instanceof Error ? error.message : error,
-        },
-        "Failed to fetch evaluation inputs from ClickHouse",
-      );
-      throw new Error("Failed to fetch evaluation inputs");
-    }
-  }
-
-  /**
-   * An unreachable ClickHouse means "nothing to show" for this read, not a
-   * failure worth surfacing - the caller renders an empty inputs panel.
-   */
-  async #resolveOrNull({
-    tenantId,
-    evaluationId,
-  }: FindInputsByEvaluationIdInput): Promise<Awaited<
-    ReturnType<ClickHouseClientResolver>
-  > | null> {
-    try {
-      return await this.resolveClient(tenantId);
-    } catch (error) {
-      logger.warn(
-        {
-          tenantId,
-          evaluationId,
-          error: error instanceof Error ? error.message : error,
-        },
-        "ClickHouse client unavailable for evaluation inputs read",
-      );
-      return null;
-    }
   }
 }
 
