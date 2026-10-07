@@ -120,7 +120,7 @@ generate/api-client: ensure-openapi-python-client
 	@echo "Replacing the old API client..."
 	@rm -rf src/langwatch/generated/langwatch_rest_api_client
 	@mkdir -p src/langwatch/generated/langwatch_rest_api_client
-	@cp -r .tmp/api-client/lang_watch_api_client/ src/langwatch/generated/langwatch_rest_api_client/
+	@cp -r .tmp/api-client/lang_watch_api_client/. src/langwatch/generated/langwatch_rest_api_client/
 	@echo "Cleaning up..."
 	@rm -rf .tmp/api-client .tmp/openapiLangWatch.python.json
 	@echo "Done! API client has been integrated into the SDK."
