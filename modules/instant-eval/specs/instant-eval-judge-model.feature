@@ -403,7 +403,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       And the judge holds no billing row for it
       When it starts a run
       Then the run is accepted
-      And its usage billing is never read
+      And the judge's usage billing copy is never read
 
   Rule: Billing says which organizations the meter bills
 
@@ -445,11 +445,12 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the judge holds one row for that project
 
     @integration @unimplemented
-    Scenario: The usage-billing catch-up marks every organization the meter bills today
+    Scenario: The usage-billing catch-up gives every organization's answer
       Given an organization the meter bills today
+      And an organization the meter does not bill
       When the usage-billing catch-up runs twice
-      Then the judge reads it as usage billed
-      And the judge's row for it, including when it was recorded, is unchanged after the second run
+      Then the judge reads the first as usage billed and the second as not
+      And the judge holds one billing row for each
 
     @integration @unimplemented
     Scenario: A billing change after the catch-up is kept
@@ -458,64 +459,74 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the judge reads it as not usage billed
 
     @integration @unimplemented
-    Scenario Outline: A catch-up fact never overrides a real billing fact
-      Given billing reported an organization is not usage billed
-      And the usage-billing catch-up marked it usage billed, stamped <stamp> the real fact
+    Scenario Outline: A catch-up read before a billing change never overrides it
+      Given billing stopped billing an organization and stamped that fact after saving it
+      And the usage-billing catch-up read billing <read> that change
       When the judge folds both facts, <order>
       Then the judge reads it as not usage billed
 
       Examples:
-        | stamp  | order                 |
-        | after  | real fact first       |
-        | after  | catch-up fact first   |
-        | before | catch-up fact first   |
+        | read   | order               |
+        | before | real fact first     |
+        | before | catch-up fact first |
+        | after  | real fact first     |
+        | after  | catch-up fact first |
 
     @integration @unimplemented
-    Scenario: The judge refuses calls until the project catch-up has run
+    Scenario: A re-run usage-billing catch-up fixes a change the judge missed
+      Given the judge reads an organization as usage billed from a real billing fact
+      And billing stopped billing it while the judge's subscriber was not running
+      When the usage-billing catch-up runs again
+      Then the judge reads it as not usage billed
+
+    @integration @unimplemented
+    Scenario: The judge refuses calls until the project catch-up has run, then judges them
       Given the judge was just deployed and holds no projects
-      When a judge call arrives for a project with Instant Evals released
+      And a project created before the deploy with Instant Evals released
+      When a judge call arrives for it
       Then it is refused with the project unknown error
-      And the classifier is not called
+      When the project catch-up runs
+      And the same judge call arrives again
+      Then it is classified
 
     @integration @unimplemented
-    Scenario: The spend catch-up adds the spend recorded before the cutover once
-      Given an organization with $0.40 of Instant Evals spend in the gateway ledger before the cutover
+    Scenario: The spend catch-up copies every ledger row once
+      Given an organization with $0.40 of Instant Evals spend in the gateway ledger over two requests
       When the spend catch-up runs twice
       Then the judge's spend for it is $0.40
-      And the judge holds one seed for it
+      And the judge holds one spend row for each request
 
     @integration @unimplemented
-    Scenario: A redeploy's spend catch-up replaces the earlier seed
-      Given an organization seeded with $0.40 at a first cutover
-      And $0.20 more Instant Evals spend in the gateway ledger after it
-      When the spend catch-up runs again with a later cutover
+    Scenario: A re-run spend catch-up copies the spend old pods wrote during a rollback
+      Given the judge holds $0.40 of spend for an organization
+      And old pods wrote $0.20 more to the gateway ledger only, during a rollback
+      When the spend catch-up runs again
       Then the judge's spend for it is $0.60
 
     @integration @unimplemented
-    Scenario: A repeated priced event adds nothing to the judge's spend
-      Given the judge recorded a $0.10 priced event
-      When the same priced event is delivered again, live and on rebuild
-      Then the judge's spend from it is $0.10
-
-    @unit @unimplemented
-    Scenario: A retried run's spend keeps the stamp of its first attempt
-      Given an Instant Evals run whose finish failed after recording its spend
-      When the finish is retried later
-      Then the spend it records again carries the first attempt's stamp
-
-    @integration @unimplemented
-    Scenario Outline: Spend judged after the cutover is counted once
-      Given an organization with $0.40 of Instant Evals spend in the gateway ledger before the cutover
-      And $0.10 judged after the cutover that is <state>
-      When the spend catch-up runs and the judge then folds every priced event
-      Then the judge's spend for it is $0.50
+    Scenario Outline: A request in both the ledger and the judge is counted once
+      Given the gateway ledger holds a $0.10 Instant Evals request
+      And the judge's priced event for the same request is folded <when> the spend catch-up runs
+      Then the judge's spend for it is $0.10
+      And the judge holds one spend row for that request
 
       Examples:
-        | state                                           |
-        | folded into the judge's total and in the ledger |
-        | in the ledger but not yet folded                |
-        | folded but not yet in the ledger                |
-        | stamped before a cutover passed too late        |
+        | when   |
+        | before |
+        | after  |
+
+    @integration @unimplemented
+    Scenario: Two priced events for one request add one row
+      Given the judge recorded a $0.10 priced event for a request
+      When a second priced event with a new event id carries the same request id
+      And the judge's spend is rebuilt from its events
+      Then the judge's spend from that request is $0.10, both live and after the rebuild
+
+    @unit @unimplemented
+    Scenario: A retried run records its spend under the same request
+      Given an Instant Evals run whose finish failed after recording its spend
+      When the finish is retried, under another finish reason or on another pod
+      Then the spend it records again carries the same request id as the first attempt
 
   Rule: The picker offers Instant Evals behind the release flag
 
