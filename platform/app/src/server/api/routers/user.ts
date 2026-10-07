@@ -30,6 +30,7 @@ import {
 } from "~/server/app-layer/identity/signin-method-policy";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { AGGREGATE_PROJECT_KIND } from "~/server/app-layer/projects/project-kinds";
 import {
   AuthRateLimitedError,
   DirectRegistrationUnavailableError,
@@ -1395,6 +1396,9 @@ export const userRouter = createTRPCRouter({
               members: { some: { userId } },
             },
             archivedAt: null,
+            // An aggregate is opened on purpose, never landed on (ADR-144
+            // block F).
+            kind: { not: AGGREGATE_PROJECT_KIND },
           },
           orderBy: { createdAt: "asc" },
           select: { slug: true },

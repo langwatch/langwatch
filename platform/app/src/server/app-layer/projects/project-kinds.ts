@@ -40,6 +40,18 @@ export function isAggregateProjectKind(
 }
 
 /**
+ * The project the app lands on when nobody chose one (ADR-144 block F): the
+ * first that is not an aggregate. An aggregate owns no traces and reads other
+ * people's projects, so an admin opens it on purpose, from the project
+ * switcher, and never by default. Undefined when every project is one.
+ */
+export function landingProjectOf<P extends { kind?: string | null }>(
+  projects: readonly P[],
+): P | undefined {
+  return projects.find((project) => !isAggregateProjectKind(project.kind));
+}
+
+/**
  * The kinds that never hold traces of their own, so no "send traces here"
  * picker offers them and no trace destination resolves to them. The governance
  * project receives ingestion-source data through its own path, never through

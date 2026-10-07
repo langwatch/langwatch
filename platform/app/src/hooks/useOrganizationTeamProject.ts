@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { resolveOrglessDestination } from "~/features/navigation/logic/resolveOrglessDestination";
 import { OrganizationUserRole, type Project } from "~/generated/prisma/client";
+import { landingProjectOf } from "~/server/app-layer/projects/project-kinds";
 import { useRouter } from "~/utils/compat/next-router";
 import { api } from "../utils/api";
 import { usePublicEnv } from "./usePublicEnv";
@@ -125,14 +126,17 @@ export function userCanOpenTeam<T extends { members?: { userId: string }[] }>({
 export function selectAmbientTeam<
   T extends {
     isPersonal?: boolean | null;
-    projects: unknown[];
+    projects: { kind?: string | null }[];
     members?: { userId: string }[];
   },
 >({ teams, userId }: { teams: T[]; userId?: string }): T | undefined {
+  // A team holding only an aggregate has nothing to land on (ADR-144 block
+  // F), so it is preferred no more than an empty one.
+  const landable = (team: T) => landingProjectOf(team.projects) !== undefined;
   const byPreference = (candidates: T[]) =>
-    candidates.find((team) => !team.isPersonal && team.projects.length > 0) ??
+    candidates.find((team) => !team.isPersonal && landable(team)) ??
     candidates.find((team) => !team.isPersonal) ??
-    candidates.find((team) => team.projects.length > 0) ??
+    candidates.find(landable) ??
     candidates[0];
 
   const own = userId
@@ -499,7 +503,11 @@ export const useOrganizationTeamProject = (
         (p) => p.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
       ) ?? team?.projects[0]) // Find demo project by slug, or fallback to first
     : team
-      ? (resolvedSlugMatch?.project ?? team.projects[0])
+      ? (resolvedSlugMatch?.project ??
+        // Never an aggregate by default; a team holding nothing else still
+        // opens on it rather than leaving the app with no project at all.
+        landingProjectOf(team.projects) ??
+        team.projects[0])
       : undefined;
 
   // Override project slug for demo projects so it matches the URL
