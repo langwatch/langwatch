@@ -7,4 +7,5 @@ export {
   normalizeOtlpUnixNano,
 } from "./otlp-span-identity.ts";
 export { OtlpTraceRequestService } from "./otlp-trace-request.ts";
+export { deriveRagContextsWithIds, ragDocumentIdFor } from "./span-rag-context-ids.ts";
 export { SpanRecordIdentityService } from "./span-record-identity.ts";

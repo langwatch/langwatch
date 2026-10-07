@@ -1,4 +1,6 @@
 export * from "./cost-attribution.ts";
+export * from "./span-cost-metrics.ts";
+export * from "./span-rollup-contribution.ts";
 export * from "./derive-trace-origin.ts";
 export * from "./derive-trace-status.ts";
 export * from "./trace.ts";

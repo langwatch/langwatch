@@ -13,6 +13,9 @@ import {
   type AnnotationAddedEvent,
   type AnnotationRemovedEvent,
   type AnnotationsBulkSyncedEvent,
+  extractSpanCacheTokens,
+  extractSpanModels,
+  isSpanTokenAccumulationSkipped,
   type LogContributedEvent,
   type LogRecordReceivedEvent,
   logContributedEventSchema,
@@ -648,11 +651,10 @@ export class TraceAnalyticsFoldProjection
   private static accumulateReservedTokenSums(
     attributes: Record<string, string>,
     span: NormalizedSpan,
-    runtime: TraceProjectionRuntimeService,
   ): void {
-    const cacheTokens = runtime.spanCost.isTokenAccumulationSkipped(span)
+    const cacheTokens = isSpanTokenAccumulationSkipped(span)
       ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
-      : runtime.spanCost.extractCacheTokens(span);
+      : extractSpanCacheTokens(span);
 
     TraceSummaryFoldProjection.addReservedTokenSum(
       attributes,
@@ -957,9 +959,9 @@ export class TraceAnalyticsFoldProjection
       outputMediaRefs: null,
     });
 
-    TraceAnalyticsFoldProjection.accumulateReservedTokenSums(attributes, span, runtime);
+    TraceAnalyticsFoldProjection.accumulateReservedTokenSums(attributes, span);
 
-    const newModels = runtime.spanCost.extractModelsFromSpan(span);
+    const newModels = extractSpanModels(span);
     const models = TraceSummaryFoldProjection.mergeModelsMostRecentFirst(state.models, newModels);
 
     // Mirror the trace-summary fold's trace-level model metadata stamp so the

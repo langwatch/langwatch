@@ -1,5 +1,3 @@
-import crypto from "crypto";
-
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type {
@@ -12,7 +10,12 @@ import type {
   NormalizedSpan,
 } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { decodeOtlpSpan, normalizeOtlpId } from "@langwatch/trace-contract/otlp-decoding";
+import {
+  decodeOtlpSpan,
+  deriveRagContextsWithIds,
+  normalizeOtlpId,
+  ragDocumentIdFor,
+} from "@langwatch/trace-contract/otlp-decoding";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
@@ -140,76 +143,20 @@ export class SpanNormalizationPipelineService implements TraceSpanNormalization 
   }
 
   /**
-   * Gives every RAG context entry a `document_id`, deriving one from the
-   * chunk's own content where the SDK sent none. Mutates the span's
-   * attributes in place, and writes back under the canonical key.
+   * Gives every RAG context entry a `document_id` (trace-contract's
+   * `deriveRagContextsWithIds`) and writes them back under the canonical key.
    */
   enrichRagContextIds(span: NormalizedSpan): void {
-    const raw =
-      span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] ??
-      span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS_LEGACY];
-    if (!Array.isArray(raw)) {
+    const contexts = deriveRagContextsWithIds(span.spanAttributes);
+    if (contexts === undefined) {
       return;
     }
 
-    span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] = raw.map((context) => {
-      if (!context || typeof context !== "object" || Array.isArray(context)) {
-        return context;
-      }
-
-      const entry: Record<string, unknown> = context;
-      if ("document_id" in entry && entry.document_id) {
-        return entry;
-      }
-
-      return {
-        ...entry,
-        document_id: SpanNormalizationPipelineService.documentIdFor(
-          entry.content !== undefined ? entry.content : context,
-        ),
-      };
-    });
+    span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] = contexts;
   }
 
-  /**
-   * The id a RAG chunk gets when it arrived without one: a hash of its own
-   * text, so the same chunk seen twice is the same document both times.
-   */
+  /** The id a RAG chunk gets when it arrived without one; see `ragDocumentIdFor`. */
   static documentIdFor(content: unknown): string {
-    return crypto
-      .createHash("md5")
-      .update(SpanNormalizationPipelineService.chunkText(content))
-      .digest("hex");
-  }
-
-  /**
-   * The ingest pipeline's own chunk flattening, close to but NOT the same as
-   * `@langwatch/trace-contract`'s `extractChunkTextualContent`: that one answers `""` for a
-   * parsed primitive, this one answers the original string.
-   */
-  private static chunkText(object: unknown): string {
-    let content = object;
-    if (typeof content === "string") {
-      try {
-        content = JSON.parse(content);
-      } catch {
-        return (object as string).trim();
-      }
-    }
-
-    if (Array.isArray(content)) {
-      return content
-        .map((item) => SpanNormalizationPipelineService.chunkText(item))
-        .filter((text) => text)
-        .join("\n")
-        .trim();
-    }
-
-    if (typeof content === "object" && content !== null) {
-      return JSON.stringify(content);
-    }
-
-    // Parsed to a primitive (number, boolean, etc.) — use the original string
-    return String(object).trim();
+    return ragDocumentIdFor(content);
   }
 }
