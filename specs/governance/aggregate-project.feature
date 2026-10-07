@@ -281,6 +281,13 @@ Feature: An aggregate project reads its member projects
     # half it is. The proof is narrowed to one of its own tenants; a tenant
     # outside the proof is refused rather than read.
 
+  @integration
+  Scenario: Two members with the same trace id each list their own events
+    Given an aggregate project whose two members each hold a trace with the same id
+    And each member's trace recorded a different event
+    When ana reads the aggregate's trace list with the Events column shown
+    Then each member's row shows only the events its own trace recorded
+
   # Unimplemented: analytics read through raw clients and the rollup windows
   # on BucketStart, a time column the fence does not admit yet; the fifth
   # time column awaits a decision (ADR-144 open questions).

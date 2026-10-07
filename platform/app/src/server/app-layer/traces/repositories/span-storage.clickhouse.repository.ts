@@ -28,6 +28,7 @@ import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
+import { listedTraceKey } from "~/shared/traces/listedTraceKey";
 import type { SpanInsertData } from "../types";
 import type {
   LangwatchSignalBucket,
@@ -391,12 +392,16 @@ function dedupInTupleForTraceIds(extraInnerWhere: string): string {
 }
 
 /**
- * One row per (trace, event name) for a page of traces, ordered so the first
- * name a trace recorded comes first.
+ * One row per (tenant, trace, event name) for a page of traces, ordered so the
+ * first name a trace recorded comes first.
  *
  * Three stages, innermost out: elect each span's latest version and keep only
  * the ones carrying events, expand those spans' `Events.*` arrays, then
- * collapse to one row per (trace, event name).
+ * collapse to one row per (tenant, trace, event name).
+ *
+ * A trace is its tenant and id together: an aggregate's proof fences several
+ * tenants and two of them may hold the same trace id, so every grouping,
+ * window partition and trim runs per tenant as well as per trace.
  *
  * The window aggregates run over the whole per-trace partition and
  * `LIMIT ... BY` trims afterwards, so a trimmed trace still reports the totals
@@ -409,20 +414,23 @@ function traceEventRollupQuery(): string {
 
   return `
     SELECT
+      tenantId,
       traceId,
       name,
       nameCount,
       firstTimestamp,
-      sum(nameCount) OVER (PARTITION BY traceId) AS totalCount,
-      count() OVER (PARTITION BY traceId) AS distinctCount
+      sum(nameCount) OVER (PARTITION BY tenantId, traceId) AS totalCount,
+      count() OVER (PARTITION BY tenantId, traceId) AS distinctCount
     FROM (
       SELECT
+        TenantId AS tenantId,
         TraceId AS traceId,
         event_name AS name,
         count() AS nameCount,
         toUnixTimestamp64Milli(min(event_timestamp)) AS firstTimestamp
       FROM (
         SELECT
+          TenantId,
           TraceId,
           "Events.Timestamp" AS Events_Timestamp,
           "Events.Name" AS Events_Name
@@ -436,20 +444,28 @@ function traceEventRollupQuery(): string {
       ARRAY JOIN
         Events_Timestamp AS event_timestamp,
         Events_Name AS event_name
-      GROUP BY traceId, name
+      GROUP BY tenantId, traceId, name
     )
-    ORDER BY traceId ASC, firstTimestamp ASC, name ASC
-    LIMIT {maxNames:UInt32} BY traceId
+    ORDER BY tenantId ASC, traceId ASC, firstTimestamp ASC, name ASC
+    LIMIT {maxNames:UInt32} BY tenantId, traceId
   `;
 }
 
-/** Gather {@link traceEventRollupQuery}'s flat rows into one rollup per trace. */
+/**
+ * Gather {@link traceEventRollupQuery}'s flat rows into one rollup per trace,
+ * keyed by {@link listedTraceKey} so two tenants holding the same trace id
+ * each keep their own rollup.
+ */
 function toTraceEventRollups(
   rows: TraceEventRollupRow[],
 ): Record<string, TraceEventRollup> {
   const rollups: Record<string, TraceEventRollup> = {};
   for (const row of rows) {
-    const rollup = (rollups[row.traceId] ??= {
+    const key = listedTraceKey({
+      projectId: row.tenantId,
+      traceId: row.traceId,
+    });
+    const rollup = (rollups[key] ??= {
       names: [],
       totalCount: asNumber(row.totalCount),
       distinctCount: asNumber(row.distinctCount),
@@ -665,6 +681,7 @@ interface TraceEventRow {
 }
 
 interface TraceEventRollupRow {
+  tenantId: string;
   traceId: string;
   name: string;
   nameCount: string | number;

@@ -1299,7 +1299,10 @@ export const tracesV2Router = createTRPCRouter({
     }),
 
   /**
-   * Event rollups for the trace list's Events column, keyed by trace id.
+   * Event rollups for the trace list's Events column, keyed by the project
+   * that holds each trace and its id together (`listedTraceKey`): on an
+   * aggregate two members may hold the same trace id, and each row shows only
+   * its own member's events.
    *
    * Its own query rather than part of `list`: events live in `stored_spans`,
    * not on the summary fold, so bundling them would put a second table's read

@@ -15,6 +15,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { listedTraceKey } from "~/shared/traces/listedTraceKey";
 import { ownProof } from "~/test-utils/authorizationProofs";
 import { spanStorageRepositoryFor } from "~/test-utils/spanStorageRepository";
 import {
@@ -323,6 +324,9 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       from: rollupBase.getTime() - 60_000,
       to: rollupBase.getTime() + 60_000,
     };
+    /** Where this suite's tenant finds a trace's rollup in the result. */
+    const rollupKey = (traceId: string) =>
+      listedTraceKey({ projectId: rollupTenantId, traceId });
 
     /**
      * A span of this suite's own tenant. Every row goes to `rollupTenantId`
@@ -439,7 +443,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
         timeRange,
       });
 
-      expect(rollups[feedbackTraceId]).toEqual({
+      expect(rollups[rollupKey(feedbackTraceId)]).toEqual({
         names: [
           {
             name: "thumbs_up_down",
@@ -461,7 +465,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
         timeRange,
       });
 
-      expect(rollups[chattyTraceId]).toEqual({
+      expect(rollups[rollupKey(chattyTraceId)]).toEqual({
         names: [
           {
             name: "gen_ai.request.attempt",
@@ -477,7 +481,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
     });
 
     /** @scenario Events are shown for the traces currently on screen */
-    it("answers a whole page in one call, keyed by trace id", async () => {
+    it("answers a whole page in one call, keyed by project and trace id", async () => {
       const rollups = await repo.getTraceEventRollupsByTraceIds({
         authorization: ownProof({ projectId: rollupTenantId }),
         traceIds: [feedbackTraceId, chattyTraceId, quietTraceId],
@@ -485,7 +489,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       });
 
       expect(Object.keys(rollups).sort()).toEqual(
-        [feedbackTraceId, chattyTraceId].sort(),
+        [feedbackTraceId, chattyTraceId].map(rollupKey).sort(),
       );
     });
 
@@ -497,7 +501,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
         timeRange,
       });
 
-      expect(rollups[quietTraceId]).toBeUndefined();
+      expect(rollups[rollupKey(quietTraceId)]).toBeUndefined();
     });
 
     /** @scenario A trace with a very large number of events stays bounded */
@@ -508,7 +512,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
         timeRange,
       });
 
-      const rollup = rollups[noisyTraceId]!;
+      const rollup = rollups[rollupKey(noisyTraceId)]!;
       expect(rollup.names).toHaveLength(MAX_EVENT_NAMES_PER_TRACE);
       expect(rollup.distinctCount).toBe(MAX_EVENT_NAMES_PER_TRACE + 5);
       expect(rollup.totalCount).toBe(MAX_EVENT_NAMES_PER_TRACE + 5);
@@ -526,7 +530,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
 
       // Both tenants recorded against this id, so the read returning nothing
       // would pass a "does not contain" check without proving anything.
-      expect(rollups[otherTenantTraceId]).toEqual({
+      expect(rollups[rollupKey(otherTenantTraceId)]).toEqual({
         names: [
           {
             name: "thumbs_up_down",

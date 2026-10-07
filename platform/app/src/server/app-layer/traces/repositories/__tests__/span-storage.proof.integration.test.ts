@@ -16,6 +16,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AuthorizedClickHouse } from "~/server/app-layer/clients/clickhouse/authorized-reads";
+import { listedTraceKey } from "~/shared/traces/listedTraceKey";
 import { aggregateProof, ownProof } from "~/test-utils/authorizationProofs";
 import {
   startTestContainers,
@@ -248,15 +249,11 @@ describe("SpanStorageClickHouseRepository through the proof", () => {
           traceIds: [SHARED_TRACE],
           timeRange: WINDOW,
         });
-        const eventNames = rollups[SHARED_TRACE]?.names.map((n) => n.name);
-        expect(eventNames).toEqual(
-          expect.arrayContaining([
-            `event-of-${AGGREGATE}`,
-            `event-of-${MEMBER_A}`,
-            `event-of-${MEMBER_B}`,
-          ]),
-        );
-        expect(eventNames).not.toContain(`event-of-${OUTSIDER}`);
+        expect(
+          rollups[
+            listedTraceKey({ projectId: OUTSIDER, traceId: SHARED_TRACE })
+          ],
+        ).toBeUndefined();
 
         const models = await repo.findModelUsageStats({
           authorization,
@@ -272,6 +269,42 @@ describe("SpanStorageClickHouseRepository through the proof", () => {
           ]),
         );
         expect(modelNames).not.toContain(`model-of-${OUTSIDER}`);
+      });
+    });
+  });
+
+  describe("given two members and the aggregate each holding a trace under the same id", () => {
+    describe("when the aggregate reads the page's event rollups", () => {
+      /** @scenario "Two members with the same trace id each list their own events" */
+      it("keeps each project's events on its own row", async () => {
+        const rollups = await repo.getTraceEventRollupsByTraceIds({
+          authorization: aggregateReadsAandB(),
+          traceIds: [SHARED_TRACE],
+          timeRange: WINDOW,
+        });
+
+        const rollupOf = (projectId: string) =>
+          rollups[listedTraceKey({ projectId, traceId: SHARED_TRACE })];
+        expect(Object.keys(rollups).sort()).toEqual(
+          [AGGREGATE, MEMBER_A, MEMBER_B]
+            .map((projectId) =>
+              listedTraceKey({ projectId, traceId: SHARED_TRACE }),
+            )
+            .sort(),
+        );
+        for (const projectId of [AGGREGATE, MEMBER_A, MEMBER_B]) {
+          expect(rollupOf(projectId)).toEqual({
+            names: [
+              {
+                name: `event-of-${projectId}`,
+                count: 1,
+                firstTimestamp: expect.any(Number),
+              },
+            ],
+            totalCount: 1,
+            distinctCount: 1,
+          });
+        }
       });
     });
   });
