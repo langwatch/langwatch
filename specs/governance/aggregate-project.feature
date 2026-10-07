@@ -378,6 +378,14 @@ Feature: An aggregate project reads its member projects
     When ana opens its trace list
     Then it offers no button to create a lens and no "Save current filtered view"
     And a lens tab's menu offers no save as new lens, rename, duplicate or delete
+    And a lens with unsaved changes offers to discard them but not to save them as a new lens
+
+  @integration
+  Scenario: No path creates a lens on the aggregate
+    Given an aggregate project
+    When an AI search, or any other part of the trace list, asks to create a lens
+    Then no lens is added to the strip and nothing is sent to save one
+    And on an ordinary project the same request still creates the lens and saves it
 
   # ── H. The aggregate in the app ──────────────────────────────────────────
   # The server refuses every write; these keep the app from inviting one, and

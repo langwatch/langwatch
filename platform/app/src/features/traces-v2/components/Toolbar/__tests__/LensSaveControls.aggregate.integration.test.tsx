@@ -4,8 +4,9 @@
  * A lens is a saved view written under the project. On an aggregate project,
  * which is read only (ADR-144), the server refuses that write, so the trace
  * list offers no control that makes one: no "+" lens button and no save,
- * rename, duplicate or delete in a lens tab's menu. An ordinary project keeps
- * them all.
+ * rename, duplicate or delete in a lens tab's menu. A lens with unsaved
+ * changes still offers to discard them, but not to save them as a new lens. An
+ * ordinary project keeps them all.
  *
  * @see specs/governance/aggregate-project.feature
  */
@@ -19,7 +20,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useExplorerStore } from "../../../stores/explorerStore";
-import type { LensConfig } from "../../../stores/viewSlice";
+import { type LensConfig, setLensSyncBridge } from "../../../stores/viewSlice";
 import { CreateLensButton } from "../CreateLensButton";
 import { LensTab } from "../LensTab";
 
@@ -64,8 +65,37 @@ const openLensMenu = async () => {
   );
 };
 
+/** Renders `lens` as the active tab with an unsaved change on it. */
+const renderDraftLens = () => {
+  const store = useExplorerStore.getState();
+  store.setUserLenses([USER_LENS]);
+  store.selectLens(USER_LENS.id);
+  useExplorerStore.getState().setGrouping("by-service");
+  expect(useExplorerStore.getState().isDraft(USER_LENS.id)).toBe(true);
+
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <Tabs.Root value={USER_LENS.id}>
+        <Tabs.List>
+          <LensTab lens={USER_LENS} isDraft errorCount={0} />
+        </Tabs.List>
+      </Tabs.Root>
+    </ChakraProvider>,
+  );
+};
+
+const openDraftDot = async () => {
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Unsaved changes on this lens. Click for options.",
+    }),
+  );
+  await waitFor(() => expect(screen.getByText("Discard changes")).toBeTruthy());
+};
+
 afterEach(() => {
   cleanup();
+  setLensSyncBridge(null);
 });
 
 describe("Lens save controls", () => {
@@ -87,6 +117,35 @@ describe("Lens save controls", () => {
         expect(screen.getByText("Delete")).toBeTruthy();
       });
     });
+
+    describe("when ana saves a lens's unsaved changes as a new lens", () => {
+      it("creates the lens and sends it to be saved", async () => {
+        projectRef.current = { id: "proj-1", kind: "application" };
+        const create = vi.fn();
+        setLensSyncBridge({
+          acceptsWrites: () => true,
+          create,
+          rename: vi.fn(),
+          delete: vi.fn(),
+        });
+
+        renderDraftLens();
+        await openDraftDot();
+        fireEvent.click(screen.getByRole("button", { name: "Save as new lens" }));
+        const nameInput = await screen.findByPlaceholderText("Lens name");
+        fireEvent.change(nameInput, { target: { value: "Grouped answers" } });
+        fireEvent.keyDown(nameInput, { key: "Enter" });
+
+        expect(create).toHaveBeenCalledWith(
+          expect.objectContaining({ name: "Grouped answers" }),
+        );
+        expect(
+          useExplorerStore
+            .getState()
+            .allLenses.some((lens) => lens.name === "Grouped answers"),
+        ).toBe(true);
+      });
+    });
   });
 
   describe("given an aggregate project", () => {
@@ -106,6 +165,25 @@ describe("Lens save controls", () => {
         expect(screen.queryByText("Rename")).toBeNull();
         expect(screen.queryByText("Duplicate")).toBeNull();
         expect(screen.queryByText("Delete")).toBeNull();
+      });
+    });
+
+    describe("when ana opens the unsaved-changes dot on a lens", () => {
+      /** @scenario "The aggregate's trace list offers no control to save a view" */
+      it("offers to discard the changes but not to save them as a new lens", async () => {
+        projectRef.current = { id: "agg-1", kind: "aggregate" };
+
+        renderDraftLens();
+        await openDraftDot();
+
+        expect(
+          screen.queryByRole("button", { name: "Save as new lens" }),
+        ).toBeNull();
+        expect(screen.queryByText("Save changes as new lens")).toBeNull();
+
+        fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+
+        expect(useExplorerStore.getState().isDraft(USER_LENS.id)).toBe(false);
       });
     });
   });

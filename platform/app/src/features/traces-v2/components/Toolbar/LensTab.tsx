@@ -170,13 +170,20 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
 }) => {
   const revertLens = useExplorerStore((s) => s.revertLens);
   const createLens = useExplorerStore((s) => s.createLens);
+  // An aggregate project takes no lens writes (ADR-144): its dot still offers
+  // to discard the changes, but not to save them as a new lens.
+  const canSaveLenses = useCanSaveLenses();
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
 
   return (
     <>
       <Tooltip
-        content="Unsaved changes. Click to discard or save as new lens."
+        content={
+          canSaveLenses
+            ? "Unsaved changes. Click to discard or save as new lens."
+            : "Unsaved changes. Click to discard them."
+        }
         positioning={{ placement: "bottom" }}
       >
         <Box display="inline-flex" marginLeft={0.5}>
@@ -236,8 +243,10 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
                     <Text as="span" color="fg" fontWeight="semibold">
                       {lensName}
                     </Text>
-                    . These edits live in your browser only. Save them as a new
-                    lens to keep them, or discard to snap back.
+                    .{" "}
+                    {canSaveLenses
+                      ? "These edits live in your browser only. Save them as a new lens to keep them, or discard to snap back."
+                      : "These edits live in your browser only. Discard them to snap back."}
                   </Text>
                   <HStack gap={2} justify="flex-end">
                     <Button
@@ -251,17 +260,19 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
                     >
                       Discard changes
                     </Button>
-                    <Button
-                      size="xs"
-                      colorPalette="orange"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPopoverOpen(false);
-                        setSaveDialogOpen(true);
-                      }}
-                    >
-                      Save as new lens
-                    </Button>
+                    {canSaveLenses && (
+                      <Button
+                        size="xs"
+                        colorPalette="orange"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPopoverOpen(false);
+                          setSaveDialogOpen(true);
+                        }}
+                      >
+                        Save as new lens
+                      </Button>
+                    )}
                   </HStack>
                 </Stack>
               </PopoverBody>
@@ -269,13 +280,15 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
           </PopoverRoot>
         </Box>
       </Tooltip>
-      <LensNameDialog
-        open={saveDialogOpen}
-        onOpenChange={setSaveDialogOpen}
-        title="Save changes as new lens"
-        defaultName={`${lensName} (copy)`}
-        onSubmit={(name) => createLens(name)}
-      />
+      {canSaveLenses && (
+        <LensNameDialog
+          open={saveDialogOpen}
+          onOpenChange={setSaveDialogOpen}
+          title="Save changes as new lens"
+          defaultName={`${lensName} (copy)`}
+          onSubmit={(name) => createLens(name)}
+        />
+      )}
     </>
   );
 };

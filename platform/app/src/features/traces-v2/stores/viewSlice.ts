@@ -139,6 +139,14 @@ export interface ViewSlice {
  * refetch + error reporting.
  */
 export interface LensSyncBridge {
+  /**
+   * Whether the project behind the bridge accepts lens writes. An aggregate
+   * project is read only (ADR-144), so its server refuses every one. The store
+   * asks before creating, renaming or deleting a saved lens, so no entry point
+   * (a toolbar control, an AI search, anything added later) can add a lens
+   * locally that the server will never keep.
+   */
+  acceptsWrites: () => boolean;
   create: (
     lens: LensConfig & { /** Optional client-suggested id. */ id: string },
   ) => void;
@@ -150,6 +158,14 @@ let lensSyncBridge: LensSyncBridge | null = null;
 
 export function setLensSyncBridge(bridge: LensSyncBridge | null): void {
   lensSyncBridge = bridge;
+}
+
+/**
+ * True when the bridged project refuses lens writes. With no bridge there is
+ * no server to refuse, so the store keeps its local behaviour.
+ */
+function lensWritesRefused(): boolean {
+  return lensSyncBridge !== null && !lensSyncBridge.acceptsWrites();
 }
 
 const DISMISSED_BUILTINS_KEY = "langwatch:traces-v2:dismissed-builtins:v1";
@@ -828,8 +844,11 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
   // every field is explicit; the popover fast-path omits them and we
   // snapshot live `viewStore` state.
   createLens: (name, overrides) => {
-    const id = generateId();
     const state = get();
+    // A refused create changes nothing, so the caller stays on the lens it
+    // was already on.
+    if (lensWritesRefused()) return state.activeLensId;
+    const id = generateId();
     const newLens: LensConfig = {
       id,
       name,
@@ -884,7 +903,7 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
   renameLens: (lensId, name) =>
     set((s) => {
       const lens = s.allLenses.find((l) => l.id === lensId);
-      if (!lens || lens.isBuiltIn) return s;
+      if (!lens || lens.isBuiltIn || lensWritesRefused()) return s;
       const allLenses = s.allLenses.map((l) =>
         l.id === lensId ? { ...l, name } : l,
       );
@@ -895,7 +914,7 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
   duplicateLens: (lensId) => {
     const state = get();
     const lens = state.allLenses.find((l) => l.id === lensId);
-    if (!lens) return lensId;
+    if (!lens || lensWritesRefused()) return lensId;
     const id = generateId();
     // Duplicate the SAVED lens — never the live draft. The
     // "Save as new lens" action handles the draft-capture case.
@@ -927,6 +946,8 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
     // lens can be deleted/dismissed, but the strip must always offer a
     // way back to the unfiltered table.
     if (lensId === "all-traces") return;
+    // Dismissing a built-in is local only; deleting a saved lens is a write.
+    if (!lens.isBuiltIn && lensWritesRefused()) return;
     const allLenses = s.allLenses.filter((l) => l.id !== lensId);
     const nextDraft = clearDraftFor(s.draftState, lensId);
     if (lens.isBuiltIn) {

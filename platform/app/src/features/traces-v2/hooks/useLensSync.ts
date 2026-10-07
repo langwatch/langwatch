@@ -3,6 +3,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useExplorerStore } from "../stores/explorerStore";
 import { type LensConfig, setLensSyncBridge } from "../stores/viewSlice";
+import { useCanSaveLenses } from "./useCanSaveLenses";
 
 /** Discriminator stored on each SavedView row so the traces v2 lens
  * persistence doesn't collide with the v1 filter views — rows left behind by
@@ -63,7 +64,8 @@ function decode(id: string, name: string, filters: unknown): LensConfig | null {
  *  - Registers a sync bridge so subsequent createLens / renameLens /
  *    deleteLens calls fire-and-forget the matching tRPC mutation —
  *    keeping the local store as a hot cache, the server as the source
- *    of truth.
+ *    of truth. The bridge also tells the store when the project takes no
+ *    lens writes (an aggregate), so the store refuses them at the source.
  *
  * Built-in lenses stay code-defined; they're not persisted server-side.
  * Drafts (per-lens local tweaks) also stay local — they're the
@@ -113,6 +115,9 @@ export function useLensSync(): void {
   // every render, which would otherwise force us to re-register.
   const projectIdRef = useRef(projectId);
   projectIdRef.current = projectId;
+  const canSaveLenses = useCanSaveLenses();
+  const canSaveLensesRef = useRef(canSaveLenses);
+  canSaveLensesRef.current = canSaveLenses;
   const createRef = useRef(createMutation.mutate);
   createRef.current = createMutation.mutate;
   const renameRef = useRef(renameMutation.mutate);
@@ -125,6 +130,7 @@ export function useLensSync(): void {
   // to the server without each call site knowing about tRPC.
   useEffect(() => {
     setLensSyncBridge({
+      acceptsWrites: () => canSaveLensesRef.current,
       create: (lens) => {
         const pid = projectIdRef.current;
         if (!pid) return;
