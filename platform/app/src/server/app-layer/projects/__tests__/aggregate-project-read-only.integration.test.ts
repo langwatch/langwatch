@@ -19,6 +19,7 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import {
   type AggregateFixture,
+  realAggregateProjectService,
   realOrganizationService,
   seedAggregateOrganization,
 } from "./aggregateProjectFixture";
@@ -37,6 +38,7 @@ describe("Feature: the aggregate project is read only", () => {
   beforeAll(async () => {
     globalForApp.__langwatch_app = createTestApp({
       organizations: realOrganizationService(prisma),
+      projects: realAggregateProjectService(prisma),
     });
     fixture = await seedAggregateOrganization(prisma, { label: "agg-ro" });
     aggregate = await fixture.makeAggregate("company-view");
@@ -69,6 +71,28 @@ describe("Feature: the aggregate project is read only", () => {
         expect(navigation.onlineEvaluations).toBe(false);
         expect(navigation.test).toBe(false);
         expect(navigation.build).toBe(false);
+      });
+    });
+
+    describe("when the Trace Explorer asks whether the aggregate has traces", () => {
+      /** @scenario "Aggregate Trace Explorer shows member rows without onboarding" */
+      it("answers yes in the project list and the first-trace read, though no trace was sent to it", async () => {
+        const stored = await prisma.project.findUniqueOrThrow({
+          where: { id: aggregate.id },
+          select: { firstMessage: true },
+        });
+        expect(stored.firstMessage).toBe(false);
+
+        const organizations = await admin.organization.getAll({});
+        const listed = organizations
+          .flatMap((organization) => organization.teams)
+          .flatMap((team) => team.projects)
+          .find((project) => project.id === aggregate.id);
+        expect(listed?.firstMessage).toBe(true);
+
+        await expect(
+          admin.project.getHasFirstMessage({ projectId: aggregate.id }),
+        ).resolves.toEqual({ firstMessage: true });
       });
     });
 

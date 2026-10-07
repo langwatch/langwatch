@@ -52,6 +52,22 @@ export function landingProjectOf<P extends { kind?: string | null }>(
 }
 
 /**
+ * Whether a project has traces to show (ADR-144). Ingestion flips
+ * `firstMessage` on a project's first trace, and an aggregate receives none,
+ * so its own flag would stay false while its members hold traces. Every gate
+ * that asks "has this project ever received a trace" (the Trace Explorer's
+ * instrument-your-agents pane, its first-trace poll, the setup page's wait)
+ * would then keep the aggregate on a screen it can never leave. An aggregate
+ * answers true; every other kind answers its own flag.
+ */
+export function hasTracesToShow(project: {
+  kind?: string | null;
+  firstMessage: boolean;
+}): boolean {
+  return isAggregateProjectKind(project.kind) || project.firstMessage;
+}
+
+/**
  * The kinds that never hold traces of their own, so no "send traces here"
  * picker offers them and no trace destination resolves to them. The governance
  * project receives ingestion-source data through its own path, never through

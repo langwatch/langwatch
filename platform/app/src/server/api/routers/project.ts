@@ -26,6 +26,7 @@ import {
   AGGREGATE_PROJECT_KIND,
   APPLICATION_PROJECT_KIND,
   aggregateProjectRouteViolation,
+  hasTracesToShow,
   isAggregateProjectKind,
 } from "~/server/app-layer/projects/project-kinds";
 import { mintProjectSlug } from "~/server/app-layer/projects/projectSlug";
@@ -379,7 +380,7 @@ export const projectRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const project = await getApp().projects.getById(input.projectId);
 
-      return { firstMessage: project?.firstMessage ?? false };
+      return { firstMessage: project ? hasTracesToShow(project) : false };
     }),
   regenerateApiKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))

@@ -341,3 +341,16 @@ Feature: An aggregate project reads its member projects
     Then each is refused as read only and nothing is written
     And the same calls on the member are not refused
     And ana can still edit the aggregate's rule, rename it and archive it
+
+  # ── H. The aggregate in the app ──────────────────────────────────────────
+  # The server refuses every write; these keep the app from inviting one, and
+  # from waiting on ingestion an aggregate never receives.
+
+  @integration
+  Scenario: Aggregate Trace Explorer shows member rows without onboarding
+    Given an aggregate project whose members hold traces
+    And no trace was ever sent to the aggregate itself
+    When ana opens the aggregate's Trace Explorer
+    Then the aggregate counts as a project with traces
+    And no "instrument your agents" onboarding is shown
+    And the page never polls for the aggregate's first trace
