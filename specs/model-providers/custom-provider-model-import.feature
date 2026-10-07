@@ -12,7 +12,11 @@ Feature: Import a custom provider's models on save
   # last listing carried are stored with the provider, and only ids new since
   # that listing are added, so a model the user removed is not imported again
   # while the endpoint keeps listing it. On the first import nothing was stored
-  # yet, so every listed model comes in.
+  # yet, so every listed model comes in. Pointing the provider at another
+  # endpoint starts a fresh listing; rotating the key on the same one does not.
+  #
+  # The probe is outbound traffic to a URL the customer chose, so it spends the
+  # same per-organization budget as a connection test.
 
   # Reading the listing
 
@@ -117,6 +121,20 @@ Feature: Import a custom provider's models on save
     Given a saved custom provider whose imported model "model-a" I removed
     When I save it again while the endpoint still lists "model-a"
     Then "model-a" is not a custom model
+
+  @integration
+  Scenario: Pointing the provider at another endpoint starts a fresh listing
+    Given a saved custom provider whose imported model "model-a" I removed
+    When I save it pointed at another endpoint that lists "model-a"
+    Then "model-a" is imported from the new endpoint
+
+  @integration
+  Scenario: An exhausted listing budget skips the import and keeps the save
+    Given my organization has used up its connection check budget
+    When I save a custom provider
+    Then the provider is saved with the models I sent
+    And the save reports the import as failed
+    And the endpoint is not called
 
   @integration
   Scenario: An unchanged provider that imports can be saved to re-import

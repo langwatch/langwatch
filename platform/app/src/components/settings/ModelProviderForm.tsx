@@ -389,15 +389,14 @@ export const EditModelProviderForm = ({
   // save, so Save stays enabled with nothing edited: pressing it picks up
   // models the endpoint added since the last save.
   const endpointKey = providerDefinition?.endpointKey;
-  const savingReimportsModels =
+  const shouldReimportModelsOnSave =
     Boolean(providerId) &&
     importsModelListing({
       provider: provider.provider,
       baseUrl: endpointKey
         ? String(state.customKeys[endpointKey] ?? "")
         : undefined,
-      openAIDefaultBaseUrl:
-        providerDefaultBaseUrls.openai ?? "https://api.openai.com/v1",
+      openAIDefaultBaseUrl: providerDefaultBaseUrls.openai,
     });
 
   const handleSave = useCallback(async () => {
@@ -676,7 +675,9 @@ export const EditModelProviderForm = ({
             loading={state.isSaving || isValidatingApiKey}
             disabled={
               cannotResolveTarget ||
-              (!state.isDirty && !isAdvancedDirty && !savingReimportsModels)
+              (!state.isDirty &&
+                !isAdvancedDirty &&
+                !shouldReimportModelsOnSave)
             }
             onClick={handleSave}
           >

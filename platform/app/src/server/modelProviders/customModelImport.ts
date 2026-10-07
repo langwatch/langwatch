@@ -28,6 +28,11 @@ export type MergedModelLists = {
   listedModelIds: string[];
 };
 
+/**
+ * Adds the listed models that are new since the previous listing to the
+ * provider's chat and embedding lists, and returns the ids to store for the
+ * next merge.
+ */
 export function mergeListedModels({
   listed,
   customModels,
@@ -53,7 +58,7 @@ export function mergeListedModels({
   for (const model of listed) {
     if (known.has(model.id) || seenBefore.has(model.id)) continue;
     known.add(model.id);
-    if (model.embedding) {
+    if (model.isEmbedding) {
       addedEmbeddings.push({
         modelId: model.id,
         displayName: model.id,
@@ -84,7 +89,7 @@ function toChatEntry(model: ListedModel): CustomModelEntry {
     displayName: model.id,
     mode: "chat",
     ...(model.maxTokens !== undefined && { maxTokens: model.maxTokens }),
-    ...(model.reasoning && { supportedParameters: ["reasoning" as const] }),
+    ...(model.hasReasoning && { supportedParameters: ["reasoning" as const] }),
   };
 }
 
@@ -107,11 +112,22 @@ export function importsModelListing({
 }: {
   provider: string;
   baseUrl: string | undefined;
-  openAIDefaultBaseUrl: string;
+  /** OpenAI's own base URL. Without one, an OpenAI provider never imports. */
+  openAIDefaultBaseUrl: string | undefined;
 }): boolean {
   if (provider === "custom") return true;
-  if (provider !== "openai" || !baseUrl?.trim()) return false;
-  return apiRoot(baseUrl) !== apiRoot(openAIDefaultBaseUrl);
+  if (provider !== "openai" || !baseUrl?.trim() || !openAIDefaultBaseUrl) {
+    return false;
+  }
+  return !isSameEndpoint(baseUrl, openAIDefaultBaseUrl);
+}
+
+/**
+ * Whether two base URLs name the same API root, ignoring case, trailing
+ * slashes and a trailing `/v1`.
+ */
+export function isSameEndpoint(a: string, b: string): boolean {
+  return apiRoot(a) === apiRoot(b);
 }
 
 function apiRoot(url: string): string {

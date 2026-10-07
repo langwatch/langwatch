@@ -77,11 +77,11 @@ describe("parseModelListing", () => {
       });
 
       expect(models).toEqual([
-        { id: "reasoner", maxTokens: 131072, reasoning: true },
+        { id: "reasoner", maxTokens: 131072, hasReasoning: true },
         { id: "vllm-model", maxTokens: 32768 },
-        { id: "embed-a", embedding: true },
-        { id: "embed-b", embedding: true },
-        { id: "embed-c", embedding: true },
+        { id: "embed-a", isEmbedding: true },
+        { id: "embed-b", isEmbedding: true },
+        { id: "embed-c", isEmbedding: true },
         { id: "plain" },
       ]);
     });

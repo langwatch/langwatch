@@ -12,7 +12,7 @@ describe("mergeListedModels", () => {
       const merged = mergeListedModels({
         listed: [
           { id: "model-a", maxTokens: 8192 },
-          { id: "model-b", reasoning: true },
+          { id: "model-b", hasReasoning: true },
         ],
         customModels: undefined,
         customEmbeddingsModels: undefined,
@@ -58,7 +58,7 @@ describe("mergeListedModels", () => {
 
     it("adds an entry marked as embeddings to the embeddings list", () => {
       const merged = mergeListedModels({
-        listed: [{ id: "embed-a", embedding: true }],
+        listed: [{ id: "embed-a", isEmbedding: true }],
         customModels: [],
         customEmbeddingsModels: [],
         previouslyListedIds: null,
@@ -83,7 +83,7 @@ describe("mergeListedModels", () => {
       };
 
       const merged = mergeListedModels({
-        listed: [{ id: "model-a", maxTokens: 9999, reasoning: true }],
+        listed: [{ id: "model-a", maxTokens: 9999, hasReasoning: true }],
         customModels: [edited],
         customEmbeddingsModels: [],
         previouslyListedIds: null,

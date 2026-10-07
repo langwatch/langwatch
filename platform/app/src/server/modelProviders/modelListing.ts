@@ -16,9 +16,9 @@ export type ListedModel = {
   /** Context window, when the entry states one. */
   maxTokens?: number;
   /** The entry advertises reasoning controls. */
-  reasoning?: boolean;
+  hasReasoning?: boolean;
   /** The entry explicitly marks itself as an embeddings model. */
-  embedding?: boolean;
+  isEmbedding?: boolean;
 };
 
 /** Largest listing body read. A bigger one is treated as no listing. */
@@ -137,8 +137,8 @@ function toListedModel(entry: unknown): ListedModel | undefined {
   const model: ListedModel = { id };
   const maxTokens = readMaxTokens(entry);
   if (maxTokens !== undefined) model.maxTokens = maxTokens;
-  if (readsReasoning(entry)) model.reasoning = true;
-  if (marksEmbedding(entry)) model.embedding = true;
+  if (readsReasoning(entry)) model.hasReasoning = true;
+  if (marksEmbedding(entry)) model.isEmbedding = true;
   return model;
 }
 

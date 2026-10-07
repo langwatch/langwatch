@@ -14,6 +14,7 @@ import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
 import {
   importsModelListing,
+  isSameEndpoint,
   type ModelImportOutcome,
   mergeListedModels,
   readListedModelIds,
@@ -1070,8 +1071,7 @@ export class ModelProviderService {
     const imports = importsModelListing({
       provider: input.provider,
       baseUrl: endpointField ? keys[endpointField] : undefined,
-      openAIDefaultBaseUrl:
-        providerDefaultBaseUrls.openai ?? "https://api.openai.com/v1",
+      openAIDefaultBaseUrl: providerDefaultBaseUrls.openai,
     });
     if (!imports) return undefined;
 
@@ -1110,6 +1110,14 @@ export class ModelProviderService {
     });
     if (!keys) return undefined;
 
+    // The probe is outbound traffic to a URL the customer chose, and Save
+    // stays enabled for these providers, so it spends the same
+    // per-organization budget as a connection test. An exhausted budget
+    // skips the import and keeps the save.
+    if (!(await this.isModelListingWithinBudget(input))) {
+      return { outcome: { status: "failed" } };
+    }
+
     let listed: Awaited<ReturnType<ListProviderModels>>;
     try {
       listed = await this.listProviderModels(input.provider, keys);
@@ -1134,9 +1142,13 @@ export class ModelProviderService {
         input.customEmbeddingsModels !== undefined
           ? input.customEmbeddingsModels
           : (existingProvider?.customEmbeddingsModels as CustomModelsInput | null),
-      previouslyListedIds: readListedModelIds(
-        existingProvider?.lastListedModelIds,
-      ),
+      previouslyListedIds: this.isSameListingEndpoint({
+        provider: input.provider,
+        keys,
+        existingProvider,
+      })
+        ? readListedModelIds(existingProvider?.lastListedModelIds)
+        : null,
     });
     return {
       outcome: {
@@ -1150,6 +1162,60 @@ export class ModelProviderService {
         lastListedModelIds: merged.listedModelIds,
       },
     };
+  }
+
+  private async isModelListingWithinBudget(
+    input: UpdateModelProviderInput,
+  ): Promise<boolean> {
+    const anchor = await this.resolveOrganizationAnchor({
+      projectId: input.projectId,
+      organizationId: input.organizationId,
+    });
+    if (!anchor) return false;
+    try {
+      await assertTestConnectionWithinBudget(anchor);
+      return true;
+    } catch (error) {
+      if (error instanceof ModelProviderTestRateLimitedError) {
+        logger.warn(
+          { provider: input.provider, organizationId: anchor },
+          "Skipped the model import on save: listing budget exhausted",
+        );
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Whether this save probes the endpoint the stored listing came from. The
+   * stored ids only suppress models the user removed from that endpoint, so
+   * a save that points the provider somewhere else starts a fresh listing. A
+   * key rotation on the same endpoint keeps it.
+   */
+  private isSameListingEndpoint({
+    provider,
+    keys,
+    existingProvider,
+  }: {
+    provider: string;
+    keys: Record<string, string>;
+    existingProvider: ModelProviderWrite["existingProvider"];
+  }): boolean {
+    if (!existingProvider) return false;
+    const endpointField =
+      modelProviders[provider as keyof typeof modelProviders]?.endpointKey;
+    if (!endpointField) return true;
+    const storedKeys = (existingProvider.customKeys ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const stored = storedKeys[endpointField];
+    const next = keys[endpointField];
+    if (typeof stored !== "string" || typeof next !== "string") {
+      return stored === next;
+    }
+    return isSameEndpoint(stored, next);
   }
 
   /**

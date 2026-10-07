@@ -32,7 +32,10 @@ import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { prisma } from "../../db";
 import type { CustomModelEntry } from "../customModel.schema";
-import { ModelProviderService } from "../modelProvider.service";
+import {
+  assertTestConnectionWithinBudget,
+  ModelProviderService,
+} from "../modelProvider.service";
 
 wireDefaultTestApp();
 
@@ -162,9 +165,11 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
     async function save({
       id,
       customModels,
+      endpointUrl = baseUrl,
     }: {
       id?: string;
       customModels?: CustomModelEntry[];
+      endpointUrl?: string;
     }) {
       return await service().updateModelProvider(
         {
@@ -175,7 +180,7 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
           enabled: true,
           customKeys: {
             CUSTOM_API_KEY: id ? MASKED_KEY_PLACEHOLDER : "sk-local-test",
-            CUSTOM_BASE_URL: baseUrl,
+            CUSTOM_BASE_URL: endpointUrl,
           },
           customModels,
           scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
@@ -311,6 +316,38 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
       });
     });
 
+    describe("given a saved provider whose imported model was removed", () => {
+      describe("when it is saved pointed at another endpoint", () => {
+        /** @scenario Pointing the provider at another endpoint starts a fresh listing */
+        it("imports the removed model from the new endpoint", async () => {
+          listing(["model-a", "model-b"]);
+          const created = await save({});
+          const withoutA = (await storedChat(created.id)).filter(
+            (m) => m.modelId !== "model-a",
+          );
+          await save({ id: created.id, customModels: withoutA });
+
+          // The same server under another host name is another endpoint.
+          const otherEndpoint = baseUrl.replace("127.0.0.1", "localhost");
+          const saved = await save({
+            id: created.id,
+            customModels: await storedChat(created.id),
+            endpointUrl: otherEndpoint,
+          });
+
+          expect(saved.modelImport).toEqual({
+            status: "imported",
+            added: 1,
+            total: 2,
+          });
+          expect(await storedChatIds(created.id)).toEqual([
+            "model-b",
+            "model-a",
+          ]);
+        });
+      });
+    });
+
     describe("given an endpoint that fails to list", () => {
       /** @scenario An endpoint that fails to list does not block the save */
       it.each([
@@ -333,6 +370,30 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
           where: { id: saved.id },
         });
         expect(row.lastListedModelIds).toBeNull();
+      });
+    });
+
+    // Last in the file: it spends the organization's whole budget.
+    describe("given the organization used up its connection check budget", () => {
+      /** @scenario An exhausted listing budget skips the import and keeps the save */
+      it("saves the models sent without calling the endpoint", async () => {
+        listing(["model-a"]);
+        await expect(async () => {
+          for (let i = 0; i < 100; i++) {
+            await assertTestConnectionWithinBudget(organizationId);
+          }
+        }).rejects.toThrow();
+        const manual: CustomModelEntry = {
+          modelId: "manual-model",
+          displayName: "manual-model",
+          mode: "chat",
+        };
+
+        const saved = await save({ customModels: [manual] });
+
+        expect(saved.modelImport).toEqual({ status: "failed" });
+        expect(await storedChat(saved.id)).toEqual([manual]);
+        expect(endpoint.requests).toEqual([]);
       });
     });
   },
