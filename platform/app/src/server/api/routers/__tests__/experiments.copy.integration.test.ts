@@ -95,11 +95,7 @@ describe("experiments.copy", () => {
     await prisma.experiment
       .deleteMany({
         where: {
-          OR: [
-            { id: originalId },
-            { id: { in: seededIds } },
-            { projectId: PROJECT_ID, name: `${originalName} (copy)` },
-          ],
+          OR: [{ id: originalId }, { id: { in: seededIds } }],
         },
       })
       .catch(() => {});
@@ -111,15 +107,16 @@ describe("experiments.copy", () => {
     }
   });
 
-  const replicate = async (projectId: string) =>
-    (
-      await caller.experiments.copy({
-        experimentId: originalId,
-        projectId,
-        sourceProjectId: PROJECT_ID,
-        copyDatasets: false,
-      })
-    ).experiment;
+  const replicate = async (projectId: string) => {
+    const { experiment } = await caller.experiments.copy({
+      experimentId: originalId,
+      projectId,
+      sourceProjectId: PROJECT_ID,
+      copyDatasets: false,
+    });
+    seededIds.push(experiment.id);
+    return experiment;
+  };
 
   /**
    * Opens the experiment the way the editor does (server row identity first,

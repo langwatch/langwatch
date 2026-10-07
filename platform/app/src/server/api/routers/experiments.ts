@@ -1034,7 +1034,7 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       // Create new experiment with unique slug
-      const experimentName = `${experiment.name ?? experiment.slug} (copy)`;
+      const experimentName = experiment.name ?? experiment.slug;
       const experiments = experimentService();
       const initialSlug = await experiments.generateUniqueSlug({
         baseSlug: slugify(experimentName),
