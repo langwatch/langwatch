@@ -1,6 +1,7 @@
 import {
   CONTENT_CATEGORIES,
   type ContentCategory,
+  EMPTY_AUDIENCE,
   type CustomAttributeDisposition,
   type Disposition,
   type PiiLevel,
@@ -107,6 +108,13 @@ function strictestCategory(
   };
 }
 
+/**
+ * Per pattern, the strictest rule any member holds. A drop acts only at
+ * ingestion and the read path hides only restricts, so where one member drops
+ * a pattern another restricts, a folded drop would show the restricting
+ * member's stored value to everyone. For a read the strictest of the two is
+ * a restriction to no one.
+ */
 function strictestCustomAttributes(
   rules: readonly ResolvedCustomAttributeRule[],
 ): ResolvedCustomAttributeRule[] {
@@ -119,6 +127,16 @@ function strictestCustomAttributes(
       held.map((rule) => rule.disposition),
       CUSTOM_ATTRIBUTE_STRICTNESS,
     );
+    if (
+      disposition === "drop" &&
+      held.some((rule) => rule.disposition === "restrict")
+    ) {
+      return {
+        pattern,
+        disposition: "restrict",
+        audience: { ...EMPTY_AUDIENCE },
+      };
+    }
     return {
       pattern,
       disposition,

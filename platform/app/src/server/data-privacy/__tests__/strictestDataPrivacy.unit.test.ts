@@ -203,7 +203,10 @@ describe("strictestDataPrivacy", () => {
       ).toEqual(["a.*", "b.*"]);
     });
 
-    it("lets a drop beat a restrict on the same pattern", () => {
+    // A drop acts only at ingestion and the read path hides only restricts,
+    // so a folded drop would show a restricting member's stored value to
+    // everyone. For a read, the strictest of the two is restrict to no one.
+    it("restricts to no one when one member drops and another restricts the same pattern", () => {
       const folded = strictestDataPrivacy([
         policy({
           customAttributes: [
@@ -222,6 +225,20 @@ describe("strictestDataPrivacy", () => {
       ]);
 
       expect(folded.customAttributes).toEqual([
+        { pattern: "a.*", disposition: "restrict", audience: EMPTY_AUDIENCE },
+      ]);
+    });
+
+    it("keeps a drop every member holds as a drop", () => {
+      const dropping = policy({
+        customAttributes: [
+          { pattern: "a.*", disposition: "drop", audience: EMPTY_AUDIENCE },
+        ],
+      });
+
+      expect(
+        strictestDataPrivacy([dropping, dropping]).customAttributes,
+      ).toEqual([
         { pattern: "a.*", disposition: "drop", audience: EMPTY_AUDIENCE },
       ]);
     });

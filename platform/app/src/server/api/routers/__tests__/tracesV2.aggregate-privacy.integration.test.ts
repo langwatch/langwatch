@@ -13,7 +13,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Project } from "~/generated/prisma/client";
-import { resetApp } from "~/server/app-layer/app";
+import { getApp, resetApp } from "~/server/app-layer/app";
 import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import {
   type AggregateFixture,
@@ -29,6 +29,7 @@ import {
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { getUserProtectionsForProject } from "../../utils";
 import {
   insertRows,
   installAggregateTraceApp,
@@ -46,6 +47,12 @@ let loose: Project;
 /** Restricts input and output to its owner; a team project has none. */
 let strict: Project;
 let admin: ReturnType<typeof appRouter.createCaller>;
+/** Drops `secret.key` at ingestion. */
+let dropper: Project;
+/** Restricts `secret.key` to no one, so its stored value is hidden. */
+let restricter: Project;
+/** Reads the dropper and the restricter. */
+let attributeAggregate: Project;
 let window: { from: number; to: number };
 
 const listOf = (projectId: string) =>
@@ -81,6 +88,40 @@ beforeAll(async () => {
         output: { disposition: "restrict", audience: { projectOwner: true } },
       },
     },
+  });
+
+  dropper = await fixture.makeTeamProject("dropper");
+  restricter = await fixture.makeTeamProject("restricter");
+  await getDataPrivacyPolicyService().setForScope({
+    scope: { scopeType: "PROJECT", scopeId: dropper.id },
+    personalOnly: false,
+    config: {
+      customAttributes: [{ pattern: "secret.key", disposition: "drop" }],
+    },
+  });
+  await getDataPrivacyPolicyService().setForScope({
+    scope: { scopeType: "PROJECT", scopeId: restricter.id },
+    personalOnly: false,
+    config: {
+      customAttributes: [
+        { pattern: "secret.key", disposition: "restrict", audience: {} },
+      ],
+    },
+  });
+  const attributeView = await admin.project.create({
+    organizationId: fixture.organizationId,
+    teamId: fixture.team.id,
+    name: `Attribute view ${run}`,
+    language: "other",
+    framework: "other",
+    kind: AGGREGATE_PROJECT_KIND,
+    aggregateRule: {
+      kind: "explicit",
+      projectIds: [dropper.id, restricter.id],
+    },
+  });
+  attributeAggregate = await prisma.project.findFirstOrThrow({
+    where: { slug: attributeView.projectSlug, teamId: fixture.team.id },
   });
 
   const { projectSlug } = await admin.project.create({
@@ -185,6 +226,47 @@ describe("Feature: an aggregate read applies the strictest member policy", () =>
         expect(looseHeader.input).toBe(`input of ${loose.id}`);
         expect(strictHeader.input).toBeNull();
         expect(strictHeader.inputRedacted).toBe(true);
+      });
+    });
+  });
+
+  describe("given an aggregate whose members drop and restrict the same attribute", () => {
+    const protectionsOf = async (projectId: string) =>
+      getUserProtectionsForProject(
+        {
+          prisma,
+          session: { user: { id: fixture.admin.id }, expires: "1" },
+        },
+        {
+          projectId,
+          authorization: await getApp().authorization.authorize({
+            actor: { type: "user", id: fixture.admin.id },
+            principal: { type: "user", id: fixture.admin.id },
+            permission: "traces:view",
+            scope: { projectId },
+            purpose: { kind: "route", route: "test.protections" },
+          }),
+        },
+      );
+
+    describe("when ana reads the restricting member directly", () => {
+      it("hides the attribute", async () => {
+        const protections = await protectionsOf(restricter.id);
+
+        expect(protections.hiddenAttributes.map((rule) => rule.pattern)).toEqual(
+          ["secret.key"],
+        );
+      });
+    });
+
+    describe("when ana reads the aggregate", () => {
+      /** @scenario "The strictest member privacy policy applies" */
+      it("still hides the attribute the restricting member stored", async () => {
+        const protections = await protectionsOf(attributeAggregate.id);
+
+        expect(protections.hiddenAttributes.map((rule) => rule.pattern)).toEqual(
+          ["secret.key"],
+        );
       });
     });
   });
