@@ -396,6 +396,7 @@ describe("TraceListClickHouseRepository through the proof", () => {
       });
 
     describe("when the aggregate pages through them one row at a time", () => {
+      /** @scenario "Paging an aggregate list hands out each member's row of a shared trace id exactly once" */
       it("hands out both rows exactly once across the pages", async () => {
         const seen = await walkOneRowPerPage(twinProof());
 

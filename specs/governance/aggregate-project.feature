@@ -288,6 +288,14 @@ Feature: An aggregate project reads its member projects
     When ana reads the aggregate's trace list with the Events column shown
     Then each member's row shows only the events its own trace recorded
 
+  @integration
+  Scenario: Paging an aggregate list hands out each member's row of a shared trace id exactly once
+    Given an aggregate project whose two members each hold a trace with the same id
+    And both traces were recorded at the same moment
+    When ana pages through the aggregate's trace list one row at a time
+    Then each member's row of that trace appears on exactly one page
+    And no row is skipped or repeated across the pages
+
   # Unimplemented: analytics read through raw clients and the rollup windows
   # on BucketStart, a time column the fence does not admit yet; the fifth
   # time column awaits a decision (ADR-144 open questions).
