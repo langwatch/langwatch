@@ -137,6 +137,14 @@ Feature: Import a custom provider's models on save
     And the endpoint is not called
 
   @integration
+  Scenario: A check budget that cannot be read does not block the save
+    Given the organization's connection check budget cannot be read
+    When I save a custom provider
+    Then the provider is saved with the models I sent
+    And the save reports the import as failed
+    And the endpoint is not called
+
+  @integration
   Scenario: An unchanged provider that imports can be saved to re-import
     Given a saved custom provider whose drawer I open without editing anything
     Then the Save button is enabled

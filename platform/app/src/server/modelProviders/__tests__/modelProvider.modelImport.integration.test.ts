@@ -32,6 +32,7 @@ import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { prisma } from "../../db";
 import type { CustomModelEntry } from "../customModel.schema";
+import { ModelProviderRepository } from "../modelProvider.repository";
 import {
   assertTestConnectionWithinBudget,
   ModelProviderService,
@@ -140,12 +141,21 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
     });
 
     beforeEach(() => {
+      spendCheckBudget = undefined;
       endpoint.requests = [];
       listing([]);
     });
 
+    let spendCheckBudget:
+      | ((organizationId: string) => Promise<void>)
+      | undefined;
+
     function service() {
-      return ModelProviderService.create(prisma);
+      return new ModelProviderService({
+        prisma,
+        repository: new ModelProviderRepository(prisma),
+        spendCheckBudget,
+      });
     }
 
     function ctx() {
@@ -411,6 +421,27 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
           where: { id: saved.id },
         });
         expect(row.lastListedModelIds).toBeNull();
+      });
+    });
+
+    describe("given a check budget that cannot be read", () => {
+      /** @scenario A check budget that cannot be read does not block the save */
+      it("saves the models sent and reports the import failed without calling the endpoint", async () => {
+        listing(["model-a"]);
+        spendCheckBudget = async () => {
+          throw new Error("budget store unreachable");
+        };
+        const manual: CustomModelEntry = {
+          modelId: "manual-model",
+          displayName: "manual-model",
+          mode: "chat",
+        };
+
+        const saved = await save({ customModels: [manual] });
+
+        expect(saved.modelImport).toEqual({ status: "failed" });
+        expect(await storedChat(saved.id)).toEqual([manual]);
+        expect(endpoint.requests).toEqual([]);
       });
     });
 

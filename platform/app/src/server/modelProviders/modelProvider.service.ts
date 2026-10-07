@@ -563,11 +563,13 @@ export class ModelProviderService {
   private readonly prisma: PrismaClient;
   private readonly repository: ModelProviderRepository;
   private readonly changeEvents: ChangeEventRepository;
+  private readonly spendCheckBudget: (organizationId: string) => Promise<void>;
 
   constructor({
     prisma,
     repository,
     changeEvents,
+    spendCheckBudget,
   }: {
     prisma: PrismaClient;
     repository: ModelProviderRepository;
@@ -579,10 +581,17 @@ export class ModelProviderService {
      * this provider id so the next request resolves the new key.
      */
     changeEvents?: ChangeEventRepository;
+    /**
+     * Spends one unit of an organization's provider check budget, throwing
+     * `ModelProviderTestRateLimitedError` when it is used up.
+     */
+    spendCheckBudget?: (organizationId: string) => Promise<void>;
   }) {
     this.prisma = prisma;
     this.repository = repository;
     this.changeEvents = changeEvents ?? new ChangeEventRepository(prisma);
+    this.spendCheckBudget =
+      spendCheckBudget ?? assertTestConnectionWithinBudget;
   }
 
   /**
@@ -1184,7 +1193,7 @@ export class ModelProviderService {
         organizationId: input.organizationId,
       });
       if (!anchor) return "unavailable";
-      await assertTestConnectionWithinBudget(anchor);
+      await this.spendCheckBudget(anchor);
       return "allowed";
     } catch (error) {
       if (error instanceof ModelProviderTestRateLimitedError) {
