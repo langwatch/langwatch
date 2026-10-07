@@ -136,6 +136,10 @@ export const CopyExperimentDialog = ({
             >
               Replicate associated dataset
             </Checkbox>
+            <Text fontSize="sm" color="fg.muted">
+              Prompts, evaluators and agents are shared with the original.
+              Editing them in the copy also changes the original.
+            </Text>
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>

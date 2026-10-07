@@ -1327,9 +1327,11 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
       return {
         ...current,
-        experimentId: (state.experimentId as string) ?? current.experimentId,
-        experimentSlug:
-          (state.experimentSlug as string) ?? current.experimentSlug,
+        // Identity comes from the server row the caller set before loading,
+        // never from the persisted state: copies made before the fix carry
+        // the original experiment's id/slug in their state.
+        experimentId: current.experimentId,
+        experimentSlug: current.experimentSlug,
         name: (state.name as string) ?? current.name,
         datasets:
           (state.datasets as typeof current.datasets) ?? current.datasets,
