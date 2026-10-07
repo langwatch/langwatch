@@ -18,6 +18,9 @@
       "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
+      "path": "../../analytics/client/tsconfig.build.json"
+    },
+    {
       "path": "../../analytics/contract/tsconfig.build.json"
     },
     {

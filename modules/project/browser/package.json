@@ -20,6 +20,7 @@
     "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
+    "@langwatch/analytics-client": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
