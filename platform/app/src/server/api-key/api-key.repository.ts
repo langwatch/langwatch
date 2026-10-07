@@ -561,6 +561,7 @@ export class ApiKeyRepository {
 
   async findProjectWithTeam({ projectId }: { projectId: string }): Promise<{
     id: string;
+    kind: string;
     team: { id: string; organizationId: string };
   } | null> {
     return this.prisma.project.findUnique({

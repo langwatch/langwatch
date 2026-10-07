@@ -151,6 +151,50 @@ describe("Feature: the aggregate project is no place to send traces", () => {
       });
     });
 
+    describe("when an access token bound to the aggregate is minted", () => {
+      /** @scenario "Aggregate onboarding mints no credential" */
+      it("refuses the aggregate and mints nothing", async () => {
+        const admin = appRouter.createCaller(
+          createInnerTRPCContext({
+            session: { user: { id: fixture.admin.id }, expires: "1" },
+          }),
+        );
+        const mint = (projectId: string) =>
+          admin.apiKey.create({
+            organizationId: fixture.organizationId,
+            name: "Initial API key",
+            bindings: [
+              {
+                role: "MEMBER",
+                customRoleId: null,
+                scopeType: "PROJECT",
+                scopeId: projectId,
+              },
+            ],
+          });
+
+        const refusal = await mint(aggregate.id)
+          .then(() => null)
+          .catch((error: unknown) => error);
+        const cause = (refusal as { cause?: unknown } | null)?.cause;
+        expect(HandledError.isHandled(cause)).toBe(true);
+        expect((cause as HandledError).code).toBe(
+          "aggregate_project_has_no_credential",
+        );
+        expect((refusal as { code?: string }).code).toBe("FORBIDDEN");
+        expect(
+          await prisma.apiKey.count({
+            where: {
+              organizationId: fixture.organizationId,
+              roleBindings: {
+                some: { scopeType: "PROJECT", scopeId: aggregate.id },
+              },
+            },
+          }),
+        ).toBe(0);
+      });
+    });
+
     describe("when an API key's project scopes are listed", () => {
       it("leaves the aggregate out", async () => {
         const projects = await ApiKeyRepository.create(

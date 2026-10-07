@@ -10,6 +10,7 @@ import {
   parseCustomRolePermissions,
   permissionFormatSchema,
 } from "~/server/app-layer/authz/custom-role-permissions";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { RoleRepository } from "~/server/role/repositories/role.repository";
 import { CUSTOM_ROLE_KIND } from "~/server/role/role-kind";
 import { assertPersonalTeamScopesOwnedBy } from "~/server/role-bindings/personal-team-scope";
@@ -30,6 +31,7 @@ import {
   verifySecret,
 } from "./api-key-token.utils";
 import {
+  AggregateProjectHasNoCredentialError,
   ApiKeyAlreadyRevokedError,
   ApiKeyNotFoundError,
   ApiKeyNotOwnedError,
@@ -769,6 +771,12 @@ export class ApiKeyService {
         `Project ${binding.scopeId} does not belong to this organization`,
         { meta: { projectId: binding.scopeId, organizationId } },
       );
+    }
+    // ADR-144 decision 7: an aggregate owns no credential, so no key may be
+    // bound to it, whichever surface mints the key. Refused with the same
+    // code the ingest door and the CLI key mint answer.
+    if (isAggregateProjectKind(project.kind)) {
+      throw new AggregateProjectHasNoCredentialError();
     }
     return { type: "project", id: binding.scopeId, teamId: project.team.id };
   }

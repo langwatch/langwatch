@@ -354,3 +354,11 @@ Feature: An aggregate project reads its member projects
     Then the aggregate counts as a project with traces
     And no "instrument your agents" onboarding is shown
     And the page never polls for the aggregate's first trace
+
+  @integration
+  Scenario: Aggregate onboarding mints no credential
+    When ana asks for an access token bound to the aggregate project
+    Then she is refused because the aggregate accepts no credential
+    And no key bound to the aggregate exists
+    And the aggregate's setup page and onboarding say "Data can't be added to this project"
+    And they show no key, no wait for a first trace and no button to mint one
