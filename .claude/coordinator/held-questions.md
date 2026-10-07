@@ -357,3 +357,13 @@ recommendation, and "default taken" if a lane proceeded on it.
 ### r-analytics-event-catalogue
 
 - Owned paths: the manifest names `lwql-catalogue.rules.ts` and `lwql-view-catalog.rules.ts`, but four of the seven analytics findings sit in `lwql-postgres-view-catalog.rules.ts`, `lwql-postgres-descriptions-overrides.rules.ts` and `lwql-audit-overrides.rules.ts`; the completion criterion (no analytics finding) needs them, so their event-table entries only were repointed (all clean in git status, no live owner); default taken, held for Alex.
+
+### upgrade-runtime
+
+- Presence declares no code steps: `readImageTree()` in the serving gate carries `codeSteps: []`, and the api never builds `.withMigrations` steps, so no live presence row declares a background step. `oldWritersGoneFor` is then false while any process is live, and a step with `needsOldWritersGone` never runs on a serving installation. Options: (a) every role collects the declared step ids (declarations only, not built) and presence declares them; (b) presence declares the released manifests' non-blocking steps at or below the image's release, leaving unreleased (cloud) steps waiting; (c) stamp code steps into the image tree at build. Needs a ruling; nothing written.
+- Background steps record `run_id = "background:<processId>"`, which names no `_langwatch_upgrade_run` row; the Upgrades page links a step to its run. Options: a third run kind `background` (enum and wire change) or leave the id unresolvable. Default taken (no new kind), held for Alex.
+- A failed background step is not retried by the worker (pending and orphaned running only); ops "requests" a retry. Default taken, held for Alex.
+
+### trace-refuse-event-read
+
+- Seat wiring (Q209): the seat reaches registries as a sixteenth store member, `eventReadSeat` (packages/process-stores `ProcessMembers`/`MEMBER_NAMES`, both §15 deleted spellings still in use), built from `eventing.eventReadSeat`; a role whose eventing reads no event log hands a seat that refuses each read by name (MemberNotConfiguredError, as encryption's refusing cipher), so building trace's live registry never fails. Alternative not taken: trace's registry requiring `eventing` itself (hands a module the shared EventSourcing client, against §7). Default taken, held for Alex.
