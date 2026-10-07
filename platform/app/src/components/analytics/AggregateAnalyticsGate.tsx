@@ -1,10 +1,10 @@
 import { Alert } from "@chakra-ui/react";
 import type { ComponentType } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { projectNavigation } from "~/components/sidebar/projectKindNavigation";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 
 /**
  * What an aggregate project (ADR-144) says where analytics would be: its
@@ -59,10 +59,12 @@ function AggregateAnalyticsPage({
 }
 
 /**
- * Renders an analytics page on every project but an aggregate, which leaves
- * analytics until they read across its members. The navigation already hides
- * Analytics there; this catches a direct link or a bookmark. The page itself
- * never mounts on an aggregate, so none of its analytics queries run.
+ * Renders an analytics page on every project whose navigation offers
+ * Analytics. An aggregate leaves analytics out until they read across its
+ * members. The gate reads the same rule the sidebar and the command bar hide
+ * Analytics on, so a direct link or a bookmark agrees with the menu, and the
+ * day that rule turns analytics on for aggregates both follow it. The page
+ * itself never mounts where the rule says no, so none of its queries run.
  */
 export function withAggregateAnalyticsGate<P extends object>(
   title: string,
@@ -70,7 +72,7 @@ export function withAggregateAnalyticsGate<P extends object>(
 ): ComponentType<P> {
   function AggregateAnalyticsGate(props: P) {
     const { project } = useOrganizationTeamProject();
-    if (project && isAggregateProjectKind(project.kind)) {
+    if (project && !projectNavigation(project.kind).analytics) {
       return (
         <AggregateAnalyticsPage title={title} projectSlug={project.slug} />
       );
