@@ -376,3 +376,12 @@ Feature: An aggregate project reads its member projects
     When ana's annotation on an aggregate trace is refused as read only
     Then the message she sees is "Data can't be added to this project"
     And not a generic "Could not save annotation"
+
+  @unit
+  Scenario: Each aggregate row names its member project
+    Given an aggregate project listing rows from two members
+    When ana reads its trace list
+    Then a Project column names each row's member project
+    And the trace drawer names the member project of the open trace
+    And a member whose name ana's project list lacks is shown by its id
+    And a plain project's trace list has no Project column
