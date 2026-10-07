@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unit test for detect-changes-source.sh, plus the git path it selects.
+# Unit test for detect-changes-source.sh, plus the git paths it selects.
 #
 # The decision table is pinned case by case. The git path is then proved in the
 # same lean checkout the gate runs in (sparse, blobless, depth one), with the
@@ -31,7 +31,7 @@ check() {
   fi
 }
 
-# source_for EVENT_NAME PUSH_STRATEGY CHANGED_FILES
+# source_for EVENT_NAME PUSH_STRATEGY CHANGED_FILES (no source reads the count any more)
 source_for() {
   EVENT_NAME="$1" PUSH_STRATEGY="$2" CHANGED_FILES="$3" bash "$SCRIPT"
 }
@@ -44,22 +44,13 @@ test_a_pull_request_reads_git() {
   check "a pull_request with no count reads git" "source=git" "$(source_for pull_request force "")"
 }
 
-# @scenario "A pull_request_target run past the files API's cap runs everything"
-test_a_large_pull_request_target_runs_everything() {
-  check "3,000 files forces every filter" "source=force" \
-    "$(source_for pull_request_target force 3000)"
-  check "42,596 files forces every filter" "source=force" \
-    "$(source_for pull_request_target force 42596)"
-  check "a missing count forces every filter" "source=force" \
-    "$(source_for pull_request_target force "")"
-  check "a count that is not a number forces every filter" "source=force" \
-    "$(source_for pull_request_target force "12; echo x")"
-}
-
-# @scenario "A pull_request_target run under the files API's cap reads the files API"
-test_a_small_pull_request_target_reads_the_api() {
-  check "2,999 files reads the API" "source=api" "$(source_for pull_request_target force 2999)"
-  check "one file reads the API" "source=api" "$(source_for pull_request_target force 1)"
+# @scenario "A pull_request_target run diffs the head commit by SHA with git"
+test_a_pull_request_target_reads_git_by_sha() {
+  local count
+  for count in 1 2999 3000 42596 "" "12; echo x"; do
+    check "pull_request_target with count '$count' reads git by SHA" "source=git-sha" \
+      "$(source_for pull_request_target force "$count")"
+  done
 }
 
 # @scenario "A push in diff mode is diffed with git and every other event runs everything"
@@ -139,8 +130,7 @@ test_git_lists_every_path_in_the_lean_checkout() {
 }
 
 test_a_pull_request_reads_git
-test_a_large_pull_request_target_runs_everything
-test_a_small_pull_request_target_reads_the_api
+test_a_pull_request_target_reads_git_by_sha
 test_push_and_other_events
 test_git_lists_every_path_in_the_lean_checkout
 

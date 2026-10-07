@@ -180,7 +180,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           # The gate reads no working-tree content: the changed paths come
-          # from git trees or the files API (.github/actions/detect-changes),
+          # from git trees (.github/actions/detect-changes),
           # and every file this job needs on disk lives under .github/.
           # Checking out the rest of the tree is pure runner time.
           sparse-checkout: .github
@@ -1489,6 +1489,12 @@ jobs:
 
       - name: Test detect-changes-source.sh
         run: bash .github/scripts/__tests__/detect-changes-source.test.sh
+
+      - name: Test detect-changes-by-sha.sh
+        run: bash .github/scripts/__tests__/detect-changes-by-sha.test.sh
+
+      - name: Test the change detector's pathspec parity with dorny's matcher
+        run: bash .github/scripts/__tests__/detect-changes-pathspec-parity.test.sh
 
       # Lives here rather than in deployment-impact-check.yml because that
       # workflow filters `on.paths` down to deployment surface, which

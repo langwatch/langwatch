@@ -21,6 +21,7 @@ interface Step {
   if?: string;
   uses?: string;
   run?: string;
+  env?: Record<string, string>;
   with?: Record<string, unknown>;
 }
 interface Workflow {
@@ -72,13 +73,32 @@ describe("where CI path gates read a pull request's changed paths", () => {
     const detector = load(readFileSync(DETECTOR, "utf8")) as { runs: { steps: Step[] } };
     const step = (id: string): Step => detector.runs.steps.find((s) => s.id === id)!;
 
-    it("hands dorny the token only when the source script chose the API", () => {
+    it("never hands dorny a token, so no source reads the files API", () => {
       expect(step("source").run).toContain("scripts/detect-changes-source.sh");
       expect(step("filter").uses).toContain(DORNY);
-      expect(step("filter").with?.token).toBe(
-        "${{ steps.source.outputs.source == 'api' && github.token || '' }}",
+      expect(step("filter").if).toBe("steps.source.outputs.source == 'git'");
+      expect(step("filter").with?.token).toBe("");
+    });
+
+    /** @scenario "A pull_request_target run diffs the head commit by SHA with git" */
+    it("diffs a pull_request_target head by SHA, passing every untrusted value through env", () => {
+      const sha = step("sha");
+      expect(sha.if).toBe("steps.source.outputs.source == 'git-sha'");
+      expect(sha.uses).toBeUndefined();
+      expect(sha.run).toContain("scripts/detect-changes-by-sha.sh");
+      expect(sha.run).not.toContain("${{");
+      expect(sha.env).toEqual({
+        BASE_SHA: "${{ github.event.pull_request.base.sha }}",
+        HEAD_SHA: "${{ github.event.pull_request.head.sha }}",
+        FILTERS: "${{ inputs.filters }}",
+      });
+    });
+
+    /** @scenario "A pull_request_target run that cannot diff by SHA runs everything" */
+    it("forces every filter when the by-SHA diff fails", () => {
+      expect(step("force").if).toBe(
+        "steps.source.outputs.source == 'force' || steps.sha.outputs.sha-diff-failed == 'true'",
       );
-      expect(step("force").if).toBe("steps.source.outputs.source == 'force'");
     });
   });
 });

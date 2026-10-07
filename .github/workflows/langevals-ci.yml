@@ -44,10 +44,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           # The gate reads no working-tree content: the changed paths come
-          # from git trees or the files API (.github/actions/detect-changes),
+          # from git trees (.github/actions/detect-changes),
           # and every file this job needs on disk lives under .github/.
           # Checking out the rest of the tree is pure runner time.
           sparse-checkout: .github
+          # No token left on disk: every fetch in this job is anonymous.
+          persist-credentials: false
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
