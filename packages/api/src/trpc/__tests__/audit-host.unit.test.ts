@@ -116,6 +116,7 @@ describe("given a process whose door records through an installed audit trail", 
 
 describe("given a process that installed no audit trail", () => {
   describe("when a mutation is answered", () => {
+    /** @scenario "A process that installed no audit trail says so instead of failing the call it was recording" */
     it("answers the call and warns, naming the audit-log module it is missing", async () => {
       const { renameIn, logs } = served({ audit: undefined });
 
