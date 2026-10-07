@@ -86,6 +86,21 @@ export abstract class GatewaySpendEventsRepository {
     limit?: number;
   }): Promise<{ rows: SpendEventRow[]; nextCursor: SpendEventsPageCursor | null }>;
 
+  abstract readSpendEventsAcrossTenants(input: {
+    tenantIds: string[];
+    statuses: string[];
+    fromMs?: number;
+    toMs?: number;
+    cursor?: string | null;
+    limit: number;
+  }): Promise<{ rows: SpendEventRow[]; nextCursor: string | null }>;
+
+  abstract findSpendEventAcrossTenants(input: {
+    tenantIds: string[];
+    gatewayRequestId: string;
+    statuses: string[];
+  }): Promise<SpendEventRow | null>;
+
   abstract walkSpendEvents(input: {
     tenantIds: string[];
     fromMs?: number;

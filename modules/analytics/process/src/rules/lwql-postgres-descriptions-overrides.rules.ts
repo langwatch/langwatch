@@ -19,8 +19,4 @@ export const DESCRIPTIONS_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOver
     description:
       "A dated link from an external account to a platform user, opened when the match holds and closed when it stops being true.",
   },
-  ProcessManagerOutboxAttempt: {
-    description:
-      "One row per failed outbox delivery attempt, so the table grows with delivery trouble rather than with traffic.",
-  },
 };

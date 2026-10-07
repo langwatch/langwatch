@@ -1,7 +1,7 @@
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { RequestBoundKey } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { TraceIdsTooManyError } from "@langwatch/trace-contract";
+import { TraceIdsTooManyError, TracePageSizeTooLargeError } from "@langwatch/trace-contract";
 
 /**
  * The tier-effective request bounds the trace reads clamp and refuse by. The
@@ -28,6 +28,22 @@ export class TraceReadBoundsService {
     const max = await this.resolve(projectId, "tracesPageSizeMax");
 
     return Math.min(requested, max);
+  }
+
+  /** Refuses a page above the plan's list or download bound, naming the bound. */
+  async assertPageSizeWithinBound({
+    projectId,
+    pageSize,
+    bound,
+  }: {
+    projectId: string;
+    pageSize: number;
+    bound: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
+  }): Promise<void> {
+    const max = await this.resolve(projectId, bound);
+    if (pageSize > max) {
+      throw new TracePageSizeTooLargeError({ maxPageSize: max, bound });
+    }
   }
 
   /**

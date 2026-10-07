@@ -6,6 +6,7 @@ import type {
   EventingParticipation,
   ProcessStore,
 } from "@langwatch/eventing";
+import { GatewayApi } from "@langwatch/gateway-contract";
 /**
  * The webhook feature's application: what both doors (tRPC and REST) call.
  * Lifts only the shared decisions — one `assertEntitled` gate, one optional
@@ -166,9 +167,13 @@ type WebhookDeliveryParts = Readonly<{
 
 export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoorApi {
   static readonly contract = WebhookApi;
-  /** The entitlement peer this app's own plan gate reads (`WebhookAccessService`),
-   *  and the project peer naming an organization's tenants for the events listing. */
-  static readonly dependencies = { entitlement: EntitlementApi, projects: ProjectApi };
+  /** The entitlement peer this app's own plan gate reads (`WebhookAccessService`), the
+   *  project peer naming an organization's tenants, and gateway answering their spend events. */
+  static readonly dependencies = {
+    entitlement: EntitlementApi,
+    gateway: GatewayApi,
+    projects: ProjectApi,
+  };
   static readonly config = webhookConfig;
 
   static create(input: WebhookSetup): WebhookModule {
@@ -202,7 +207,7 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
       endpoints: input.repositories.endpoints,
       events: WebhookEventsService.create({
         projects: input.dependencies.projects,
-        events: input.repositories.events,
+        spend: input.dependencies.gateway,
         envelopes: WebhookEnvelopeService.create(),
       }),
       assertEndpointsEntitled: (organizationId) => access.assertEndpointsAvailable(organizationId),

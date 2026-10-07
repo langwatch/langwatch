@@ -57,6 +57,10 @@ import {
   type VirtualKeyApiApplicableBudgetsInput,
   type VirtualKeySpendThisMonth,
   type GatewaySpendEventsPageQuery,
+  type GatewaySpendEventsAcrossTenantsQuery,
+  type GatewaySpendEventsAcrossTenantsPage,
+  type GatewaySpendEventAcrossTenantsQuery,
+  type SpendEventRow,
   type gatewayInternalBucketSpendAnswers,
   type gatewayInternalChangesAnswers,
   type gatewayInternalCodexRefreshAnswers,
@@ -2029,6 +2033,30 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     const service = this.#dependencies.spendEvents;
     if (!service) return [];
     return service.findSpendDaysForOrganizationProjects(input);
+  }
+
+  async listSpendEventsAcrossTenants(
+    input: GatewaySpendEventsAcrossTenantsQuery,
+  ): Promise<GatewaySpendEventsAcrossTenantsPage> {
+    const service = this.#dependencies.spendEvents;
+    if (!service) return { rows: [], nextCursor: null };
+    return service.getSpendEventsAcrossTenants({
+      ...input,
+      tenantIds: [...input.tenantIds],
+      statuses: [...input.statuses],
+    });
+  }
+
+  async findSpendEventAcrossTenants(
+    input: GatewaySpendEventAcrossTenantsQuery,
+  ): Promise<SpendEventRow | null> {
+    const service = this.#dependencies.spendEvents;
+    if (!service) return null;
+    return service.findSpendEventAcrossTenants({
+      ...input,
+      tenantIds: [...input.tenantIds],
+      statuses: [...input.statuses],
+    });
   }
 
   async listSpendEventsPage(input: GatewaySpendEventsPageQuery): Promise<GatewaySpendEventPage> {

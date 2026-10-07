@@ -5,7 +5,11 @@
  */
 
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
-import { defineLwqlCatalog, defineTableCatalogue } from "./lwql-catalogue.rules.ts";
+import {
+  defineLwqlCatalog,
+  defineTableCatalogue,
+  LWQL_POSTGRES_EVENT_TABLES,
+} from "./lwql-catalogue.rules.ts";
 import {
   defineCatalogModel,
   type PostgresDatasetOverride,
@@ -64,6 +68,7 @@ export const LWQL_POSTGRES_ALL_OVERRIDES: Record<string, PostgresDatasetOverride
     CONTENT_POSTGRES_OVERRIDES,
     VISIBILITY_POSTGRES_OVERRIDES,
     DESCRIPTIONS_POSTGRES_OVERRIDES,
+    LWQL_POSTGRES_EVENT_TABLES.overrides,
   ]);
 
 /**
@@ -1110,76 +1115,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       CreatedAt: { source: "createdAt" },
     },
   }),
-  process_manager_inboxes: defineTableCatalogue({
-    sourceTable: "ProcessManagerInbox",
-    access: { allOf: ["analytics:view", "project:manage"] },
-    columns: {
-      TenantId: { source: "projectId" },
-      ProcessManagerInboxId: { source: "id" },
-      ProcessName: { source: "processName" },
-      processKey: "omit", // secret
-      tenantId: "omit", // internal tenant id, not the owning project
-      SourceEventId: { source: "sourceEventId" },
-      sourceEventKey: "omit", // secret
-      ConsumedAt: { source: "consumedAt" },
-    },
-  }),
-  process_manager_instances: defineTableCatalogue({
-    sourceTable: "ProcessManagerInstance",
-    access: { allOf: ["analytics:view", "project:manage"] },
-    columns: {
-      TenantId: { source: "projectId" },
-      ProcessManagerInstanceId: { source: "id" },
-      ProcessName: { source: "processName" },
-      processKey: "omit", // secret
-      tenantId: "omit", // internal tenant id, not the owning project
-      UserId: { source: "userId" },
-      State: { source: "state", content: "output" },
-      Revision: { source: "revision" },
-      NextWakeAt: { source: "nextWakeAt" },
-      UpdatedAt: { source: "updatedAt" },
-    },
-  }),
-  process_manager_outbox_attempts: defineTableCatalogue({
-    sourceTable: "ProcessManagerOutboxAttempt",
-    access: { allOf: ["analytics:view", "project:manage"] },
-    columns: {
-      TenantId: { source: "projectId" },
-      ProcessManagerOutboxAttemptId: { source: "id" },
-      OutboxId: { source: "outboxId" },
-      Attempt: { source: "attempt" },
-      OccurredAt: { source: "occurredAt" },
-      Outcome: { source: "outcome" },
-      ErrorType: { source: "errorType" },
-      ErrorMessage: { source: "errorMessage", content: "output" },
-      RetryAfterMs: { source: "retryAfterMs" },
-    },
-  }),
-  process_manager_outboxes: defineTableCatalogue({
-    sourceTable: "ProcessManagerOutbox",
-    access: { allOf: ["analytics:view", "project:manage"] },
-    columns: {
-      TenantId: { source: "projectId" },
-      ProcessManagerOutboxId: { source: "id" },
-      ProcessName: { source: "processName" },
-      processKey: "omit", // secret
-      tenantId: "omit", // internal tenant id, not the owning project
-      UserId: { source: "userId" },
-      messageKey: "omit", // secret
-      IntentType: { source: "intentType" },
-      Payload: { source: "payload", content: "output" },
-      TraceCarrier: { source: "traceCarrier", content: "output" },
-      SourceEventId: { source: "sourceEventId" },
-      Status: { source: "status" },
-      Attempts: { source: "attempts" },
-      NextAttemptAt: { source: "nextAttemptAt" },
-      LeasedUntil: { source: "leasedUntil" },
-      leaseToken: "omit", // secret
-      DispatchedAt: { source: "dispatchedAt" },
-      CreatedAt: { source: "createdAt" },
-      UpdatedAt: { source: "updatedAt" },
-    },
-  }),
+  ...LWQL_POSTGRES_EVENT_TABLES.tables,
   projects: defineTableCatalogue({
     sourceTable: "Project",
     access: { allOf: ["analytics:view", "project:view"] },

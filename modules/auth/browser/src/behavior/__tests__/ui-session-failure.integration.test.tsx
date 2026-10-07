@@ -21,6 +21,7 @@ vi.mock("@langwatch/browser-host/navigation", async (importOriginal) => ({
   },
 }));
 
+import type { UiAuthClient } from "@langwatch/auth-contract";
 import {
   UiFeedback,
   type UiFailureNotice,
@@ -28,7 +29,6 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import type { UiActiveScopeReading } from "@langwatch/browser-host/session";
 
-import type { UiAuthClient } from "../../session";
 import { useBrowserUiSession, useUiSessionReading } from "../ui-session";
 import { answeringTransport } from "./answering-transport.test-helpers";
 

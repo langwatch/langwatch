@@ -33,6 +33,8 @@ type PublishRequest struct {
 	// lives, shown under the headline.
 	PR   string
 	Link string
+	// Partial says why the run captured less than it planned; the comment says so.
+	Partial []string
 }
 
 // Publish shows a run's selected screens on the pull request of the branch
@@ -72,7 +74,7 @@ func (request PublishRequest) stage(ctx context.Context, picks []ScreenPick) ([]
 	dir := filepath.Join(request.RunDir, PublishDir)
 	_ = os.RemoveAll(dir)
 	headline := headlineFor(request.Rows, request.Findings)
-	headline.RunID, headline.Link = filepath.Base(request.RunDir), request.Link
+	headline.RunID, headline.Link, headline.Partial = filepath.Base(request.RunDir), request.Link, request.Partial
 	headline.BaseCommit, _ = resolveCommit(ctx, gitRef{run: request.Run, root: request.Root, ref: request.BaseRef})
 	headline.CandidateCommit, _ = resolveCommit(ctx, gitRef{run: request.Run, root: request.Root, ref: request.CandidateRef})
 	body, images := RenderComment(headline, picks)
