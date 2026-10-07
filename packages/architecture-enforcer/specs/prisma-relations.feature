@@ -4,7 +4,7 @@ Feature: No new Prisma relation
   So that existing relations stay while no new one lands
 
   An eventually consistent system has no relations; existing ones stay and no new one lands
-  (Alex, 2026-10-06). The Postgres migration scanner refuses the matching foreign key.
+  (Alex, 2026-10-06). The Postgres migration scanner separately refuses a hand-written foreign key.
 
   @unit @architecture
   Scenario: A @relation is counted against the model that declares it

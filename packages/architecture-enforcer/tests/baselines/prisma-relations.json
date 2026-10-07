@@ -1,5 +1,5 @@
 {
-  "record": "no new @relation in packages/prisma-client/prisma/schema.prisma; existing ones stay (Alex, 2026-10-06; dev/docs/ARCHITECTURE.md \u00a717). Shrink-only: lower a model's count in the change that removes one of its @relation lines.",
+  "record": "no new @relation in packages/prisma-client/prisma/schema.prisma; existing ones stay (Alex, 2026-10-06; dev/docs/ARCHITECTURE.md §17). Shrink-only: lower a model's count in the change that removes one of its @relation lines.",
   "findings": {
     "Account": 1,
     "AccountCredential": 1,

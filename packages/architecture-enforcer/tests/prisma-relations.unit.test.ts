@@ -18,7 +18,7 @@ const RELATIONS = join(here, "baselines", "prisma-relations.json");
 function relationModels({ schema }: { schema: string }): string[] {
   let model = "";
   return schema.split("\n").flatMap((line) => {
-    const code = line.split("//")[0] ?? "";
+    const code = line.replace(/(^|\s)\/\/.*$/, "");
     const opened = /^\s*model\s+(\w+)/.exec(code);
     if (opened) model = opened[1]!;
     return /@relation\b/.test(code) ? [model] : [];

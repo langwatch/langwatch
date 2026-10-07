@@ -89,7 +89,7 @@ Feature: Migration safety
 
   @unit
   Scenario: A unique index or validated constraint on an existing table is refused by name
-    When the migration builds a unique index, a UNIQUE or PRIMARY KEY constraint, or a validated CHECK or FOREIGN KEY on a table it does not create
+    When the migration builds a unique index, a UNIQUE or PRIMARY KEY constraint, or a validated CHECK on a table it does not create
     Then the scanner names the migration, the object and the table
     And the fix says to pre-build the index or add the constraint NOT VALID
 
