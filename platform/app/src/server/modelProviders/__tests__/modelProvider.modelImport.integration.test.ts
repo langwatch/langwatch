@@ -348,6 +348,47 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
       });
     });
 
+    describe("given a saved provider moved to an endpoint that fails to list", () => {
+      describe("when the new endpoint lists models on a later save", () => {
+        /** @scenario Pointing the provider at another endpoint starts a fresh listing */
+        it("imports the removed model once the new endpoint answers", async () => {
+          listing(["model-a", "model-b"]);
+          const created = await save({});
+          const withoutA = (await storedChat(created.id)).filter(
+            (m) => m.modelId !== "model-a",
+          );
+          await save({ id: created.id, customModels: withoutA });
+
+          const otherEndpoint = baseUrl.replace("127.0.0.1", "localhost");
+          endpoint.status = 500;
+          endpoint.body = '{"error":"boom"}';
+          const moved = await save({
+            id: created.id,
+            customModels: await storedChat(created.id),
+            endpointUrl: otherEndpoint,
+          });
+          expect(moved.modelImport).toEqual({ status: "failed" });
+
+          listing(["model-a", "model-b"]);
+          const saved = await save({
+            id: created.id,
+            customModels: await storedChat(created.id),
+            endpointUrl: otherEndpoint,
+          });
+
+          expect(saved.modelImport).toEqual({
+            status: "imported",
+            added: 1,
+            total: 2,
+          });
+          expect(await storedChatIds(created.id)).toEqual([
+            "model-b",
+            "model-a",
+          ]);
+        });
+      });
+    });
+
     describe("given an endpoint that fails to list", () => {
       /** @scenario An endpoint that fails to list does not block the save */
       it.each([

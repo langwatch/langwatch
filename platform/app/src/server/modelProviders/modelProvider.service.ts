@@ -67,13 +67,19 @@ const logger = createLogger("langwatch:modelProviders:service");
 
 /** The import step's result, before the write folds it in. */
 type ModelListingImport = {
-  outcome: ModelImportOutcome;
-  /** Set only on an import: the merged lists and the ids to remember. */
+  /** Absent when this save did not ask the listing. */
+  outcome?: ModelImportOutcome;
+  /** Set only on an import: the merged lists. */
   merged?: {
     customModels: CustomModelsInput;
     customEmbeddingsModels: CustomModelsInput;
-    lastListedModelIds: string[];
   };
+  /**
+   * The listing ids to store: the new listing on an import, an empty list
+   * when the save moves the provider to another endpoint without one, and
+   * absent to leave the stored ids alone.
+   */
+  lastListedModelIds?: string[];
 };
 
 /**
@@ -1022,7 +1028,7 @@ export class ModelProviderService {
           validatedKeys,
           customKeysProvided,
           scopes,
-          lastListedModelIds: listing?.merged?.lastListedModelIds,
+          lastListedModelIds: listing?.lastListedModelIds,
         }),
     });
 
@@ -1090,7 +1096,6 @@ export class ModelProviderService {
     validatedKeys: Record<string, unknown> | null;
     customKeysProvided: boolean;
   }): Promise<ModelListingImport | undefined> {
-    if (!input.enabled) return undefined;
     const keys = this.importCredential({
       input,
       existingProvider,
@@ -1099,13 +1104,29 @@ export class ModelProviderService {
     });
     if (!keys) return undefined;
 
+    // Stored ids belong to the endpoint that listed them. A save that moves
+    // the provider elsewhere clears them even when it lists nothing, so a
+    // later listing from the new endpoint starts fresh.
+    const isSameEndpointAsStored = this.isSameListingEndpoint({
+      provider: input.provider,
+      keys,
+      existingProvider,
+    });
+    const notListed = (outcome?: ModelImportOutcome): ModelListingImport => ({
+      outcome,
+      lastListedModelIds:
+        existingProvider && !isSameEndpointAsStored ? [] : undefined,
+    });
+
+    if (!input.enabled) return notListed();
+
     // The probe is outbound traffic to a URL the customer chose, and Save
     // stays enabled for these providers, so it spends the same
     // per-organization budget as a connection test. An exhausted budget
     // skips the import and keeps the save.
-    if (!(await this.isModelListingWithinBudget(input))) {
-      return { outcome: { status: "skipped" } };
-    }
+    const budget = await this.modelListingBudget(input);
+    if (budget === "exhausted") return notListed({ status: "skipped" });
+    if (budget === "unavailable") return notListed({ status: "failed" });
 
     let listed: ValidationResult;
     try {
@@ -1115,10 +1136,10 @@ export class ModelProviderService {
         { provider: input.provider, error },
         "Could not list models from the provider on save",
       );
-      return { outcome: { status: "failed" } };
+      return notListed({ status: "failed" });
     }
     if (listed.outcome !== "verified" || !listed.models) {
-      return { outcome: { status: "failed" } };
+      return notListed({ status: "failed" });
     }
 
     const merged = mergeListedModels({
@@ -1131,11 +1152,7 @@ export class ModelProviderService {
         input.customEmbeddingsModels !== undefined
           ? input.customEmbeddingsModels
           : (existingProvider?.customEmbeddingsModels as CustomModelsInput | null),
-      previouslyListedIds: this.isSameListingEndpoint({
-        provider: input.provider,
-        keys,
-        existingProvider,
-      })
+      previouslyListedIds: isSameEndpointAsStored
         ? readListedModelIds(existingProvider?.lastListedModelIds)
         : null,
     });
@@ -1148,31 +1165,40 @@ export class ModelProviderService {
       merged: {
         customModels: merged.customModels,
         customEmbeddingsModels: merged.customEmbeddingsModels,
-        lastListedModelIds: merged.listedModelIds,
       },
+      lastListedModelIds: merged.listedModelIds,
     };
   }
 
-  private async isModelListingWithinBudget(
+  /**
+   * Spends one unit of the organization's provider check budget for the
+   * import probe. A budget that cannot be read reports `unavailable`: the
+   * probe is skipped and the save still goes through.
+   */
+  private async modelListingBudget(
     input: UpdateModelProviderInput,
-  ): Promise<boolean> {
-    const anchor = await this.resolveOrganizationAnchor({
-      projectId: input.projectId,
-      organizationId: input.organizationId,
-    });
-    if (!anchor) return false;
+  ): Promise<"allowed" | "exhausted" | "unavailable"> {
     try {
+      const anchor = await this.resolveOrganizationAnchor({
+        projectId: input.projectId,
+        organizationId: input.organizationId,
+      });
+      if (!anchor) return "unavailable";
       await assertTestConnectionWithinBudget(anchor);
-      return true;
+      return "allowed";
     } catch (error) {
       if (error instanceof ModelProviderTestRateLimitedError) {
         logger.warn(
-          { provider: input.provider, organizationId: anchor },
+          { provider: input.provider },
           "Skipped the model import on save: listing budget exhausted",
         );
-        return false;
+        return "exhausted";
       }
-      throw error;
+      logger.warn(
+        { provider: input.provider, error },
+        "Skipped the model import on save: listing budget unavailable",
+      );
+      return "unavailable";
     }
   }
 

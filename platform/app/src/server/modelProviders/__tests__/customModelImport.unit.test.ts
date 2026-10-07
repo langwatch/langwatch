@@ -3,7 +3,11 @@
  * specs/model-providers/custom-provider-model-import.feature.
  */
 import { describe, expect, it } from "vitest";
-import { importsModelListing, mergeListedModels } from "../customModelImport";
+import {
+  importsModelListing,
+  isSameEndpoint,
+  mergeListedModels,
+} from "../customModelImport";
 
 describe("mergeListedModels", () => {
   describe("given a provider with no custom models and no previous listing", () => {
@@ -222,5 +226,29 @@ describe("importsModelListing", () => {
         openAIDefaultBaseUrl,
       }),
     ).toBe(false);
+  });
+});
+
+describe("isSameEndpoint", () => {
+  describe("when two base URLs differ only in host case, trailing slash or /v1", () => {
+    it("treats them as the same endpoint", () => {
+      expect(
+        isSameEndpoint(
+          "https://LLM.example.com/tenant/v1/",
+          "https://llm.example.com/tenant",
+        ),
+      ).toBe(true);
+    });
+  });
+
+  describe("when two base URLs differ in path case", () => {
+    it("treats them as different endpoints", () => {
+      expect(
+        isSameEndpoint(
+          "https://llm.example.com/TenantA/v1",
+          "https://llm.example.com/tenanta/v1",
+        ),
+      ).toBe(false);
+    });
   });
 });

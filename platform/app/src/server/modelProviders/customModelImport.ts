@@ -132,10 +132,21 @@ export function isSameEndpoint(a: string, b: string): boolean {
   return apiRoot(a) === apiRoot(b);
 }
 
+/**
+ * The base URL without trailing slashes or a trailing `/v1`. Scheme and host
+ * compare case-insensitively; the path keeps its case, since a server may
+ * route on it.
+ */
 function apiRoot(url: string): string {
-  return url
-    .trim()
-    .toLowerCase()
+  const trimmed = url.trim();
+  let normalized: string;
+  try {
+    const parsed = new URL(trimmed);
+    normalized = `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+  } catch {
+    normalized = trimmed;
+  }
+  return normalized
     .replace(/\/+$/, "")
     .replace(/\/v1$/, "")
     .replace(/\/+$/, "");
