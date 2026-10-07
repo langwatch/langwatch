@@ -129,13 +129,39 @@ interface TraceIdPeekProps {
  * already have a button or link you can wrap, prefer
  * `<TracePreviewHoverCard>` directly so the eye doesn't crowd the row.
  */
-export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({
+export const TraceIdPeek: React.FC<TraceIdPeekProps> = (props) =>
+  // Only a row that names the trace's owner can be on an aggregate's member,
+  // so only it resolves the current project. Every other row renders as it
+  // did before, without the organization/team/project resolution per row.
+  props.ownerProjectId === undefined ? (
+    <TraceIdPeekButton {...props} tenantId={null} />
+  ) : (
+    <MemberTraceIdPeek {...props} ownerProjectId={props.ownerProjectId} />
+  );
+
+/** A row that names the trace's owner: the drawer opens on that member. */
+function MemberTraceIdPeek(
+  props: TraceIdPeekProps & { ownerProjectId: string },
+) {
+  const { project } = useOrganizationTeamProject();
+  return (
+    <TraceIdPeekButton
+      {...props}
+      tenantId={memberTenantOf({
+        ownerProjectId: props.ownerProjectId,
+        projectId: project?.id,
+      })}
+    />
+  );
+}
+
+function TraceIdPeekButton({
   traceId,
   occurredAtMs,
   ownerProjectId,
-}) => {
+  tenantId,
+}: TraceIdPeekProps & { tenantId: string | null }) {
   const { openDrawer } = useDrawer();
-  const { project } = useOrganizationTeamProject();
 
   const handleOpenDrawer = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -144,14 +170,7 @@ export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({
     // walking every weekly partition by id.
     openDrawer(
       "traceV2Details",
-      traceDrawerParams({
-        traceId,
-        occurredAtMs,
-        tenantId: memberTenantOf({
-          ownerProjectId,
-          projectId: project?.id,
-        }),
-      }),
+      traceDrawerParams({ traceId, occurredAtMs, tenantId }),
     );
   };
 
@@ -181,7 +200,7 @@ export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({
       </Box>
     </TracePreviewHoverCard>
   );
-};
+}
 
 interface PeekPopoverContentProps {
   traceId: string;
