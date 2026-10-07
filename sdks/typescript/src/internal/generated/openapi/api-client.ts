@@ -8385,7 +8385,7 @@ export interface operations {
                         };
                         readonly diagnostics: {
                             /** @enum {string} */
-                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
+                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS" | "APP_FUNCTION_RESULT_TRUNCATED" | "INSTANT_EVAL_SKIPPED";
                             message: string;
                             meta?: {
                                 [key: string]: unknown;
