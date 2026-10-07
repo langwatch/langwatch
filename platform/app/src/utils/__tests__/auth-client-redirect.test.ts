@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
 /**
- * Security tests for the same-origin redirect guard.
+ * Security tests for the same-origin redirect guard, and the callbackURL
+ * hand-off around better-auth's stricter relative-path check.
  *
  * Invariants:
  *  - Relative paths starting with `/` pass through
@@ -8,24 +10,42 @@
  *  - Cross-origin URLs are replaced with "/"
  *  - Malformed URLs fall back to "/"
  *  - Dangerous schemes (javascript:, data:) are rejected
+ *
+ * Spec: specs/auth/signin-callback-url-unsupported-characters.feature
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { emailSpy, socialSpy, ssoSpy, hardNavigateSpy } = vi.hoisted(() => ({
+  emailSpy: vi.fn(),
+  socialSpy: vi.fn(),
+  ssoSpy: vi.fn(),
+  hardNavigateSpy: vi.fn(),
+}));
 
 // Stub out the better-auth client so the module can load without network.
 vi.mock("better-auth/react", () => ({
   createAuthClient: () => ({
     useSession: () => ({ data: null, isPending: false, refetch: vi.fn() }),
-    signIn: {
-      email: vi.fn().mockResolvedValue({ error: null }),
-      social: vi.fn().mockResolvedValue({ error: null }),
-    },
+    signIn: { email: emailSpy, social: socialSpy, sso: ssoSpy },
     signOut: vi.fn().mockResolvedValue({}),
     getSession: vi.fn().mockResolvedValue({ data: null }),
   }),
 }));
 
-import { safeRedirectTarget } from "../auth-client";
+vi.mock("~/utils/browserNavigation", () => ({
+  hardNavigate: hardNavigateSpy,
+  replaceLocation: vi.fn(),
+  reloadPage: vi.fn(),
+}));
+
+import {
+  BETTER_AUTH_CALLBACK_PATTERN,
+  consumeStoredReturnTo,
+  safeRedirectTarget,
+  signIn,
+  toBetterAuthCallbackURL,
+} from "../auth-client";
 
 const ORIGIN = "https://app.example.com";
 
@@ -131,6 +151,108 @@ describe("safeRedirectTarget", () => {
 
     it("blocks file: URLs", () => {
       expect(safeRedirectTarget("file:///etc/passwd", ORIGIN)).toBe("/");
+    });
+  });
+});
+
+const AGENT_TESTING_PATH =
+  "/p/agent-testing/results/external:set/batch?drawer.open=scenarioRunDetail";
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  window.sessionStorage.clear();
+  emailSpy.mockResolvedValue({ error: null, data: {} });
+  socialSpy.mockResolvedValue({ error: null, data: {} });
+  ssoSpy.mockResolvedValue({ error: null, data: {} });
+});
+
+describe("toBetterAuthCallbackURL", () => {
+  describe("when the target already passes better-auth's check", () => {
+    /** @scenario "An address better-auth already accepts is handed over unchanged" */
+    it.each([
+      "/dashboard",
+      "/p/traces?x=1&y=2",
+    ])("hands %s over unchanged and parks nothing", (target) => {
+      expect(toBetterAuthCallbackURL(target)).toBe(target);
+      expect(consumeStoredReturnTo()).toBe("/");
+    });
+  });
+
+  describe("when the target carries characters better-auth refuses", () => {
+    /** @scenario "Addresses better-auth refuses are carried through the resume page" */
+    it.each([
+      AGENT_TESTING_PATH,
+      "/a#frag",
+      "/a~b",
+      "/a,b",
+    ])("sends %s through the resume page and returns it once", (target) => {
+      const callbackURL = toBetterAuthCallbackURL(target);
+
+      expect(callbackURL).toBe("/auth/resume");
+      expect(BETTER_AUTH_CALLBACK_PATTERN.test(callbackURL)).toBe(true);
+      expect(consumeStoredReturnTo()).toBe(target);
+      expect(consumeStoredReturnTo()).toBe("/");
+    });
+  });
+});
+
+describe("consumeStoredReturnTo", () => {
+  describe("when the parked target points at another site", () => {
+    /** @scenario "A parked destination on another site falls back to the home page" */
+    it("returns / instead", () => {
+      window.sessionStorage.setItem("langwatch.auth.returnTo", "//evil.com");
+
+      expect(consumeStoredReturnTo()).toBe("/");
+    });
+  });
+});
+
+describe("signIn", () => {
+  describe("when signing in with a password from a page with a colon in its address", () => {
+    /** @scenario "A password sign-in from a page with a colon in its address lands back on that page" */
+    it("hands better-auth the resume page and navigates straight to the page", async () => {
+      await signIn("credentials", {
+        email: "someone@example.com",
+        password: "correct horse",
+        callbackUrl: AGENT_TESTING_PATH,
+      });
+
+      expect(emailSpy.mock.calls[0]![0]).toMatchObject({
+        callbackURL: "/auth/resume",
+      });
+      expect(hardNavigateSpy).toHaveBeenCalledWith(AGENT_TESTING_PATH);
+      // Navigated directly, so nothing is left parked for a later landing.
+      expect(consumeStoredReturnTo()).toBe("/");
+    });
+  });
+
+  describe("when signing in with a social provider from a page with a colon in its address", () => {
+    /** @scenario "A provider sign-in from a page with a colon in its address resumes there" */
+    it("hands better-auth the resume page and parks the page for it", async () => {
+      await signIn("google", {
+        callbackUrl: AGENT_TESTING_PATH,
+        redirect: false,
+      });
+
+      expect(socialSpy.mock.calls[0]![0]).toMatchObject({
+        callbackURL: "/auth/resume",
+      });
+      expect(consumeStoredReturnTo()).toBe(AGENT_TESTING_PATH);
+    });
+  });
+
+  describe("when signing in through an organization's connection from a page with a colon in its address", () => {
+    /** @scenario "A provider sign-in from a page with a colon in its address resumes there" */
+    it("hands better-auth the resume page and parks the page for it", async () => {
+      await signIn("ssoc_2f8Qk3", {
+        callbackUrl: AGENT_TESTING_PATH,
+        redirect: false,
+      });
+
+      expect(ssoSpy.mock.calls[0]![0]).toMatchObject({
+        callbackURL: "/auth/resume",
+      });
+      expect(consumeStoredReturnTo()).toBe(AGENT_TESTING_PATH);
     });
   });
 });

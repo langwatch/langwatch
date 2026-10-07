@@ -15,6 +15,7 @@ import {
 import { promotePendingMethod } from "~/features/auth/logic/lastUsedMethod";
 import { readHandledError } from "~/features/errors/logic/readHandledError";
 import { auth0BridgeConnectionOf } from "~/utils/auth0-bridge";
+import { hardNavigate } from "~/utils/browserNavigation";
 
 /**
  * Client-side auth wrapper exposing a NextAuth-compatible API surface over
@@ -262,13 +263,20 @@ export const signIn = async (
   options?: SignInOptions,
 ): Promise<SignInResult | undefined> => {
   // Same-origin guard on the post-login redirect target.
-  const callbackURL = options?.callbackUrl
+  const target = options?.callbackUrl
     ? safeRedirectTarget(options.callbackUrl)
     : undefined;
+  const callbackURL =
+    target === undefined ? undefined : toBetterAuthCallbackURL(target);
   const shouldRedirect = options?.redirect !== false;
 
   if (provider === "credentials" || provider === "email") {
-    return signInWithCredentials(options, callbackURL, shouldRedirect);
+    return signInWithCredentials({
+      options,
+      target,
+      callbackURL,
+      shouldRedirect,
+    });
   }
 
   // Organization connections are registered with the SSO plugin.
@@ -340,11 +348,19 @@ export const signIn = async (
   return { ok: true };
 };
 
-async function signInWithCredentials(
-  options: SignInOptions | undefined,
-  callbackURL: string | undefined,
-  shouldRedirect: boolean,
-): Promise<SignInResult> {
+async function signInWithCredentials({
+  options,
+  target,
+  callbackURL,
+  shouldRedirect,
+}: {
+  options: SignInOptions | undefined;
+  /** Where the user goes on success; navigated to directly, never via better-auth. */
+  target: string | undefined;
+  /** What better-auth is handed, which its callbackURL check accepts. */
+  callbackURL: string | undefined;
+  shouldRedirect: boolean;
+}): Promise<SignInResult> {
   // Retry timing is carried by the response header, not the auth result.
   let retryAfterSeconds: number | undefined;
   const result = await client.signIn.email({
@@ -361,6 +377,9 @@ async function signInWithCredentials(
       },
     },
   });
+  // This path navigates to `target` itself, so a parked copy would only go
+  // stale and be picked up by some later, unrelated landing on the resume page.
+  consumeStoredReturnTo();
   if (result.error) {
     // Application refusals carry their code in the handled-error payload.
     const handled = readHandledError(result.error);
@@ -376,7 +395,7 @@ async function signInWithCredentials(
     return { ok: false, twoStepRequired: true };
   }
   if (shouldRedirect) {
-    navigate(callbackURL ?? "/");
+    navigate(target ?? "/");
   }
   return { ok: true };
 }
@@ -387,9 +406,7 @@ async function signInWithCredentials(
  * Production callers go through `signIn`/`signOut` which invoke this.
  */
 export const navigate = (href: string): void => {
-  if (typeof window !== "undefined") {
-    window.location.href = href;
-  }
+  hardNavigate(href);
 };
 
 /**
@@ -430,6 +447,59 @@ export const safeRedirectTarget = (
   if (!callbackUrl || !isSameOrigin(callbackUrl, origin)) return "/";
   const url = new URL(callbackUrl, origin);
   return url.pathname + url.search + url.hash;
+};
+
+/**
+ * The relative callbackURL shape better-auth accepts: the same character sets
+ * as better-auth 1.7.1 `dist/auth/trusted-origins.mjs` (`matchesOriginPattern`,
+ * `allowRelativePaths`), minus its redundant escapes. Its origin check
+ * refuses any relative callbackURL outside this set with a 403 "Invalid
+ * callbackURL". App paths routinely fall outside it (agent-testing results carry a `:` in the path; `#`, `~`, `,` and
+ * `%` are refused too), and a refused callbackURL makes sign-in impossible
+ * from that page. Re-check on every better-auth upgrade.
+ */
+export const BETTER_AUTH_CALLBACK_PATTERN =
+  /^\/(?!\/|\\|%2f|%5c)[\w.+/@-]*(?:\?[\w.+/=&%@-]*)?$/;
+
+/** Landing page that reads the parked target back and continues to it. */
+export const AUTH_RESUME_PATH = "/auth/resume";
+
+const RETURN_TO_STORAGE_KEY = "langwatch.auth.returnTo";
+
+/**
+ * The callbackURL to hand better-auth for a same-origin `target`.
+ *
+ * A target better-auth would refuse is parked in sessionStorage instead and
+ * better-auth is sent to the resume page, which always passes its check and
+ * forwards to the parked target. sessionStorage, not a query parameter,
+ * because a query parameter would have to carry the very characters the check
+ * refuses.
+ */
+export const toBetterAuthCallbackURL = (target: string): string => {
+  if (BETTER_AUTH_CALLBACK_PATTERN.test(target)) return target;
+  try {
+    window.sessionStorage.setItem(RETURN_TO_STORAGE_KEY, target);
+  } catch {
+    // Storage unavailable: the resume page falls back to "/", which still
+    // beats a sign-in that can never succeed.
+  }
+  return AUTH_RESUME_PATH;
+};
+
+/**
+ * Reads and clears the target parked by `toBetterAuthCallbackURL`, returning
+ * "/" when there is none. Re-guarded because storage is writable by any
+ * script on the origin and must not become an open redirect.
+ */
+export const consumeStoredReturnTo = (): string => {
+  let stored: string | null = null;
+  try {
+    stored = window.sessionStorage.getItem(RETURN_TO_STORAGE_KEY);
+    window.sessionStorage.removeItem(RETURN_TO_STORAGE_KEY);
+  } catch {
+    // Storage unavailable: nothing was parked.
+  }
+  return safeRedirectTarget(stored ?? undefined);
 };
 
 export const signOut = async (opts?: {
@@ -476,7 +546,9 @@ export const linkAccount = async (
   provider: string,
   options?: { callbackUrl?: string },
 ): Promise<{ error?: string; ok?: boolean }> => {
-  const callbackURL = safeRedirectTarget(options?.callbackUrl) || "/";
+  const callbackURL = toBetterAuthCallbackURL(
+    safeRedirectTarget(options?.callbackUrl),
+  );
   const mapped = provider === "azure-ad" ? "microsoft" : provider;
 
   const res = await fetch("/api/auth/link-social", {
