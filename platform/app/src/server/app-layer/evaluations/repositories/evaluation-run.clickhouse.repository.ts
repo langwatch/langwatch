@@ -5,6 +5,7 @@ import {
   ownProjectIdOf,
   singleTenantOf,
   tenantScope,
+  tenantScopeKey,
   tenantSet,
 } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
@@ -460,7 +461,11 @@ export class EvaluationRunClickHouseRepository
       return this.fromClickHouseRecord(row);
     } catch (error) {
       logger.warn(
-        { evaluationId, error },
+        {
+          evaluationId,
+          scope: tenantScopeKey({ authorization, reads: "traces" }),
+          error,
+        },
         "Failed to get evaluation run from ClickHouse",
       );
       throw error;
@@ -534,7 +539,11 @@ export class EvaluationRunClickHouseRepository
       return rows.map((row) => this.fromClickHouseRecord(row));
     } catch (error) {
       logger.warn(
-        { traceId, error },
+        {
+          traceId,
+          scope: tenantScopeKey({ authorization, reads: "traces" }),
+          error,
+        },
         "Failed to find evaluation runs by trace ID in ClickHouse",
       );
       throw error;
@@ -630,7 +639,11 @@ export class EvaluationRunClickHouseRepository
       });
     } catch (error) {
       logger.warn(
-        { traceIdCount: traceIds.length, error },
+        {
+          traceIdCount: traceIds.length,
+          scope: tenantScopeKey({ authorization, reads: "traces" }),
+          error,
+        },
         "Failed to find evaluation summaries by trace IDs in ClickHouse",
       );
       throw error;

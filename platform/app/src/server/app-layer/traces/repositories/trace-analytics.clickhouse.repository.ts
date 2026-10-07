@@ -21,6 +21,7 @@ import {
   type AuthorizedClickHouse,
   type TenantScopedReader,
   tenantScope,
+  tenantScopeKey,
 } from "../../clients/clickhouse/authorized-reads";
 import { queryWindowed } from "../../clients/clickhouse/windowed-read";
 import type { TraceAnalyticsRepository } from "./trace-analytics.repository";
@@ -344,7 +345,11 @@ export class TraceAnalyticsClickHouseRepository
       // rolling ahead of migration 00056, every read throwing
       // UNKNOWN_IDENTIFIER — surfaces as an untraceable line.
       logger.warn(
-        { traceId, error },
+        {
+          traceId,
+          scope: tenantScopeKey({ authorization, reads: "traces" }),
+          error,
+        },
         "Failed to read back trace analytics row",
       );
       throw error;

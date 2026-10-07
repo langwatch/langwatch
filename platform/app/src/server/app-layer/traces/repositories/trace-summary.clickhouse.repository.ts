@@ -15,6 +15,7 @@ import {
   type AuthorizedClickHouse,
   type TenantScopedReader,
   tenantScope,
+  tenantScopeKey,
   tenantSet,
 } from "../../clients/clickhouse/authorized-reads";
 import {
@@ -34,6 +35,26 @@ const TABLE_NAME = "trace_summaries" as const;
 const logger = createLogger(
   "langwatch:app-layer:traces:trace-summary-repository",
 );
+
+/** A failed summary read, logged with the fence it ran under. */
+function logSummaryReadFailure({
+  authorization,
+  traceId,
+  error,
+}: {
+  authorization: Authorization;
+  traceId: string;
+  error: unknown;
+}): void {
+  logger.warn(
+    {
+      traceId,
+      scope: tenantScopeKey({ authorization, reads: "traces" }),
+      error: error instanceof Error ? error.message : String(error),
+    },
+    "Failed to get trace summary from ClickHouse",
+  );
+}
 
 type ClickHouseSummaryWriteRecord = WithDateWrites<
   ClickHouseSummaryRecord,
@@ -235,12 +256,7 @@ export class TraceSummaryClickHouseRepository
               : null,
         });
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        logger.warn(
-          { traceId, error: errorMessage },
-          "Failed to get trace summary from ClickHouse",
-        );
+        logSummaryReadFailure({ authorization, traceId, error });
         throw error;
       }
     }
@@ -321,12 +337,7 @@ export class TraceSummaryClickHouseRepository
         },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.warn(
-        { traceId, error: errorMessage },
-        "Failed to get trace summary from ClickHouse",
-      );
+      logSummaryReadFailure({ authorization, traceId, error });
       throw error;
     }
   }
@@ -365,6 +376,7 @@ export class TraceSummaryClickHouseRepository
       logger.warn(
         {
           traceId,
+          scope: tenantScopeKey({ authorization, reads: "traces" }),
           error: error instanceof Error ? error.message : String(error),
         },
         "Failed to resolve the tenant of a trace from ClickHouse",
