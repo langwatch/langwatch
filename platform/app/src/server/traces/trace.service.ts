@@ -640,21 +640,24 @@ export class TraceService {
    *
    * @param authorization - The route's proof, narrowed to the trace's member
    * @param traceId - The trace ID
+   * @param protections - The viewer's protections, resolved through the proof
    * @returns The trace's evaluations
    */
   async getEvaluationsForTrace({
     authorization,
     traceId,
+    protections,
   }: {
     authorization: Authorization;
     traceId: string;
+    protections: Protections;
   }): Promise<Evaluation[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getEvaluationsForTrace",
       { attributes: { "trace.id": traceId } },
       async () => {
         const evaluations = await this.evaluationService.getEvaluationsForTrace(
-          { authorization, traceId },
+          { authorization, traceId, protections },
         );
         return (
           mapTraceEvaluationsToLegacyEvaluations({ [traceId]: evaluations })[
@@ -672,14 +675,17 @@ export class TraceService {
    *
    * @param authorization - The route's proof, narrowed to a member when named
    * @param evaluationId - The evaluation to fetch inputs for
-   * @returns The parsed inputs, or null when none are available
+   * @param protections - The viewer's protections, resolved through the proof
+   * @returns The parsed inputs, or null when none are available or visible
    */
   async getEvaluationInputs({
     authorization,
     evaluationId,
+    protections,
   }: {
     authorization: Authorization;
     evaluationId: string;
+    protections: Protections;
   }): Promise<Record<string, unknown> | null> {
     return this.tracer.withActiveSpan(
       "TraceService.getEvaluationInputs",
@@ -688,6 +694,7 @@ export class TraceService {
         return this.evaluationService.getEvaluationInputs({
           authorization,
           evaluationId,
+          protections,
         });
       },
     );

@@ -2,6 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ownProof } from "~/test-utils/authorizationProofs";
 import { serviceOver } from "./support/evaluationServiceOver";
 
+/** A viewer who may read captured input and output. */
+const CONTENT_VISIBLE = {
+  canSeeCapturedInput: true,
+  canSeeCapturedOutput: true,
+};
+
 /**
  * Build a fake ClickHouse client whose `query` inspects the SQL and either
  * throws the memory-limit error (when the heavy `Inputs` column is in the
@@ -51,6 +57,7 @@ describe("EvaluationService memory-limit fallback", () => {
         const service = serviceOver(client);
 
         const result = await service.getEvaluationsForTrace({
+          protections: CONTENT_VISIBLE,
           authorization: ownProof({ projectId: "project_test" }),
           traceId: "trace-1",
         });
@@ -69,6 +76,7 @@ describe("EvaluationService memory-limit fallback", () => {
         const service = serviceOver(client);
 
         const result = await service.getEvaluationsMultiple({
+          protections: CONTENT_VISIBLE,
           projectId: "project_test",
           traceIds: ["trace-1"],
         });

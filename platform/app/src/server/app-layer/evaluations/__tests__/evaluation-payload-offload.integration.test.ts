@@ -64,6 +64,12 @@ import {
 } from "../evaluation-inputs-offload";
 import type { EvaluationRunData } from "../types";
 
+/** A viewer who may read captured input and output. */
+const CONTENT_VISIBLE = {
+  canSeeCapturedInput: true,
+  canSeeCapturedOutput: true,
+};
+
 // Route the stored-objects repository (which resolves its client internally)
 // to the shared test client. Everything else uses injected clients.
 vi.mock("~/server/clickhouse/clickhouseClient", async () => {
@@ -342,6 +348,7 @@ describe("evaluation inputs offload (integration)", () => {
         }),
       });
       const readInputs = await service.getEvaluationInputs({
+        protections: CONTENT_VISIBLE,
         authorization: ownProof({ projectId: tenantId }),
         evaluationId,
       });

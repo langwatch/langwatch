@@ -68,6 +68,7 @@ import {
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
   stripRolesFromChatArrayJson,
 } from "~/server/data-privacy/dropKeyCatalog";
+import { gateEvaluationContent } from "~/server/evaluations/evaluation-content-gate";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
@@ -2232,6 +2233,8 @@ export const tracesV2Router = createTRPCRouter({
    * The evaluations already scored on one trace. Read through the detail
    * proof, so on an aggregate an evaluation is matched to the member and the
    * trace together (ADR-144 block F); the aggregate never runs one itself.
+   * Their inputs, details and error text follow the viewer's protections,
+   * resolved through the same proof, like the span reads beside it.
    */
   evals: protectedProcedure
     .input(
@@ -2244,10 +2247,18 @@ export const tracesV2Router = createTRPCRouter({
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const app = getApp();
-      return app.evaluations.runs.findByTraceId({
-        authorization: await traceDetailAuthorization({ ctx, input }),
+      const authorization = await traceDetailAuthorization({ ctx, input });
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+        authorization,
+      });
+      const runs = await app.evaluations.runs.findByTraceId({
+        authorization,
         traceId: input.traceId,
       });
+      return runs.map((evaluation) =>
+        gateEvaluationContent({ evaluation, protections }),
+      );
     }),
 
   /**

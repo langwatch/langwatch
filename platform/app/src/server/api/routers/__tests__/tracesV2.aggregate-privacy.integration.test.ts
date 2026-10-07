@@ -27,6 +27,7 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { evaluationRunRepositoryFor } from "~/test-utils/evaluationRunRepository";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
@@ -54,6 +55,8 @@ let restricter: Project;
 /** Reads the dropper and the restricter. */
 let attributeAggregate: Project;
 let window: { from: number; to: number };
+/** One evaluation per content member, each recording inputs and prose. */
+const evaluationIdOf = (handle: string) => `agg-privacy-eval-${handle}-${run}`;
 
 const listOf = (projectId: string) =>
   admin.tracesV2.list({
@@ -155,6 +158,41 @@ beforeAll(async () => {
       }),
     ],
   });
+  const evaluations = evaluationRunRepositoryFor({
+    resolveClient: async () => ch,
+  });
+  for (const [handle, member] of [
+    ["loose", loose],
+    ["strict", strict],
+  ] as const) {
+    await evaluations.upsert(
+      {
+        evaluationId: evaluationIdOf(handle),
+        evaluatorId: `monitor-of-${handle}`,
+        evaluatorType: "langevals/basic",
+        evaluatorName: `monitor of ${handle}`,
+        traceId: traceIdOf(handle),
+        isGuardrail: false,
+        status: "processed",
+        score: 1,
+        passed: true,
+        label: "on topic",
+        details: `the reply to input of ${member.id} was on topic`,
+        inputs: { input: `input of ${member.id}` },
+        error: null,
+        errorDetails: null,
+        createdAt: occurredAt,
+        updatedAt: occurredAt,
+        LastEventOccurredAt: occurredAt,
+        archivedAt: null,
+        scheduledAt: occurredAt,
+        startedAt: occurredAt,
+        completedAt: occurredAt,
+        costId: null,
+      },
+      member.id,
+    );
+  }
 }, 180_000);
 
 afterAll(async () => {
@@ -226,6 +264,82 @@ describe("Feature: an aggregate read applies the strictest member policy", () =>
         expect(looseHeader.input).toBe(`input of ${loose.id}`);
         expect(strictHeader.input).toBeNull();
         expect(strictHeader.inputRedacted).toBe(true);
+      });
+    });
+  });
+
+  describe("given an evaluation on each member that recorded its inputs and prose", () => {
+    const evaluationsVia = async ({
+      projectId,
+      handle,
+      tenantId,
+    }: {
+      projectId: string;
+      handle: string;
+      tenantId?: string;
+    }) => {
+      const args = { projectId, traceId: traceIdOf(handle), tenantId };
+      const [run] = await admin.tracesV2.evals(args);
+      const [legacy] = await admin.traces.getEvaluations(args);
+      const inputs = await admin.traces.getEvaluationInputs({
+        projectId,
+        evaluationId: evaluationIdOf(handle),
+        tenantId,
+      });
+      return { run, legacy, inputs };
+    };
+
+    describe("when ana opens the strict member's trace from the aggregate", () => {
+      /** @scenario "The strictest member privacy policy applies" */
+      it("hides the evaluation's inputs and prose and keeps its verdict", async () => {
+        const { run, legacy, inputs } = await evaluationsVia({
+          projectId: aggregate.id,
+          handle: "strict",
+          tenantId: strict.id,
+        });
+
+        expect(run).toMatchObject({
+          evaluationId: evaluationIdOf("strict"),
+          passed: true,
+          label: "on topic",
+          details: null,
+          inputs: null,
+        });
+        expect(legacy).toMatchObject({ passed: true, details: null });
+        expect(legacy?.inputs ?? null).toBeNull();
+        expect(inputs).toBeNull();
+      });
+    });
+
+    describe("when ana opens the loose member's trace from the aggregate", () => {
+      it("shows the evaluation's inputs and prose, as its spans are shown", async () => {
+        const { run, legacy, inputs } = await evaluationsVia({
+          projectId: aggregate.id,
+          handle: "loose",
+          tenantId: loose.id,
+        });
+
+        expect(run?.details).toBe(
+          `the reply to input of ${loose.id} was on topic`,
+        );
+        expect(legacy?.details).toBe(run?.details);
+        expect(inputs).toEqual({ input: `input of ${loose.id}` });
+      });
+    });
+
+    describe("when ana opens the strict member directly", () => {
+      it("hides the evaluation's content there too, as a plain project", async () => {
+        const { run, inputs } = await evaluationsVia({
+          projectId: strict.id,
+          handle: "strict",
+        });
+
+        expect(run).toMatchObject({
+          passed: true,
+          details: null,
+          inputs: null,
+        });
+        expect(inputs).toBeNull();
       });
     });
   });

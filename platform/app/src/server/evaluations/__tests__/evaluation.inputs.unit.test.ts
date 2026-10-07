@@ -5,6 +5,12 @@ import {
   serviceOverUnavailable,
 } from "./support/evaluationServiceOver";
 
+/** A viewer who may read captured input and output. */
+const CONTENT_VISIBLE = {
+  canSeeCapturedInput: true,
+  canSeeCapturedOutput: true,
+};
+
 describe("EvaluationService.getEvaluationInputs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -30,6 +36,7 @@ describe("EvaluationService.getEvaluationInputs", () => {
         const service = serviceOver({ query });
 
         const result = await service.getEvaluationInputs({
+          protections: CONTENT_VISIBLE,
           authorization: ownProof({ projectId: "project_test" }),
           evaluationId: "eval-1",
         });
@@ -58,6 +65,7 @@ describe("EvaluationService.getEvaluationInputs", () => {
         const service = serviceOver({ query });
 
         const result = await service.getEvaluationInputs({
+          protections: CONTENT_VISIBLE,
           authorization: ownProof({ projectId: "project_test" }),
           evaluationId: "eval-1",
         });
@@ -78,6 +86,7 @@ describe("EvaluationService.getEvaluationInputs", () => {
         const service = serviceOver({ query });
 
         const result = await service.getEvaluationInputs({
+          protections: CONTENT_VISIBLE,
           authorization: ownProof({ projectId: "project_test" }),
           evaluationId: "eval-1",
         });
@@ -94,6 +103,7 @@ describe("EvaluationService.getEvaluationInputs", () => {
         const service = serviceOver({ query });
 
         const result = await service.getEvaluationInputs({
+          protections: CONTENT_VISIBLE,
           authorization: ownProof({ projectId: "project_test" }),
           evaluationId: "eval-1",
         });
@@ -112,6 +122,7 @@ describe("EvaluationService.getEvaluationInputs", () => {
 
         await expect(
           service.getEvaluationInputs({
+            protections: CONTENT_VISIBLE,
             authorization: ownProof({ projectId: "project_test" }),
             evaluationId: "eval-1",
           }),

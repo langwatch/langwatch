@@ -5,6 +5,10 @@ import { resolveInputsMarker } from "~/server/app-layer/evaluations/evaluation-i
 import type { TraceEvaluationsRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import type { Protections } from "~/server/traces/protections";
+import {
+  gateEvaluationContent,
+  gateEvaluationInputs,
+} from "./evaluation-content-gate";
 import type { TraceEvaluation } from "./evaluation-run.types";
 
 /**
@@ -73,14 +77,17 @@ export class EvaluationService {
   /**
    * One trace's evaluations, read through the proof (ADR-144 block F): on an
    * aggregate the proof is narrowed to the member that holds the trace, so
-   * the drawer shows that member's evaluations.
+   * the drawer shows that member's evaluations. Their content follows the
+   * viewer's protections, resolved through the same proof.
    */
   async getEvaluationsForTrace({
     authorization,
     traceId,
+    protections,
   }: {
     authorization: Authorization;
     traceId: string;
+    protections: Protections;
   }): Promise<TraceEvaluation[]> {
     return await this.tracer.withActiveSpan(
       "EvaluationService.getEvaluationsForTrace",
@@ -90,7 +97,9 @@ export class EvaluationService {
           authorization,
           traceIds: [traceId],
         });
-        return evaluationsByTrace[traceId] ?? [];
+        return (evaluationsByTrace[traceId] ?? []).map((evaluation) =>
+          gateEvaluationContent({ evaluation, protections }),
+        );
       },
     );
   }
@@ -98,11 +107,11 @@ export class EvaluationService {
   async getEvaluationsMultiple({
     projectId,
     traceIds,
-    protections: _protections,
+    protections,
   }: {
     projectId: string;
     traceIds: string[];
-    protections?: Protections;
+    protections: Protections;
   }): Promise<Record<string, TraceEvaluation[]>> {
     return await this.tracer.withActiveSpan(
       "EvaluationService.getEvaluationsMultiple",
@@ -112,11 +121,20 @@ export class EvaluationService {
           "trace.count": traceIds.length,
         },
       },
-      () =>
-        this.repository.findManyByTraceIdsForTenant({
+      async () => {
+        const byTrace = await this.repository.findManyByTraceIdsForTenant({
           tenantId: projectId,
           traceIds,
-        }),
+        });
+        return Object.fromEntries(
+          Object.entries(byTrace).map(([traceId, evaluations]) => [
+            traceId,
+            evaluations.map((evaluation) =>
+              gateEvaluationContent({ evaluation, protections }),
+            ),
+          ]),
+        );
+      },
     );
   }
 
@@ -133,9 +151,11 @@ export class EvaluationService {
   async getEvaluationInputs({
     authorization,
     evaluationId,
+    protections,
   }: {
     authorization: Authorization;
     evaluationId: string;
+    protections: Protections;
   }): Promise<Record<string, unknown> | null> {
     return await this.tracer.withActiveSpan(
       "EvaluationService.getEvaluationInputs",
@@ -152,10 +172,14 @@ export class EvaluationService {
         // the inputs were inline or offloaded. Non-markers pass through. The
         // marker lives under the project the row was read from, which on an
         // aggregate is the member, not the aggregate.
-        return this.resolveInputsMarker({
-          projectId: read.tenantId,
+        // Gated before the marker is resolved, so a viewer who may not read
+        // the content costs no object-storage read either.
+        const inputs = gateEvaluationInputs({
           inputs: read.inputs,
+          protections,
         });
+        if (inputs === null) return null;
+        return this.resolveInputsMarker({ projectId: read.tenantId, inputs });
       },
     );
   }

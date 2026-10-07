@@ -99,9 +99,14 @@ export const tracesRouter = createTRPCRouter({
     )
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
+      const authorization = await traceDetailAuthorization({ ctx, input });
       return TraceService.create(ctx.prisma).getEvaluationsForTrace({
-        authorization: await traceDetailAuthorization({ ctx, input }),
+        authorization,
         traceId: input.traceId,
+        protections: await getUserProtectionsForProject(ctx, {
+          projectId: input.projectId,
+          authorization,
+        }),
       });
     }),
 
@@ -122,13 +127,18 @@ export const tracesRouter = createTRPCRouter({
     )
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
+      const authorization = namedTenantAuthorization({
+        ctx,
+        tenantId: input.tenantId,
+        notFound: () => new EvaluationNotFoundError(input.evaluationId),
+      });
       return TraceService.create(ctx.prisma).getEvaluationInputs({
-        authorization: namedTenantAuthorization({
-          ctx,
-          tenantId: input.tenantId,
-          notFound: () => new EvaluationNotFoundError(input.evaluationId),
-        }),
+        authorization,
         evaluationId: input.evaluationId,
+        protections: await getUserProtectionsForProject(ctx, {
+          projectId: input.projectId,
+          authorization,
+        }),
       });
     }),
 
