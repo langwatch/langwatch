@@ -262,7 +262,7 @@ class OpenAICompletionTracer:
     ):
         text_outputs: Dict[int, str] = {}
         for delta in deltas:
-            for choice in delta.choices:
+            for choice in delta.choices or []:
                 index = choice.index or 0
                 text_outputs[index] = text_outputs.get(index, "") + (choice.text or "")
 
@@ -292,7 +292,7 @@ class OpenAICompletionTracer:
             span=span,
             outputs=[
                 TypedValueText(type="text", value=output.text)
-                for output in response.choices
+                for output in response.choices or []
             ],
             metrics=SpanMetrics(
                 prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
@@ -618,7 +618,7 @@ class OpenAIChatCompletionTracer:
         for delta in deltas:
             if hasattr(delta, "usage") and delta.usage is not None:
                 usage = delta.usage
-            for choice in delta.choices:
+            for choice in delta.choices or []:
                 index = choice.index
                 delta = choice.delta
                 if delta.role and index in synthesized_roles:
@@ -732,7 +732,7 @@ class OpenAIChatCompletionTracer:
                         cast(ChatMessage, output.message.model_dump(exclude_unset=True))
                     ],
                 )
-                for output in response.choices
+                for output in response.choices or []
             ],
             metrics=SpanMetrics(
                 prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
