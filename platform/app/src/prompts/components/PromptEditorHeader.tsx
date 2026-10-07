@@ -9,6 +9,7 @@ import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePro
 import { SavePromptButton } from "~/prompts/components/SavePromptButton";
 import { ModelSelectFieldMini } from "~/prompts/forms/fields/ModelSelectFieldMini";
 import { VersionHistoryButton } from "~/prompts/forms/prompt-config-form/components/VersionHistoryButton";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 
 export type PromptEditorHeaderProps = {
@@ -41,6 +42,10 @@ export type PromptEditorHeaderProps = {
  * - Version history (if prompt exists)
  * - API snippet button
  * - Save button with "Update to vX" logic
+ *
+ * On an aggregate project (ADR-144), which keeps no prompts of its own and
+ * refuses every write, a tab carried over from another project offers
+ * neither Save nor Deploy.
  */
 export function PromptEditorHeader({
   onSave,
@@ -56,6 +61,7 @@ export function PromptEditorHeader({
   const handle = formMethods.watch("handle");
   const configId = formMethods.watch("configId");
   const deployDialog = useDisclosure();
+  const acceptsWrites = !isAggregateProjectKind(project?.kind);
 
   return (
     <Box width="full" display="flex" gap={8} justifyContent="space-between">
@@ -71,7 +77,7 @@ export function PromptEditorHeader({
               initialOpen={openHistoryOnLoad}
             />
           )}
-          {configId && handle && project?.id && (
+          {acceptsWrites && configId && handle && project?.id && (
             <>
               <Button variant="outline" size="sm" onClick={deployDialog.onOpen}>
                 Deploy
@@ -93,12 +99,14 @@ export function PromptEditorHeader({
               <GenerateApiSnippetButton hasHandle={!!handle} />
             </GeneratePromptApiSnippetDialog.Trigger>
           </GeneratePromptApiSnippetDialog>
-          <SavePromptButton
-            onSave={onSave}
-            hasUnsavedChanges={hasUnsavedChanges}
-            isValid={isValid}
-            isSaving={isSaving}
-          />
+          {acceptsWrites && (
+            <SavePromptButton
+              onSave={onSave}
+              hasUnsavedChanges={hasUnsavedChanges}
+              isValid={isValid}
+              isSaving={isSaving}
+            />
+          )}
         </HStack>
       )}
     </Box>

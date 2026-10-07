@@ -425,6 +425,7 @@ Feature: An aggregate project reads its member projects
     And its analytics overview offers no card to build a dashboard
     And its datasets, automations and prompts pages say "Data can't be added to this project" instead of offering to create one
     And its prompt playground shows that notice in place of the chat and sends no message
+    And a prompt playground tab carried over to it offers neither Save nor Deploy
     And managing the aggregate itself stays available
 
   @integration
