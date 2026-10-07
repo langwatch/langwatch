@@ -295,6 +295,11 @@ function isCoreSource(file) {
   return !file.enterprise && file.role !== "other";
 }
 
+/** A core browser reads an enterprise client as it reads a core one (Alex, 2026-10-07). */
+function isAdmittedEnterpriseTarget(file, target) {
+  return target.role === "contract" || (target.role === "client" && file.role === "browser");
+}
+
 function packageFindings({ file, specifier, cwd, node, typeOnly }) {
   const found = modulePackageOf(cwd, specifier);
   if (!found) return [];
@@ -306,7 +311,7 @@ function packageFindings({ file, specifier, cwd, node, typeOnly }) {
   const shape =
     directionFinding(file, target) ?? ownershipFinding({ file, target, subpath, node, typeOnly });
   if (shape) findings.push({ messageId: shape, data: { specifier, ...peerData(target) } });
-  if (isCoreSource(file) && target.enterprise && target.role !== "contract") {
+  if (isCoreSource(file) && target.enterprise && !isAdmittedEnterpriseTarget(file, target)) {
     findings.push({ messageId: "coreImportsEnterprise", data: { specifier } });
   }
 

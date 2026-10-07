@@ -38,6 +38,14 @@ const workspace = createFixtureWorkspace({
       name: "@langwatch/enterprise-governance-contract",
       exports: { ".": "." },
     }),
+    "enterprise/modules/governance/browser/package.json": JSON.stringify({
+      name: "@langwatch/enterprise-governance-browser",
+      exports: { ".": "." },
+    }),
+    "enterprise/modules/governance/client/package.json": JSON.stringify({
+      name: "@langwatch/enterprise-governance-client",
+      exports: { ".": "." },
+    }),
   },
 });
 
@@ -256,6 +264,54 @@ describe("given package-boundaries", () => {
       expect(
         ids(SERVICE, 'import { GovernanceApi } from "@langwatch/enterprise-governance-contract";'),
       ).not.toContain("coreImportsEnterprise");
+    });
+  });
+
+  describe("when a core browser reads an enterprise module's client", () => {
+    /** @scenario "A core browser may read an enterprise module's client, and no other enterprise package" */
+    it("reports nothing", () => {
+      expect(
+        report(
+          BROWSER,
+          'import { GovernanceLentToken } from "@langwatch/enterprise-governance-client";',
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario "A core browser may read an enterprise module's client, and no other enterprise package" */
+    it("still reports coreImportsEnterprise for the enterprise browser and process packages", () => {
+      expect(
+        ids(
+          BROWSER,
+          'import { governanceBrowser } from "@langwatch/enterprise-governance-browser";',
+        ),
+      ).toContain("coreImportsEnterprise");
+      expect(
+        ids(
+          BROWSER,
+          'import { governanceProcessModule } from "@langwatch/enterprise-governance-process";',
+        ),
+      ).toContain("coreImportsEnterprise");
+    });
+
+    /** @scenario "A core browser may read an enterprise module's client, and no other enterprise package" */
+    it("still lets the enterprise contract through, as before", () => {
+      expect(
+        report(
+          BROWSER,
+          'import { GovernanceApi } from "@langwatch/enterprise-governance-contract";',
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario "Core code other than a browser reading an enterprise client is still reported" */
+    it("reports a core service reading it", () => {
+      expect(
+        ids(
+          SERVICE,
+          'import { GovernanceLentToken } from "@langwatch/enterprise-governance-client";',
+        ),
+      ).toEqual(expect.arrayContaining(["clientConsumer", "coreImportsEnterprise"]));
     });
   });
 

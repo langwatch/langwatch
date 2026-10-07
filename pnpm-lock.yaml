@@ -2134,6 +2134,9 @@ importers:
       '@langwatch/navigation-browser':
         specifier: workspace:*
         version: link:../../modules/navigation/browser
+      '@langwatch/navigation-contract':
+        specifier: workspace:*
+        version: link:../../modules/navigation/contract
       '@langwatch/notification-browser':
         specifier: workspace:*
         version: link:../../modules/notification/browser
@@ -4433,9 +4436,6 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../../../modules/authz/contract
-      '@langwatch/enterprise-governance-contract':
-        specifier: workspace:*
-        version: link:../../governance/contract
       '@langwatch/enterprise-scim-contract':
         specifier: workspace:*
         version: link:../contract
@@ -4494,9 +4494,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/enterprise-governance-process':
-        specifier: workspace:*
-        version: link:../../governance/process
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../../packages/test-harness
@@ -10504,6 +10501,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-managed-provider-client':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/managed-provider/client
       '@langwatch/enterprise-managed-provider-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/managed-provider/contract
@@ -10964,6 +10964,9 @@ importers:
       '@langwatch/navigation-client':
         specifier: workspace:*
         version: link:../client
+      '@langwatch/navigation-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../ops/contract
@@ -11046,6 +11049,12 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+
+  modules/navigation/contract:
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -14460,6 +14469,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2)
