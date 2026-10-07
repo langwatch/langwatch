@@ -83,17 +83,17 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 
 ## Landed and not landed (2026-10-06)
 
-| Piece                                                                            | State                                                                                                  |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Ledger, runner, `upgrade` / `upgrade status` / `upgrade plan`, manifests, floor  | landed (`packages/upgrade`, `apps/tasks/src/upgrade.ts`)                                               |
-| Serving gate, first-install upgrade, presence 15 s / 60 s, rollback reopen       | landed (`packages/upgrade/src/gate`, `packages/upgrade/src/presence`)                                  |
-| Prisma and ClickHouse guard scanners, floor check, lock-heavy refusals           | landed (`packages/*/src/__tests__/migration-safety.rules.ts`)                                          |
-| `migration-order` CI check, `migration-owners` policy                            | landed (`cmd/migrationorder`, `packages/architecture-enforcer`)                                        |
-| `defineMigrationStep` and `.withMigrations` collection (tasks, worker)           | landed (`packages/upgrade/src/step`, `packages/process/src/migration-steps.ts`)                        |
+| Piece                                                                            | State                                                                                                   |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Ledger, runner, `upgrade` / `upgrade status` / `upgrade plan`, manifests, floor  | landed (`packages/upgrade`, `apps/tasks/src/upgrade.ts`)                                                |
+| Serving gate, first-install upgrade, presence 15 s / 60 s, rollback reopen       | landed (`packages/upgrade/src/gate`, `packages/upgrade/src/presence`)                                   |
+| Prisma and ClickHouse guard scanners, floor check, lock-heavy refusals           | landed (`packages/*/src/__tests__/migration-safety.rules.ts`)                                           |
+| `migration-order` CI check, `migration-owners` policy                            | landed (`cmd/migrationorder`, `packages/architecture-enforcer`)                                         |
+| `defineMigrationStep` and `.withMigrations` collection (tasks, worker)           | landed (`packages/upgrade/src/step`, `packages/process/src/migration-steps.ts`)                         |
 | The upgrade task running declared code steps; the worker running background ones | landed (`apps/tasks/src/upgrade.ts`, `packages/upgrade/src/background`)                                 |
-| `.withUpcasts` read-time upcast and drain                                        | landed (`packages/eventing/src/upcast`)                                                                |
-| Upcast rewrite step, drain-age lint                                              | **not landed** (`@unimplemented` in `packages/eventing/specs/event-upcast.feature`)                    |
-| Re-runnable migration guard rule and the runner's auto-resolve                   | **ruled, not landed** (round 21); write re-runnable SQL now                                            |
+| `.withUpcasts` read-time upcast and drain                                        | landed (`packages/eventing/src/upcast`)                                                                 |
+| Upcast rewrite step, drain-age lint                                              | **not landed** (`@unimplemented` in `packages/eventing/specs/event-upcast.feature`)                     |
+| Re-runnable migration guard rule and the runner's auto-resolve                   | **ruled, not landed** (round 21); write re-runnable SQL now                                             |
 | Lapsed presence turning `/readyz` 503 and pausing the worker                     | landed for readiness and background steps; queue consumers pause once `packages/eventing` implements it |
 
 ## Never
