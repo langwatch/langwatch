@@ -1167,13 +1167,14 @@ Declared at `src/eventing/coding-assistant-billing.pipeline.ts:52`. Events: `cod
 
 ### Pipeline `governance_activity_monitor` (aggregate `global`)
 
-Declared at `src/eventing/governance-activity-monitor.pipeline.ts:54`.
+Declared at `src/eventing/governance-activity-monitor.pipeline.ts:64`.
 
-| Kind            | Name                       | Handles                                                                                     | Declared at                                               |
-| --------------- | -------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| process manager | `spendSpikeEvaluation`     | every 5 min (`SPEND_SPIKE_EVALUATION_INTERVAL_MS = 5 * 60 * 1000`); intents `pass` (outbox) | `src/eventing/governance-activity-monitor.pipeline.ts:67` |
-| process manager | `governanceTraceFacts`     | every 1 min (`GOVERNANCE_TRACE_FACTS_INTERVAL_MS = 60 * 1000`); intents `pass` (outbox)     | `src/eventing/governance-activity-monitor.pipeline.ts:84` |
-| peer subscriber | `seedDefaultAiToolCatalog` | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md) | `src/eventing/governance-activity-monitor.pipeline.ts:60` |
+| Kind            | Name                             | Handles                                                                                     | Declared at                                               |
+| --------------- | -------------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| process manager | `spendSpikeEvaluation`           | every 5 min (`SPEND_SPIKE_EVALUATION_INTERVAL_MS = 5 * 60 * 1000`); intents `pass` (outbox) | `src/eventing/governance-activity-monitor.pipeline.ts:82` |
+| process manager | `governanceTraceFacts`           | every 1 min (`GOVERNANCE_TRACE_FACTS_INTERVAL_MS = 60 * 1000`); intents `pass` (outbox)     | `src/eventing/governance-activity-monitor.pipeline.ts:99` |
+| peer subscriber | `seedDefaultAiToolCatalog`       | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md) | `src/eventing/governance-activity-monitor.pipeline.ts:70` |
+| peer subscriber | `assignScimCostCenterDepartment` | `lw.scim.cost_center_changed` from [scim](../../scim/README.md)                             | `src/eventing/governance-activity-monitor.pipeline.ts:77` |
 
 ### Pipeline `ingestion_pull_reconcile` (aggregate `global`)
 

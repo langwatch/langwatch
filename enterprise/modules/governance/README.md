@@ -10,7 +10,7 @@ AI governance: ingestion sources and pulls, cost attribution, anomaly rules and 
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Classification | enterprise (`modules/catalogue.json`)                                                                                                                                                                                                                                                                                                                           |
 | Subjects       | ai-tool-catalog, anomaly-alert, anomaly-rule, canonical-cost, cost-attribution-policy, department, governance, ingestion-credentials, ingestion-pull, ingestion-source, ingestion-template, ocsf-export, ottl, persona-home, personal-usage, platform-tool-policy, pull-destination, pulled-usage, puller, quarantine-fill, session-policy, spend-spike-anomaly |
-| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                                                                                                                                                                                                                                                                        |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                                                                                                                                                                                                                                                                     |
 | Api token      | `GovernanceRestApi` = `moduleApi<GovernanceRestApi>()("governance")`, `contract/src/governance.api.ts:448` (112 operations)                                                                                                                                                                                                                                     |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                                                                                                                                                                                                                                                                      |
 
@@ -56,6 +56,6 @@ Anything else governance needs belongs to another module and is reached through 
 
 ## Who depends on governance
 
-[coding-agent](../../../modules/coding-agent/README.md), [hosted-mcp](../../../modules/hosted-mcp/README.md), [scim](../scim/README.md), [user](../../../modules/user/README.md) (as a peer).
+[coding-agent](../../../modules/coding-agent/README.md), [hosted-mcp](../../../modules/hosted-mcp/README.md), [user](../../../modules/user/README.md) (as a peer).
 
 <!-- readme:generated:end -->

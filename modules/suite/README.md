@@ -16,11 +16,11 @@ Suites (run plans): their definitions, the scenario references they hold and the
 
 ## What suite owns
 
-| Kind                           | Name                          | Declared at                                                                 |
-| ------------------------------ | ----------------------------- | --------------------------------------------------------------------------- |
-| Postgres, accessed not claimed | `Scenario`, `SimulationSuite` | `process/src/repositories/prisma/prisma.suite.repository.ts:63`             |
-| ClickHouse table (writes)      | `suite_runs`                  | `process/src/repositories/clickhouse/clickhouse.suite-run.repository.ts:97` |
-| Config                         | `publicBaseUrl` (BASE_HOST)   | `contract/src/suite.config.ts:5`                                            |
+| Kind                           | Name                          | Declared at                                                                  |
+| ------------------------------ | ----------------------------- | ---------------------------------------------------------------------------- |
+| Postgres, accessed not claimed | `Scenario`, `SimulationSuite` | `process/src/repositories/prisma/prisma.suite.repository.ts:63`              |
+| ClickHouse table (writes)      | `suite_runs`                  | `process/src/repositories/clickhouse/clickhouse.suite-run.repository.ts:111` |
+| Config                         | `publicBaseUrl` (BASE_HOST)   | `contract/src/suite.config.ts:5`                                             |
 
 Anything else suite needs belongs to another module and is reached through its `*Api`.
 
