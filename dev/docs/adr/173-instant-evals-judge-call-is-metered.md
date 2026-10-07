@@ -4,7 +4,7 @@
 
 **Status:** Accepted
 
-> One line: when an LLM-as-a-judge evaluator names Instant Evals as its model, the **evaluation module** turns its settings into one classifier **question** and maps the verdict back to today's result shape, and the Instant Evals module answers it with a **budget check, a classification and one spend record keyed by the evaluation's own retry key**.
+> One line: when an LLM-as-a-judge evaluator names Instant Evals as its model, the **evaluation module** turns its settings into one classifier **question** and maps the verdict back to today's result shape, and a new leaf module, the Instant Evals judge, answers it with a **budget check, a classification and one spend record keyed by the evaluation's own retry key**.
 
 ## Context
 
@@ -47,15 +47,24 @@
    - Record one spend row. A call with no input tokens records nothing.
    - A call cancelled after the classifier answered still records its spend, because the classifier was paid.
    - A spend row that cannot be written is logged and the verdict kept, as a judged query does today.
-   - Calls that pass the check together can take an organization past $1, by up to about a minute of judging. The spend takes time to land, and each server caches the total for 60 seconds. The user accepted this. Every call past $1 still writes its spend row, so the overshoot is on record and can be charged later.
+   - Calls that pass the check together can take an organisation past $1. The leaf's total updates after each call is priced, so calls in flight together can still pass the check. The user accepted this. Every call past $1 still writes its spend row, so the overshoot is on record and can be charged later.
    - The result's `cost` is the price the customer pays. The evaluation cost row the costs page shows carries that price, as for any other judge, so it counts toward the customer's monthly spend limit. Stripe reads only the spend row.
 9. **The spend id comes from the evaluation's retry key.** When the caller carries an operation key (a monitor's queued command, `tenantId:evaluationId:execution`), the spend request id is derived from it, so a redelivered command lands on the same row and the ledger drops the copy. A call with no key gets a fresh id: a REST call, an experiment cell, simulation grading and a guardrail check. Rejected: a fresh id on every call. A command redelivered after the judge succeeded would be billed twice.
    - Experiment cells and simulation grading retry by themselves, and each retry is billed again. The user accepted this for wave 1. Their stable keys exist (the cell's run and position, the scenario run and evaluator) and can be passed through later.
    - The monitor key is only as stable as the trigger. A trigger redelivered more than 30 seconds later mints a new evaluation id and is billed again.
    - A client that retries a REST call pays twice, as it would at its own provider today.
-10. **A new method on the Instant Evals contract** answers one judge call. It takes the project, the text, the question and an optional request key, and returns the verdict plus the price charged.
+10. **A new method on the Instant Evals judge's contract** answers one judge call. It sits on the leaf's contract, not the Instant Evals contract (decision 13). It takes the project, the text, the question and an optional request key, and returns the verdict plus the price charged.
 11. **The picker reuses the release flag `release_instant_evals`, and the option works in wave 1.** This was the user's call over a separate judge flag. The picker ships in the same pull request as the rest of wave 1. The judge model id is `langwatch/instant-evals`. The evaluation module answers it before any provider lookup, so a project with no model provider can pick it too.
-12. **Only usage-billed organizations judge without a cap.** The $1 cap applies to every organization the meter does not bill: free plans, and paid plans on tiered pricing. Before, the cap read only the plan's free flag and the meter read only the pricing model, so a paid tiered organization was neither capped nor charged. Nobody had decided that overlap. The cap now asks billing whether the meter bills the organization, by the meter's own rule: usage pricing, a Stripe customer and an active subscription, or a connected self-hosted account. Billing exposes that rule as `isUsageBilled`, and the monthly report reads the same rule. The Instant Evals run row cap reads it too, so the two caps agree. Consequence: a paying tiered customer stops at $1 until top-up lands in wave 3, then uses their own provider key. This also closes the gap for Instant Evals runs, which share the check. A tiered organization already past $1 is refused for runs as well as judges on the day this ships. The refusal message must not tell an organization that already pays to upgrade to a paid plan, so its copy changes in wave 1 to fit both free and paid tiered organizations.
+12. **Only usage-billed organizations judge without a cap.** The $1 cap applies to every organization the meter does not bill: free plans, and paid plans on tiered pricing. Before, the cap read only the plan's free flag and the meter read only the pricing model, so a paid tiered organization was neither capped nor charged. Nobody had decided that overlap. Billing keeps the rule for whether the meter bills an organisation: usage pricing, a Stripe customer and an active subscription, or a connected self-hosted account. Billing now publishes that rule as an event the judge leaf folds (decision 13), and the monthly report reads the same rule. The Instant Evals run row cap reads the same fold, so the two caps agree. Consequence: a paying tiered customer stops at $1 until top-up lands in wave 3, then uses their own provider key. This also closes the gap for Instant Evals runs, which share the check. A tiered organization already past $1 is refused for runs as well as judges on the day this ships. The refusal message must not tell an organization that already pays to upgrade to a paid plan, so its copy changes in wave 1 to fit both free and paid tiered organizations.
+13. **The judge call lives in a leaf module, so wave 1 adds no peer cycle.**
+    - Why: evaluation calling Instant Evals closes a loop through gateway, and a second one through trace. Removing the gateway path alone leaves the trace loop. The policy allows no cycle, so wave 1 adds none.
+    - Shape: a new module, the Instant Evals judge (`modules/instant-eval-judge`), with no peer Api dependency. It owns the classifier client, the pricing rule, the budget check and the judge method. Evaluation and Instant Evals both depend on it. This is the shape the guardrail ruling gives the evaluation runtime: a dependency leaf.
+    - Own total: the leaf appends one priced event per call on the organisation's aggregate and folds them into that organisation's Instant Evals spend. The $1 check reads that total before the classifier is called, so the check stays as immediate as today. This follows entitlement counting from its own meters.
+    - Gateway learns by event: gateway peer-subscribes to the priced event and writes the spend row the meter already reads, as it does for governance's priced pulled usage. The meter does not change.
+    - Organisation lookup: the leaf folds project's `lw.project.created` into its own project to organisation map, as analytics does. Callers pass only the project.
+    - Usage billing: the leaf folds a billing event that says whether the meter bills the organisation. Billing's current events carry only whether there is a subscription, so billing adds this event in wave 1.
+    - Instant Evals runs record through the leaf too, so runs and judges share one total. Instant Evals drops its gateway spend reads and writes.
+    - Search-bar classification moves with the classifier client and stays unmetered (ADR-144).
 
 ## Constants
 
@@ -70,16 +79,17 @@
 
 ## Invariants
 
-| Invariant                            | Meaning                                                       | How it holds (test anchor)                                                                                  |
-| ------------------------------------ | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| One evaluation, one spend row        | A redelivered command is not billed twice                     | Unit test: the same request key gives the same spend id, and a keyed ledger keeps one row                   |
-| No tokens, no row                    | A skipped judgement is never billed                           | Unit test on the judge method with a skipped classifier                                                     |
-| Unbilled orgs refused past $1        | A call after the spend shows $1 is refused before classifying | Unit test: the budget check throws `InstantEvalFreeBudgetExhaustedError` and the classifier is never called |
-| Overshoot is on record               | A call that runs past $1 still writes its spend row           | Unit test: a call admitted while the cached spend was under $1 records its full price                       |
-| Fail-condition prompts keep polarity | "Return false if X" fails when X holds                        | Builder unit test on the question text, plus one live classifier check before the picker merges             |
-| Score stays on the customer's scale  | A 1 to 5 prompt returns 1 to 5                                | Builder unit tests for 0 to 1, 1 to 5 and 0 to 100                                                          |
-| Every skip has a status              | No skip reads as a pass or a crash                            | Unit test over every `skippedReason`                                                                        |
-| Search bar stays unmetered           | ADR-144 still holds                                           | Existing `classify` path untouched; test that it records no spend                                           |
+| Invariant                            | Meaning                                                       | How it holds (test anchor)                                                                                       |
+| ------------------------------------ | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| One evaluation, one spend row        | A redelivered command is not billed twice                     | Unit test: the same request key gives the same spend id, and a keyed ledger keeps one row                        |
+| No tokens, no row                    | A skipped judgement is never billed                           | Unit test on the judge method with a skipped classifier                                                          |
+| Unbilled orgs refused past $1        | A call after the spend shows $1 is refused before classifying | Unit test: the budget check throws `InstantEvalFreeBudgetExhaustedError` and the classifier is never called      |
+| Overshoot is on record               | A call that runs past $1 still writes its spend row           | Unit test: a call admitted while the leaf's total was under $1 records its full price                            |
+| Fail-condition prompts keep polarity | "Return false if X" fails when X holds                        | Builder unit test on the question text, plus one live classifier check before the picker merges                  |
+| Score stays on the customer's scale  | A 1 to 5 prompt returns 1 to 5                                | Builder unit tests for 0 to 1, 1 to 5 and 0 to 100                                                               |
+| Every skip has a status              | No skip reads as a pass or a crash                            | Unit test over every `skippedReason`                                                                             |
+| Search bar stays unmetered           | ADR-144 still holds                                           | Existing `classify` path untouched; test that it records no spend                                                |
+| No peer cycle                        | Wave 1 adds no edge whose peer reaches back                   | `pnpm lint:architecture --policies peer-cycles --all` shows no new finding, and the ratchet test is not loosened |
 
 ## Assumptions
 
@@ -89,6 +99,7 @@
 | Every project has an organization                       | A project with none is uncapped and its spend row is dropped, so it judges for free                                                                                                                                                                                        |
 | The langevals service port is internal in production    | Anyone reaching it runs judges with no app in between. It never reaches Instant Evals, so it is not a billing hole                                                                                                                                                         |
 | The three judge settings shapes stay as generated today | The builder maps the wrong field. Its tests read the generated schemas                                                                                                                                                                                                     |
+| No Instant Evals spend exists in production yet         | The module tree has not shipped, so the leaf's total starts at zero with nothing to carry over. If spend exists, the leaf must be seeded from the gateway ledger before the cap goes live                                                                                  |
 
 ## Gates
 
@@ -99,6 +110,7 @@
 | Cap moves to `isUsageBilled` | Yes                            | Large, paying tiered customers stop at $1 | Unit tests for usage billed, tiered and free organizations, and the monthly report reading the same rule               |
 | Builder and result mapping   | Yes                            | Large for guardrails                      | Unit tests against the generated schemas, plus the polarity check                                                      |
 | Picker entry                 | Yes                            | Large, customer-visible                   | Ships with wave 1 behind `release_instant_evals`. Reviewer confirms the bounded flag in the deploy config before merge |
+| Judge leaf                   | Yes                            | Medium                                    | The peer-cycle policy shows no new finding before merge                                                                |
 
 ## Schema
 
@@ -112,25 +124,30 @@ No database change. The score judge's settings gain an optional `min` and `max` 
 - A model-written reason: a second call and a second billing path.
 - Separate judge flag: hides the picker cleanly, but the user chose not to add a flag.
 - Builder in Instant Evals: one pull request, but couples it to evaluator settings.
+- Accepting the cycle: the policy refuses every cycle and the ratchet test expects none.
+- Removing only the gateway dependency: the loop still closes through trace.
+- Evaluation reading plan or spend from entitlement, billing or gateway: each of those reaches evaluation again.
 
 ## Consequences
 
 - Positive: one dispatch point covers every in-app judge.
 - Positive: results keep today's shape and scale.
-- Negative: a busy unbilled organization can go past $1 by up to about a minute of judging. The spend rows record all of it.
+- Negative: a busy unbilled organisation can go past $1 by the calls in flight together. The spend rows record all of it.
 - Negative: a retried experiment cell or simulation grading is billed per attempt.
 - Negative: a fail-closed guardrail blocks a free organization's traffic once it is past $1.
 - Negative: connected self-hosted accounts are billed only up to their contract ceiling, and the meter stops reporting when its breaker trips. Those organizations stay uncapped either way. A past-due organization stays usage billed, since billing has no past-due state.
 - Negative: a paying tiered organization stops at $1 until top-up lands in wave 3.
 - Negative: details is a confidence line, not a reason.
-- Negative: the evaluation module gains an Instant Evals peer. Instant Evals reaches evaluation through the gateway, so this adds one peer cycle to the list the policy reports. Cutting it is wave 2's transport question.
+- Positive: wave 1 adds no peer cycle, and Instant Evals loses its gateway dependency for spend.
+- Negative: wave 1 grows by one module, one priced event, one gateway subscriber and one billing event.
 - Neutral: the Instant Evals process lists the evaluator contract as a dependency it never imports. Remove it in the same change.
 
 ## Open questions
 
-- Transport: in the app or through the gateway. Owner: the user, with Rogério (tasks#902). Blocks wave 2.
+- Transport: in the app or through the gateway. Owner: the user (tasks#902). Blocks wave 2.
 - Merging tasks#902 into tasks#915. Owner: the user. Not blocking.
 - Whether an organization's model restrictions should be able to block Instant Evals. The judge skips the provider lookup, which is where restrictions are checked. Owner: the user. Not blocking.
+- Whether the priced event also lets billing meter Instant Evals directly, retiring the gateway spend row. Owner: the user. Not blocking.
 
 ## Revisions
 
@@ -160,3 +177,6 @@ No database change. The score judge's settings gain an optional `min` and `max` 
   - Simulations left wave 1, since they never reach `runEvaluation` (decision 1).
   - Whole-number score ranges wider than ten levels return whole numbers; 0 to 1 is a fraction scale and is not rounded. The range has no schema default (decision 4).
   - The run row cap reads `isUsageBilled` too (decision 12).
+- v6, 2026-10-07, after the dependency review. Captain: Sergio Esteban.
+  - The judge call moves into a leaf module with its own spend total, and gateway learns of each call by event (decision 13). Calling Instant Evals from evaluation would have added a peer cycle the policy refuses.
+  - Billing publishes whether the meter bills an organisation as an event (decision 12).
