@@ -2,7 +2,8 @@
 # `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host
 # shell against the local stateful stores. The base compose.dev.yml leaves
 # postgres + clickhouse without host ports for normal modes (workspace-
-# internal access only); this overlay opens them up for the migration mode.
+# internal access only); this overlay opens them up for the migration mode,
+# on loopback only: Docker-published ports bypass host firewalls such as ufw.
 #
 # Usage:
 #   docker compose -f dev/compose.dev.yml -f dev/compose.dev.migration.yml --project-directory . up postgres clickhouse
@@ -12,7 +13,7 @@
 services:
   postgres:
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
   clickhouse:
     ports:
-      - "8123:8123"
+      - "127.0.0.1:8123:8123"

@@ -92,8 +92,9 @@ services:
   # Linux: `sudo systemctl stop redis-server`.
   redis:
     image: redis:alpine
+    # Loopback only: Docker-published ports bypass host firewalls such as ufw.
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:

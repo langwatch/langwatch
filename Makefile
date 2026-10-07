@@ -321,9 +321,12 @@ start:
 		'pnpm dev' \
 		'SERVER_ADDR=:5561 LANGWATCH_ENDPOINT=http://localhost:5560 make -C .. service svc=nlpgo'
 
+# Postgres on host 127.0.0.1:5432 for `make start`. The self-host
+# infra/compose.yml publishes no datastore ports, so this uses the dev stack's
+# migration overlay, which binds loopback only.
 start/postgres:
 	@echo "Starting Postgres..."
-	@docker compose -f infra/compose.yml --project-directory . up -d postgres
+	@docker compose -f dev/compose.dev.yml -f dev/compose.dev.migration.yml --project-directory . up -d postgres
 
 tsc-watch:
 	cd platform/app && pnpm tsc-watch

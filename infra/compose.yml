@@ -3,8 +3,8 @@ services:
     image: langwatch/langwatch:latest
     environment:
       SKIP_ENV_VALIDATION: true
-      DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+      DATABASE_URL: postgresql://prisma:${POSTGRES_PASSWORD:-prisma}@postgres:5432/mydb?schema=mydb
+      CLICKHOUSE_URL: http://default:${CLICKHOUSE_PASSWORD:-langwatch}@clickhouse:8123/langwatch
       # This compose stack runs a plain ClickHouse with no backups, so
       # system.backup_log does not exist here. Backup-status collection is on by
       # default (an unset flag must not disarm the alerts that read those gauges
@@ -36,8 +36,8 @@ services:
     working_dir: /app/platform/app
     environment:
       SKIP_ENV_VALIDATION: true
-      DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+      DATABASE_URL: postgresql://prisma:${POSTGRES_PASSWORD:-prisma}@postgres:5432/mydb?schema=mydb
+      CLICKHOUSE_URL: http://default:${CLICKHOUSE_PASSWORD:-langwatch}@clickhouse:8123/langwatch
       # This compose stack runs a plain ClickHouse with no backups, so
       # system.backup_log does not exist here. Backup-status collection is on by
       # default (an unset flag must not disarm the alerts that read those gauges
@@ -79,8 +79,8 @@ services:
 
   langevals:
     image: langwatch/langevals:latest
-    ports:
-      - "5562:5562"
+    # No host port - accessed via docker network as "langevals:5562". The
+    # evaluator API has no authentication of its own.
     restart: always
     pull_policy: always
     environment:
@@ -92,9 +92,10 @@ services:
     environment:
       POSTGRES_DB: mydb
       POSTGRES_USER: prisma
-      POSTGRES_PASSWORD: prisma
-    ports:
-      - "5432:5432"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prisma}
+    # No host port - accessed via docker network as "postgres:5432".
+    # Docker-published ports bypass host firewalls such as ufw, so a published
+    # database is reachable from the internet on any host with a public IP.
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
@@ -116,9 +117,9 @@ services:
   clickhouse:
     image: langwatch/clickhouse-serverless:0.2.0
     environment:
-      CLICKHOUSE_PASSWORD: langwatch
-    ports:
-      - "8123:8123"
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-langwatch}
+    # No host port - accessed via docker network as "clickhouse:8123", for the
+    # same reason as postgres.
     volumes:
       - clickhouse-data:/var/lib/clickhouse
     deploy:
