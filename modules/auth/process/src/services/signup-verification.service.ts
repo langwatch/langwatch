@@ -19,8 +19,8 @@ import type { SignUpVerificationMailChannel } from "../channels/sign-up-verifica
 import type { SignUpVerificationTokenRepository } from "../repositories/signup-verification.repository.ts";
 
 /**
- * Sign-up's address confirmation (D13, ADR-117 §6), main's current service: the link proves
- * an address before an account exists, and never adopts an account that already does.
+ * Sign-up's address confirmation (D13, ADR-117 §6): the link proves an address before an
+ * account exists, and adopts an unfinished one that already does (rulings 2026-10-06, Auth 32).
  */
 
 /** What an address already is to us: no account, an unconfirmed one, or a confirmed one. */
@@ -29,7 +29,7 @@ type SignUpAddressState = "unknown" | "awaiting_confirmation" | "confirmed";
 export interface SignUpVerificationDeps {
   tokens: SignUpVerificationTokenRepository;
   mailer: SignUpVerificationMailChannel;
-  users: Pick<UserApi, "findByEmail">;
+  users: Pick<UserApi, "findByEmail" | "adoptUnconfirmedAccount">;
   /** Where the address signs in; an organization's own connection refuses a password sign-up. */
   route(input: Readonly<{ identifier: string; breakGlass: boolean }>): Promise<RoutingDecision>;
   isWithinBudget(
@@ -211,7 +211,7 @@ export class SignUpVerificationService {
 
   /**
    * Spends a link and answers the address it proved, with the proof `user.register` spends.
-   * An address that already holds an account is refused: the link never adopts it.
+   * An address holding an unfinished account adopts it instead; any other account refuses.
    */
   async completeVerification({ token }: { token: string }): Promise<CompletedVerification> {
     const now = this.now();
@@ -229,7 +229,7 @@ export class SignUpVerificationService {
     }
 
     if (await this.addressIsRegistered({ email: pending.email })) {
-      throw new IdentityVerificationExpiredError();
+      return this.adoptUnfinishedAccount({ email: pending.email });
     }
 
     // A credential on an old link is untrusted: the mailbox proves the address, not the hash.
@@ -262,6 +262,31 @@ export class SignUpVerificationService {
       identifier: `${CONFIRMED_ADDRESS_NAMESPACE}${normalizeIdentifierValue(email)}`,
       now: this.now(),
     });
+  }
+
+  /**
+   * The proof adopts the account its address holds, unless an organization's connection now owns
+   * that address. Every refusal reads as a dead link, and changes nothing about the account.
+   */
+  private async adoptUnfinishedAccount({
+    email,
+  }: {
+    email: string;
+  }): Promise<CompletedVerification> {
+    const decision = await this.deps.route({ identifier: email, breakGlass: false });
+    if (isOrganizationManagedDecision(decision)) throw new IdentityVerificationExpiredError();
+
+    const adoption = await this.deps.users.adoptUnconfirmedAccount({ email });
+    if (adoption !== "adopted") throw new IdentityVerificationExpiredError();
+
+    // No proof: the account exists, so the door opens a session on it for this fresh claim.
+    return {
+      email,
+      accountCreated: false,
+      accountExists: true,
+      addressProof: null,
+      freshClaim: true,
+    };
   }
 
   /** The same link opened again inside its grace: status only, no fresh proof. */
