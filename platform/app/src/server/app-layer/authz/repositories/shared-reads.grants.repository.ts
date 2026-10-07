@@ -42,6 +42,8 @@ export type SharedReadRow = {
   expiresAt: Date | null;
 };
 
+/** Reads the live `project-reader` grants a reader project holds, as the
+ *  stored rows the door turns into shared grants on a proof. */
 export class SharedReadsGrantsRepository {
   constructor(private readonly prisma: Pick<PrismaClient, "grant">) {}
 

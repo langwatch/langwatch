@@ -75,6 +75,8 @@ type SharedReadsEntry = {
   storedAt: number;
 };
 
+/** The door: evaluates a route's permission and mints the sealed proof its
+ *  reads carry, with one shared grant per project shared with the caller's. */
 export class AuthorizationService {
   private readonly internalScopes = new Map<
     string,
