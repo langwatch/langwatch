@@ -14,6 +14,7 @@ import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
 import { Select } from "../ui/select";
 import { toaster } from "../ui/toaster";
+import { replicateReferencesNote } from "./replicateReferencesNote";
 
 export const CopyExperimentDialog = ({
   open,
@@ -42,6 +43,11 @@ export const CopyExperimentDialog = ({
 
   const projectCollection = createListCollection({
     items: projects,
+  });
+
+  const note = replicateReferencesNote({
+    sourceProjectId: project?.id,
+    targetProjectId: selectedProjectId[0],
   });
 
   const handleCopy = async () => {
@@ -136,10 +142,11 @@ export const CopyExperimentDialog = ({
             >
               Replicate associated dataset
             </Checkbox>
-            <Text fontSize="sm" color="fg.muted">
-              Prompts, evaluators and agents are shared with the original.
-              Editing them in the copy also changes the original.
-            </Text>
+            {note && (
+              <Text fontSize="sm" color="fg.muted">
+                {note}
+              </Text>
+            )}
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>

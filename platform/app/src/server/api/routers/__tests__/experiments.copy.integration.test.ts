@@ -8,6 +8,8 @@
 
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { useEvaluationsV3Store } from "~/experiments-v3/hooks/useEvaluationsV3Store";
+import { extractPersistedState } from "~/experiments-v3/types/persistence";
 import { ExperimentType } from "~/generated/prisma/client";
 import { getTestUser } from "../../../../utils/testUtils";
 import { globalForApp } from "../../../app-layer/app";
@@ -32,6 +34,7 @@ describe("experiments.copy", () => {
   let previousApp: typeof globalForApp.__langwatch_app;
   let otherProjectId: string;
   const createdProjectIds: string[] = [];
+  const seededIds: string[] = [];
 
   const originalId = `experiment_${nanoid(8)}`;
   const originalSlug = `orig-${nanoid(6)}`;
@@ -94,6 +97,7 @@ describe("experiments.copy", () => {
         where: {
           OR: [
             { id: originalId },
+            { id: { in: seededIds } },
             { projectId: PROJECT_ID, name: `${originalName} (copy)` },
           ],
         },
@@ -117,79 +121,148 @@ describe("experiments.copy", () => {
       })
     ).experiment;
 
+  /**
+   * Opens the experiment the way the editor does (server row identity first,
+   * then the persisted state), edits it, and saves what autosave would send.
+   */
+  const openInEditorAndSave = async ({
+    projectId,
+    slug,
+    edit,
+  }: {
+    projectId: string;
+    slug: string;
+    edit: string;
+  }) => {
+    const row = await caller.experiments.getEvaluationsV3BySlug({
+      projectId,
+      experimentSlug: slug,
+    });
+    const store = useEvaluationsV3Store.getState();
+    store.reset();
+    store.setExperimentId(row.id);
+    store.setExperimentSlug(row.slug);
+    store.setWorkbenchVersion(row.version);
+    store.loadState(row.workbenchState);
+    useEvaluationsV3Store.getState().setName(edit);
+
+    const current = useEvaluationsV3Store.getState();
+    return caller.experiments.saveEvaluationsV3({
+      projectId,
+      experimentId: current.experimentId,
+      state: extractPersistedState(current),
+    });
+  };
+
+  const findRow = (id: string, projectId = PROJECT_ID) =>
+    prisma.experiment.findFirstOrThrow({ where: { id, projectId } });
+
+  const workbenchName = (row: { workbenchState: unknown }) =>
+    (row.workbenchState as Record<string, unknown>).name;
+
   describe("given an experiment whose saved state holds its own id, slug and results", () => {
     describe("when the experiment is replicated", () => {
       /** @scenario "A replicated experiment does not carry the original's identity" */
-      it("drops id, slug and results and names the copy", async () => {
+      it("drops the original's id and slug", async () => {
         const copy = await replicate(PROJECT_ID);
-        const row = await prisma.experiment.findFirstOrThrow({
-          where: { id: copy.id, projectId: PROJECT_ID },
-        });
-        const state = row.workbenchState as Record<string, unknown>;
+        const state = (await findRow(copy.id)).workbenchState as Record<
+          string,
+          unknown
+        >;
 
         expect(state.experimentId).toBeUndefined();
         expect(state.experimentSlug).toBeUndefined();
+      });
+
+      /** @scenario "A replicated experiment does not carry the original's identity" */
+      it("drops results", async () => {
+        const copy = await replicate(PROJECT_ID);
+        const state = (await findRow(copy.id)).workbenchState as Record<
+          string,
+          unknown
+        >;
+
         expect(state.results).toBeUndefined();
+      });
+
+      /** @scenario "A replicated experiment does not carry the original's identity" */
+      it("names the copy", async () => {
+        const copy = await replicate(PROJECT_ID);
+        const row = await findRow(copy.id);
+
         expect(row.name).toBe(`${originalName} (copy)`);
-        expect(state.name).toBe(`${originalName} (copy)`);
+        expect(workbenchName(row)).toBe(`${originalName} (copy)`);
       });
     });
 
-    describe("when the copy is saved with edits", () => {
+    describe("when the copy is opened in the editor and saved with edits", () => {
       /** @scenario "Saving a replicated experiment leaves the original untouched" */
       it("changes the copy and not the original", async () => {
         const copy = await replicate(PROJECT_ID);
-        const before = await prisma.experiment.findFirstOrThrow({
-          where: { id: originalId, projectId: PROJECT_ID },
-        });
+        const before = await findRow(originalId);
 
-        await caller.experiments.saveEvaluationsV3({
+        await openInEditorAndSave({
           projectId: PROJECT_ID,
-          experimentId: copy.id,
-          state: {
-            name: "Edited copy",
-            datasets: [],
-            activeDatasetId: "dataset-1",
-            evaluators: [],
-            targets: [],
-          },
+          slug: copy.slug,
+          edit: "Edited copy",
         });
 
-        const after = await prisma.experiment.findFirstOrThrow({
-          where: { id: originalId, projectId: PROJECT_ID },
-        });
-        const savedCopy = await prisma.experiment.findFirstOrThrow({
-          where: { id: copy.id, projectId: PROJECT_ID },
-        });
-
+        const after = await findRow(originalId);
         expect(after.workbenchState).toEqual(before.workbenchState);
         expect(after.updatedAt).toEqual(before.updatedAt);
-        expect((savedCopy.workbenchState as Record<string, unknown>).name).toBe(
-          "Edited copy",
-        );
+        expect(workbenchName(await findRow(copy.id))).toBe("Edited copy");
+      });
+    });
+  });
+
+  describe("given a copy made before the fix whose saved state holds the original's id and slug", () => {
+    describe("when the copy is opened in the editor and saved with edits", () => {
+      /** @scenario "Opening a copy made before the fix edits the copy" */
+      it("changes the copy and not the original", async () => {
+        const oldCopyId = `experiment_${nanoid(8)}`;
+        const oldCopySlug = `old-copy-${nanoid(6)}`;
+        seededIds.push(oldCopyId);
+        await prisma.experiment.create({
+          data: {
+            id: oldCopyId,
+            name: `${originalName} (old copy)`,
+            slug: oldCopySlug,
+            projectId: PROJECT_ID,
+            type: ExperimentType.EVALUATIONS_V3,
+            workbenchState: { ...originalState, results: undefined },
+          },
+        });
+        const before = await findRow(originalId);
+
+        await openInEditorAndSave({
+          projectId: PROJECT_ID,
+          slug: oldCopySlug,
+          edit: "Edited old copy",
+        });
+
+        const after = await findRow(originalId);
+        expect(after.workbenchState).toEqual(before.workbenchState);
+        expect(after.updatedAt).toEqual(before.updatedAt);
+        expect(workbenchName(await findRow(oldCopyId))).toBe("Edited old copy");
       });
     });
   });
 
   describe("given an experiment replicated into another project", () => {
-    describe("when the copy is saved in that project", () => {
+    describe("when the copy is opened in the editor and saved in that project", () => {
       /** @scenario "A replicated experiment in another project can be saved" */
-      it("succeeds", async () => {
+      it("persists the edit in that project", async () => {
         const copy = await replicate(otherProjectId);
 
-        await expect(
-          caller.experiments.saveEvaluationsV3({
-            projectId: otherProjectId,
-            experimentId: copy.id,
-            state: {
-              name: "Edited cross-project copy",
-              datasets: [],
-              activeDatasetId: "dataset-1",
-              evaluators: [],
-              targets: [],
-            },
-          }),
-        ).resolves.toBeDefined();
+        await openInEditorAndSave({
+          projectId: otherProjectId,
+          slug: copy.slug,
+          edit: "Edited cross-project copy",
+        });
+
+        const saved = await findRow(copy.id, otherProjectId);
+        expect(saved.projectId).toBe(otherProjectId);
+        expect(workbenchName(saved)).toBe("Edited cross-project copy");
       });
     });
   });
