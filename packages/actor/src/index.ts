@@ -114,6 +114,8 @@ export {
   authorizationPurposeSchema,
   authorizationSchema,
   ForgedAuthorizationError,
+  type GrantCondition,
+  grantConditionSchema,
   isSealedAuthorization,
   narrowAuthorization,
   sealAuthorization,

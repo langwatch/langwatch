@@ -26,7 +26,7 @@
  * import/migration tool's, where identity must survive re-runs with no
  * caller to remember a mint.
  */
-import type { LedgerActor } from "@langwatch/actor";
+import type { GrantCondition, LedgerActor } from "@langwatch/actor";
 import {
   PROJECT_READER_ROLE_KEY,
   roleKeyForTeamRole,
@@ -36,7 +36,6 @@ import {
   BindingMissingError,
   type BindingPrincipalWhere,
   DuplicateBindingError,
-  type GrantCondition,
   type GrantEventSource,
   GrantValidationError,
   grantFactToCompatBinding,

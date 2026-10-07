@@ -1,6 +1,6 @@
+import { grantConditionSchema } from "@langwatch/actor";
 import { z } from "zod";
 import {
-  grantConditionSchema,
   grantEventSourceSchema,
   grantShapeRefinement,
   grantsLedgerActorSchema,

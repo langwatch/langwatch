@@ -3,11 +3,10 @@
  * `project-reader` rows the reconciler wrote - as the minter needs them.
  * Stored facts only; which of them reach a proof is the service's call.
  */
+
+import type { GrantCondition } from "@langwatch/actor";
 import { PROJECT_READER_ROLE_KEY } from "@langwatch/authz";
-import {
-  type GrantCondition,
-  grantConditionFromDb,
-} from "@langwatch/authz-server";
+import { grantConditionFromDb } from "@langwatch/authz-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { liveGrants } from "./live-rows";
 

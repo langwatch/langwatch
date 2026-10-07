@@ -366,6 +366,10 @@ describe("shared grant condition (ADR-144)", () => {
         { type: "metric" },
         { type: "trace", from: 42 },
         { type: "trace", where: { eq: 1 } },
+        // Strings the event wire would refuse: not ISO instants.
+        { type: "trace", from: "yesterday" },
+        { type: "trace", until: "2026-13-45" },
+        { type: "trace", from: "1760000000000" },
       ]) {
         expect(grantConditionFromDb(stored)).toBeUndefined();
       }

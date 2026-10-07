@@ -71,6 +71,23 @@ export type AuthorizationCondition = z.infer<
   typeof authorizationConditionSchema
 >;
 
+/**
+ * ADR-144 / ADR-166: the same window as the ledger stores it on a SHARED
+ * grant, the one shape both the event wire and the projection reader parse.
+ * `type` names the store resource the window applies to; `where` is an OTTL
+ * slot nothing compiles in v1 (the wire's shape refinement refuses a
+ * non-empty one); `from` and `until` are ISO instants bounding the rows by
+ * their occurrence time. An own grant carries no condition. The minter turns
+ * this into an {@link AuthorizationCondition}.
+ */
+export const grantConditionSchema = z.object({
+  type: z.enum(AUTHORIZATION_CONDITION_TYPES),
+  where: z.string().optional(),
+  from: z.string().datetime({ offset: true }).optional(),
+  until: z.string().datetime({ offset: true }).optional(),
+});
+export type GrantCondition = z.infer<typeof grantConditionSchema>;
+
 export const authorizationGrantSchema = z
   .object({
     /** Absent: the organization tier (members, keys, SSO). */

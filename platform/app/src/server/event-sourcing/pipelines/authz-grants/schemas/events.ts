@@ -1,8 +1,6 @@
+import { grantConditionSchema } from "@langwatch/actor";
 import { PROJECT_READER_ROLE_KEY } from "@langwatch/authz";
-import {
-  GRANT_CONDITION_TYPES,
-  GRANT_EVENT_SOURCES,
-} from "@langwatch/authz-server";
+import { GRANT_EVENT_SOURCES } from "@langwatch/authz-server";
 import { z } from "zod";
 import { EventSchema } from "../../../domain/types";
 import {
@@ -104,20 +102,6 @@ export const resourceGrantTermsSchema = z.object({
   expiresAtMs: z.number().int().nonnegative().optional(),
   maxViews: z.number().int().nonnegative().optional(),
 });
-
-/**
- * ADR-144 / ADR-166: the window a SHARED grant opens on another project.
- * `where` is a slot for the OTTL predicate and nothing compiles it yet, so
- * the shape refinement below refuses a non-empty one; `from` and `until`
- * are ISO instants.
- */
-export const grantConditionSchema = z.object({
-  type: z.enum(GRANT_CONDITION_TYPES),
-  where: z.string().optional(),
-  from: z.string().datetime({ offset: true }).optional(),
-  until: z.string().datetime({ offset: true }).optional(),
-});
-export type GrantConditionWire = z.infer<typeof grantConditionSchema>;
 
 /**
  * The resource tier and every other tier are mutually exclusive shapes, and

@@ -223,7 +223,7 @@ on the Postgres side.
 | `PROJECT_READER_ROLE_KEY` | `"project-reader"` | `Grant.roleKey` for a project-to-project read grant |
 | `PROJECT_READER_PERMISSIONS` | `["traces:view", "analytics:view"]` | the role's whole permission list |
 | `GRANT_SOURCE_AGGREGATE_RECONCILER` | `"aggregate-reconciler"` | added to `GRANT_EVENT_SOURCES` |
-| `GRANT_CONDITION_TYPES` | `"trace" \| "span" \| "log"` | `Grant.condition.type`; v1 writes only `"trace"` |
+| `AUTHORIZATION_CONDITION_TYPES` | `"trace" \| "span" \| "log"` | `Grant.condition.type` and the proof's condition type, in `@langwatch/actor` beside `grantConditionSchema`; v1 writes only `"trace"` |
 | `AUTHORIZATION_GRANT_KINDS` | `"own" \| "shared"` | ADR-166 grant kind inside the proof |
 | `AUTHORIZATION_PURPOSES` | `"route" \| "event" \| "operator"` | ADR-166 purpose; v1 mints only `"route"` |
 | `CLICKHOUSE_READ_RESOURCES` | `"traces" \| "analytics"` | the `reads` declaration on `as()`; span reads declare `"traces"` |

@@ -9,11 +9,9 @@ import type {
   TeamUserRole,
 } from "@langwatch/authz";
 
+import { type GrantCondition, grantConditionSchema } from "@langwatch/actor";
 import { BindingMissingError } from "../authz-grants.repository";
-import { GRANT_CONDITION_TYPES } from "./facts";
 import type {
-  GrantCondition,
-  GrantConditionType,
   GrantEventSource,
   GrantFact,
   LedgerPrincipalType,
@@ -91,30 +89,15 @@ const RESOURCE_KIND_FROM_DB: Record<
  * kind of thing — a share row that matches whichever resource is asked about.
  */
 /** The stored column is JSONB with no schema behind it, so a row's condition
- *  has to PARSE as one before it becomes a fact: an object that names a type
- *  the vocabulary lacks, or carries a non-string field, is treated as no
- *  condition rather than as a window the engine would then widen. */
+ *  has to PARSE as one before it becomes a fact, through the same schema the
+ *  event wire uses: an object that names a type the vocabulary lacks, carries
+ *  a non-string field, or a `from`/`until` that is not an ISO instant, is
+ *  treated as no condition rather than as a window the engine would widen. */
 export function grantConditionFromDb(
   value: unknown,
 ): GrantCondition | undefined {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return undefined;
-  }
-  const { type, where, from, until } = value as Record<string, unknown>;
-  if (!(GRANT_CONDITION_TYPES as readonly unknown[]).includes(type)) {
-    return undefined;
-  }
-  const optionalString = (field: unknown): field is string | undefined =>
-    field === undefined || typeof field === "string";
-  if (!optionalString(where) || !optionalString(from) || !optionalString(until)) {
-    return undefined;
-  }
-  return {
-    type: type as GrantConditionType,
-    ...(where !== undefined ? { where } : {}),
-    ...(from !== undefined ? { from } : {}),
-    ...(until !== undefined ? { until } : {}),
-  };
+  const parsed = grantConditionSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
 }
 
 function resourceKindFromDb(

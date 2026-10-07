@@ -13,6 +13,7 @@ import {
   type AuthorizationCondition,
   type AuthorizationGrant,
   type AuthorizationPurpose,
+  type GrantCondition,
   sealAuthorization,
 } from "@langwatch/actor";
 import {
@@ -25,7 +26,6 @@ import type {
   AuthzCollectorService,
   AuthzEpochReader,
   AuthzService,
-  GrantCondition,
 } from "@langwatch/authz-server";
 import type {
   SharedReadRow,

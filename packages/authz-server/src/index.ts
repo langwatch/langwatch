@@ -105,10 +105,8 @@ export type {
   BindingIdentityPrincipal,
 } from "./ledger/grant-identity";
 export {} from "./ledger/facts";
-export { GRANT_CONDITION_TYPES, GRANT_EVENT_SOURCES } from "./ledger/facts";
+export { GRANT_EVENT_SOURCES } from "./ledger/facts";
 export type {
-  GrantCondition,
-  GrantConditionType,
   GrantEventSource,
   GrantFact,
   GrantsLedgerActor,

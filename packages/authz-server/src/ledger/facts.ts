@@ -1,7 +1,4 @@
-import {
-  AUTHORIZATION_CONDITION_TYPES,
-  type AuthorizationConditionType,
-} from "@langwatch/actor";
+import type { GrantCondition } from "@langwatch/actor";
 /**
  * The authorization domain's facts: what a grant IS, what a role IS, and the
  * vocabulary they are written in.
@@ -94,23 +91,6 @@ export interface ResourceGrantTerms {
 /** The legacy `RoleBinding.role` / `TeamUser.role` vocabulary, mirrored so
  *  the reducer never imports the enum. */
 export type LegacyBindingRole = "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-
-/**
- * ADR-144 / ADR-166: the condition on a SHARED grant - what one project may
- * read of another. `type` names the store resource the window applies to;
- * `where` is an OTTL predicate kept as a slot (nothing compiles it in v1, so
- * the wire refuses a non-empty one); `from` and `until` are ISO instants
- * bounding the rows by start time. An own grant carries no condition.
- */
-export const GRANT_CONDITION_TYPES = AUTHORIZATION_CONDITION_TYPES;
-export type GrantConditionType = AuthorizationConditionType;
-
-export type GrantCondition = {
-  type: GrantConditionType;
-  where?: string;
-  from?: string;
-  until?: string;
-};
 
 export interface GrantFact {
   grantId: string;
