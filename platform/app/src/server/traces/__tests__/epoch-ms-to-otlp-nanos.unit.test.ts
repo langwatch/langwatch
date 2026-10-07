@@ -30,6 +30,13 @@ describe("epochMsToOtlpNanos", () => {
       );
     });
 
+    it("rounds a sub-nanosecond remainder to the nearest nanosecond", () => {
+      // 0.0000006 ms is 0.6 ns and 0.0000004 ms is 0.4 ns. Rounding down the
+      // first (floor) or up the second (ceil) would each break one assertion.
+      expect(epochMsToOtlpNanos(41.0000006)).toBe("41000001");
+      expect(epochMsToOtlpNanos(41.0000004)).toBe("41000000");
+    });
+
     it("keeps a 0.25ms span from collapsing to zero duration", () => {
       const start = BigInt(epochMsToOtlpNanos(1_757_400_000_000.125));
       const end = BigInt(epochMsToOtlpNanos(1_757_400_000_000.375));
