@@ -311,6 +311,28 @@ describe("Feature: opening an aggregate page never writes a default row", () => 
  * reads, so each asks the write guard itself.
  */
 describe("Feature: saving a view is refused on the aggregate", () => {
+  /**
+   * A real view under the aggregate for the rename, reorder and delete to aim
+   * at. An aggregate never gets one through the app, so the test inserts it
+   * directly. Without it each write would target nothing and "writes nothing"
+   * would hold trivially.
+   */
+  const SEEDED_VIEW_ID = `seeded-${run}`;
+  let seededView: Awaited<ReturnType<typeof prisma.savedView.findFirstOrThrow>>;
+
+  beforeAll(async () => {
+    seededView = await prisma.savedView.create({
+      data: {
+        id: SEEDED_VIEW_ID,
+        projectId: aggregate.id,
+        name: `Seeded ${run}`,
+        filters: { v: 1 },
+        kind: "v2-traces-lens",
+        order: 3,
+      },
+    });
+  });
+
   const VIEW_WRITES = {
     "savedViews.create": (projectId: string) =>
       admin.savedViews.create({
@@ -323,28 +345,31 @@ describe("Feature: saving a view is refused on the aggregate", () => {
     "savedViews.rename": (projectId: string) =>
       admin.savedViews.rename({
         projectId,
-        viewId: `custom-${run}`,
+        viewId: SEEDED_VIEW_ID,
         name: "Renamed",
       }),
+    // The seeded view sits at order 3, so an applied reorder would move it to 0.
     "savedViews.reorder": (projectId: string) =>
-      admin.savedViews.reorder({ projectId, viewIds: [`custom-${run}`] }),
+      admin.savedViews.reorder({ projectId, viewIds: [SEEDED_VIEW_ID] }),
     "savedViews.delete": (projectId: string) =>
-      admin.savedViews.delete({ projectId, viewId: `custom-${run}` }),
+      admin.savedViews.delete({ projectId, viewId: SEEDED_VIEW_ID }),
   } as const;
 
   describe("given an aggregate project and one of its members", () => {
     for (const [path, write] of Object.entries(VIEW_WRITES)) {
       describe(`when ana calls ${path} on the aggregate`, () => {
         /** @scenario "Saving, renaming, reordering or deleting a view is refused on the aggregate" */
-        it("is refused with the read-only code and writes no view", async () => {
+        it("is refused with the read-only code and leaves the views as they were", async () => {
           const refusal = await refusalOf(write(aggregate.id));
 
           expect(handledCodeOf(refusal)).toBe(READ_ONLY);
+          // Exactly the seeded row, untouched: no new view, and the existing
+          // one keeps its name, its order and its updatedAt.
           expect(
-            await prisma.savedView.count({
+            await prisma.savedView.findMany({
               where: { projectId: aggregate.id },
             }),
-          ).toBe(0);
+          ).toEqual([seededView]);
         });
       });
     }

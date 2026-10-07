@@ -26,47 +26,57 @@ function buildService({ existing }: { existing: number }) {
 }
 
 describe("SavedViewService.getAll()", () => {
-  /** @scenario "A read that seeds defaults must be told whether the project takes writes" */
-  it("requires the caller to say whether the project takes writes", async () => {
-    const { service } = buildService({ existing: 0 });
+  describe("given a caller that does not say whether the project takes writes", () => {
+    describe("when it reads the views", () => {
+      /** @scenario "A read that seeds defaults must be told whether the project takes writes" */
+      it("does not compile", async () => {
+        const { service } = buildService({ existing: 0 });
 
-    // @ts-expect-error acceptsWrites is required, so omitting it is a type error.
-    await service.getAll({ projectId: "proj-1" });
-  });
+        // @ts-expect-error acceptsWrites is required, so omitting it is a type error.
+        await service.getAll({ projectId: "proj-1" });
+      });
+    });
 
-  /** @scenario "A read that seeds defaults must be told whether the project takes writes" */
-  it("matches DashboardService, whose seeding read requires it too", () => {
-    type FirstDashboardArgs = Parameters<
-      DashboardService["getOrCreateFirst"]
-    >[0];
-    // @ts-expect-error acceptsWrites is required on the dashboard seed too.
-    const withoutFlag: FirstDashboardArgs = { projectId: "proj-1" };
+    describe("when it reads the first dashboard instead", () => {
+      /** @scenario "A read that seeds defaults must be told whether the project takes writes" */
+      it("does not compile either, matching DashboardService", () => {
+        type FirstDashboardArgs = Parameters<
+          DashboardService["getOrCreateFirst"]
+        >[0];
+        // @ts-expect-error acceptsWrites is required on the dashboard seed too.
+        const withoutFlag: FirstDashboardArgs = { projectId: "proj-1" };
 
-    expect(withoutFlag.projectId).toBe("proj-1");
-  });
-
-  describe("when the project takes no writes", () => {
-    /** @scenario "A read that seeds defaults must be told whether the project takes writes" */
-    it("returns what exists and seeds nothing", async () => {
-      const { service, repository } = buildService({ existing: 0 });
-
-      await service.getAll({ projectId: "agg-1", acceptsWrites: false });
-
-      expect(repository.count).not.toHaveBeenCalled();
-      expect(repository.createMany).not.toHaveBeenCalled();
-      expect(repository.findAll).toHaveBeenCalledWith(
-        expect.objectContaining({ projectId: "agg-1" }),
-      );
+        expect(withoutFlag.projectId).toBe("proj-1");
+      });
     });
   });
 
-  describe("when the project takes writes and has no views", () => {
-    it("seeds the default views", async () => {
-      const { service, repository } = buildService({ existing: 0 });
+  describe("given a project that takes no writes", () => {
+    describe("when its views are read", () => {
+      /** @scenario "A read that seeds defaults must be told whether the project takes writes" */
+      it("returns what exists and seeds nothing", async () => {
+        const { service, repository } = buildService({ existing: 0 });
 
-      await service.getAll({ projectId: "proj-1", acceptsWrites: true });
+        await service.getAll({ projectId: "agg-1", acceptsWrites: false });
 
-      expect(repository.createMany).toHaveBeenCalledTimes(1);
+        expect(repository.count).not.toHaveBeenCalled();
+        expect(repository.createMany).not.toHaveBeenCalled();
+        expect(repository.findAll).toHaveBeenCalledWith(
+          expect.objectContaining({ projectId: "agg-1" }),
+        );
+      });
+    });
+  });
+
+  describe("given a project that takes writes and has no views", () => {
+    describe("when its views are read", () => {
+      it("seeds the default views", async () => {
+        const { service, repository } = buildService({ existing: 0 });
+
+        await service.getAll({ projectId: "proj-1", acceptsWrites: true });
+
+        expect(repository.createMany).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });
