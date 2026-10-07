@@ -8,7 +8,7 @@ import {
   AnnotateBodyToken,
   AnnotationFormFooterToken,
   SuggestBodyToken,
-} from "@langwatch/annotation-contract";
+} from "@langwatch/annotation-client";
 import { defineBrowserModule } from "@langwatch/browser";
 import { createElement } from "react";
 import { z } from "zod";
