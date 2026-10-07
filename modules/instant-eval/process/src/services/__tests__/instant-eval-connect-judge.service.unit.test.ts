@@ -120,7 +120,7 @@ describe("the Connect judge", () => {
     const { judge, calls } = harness({ enabled: false });
 
     expect(
-      instantEvalJudgeKind({ classifier: undefined, hasOwnKey: false, isProduction: false }),
+      instantEvalJudgeKind({ classifier: undefined, hasCloudKey: false, isProduction: false }),
     ).toBe("connect");
     await expect(judge.classify(REQUEST)).resolves.toMatchObject({
       skippedReason: "classifier_not_configured",

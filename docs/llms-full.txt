@@ -63779,9 +63779,7 @@ A delivered license that does not verify is not applied. The install keeps the l
 
 ## Instant Evals through Connect
 
-An install with its own `JEV_API_KEY` judges with that key and is unchanged by Connect: its evaluations stay on your infrastructure whatever else is switched on.
-
-Without a judge key, an install whose license names **Instant Evals** judges through LangWatch. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
+An install whose license names **Instant Evals** judges through LangWatch. A self-hosted install cannot judge with a key of its own, so without Connect its eval functions are published as unavailable. Judging on your own infrastructure is planned for a later release. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
 
 Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
 
@@ -63902,7 +63900,6 @@ With a license that names hosted services, the install also runs the daily licen
 | Host | Component | When | What it carries | How to stop it |
 |---|---|---|---|---|
 | Model providers you add (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex AI, Gemini, custom endpoints and others) | AI Gateway, NLP, LangEvals; App when it validates a key | A feature uses a provider you configured | Content: prompts and completions | Remove the provider |
-| `api.typesafe.ai`, or `JEV_BASE_URL` | App, Workers | `JEV_API_KEY` is set. Instant Evals then use your own key and skip `gateway.langwatch.ai` | Content: the text being judged and the questions | Unset `JEV_API_KEY` |
 | `dlp.googleapis.com` | App, Workers | Strict PII redaction, only when the in-cluster Presidio call fails and Google credentials are set (`app.evaluators.google.enabled`) | Content: span text to redact | `LANGWATCH_DISABLE_GOOGLE_DLP=true` |
 | `api.github.com`, or `GITHUB_LANGY_HOST` | App | The Langy GitHub App is configured | Repository and installation metadata, token requests | Leave the GitHub App unset |
 | `github.com`, `api.github.com`, `codeload.github.com`, the npm registry, and hosts on a project's allow-list | Langy agent | `networkPolicy.allowExternalHttps: true` on the Langy agent. The NetworkPolicy then allows `:443` to any public address. The agent's L7 egress adapter checks proxied traffic against the allow-list, which is cooperative by default | git clone and push, `gh`, `npm` | Off by default, see [Langy networking](/self-hosting/langy/networking-and-egress) |
@@ -63947,7 +63944,7 @@ Both services run only when three things hold: the license names the service, no
 
 Instant Evals judge rows of an LWQL query or a trace search with a hosted model. The App or the Workers send the text being judged (a rendered trace or conversation) and the questions to `gateway.langwatch.ai/v1/instant-evals/classify`. Trace search also sends a typed sentence, the active query and the field list, to route the sentence to a filter.
 
-With `JEV_API_KEY` set, the same calls go to `api.typesafe.ai` with your own key instead, and no Instant Evals call goes to LangWatch. `INSTANT_EVAL_CLASSIFIER=null` turns the judge off entirely.
+A self-hosted install never judges with a key of its own, so no Instant Evals call goes anywhere else. `INSTANT_EVAL_CLASSIFIER=null` turns the judge off entirely.
 
 ### Managed models
 

@@ -211,7 +211,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then it is answered as classifier not configured
       And the classifier is not called
 
-    @unit @unimplemented
+    @unit
     Scenario: The not configured copy never asks for a key of one's own
       Given the copy shown when Instant Evals is not configured
       Then the error tip, the error message and the error copy the customer reads each never mention adding or setting a key

@@ -28,6 +28,7 @@ import {
   type InstantEvalJudgeSpendPipeline,
 } from "../eventing/instant-eval-judge-spend.pipeline.ts";
 import type { InstantEvalJudgeRepositories } from "../repositories/instant-eval-judge.repositories.ts";
+import { cloudClassifierKeyOf } from "../rules/instant-eval-judge-cloud-key.rules.ts";
 import { InstantEvalJudgeFactsService } from "../services/instant-eval-judge-facts.service.ts";
 import { InstantEvalJudgeService } from "../services/instant-eval-judge.service.ts";
 import { InstantEvalRateLimiterService } from "../services/instant-eval-rate-limiter.service.ts";
@@ -54,7 +55,7 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
   static readonly contract = InstantEvalJudgeApi;
   static readonly dependencies = {};
   static readonly config = instantEvalJudgeConfig;
-  /** LangWatch's own classifier key; a deployment without one classifies nothing. */
+  /** LangWatch's own classifier key, read on LangWatch Cloud only; elsewhere nothing classifies. */
   static readonly secrets = {
     classifierApiKey: Secret.load("JEV_API_KEY", { optional: true }),
   } as const;
@@ -89,7 +90,8 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
   }
 
   static async create(setup: InstantEvalJudgeSetup): Promise<InstantEvalJudgeModule> {
-    return setup.secrets.into(InstantEvalJudgeModule.secrets.classifierApiKey, (apiKey) => {
+    return setup.secrets.into(InstantEvalJudgeModule.secrets.classifierApiKey, (secretKey) => {
+      const apiKey = cloudClassifierKeyOf({ isCloud: setup.config.isSaas, apiKey: secretKey });
       const classifier = apiKey ? InstantEvalJudgeModule.classifierOf({ setup, apiKey }) : void 0;
       if (classifier) {
         setup.resources.own(

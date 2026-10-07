@@ -141,9 +141,7 @@ A delivered license that does not verify is not applied. The install keeps the l
 
 ## Instant Evals through Connect
 
-An install with its own `JEV_API_KEY` judges with that key and is unchanged by Connect: its evaluations stay on your infrastructure whatever else is switched on.
-
-Without a judge key, an install whose license names **Instant Evals** judges through LangWatch. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
+An install whose license names **Instant Evals** judges through LangWatch. A self-hosted install cannot judge with a key of its own, so without Connect its eval functions are published as unavailable. Judging on your own infrastructure is planned for a later release. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
 
 Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
 

@@ -288,3 +288,7 @@ The score judge's settings gain an optional `min` and `max` in the langevals set
   - The usage-billing catch-up stops on an organization whose fact it cannot record, unlike a real fact, which is logged. A hand-run job that skipped an organization silently would leave it capped (decision 17).
   - The spend catch-up writes each ledger row straight into the leaf's spend table under its request id. It sends no priced fact, since the ledger already holds the row a priced fact would write (decision 17).
   - Gateway reads the ledger's confirmed rows of one request type a page at a time, the rows its request-type sum already counts, filtered by the organization's projects (decision 17).
+- v17, 2026-10-07, after the docs strip. Captain: Sergio Esteban.
+  - The leaf reads the classifier key on LangWatch Cloud only, so a key a self-hosted install sets builds no classifier. Runs and judged queries then judge through Connect or not at all, as the judge call already did (decision 14).
+  - The self-hosting docs, the not configured tip and its customer copy point at Connect and never at a key of one's own. The tracked `.env.example` says a self-hosted install ignores the key (decision 14).
+  - The connect-settings scenario that kept an install's own judge key now says a self-hosted install never judges with one (decision 14).

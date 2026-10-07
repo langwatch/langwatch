@@ -97,8 +97,8 @@ export class InstantEvalNotEnabledError extends HandledError {
 
 /**
  * The project is released for Instant Evals, but the deployment has no classifier that can judge
- * for its organization (no judge key, no hosted judging through Connect). The operator can act on
- * it, which is why it is not folded into `instant_eval_not_enabled`.
+ * for its organization: it is not LangWatch Cloud and has no hosted judging through Connect. The
+ * operator can act on it, which is why it is not folded into `instant_eval_not_enabled`.
  */
 export class InstantEvalClassifierNotConfiguredError extends HandledError {
   declare readonly code: "instant_eval_classifier_not_configured";

@@ -488,13 +488,13 @@ export class InstantEvalModule implements InstantEvalApiContract {
       const { judges } = setup.dependencies;
       return InstantEvalJudgeChoiceService.create({
         choose: async () => {
-          const hasOwnKey = await judges.isClassifierConfigured();
-          const kind = instantEvalJudgeKind({ classifier, hasOwnKey, isProduction });
-          return kind === "own_key" ? InstantEvalCloudJudgeService.create({ judges }) : connect();
+          const hasCloudKey = await judges.isClassifierConfigured();
+          const kind = instantEvalJudgeKind({ classifier, hasCloudKey, isProduction });
+          return kind === "cloud" ? InstantEvalCloudJudgeService.create({ judges }) : connect();
         },
       });
     }
-    const kind = instantEvalJudgeKind({ classifier, hasOwnKey: false, isProduction });
+    const kind = instantEvalJudgeKind({ classifier, hasCloudKey: false, isProduction });
     if (kind === "none") return MemoryInstantEvalJudgeChannel.create();
     if (kind === "memory") return DeterministicInstantEvalJudgeChannel.create();
     return connect();
