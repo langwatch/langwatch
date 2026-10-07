@@ -36,9 +36,14 @@ import type {
  *  how stale a route's view of access may be. */
 export const AUTHORIZATION_MAX_AGE_MS = 5 * 60 * 1000;
 
-/** How long a project's organisation is remembered for internal mints. A
- *  project never changes organisation, so this bounds memory, not staleness. */
+/** How long a project's organisation is remembered for internal mints: it
+ *  bounds how stale a remembered scope may be, for a project that has since
+ *  been deleted. */
 const INTERNAL_SCOPE_CACHE_MS = 60 * 1000;
+
+/** Bounds the internal-mint scope cache's memory; the oldest entry goes
+ *  first. */
+export const INTERNAL_SCOPE_CACHE_MAX_ENTRIES = 5_000;
 
 /**
  * Absolute ceiling on a cached shared-read lookup, epoch agreement or not,
@@ -129,6 +134,11 @@ export class AuthorizationService {
       return cached.organizationId;
     const scopeRef = await this.deps.collector.resolveScopeRef({ projectId });
     if (scopeRef?.type !== "project") return undefined;
+    this.internalScopes.delete(projectId);
+    if (this.internalScopes.size >= INTERNAL_SCOPE_CACHE_MAX_ENTRIES) {
+      const oldest = this.internalScopes.keys().next().value;
+      if (oldest !== undefined) this.internalScopes.delete(oldest);
+    }
     this.internalScopes.set(projectId, {
       organizationId: scopeRef.organizationId,
       until: now + INTERNAL_SCOPE_CACHE_MS,

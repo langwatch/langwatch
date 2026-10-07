@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   AUTHORIZATION_MAX_AGE_MS,
   AuthorizationService,
+  INTERNAL_SCOPE_CACHE_MAX_ENTRIES,
 } from "../authorization.service";
 import type { SharedReadRow } from "../repositories/shared-reads.grants.repository";
 
@@ -270,6 +271,38 @@ describe("AuthorizationService.authorizeInternal", () => {
         await mint();
         await mint();
         expect(deps.collector.resolveScopeRef).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when it mints for more projects than the cache holds", () => {
+      it("keeps the newest projects and forgets the oldest first", async () => {
+        const { service, deps } = door();
+        const mint = (projectId: string) =>
+          service.authorizeInternal({
+            actor: { type: "system", name: "aggregateReconciler" },
+            projectId,
+            permission: "traces:view",
+            purpose: { kind: "operator", entry: "reconcile" },
+          });
+        const projects = Array.from(
+          { length: INTERNAL_SCOPE_CACHE_MAX_ENTRIES + 1 },
+          (_, index) => `proj_${index}`,
+        );
+        expect(projects.length).toBeGreaterThan(1);
+        for (const projectId of projects) await mint(projectId);
+        expect(deps.collector.resolveScopeRef).toHaveBeenCalledTimes(
+          projects.length,
+        );
+
+        for (const projectId of projects.slice(1)) await mint(projectId);
+        expect(deps.collector.resolveScopeRef).toHaveBeenCalledTimes(
+          projects.length,
+        );
+
+        await mint("proj_0");
+        expect(deps.collector.resolveScopeRef).toHaveBeenCalledTimes(
+          projects.length + 1,
+        );
       });
     });
   });

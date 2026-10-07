@@ -724,4 +724,7 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
 - v4.9 (2026-10-07, implementation note after the second review, no
   decision changed). `TenantMismatchError` is deleted from `@langwatch/actor`:
   nothing threw or caught it, and the same-organisation invariant above
-  says how the door keeps a proof inside one organisation without it.
+  says how the door keeps a proof inside one organisation without it. The
+  door's memory of each project's organisation for internal mints is
+  capped, oldest first, as its shared-read cache already was: its time limit
+  bounds staleness, and only the cap bounds memory.
