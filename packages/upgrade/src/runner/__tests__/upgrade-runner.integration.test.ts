@@ -435,6 +435,73 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
     });
   });
 
+  describe("when the upgrade jumps two releases that each carry schema and a blocking step", () => {
+    /** @scenario "A jump across two releases applies each release's schema, then its blocking steps, release by release" */
+    it("applies the older release's schema and step before the newer release's", async () => {
+      await run(runnerFor({ release: "3.20.1", applier: fakeApplier({ release: "3.20.1" }) }));
+      const manifests: ReleaseManifest[] = [
+        ...MANIFESTS.slice(0, 2),
+        {
+          release: "3.22.0",
+          previous: "3.21.0",
+          cutAt: "2026-10-04T09:00:00+02:00",
+          steps: [
+            step("prisma:20261003000000_more", "postgres-schema"),
+            step("trace:rekey", "data"),
+          ],
+        },
+      ];
+      const upTo = (release: string) =>
+        manifests.filter((m) => m.release <= release).flatMap((m) => m.steps.map((s) => s.id));
+      const order: string[] = [];
+      const applier: UpgradeSchemaApplier = {
+        async apply({ release }) {
+          order.push(`schema ${release}`);
+          const ids = upTo(release ?? "3.22.0");
+          for (const id of ids.filter((each) => each.startsWith("prisma:"))) {
+            await scratch.postgres.query(
+              `INSERT INTO "_prisma_migrations" ("migration_name", "finished_at")
+               SELECT $1::text, now() WHERE NOT EXISTS (SELECT 1 FROM "_prisma_migrations" WHERE "migration_name" = $1::text)`,
+              [id.slice("prisma:".length)],
+            );
+          }
+          const goose = new Set(ids.filter((each) => each.startsWith("clickhouse:")));
+          return [
+            { engine: "postgres", target: "postgres", ok: true, error: null },
+            { engine: "clickhouse", target: "shared", ok: true, error: null, applied: goose },
+          ];
+        },
+      };
+      const blocking = (id: string): MigrationStep =>
+        defineMigrationStep({
+          id,
+          kind: "data",
+          mode: "blocking",
+          description: `runs ${id}`,
+          run: async () => {
+            order.push(`step ${id}`);
+            return {};
+          },
+        });
+      const outcome = await run(
+        runnerFor({
+          release: "3.22.0",
+          applier,
+          image: { release: "3.22.0", steps: manifests.flatMap((m) => m.steps) },
+          releases: { manifests, floor: FLOOR },
+          codeSteps: [blocking("dataset:copy-keys"), blocking("trace:rekey")],
+        }),
+      );
+      expect(outcome.code).toBe("done");
+      expect(order).toEqual([
+        "schema 3.21.0",
+        "step dataset:copy-keys",
+        "schema 3.22.0",
+        "step trace:rekey",
+      ]);
+    });
+  });
+
   describe("when the applier fails once without leaving a failed migration", () => {
     /** @scenario "A transient schema failure that left no failed migration is retried with backoff" */
     it("waits, retries and completes", async () => {
