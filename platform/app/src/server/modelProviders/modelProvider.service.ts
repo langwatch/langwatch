@@ -1,15 +1,23 @@
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import type { PrismaClient, Project } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockConfig";
+import { providerDefaultBaseUrls } from "../../features/onboarding/regions/model-providers/registry";
 import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import { getSchemaShape } from "../../utils/modelProviderHelpers";
 import { rateLimit } from "../rateLimit";
 import { isSecretCredential, mergeStoredCustomKeys } from "./credentialMerge";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
+import {
+  importsModelListing,
+  type ModelImportOutcome,
+  mergeListedModels,
+  readListedModelIds,
+} from "./customModelImport";
 import {
   ModelProviderAnchorRequiredError,
   ModelProviderCredentialsUnreadableError,
@@ -54,6 +62,25 @@ import {
 } from "./routingHandle";
 import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
 
+const logger = createLogger("langwatch:modelProviders:service");
+
+/** Asks a provider to list its models with the credential the save stores. */
+export type ListProviderModels = (
+  provider: string,
+  customKeys: Record<string, string>,
+) => Promise<ValidationResult>;
+
+/** The import step's result, before the write folds it in. */
+type ModelListingImport = {
+  outcome: ModelImportOutcome;
+  /** Set only on an import: the merged lists and the ids to remember. */
+  merged?: {
+    customModels: CustomModelsInput;
+    customEmbeddingsModels: CustomModelsInput;
+    lastListedModelIds: string[];
+  };
+};
+
 /**
  * Minimal ctx slice this service uses to authorize scope-level writes.
  * Kept narrow so the service can be constructed from any caller (tRPC,
@@ -77,6 +104,8 @@ type ModelProviderWrite = {
   validatedKeys: Record<string, unknown> | null;
   customKeysProvided: boolean;
   scopes: ScopeInput[] | undefined;
+  /** Set when this save imported from the provider's model listing. */
+  lastListedModelIds?: string[];
 };
 
 /** The advanced settings that ride the same row as the basic fields. */
@@ -489,6 +518,41 @@ export function providerRowServesModel({
 }
 
 /**
+ * The string credential fields a save will store: the incoming fields over
+ * the stored ones, a masked field meaning the stored value. `undefined` for a
+ * managed row, whose credential is not the customer's to probe with.
+ */
+function credentialToStore({
+  existingProvider,
+  validatedKeys,
+  customKeysProvided,
+}: {
+  existingProvider: {
+    customKeys: unknown;
+    customKeysUnreadable?: boolean;
+  } | null;
+  validatedKeys: Record<string, unknown> | null;
+  customKeysProvided: boolean;
+}): Record<string, string> | undefined {
+  const storedKeys =
+    existingProvider?.customKeysUnreadable === true
+      ? null
+      : ((existingProvider?.customKeys ?? null) as Record<
+          string,
+          unknown
+        > | null);
+  const effectiveKeys = customKeysProvided
+    ? mergeStoredCustomKeys({ incoming: validatedKeys, stored: storedKeys })
+    : (storedKeys ?? {});
+  if ("MANAGED" in effectiveKeys) return undefined;
+  return Object.fromEntries(
+    Object.entries(effectiveKeys).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
+}
+
+/**
  * Service layer for ModelProvider business logic.
  * Single Responsibility: Model provider lifecycle management.
  *
@@ -498,11 +562,13 @@ export class ModelProviderService {
   private readonly prisma: PrismaClient;
   private readonly repository: ModelProviderRepository;
   private readonly changeEvents: ChangeEventRepository;
+  private readonly listProviderModels: ListProviderModels;
 
   constructor({
     prisma,
     repository,
     changeEvents,
+    listProviderModels,
   }: {
     prisma: PrismaClient;
     repository: ModelProviderRepository;
@@ -514,10 +580,13 @@ export class ModelProviderService {
      * this provider id so the next request resolves the new key.
      */
     changeEvents?: ChangeEventRepository;
+    /** The model listing probe; the credential check by default. */
+    listProviderModels?: ListProviderModels;
   }) {
     this.prisma = prisma;
     this.repository = repository;
     this.changeEvents = changeEvents ?? new ChangeEventRepository(prisma);
+    this.listProviderModels = listProviderModels ?? validateProviderApiKey;
   }
 
   /**
@@ -936,7 +1005,16 @@ export class ModelProviderService {
       throw new ModelProviderScopesRequiredError();
     }
 
-    return await this.withRoutingHandleConflict({
+    // Outside the transaction: this is a network call to the provider, and
+    // nothing in it may hold a database transaction open.
+    const listing = await this.importListedModels({
+      input,
+      existingProvider,
+      validatedKeys,
+      customKeysProvided,
+    });
+
+    const row = await this.withRoutingHandleConflict({
       handle: normalizedHandle,
       write: () =>
         this.writeModelProvider({
@@ -944,12 +1022,136 @@ export class ModelProviderService {
           createScopes,
           isHandleProvided,
           normalizedHandle,
-          input,
+          input: listing?.merged
+            ? {
+                ...input,
+                customModels: listing.merged.customModels,
+                customEmbeddingsModels: listing.merged.customEmbeddingsModels,
+              }
+            : input,
           validatedKeys,
           customKeysProvided,
           scopes,
+          lastListedModelIds: listing?.merged?.lastListedModelIds,
         }),
     });
+
+    return { ...row, modelImport: listing?.outcome };
+  }
+
+  /**
+   * The credential a model import probes with, or `undefined` when this save
+   * does not import: the provider is not an OpenAI-compatible endpoint of
+   * the customer's own, or the row is managed.
+   */
+  private importCredential({
+    input,
+    existingProvider,
+    validatedKeys,
+    customKeysProvided,
+  }: {
+    input: UpdateModelProviderInput;
+    existingProvider: ModelProviderWrite["existingProvider"];
+    validatedKeys: Record<string, unknown> | null;
+    customKeysProvided: boolean;
+  }): Record<string, string> | undefined {
+    const definition =
+      modelProviders[input.provider as keyof typeof modelProviders];
+    if (!definition) return undefined;
+
+    const keys = credentialToStore({
+      existingProvider,
+      validatedKeys,
+      customKeysProvided,
+    });
+    if (!keys) return undefined;
+
+    const endpointField = definition.endpointKey;
+    const imports = importsModelListing({
+      provider: input.provider,
+      baseUrl: endpointField ? keys[endpointField] : undefined,
+      openAIDefaultBaseUrl:
+        providerDefaultBaseUrls.openai ?? "https://api.openai.com/v1",
+    });
+    if (!imports) return undefined;
+
+    const envKey = process.env[definition.apiKey];
+    if (!keys[definition.apiKey]?.trim() && envKey) {
+      keys[definition.apiKey] = envKey;
+    }
+    return keys;
+  }
+
+  /**
+   * Imports the models a custom provider lists at `/v1/models` into the
+   * lists this save writes.
+   *
+   * The probe runs with the credential the save is about to store: the
+   * incoming fields over the stored ones, a masked field meaning the stored
+   * value. Only ids new since the previous listing are added, so an entry the
+   * user edited or removed stays as they left it. Any failure leaves the save
+   * exactly as it was sent and reports `failed`; this never throws.
+   */
+  private async importListedModels({
+    input,
+    existingProvider,
+    validatedKeys,
+    customKeysProvided,
+  }: {
+    input: UpdateModelProviderInput;
+    existingProvider: ModelProviderWrite["existingProvider"];
+    validatedKeys: Record<string, unknown> | null;
+    customKeysProvided: boolean;
+  }): Promise<ModelListingImport | undefined> {
+    if (!input.enabled) return undefined;
+    const keys = this.importCredential({
+      input,
+      existingProvider,
+      validatedKeys,
+      customKeysProvided,
+    });
+    if (!keys) return undefined;
+
+    let listed: Awaited<ReturnType<ListProviderModels>>;
+    try {
+      listed = await this.listProviderModels(input.provider, keys);
+    } catch (error) {
+      logger.warn(
+        { provider: input.provider, error },
+        "Could not list models from the provider on save",
+      );
+      return { outcome: { status: "failed" } };
+    }
+    if (listed.outcome !== "verified" || !listed.models) {
+      return { outcome: { status: "failed" } };
+    }
+
+    const merged = mergeListedModels({
+      listed: listed.models,
+      customModels:
+        input.customModels !== undefined
+          ? input.customModels
+          : (existingProvider?.customModels as CustomModelsInput | null),
+      customEmbeddingsModels:
+        input.customEmbeddingsModels !== undefined
+          ? input.customEmbeddingsModels
+          : (existingProvider?.customEmbeddingsModels as CustomModelsInput | null),
+      previouslyListedIds: readListedModelIds(
+        existingProvider?.lastListedModelIds,
+      ),
+    });
+    return {
+      outcome: {
+        status: "imported",
+        added: merged.added,
+        total: listed.models.length,
+      },
+      merged: {
+        customModels: merged.customModels,
+        customEmbeddingsModels: merged.customEmbeddingsModels,
+        lastListedModelIds: merged.listedModelIds,
+      },
+    };
   }
 
   /**
@@ -1007,6 +1209,7 @@ export class ModelProviderService {
         scopes,
         customModels: input.customModels ?? [],
         customEmbeddingsModels: input.customEmbeddingsModels ?? [],
+        lastListedModelIds: write.lastListedModelIds,
         extraHeaders: input.extraHeaders ?? [],
         ...(isHandleProvided && { routingHandle: normalizedHandle }),
         advanced: advancedFields(input),
@@ -1073,6 +1276,7 @@ export class ModelProviderService {
         scopes: createScopes,
         customModels: input.customModels ?? undefined,
         customEmbeddingsModels: input.customEmbeddingsModels ?? undefined,
+        lastListedModelIds: write.lastListedModelIds,
         extraHeaders: input.extraHeaders ?? [],
         ...(isHandleProvided && { routingHandle: normalizedHandle }),
         advanced: advancedFields(input),
@@ -1957,6 +2161,7 @@ export class ModelProviderService {
       scopes?: ScopeInput[];
       customModels: CustomModelsInput;
       customEmbeddingsModels: CustomModelsInput;
+      lastListedModelIds?: string[];
       extraHeaders: { key: string; value: string }[];
       routingHandle?: string | null;
       advanced: AdvancedGatewayInput;
@@ -1990,6 +2195,9 @@ export class ModelProviderService {
         enabled: data.enabled,
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
+        ...(data.lastListedModelIds !== undefined && {
+          lastListedModelIds: data.lastListedModelIds,
+        }),
         extraHeaders: this.mergeExtraHeaders(
           data.extraHeaders,
           existingProvider.extraHeaders as
@@ -2017,6 +2225,7 @@ export class ModelProviderService {
       enabled: boolean;
       customModels?: CustomModelsInput;
       customEmbeddingsModels?: CustomModelsInput;
+      lastListedModelIds?: string[];
       extraHeaders: { key: string; value: string }[];
       scopes: ScopeInput[];
       routingHandle?: string | null;
@@ -2033,6 +2242,7 @@ export class ModelProviderService {
         enabled: data.enabled,
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
+        lastListedModelIds: data.lastListedModelIds,
         // No existing row to restore from — placeholder values are dropped
         // instead of being stored literally.
         extraHeaders: this.mergeExtraHeaders(data.extraHeaders, null),

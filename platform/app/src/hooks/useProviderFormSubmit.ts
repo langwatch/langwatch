@@ -4,6 +4,7 @@ import { fromZodError } from "zod-validation-error";
 import { describeError, showErrorToast } from "~/features/errors";
 import { toaster } from "../components/ui/toaster";
 import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
+import type { ModelImportOutcome } from "../server/modelProviders/customModelImport";
 import {
   type MaybeStoredModelProvider,
   modelProviders,
@@ -99,6 +100,37 @@ export type AdvancedGatewayPayload = {
   } | null;
   langySkipPermissionsModels?: string[];
 };
+
+/**
+ * Tells the user what the save imported from the provider's model listing.
+ * Nothing is shown when the provider does not import, or imported nothing new.
+ */
+export function showModelImportToast({
+  modelImport,
+  providerName,
+}: {
+  modelImport: ModelImportOutcome | undefined;
+  providerName: string;
+}): void {
+  if (!modelImport) return;
+  if (modelImport.status === "failed") {
+    toaster.create({
+      title: "Could not list models from this provider",
+      description: "The provider was saved. Add its models by hand.",
+      type: "warning",
+      duration: 6000,
+    });
+    return;
+  }
+  if (modelImport.added === 0) return;
+  toaster.create({
+    title: `Imported ${modelImport.added} ${
+      modelImport.added === 1 ? "model" : "models"
+    } from ${providerName}`,
+    type: "success",
+    duration: 4000,
+  });
+}
 
 export function useProviderFormSubmit({
   getFormSnapshot,
@@ -294,7 +326,7 @@ export function useProviderFormSubmit({
           return;
         }
       }
-      await updateMutation.mutateAsync({
+      const saved = await updateMutation.mutateAsync({
         id: provider.id,
         projectId,
         organizationId,
@@ -456,6 +488,14 @@ export function useProviderFormSubmit({
         title: "Model Provider Updated",
         type: "success",
         duration: 3000,
+      });
+      showModelImportToast({
+        modelImport: saved?.modelImport,
+        providerName:
+          trimmedName ||
+          (modelProviders[provider.provider as keyof typeof modelProviders]
+            ?.name ??
+            provider.provider),
       });
       onSuccess?.();
     } catch (err) {

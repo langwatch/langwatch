@@ -138,6 +138,7 @@ function platformProviderRow({
     customKeys: { [apiKey]: process.env[apiKey] ?? "" },
     extraHeaders: null,
     customModels: null,
+    lastListedModelIds: null,
     customEmbeddingsModels: null,
     deploymentMapping: null,
     rateLimitRpm: null,
