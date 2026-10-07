@@ -49,14 +49,18 @@ const READ_RESOURCES = {
 export type ReadResource = keyof typeof READ_RESOURCES;
 
 /**
- * The permissions a route's `.permission()` check mints a proof for. A
- * route checked under any other permission reads no proof-bearing store,
- * so minting there would cost an engine pass nothing consumes. Widening
+ * The permissions a route's `.permission()` check mints a proof for: only
+ * the trace read's. Every route that applies a proof is checked under
+ * `traces:view`. No production read asks for `analytics` yet (analytics
+ * across an aggregate's members is not delivered), so minting under
+ * `analytics:view` would cost an engine pass and a shared-read lookup that
+ * nothing consumes. The `analytics` resource stays so the client still
+ * refuses a proof minted for traces when analytics is asked of it. Widening
  * this to every route is the foundation branch's job (PR 7536).
  */
-export const PROOF_BEARING_PERMISSIONS: ReadonlySet<AuthzPermission> = new Set(
-  Object.values(READ_RESOURCES).map((resource) => resource.permission),
-);
+export const PROOF_BEARING_PERMISSIONS: ReadonlySet<AuthzPermission> = new Set([
+  READ_RESOURCES.traces.permission,
+]);
 
 /**
  * The time columns a marker may name. The window on a shared grant is

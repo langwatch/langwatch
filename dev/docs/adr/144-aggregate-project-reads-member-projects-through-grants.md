@@ -733,3 +733,9 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   `log` window a later minter writes can never open trace rows. The door
   leaves a stored window with no start out of the proof, as it does one
   with a `where`, rather than reading the missing start as the epoch.
+  Only a route checked under `traces:view` mints a proof: every route that
+  applies one is a trace read, and analytics across members is not
+  delivered, so a mint under `analytics:view` cost an engine pass and a
+  shared-read lookup nothing consumed. The client keeps its `analytics`
+  read resource, so a proof minted for traces is still refused when
+  analytics is asked of it.

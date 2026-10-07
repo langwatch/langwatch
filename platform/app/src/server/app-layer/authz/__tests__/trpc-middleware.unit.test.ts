@@ -634,6 +634,26 @@ describe("ADR-144: the proof a trace route carries", () => {
       });
     });
   });
+
+  describe("given a procedure checked under analytics view", () => {
+    describe("when the check admits the caller", () => {
+      it("mints nothing, since no analytics read applies a proof", async () => {
+        const app = appWith();
+        const params = paramsFor({ projectId: "proj-1" });
+        (params.ctx as { app?: unknown }).app = app;
+
+        await checkDeclaredPermission({ permission: "analytics:view" })(
+          params as any,
+        );
+
+        expect(app.authorization.authorize).not.toHaveBeenCalled();
+        expect(
+          (params.ctx as { authorization?: unknown }).authorization,
+        ).toBeUndefined();
+        expect(params.next).toHaveBeenCalled();
+      });
+    });
+  });
 });
 
 describe("ADR-144: an aggregate read is audited at the door", () => {
