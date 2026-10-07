@@ -303,3 +303,65 @@ describe("Feature: opening an aggregate page never writes a default row", () => 
     });
   });
 });
+
+/**
+ * Saving a view writes a row under the project, but the four saved-view
+ * mutations are declared under `traces:view` so a member who can only read
+ * traces can still keep a view. The permission-level guard reads them as
+ * reads, so each asks the write guard itself.
+ */
+describe("Feature: saving a view is refused on the aggregate", () => {
+  const VIEW_WRITES = {
+    "savedViews.create": (projectId: string) =>
+      admin.savedViews.create({
+        projectId,
+        name: `Lens ${run}`,
+        filters: {},
+        kind: "v2-traces-lens",
+        scope: "project",
+      }),
+    "savedViews.rename": (projectId: string) =>
+      admin.savedViews.rename({
+        projectId,
+        viewId: `custom-${run}`,
+        name: "Renamed",
+      }),
+    "savedViews.reorder": (projectId: string) =>
+      admin.savedViews.reorder({ projectId, viewIds: [`custom-${run}`] }),
+    "savedViews.delete": (projectId: string) =>
+      admin.savedViews.delete({ projectId, viewId: `custom-${run}` }),
+  } as const;
+
+  describe("given an aggregate project and one of its members", () => {
+    for (const [path, write] of Object.entries(VIEW_WRITES)) {
+      describe(`when ana calls ${path} on the aggregate`, () => {
+        /** @scenario "Saving, renaming, reordering or deleting a view is refused on the aggregate" */
+        it("is refused with the read-only code and writes no view", async () => {
+          const refusal = await refusalOf(write(aggregate.id));
+
+          expect(handledCodeOf(refusal)).toBe(READ_ONLY);
+          expect(
+            await prisma.savedView.count({
+              where: { projectId: aggregate.id },
+            }),
+          ).toBe(0);
+        });
+      });
+    }
+
+    describe("when ana saves a view on the member", () => {
+      /** @scenario "Saving, renaming, reordering or deleting a view is refused on the aggregate" */
+      it("writes the view", async () => {
+        const view = await admin.savedViews.create({
+          projectId: member.id,
+          name: `Lens ${run}`,
+          filters: {},
+          kind: "v2-traces-lens",
+          scope: "project",
+        });
+
+        expect(view.projectId).toBe(member.id);
+      });
+    });
+  });
+});

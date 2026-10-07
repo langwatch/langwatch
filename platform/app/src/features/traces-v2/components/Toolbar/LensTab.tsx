@@ -30,6 +30,7 @@ import {
   MenuRoot,
   MenuSeparator,
 } from "../../../../components/ui/menu";
+import { useCanSaveLenses } from "../../hooks/useCanSaveLenses";
 import { useExplorerStore } from "../../stores/explorerStore";
 import type { LensConfig } from "../../stores/viewSlice";
 import { LensNameDialog } from "./LensNameDialog";
@@ -351,6 +352,7 @@ const BuiltInLensMenuItems: React.FC<{
   const revertLens = useExplorerStore((s) => s.revertLens);
   const createLens = useExplorerStore((s) => s.createLens);
   const deleteLens = useExplorerStore((s) => s.deleteLens);
+  const canSaveLenses = useCanSaveLenses();
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   // "All" is the table's home base — if a user could dismiss it
@@ -362,14 +364,16 @@ const BuiltInLensMenuItems: React.FC<{
 
   return (
     <>
-      <MenuItem
-        value="save-as-new"
-        onClick={() => setSaveDialogOpen(true)}
-        fontWeight={isDraft ? "semibold" : undefined}
-      >
-        <LuFilePlus />
-        {isDraft ? "Save changes as new lens…" : "Save as new lens…"}
-      </MenuItem>
+      {canSaveLenses && (
+        <MenuItem
+          value="save-as-new"
+          onClick={() => setSaveDialogOpen(true)}
+          fontWeight={isDraft ? "semibold" : undefined}
+        >
+          <LuFilePlus />
+          {isDraft ? "Save changes as new lens…" : "Save as new lens…"}
+        </MenuItem>
+      )}
       <MenuItem
         value="revert"
         onClick={() => revertLens(lensId)}
@@ -379,6 +383,8 @@ const BuiltInLensMenuItems: React.FC<{
         Revert local changes
       </MenuItem>
       <MenuSeparator />
+      {/* Hiding a built-in lens is kept in this browser, never on the
+          server, so it stays available on an aggregate project. */}
       <MenuItem
         value="delete"
         onClick={() => !isUndeletable && canDelete && deleteLens(lensId)}
@@ -411,7 +417,21 @@ const UserLensMenuItems: React.FC<{
   const createLens = useExplorerStore((s) => s.createLens);
   const duplicateLens = useExplorerStore((s) => s.duplicateLens);
   const deleteLens = useExplorerStore((s) => s.deleteLens);
+  const canSaveLenses = useCanSaveLenses();
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+
+  if (!canSaveLenses) {
+    return (
+      <MenuItem
+        value="revert"
+        onClick={() => revertLens(lensId)}
+        disabled={!isDraft}
+      >
+        <LuUndo2 />
+        Revert local changes
+      </MenuItem>
+    );
+  }
 
   return (
     <>

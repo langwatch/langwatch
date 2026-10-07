@@ -358,6 +358,20 @@ Feature: An aggregate project reads its member projects
     And no dashboard or saved view row exists under the aggregate
     And opening the member the same way still creates its first dashboard and default views
 
+  @integration
+  Scenario: Saving, renaming, reordering or deleting a view is refused on the aggregate
+    Given an aggregate project and one of its members
+    When ana saves a view of the aggregate's trace list, or renames, reorders or deletes one
+    Then each is refused as read only and no saved view row is written
+    And saving a view on the member still writes one
+
+  @integration
+  Scenario: The aggregate's trace list offers no control to save a view
+    Given an aggregate project
+    When ana opens its trace list
+    Then it offers no button to create a lens and no "Save current filtered view"
+    And a lens tab's menu offers no save as new lens, rename, duplicate or delete
+
   # ── H. The aggregate in the app ──────────────────────────────────────────
   # The server refuses every write; these keep the app from inviting one, and
   # from waiting on ingestion an aggregate never receives.
