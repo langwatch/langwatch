@@ -53,3 +53,10 @@ Feature: Transient refusals keep their body, and JSON text is parsed at the door
       When a caller sends text that is not JSON, or JSON that is not an object
       Then the input is refused as a schema issue, which tRPC answers 400 BAD_REQUEST
       And the handler is not reached
+
+    @unit
+    Scenario: A malformed graph JSON is a 400 schema issue
+      Given the dashboard's graphs.create and graphs.updateById procedures, whose graph field is JSON text
+      When a caller sends graph text that is not JSON, or JSON that is not an object
+      Then the procedure answers 400 BAD_REQUEST with a schema issue on the graph field and stores nothing
+      And a well-formed graph is stored and read back as the parsed record

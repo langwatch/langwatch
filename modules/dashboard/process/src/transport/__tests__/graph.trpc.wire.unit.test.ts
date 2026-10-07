@@ -102,7 +102,10 @@ describe("the graphs tRPC namespace", () => {
       const call = mounted(app);
       const dashboard = await dashboardOn(app);
       const created = legacyGraphSchema.parse(
-        await call("create", { ...GRAPH, dashboardId: dashboard.id }),
+        await call(
+          "create",
+          graphApiCreateInputSchema.parse({ ...GRAPH, dashboardId: dashboard.id }),
+        ),
       );
 
       await call(
