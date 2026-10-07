@@ -242,7 +242,11 @@ describe("SpanStorageClickHouseRepository through the proof", () => {
           traceId: SHARED_TRACE,
           occurredAtMs: TODAY,
         });
-        expect(summary.map((row) => row.spanId)).not.toContain("out-1");
+        expect(summary.map((row) => row.spanId).sort()).toEqual([
+          "a-1",
+          "agg-1",
+          "b-in",
+        ]);
 
         const rollups = await repo.getTraceEventRollupsByTraceIds({
           authorization,
