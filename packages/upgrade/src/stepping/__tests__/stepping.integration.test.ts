@@ -43,6 +43,19 @@ const CLIENT_RESOLVES = resolves("@prisma/client/package.json") && resolves("@pr
 
 let sequence = 0;
 
+/** `Pool.end()` resolves before its sockets close; a FORCE drop then hits them with 57P01. */
+async function dropDatabase({ admin, name }: { admin: Pool; name: string }): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const open = await admin.query<{ count: string }>(
+      "SELECT count(*) AS count FROM pg_stat_activity WHERE datname = $1",
+      [name],
+    );
+    if (open.rows[0]?.count === "0") break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
+}
+
 interface Scratch {
   name: string;
   dir: string;
@@ -81,7 +94,7 @@ async function openScratch(): Promise<Scratch> {
     },
     drop: async () => {
       await postgres.end();
-      await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
+      await dropDatabase({ admin, name });
       await admin.end();
       await root.command({ query: `DROP DATABASE IF EXISTS ${name}` });
       await root.close();
@@ -437,7 +450,7 @@ describe.skipIf(!DB_URL || !CLIENT_RESOLVES)("a model client newer than its tabl
       });
     } finally {
       await rm(dir, { recursive: true, force: true });
-      await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
+      await dropDatabase({ admin, name });
       await admin.end();
     }
   });
