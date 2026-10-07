@@ -9,7 +9,7 @@
  * updates").
  */
 import { describe, expect, it, vi } from "vitest";
-import { ownProof } from "~/test-utils/authorizationProofs";
+import { aggregateProof, ownProof } from "~/test-utils/authorizationProofs";
 import { LANGY_TRACE_ORIGIN } from "../derive-trace-origin";
 import { FACET_REGISTRY } from "../facet-registry";
 import { translateFilterToClickHouse } from "../filter-to-clickhouse";
@@ -277,6 +277,90 @@ describe("TraceListService.getFacets", () => {
       expect(
         [...shared.categoricalSpecs, ...shared.rangeSpecs].map((s) => s.key),
       ).toEqual(batchedKeys);
+    });
+  });
+
+  describe("given an aggregate whose facet lists a member's topic", () => {
+    const AGGREGATE = "aggregate-1";
+    const MEMBER = "member-1";
+    const OUTSIDER = "outsider-1";
+    /** Topic rows as Postgres holds them: the id is the primary key. */
+    const TOPICS = [
+      { id: "topic-own", projectId: AGGREGATE, name: "Own topic" },
+      { id: "topic-member", projectId: MEMBER, name: "Member topic" },
+      { id: "topic-outsider", projectId: OUTSIDER, name: "Outsider topic" },
+    ];
+
+    function topicService() {
+      return {
+        getNamesByIds: vi.fn(
+          async ({
+            projectIds,
+            ids,
+          }: {
+            projectIds: readonly string[];
+            ids: readonly string[];
+          }) =>
+            new Map(
+              TOPICS.filter(
+                (topic) =>
+                  projectIds.includes(topic.projectId) &&
+                  ids.includes(topic.id),
+              ).map((topic) => [topic.id, topic.name]),
+            ),
+        ),
+      };
+    }
+
+    describe("when the facets are read", () => {
+      it("names the member's topic and leaves a topic outside the proof unnamed", async () => {
+        const repository = fakeRepository();
+        repository.findBatchedFacets.mockImplementation(
+          async ({ table }: { table: string }) =>
+            table === "trace_summaries"
+              ? {
+                  categoricals: {
+                    topic: {
+                      values: TOPICS.map((topic) => ({
+                        value: topic.id,
+                        count: 1,
+                      })),
+                      totalDistinct: TOPICS.length,
+                    },
+                  },
+                  ranges: {},
+                }
+              : { categoricals: {}, ranges: {} },
+        );
+        const topics = topicService();
+        const service = new TraceListService(
+          repository as never,
+          { findSummariesByTraceIds: vi.fn().mockResolvedValue([]) } as never,
+          topics as never,
+        );
+
+        const { facets } = await service.getFacets({
+          authorization: aggregateProof({
+            projectId: AGGREGATE,
+            members: [{ projectId: MEMBER, from: 0 }],
+          }),
+          timeRange,
+        });
+
+        const topic = facets.find((facet) => facet.key === "topic");
+        const labels =
+          topic?.kind === "categorical"
+            ? topic.topValues.map((value) => [value.value, value.label])
+            : [];
+        expect(labels).toEqual([
+          ["topic-own", "Own topic"],
+          ["topic-member", "Member topic"],
+          ["topic-outsider", undefined],
+        ]);
+        expect(topics.getNamesByIds).toHaveBeenCalledWith(
+          expect.objectContaining({ projectIds: [AGGREGATE, MEMBER] }),
+        );
+      });
     });
   });
 

@@ -2,6 +2,7 @@ import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import {
+  fenceFor,
   ownProjectIdOf,
   tenantScopeKey,
 } from "~/server/app-layer/clients/clickhouse/authorized-reads";
@@ -396,12 +397,21 @@ function scopeKeyOf(authorization: Authorization): string {
 }
 
 /**
- * The project the proof was minted for. Postgres rows (topic names) and the
- * discover broadcast channel live under it; on an aggregate that is the
- * aggregate itself, not a member.
+ * The project the proof was minted for. The discover broadcast channel
+ * lives under it; on an aggregate that is the aggregate itself, not a member.
  */
 function ownProjectOf(authorization: Authorization): string {
   return ownProjectIdOf({ authorization, reads: "traces" });
+}
+
+/**
+ * Every project the proof reads traces from: its own project and each shared
+ * member. A facet over an aggregate carries topic ids owned by any of them,
+ * so their names are looked up across all of them.
+ */
+function projectsReadBy(authorization: Authorization): string[] {
+  const fence = fenceFor({ authorization, reads: "traces" });
+  return [...fence.own, ...fence.shared.map((window) => window.projectId)];
 }
 
 function facetValuesCacheKey(params: FacetValuesParams): string {
@@ -558,12 +568,15 @@ export class TraceListService {
    * The `value` field stays as the ID (used for filtering); `label` carries the name.
    */
   private async enrichTopicNames(
-    projectId: string,
+    authorization: Authorization,
     result: CategoricalFacetResult,
   ): Promise<CategoricalFacetResult> {
     const ids = result.values.map((v) => v.value).filter(Boolean);
     if (ids.length === 0) return result;
-    const names = await this.topicService.getNamesByIds({ projectId, ids });
+    const names = await this.topicService.getNamesByIds({
+      projectIds: projectsReadBy(authorization),
+      ids,
+    });
     return {
       ...result,
       values: result.values.map((v) => {
@@ -1105,7 +1118,7 @@ export class TraceListService {
       if (!raw) return null;
       const enriched =
         def.key === "topic" || def.key === "subtopic"
-          ? await this.enrichTopicNames(ownProjectOf(params.authorization), raw)
+          ? await this.enrichTopicNames(params.authorization, raw)
           : raw;
       return {
         key: def.key,
@@ -1247,10 +1260,7 @@ export class TraceListService {
     }
 
     if (def.key === "topic" || def.key === "subtopic") {
-      result = await this.enrichTopicNames(
-        ownProjectOf(params.authorization),
-        result,
-      );
+      result = await this.enrichTopicNames(params.authorization, result);
     }
 
     return result;
@@ -1327,10 +1337,7 @@ export class TraceListService {
     }
 
     if (def.key === "topic" || def.key === "subtopic") {
-      result = await this.enrichTopicNames(
-        ownProjectOf(params.authorization),
-        result,
-      );
+      result = await this.enrichTopicNames(params.authorization, result);
     }
 
     return {
