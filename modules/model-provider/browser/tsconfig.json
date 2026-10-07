@@ -33,9 +33,6 @@
       "path": "../../../enterprise/modules/managed-provider/client/tsconfig.build.json"
     },
     {
-      "path": "../../../enterprise/modules/managed-provider/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/error-views/tsconfig.build.json"
     },
     {
