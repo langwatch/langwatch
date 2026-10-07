@@ -47,6 +47,7 @@ import { loadUiRootCapabilities, type UiRootCapabilities } from "./shell/ui-root
 import { uiRouteTable } from "./shell/ui-route-table";
 import { uiShellLayouts } from "./shell/ui-shell-layouts";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
+import { lentFirstTouchAttribution } from "./shell/use-analytics-identity";
 import {
   parseUiFeatureConfig,
   uiDeploymentOf,
@@ -70,8 +71,7 @@ const NO_ATTRIBUTION_CAPTURE = () => void 0;
  * reads every landing URL before a navigation can drop its query string.
  */
 const useAttributionCapture =
-  installedUiDeclarations.declared("firstTouchAttribution")[0]?.capability.useCapture ??
-  NO_ATTRIBUTION_CAPTURE;
+  lentFirstTouchAttribution(installedUiDeclarations)?.useCapture ?? NO_ATTRIBUTION_CAPTURE;
 
 function UiAttributionCapture({ children }: { children: ReactNode }) {
   useAttributionCapture();

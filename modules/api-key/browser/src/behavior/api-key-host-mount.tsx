@@ -10,6 +10,7 @@ import {
   useUiDeployment,
   useUiScope,
 } from "@langwatch/browser-host/capabilities";
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useMemo, type ReactNode } from "react";
 
@@ -21,7 +22,6 @@ import {
   type ApiKeyFailureNotice,
   type ApiKeyHostScope,
   type ApiKeyOrganization,
-  type ApiKeyPlatformDrawer,
   type ApiKeyRouteReading,
   type ApiKeySessionStatus,
   type ApiKeySuccessNotice,
@@ -172,11 +172,8 @@ class CapabilityApiKeyHost extends ApiKeyHostApi {
     }
   }
 
-  openPlatformDrawer(request: {
-    drawer: ApiKeyPlatformDrawer;
-    params?: Readonly<Record<string, string | undefined>>;
-  }): void {
-    this.deps.openDrawer(request.drawer, { ...request.params });
+  openDrawerByToken<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+    this.deps.openDrawer(drawer, props);
   }
 
   lookupDeviceCode(userCode: string): Promise<CliDeviceCodeLookup> {

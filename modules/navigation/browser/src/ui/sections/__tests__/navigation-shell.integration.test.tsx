@@ -4,6 +4,7 @@
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { CreateProjectDrawerToken } from "@langwatch/organization-client";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -114,6 +115,7 @@ const navigateMock = vi.fn();
 const replaceMock = vi.fn();
 const rememberScopeMock = vi.fn();
 const openDrawerMock = vi.fn();
+const openDrawerByTokenMock = vi.fn();
 
 const BASE_READINGS: StubNavigationReadings = {
   organizations: [orgA],
@@ -147,6 +149,7 @@ function renderShell({
         replace: replaceMock,
         rememberScope: rememberScopeMock,
         openDrawer: openDrawerMock,
+        openDrawerByToken: openDrawerByTokenMock,
       }}
     >
       <NavigationShell personalScope={personalScope}>
@@ -248,6 +251,7 @@ beforeEach(() => {
   navigateMock.mockReset();
   rememberScopeMock.mockReset();
   openDrawerMock.mockReset();
+  openDrawerByTokenMock.mockReset();
   localStorage.clear();
 });
 
@@ -476,11 +480,26 @@ describe("the product-switcher top bar", () => {
       await user.click(screen.getByRole("button", { name: "Switch project" }));
       await user.click(await screen.findByText("New Project"));
 
-      expect(openDrawerMock).toHaveBeenCalledWith("createProject", {
-        navigateOnCreate: "true",
+      expect(openDrawerByTokenMock).toHaveBeenCalledWith(CreateProjectDrawerToken, {
+        navigateOnCreate: true,
         defaultTeamId: "team_1",
         organizationId: "org_1",
       });
+    });
+
+    /** @scenario Navigation opens organization's create-project drawer by token */
+    it("opens the create-project drawer by organization's client token, never by name", async () => {
+      renderShell({ readings: { permissions: ["project:create"] } });
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Switch project" }));
+      await user.click(await screen.findByText("New Project"));
+
+      expect(openDrawerByTokenMock).toHaveBeenCalledWith(
+        CreateProjectDrawerToken,
+        expect.objectContaining({ defaultTeamId: "team_1", organizationId: "org_1" }),
+      );
+      expect(openDrawerMock).not.toHaveBeenCalled();
     });
 
     it("offers no New Project to a reader who may not create one", async () => {

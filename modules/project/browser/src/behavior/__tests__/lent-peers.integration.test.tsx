@@ -2,6 +2,11 @@
 
 import "@testing-library/jest-dom/vitest";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
+import { InlineCommandPaletteToken } from "@langwatch/navigation-client";
+import {
+  PendingJoinRequestsToken,
+  ProjectDepartmentFieldToken,
+} from "@langwatch/organization-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -24,32 +29,37 @@ const peerLends = uiDeclarations([
   {
     name: "navigation",
     installation: {
-      capabilities: {
-        inlineCommandPalette: {
+      capabilities: {},
+      lends: [
+        {
+          token: InlineCommandPaletteToken,
           load: async () => ({
             default: ({ placeholder }: { placeholder: string }) => (
               <input placeholder={placeholder} />
             ),
           }),
         },
-      },
+      ],
     },
   },
   {
     name: "organization",
     installation: {
-      capabilities: {
-        projectDepartmentField: {
+      capabilities: {},
+      lends: [
+        {
+          token: ProjectDepartmentFieldToken,
           load: async () => ({
             default: ({ projectId }: { projectId: string }) => (
               <span>department of {projectId}</span>
             ),
           }),
         },
-        pendingJoinRequests: {
+        {
+          token: PendingJoinRequestsToken,
           load: async () => ({ default: () => <span>people are waiting to join</span> }),
         },
-      },
+      ],
     },
   },
 ]);
@@ -81,10 +91,20 @@ describe("what navigation and organization lend project", () => {
   });
 
   describe("given organization lends its waiting join requests", () => {
+    /** @scenario Project's home renders organization's pending join requests through its client token */
     it("draws the card where project's home places it", async () => {
       declarations.current = peerLends;
       render(<PendingJoinRequests />);
       expect(await screen.findByText("people are waiting to join")).toBeInTheDocument();
+    });
+  });
+
+  describe("given no installed module lends the pending join requests token", () => {
+    /** @scenario An uninstalled organization leaves project's home without the join requests card */
+    it("draws nothing in the card's place, and nothing fails", () => {
+      declarations.current = uiDeclarations([]);
+      const { container } = render(<PendingJoinRequests />);
+      expect(container).toBeEmptyDOMElement();
     });
   });
 

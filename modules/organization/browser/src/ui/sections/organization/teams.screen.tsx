@@ -25,7 +25,7 @@ import {
   CreateProjectDrawerToken,
   CreateTeamDrawerToken,
   EditProjectDrawerToken,
-} from "@langwatch/organization-contract";
+} from "@langwatch/organization-client";
 import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 

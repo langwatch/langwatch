@@ -1,5 +1,5 @@
-import type { UiInlineCommandPaletteProps } from "@langwatch/browser-host/declarations";
 import { Box } from "@langwatch/design-system/primitives";
+import type { InlineCommandPaletteProps } from "@langwatch/navigation-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useCommandBar } from "../../behavior/command-bar-context.ts";
@@ -10,7 +10,7 @@ import { CommandPalette } from "./command-palette.tsx";
  * overlay without changing height. Pressing Cmd+K focuses here instead of
  * raising a second bar.
  */
-export function InlineCommandPalette({ placeholder }: UiInlineCommandPaletteProps) {
+export function InlineCommandPalette({ placeholder }: InlineCommandPaletteProps) {
   const { registerInlinePalette } = useCommandBar();
 
   // This surface's own query, deliberately NOT the Cmd+K bar's. The two are

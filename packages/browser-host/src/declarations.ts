@@ -7,7 +7,6 @@
 import type { CustomGraphInput } from "@langwatch/dashboard-contract";
 import type { DatasetColumn, MappingState } from "@langwatch/dataset-contract";
 import type { SystemStyleObject } from "@langwatch/design-system/primitives";
-import type { LangyKickoffBrief } from "@langwatch/langy-contract";
 import type { UiTokenIdentity } from "@langwatch/module";
 import type { MediaAudioElement } from "@langwatch/scenario-contract";
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
@@ -80,19 +79,6 @@ export type UiCustomGraphProps = {
   input: CustomGraphInput;
   titleProps?: SystemStyleObject;
   emptyState?: ReactNode;
-};
-
-/** What a surface hands navigation's lent command palette, drawn inline rather than as the bar. */
-export type UiInlineCommandPaletteProps = { placeholder: string };
-
-/** Organization's lent card of people waiting to join needs nothing handed in: it reads scope. */
-export type UiPendingJoinRequestsProps = Record<string, never>;
-
-/** What project's settings form hands organization's lent department row. */
-export type UiProjectDepartmentFieldProps = {
-  organizationId: string;
-  projectId: string;
-  governanceEnabled: boolean;
 };
 
 /** A dataset column as a dataset surface names it: its name and its type's name. */
@@ -316,50 +302,6 @@ export type UiResourceLimitRowProps = { current: number; max?: number } & (
   | { limitType: "members" | "membersLite"; label?: never }
 );
 
-/** The product space a guided onboarding offer sits in. */
-export type UiGuidedSpace = "project" | "me" | "gateway" | "governance";
-
-/**
- * What a screen hands onboarding's guided offer: the space it sits in, and its own answer to
- * whether that space is already in use (null while unknown, which keeps the offer hidden).
- */
-export type UiGuidedOnboardingOfferProps = {
-  space: UiGuidedSpace;
-  spaceInUse?: boolean | null;
-};
-
-/** The guided kickoff a caller hands Langy's panel to send. */
-export type UiLangyKickoff = LangyKickoffBrief;
-
-/** What Langy lends onboarding: dock the panel and hand it the guided kickoff. */
-export type UiLangyGuidedOnboarding = {
-  dock(): void;
-  queueKickoff(kickoff: UiLangyKickoff): void;
-  /** Calls back once, with the scope the panel announced; returns the release. */
-  onScopeAnnounced(announced: (scope: { organizationId: string | null }) => void): () => void;
-};
-
-/**
- * What onboarding lends Langy's tour card: whether a tour is on screen, and a replay of one.
- * Both are hooks, read during render.
- */
-export type UiGuidedTour = {
-  useRunning(): boolean;
-  /** The replay: runs `path`'s tour again and records it on the organization, when named. */
-  useReplay(): (input: { path: string; organizationId?: string | null }) => void;
-};
-
-/**
- * Each capability a peer reads by name, and the shape a declaration must have
- * to fill it: the CORE side of the contract.
- */
-/** Navigation's sidebar groups: fold, unfold, restore each to its remembered preference. */
-export type UiNavigationSidebar = {
-  expandGroup(id: string): void;
-  collapseGroup(id: string): void;
-  restoreAll(): void;
-};
-
 /** Governance's sample-data choice, written by onboarding's guided tour. */
 export type UiGovernanceSampleChoice = { setSampleChoice(choice: boolean): void };
 
@@ -367,19 +309,9 @@ export type UiGovernanceSampleChoice = { setSampleChoice(choice: boolean): void 
 export type UiGuidedPathActive = { useIsActive(): boolean };
 
 /**
- * Onboarding's first-touch acquisition attribution, lent to the shell.
- * `useCapture` is a hook: the shell calls it at its outermost provider position.
+ * Each capability a peer reads by name, and the shape a declaration must have
+ * to fill it: the CORE side of the contract.
  */
-export type UiFirstTouchAttribution = {
-  readonly useCapture: () => void;
-  /**
-   * Attribution as analytics event properties, from one source as a whole: the
-   * UTM and `ref` params of the current URL when it has any, otherwise the
-   * stored first-touch fields.
-   */
-  eventProperties(): Readonly<Record<string, string>>;
-};
-
 export type UiDeclaredCapabilities = {
   agentActionsMenu: UiDeclaredComponent<UiAgentActionsMenuProps>;
   /** A card on the Authentication overview; `section` places it, sign-in first. */
@@ -390,25 +322,17 @@ export type UiDeclaredCapabilities = {
   /** The directory's status band, drawn above the Directory's tabs; scim lends it. */
   directorySummary: UiDeclaredComponent<UiDirectorySummaryProps>;
   customGraph: UiDeclaredComponent<UiCustomGraphProps>;
-  guidedOnboarding: UiLangyGuidedOnboarding;
-  guidedOnboardingOffer: UiDeclaredComponent<UiGuidedOnboardingOfferProps>;
   guidedPathActive: UiGuidedPathActive;
-  guidedTour: UiGuidedTour;
-  inlineCommandPalette: UiDeclaredComponent<UiInlineCommandPaletteProps>;
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
   evaluatorTracesMapping: UiDeclaredComponent<UiEvaluatorTracesMappingProps>;
-  firstTouchAttribution: UiFirstTouchAttribution;
   llmConfigField: UiDeclaredComponent<UiLlmConfigFieldProps>;
   llmConfigPopover: UiDeclaredComponent<UiLlmConfigPopoverProps>;
   outputsSection: UiDeclaredComponent<UiOutputsSectionProps>;
-  pendingJoinRequests: UiDeclaredComponent<UiPendingJoinRequestsProps>;
-  projectDepartmentField: UiDeclaredComponent<UiProjectDepartmentFieldProps>;
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   resourceLimitRow: UiDeclaredComponent<UiResourceLimitRowProps>;
   sampleChoice: UiGovernanceSampleChoice;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
-  sidebar: UiNavigationSidebar;
   studioEvaluatorEditor: UiDeclaredComponent<UiStudioEvaluatorEditorProps>;
   studioPromptEditor: UiDeclaredComponent<UiStudioPromptEditorProps>;
   traceIdPeek: UiDeclaredComponent<UiTraceIdPeekProps>;

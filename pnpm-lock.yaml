@@ -16229,9 +16229,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
-      '@langwatch/langy-contract':
-        specifier: workspace:*
-        version: link:../../modules/langy/contract
       '@langwatch/module':
         specifier: workspace:*
         version: link:../module

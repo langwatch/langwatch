@@ -13,7 +13,8 @@ import {
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { useLent } from "@langwatch/browser-host/lent";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { ProjectSwitcherToken, type ProjectSwitcherProps } from "@langwatch/project-contract";
+import { ProjectSwitcherToken } from "@langwatch/project-client";
+import type { ProjectSwitcherProps } from "@langwatch/project-contract";
 import { lazy, Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 
 import {

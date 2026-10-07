@@ -18,7 +18,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
-import { InviteMemberDrawerToken, PersonDrawerToken } from "@langwatch/organization-contract";
+import { InviteMemberDrawerToken, PersonDrawerToken } from "@langwatch/organization-client";
 import { Ban, MoreVertical, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ComponentProps } from "react";
 

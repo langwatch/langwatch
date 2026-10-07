@@ -7,8 +7,8 @@ import {
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { ModelSelectorToken } from "@langwatch/model-provider-client";
-import { GuidedOnboardingOfferToken } from "@langwatch/onboarding-contract";
-import { HeroAskFieldToken } from "@langwatch/project-contract";
+import { GuidedOnboardingOfferToken } from "@langwatch/onboarding-client";
+import { HeroAskFieldToken } from "@langwatch/project-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

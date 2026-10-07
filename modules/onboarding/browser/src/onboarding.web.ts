@@ -4,7 +4,13 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { GuidedOnboardingOfferToken, GuidedTourToken } from "@langwatch/onboarding-contract";
+import {
+  FirstTouchAttributionToken,
+  GuidedOnboardingOfferToken,
+  GuidedPathActiveToken,
+  GuidedTourStateToken,
+  GuidedTourToken,
+} from "@langwatch/onboarding-client";
 
 import { onboardingFirstTouchAttribution } from "./behavior/first-touch-attribution.capability.ts";
 import { onboardingGuidedPath } from "./features/guided-onboarding/behavior/guided-path-active.capability.ts";
@@ -12,16 +18,8 @@ import { onboardingGuidedTour } from "./features/guided-onboarding/behavior/guid
 import { onboardingGuidedTourHooks } from "./features/guided-onboarding/behavior/guided-tour.lend.ts";
 
 export const onboardingWeb = defineBrowserModule("onboarding")
-  // The tour's state for Langy's tour card, the Home offer a screen draws in its own space,
-  // and first-touch attribution for the shell.
-  .withCapabilities({
-    firstTouchAttribution: onboardingFirstTouchAttribution,
-    guidedTour: onboardingGuidedTour,
-    guidedPathActive: onboardingGuidedPath,
-    guidedOnboardingOffer: {
-      load: () => import("./features/guided-onboarding/ui/home/guided-onboarding-offer.tsx"),
-    },
-  })
+  // Trace reads the guided path by name until it converts to the token (r-lends-4).
+  .withCapabilities({ guidedPathActive: onboardingGuidedPath })
   .withHosts({
     requires: ["OnboardingHostApi", "GuidedOnboardingHostApi"],
     mounts: {
@@ -56,6 +54,10 @@ export const onboardingWeb = defineBrowserModule("onboarding")
     },
   })
   .lends(GuidedTourToken, { value: onboardingGuidedTourHooks })
+  /** The tour's state for Langy's tour card, the guided path, and attribution for the shell. */
+  .lends(GuidedTourStateToken, { value: onboardingGuidedTour })
+  .lends(GuidedPathActiveToken, { value: onboardingGuidedPath })
+  .lends(FirstTouchAttributionToken, { value: onboardingFirstTouchAttribution })
   .lends(GuidedOnboardingOfferToken, {
     load: () => import("./features/guided-onboarding/ui/home/guided-onboarding-offer.tsx"),
   });

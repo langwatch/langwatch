@@ -55,9 +55,6 @@
       "path": "../handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../modules/langy/contract/tsconfig.build.json"
-    },
-    {
       "path": "../module/tsconfig.build.json"
     },
     {

@@ -1,5 +1,6 @@
 /** Navigation feature port; synchronous and fail-closed, same contract as apps/ui session */
 
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { createContext, useContext, type ReactNode } from "react";
 
 /** A project as the switcher and the landing redirect need to know it. */
@@ -296,6 +297,9 @@ export abstract class NavigationHost {
 
   /** Opens drawer by name; host resolves against its registry, missing = no-op */
   abstract openDrawer(drawer: string, params?: Record<string, string>): void;
+
+  /** Opens another module's drawer by the token its client declares (§10.1). */
+  abstract openDrawerByToken<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void;
 
   /** The assistant, or nothing when this reader may not start a turn. */
   abstract langy(): NavigationLangy | null;

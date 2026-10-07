@@ -24,6 +24,7 @@ import {
   handleSearchResultSelect,
   type NavigationContext,
   type OpenDrawer,
+  type OpenDrawerByToken,
 } from "../../model/command-select-handlers.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { CommandBarLangyMode } from "../blocks/command-bar-langy-mode.tsx";
@@ -102,6 +103,7 @@ function selectPaletteCommand({
   ctx,
   addRecentItem,
   openDrawer,
+  openDrawerByToken,
   openSupportChat,
   setTheme,
   triggerEffect,
@@ -114,6 +116,7 @@ function selectPaletteCommand({
   ctx: NavigationContext;
   addRecentItem: AddRecentItem;
   openDrawer: OpenDrawer;
+  openDrawerByToken: OpenDrawerByToken;
   openSupportChat: () => void;
   setTheme: (theme: string) => void;
   triggerEffect: (egg: EasterEgg) => void;
@@ -151,7 +154,7 @@ function selectPaletteCommand({
     runEasterEgg({ query, triggerEffect, onDone: ctx.close });
     return;
   }
-  handleCommandSelect({ cmd, projectSlug, ctx, addRecentItem, openDrawer });
+  handleCommandSelect({ cmd, projectSlug, ctx, addRecentItem, openDrawer, openDrawerByToken });
 }
 
 function selectPaletteItem({
@@ -354,6 +357,7 @@ export function CommandPalette({
   const project = host.project();
   const organizations = host.organizations();
   const openDrawer = host.openDrawer.bind(host);
+  const openDrawerByToken: OpenDrawerByToken = host.openDrawerByToken.bind(host);
   const deployment = host.deployment();
   const { setTheme } = useTheme();
   const { idResult, searchResults, isLoading: searchLoading } = useCommandSearch(query, active);
@@ -456,6 +460,7 @@ export function CommandPalette({
             ctx,
             addRecentItem,
             openDrawer,
+            openDrawerByToken,
             openSupportChat: () => host.supportChat()?.open(),
             setTheme,
             triggerEffect,
@@ -469,6 +474,7 @@ export function CommandPalette({
       host,
       onDone,
       openDrawer,
+      openDrawerByToken,
       addRecentItem,
       setTheme,
       query,

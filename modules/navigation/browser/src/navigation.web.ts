@@ -6,6 +6,7 @@
 
 import { defineBrowserModule } from "@langwatch/browser";
 import { featureFlagTrpc } from "@langwatch/feature-flag-contract";
+import { InlineCommandPaletteToken, SidebarToken } from "@langwatch/navigation-client";
 
 import { navigationApi } from "./behavior/navigation-api.ts";
 import { sidebarCapability } from "./behavior/sidebar-capability.ts";
@@ -32,14 +33,14 @@ export const navigationWeb = defineBrowserModule("navigation")
     host: { load: () => import("./navigation.ts") },
     /** The frame drawn around every address behind a session. */
     chrome: { load: () => import("./ui/index.ts") },
-    /** Sidebar group fold/expand/restore, lent to onboarding's guided tour. */
-    sidebar: sidebarCapability,
     /** The search palette the chrome layout mounts once. */
     commandBar: { load: () => import("./command-bar.ts") },
-    /** The palette drawn inline in a landing hero, lent to project (§3.4 rule 7). */
-    inlineCommandPalette: {
-      load: async () => ({
-        default: (await import("./ui/sections/inline-command-palette.tsx")).InlineCommandPalette,
-      }),
-    },
+  })
+  /** Sidebar group fold/expand/restore, lent to onboarding's guided tour. */
+  .lends(SidebarToken, { value: sidebarCapability })
+  /** The palette drawn inline in a landing hero, lent to project (§10.1). */
+  .lends(InlineCommandPaletteToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/inline-command-palette.tsx")).InlineCommandPalette,
+    }),
   });

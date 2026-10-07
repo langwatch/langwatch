@@ -1,6 +1,7 @@
 // Test host: abstract class; fake records screen actions (queries, drawers, copies, device flow).
 // Device flow is programmable (four lookup outcomes, two approve outcomes). Not exported.
 
+import type { UiDrawerToken, UiTokenIdentity } from "@langwatch/browser-host/declarations";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type { ReactElement, ReactNode } from "react";
@@ -13,7 +14,6 @@ import {
   type ApiKeyFailureNotice,
   type ApiKeyHostScope,
   type ApiKeyOrganization,
-  type ApiKeyPlatformDrawer,
   type ApiKeyRouteReading,
   type ApiKeySessionStatus,
   type ApiKeySuccessNotice,
@@ -30,11 +30,8 @@ import {
   type McpAuthorizeRequest,
 } from "./model/authorize-host.ts";
 
-/** One recorded `openPlatformDrawer` call. */
-export type RecordedDrawerOpen = {
-  drawer: ApiKeyPlatformDrawer;
-  params: Readonly<Record<string, string | undefined>>;
-};
+/** One recorded `openDrawerByToken` call. */
+export type RecordedDrawerOpen = { drawer: UiTokenIdentity; props: object | undefined };
 
 /** One recorded clipboard write. */
 export type RecordedCopy = { text: string; succeeded: ApiKeySuccessNotice };
@@ -157,11 +154,8 @@ export class FakeApiKeyHost extends ApiKeyHostApi {
     this.signOuts += 1;
   }
 
-  openPlatformDrawer(request: {
-    drawer: ApiKeyPlatformDrawer;
-    params?: Readonly<Record<string, string | undefined>>;
-  }): void {
-    this.drawerOpens.push({ drawer: request.drawer, params: request.params ?? {} });
+  openDrawerByToken<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+    this.drawerOpens.push({ drawer, props });
   }
 
   lookupDeviceCode(userCode: string): Promise<CliDeviceCodeLookup> {

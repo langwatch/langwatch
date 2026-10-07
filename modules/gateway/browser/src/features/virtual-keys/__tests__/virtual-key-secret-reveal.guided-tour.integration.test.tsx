@@ -5,11 +5,8 @@
  */
 import "@testing-library/jest-dom/vitest";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
-import {
-  GuidedTourToken,
-  type GuidedTourActions,
-  type GuidedTourHooks,
-} from "@langwatch/onboarding-contract";
+import { GuidedTourToken } from "@langwatch/onboarding-client";
+import type { GuidedTourActions, GuidedTourHooks } from "@langwatch/onboarding-contract";
 import { act, cleanup, screen } from "@testing-library/react";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

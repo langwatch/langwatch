@@ -6,6 +6,16 @@
 
 import { defineBrowserModule } from "@langwatch/browser";
 import { planTrpc } from "@langwatch/entitlement-contract";
+import {
+  CreateProjectDrawerToken,
+  CreateTeamDrawerToken,
+  EditProjectDrawerToken,
+  InviteMemberDrawerToken,
+  JoinOfferToken,
+  PendingJoinRequestsToken,
+  PersonDrawerToken,
+  ProjectDepartmentFieldToken,
+} from "@langwatch/organization-client";
 import { organizationTrpc } from "@langwatch/organization-contract";
 
 import { organizationApi } from "./behavior/organization-api.ts";
@@ -51,37 +61,32 @@ export const organizationWeb = defineBrowserModule("organization")
       load: () => import("./ui/sections/organization/team-detail.screen.tsx"),
     },
   })
-  /**
-   * What another module may mount. annotation reads the feature gate;
-   * project mounts the department picker.
-   */
-  .withDrawers({
-    createProject: {
-      load: async () => ({
-        default: (await import("./ui/sections/create-project-drawer.tsx")).CreateProjectDrawer,
-      }),
-    },
-    editProject: {
-      load: async () => ({
-        default: (await import("./ui/sections/edit-project-drawer.tsx")).EditProjectDrawer,
-      }),
-    },
-    createTeam: {
-      load: async () => ({
-        default: (await import("./ui/sections/create-team-drawer.tsx")).CreateTeamDrawer,
-      }),
-    },
-    inviteMember: {
-      load: async () => ({
-        default: (await import("./ui/sections/invite-member-drawer.tsx")).InviteMemberDrawer,
-      }),
-    },
-    /** One member, from the members list: `?drawer.open=person&drawer.userId=…`. */
-    person: {
-      load: async () => ({
-        default: (await import("./ui/sections/person-drawer.tsx")).PersonDrawer,
-      }),
-    },
+  /** Organization's drawers, opened by the tokens in organization-client (§10.1). */
+  .drawer(CreateProjectDrawerToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/create-project-drawer.tsx")).CreateProjectDrawer,
+    }),
+  })
+  .drawer(EditProjectDrawerToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/edit-project-drawer.tsx")).EditProjectDrawer,
+    }),
+  })
+  .drawer(CreateTeamDrawerToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/create-team-drawer.tsx")).CreateTeamDrawer,
+    }),
+  })
+  .drawer(InviteMemberDrawerToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/invite-member-drawer.tsx")).InviteMemberDrawer,
+    }),
+  })
+  /** One member, from the members list: `?drawer.open=person&drawer.userId=…`. */
+  .drawer(PersonDrawerToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/person-drawer.tsx")).PersonDrawer,
+    }),
   })
   /**
    * The post-login join offer the shell renders over a dashboard (and the
@@ -99,17 +104,20 @@ export const organizationWeb = defineBrowserModule("organization")
     },
     /** Shown in place of the dashboard body to a member on none of its teams. */
     teamAccessWaiting: { load: () => import("./ui/sections/team-access-waiting.tsx") },
-    /** People waiting at the door, lent to project's home for those who can answer (§3.4 r7). */
-    pendingJoinRequests: {
-      load: async () => ({
-        default: (await import("./ui/sections/pending-join-requests.tsx")).PendingJoinRequests,
-      }),
-    },
-    /** A project's department row, lent to project's settings form (§3.4 rule 7). */
-    projectDepartmentField: {
-      load: async () => ({
-        default: (await import("./ui/sections/project-department-field.tsx"))
-          .ProjectDepartmentField,
-      }),
-    },
+  })
+  /** The join offer onboarding's welcome draws; the shell still prefetches it by name above. */
+  .lends(JoinOfferToken, {
+    load: () => import("./features/join-offer/ui/sections/join-your-team-takeover.tsx"),
+  })
+  /** People waiting at the door, lent to project's home for those who can answer (§10.1). */
+  .lends(PendingJoinRequestsToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/pending-join-requests.tsx")).PendingJoinRequests,
+    }),
+  })
+  /** A project's department row, lent to project's settings form (§10.1). */
+  .lends(ProjectDepartmentFieldToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/project-department-field.tsx")).ProjectDepartmentField,
+    }),
   });

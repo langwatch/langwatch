@@ -4,7 +4,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { HeroAskFieldToken, ProjectSwitcherToken } from "@langwatch/project-contract";
+import { HeroAskFieldToken, ProjectSwitcherToken } from "@langwatch/project-client";
 
 export const projectWeb = defineBrowserModule("project")
   .withHosts({
