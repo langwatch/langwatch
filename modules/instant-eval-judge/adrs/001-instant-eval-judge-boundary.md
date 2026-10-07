@@ -33,7 +33,16 @@ None. The contract depends on `zod` only, and the module names no peer `*Api`.
 
 ## Persistence
 
-None yet. ADR-174 decision 13 lists the tables the module will own.
+Three Postgres tables, created in migration `20261007120000_instant_eval_judge_tables` (ADR-174
+Schema). Each is the leaf's own copy of a fact; none has a relation or foreign key.
+
+- `InstantEvalJudgeProject`, keyed by `projectId`: the project's organization and creation time.
+- `InstantEvalJudgeUsageBilling`, keyed by `organizationId`: whether the organization is usage-billed,
+  when that was true, and whether a catch-up wrote it.
+- `InstantEvalJudgeSpend`, keyed by `organizationId` and `requestId`: one judge request's spend in
+  nano USD. The organization's total is the sum of its rows.
+
+The repositories that claim them land with the folds (ADR-174 decision 13).
 
 ## Runtime and registration
 
