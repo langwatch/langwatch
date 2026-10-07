@@ -21,6 +21,10 @@ import {
   formatPlan,
   gooseAppliedStepIds,
   type SchemaTargetReport,
+  redactSecrets,
+  UPGRADE_NEXT_ACTION,
+  UPGRADE_STATUS_COMMAND,
+  type UpgradeOutcome,
   type UpgradeReadHintPublish,
   type UpgradeReconciler,
   type UpgradeRunnerLog,
@@ -219,6 +223,72 @@ function runnerLog(): UpgradeRunnerLog {
   };
 }
 
+/** A log line the task writes, kept pure so its wording is tested without a logger. */
+export type UpgradeTaskLine = Readonly<{
+  level: "info" | "warn" | "error";
+  message: string;
+  fields: Record<string, unknown>;
+}>;
+
+/** Said before a run with no ClickHouse target: the gate refuses to serve without one. */
+export function noClickHouseLine(): UpgradeTaskLine {
+  return {
+    level: "warn",
+    message:
+      "no ClickHouse target is configured: the upgrade applies Postgres only, and the api and " +
+      "worker refuse to serve until CLICKHOUSE_URL is set",
+    fields: {
+      phase: "preflight",
+      waitingOn: "nothing",
+      next: "set CLICKHOUSE_URL (or a private ClickHouse route), then run `pnpm task upgrade` again",
+    },
+  };
+}
+
+/** The task's last lines: the outcome, then where the UI is and what `upgrade status` shows. */
+export function closingLines({
+  outcome,
+  baseHost,
+}: {
+  outcome: UpgradeOutcome;
+  baseHost: string | undefined;
+}): UpgradeTaskLine[] {
+  const { code, runId } = outcome;
+  const next = UPGRADE_NEXT_ACTION[code];
+  const status = `\`${UPGRADE_STATUS_COMMAND}\` shows every step and run`;
+  const ui = baseHost?.trim()
+    ? `the UI is at ${baseHost.trim()} (Upgrades, for platform operators)`
+    : "BASE_HOST is not set: set it to the address operators open the UI at";
+  const message = redactSecrets(outcome.message);
+  const fields = { phase: "finished", code, runId, next };
+  const first: UpgradeTaskLine =
+    outcome.exitCode === 0
+      ? { level: "info", message, fields }
+      : { level: "error", message, fields: { ...fields, ...redactDetail(outcome.detail) } };
+  const where =
+    outcome.exitCode === 0
+      ? `upgrade complete; ${ui}`
+      : `upgrade exited ${outcome.exitCode}; ${ui}`;
+  return [
+    first,
+    { level: "info", message: `${where}; ${status}`, fields: { phase: "finished", next } },
+  ];
+}
+
+function redactDetail(detail: Record<string, unknown>): Record<string, unknown> {
+  return JSON.parse(redactSecrets(JSON.stringify(detail))) as Record<string, unknown>;
+}
+
+function writeLine({
+  logger,
+  line,
+}: {
+  logger: ReturnType<typeof createLogger>;
+  line: UpgradeTaskLine;
+}) {
+  logger[line.level](line.fields, line.message);
+}
+
 /** Hands `use` the steps the installed modules declare, then closes the process that built them. */
 export type DeclaredCodeSteps = <Result>(
   use: (steps: readonly MigrationStep[]) => Promise<Result>,
@@ -269,9 +339,11 @@ async function runWithCodeSteps({
   if (!database) throw new Error("DATABASE_URL is required to upgrade");
   const releases = loadReleases();
   const newest = releases.manifests.at(-1)?.release ?? null;
-  const sharedUrl = clickhouseTargets(input).targets.find(
-    (target) => target.name === "shared",
-  )?.url;
+  const { targets } = clickhouseTargets(input);
+  const sharedUrl = targets.find((target) => target.name === "shared")?.url;
+  const logger = createLogger("langwatch:tasks:upgrade");
+  if (command.command === "run" && targets.length === 0)
+    writeLine({ logger, line: noClickHouseLine() });
   const shared = sharedUrl
     ? createClient({ url: parseConnectionUrl({ connectionUrl: sharedUrl }).databaseUrl })
     : undefined;
@@ -305,13 +377,8 @@ async function runWithCodeSteps({
       return 0;
     }
     const outcome = await runner.run({ signal: input.signal });
-    const logger = createLogger("langwatch:tasks:upgrade");
-    if (outcome.exitCode === 0) logger.info({ runId: outcome.runId }, outcome.message);
-    else
-      logger.error(
-        { code: outcome.code, runId: outcome.runId, ...outcome.detail },
-        outcome.message,
-      );
+    const baseHost = input.environment.BASE_HOST;
+    for (const line of closingLines({ outcome, baseHost })) writeLine({ logger, line });
     return outcome.exitCode;
   } finally {
     await shared?.close();

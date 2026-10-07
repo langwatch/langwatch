@@ -78,9 +78,11 @@ export async function runModuleTask({
       const catalogue = TaskCatalogue.create({ tasks: [...app.tasks(isTask), ...loaded] });
       const logger = createLogger("langwatch:tasks");
       signal.throwIfAborted();
+      const startedAt = performance.now();
       logger.info({ task: name }, "task starting");
       await catalogue.get({ name }).run({ args, signal });
-      logger.info({ task: name }, "task finished");
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      logger.info({ task: name, elapsedMs }, "task finished");
     },
   });
 }

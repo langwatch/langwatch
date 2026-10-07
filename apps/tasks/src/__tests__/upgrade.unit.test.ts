@@ -4,12 +4,15 @@
 import { type ClickHouseClient, ClickHouseError } from "@clickhouse/client";
 import { SecretsChain } from "@langwatch/secrets";
 import type { UpgradePostgres } from "@langwatch/upgrade";
+import { upgradeOutcome } from "@langwatch/upgrade/runner";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 import { describe, expect, it } from "vitest";
 
 import { resolveTasksConfig, type TaskInput, type TasksDatabase } from "../config.ts";
 import {
+  closingLines,
   type DeclaredCodeSteps,
+  noClickHouseLine,
   parseUpgradeArgs,
   runUpgradeCommand,
   sqlReader,
@@ -132,5 +135,51 @@ describe("the upgrade's ClickHouse reader", () => {
 
     const denied = sqlReader({ client: failingClient({ code: "497", type: "ACCESS_DENIED" }) });
     await expect(denied.queryRows("SELECT 1")).rejects.toMatchObject({ code: "497" });
+  });
+});
+
+describe("the upgrade task's closing lines", () => {
+  const done = upgradeOutcome({ code: "done", message: "upgraded to 3.21.0", runId: "run_1" });
+
+  describe("when BASE_HOST is set", () => {
+    /** @scenario "The upgrade task's last line names the UI and what upgrade status shows" */
+    it("names the UI's address and the status command on the last line", () => {
+      const lines = closingLines({ outcome: done, baseHost: "https://langwatch.example.test" });
+      expect(lines.at(-1)?.message).toContain("https://langwatch.example.test");
+      expect(lines.at(-1)?.message).toContain("pnpm task upgrade status");
+    });
+  });
+
+  describe("when BASE_HOST is not set", () => {
+    /** @scenario "The upgrade task with no BASE_HOST says which variable sets the UI's address" */
+    it("names BASE_HOST and the status command on the last line", () => {
+      const lines = closingLines({ outcome: done, baseHost: undefined });
+      expect(lines.at(-1)?.message).toContain("BASE_HOST");
+      expect(lines.at(-1)?.message).toContain("pnpm task upgrade status");
+    });
+  });
+
+  describe("when the run failed with a credential in its detail", () => {
+    it("logs the failure as an error with its next action and without the password", () => {
+      const failed = upgradeOutcome({
+        code: "schema_failed",
+        message: "schema failed on postgres (postgresql://lw:hunter2@db/lw)",
+        detail: { targets: [{ target: "postgres", error: "postgresql://lw:hunter2@db/lw" }] },
+      });
+      const [first] = closingLines({ outcome: failed, baseHost: undefined });
+      expect(first).toMatchObject({ level: "error", fields: { code: "schema_failed" } });
+      expect(first?.fields.next).toContain("pnpm task upgrade");
+      expect(JSON.stringify(first)).not.toContain("hunter2");
+    });
+  });
+});
+
+describe("the upgrade task with no ClickHouse target", () => {
+  /** @scenario "The upgrade task with no ClickHouse target names CLICKHOUSE_URL before it starts" */
+  it("warns that the api and worker refuse to serve until CLICKHOUSE_URL is set", () => {
+    const line = noClickHouseLine();
+    expect(line.level).toBe("warn");
+    expect(line.message).toContain("CLICKHOUSE_URL");
+    expect(line.fields.next).toContain("CLICKHOUSE_URL");
   });
 });
