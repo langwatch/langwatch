@@ -39,6 +39,7 @@ func envelopeClient(t *testing.T, body string) (openai.Client, func() codes.Code
 func TestMiddleware_ErrorEnvelope(t *testing.T) {
 	const envelope = `{"error":{"message":"upstream provider failed","type":"provider_error"}}`
 
+	// @scenario "A 200 carrying the error envelope marks the span as an error"
 	t.Run("a 200 carrying the error envelope marks the span as an error", func(t *testing.T) {
 		client, status, detail := envelopeClient(t, envelope)
 
@@ -52,6 +53,7 @@ func TestMiddleware_ErrorEnvelope(t *testing.T) {
 		assert.Equal(t, "provider_error", attrs[string(semconv.ErrorTypeKey)])
 	})
 
+	// @scenario "An envelope without a message falls back to a generic one"
 	t.Run("an envelope without a message falls back to a generic one", func(t *testing.T) {
 		client, status, detail := envelopeClient(t, `{"error":{}}`)
 
@@ -65,6 +67,7 @@ func TestMiddleware_ErrorEnvelope(t *testing.T) {
 		assert.False(t, hasType)
 	})
 
+	// @scenario "A chat completion object carrying the envelope is an error too"
 	t.Run("a chat completion object carrying the envelope is an error too", func(t *testing.T) {
 		client, status, _ := envelopeClient(t, `{"object":"chat.completion","choices":[],"error":{"message":"boom"}}`)
 
@@ -73,6 +76,7 @@ func TestMiddleware_ErrorEnvelope(t *testing.T) {
 		assert.Equal(t, codes.Error, status())
 	})
 
+	// @scenario "A 200 with neither choices nor an error is not an error"
 	t.Run("a 200 with neither choices nor an error stays Ok", func(t *testing.T) {
 		client, status, _ := envelopeClient(t, `{"id":"x","object":"chat.completion","choices":[]}`)
 
@@ -81,6 +85,7 @@ func TestMiddleware_ErrorEnvelope(t *testing.T) {
 		assert.Equal(t, codes.Ok, status())
 	})
 
+	// @scenario "A completion with choices and a null error is not an error"
 	t.Run("a completion with choices and a null error stays Ok", func(t *testing.T) {
 		body := `{"id":"x","object":"chat.completion","error":null,"choices":[{"index":0,"finish_reason":"stop","message":{"role":"assistant","content":"hi"}}]}`
 		client, status, _ := envelopeClient(t, body)
