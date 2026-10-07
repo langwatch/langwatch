@@ -21,6 +21,7 @@ import {
   evaluationInputSchema,
   evaluatorCatalogueResponseSchema,
   evaluatorParamsSchema,
+  getEvaluatorDataForParams,
   legacySentenceErrorSchema,
   namespacedEvaluatorParamsSchema,
   type BatchEvaluationRESTParams,
@@ -57,7 +58,6 @@ import { ZodError as ZodErrorClass } from "zod";
 import { fromZodError } from "zod-validation-error";
 
 import {
-  getEvaluatorDataForParams,
   stripIncompatiblePairwisePrompt,
   translateLegacyPairwisePayload,
 } from "../rules/evaluation-dispatch.rules.ts";

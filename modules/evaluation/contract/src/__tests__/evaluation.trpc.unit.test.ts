@@ -12,6 +12,7 @@ describe("given the evaluations tRPC declaration", () => {
     expect(Object.keys(evaluationTrpc.members).toSorted()).toEqual([
       "availableCustomEvaluators",
       "availableEvaluators",
+      "getMonitorPerformanceForProject",
       "runEvaluation",
       "warmupLambda",
     ]);
