@@ -289,10 +289,22 @@ function contractCases(backend: Backend): void {
     const starred = (userId: string) =>
       backend
         .repository()
-        .findStarredDashboards({ projectId: backend.projectId(), userId })
-        .then((rows) => rows.map((row) => row.id));
+        .findStarred({ projectId: backend.projectId(), userId })
+        .then((rows) =>
+          rows.map((row) =>
+            row.kind === "board" ? row.dashboard.id : `template:${row.templateId}`,
+          ),
+        );
     const star = (userId: string, dashboardId: string) =>
-      backend.repository().starDashboard({ projectId: backend.projectId(), userId, dashboardId });
+      backend
+        .repository()
+        .addStar({ projectId: backend.projectId(), userId, star: { kind: "board", dashboardId } });
+    const starTemplate = (userId: string, templateId: string) =>
+      backend.repository().addStar({
+        projectId: backend.projectId(),
+        userId,
+        star: { kind: "template", templateId },
+      });
 
     /** @scenario "The memory and Postgres dashboard repositories answer alike" */
     it("appends each star after the last and ignores a repeat", async () => {
@@ -335,9 +347,11 @@ function contractCases(backend: Backend): void {
       await star("u", b.id);
       await star("u", c.id);
 
-      await backend
-        .repository()
-        .unstarDashboard({ projectId: backend.projectId(), userId: "u", dashboardId: b.id });
+      await backend.repository().removeStar({
+        projectId: backend.projectId(),
+        userId: "u",
+        star: { kind: "board", dashboardId: b.id },
+      });
 
       await expect(starred("u")).resolves.toEqual([a.id, c.id]);
     });
@@ -351,7 +365,7 @@ function contractCases(backend: Backend): void {
       await backend.repository().reorderStars({
         projectId: backend.projectId(),
         userId: "u",
-        dashboardIds: [c.id, a.id, b.id],
+        stars: [c.id, a.id, b.id].map((dashboardId) => ({ kind: "board" as const, dashboardId })),
       });
 
       await expect(starred("u")).resolves.toEqual([c.id, a.id, b.id]);
@@ -369,6 +383,74 @@ function contractCases(backend: Backend): void {
       await expect(starred("u")).resolves.toEqual([]);
       await expect(starred("v")).resolves.toEqual([]);
     });
+
+    it("keeps a template star beside a board star, in the order starred", async () => {
+      const a = await dashboard();
+
+      await starTemplate("u", "llm-costs");
+      await star("u", a.id);
+      await starTemplate("u", "llm-costs");
+
+      await expect(starred("u")).resolves.toEqual(["template:llm-costs", a.id]);
+    });
+
+    it("reorders template and board stars together", async () => {
+      const [a, b] = [await dashboard("A", 0), await dashboard("B", 1)];
+      await star("u", a.id);
+      await starTemplate("u", "t1");
+      await star("u", b.id);
+
+      await backend.repository().reorderStars({
+        projectId: backend.projectId(),
+        userId: "u",
+        stars: [
+          { kind: "board", dashboardId: b.id },
+          { kind: "template", templateId: "t1" },
+          { kind: "board", dashboardId: a.id },
+        ],
+      });
+
+      await expect(starred("u")).resolves.toEqual([b.id, "template:t1", a.id]);
+    });
+
+    it("removes a template star and leaves the board star", async () => {
+      const a = await dashboard();
+      await star("u", a.id);
+      await starTemplate("u", "t1");
+
+      await backend.repository().removeStar({
+        projectId: backend.projectId(),
+        userId: "u",
+        star: { kind: "template", templateId: "t1" },
+      });
+
+      await expect(starred("u")).resolves.toEqual([a.id]);
+    });
+
+    it("keeps template stars apart per member and out of the starred board ids", async () => {
+      const a = await dashboard();
+      await star("u", a.id);
+      await starTemplate("u", "t1");
+
+      await expect(starred("v")).resolves.toEqual([]);
+      await expect(
+        backend
+          .repository()
+          .findStarredDashboardIds({ projectId: backend.projectId(), userId: "u" }),
+      ).resolves.toEqual([a.id]);
+    });
+
+    it("leaves template stars alone when a board is deleted", async () => {
+      const a = await dashboard();
+      await star("u", a.id);
+      await starTemplate("u", "t1");
+
+      await backend
+        .repository()
+        .deleteDashboard({ projectId: backend.projectId(), dashboardId: a.id });
+
+      await expect(starred("u")).resolves.toEqual(["template:t1"]);
+    });
   });
 
   describe("when favourites are written", () => {
@@ -378,7 +460,11 @@ function contractCases(backend: Backend): void {
       const one = await dashboard("One", 0);
       const two = await dashboard("Two", 1);
       const star = (dashboardId: string) =>
-        repository.starDashboard({ projectId: backend.projectId(), userId: "u", dashboardId });
+        repository.addStar({
+          projectId: backend.projectId(),
+          userId: "u",
+          star: { kind: "board", dashboardId },
+        });
 
       await star(two.id);
       await star(one.id);
@@ -387,11 +473,14 @@ function contractCases(backend: Backend): void {
       await expect(
         repository.findStarredDashboardIds({ projectId: backend.projectId(), userId: "u" }),
       ).resolves.toEqual([two.id, one.id]);
-      const listed = await repository.findStarredDashboards({
+      const listed = await repository.findStarred({
         projectId: backend.projectId(),
         userId: "u",
       });
-      expect(listed.map((row) => row.id)).toEqual([two.id, one.id]);
+      expect(listed.map((row) => (row.kind === "board" ? row.dashboard.id : null))).toEqual([
+        two.id,
+        one.id,
+      ]);
     });
 
     it("unstars and reorders a member's stars without touching another member's", async () => {
@@ -401,12 +490,24 @@ function contractCases(backend: Backend): void {
       const c = await dashboard("C", 2);
       const projectId = backend.projectId();
       for (const dashboardId of [a.id, b.id, c.id]) {
-        await repository.starDashboard({ projectId, userId: "u", dashboardId });
+        await repository.addStar({ projectId, userId: "u", star: { kind: "board", dashboardId } });
       }
-      await repository.starDashboard({ projectId, userId: "other", dashboardId: a.id });
+      await repository.addStar({
+        projectId,
+        userId: "other",
+        star: { kind: "board", dashboardId: a.id },
+      });
 
-      await repository.unstarDashboard({ projectId, userId: "u", dashboardId: b.id });
-      await repository.reorderStars({ projectId, userId: "u", dashboardIds: [c.id, a.id] });
+      await repository.removeStar({
+        projectId,
+        userId: "u",
+        star: { kind: "board", dashboardId: b.id },
+      });
+      await repository.reorderStars({
+        projectId,
+        userId: "u",
+        stars: [c.id, a.id].map((dashboardId) => ({ kind: "board" as const, dashboardId })),
+      });
 
       await expect(repository.findStarredDashboardIds({ projectId, userId: "u" })).resolves.toEqual(
         [c.id, a.id],
@@ -420,8 +521,9 @@ function contractCases(backend: Backend): void {
       const repository = backend.repository();
       const board = await dashboard();
       const projectId = backend.projectId();
-      await repository.starDashboard({ projectId, userId: "u", dashboardId: board.id });
-      await repository.starDashboard({ projectId, userId: "other", dashboardId: board.id });
+      const star = { kind: "board" as const, dashboardId: board.id };
+      await repository.addStar({ projectId, userId: "u", star });
+      await repository.addStar({ projectId, userId: "other", star });
 
       await repository.deleteDashboard({ projectId, dashboardId: board.id });
 

@@ -283,7 +283,7 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
     projectSlug: host.project()?.slug,
   });
   if (!showExpanded) return null;
-  return <SavedDashboards activeDashboardId={dashboardsAreaAt(pattern)?.dashboardId} />;
+  return <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />;
 }
 
 function ProductSidebarBody({

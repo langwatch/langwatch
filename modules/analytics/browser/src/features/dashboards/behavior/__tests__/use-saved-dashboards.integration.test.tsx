@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * Creating a board sends no visibility (every board is the project's), and
  * the list carries each board's star and last change.
- * @see specs/dashboards-v1.feature
+ * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
 import { act, renderHook } from "@testing-library/react";
@@ -79,7 +79,7 @@ describe("given a member creates a board", () => {
 });
 
 describe("given the project has boards", () => {
-  /** @scenario "AC151 The Dashboards tab lists every board with a star, name, menu and link" */
+  /** @scenario "AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name" */
   it("lists each with its star and last change", () => {
     const { result } = renderHook(() => useSavedDashboards());
 

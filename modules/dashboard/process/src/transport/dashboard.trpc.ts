@@ -100,7 +100,7 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
       app.star({
         projectId: input.projectId,
         userId: actor.id,
-        dashboardId: input.dashboardId,
+        star: input.star,
       }),
     )
 
@@ -110,7 +110,7 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
       app.unstar({
         projectId: input.projectId,
         userId: actor.id,
-        dashboardId: input.dashboardId,
+        star: input.star,
       }),
     )
 
@@ -120,7 +120,7 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
       app.reorderStars({
         projectId: input.projectId,
         userId: actor.id,
-        dashboardIds: input.dashboardIds,
+        stars: input.stars,
       }),
     )
 

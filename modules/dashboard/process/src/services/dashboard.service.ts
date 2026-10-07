@@ -6,6 +6,7 @@ import {
   DASHBOARD_KSUID_RESOURCE,
   dashboardCreateInputSchema,
   dashboardIdSchema,
+  dashboardStarSchema,
   dashboardRenameInputSchema,
   dashboardReorderInputSchema,
   DashboardNotFoundError,
@@ -20,7 +21,9 @@ import {
   projectIdSchema,
   type Dashboard,
   type DashboardGraphCountScope,
+  type DashboardStar,
   type DashboardSummary,
+  type StarredDashboard,
   type DashboardViewer,
   type Graph,
   type GraphLayout,
@@ -106,7 +109,7 @@ export class DashboardService {
     return dashboard;
   }
 
-  /** A member-created board is starred for that member; a project credential makes no star. */
+  /** A new board after the last; creating never stars it. */
   async create(input: {
     projectId: string;
     name: string;
@@ -125,14 +128,6 @@ export class DashboardService {
       order: (last?.order ?? -1) + 1,
       createdById: createdById ?? null,
     });
-
-    if (createdById !== undefined) {
-      await this.#repository.starDashboard({
-        projectId: parsed.projectId,
-        userId: createdById,
-        dashboardId: dashboard.id,
-      });
-    }
 
     return dashboard;
   }
@@ -211,7 +206,7 @@ export class DashboardService {
     return { success: true as const };
   }
 
-  /** The project's first board, or a new one after the last, starred for the viewer. */
+  /** The project's first board, or a new one after the last. */
   async getOrCreateFirst(input: {
     projectId: string;
     viewer?: DashboardViewer;
@@ -230,43 +225,47 @@ export class DashboardService {
 
   // -- favourites ------------------------------------------------------------
 
-  /** The member's starred boards for this project, in their own order. */
-  async listStarred(input: { projectId: string; userId: string }): Promise<Dashboard[]> {
+  /** The member's stars for this project, boards and templates, in their own order. */
+  async listStarred(input: { projectId: string; userId: string }): Promise<StarredDashboard[]> {
     const projectId = projectIdSchema.parse(input.projectId);
-    return this.#repository.findStarredDashboards({ projectId, userId: input.userId });
+    return this.#repository.findStarred({ projectId, userId: input.userId });
   }
 
+  /** Stars a board (it must exist) or a template (unchecked: the catalogue is browser-side). */
   async star(input: {
     projectId: string;
     userId: string;
-    dashboardId: string;
+    star: DashboardStar;
   }): Promise<{ success: true }> {
-    const ref = dashboardRef(input);
-    await this.#requireBoard(ref);
-    await this.#repository.starDashboard({ ...ref, userId: input.userId });
+    const projectId = projectIdSchema.parse(input.projectId);
+    const star = dashboardStarSchema.parse(input.star);
+    if (star.kind === "board")
+      await this.#requireBoard({ projectId, dashboardId: star.dashboardId });
+    await this.#repository.addStar({ projectId, userId: input.userId, star });
     return { success: true as const };
   }
 
   async unstar(input: {
     projectId: string;
     userId: string;
-    dashboardId: string;
+    star: DashboardStar;
   }): Promise<{ success: true }> {
-    const ref = dashboardRef(input);
-    await this.#repository.unstarDashboard({ ...ref, userId: input.userId });
+    const projectId = projectIdSchema.parse(input.projectId);
+    const star = dashboardStarSchema.parse(input.star);
+    await this.#repository.removeStar({ projectId, userId: input.userId, star });
     return { success: true as const };
   }
 
   async reorderStars(input: {
     projectId: string;
     userId: string;
-    dashboardIds: string[];
+    stars: DashboardStar[];
   }): Promise<{ success: true }> {
     const projectId = projectIdSchema.parse(input.projectId);
     await this.#repository.reorderStars({
       projectId,
       userId: input.userId,
-      dashboardIds: input.dashboardIds.map((id) => dashboardIdSchema.parse(id)),
+      stars: input.stars.map((star) => dashboardStarSchema.parse(star)),
     });
     return { success: true as const };
   }

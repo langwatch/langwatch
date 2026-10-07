@@ -13,278 +13,351 @@ import { StubAnalyticsHost } from "../../../testing.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
-const board = ({ id, name }: { id: string; name: string }) => ({
+const board = ({
   id,
   name,
+  createdById = "user-1",
+}: {
+  id: string;
+  name: string;
+  createdById?: string;
+}) => ({
+  id,
+  projectId: "proj-1",
+  name,
+  order: 0,
   description: null,
-  createdById: "user-1",
-  isStarred: true,
+  createdById,
+  isStarred: false,
+  createdAt: new Date("2026-01-01"),
   updatedAt: new Date("2026-01-01"),
+  _count: { graphs: 0 },
 });
 
-const STARS = [
-  board({ id: "board-1", name: "Weekly review" }),
-  board({ id: "board-2", name: "Latency" }),
+const MINE = board({ id: "board-mine", name: "My dashboard" });
+const WEEKLY = board({ id: "board-1", name: "Weekly review" });
+const LATENCY = board({ id: "board-2", name: "Latency" });
+const COSTS = board({ id: "board-3", name: "Costs", createdById: "user-2" });
+const THEIRS = board({ id: "board-theirs", name: "My dashboard", createdById: "user-2" });
+const BOARDS = [WEEKLY, MINE, LATENCY, COSTS, THEIRS];
+
+type Star =
+  | { kind: "board"; dashboard: ReturnType<typeof board> }
+  | { kind: "template"; templateId: string };
+
+/** The member starred Latency, then the Release check template. */
+const STARS: Star[] = [
+  { kind: "board", dashboard: LATENCY },
+  { kind: "template", templateId: "release" },
 ];
 
 const graph = { version: 1, code: "export default () => null;", queries: [] };
 
-/** Two widgets on "Latency" and one on another board, as `dashboardWidgets.list` answers. */
 const STORED_WIDGETS = [
-  {
-    id: "w-1",
-    name: "Traffic",
-    dashboardId: "board-2",
-    gridColumn: 0,
-    gridRow: 0,
-    colSpan: 6,
-    rowSpan: 3,
-    graph,
-  },
-  {
-    id: "w-2",
-    name: "Cost",
-    dashboardId: "board-2",
-    gridColumn: 6,
-    gridRow: 0,
-    colSpan: 6,
-    rowSpan: 3,
-    graph,
-  },
-  {
-    id: "w-3",
-    name: "Other",
-    dashboardId: "board-1",
-    gridColumn: 0,
-    gridRow: 0,
-    colSpan: 12,
-    rowSpan: 3,
-    graph,
-  },
+  { id: "w-1", name: "Traffic", dashboardId: "board-2", gridColumn: 0, gridRow: 0 },
+  { id: "w-2", name: "Cost", dashboardId: "board-2", gridColumn: 4, gridRow: 0 },
+  { id: "w-3", name: "Other", dashboardId: "board-1", gridColumn: 0, gridRow: 0 },
+].map((widget) => ({ ...widget, colSpan: 4, rowSpan: 3, graph }));
+
+const ACK_PATHS = [
+  "dashboards.updateDetails",
+  "dashboards.star",
+  "dashboards.unstar",
+  "dashboards.reorderStars",
+  "dashboards.delete",
+  "dashboardWidgets.batchUpdateLayouts",
 ];
 
-/** Answers the star list, the board list and the writes, keeping every call for the test. */
-function projectWithStars({
-  stars = STARS,
-  listStarredFails = false,
-}: { stars?: typeof STARS; listStarredFails?: boolean } = {}) {
+/** Answers the board list, the stars and the writes, keeping every call for the test. */
+function project({ stars = STARS, listFails = false }: { stars?: Star[]; listFails?: boolean }) {
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall) => {
     calls.push(call);
     if (call.path === "dashboards.listStarred") {
-      return listStarredFails ? Promise.reject(new Error("down")) : Promise.resolve(stars);
+      return listFails ? Promise.reject(new Error("down")) : Promise.resolve(stars);
     }
-    if (call.path === "dashboards.getAll") return Promise.resolve(stars);
-    if (call.path === "dashboards.create")
-      return Promise.resolve({ id: "board-3", name: "Latency copy" });
+    if (call.path === "dashboards.getAll") return Promise.resolve(BOARDS);
+    if (call.path === "dashboards.create") {
+      return Promise.resolve({ ...board({ id: "board-new", name: "Untitled" }) });
+    }
     if (call.path === "dashboardWidgets.list") return Promise.resolve(STORED_WIDGETS);
-    if (call.path === "dashboardWidgets.create") {
+    if (call.path === "dashboardWidgets.create")
       return Promise.resolve({ id: `copy-${calls.length}` });
-    }
-    const ACK_PATHS = [
-      "dashboards.updateDetails",
-      "dashboards.unstar",
-      "dashboards.reorderStars",
-      "dashboards.delete",
-      "dashboardWidgets.batchUpdateLayouts",
-    ];
-    if (ACK_PATHS.includes(call.path)) {
-      return Promise.resolve({ success: true });
-    }
+    if (ACK_PATHS.includes(call.path)) return Promise.resolve({ success: true });
     return NO_PROCEDURES(call);
   };
   return { calls, answer };
 }
 
 function renderSection({
-  activeDashboardId,
+  openPath = "",
   ...options
-}: { activeDashboardId?: string; stars?: typeof STARS; listStarredFails?: boolean } = {}) {
+}: { openPath?: string; stars?: Star[]; listFails?: boolean } = {}) {
   const host = new StubAnalyticsHost({ flags: { release_dashboards: true } });
-  const project = projectWithStars(options);
-  renderDashboards({
-    element: <SavedDashboardsSection activeDashboardId={activeDashboardId} />,
-    host,
-    answer: project.answer,
-  });
-  return { host, calls: project.calls };
+  const { calls, answer } = project(options);
+  renderDashboards({ element: <SavedDashboardsSection openPath={openPath} />, host, answer });
+  return { host, calls, user: userEvent.setup({ pointerEventsCheck: 0 }) };
 }
 
-const starredList = () => screen.findByRole("list", { name: "Starred dashboards" });
+const listNamed = (name: string) => screen.findByRole("list", { name });
+const namesIn = async (name: string) =>
+  within(await listNamed(name))
+    .getAllByRole("link")
+    .map((link) => link.textContent?.trim());
+const menuItemNames = () => screen.getAllByRole("menuitem").map((item) => item.textContent?.trim());
+const inputsTo = (calls: UiProcedureCall[], path: string) =>
+  calls.filter((call) => call.path === path).map(({ input }) => input);
 
-describe("the starred-dashboards list in the sidebar", () => {
-  describe("given the release_dashboards flag is on for the project", () => {
-    describe("when the member looks at the sidebar", () => {
-      /** @scenario "AC3 Sidebar matches the reference" */
-      it("lists the member's stars with no built-in board and no Default tag", async () => {
-        renderSection();
+describe("the Dashboards sidebar", () => {
+  describe("given the member's boards, stars and the From LangWatch boards", () => {
+    /** @scenario "AC161 The sidebar lists Your dashboards, Starred, From LangWatch and Browse templates in order" */
+    it("shows the groups in the prototype's order, each board once", async () => {
+      renderSection();
 
-        const links = within(await starredList()).getAllByRole("link");
-        expect(links.map((link) => link.getAttribute("href"))).toEqual([
-          "/test-project/dashboards/board-1",
-          "/test-project/dashboards/board-2",
-        ]);
-        expect(screen.getByText("Starred")).toBeInTheDocument();
-        expect(screen.queryByText("Agent Flight Deck")).toBeNull();
-        expect(screen.queryByText("Default")).toBeNull();
-        expect(screen.queryByRole("button", { name: "New dashboard" })).toBeNull();
-      });
-
-      /** @scenario "AC3 Sidebar matches the reference" */
-      it("gives each starred board a menu", async () => {
-        renderSection();
-
-        expect(
-          await screen.findByRole("button", { name: "Actions for Weekly review" }),
-        ).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Actions for Latency" })).toBeInTheDocument();
-      });
+      expect(await namesIn("Your dashboards")).toEqual(["My dashboard", "Costs", "Weekly review"]);
+      expect(await namesIn("Starred dashboards")).toEqual(["Latency", "Release check"]);
+      expect(await namesIn("From LangWatch")).toEqual([
+        "Can I trust my numbers?",
+        "Where my agent breaks",
+      ]);
+      const links = screen.getAllByRole("link");
+      expect(links.at(-1)).toHaveTextContent("Browse templates");
+      expect(links.at(-1)).toHaveAttribute("href", "/test-project/dashboards/templates");
+      expect(screen.queryByText("All dashboards")).toBeNull();
     });
 
-    describe("when the member has starred boards", () => {
-      /** @scenario "AC154 The sidebar shows my stars for this project, then All dashboards" */
-      it("lists the stars in the member's order, then an All dashboards link", async () => {
-        const { host } = renderSection();
-        await starredList();
+    /** @scenario "AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name" */
+    it("leaves another member's My dashboard out", async () => {
+      renderSection();
 
-        const links = screen.getAllByRole("link");
-        const all = links.at(-1);
-        expect(all).toHaveTextContent("All dashboards");
-        expect(all).toHaveAttribute("href", "/test-project/dashboards");
-        expect(all).toHaveAttribute("aria-current", "page");
-
-        fireEvent.click(all!);
-        expect(host.navigations).toEqual(["/test-project/dashboards"]);
-      });
-
-      /** @scenario "AC154 The sidebar shows my stars for this project, then All dashboards" */
-      it("shows a one-line error with Retry when the stars fail to load", async () => {
-        renderSection({ listStarredFails: true });
-
-        expect(await screen.findByRole("button", { name: "Retry" })).toBeInTheDocument();
-        expect(screen.getByRole("link", { name: /All dashboards/ })).toBeInTheDocument();
-      });
-
-      /** @scenario "AC154 The sidebar shows my stars for this project, then All dashboards" */
-      it("unstars a board from its star icon", async () => {
-        const user = userEvent.setup({ pointerEventsCheck: 0 });
-        const { calls, host } = renderSection();
-        await starredList();
-
-        await user.click(screen.getAllByRole("button", { name: "Unstar dashboard" })[1]!);
-
-        await waitFor(() =>
-          expect(calls.find(({ path }) => path === "dashboards.unstar")?.input).toEqual({
-            projectId: "proj-1",
-            dashboardId: "board-2",
-          }),
-        );
-        expect(host.navigations).toEqual([]);
-      });
+      const yours = within(await listNamed("Your dashboards")).getAllByRole("link");
+      expect(yours.map((link) => link.getAttribute("href"))).not.toContain(
+        "/test-project/dashboards/board-theirs",
+      );
     });
 
-    describe("when the member opens a starred board's menu", () => {
-      const menuItemNames = () =>
-        screen.getAllByRole("menuitem").map((item) => item.textContent?.trim());
+    /** @scenario "AC161 The sidebar lists Your dashboards, Starred, From LangWatch and Browse templates in order" */
+    it("links a From LangWatch board to its live address and marks the open one", async () => {
+      renderSection({ openPath: "curated/data" });
 
-      /** @scenario "AC107 Sidebar menu: each starred board offers its actions in order" */
-      it("offers Rename, Duplicate, Move up, Move down and Delete, with no Share or default", async () => {
-        const user = userEvent.setup({ pointerEventsCheck: 0 });
-        renderSection();
-
-        await user.click(await screen.findByRole("button", { name: "Actions for Latency" }));
-        await screen.findByRole("menuitem", { name: "Delete" });
-
-        expect(menuItemNames()).toEqual(["Rename", "Duplicate", "Move up", "Move down", "Delete"]);
-        expect(screen.queryByRole("menuitem", { name: "Share" })).toBeNull();
-        expect(screen.queryByRole("menuitem", { name: "Set as default" })).toBeNull();
-        expect(screen.getByRole("separator")).toBeInTheDocument();
+      const data = within(await listNamed("From LangWatch")).getByRole("link", {
+        name: /Can I trust my numbers\?/,
       });
+      expect(data).toHaveAttribute("href", "/test-project/dashboards/curated/data");
+      expect(data).toHaveAttribute("aria-current", "page");
+    });
+  });
 
-      /** @scenario "AC107b Sidebar menu: reorder is bounded by the list's ends" */
-      it("disables Move up on the first star and Move down on the last", async () => {
-        const user = userEvent.setup({ pointerEventsCheck: 0 });
-        renderSection();
+  describe("given the member has no stars", () => {
+    /** @scenario "AC161c Starred shows only when the member has stars, in their own order" */
+    it("shows no Starred group", async () => {
+      renderSection({ stars: [] });
 
-        await user.click(await screen.findByRole("button", { name: "Actions for Weekly review" }));
-        expect(await screen.findByRole("menuitem", { name: "Move up" })).toHaveAttribute(
-          "aria-disabled",
-          "true",
-        );
-        expect(screen.getByRole("menuitem", { name: "Move down" })).not.toHaveAttribute(
-          "aria-disabled",
-          "true",
-        );
-        await user.keyboard("{Escape}");
-        await waitFor(() => expect(screen.queryByRole("menuitem", { name: "Move up" })).toBeNull());
+      await listNamed("Your dashboards");
+      expect(screen.queryByText("Starred")).toBeNull();
+      expect(await namesIn("From LangWatch")).toHaveLength(3);
+    });
+  });
 
-        await user.click(screen.getByRole("button", { name: "Actions for Latency" }));
-        expect(await screen.findByRole("menuitem", { name: "Move down" })).toHaveAttribute(
-          "aria-disabled",
-          "true",
-        );
-      });
+  describe("when the stars fail to load", () => {
+    /** @scenario "AC161c Starred shows only when the member has stars, in their own order" */
+    it("shows a one-line error with Retry and keeps Browse templates", async () => {
+      renderSection({ listFails: true });
 
-      /** @scenario "AC155 Move up and Move down reorder the member's stars" */
-      it("swaps a board with the one above and saves the new order", async () => {
-        const user = userEvent.setup({ pointerEventsCheck: 0 });
-        const { calls } = renderSection();
+      expect(await screen.findByRole("button", { name: "Retry" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /Browse templates/ })).toBeInTheDocument();
+    });
+  });
 
-        await user.click(await screen.findByRole("button", { name: "Actions for Latency" }));
-        await user.click(await screen.findByRole("menuitem", { name: "Move up" }));
+  describe("when the member presses the '+' on Your dashboards", () => {
+    /** @scenario "AC162 The '+' on Your dashboards makes a blank board or opens the templates" */
+    it("offers a blank board or a template", async () => {
+      const { user, host, calls } = renderSection();
+      await listNamed("Your dashboards");
 
-        await waitFor(() =>
-          expect(calls.find(({ path }) => path === "dashboards.reorderStars")?.input).toEqual({
+      await user.click(screen.getByRole("button", { name: "New dashboard" }));
+      expect(menuItemNames()).toEqual(["Blank dashboard", "From a template"]);
+      await user.click(screen.getByRole("menuitem", { name: "From a template" }));
+      expect(host.navigations).toEqual(["/test-project/dashboards/templates"]);
+
+      await user.click(screen.getByRole("button", { name: "New dashboard" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Blank dashboard" }));
+      await waitFor(() => expect(inputsTo(calls, "dashboards.create")).toHaveLength(1));
+    });
+  });
+
+  describe("when the member clicks the From LangWatch heading", () => {
+    /** @scenario "AC164 From LangWatch folds only when the member clicks it" */
+    it("folds the group, and a second click opens it again", async () => {
+      const { user } = renderSection();
+      await listNamed("From LangWatch");
+
+      await user.click(screen.getByRole("button", { name: /From LangWatch/ }));
+      expect(screen.queryByRole("list", { name: "From LangWatch" })).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: /From LangWatch/ }));
+      expect(await listNamed("From LangWatch")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the member stars and unstars from the row's star", () => {
+    /** @scenario "AC165 A star can point at a From LangWatch board" */
+    it("stars a From LangWatch board by its template id", async () => {
+      const { user, calls, host } = renderSection();
+      const data = within(await listNamed("From LangWatch"))
+        .getAllByRole("listitem")
+        .find((item) => item.textContent?.includes("Can I trust my numbers?"));
+
+      await user.click(within(data!).getByRole("button", { name: "Star dashboard" }));
+
+      await waitFor(() =>
+        expect(inputsTo(calls, "dashboards.star")).toEqual([
+          { projectId: "proj-1", star: { kind: "template", templateId: "data" } },
+        ]),
+      );
+      expect(host.navigations).toEqual([]);
+    });
+
+    /** @scenario "AC165 A star can point at a From LangWatch board" */
+    it("unstars a starred board", async () => {
+      const { user, calls } = renderSection();
+      const starred = within(await listNamed("Starred dashboards"));
+
+      await user.click(starred.getAllByRole("button", { name: "Unstar dashboard" })[0]!);
+
+      await waitFor(() =>
+        expect(inputsTo(calls, "dashboards.unstar")).toEqual([
+          { projectId: "proj-1", star: { kind: "board", dashboardId: "board-2" } },
+        ]),
+      );
+    });
+  });
+
+  describe("when the member opens a board's menu", () => {
+    /** @scenario "AC107 Sidebar menu: each board offers its actions in order" */
+    it("offers Star, Rename, Duplicate and Delete on a team board", async () => {
+      const { user } = renderSection();
+
+      await user.click(await screen.findByRole("button", { name: "Actions for Weekly review" }));
+      await screen.findByRole("menuitem", { name: "Delete" });
+
+      expect(menuItemNames()).toEqual(["Star", "Rename", "Duplicate", "Delete"]);
+      expect(screen.queryByRole("menuitem", { name: "Share" })).toBeNull();
+    });
+
+    /** @scenario "AC163 My dashboard cannot be deleted" */
+    it("offers no Delete and no Rename on My dashboard", async () => {
+      const { user } = renderSection();
+
+      await user.click(await screen.findByRole("button", { name: "Actions for My dashboard" }));
+
+      expect(await screen.findByRole("menuitem", { name: "Delete" })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+      expect(screen.getByRole("menuitem", { name: "Rename" })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+    });
+
+    /** @scenario "AC107 Sidebar menu: each board offers its actions in order" */
+    it("offers Unstar, Move up, Move down then Duplicate to edit on a starred template", async () => {
+      const { user } = renderSection();
+
+      await user.click(await screen.findByRole("button", { name: "Actions for Release check" }));
+      await screen.findByRole("menuitem", { name: "Duplicate to edit" });
+
+      expect(menuItemNames()).toEqual(["Unstar", "Move up", "Move down", "Duplicate to edit"]);
+    });
+
+    /** @scenario "AC107b Sidebar menu: reorder is bounded by the Starred list's ends" */
+    it("disables Move up on the first star and Move down on the last", async () => {
+      const { user } = renderSection();
+
+      await user.click(await screen.findByRole("button", { name: "Actions for Latency" }));
+      expect(await screen.findByRole("menuitem", { name: "Move up" })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("menuitem", { name: "Move up" })).toBeNull());
+
+      await user.click(screen.getByRole("button", { name: "Actions for Release check" }));
+      expect(await screen.findByRole("menuitem", { name: "Move down" })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+    });
+
+    /** @scenario "AC155 Move up and Move down reorder the member's stars" */
+    it("swaps a star with the one above and saves the order, boards and templates alike", async () => {
+      const { user, calls } = renderSection();
+
+      await user.click(await screen.findByRole("button", { name: "Actions for Release check" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Move up" }));
+
+      await waitFor(() =>
+        expect(inputsTo(calls, "dashboards.reorderStars")).toEqual([
+          {
             projectId: "proj-1",
-            dashboardIds: ["board-2", "board-1"],
-          }),
-        );
-      });
+            stars: [
+              { kind: "template", templateId: "release" },
+              { kind: "board", dashboardId: "board-2" },
+            ],
+          },
+        ]),
+      );
+    });
 
-      /** @scenario "AC109 Sidebar menu: Duplicate copies the board and its widgets" */
-      it("copies the board and its widgets, then opens it, sending no visibility", async () => {
-        const user = userEvent.setup({ pointerEventsCheck: 0 });
-        const { host, calls } = renderSection();
+    /** @scenario "AC109 Sidebar menu: Duplicate copies the board and its widgets" */
+    it("copies the board and its widgets, then opens it, starring nothing", async () => {
+      const { user, host, calls } = renderSection();
 
-        await user.click(await screen.findByRole("button", { name: "Actions for Latency" }));
-        await user.click(await screen.findByRole("menuitem", { name: "Duplicate" }));
+      await user.click(await screen.findByRole("button", { name: "Actions for Latency" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Duplicate" }));
 
-        await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-3"]));
-        const inputsTo = (path: string) =>
-          calls.filter((call) => call.path === path).map(({ input }) => input);
-        expect(inputsTo("dashboards.create")).toEqual([
-          { projectId: "proj-1", name: "Latency copy" },
-        ]);
-        expect(
-          inputsTo("dashboardWidgets.create").map((input) => (input as { name: string }).name),
-        ).toEqual(["Traffic", "Cost"]);
-        const [{ layouts }] = inputsTo("dashboardWidgets.batchUpdateLayouts") as [
-          { layouts: { gridColumn: number; gridRow: number }[] },
-        ];
-        expect(layouts.map(({ gridColumn, gridRow }) => [gridColumn, gridRow])).toEqual([
-          [0, 0],
-          [6, 0],
-        ]);
-      });
+      await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-new"]));
+      expect(inputsTo(calls, "dashboards.create")).toEqual([
+        { projectId: "proj-1", name: "Latency copy" },
+      ]);
+      expect(
+        inputsTo(calls, "dashboardWidgets.create").map((input) => (input as { name: string }).name),
+      ).toEqual(["Traffic", "Cost"]);
+      expect(inputsTo(calls, "dashboards.star")).toEqual([]);
+    });
 
-      /** @scenario "AC107 Sidebar menu: each starred board offers its actions in order" */
-      it("deletes a board after the member confirms", async () => {
-        const user = userEvent.setup({ pointerEventsCheck: 0 });
-        const { calls } = renderSection();
+    /** @scenario "From LangWatch: Duplicate to edit makes an own board named after the template" */
+    it("duplicates a From LangWatch board as '<name> (copy)'", async () => {
+      const { user, calls } = renderSection();
 
-        await user.click(await screen.findByRole("button", { name: "Actions for Latency" }));
-        await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
-        const dialog = await screen.findByRole("dialog");
-        expect(calls.some(({ path }) => path === "dashboards.delete")).toBe(false);
-        await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+      await user.click(
+        await screen.findByRole("button", { name: "Actions for Where my agent breaks" }),
+      );
+      await user.click(await screen.findByRole("menuitem", { name: "Duplicate to edit" }));
 
-        await waitFor(() =>
-          expect(calls.find(({ path }) => path === "dashboards.delete")?.input).toEqual({
-            projectId: "proj-1",
-            dashboardId: "board-2",
-          }),
-        );
-      });
+      await waitFor(() =>
+        expect(inputsTo(calls, "dashboards.create")).toEqual([
+          { projectId: "proj-1", name: "Where my agent breaks (copy)" },
+        ]),
+      );
+    });
+
+    /** @scenario "AC107 Sidebar menu: each board offers its actions in order" */
+    it("deletes a team board after the member confirms", async () => {
+      const { user, calls } = renderSection({ openPath: "board-1" });
+
+      await user.click(await screen.findByRole("button", { name: "Actions for Weekly review" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+      const dialog = await screen.findByRole("dialog");
+      expect(inputsTo(calls, "dashboards.delete")).toEqual([]);
+      fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+      await waitFor(() =>
+        expect(inputsTo(calls, "dashboards.delete")).toEqual([
+          { projectId: "proj-1", dashboardId: "board-1" },
+        ]),
+      );
     });
   });
 });

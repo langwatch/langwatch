@@ -827,6 +827,10 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
                 page: "pages/[project]/dashboards/templates",
               },
               {
+                path: "/:project/dashboards/curated/:templateId",
+                page: "pages/[project]/dashboards/curated/[templateId]",
+              },
+              {
                 path: "/:project/dashboards/:dashboardId",
                 page: "pages/[project]/dashboards/[dashboardId]",
               },

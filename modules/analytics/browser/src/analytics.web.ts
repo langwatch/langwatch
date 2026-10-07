@@ -76,6 +76,9 @@ export const analyticsWeb = defineBrowserModule("analytics")
     "pages/[project]/dashboards/templates": {
       load: () => import("./features/dashboards/ui/sections/templates-library.screen.tsx"),
     },
+    "pages/[project]/dashboards/curated/[templateId]": {
+      load: () => import("./features/dashboards/ui/sections/curated-board.screen.tsx"),
+    },
     "pages/[project]/dashboards/[dashboardId]": {
       load: () => import("./features/dashboards/ui/sections/dashboard-board.screen.tsx"),
     },

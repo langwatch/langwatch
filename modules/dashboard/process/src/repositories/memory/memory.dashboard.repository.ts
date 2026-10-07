@@ -7,7 +7,9 @@ import {
   SavedWorkbenchChartNotFoundError,
   type GraphLayout,
   type SavedWorkbenchChartDefinition,
+  type DashboardStar,
   type DashboardUsageCount,
+  type StarredDashboard,
 } from "@langwatch/dashboard-contract";
 import { Temporal, toDate } from "@langwatch/time";
 
@@ -42,11 +44,12 @@ type StoredChart = Pick<GraphRecord, "createdAt" | "updatedAt"> & {
   rowSpan: number;
 };
 
-/** One member's star on one board, in their own order within a project. */
+/** One member's star on a board or a template, in their own order within a project. */
 type StoredFavourite = {
   id: string;
   userId: string;
-  dashboardId: string;
+  dashboardId: string | null;
+  templateId: string | null;
   projectId: string;
   position: number;
 };
@@ -174,52 +177,52 @@ export class MemoryDashboardRepository implements DashboardRepository {
     return dashboard;
   }
 
-  async findStarredDashboards(input: {
-    projectId: string;
-    userId: string;
-  }): Promise<DashboardRecord[]> {
-    return this.#starred(input)
-      .map((favourite) => this.#dashboards.find((row) => row.id === favourite.dashboardId))
-      .filter((row): row is DashboardRecord => row !== undefined);
+  async findStarred(input: { projectId: string; userId: string }): Promise<StarredDashboard[]> {
+    return this.#starred(input).flatMap((favourite): StarredDashboard[] => {
+      if (favourite.templateId !== null) {
+        return [{ kind: "template", templateId: favourite.templateId }];
+      }
+      const dashboard = this.#dashboards.find((row) => row.id === favourite.dashboardId);
+      return dashboard ? [{ kind: "board", dashboard }] : [];
+    });
   }
 
   async findStarredDashboardIds(input: { projectId: string; userId: string }): Promise<string[]> {
-    return this.#starred(input).map((favourite) => favourite.dashboardId);
+    return this.#starred(input).flatMap((favourite) =>
+      favourite.dashboardId === null ? [] : [favourite.dashboardId],
+    );
   }
 
-  async starDashboard(input: {
-    projectId: string;
-    userId: string;
-    dashboardId: string;
-  }): Promise<void> {
+  async addStar(input: { projectId: string; userId: string; star: DashboardStar }): Promise<void> {
     if (this.#favourite(input)) return;
     const position = this.#starred(input).length;
     this.#favouriteId += 1;
-    this.#favourites.push({ id: `fav_${this.#favouriteId}`, ...input, position });
+    this.#favourites.push({
+      id: `fav_${this.#favouriteId}`,
+      userId: input.userId,
+      projectId: input.projectId,
+      dashboardId: input.star.kind === "board" ? input.star.dashboardId : null,
+      templateId: input.star.kind === "template" ? input.star.templateId : null,
+      position,
+    });
   }
 
-  async unstarDashboard(input: {
+  async removeStar(input: {
     projectId: string;
     userId: string;
-    dashboardId: string;
+    star: DashboardStar;
   }): Promise<void> {
-    this.#favourites = this.#favourites.filter(
-      (row) =>
-        !(
-          row.userId === input.userId &&
-          row.dashboardId === input.dashboardId &&
-          row.projectId === input.projectId
-        ),
-    );
+    const found = this.#favourite(input);
+    this.#favourites = this.#favourites.filter((row) => row !== found);
   }
 
   async reorderStars(input: {
     projectId: string;
     userId: string;
-    dashboardIds: string[];
+    stars: DashboardStar[];
   }): Promise<void> {
-    for (const [position, dashboardId] of input.dashboardIds.entries()) {
-      const favourite = this.#favourite({ ...input, dashboardId });
+    for (const [position, star] of input.stars.entries()) {
+      const favourite = this.#favourite({ ...input, star });
       if (favourite) favourite.position = position;
     }
   }
@@ -234,13 +237,12 @@ export class MemoryDashboardRepository implements DashboardRepository {
   #favourite(input: {
     projectId: string;
     userId: string;
-    dashboardId: string;
+    star: DashboardStar;
   }): StoredFavourite | undefined {
-    return this.#favourites.find(
-      (row) =>
-        row.userId === input.userId &&
-        row.dashboardId === input.dashboardId &&
-        row.projectId === input.projectId,
+    return this.#starred(input).find((row) =>
+      input.star.kind === "board"
+        ? row.dashboardId === input.star.dashboardId
+        : row.templateId === input.star.templateId,
     );
   }
 

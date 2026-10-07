@@ -1,7 +1,6 @@
 /**
- * The "Add a block" picker: every catalogue widget, filtered as the library is (only while
- * open), in branch sections by trunk. Choosing one adds it and drafts its widget's prompt in
- * Langy, as Ask Langy on its card does (AC141). A pinned footer asks Langy anything else.
+ * "Add a widget": every catalogue widget in branch sections by trunk, searched from what the
+ * ask bar had typed. A pick adds it and drafts its prompt in Langy (AC141); a footer asks Langy.
  */
 
 import { Dialog } from "@langwatch/design-system/dialog";
@@ -24,7 +23,7 @@ import {
   TrendingDown,
   XCircle,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   PICKER_QUESTIONS,
@@ -77,19 +76,34 @@ const QUESTION_ICONS: Readonly<Record<BlockQuestionIcon, LucideIcon>> = {
 export function BlockPickerDialog({
   board,
   period,
+  initialSearch = "",
   onAddWidgets,
   onClose,
 }: {
   /** The board the picker opened on, attached as Langy's context. */
   board: BoardSubject;
   period: BoardPeriod;
+  /** The search it opens with, such as what the ask bar had typed. */
+  initialSearch?: string;
   /** Adds the picked question's widget(s) to the board; false when the write failed. */
   onAddWidgets: (question: BlockQuestion) => Promise<boolean>;
   onClose: () => void;
 }) {
   const langy = useLangyAsk();
-  const [filters, setFilters] = useState<CatalogueFilters>(NO_CATALOGUE_FILTERS);
+  const [filters, setFilters] = useState<CatalogueFilters>({
+    ...NO_CATALOGUE_FILTERS,
+    search: initialSearch,
+  });
   const searchRef = useRef<HTMLInputElement>(null);
+  // The dialog's focus selects the search; the caret goes to the end instead, so typing
+  // carries on from the ask bar rather than replacing what was typed there.
+  useEffect(() => {
+    if (!initialSearch) return;
+    const frame = requestAnimationFrame(() => {
+      searchRef.current?.setSelectionRange(initialSearch.length, initialSearch.length);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [initialSearch]);
 
   const shown = filterCatalogue({ items: PICKER_QUESTIONS, filters });
   const counts = catalogueChipCounts({ items: PICKER_QUESTIONS, filters });
@@ -127,7 +141,7 @@ export function BlockPickerDialog({
       <Dialog.Content maxHeight="76vh" maxWidth="720px" borderRadius="xl">
         <Dialog.Header borderBottomWidth="1px" paddingX={5} paddingY={3.5}>
           <Dialog.Title fontSize="14px" fontWeight="semibold">
-            Add a block
+            Add a widget
           </Dialog.Title>
           <Dialog.CloseTrigger />
         </Dialog.Header>

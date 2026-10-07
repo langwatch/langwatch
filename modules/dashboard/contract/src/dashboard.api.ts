@@ -13,8 +13,10 @@ import { moduleApi } from "@langwatch/module";
 import type {
   Dashboard,
   DashboardSourcePresence,
+  DashboardStar,
   DashboardSummary,
   DashboardViewer,
+  StarredDashboard,
 } from "./dashboard.ts";
 import type { Graph, GraphLayout } from "./graph.ts";
 import type { SavedView, SavedViewPeriod } from "./saved-view.ts";
@@ -54,10 +56,7 @@ export interface DashboardApi {
     dashboardId: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard & { graphs: Graph[] }>;
-  /**
-   * `createdById` is the member creating it; absent for a project credential.
-   * A member-created board is starred for that member.
-   */
+  /** `createdById` is the member creating it; absent for a project credential. Stars nothing. */
   create(input: { projectId: string; name: string; createdById?: string }): Promise<Dashboard>;
   rename(input: {
     projectId: string;
@@ -79,24 +78,24 @@ export interface DashboardApi {
   }): Promise<{ success: true }>;
   getOrCreateFirst(input: { projectId: string; viewer?: DashboardViewer }): Promise<Dashboard>;
 
-  /** The member's starred boards for this project, in their own order. */
-  listStarred(input: { projectId: string; userId: string }): Promise<Dashboard[]>;
-  /** Stars a board for the member; appends at the end, idempotent; unknown board is not found. */
+  /** The member's stars for this project, boards and templates, in their own order. */
+  listStarred(input: { projectId: string; userId: string }): Promise<StarredDashboard[]>;
+  /** Stars a board or a template; appends at the end, idempotent; an unknown board is not found. */
   star(input: {
     projectId: string;
     userId: string;
-    dashboardId: string;
+    star: DashboardStar;
   }): Promise<{ success: true }>;
   unstar(input: {
     projectId: string;
     userId: string;
-    dashboardId: string;
+    star: DashboardStar;
   }): Promise<{ success: true }>;
-  /** Rewrites the member's star order from the ids given, in the order given. */
+  /** Rewrites the member's star order from the stars given, in the order given. */
   reorderStars(input: {
     projectId: string;
     userId: string;
-    dashboardIds: string[];
+    stars: DashboardStar[];
   }): Promise<{ success: true }>;
   /** Where a reader opens each of these dashboards, keyed by dashboard id. */
   getDashboardLinks(input: {

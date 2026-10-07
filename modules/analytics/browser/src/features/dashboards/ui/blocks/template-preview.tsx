@@ -1,8 +1,6 @@
 /**
- * A template card's preview: the template's real board as a captured image in an inset frame,
- * or, until one is captured, faint blocks where its widgets sit. Either way it is decoration,
- * runs no query and cannot be focused. Both fit the card's width and run off the bottom
- * under the fade, so no widget is cut at the sides.
+ * A template card's preview: its board as a captured image, or faint blocks where its widgets
+ * sit. Decoration only: no query, no focus; it fits the card's width and fades off the bottom.
  */
 
 import { Box, Grid, HStack, Image } from "@langwatch/design-system/primitives";
@@ -84,7 +82,16 @@ function LayoutSketch({ widgets }: { widgets: readonly PreviewWidget[] }) {
   );
 }
 
-export function TemplatePreview({ preview, isMuted }: { preview: Preview; isMuted: boolean }) {
+export function TemplatePreview({
+  preview,
+  isMuted,
+  isCompact = false,
+}: {
+  preview: Preview;
+  isMuted: boolean;
+  /** The short frame an empty board's cards use, showing the top of the board only. */
+  isCompact?: boolean;
+}) {
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.36);
   useEffect(() => {
@@ -103,7 +110,7 @@ export function TemplatePreview({ preview, isMuted }: { preview: Preview; isMute
       aria-hidden
       inert
       position="relative"
-      height={{ base: "260px", md: "320px" }}
+      height={isCompact ? "144px" : { base: "260px", md: "320px" }}
       overflow="hidden"
       borderWidth="1px"
       borderColor="border.muted"

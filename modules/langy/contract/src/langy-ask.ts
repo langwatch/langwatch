@@ -7,16 +7,23 @@ import type { LangyAttachedContextType } from "./langy-slice.ts";
 /** One reference the asking module hands over with its question; `ref` is the chip's id too. */
 export type LangyAskContext = { kind: LangyAttachedContextType; ref: string; label: string };
 
+/** What a draft is about: a thing on screen (a dashboard), and an item within it (a widget). */
+export type LangyDraftAbout = { ref: string; itemRef?: string };
+
 /** A question to ask outright, or a sentence for the reader to finish, with its context. */
 export type LangyAskRequest = {
   question?: string;
   draft?: string;
+  /** Scopes a draft: left unsent, it is dropped once what it is about leaves the screen. */
+  about?: LangyDraftAbout;
   context?: readonly LangyAskContext[];
 };
 
 /** All another module may do to the panel by asking; Langy's store stays its own. */
 export type LangyAsk = {
   ask(request: LangyAskRequest): void;
+  /** What the page shows now, null when nothing a draft can be about is on screen. */
+  onScreen(about: LangyDraftAbout | null): void;
 };
 
 export const LangyAskToken = uiTokens("langy").operations<LangyAsk>("langyAsk");

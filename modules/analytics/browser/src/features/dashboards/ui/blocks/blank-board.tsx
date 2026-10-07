@@ -1,17 +1,28 @@
 /**
- * A board with nothing on it yet: one calm empty state, centred with room around it, whose
- * single outlined pill opens the templates library, so the Ask bar above stays the first thing
- * to reach for. The dashed "Add a block" target stays only as the footer on a non-empty board.
+ * What every empty board shows under its ask bar and suggested questions: "Or start from a
+ * template" with the From LangWatch boards, each card opening its live board, then a card into
+ * the full library. The footer "Add a widget" stays only below a board's widgets.
  */
 
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Box, Button, Text } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  Button,
+  Grid,
+  Heading,
+  HStack,
+  Link as ChakraLink,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { LayoutTemplate, Plus } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
+import type { CuratedBoard } from "../../model/curated-boards.ts";
+import { TemplatePreview } from "./template-preview.tsx";
 
-/** The compact footer below a board's widgets, opening the question picker. */
+/** The compact footer below a board's widgets, opening "Add a widget". */
 export function AddBlockCard({ onClick }: { onClick: () => void }) {
   return (
     <Button
@@ -44,7 +55,7 @@ export function AddBlockCard({ onClick }: { onClick: () => void }) {
         <Plus size={18} aria-hidden />
       </Box>
       <Text fontSize="14px" fontWeight="medium">
-        Add a block
+        Add a widget
       </Text>
       <Text fontSize="12.5px" color="fg.subtle">
         Start from the question you need answered.
@@ -53,43 +64,122 @@ export function AddBlockCard({ onClick }: { onClick: () => void }) {
   );
 }
 
-/**
- * Everything a blank board shows under its header. The action is a real link, so a
- * modified click still opens the library in a new tab.
- */
-export function BlankBoard({ templatesHref }: { templatesHref: string }) {
+/** A real link, so a modified click still opens it in a new tab. */
+function CardLink({ href, label, children }: { href: string; label: string; children: ReactNode }) {
   const host = useAnalyticsHost();
   return (
-    <Box display="flex" minHeight="360px" paddingY={10}>
-      <NoDataInfoBlock
-        title="This board is empty"
-        description="Start from a ready-made dashboard and make it your own."
-        icon={<LayoutTemplate />}
+    <ChakraLink
+      href={href}
+      aria-label={label}
+      display="flex"
+      alignItems="stretch"
+      minWidth={0}
+      borderRadius="xl"
+      textDecoration="none"
+      color="inherit"
+      transition="box-shadow 0.15s"
+      _hover={{ boxShadow: "0 2px 10px rgb(16 16 32 / 0.08)", textDecoration: "none" }}
+      onClick={(event) => {
+        if (opensElsewhere(event)) return;
+        event.preventDefault();
+        host.navigate(href);
+      }}
+    >
+      {children}
+    </ChakraLink>
+  );
+}
+
+export function EmptyBoard({
+  boards,
+  boardHref,
+  templatesHref,
+}: {
+  boards: readonly CuratedBoard[];
+  boardHref: (board: CuratedBoard) => string;
+  templatesHref: string;
+}) {
+  return (
+    <VStack as="section" aria-label="Start from a template" align="stretch" gap={5}>
+      <Heading as="h2" fontSize="14px" fontWeight="semibold">
+        Or start from a template
+      </Heading>
+      <Grid
+        templateColumns={{
+          base: "minmax(0, 1fr)",
+          sm: "repeat(2, minmax(0, 1fr))",
+          xl: "repeat(4, minmax(0, 1fr))",
+        }}
+        gap={4}
       >
-        <Button
-          asChild
-          variant="outline"
-          size="md"
-          height="40px"
-          gap={2}
-          marginTop={1}
-          paddingX={5}
-          borderRadius="full"
-          fontSize="14px"
-        >
-          <a
-            href={templatesHref}
-            onClick={(event) => {
-              if (opensElsewhere(event)) return;
-              event.preventDefault();
-              host.navigate(templatesHref);
-            }}
+        {boards.map((board) => (
+          <CardLink key={board.templateId} href={boardHref(board)} label={board.name}>
+            <VStack
+              as="article"
+              align="stretch"
+              gap={3}
+              width="full"
+              padding={4}
+              borderWidth="1px"
+              borderColor="border"
+              borderRadius="xl"
+              background="bg.panel"
+            >
+              <VStack align="stretch" gap={1} minWidth={0}>
+                <Text as="h3" fontSize="15px" lineHeight="20px" fontWeight="semibold" lineClamp={2}>
+                  {board.name}
+                </Text>
+                {/* Two lines kept even for a short job, so previews line up across a row. */}
+                <Text
+                  fontSize="13px"
+                  lineHeight="20px"
+                  minHeight="40px"
+                  color="fg.muted"
+                  lineClamp={2}
+                >
+                  {board.job}
+                </Text>
+              </VStack>
+              <Box marginTop="auto">
+                <TemplatePreview preview={board.card.preview} isMuted={false} isCompact />
+              </Box>
+              <HStack justify="end" fontSize="12px" color="fg.muted">
+                {board.card.widgetCount} widgets
+              </HStack>
+            </VStack>
+          </CardLink>
+        ))}
+        <CardLink href={templatesHref} label="View all templates">
+          <VStack
+            justify="center"
+            gap={2}
+            width="full"
+            padding={5}
+            textAlign="center"
+            color="fg.muted"
+            borderWidth="1px"
+            borderStyle="dashed"
+            borderColor="border.emphasized"
+            borderRadius="xl"
+            _hover={{ color: "fg" }}
           >
-            <LayoutTemplate size={16} aria-hidden />
-            Start from a template
-          </a>
-        </Button>
-      </NoDataInfoBlock>
-    </Box>
+            <Box
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              boxSize={10}
+              borderRadius="full"
+              background="bg.muted"
+            >
+              <LayoutTemplate size={18} aria-hidden />
+            </Box>
+            <Text fontSize="14px" fontWeight="medium">
+              View all templates
+            </Text>
+            <Text fontSize="12.5px">Find a dashboard by the question it answers.</Text>
+          </VStack>
+        </CardLink>
+      </Grid>
+    </VStack>
   );
 }

@@ -7,7 +7,7 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { boardQuestion, boardSubject } from "../model/board-langy.ts";
+import { boardPromptDraft, boardQuestion, boardSubject } from "../model/board-langy.ts";
 
 const PERIOD = {
   periodStart: Temporal.Instant.from("2026-09-01T00:00:00Z").epochMilliseconds,
@@ -47,6 +47,40 @@ describe("the context a board hands Langy", () => {
       });
 
       expect(request.context[0]?.ref).toContain("widgets: none yet");
+    });
+  });
+});
+
+describe("a draft about a board", () => {
+  describe("given a template's report drafted for a new board", () => {
+    /** @scenario "Langy drafts: a draft records the board it is about" */
+    it("records the board it is about, so Langy can drop it once the board leaves", () => {
+      const request = boardPromptDraft({
+        prompt: "Write a short report.",
+        board: boardSubject({ board: { id: "board-7", name: "Release check" }, widgets: [] }),
+        period: PERIOD,
+      });
+
+      expect(request.about).toEqual({ ref: "board-7" });
+      expect(request.question).toBeUndefined();
+    });
+  });
+
+  describe("given a From LangWatch board", () => {
+    /** @scenario "From LangWatch: a template board asks Langy with the board as context" */
+    it("names it as a read-only template rather than a stored board", () => {
+      const request = boardQuestion({
+        question: "Can it ship?",
+        board: boardSubject({
+          board: { id: "curated/release", name: "Release check", templateId: "release" },
+          widgets: [{ name: "Can the new version of my agent ship?" }],
+        }),
+        period: PERIOD,
+      });
+
+      expect(request.context[0]?.ref).toContain(
+        'From LangWatch dashboard "Release check" (template release, read-only, not stored)',
+      );
     });
   });
 });

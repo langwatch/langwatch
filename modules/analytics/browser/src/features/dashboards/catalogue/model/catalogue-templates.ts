@@ -374,7 +374,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
   },
   {
     id: "data",
-    name: "Is my data complete?",
+    name: "Can I trust my numbers?",
     job: "Check that my traces carry what the dashboards need, and fix what is missing.",
     personas: ["eng"],
     trunk: "Trust",
@@ -385,7 +385,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     byAgentKind: {},
     preloadFor: [],
     reportPrompt:
-      'Write a short report on my "Is my data complete?" dashboard for the dashboard period. Check that my traces carry what the dashboards need, and fix what is missing. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Is my data complete? (2) Are my cost figures complete? (3) Which of my traces are noise? (4) How much of my traffic is evaluated? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+      'Write a short report on my "Can I trust my numbers?" dashboard for the dashboard period. Check that my traces carry what the dashboards need, and fix what is missing. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Is my data complete? (2) Are my cost figures complete? (3) Which of my traces are noise? (4) How much of my traffic is evaluated? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "safety",

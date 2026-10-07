@@ -130,6 +130,7 @@
   "/:project/analytics/custom/:id",
   "/:project/dashboards",
   "/:project/dashboards/templates",
+  "/:project/dashboards/curated/:templateId",
   "/:project/dashboards/:dashboardId",
   "/:project/experiments",
   "/:project/experiments/workbench",

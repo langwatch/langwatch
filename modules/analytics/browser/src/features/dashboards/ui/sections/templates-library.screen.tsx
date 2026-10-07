@@ -1,6 +1,6 @@
 /**
  * `/[project]/dashboards/templates`: every template, searchable, filtered and sectioned by trunk.
- * Adding one makes an only-me board, opens it and drafts its report in Langy (AC140).
+ * Adding one makes a board for the whole project, opens it and drafts its report in Langy (AC140).
  */
 
 import {
@@ -36,7 +36,6 @@ import {
   templateSections,
 } from "../../model/template-library.ts";
 import { CatalogueFilterBar, TRUNK_ICONS, TRUNK_PALETTES } from "../blocks/catalogue-filters.tsx";
-import { DashboardsTabs } from "../blocks/dashboards-tabs.tsx";
 import { TemplateCard } from "../blocks/template-card.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 
@@ -138,9 +137,11 @@ function TemplatesLibrary() {
       paddingY={{ base: 5, md: 7 }}
     >
       <VStack align="stretch" gap={5}>
-        <VStack align="stretch" gap={2}>
-          <DashboardsTabs projectSlug={saved.projectSlug} active="templates" />
-          <Text fontSize="13px" color="fg.muted" maxWidth="680px">
+        <VStack gap={1.5} textAlign="center">
+          <Heading as="h1" fontSize="19px" fontWeight="semibold" letterSpacing="tight">
+            Dashboard templates
+          </Heading>
+          <Text fontSize="13px" color="fg.muted">
             Each template answers one job with a ready-made dashboard you can edit.
           </Text>
         </VStack>

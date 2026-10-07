@@ -16,6 +16,8 @@ import {
   dashboardDescriptionSchema,
   dashboardNameSchema,
   dashboardSourcePresenceSchema,
+  dashboardStarSchema,
+  starredDashboardSchema,
 } from "./dashboard.ts";
 
 const projectScopeSchema = z.object({ projectId: z.string() });
@@ -78,23 +80,23 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
   )
   .withOutput(dashboardTrpcRowSchema)
 
-  /** The member's starred boards for this project, in their own order. */
+  /** The member's stars for this project, boards and templates, in their own order. */
   .query("listStarred")
   .withInput(projectScopeSchema)
-  .withOutput(dashboardTrpcRowSchema.array())
+  .withOutput(starredDashboardSchema.array())
 
-  /** Stars a board for the acting member; appends at the end and is idempotent. */
+  /** Stars a board or a template for the acting member; appends at the end, idempotent. */
   .mutation("star")
-  .withInput(dashboardScopeSchema)
+  .withInput(z.object({ ...projectScopeSchema.shape, star: dashboardStarSchema }))
   .withOutput(dashboardReorderResponseSchema)
 
   .mutation("unstar")
-  .withInput(dashboardScopeSchema)
+  .withInput(z.object({ ...projectScopeSchema.shape, star: dashboardStarSchema }))
   .withOutput(dashboardReorderResponseSchema)
 
-  /** Rewrites the member's star order from the ids given, in the order given. */
+  /** Rewrites the member's star order from the stars given, in the order given. */
   .mutation("reorderStars")
-  .withInput(z.object({ ...projectScopeSchema.shape, dashboardIds: z.array(z.string()) }))
+  .withInput(z.object({ ...projectScopeSchema.shape, stars: z.array(dashboardStarSchema) }))
   .withOutput(dashboardReorderResponseSchema)
 
   /** Per Flight Deck source, whether the project ever recorded a row. */

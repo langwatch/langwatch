@@ -19,18 +19,11 @@ Feature: Dashboards v1
     And the product switcher does not offer Dashboards
 
   @integration
-  Scenario: AC2 Opening the dashboards area shows the All dashboards page
-    Given the release_dashboards flag is on for the project
-    When they open /[project]/dashboards
-    Then the All dashboards page opens, listing every board in the project
-    And no board is created just by opening the area
-
-  @integration
   Scenario: AC3 Sidebar matches the reference
     Given the release_dashboards flag is on for the project
     When the member looks at the Dashboards product sidebar
-    Then they see their starred boards for this project in their own order, each with a menu
-    And an All dashboards link follows them
+    Then they see "Your dashboards" with My dashboard first, then Starred when they have stars,
+      then From LangWatch and Browse templates, each board with a menu
     And the sidebar shows nothing else besides Quick Search
 
   # ---------------------------------------------------------------------------
@@ -87,10 +80,10 @@ Feature: Dashboards v1
   @e2e
   Scenario: AC10 Blank board matches the reference
     Given a member creates a new dashboard
-    Then it is visible only to them, under Mine in the sidebar
+    Then every member of the project sees it, and it is starred by nobody
     When it opens
     Then they see "Add a description"
-    And they see one "Start from a template" button that opens the templates library
+    And they see the one empty board view: the ask bar, suggested questions and the templates
 
   @e2e
   Scenario: AC11 Ask Langy by question
@@ -125,10 +118,10 @@ Feature: Dashboards v1
 
   @integration
   Scenario: AC14 Rename and describe
-    Given a member on their own board
-    When they edit the name or description inline
+    Given a member on a board other than their My dashboard
+    When they rename it from its sidebar menu or edit the description inline
     Then the change is saved
-    And it is shown in the sidebar
+    And it is shown on the board and in the sidebar
 
   @integration
   Scenario: AC15 Widget menu actions persist after reload
@@ -141,12 +134,12 @@ Feature: Dashboards v1
   @integration
   Scenario: AC16 Ask Langy from the board
     Given Langy is enabled for the project
-    When the member presses "What would you like to know?" on any board
-    Then the question picker opens, since the bar is a button and never a text field
+    When the member presses "Ask" in the "What do you want to know?" bar on any board
+    Then Langy opens about that board, with the board passed as context
+    When they type in the bar instead, the picker opens with their text in its search
     And a pinned "Ask Langy" footer is always visible below the list
-    When they type their own question and press "Ask Langy" on the footer
-    Then Langy opens with that question
-    And the current board is passed as context
+    When they press "Ask Langy" on the footer
+    Then Langy opens with that question and the current board as context
 
   @integration
   Scenario: AC18 Every board in the project is visible to every member
@@ -298,14 +291,14 @@ Feature: Dashboards v1
 
   # --- AC Coverage Map ---
   # AC 1: "Flag off hides the area" → Scenario: AC1 Flag off hides the area
-  # AC 2: "Landing" (changed by langwatch/tasks#911: /dashboards opens the All dashboards page; no redirect, no auto-created board) -> Scenario: AC2 Opening the dashboards area shows the All dashboards page
-  # AC 3: "Sidebar matches the reference" (changed by langwatch/tasks#911: the sidebar lists the member stars then an All dashboards link) -> Scenario: AC3 Sidebar matches the reference
+  # AC 2: "Landing" (changed again by langwatch/tasks#911: /dashboards lands on My dashboard) -> dashboards-v2.feature Scenario: AC160 The dashboards area lands on My dashboard
+  # AC 3: "Sidebar matches the reference" (changed by langwatch/tasks#911: Your dashboards, Starred, From LangWatch, Browse templates) -> Scenario: AC3 Sidebar matches the reference
   # AC 5: "Status tiles compare with the previous period" → Scenario: AC5 Status tiles compare with the previous period
   # AC 6: "Unconnected source shows a call to action" → Scenario: AC6 Unconnected source shows a call to action
   # AC 7: "Connected state comes from real data" → Scenario: AC7 Connected state comes from real data
   # AC 8: "The Agent Flight Deck is a template" (changed: was "The Flight Deck cannot be edited"; the read-only board and its server refusal are gone; changed again: boards are made from the templates library, not the blank board) → Scenario: AC8 Starting from the template makes a new board of editable widgets
   # AC 9: "Empty period" → Scenario: AC9 Empty period shows an empty state
-  # AC 10: "Blank board matches the reference" (changed by langwatch/tasks#911: no "Add a block" area on the empty board; changed again: one button to the templates library instead of the template cards) → Scenario: AC10 Blank board matches the reference
+  # AC 10: "Blank board matches the reference" (changed by langwatch/tasks#911: every empty board shows one view) → Scenario: AC10 Blank board matches the reference
   # AC 11: "Add a block by question" (changed by langwatch/tasks#911: picking a question adds its widget and drafts Langy to send, instead of sending and writing nothing) → Scenario: AC11 Ask Langy by question
   # AC 12: "Only working questions are offered" (changed by langwatch/tasks#911: the picker lists every question with or without Langy) → Scenario: AC12 Only working questions are offered
   # AC 13: "Period and grain" (changed: widgets, through their reserved parameters) → Scenario: AC13 Period and grain update every block; Scenario: AC13 Grain choices update every block

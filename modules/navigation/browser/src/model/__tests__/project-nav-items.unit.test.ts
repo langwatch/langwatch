@@ -76,18 +76,21 @@ describe("given the document title's read of the open destination", () => {
   });
 });
 
-describe("given the Dashboards area's read of the open board", () => {
+describe("given the Dashboards area's read of the open address", () => {
   describe("when a board is open", () => {
-    it("names the board", () => {
+    it("hands over what follows the area", () => {
       expect(dashboardsAreaAt("/[project]/dashboards/agent-flight-deck")).toEqual({
-        dashboardId: "agent-flight-deck",
+        openPath: "agent-flight-deck",
+      });
+      expect(dashboardsAreaAt("/[project]/dashboards/curated/release")).toEqual({
+        openPath: "curated/release",
       });
     });
   });
 
   describe("when the area's own address is open", () => {
-    it("is inside the area with no board yet", () => {
-      expect(dashboardsAreaAt("/[project]/dashboards")).toEqual({ dashboardId: void 0 });
+    it("is inside the area with nothing after it", () => {
+      expect(dashboardsAreaAt("/[project]/dashboards")).toEqual({ openPath: "" });
     });
   });
 

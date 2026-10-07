@@ -2179,20 +2179,24 @@ model Dashboard {
   @@map("Dashboard")
 }
 
-/// A member's starred dashboard, in their own order within a project. Personal:
-/// one member's stars never show to another. No foreign key (per the database
-/// rule): the dashboard service removes a board's favourites when it deletes
-/// the board, so a star never outlives its dashboard.
+/// A member's star, in their own order within a project: a board or a From
+/// LangWatch template. Personal: one member's stars never show to another. No
+/// foreign key (per the database rule): the dashboard service removes a board's
+/// favourites when it deletes the board, so a star never outlives its dashboard.
 model DashboardFavourite {
   id          String   @id @default(nanoid())
   userId      String
-  dashboardId String
+  /// Null when the star is a template.
+  dashboardId String?
+  /// The starred From LangWatch template id; null when the star is a board.
+  templateId  String?
   projectId   String
   /// The member's drag order among their own stars in the project.
   position    Int
   createdAt   DateTime @default(now())
 
   @@unique([userId, dashboardId])
+  @@unique([userId, projectId, templateId])
   @@index([userId, projectId, position])
   @@index([dashboardId])
   @@map("DashboardFavourite")

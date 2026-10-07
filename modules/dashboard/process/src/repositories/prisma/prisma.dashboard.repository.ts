@@ -10,7 +10,9 @@ import {
   SavedWorkbenchChartNotFoundError,
   type GraphLayout,
   type SavedWorkbenchChartDefinition,
+  type DashboardStar,
   type DashboardUsageCount,
+  type StarredDashboard,
 } from "@langwatch/dashboard-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import type { Prisma } from "@langwatch/prisma-client/generated";
@@ -27,6 +29,10 @@ import type {
 
 const BUILDER_CHART_KIND = "builder";
 const WORKBENCH_SQL_CHART_KIND = "workbench_sql";
+
+/** The column a star matches on: the board id for a board, the template id for a template. */
+const starTarget = (star: DashboardStar) =>
+  star.kind === "board" ? { dashboardId: star.dashboardId } : { templateId: star.templateId };
 
 const dashboardRow = (row: {
   id: string;
@@ -225,46 +231,50 @@ export class PrismaDashboardRepository
     });
   }
 
-  async findStarredDashboards(input: {
-    projectId: string;
-    userId: string;
-  }): Promise<DashboardRecord[]> {
+  async findStarred(input: { projectId: string; userId: string }): Promise<StarredDashboard[]> {
     const favourites = await this.prisma.dashboardFavourite.findMany({
       where: { projectId: input.projectId, userId: input.userId },
       orderBy: { position: "asc" },
-      select: { dashboardId: true },
+      select: { dashboardId: true, templateId: true },
     });
-    if (favourites.length === 0) return [];
-    const rows = await this.prisma.dashboard.findMany({
-      where: { projectId: input.projectId, id: { in: favourites.map((row) => row.dashboardId) } },
-    });
+    const boardIds = favourites.flatMap((row) =>
+      row.dashboardId === null ? [] : [row.dashboardId],
+    );
+    const rows =
+      boardIds.length === 0
+        ? []
+        : await this.prisma.dashboard.findMany({
+            where: { projectId: input.projectId, id: { in: boardIds } },
+          });
     const byId = new Map(rows.map((row) => [row.id, dashboardRow(row)]));
-    return favourites
-      .map((favourite) => byId.get(favourite.dashboardId))
-      .filter((row): row is DashboardRecord => row !== undefined);
+    return favourites.flatMap((favourite): StarredDashboard[] => {
+      if (favourite.templateId !== null) {
+        return [{ kind: "template", templateId: favourite.templateId }];
+      }
+      const dashboard =
+        favourite.dashboardId === null ? undefined : byId.get(favourite.dashboardId);
+      return dashboard ? [{ kind: "board", dashboard }] : [];
+    });
   }
 
   async findStarredDashboardIds(input: { projectId: string; userId: string }): Promise<string[]> {
     const rows = await this.prisma.dashboardFavourite.findMany({
-      where: { projectId: input.projectId, userId: input.userId },
+      where: { projectId: input.projectId, userId: input.userId, dashboardId: { not: null } },
       orderBy: { position: "asc" },
       select: { dashboardId: true },
     });
-    return rows.map((row) => row.dashboardId);
+    return rows.flatMap((row) => (row.dashboardId === null ? [] : [row.dashboardId]));
   }
 
-  async starDashboard(input: {
-    projectId: string;
-    userId: string;
-    dashboardId: string;
-  }): Promise<void> {
+  async addStar(input: { projectId: string; userId: string; star: DashboardStar }): Promise<void> {
+    const where = {
+      projectId: input.projectId,
+      userId: input.userId,
+      ...starTarget(input.star),
+    };
     await this.transaction(async (transaction) => {
       const existing = await transaction.dashboardFavourite.findFirst({
-        where: {
-          projectId: input.projectId,
-          userId: input.userId,
-          dashboardId: input.dashboardId,
-        },
+        where,
         select: { id: true },
       });
       if (existing) return;
@@ -274,51 +284,34 @@ export class PrismaDashboardRepository
         select: { position: true },
       });
       await transaction.dashboardFavourite.create({
-        data: {
-          userId: input.userId,
-          dashboardId: input.dashboardId,
-          projectId: input.projectId,
-          position: (last?.position ?? -1) + 1,
-        },
+        data: { ...where, position: (last?.position ?? -1) + 1 },
       });
     });
   }
 
-  async unstarDashboard(input: {
+  async removeStar(input: {
     projectId: string;
     userId: string;
-    dashboardId: string;
+    star: DashboardStar;
   }): Promise<void> {
     await this.prisma.dashboardFavourite.deleteMany({
-      where: { userId: input.userId, dashboardId: input.dashboardId, projectId: input.projectId },
+      where: { projectId: input.projectId, userId: input.userId, ...starTarget(input.star) },
     });
   }
 
   async reorderStars(input: {
     projectId: string;
     userId: string;
-    dashboardIds: string[];
+    stars: DashboardStar[];
   }): Promise<void> {
     await this.transaction(async (transaction) => {
-      const current = await transaction.dashboardFavourite.findMany({
-        where: {
-          projectId: input.projectId,
-          userId: input.userId,
-          dashboardId: { in: input.dashboardIds },
-        },
-        select: { dashboardId: true, position: true },
-      });
-      const positionById = new Map(current.map((row) => [row.dashboardId, row.position]));
+      // Rows are matched by target, so only stars the member holds are moved.
       await Promise.all(
-        input.dashboardIds.flatMap((dashboardId, position) =>
-          !positionById.has(dashboardId) || positionById.get(dashboardId) === position
-            ? []
-            : [
-                transaction.dashboardFavourite.updateMany({
-                  where: { projectId: input.projectId, userId: input.userId, dashboardId },
-                  data: { position },
-                }),
-              ],
+        input.stars.map((star, position) =>
+          transaction.dashboardFavourite.updateMany({
+            where: { projectId: input.projectId, userId: input.userId, ...starTarget(star) },
+            data: { position },
+          }),
         ),
       );
     });

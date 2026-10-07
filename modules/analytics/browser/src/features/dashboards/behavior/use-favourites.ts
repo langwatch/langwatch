@@ -1,23 +1,14 @@
 /**
- * The member's starred boards for the project in scope, and the star/unstar/
- * reorder writes the sidebar and the page offer. A star is personal: one
+ * The member's stars for the project in scope, boards and From LangWatch boards in one
+ * order, and the star/unstar/reorder writes the sidebar offers. A star is personal: one
  * member's stars never show to another. Failures travel raw to the host (#5984).
  */
 
+import type { DashboardStar } from "@langwatch/dashboard-contract";
+
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-
-/** One starred board, as the ordered list answers it. */
-export type StarredBoard = {
-  id: string;
-  name: string;
-  description: string | null;
-  createdById: string | null;
-};
-
-function starredBoardOf({ id, name, description, createdById }: StarredBoard): StarredBoard {
-  return { id, name, description, createdById };
-}
+import { type MemberStar, sameStar, starRefOf } from "../model/sidebar-boards.ts";
 
 export function useFavourites() {
   const host = useAnalyticsHost();
@@ -32,7 +23,20 @@ export function useFavourites() {
   const unstarMutation = analyticsApi.dashboards.unstar.useMutation();
   const reorderMutation = analyticsApi.dashboards.reorderStars.useMutation();
 
-  const stars: StarredBoard[] = (list.data ?? []).map(starredBoardOf);
+  const stars: MemberStar[] = (list.data ?? []).map((star) =>
+    star.kind === "board"
+      ? {
+          kind: "board",
+          board: {
+            id: star.dashboard.id,
+            name: star.dashboard.name,
+            description: star.dashboard.description,
+            createdById: star.dashboard.createdById,
+          },
+        }
+      : { kind: "template", templateId: star.templateId },
+  );
+  const refs = stars.map(starRefOf);
 
   const refresh = () =>
     Promise.all([
@@ -40,10 +44,12 @@ export function useFavourites() {
       utils.dashboards.getAll.invalidate({ projectId }),
     ]);
 
-  const toggleStar = ({ dashboardId, isStarred }: { dashboardId: string; isStarred: boolean }) => {
-    const mutation = isStarred ? unstarMutation : starMutation;
+  const isStarred = (star: DashboardStar) => refs.some((ref) => sameStar(ref, star));
+
+  const toggleStar = (star: DashboardStar) => {
+    const mutation = isStarred(star) ? unstarMutation : starMutation;
     mutation.mutate(
-      { projectId, dashboardId },
+      { projectId, star },
       {
         onSuccess: () => void refresh(),
         onError: (error) => host.failed({ error, fallbackTitle: "Couldn't change your stars" }),
@@ -51,21 +57,27 @@ export function useFavourites() {
     );
   };
 
-  /** Moves one star up or down and saves the new order; a no-op at the end it faces. */
+  /**
+   * Moves one star up or down among the `shown` ones and saves the order; a no-op at the end
+   * it faces. Stars the sidebar does not show (My dashboard) keep their place after them.
+   */
   const moveStar = ({
-    dashboardId,
+    star,
     direction,
+    shown,
   }: {
-    dashboardId: string;
+    star: DashboardStar;
     direction: "up" | "down";
+    shown: readonly DashboardStar[];
   }) => {
-    const ids = stars.map((board) => board.id);
-    const from = ids.indexOf(dashboardId);
+    const ordered = [...shown];
+    const from = ordered.findIndex((ref) => sameStar(ref, star));
     const to = direction === "up" ? from - 1 : from + 1;
-    if (from === -1 || to < 0 || to >= ids.length) return;
-    [ids[from], ids[to]] = [ids[to]!, ids[from]!];
+    if (from === -1 || to < 0 || to >= ordered.length) return;
+    [ordered[from], ordered[to]] = [ordered[to]!, ordered[from]!];
+    const hidden = refs.filter((ref) => !shown.some((visible) => sameStar(visible, ref)));
     reorderMutation.mutate(
-      { projectId, dashboardIds: ids },
+      { projectId, stars: [...ordered, ...hidden] },
       {
         onSuccess: () => void refresh(),
         onError: (error) =>
@@ -80,6 +92,7 @@ export function useFavourites() {
     isLoading: list.data === void 0 && !list.isError,
     loadError: list.error,
     retry: () => void list.refetch(),
+    isStarred,
     toggleStar,
     moveStar,
   };

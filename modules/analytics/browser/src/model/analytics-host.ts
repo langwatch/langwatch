@@ -62,12 +62,17 @@ export type AnalyticsAlertAuthoring = {
 /** One reference riding with a question to Langy, as self-describing text the agent reads. */
 export type AnalyticsLangyContext = { kind: "dashboard"; ref: string; label: string };
 
+/** What a Langy draft is about: a board, and a widget on it when the draft names one. */
+export type AnalyticsLangyDraftAbout = { ref: string; itemRef?: string };
+
 /** A question for Langy and what it is asked about. */
 export type AnalyticsLangyAskRequest = {
   /** A question to send outright; absent when only a draft is handed over. */
   question?: string;
   /** A prompt seeded into the composer for the reader to send; never sent for them. */
   draft?: string;
+  /** What the draft is about; left unsent, it is dropped once that leaves the screen. */
+  about?: AnalyticsLangyDraftAbout;
   context: readonly AnalyticsLangyContext[];
 };
 
@@ -115,6 +120,9 @@ export abstract class AnalyticsHostApi {
    * Langy does nothing with it, which is why a screen never reaches Langy itself.
    */
   abstract askLangy(request: AnalyticsLangyAskRequest): void;
+
+  /** Tells Langy which board (and widget) is on screen; null once none is. */
+  abstract showLangy(about: AnalyticsLangyDraftAbout | null): void;
 }
 
 const AnalyticsHostContext = createContext<AnalyticsHostApi | undefined>(void 0);

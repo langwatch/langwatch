@@ -1017,6 +1017,7 @@ export const prismaModelFieldCatalogue = {
     "id",
     "userId",
     "dashboardId",
+    "templateId",
     "projectId",
     "position",
     "createdAt"

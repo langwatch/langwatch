@@ -9,6 +9,7 @@ import { Temporal } from "@langwatch/time";
 import type {
   AnalyticsLangyAskRequest,
   AnalyticsLangyContext,
+  AnalyticsLangyDraftAbout,
 } from "../../../../model/analytics-host.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 
@@ -18,15 +19,26 @@ export const LANGY_RELEASE_FLAG = "release_langy_enabled";
 /** An ask starts a conversation, which is what this permission allows. */
 export const LANGY_ASK_PERMISSION = "langy:create";
 
+/** The questions an empty board suggests, short enough to sit on one line under the bar. */
+export const SUGGESTED_QUESTIONS: readonly string[] = [
+  "Where does my money go?",
+  "What changed this week?",
+  "What needs attention?",
+  "Is quality holding?",
+];
+
 /** Langy's own bounds on a context reference and its label. */
 const MAX_REF_LENGTH = 4_000;
 const MAX_LABEL_LENGTH = 200;
 
 /** The board a question is asked from: the open one, and the widgets on it now. */
 export interface BoardSubject {
+  /** The stored board's id, or the From LangWatch board's address for a template. */
   readonly id: string;
   readonly name: string;
   readonly widgetNames: readonly string[];
+  /** Set on a From LangWatch board: a live template, read-only and never stored. */
+  readonly templateId?: string;
 }
 
 /** The open board as Langy's subject. */
@@ -34,10 +46,20 @@ export function boardSubject({
   board,
   widgets,
 }: {
-  board: { id: string; name: string };
+  board: { id: string; name: string; templateId?: string };
   widgets: readonly { name: string }[];
 }): BoardSubject {
-  return { id: board.id, name: board.name, widgetNames: widgets.map(({ name }) => name) };
+  return {
+    id: board.id,
+    name: board.name,
+    widgetNames: widgets.map(({ name }) => name),
+    ...(board.templateId === void 0 ? {} : { templateId: board.templateId }),
+  };
+}
+
+/** What a draft about this board is scoped to: the board, as it says it is on screen. */
+export function boardDraftAbout(board: Pick<BoardSubject, "id">): AnalyticsLangyDraftAbout {
+  return { ref: board.id };
 }
 
 function periodText(period: BoardPeriod): string {
@@ -76,12 +98,12 @@ export function boardAskContext({
   period: BoardPeriod;
 }): AnalyticsLangyContext {
   const widgets = board.widgetNames.length > 0 ? board.widgetNames.join(", ") : "none yet";
+  const which =
+    board.templateId === void 0
+      ? `dashboard "${board.name}" (id ${board.id})`
+      : `From LangWatch dashboard "${board.name}" (template ${board.templateId}, read-only, not stored)`;
   return context({
-    ref: [
-      `dashboard "${board.name}" (id ${board.id})`,
-      `widgets: ${widgets}`,
-      `period: ${periodText(period)}`,
-    ].join("; "),
+    ref: [which, `widgets: ${widgets}`, `period: ${periodText(period)}`].join("; "),
     label: board.name,
   });
 }
@@ -122,6 +144,7 @@ export function boardPromptDraft({
 }): AnalyticsLangyAskRequest {
   return {
     draft: promptWithWindow({ prompt, period }),
+    about: boardDraftAbout(board),
     context: [boardAskContext({ board, period })],
   };
 }
@@ -257,6 +280,7 @@ function widgetDraft({
   const room = MAX_WIDGET_DRAFT_LENGTH - draftWith([]).length;
   return {
     draft: draftWith(fittedSql({ sqls, room })),
+    about: boardDraftAbout(board),
     context: [boardAskContext({ board, period })],
   };
 }

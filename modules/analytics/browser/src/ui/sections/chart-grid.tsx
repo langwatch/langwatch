@@ -79,8 +79,9 @@ export interface ChartGridProps {
   /**
    * Called once per finished drag or resize with the whole grid's new
    * placement, and only when something actually moved or changed size.
+   * Absent on a read-only grid, whose cards neither move nor resize.
    */
-  onPlacementsCommit: (placements: ChartGridPlacement[]) => void;
+  onPlacementsCommit?: (placements: ChartGridPlacement[]) => void;
   /** The card for one placement. */
   renderCard: (placement: ChartGridPlacement) => ReactNode;
   /**
@@ -104,12 +105,13 @@ export function ChartGrid({
 }: ChartGridProps) {
   const { width: measuredWidth, containerRef, mounted } = useContainerWidth();
   const width = fixedWidth ?? measuredWidth;
+  const isEditable = onPlacementsCommit !== void 0;
 
   const commit = useCallback(
     (layout: Layout) => {
       const next = layout.map(fromLayoutItem);
       if (samePlacements({ a: next, b: placements })) return;
-      onPlacementsCommit(next);
+      onPlacementsCommit?.(next);
     },
     [onPlacementsCommit, placements],
   );
@@ -128,8 +130,8 @@ export function ChartGrid({
             margin: [CHART_GRID_MARGIN_PX, CHART_GRID_MARGIN_PX],
             containerPadding: [0, 0],
           }}
-          dragConfig={{ handle: `.${CHART_GRID_DRAG_HANDLE_CLASS}` }}
-          resizeConfig={{ handles: ["se"] }}
+          dragConfig={{ enabled: isEditable, handle: `.${CHART_GRID_DRAG_HANDLE_CLASS}` }}
+          resizeConfig={{ enabled: isEditable, handles: ["se"] }}
           onDragStop={commit}
           onResizeStop={commit}
         >

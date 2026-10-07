@@ -23,6 +23,7 @@ import {
   type AnalyticsFailureNotice,
   type AnalyticsHostProject,
   type AnalyticsLangyAskRequest,
+  type AnalyticsLangyDraftAbout,
   type AnalyticsRouteReading,
   type AnalyticsSuccessNotice,
 } from "../model/analytics-host.ts";
@@ -123,6 +124,11 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
   askLangy(request: AnalyticsLangyAskRequest): void {
     if (!this.langy) return;
     void this.langy().then((langy) => langy.ask(request));
+  }
+
+  showLangy(about: AnalyticsLangyDraftAbout | null): void {
+    if (!this.langy) return;
+    void this.langy().then((langy) => langy.onScreen(about));
   }
 }
 

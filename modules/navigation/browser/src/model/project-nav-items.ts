@@ -43,15 +43,14 @@ export function projectNavItemAt(pathname: string): ProjectNavItem | undefined {
 }
 
 /**
- * Where a route pattern stands in the Dashboards area: `undefined` outside it,
- * otherwise the board it opens (`dashboardId` absent on the area's own address).
+ * Where a route pattern stands in the Dashboards area: `undefined` outside it, otherwise
+ * what follows `/dashboards/` (empty on the area's own address), which analytics reads.
  */
-export function dashboardsAreaAt(pattern: string): { dashboardId: string | undefined } | undefined {
+export function dashboardsAreaAt(pattern: string): { openPath: string } | undefined {
   const area = projectNavItems.dashboards.path;
-  if (pattern === area) return { dashboardId: void 0 };
+  if (pattern === area) return { openPath: "" };
   if (!pattern.startsWith(`${area}/`)) return void 0;
-  const [dashboardId] = pattern.slice(area.length + 1).split("/");
-  return { dashboardId: dashboardId || void 0 };
+  return { openPath: pattern.slice(area.length + 1) };
 }
 
 /** Address to route pattern; normalize for pattern-based tests vs address-based host */

@@ -1,7 +1,6 @@
 /**
- * A new only-me board filled with widgets, opened and answered: from a template, or a board's
- * own widgets for "Duplicate". No server procedure copies a board, so both reuse the create
- * and widget writes. A failure is reported and the half-made board removed.
+ * A new board for the whole project, filled and opened: from a template, "Duplicate" or
+ * "Duplicate to edit". No procedure copies a board; a failure removes the half-made one.
  */
 
 import { useState } from "react";
@@ -9,7 +8,13 @@ import { useState } from "react";
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { boardCopyWidgets, boardWidgetsOf } from "../model/board-widgets.ts";
-import { boardCopyName, dashboardsPath, templateBoardName } from "../model/boards.ts";
+import {
+  boardCopyName,
+  curatedCopyName,
+  dashboardsPath,
+  templateBoardName,
+} from "../model/boards.ts";
+import { type CuratedBoard, curatedCopyWidgets } from "../model/curated-boards.ts";
 import type { BoardTemplate, BoardTemplateWidget } from "../templates/index.ts";
 import type { SavedBoard } from "./use-saved-dashboards.ts";
 
@@ -143,5 +148,24 @@ export function useBoardFromTemplate() {
       fallbackTitle: "Couldn't duplicate the dashboard",
     });
 
-  return { creatingId, createFromTemplate, duplicateBoard };
+  /** "Duplicate to edit": the From LangWatch board's built widgets as "<name> (copy)". */
+  const duplicateCurated = ({
+    board,
+    existingNames,
+  }: {
+    board: CuratedBoard;
+    existingNames: readonly string[];
+  }) =>
+    createFrom({
+      source: {
+        id: board.templateId,
+        name: curatedCopyName(board.name),
+        description: board.job,
+        widgets: () => Promise.resolve(curatedCopyWidgets(board)),
+      },
+      existingNames,
+      fallbackTitle: "Couldn't duplicate the dashboard",
+    });
+
+  return { creatingId, createFromTemplate, duplicateBoard, duplicateCurated };
 }

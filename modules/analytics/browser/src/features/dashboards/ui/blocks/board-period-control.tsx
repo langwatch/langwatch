@@ -1,11 +1,10 @@
 /**
- * The board header's period control: one pill ("30d · auto", or "Live") opening a
- * menu of three columns, Range, Grain and Refresh. A grain the range cannot carry is
- * shown greyed out; while Live, the refresh is fixed at every minute (dashboards-v2 AC19).
+ * The period pill ("30d", "30d · 1d", "Live") and its menu: Range, Grain, Refresh, then
+ * "Refresh now". Unfit grains are greyed out; Live refreshes every minute (dashboards-v2 AC19).
  */
 
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Check, ChevronDown, Clock, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -61,6 +60,7 @@ export function BoardPeriodControl({
   onRangeChange,
   onGrainChange,
   onRefreshChange,
+  onRefreshNow,
 }: {
   readonly range: BoardPeriodRange;
   readonly grain: BoardPeriodGrain;
@@ -69,6 +69,8 @@ export function BoardPeriodControl({
   readonly onRangeChange: (range: BoardPeriodRange) => void;
   readonly onGrainChange: (grain: BoardPeriodGrain) => void;
   readonly onRefreshChange: (refresh: DashboardAutoRefreshOption) => void;
+  /** Re-runs every widget now. */
+  readonly onRefreshNow: () => void;
 }) {
   const live = range === "live";
   return (
@@ -105,9 +107,11 @@ export function BoardPeriodControl({
               <Text as="span" fontFamily="mono" fontWeight="medium" color="fg">
                 {range}
               </Text>
-              <Text as="span" color="gray.400">
-                · {grain}
-              </Text>
+              {grain !== "auto" && (
+                <Text as="span" color="gray.400">
+                  · {grain}
+                </Text>
+              )}
               {refresh !== "off" && (
                 <HStack as="span" gap={0.5} color="gray.400" title={REFRESH_LABEL[refresh]}>
                   <RefreshCw size={11} aria-label="auto-refresh" />
@@ -123,52 +127,68 @@ export function BoardPeriodControl({
           </Box>
         </Button>
       </Menu.Trigger>
-      <Menu.Content display="flex" flexDirection="row" padding={0}>
-        <Column title="Range">
-          {BOARD_PERIOD_RANGES.map((option) => (
-            <Menu.Item key={option} value={`range-${option}`} onClick={() => onRangeChange(option)}>
-              <PeriodOption selected={option === range}>
-                {option === "live" ? (
-                  <>
-                    <LiveDot />
-                    <Text as="span" fontFamily="body">
-                      Live
-                    </Text>
-                  </>
-                ) : (
-                  option
-                )}
-              </PeriodOption>
-            </Menu.Item>
-          ))}
-        </Column>
-        <Box borderLeftWidth="1px" borderColor="border" />
-        <Column title="Grain">
-          {BOARD_PERIOD_GRAINS.map((option) => (
-            <Menu.Item
-              key={option}
-              value={`grain-${option}`}
-              disabled={!boardGrainFits({ range, grain: option })}
-              onClick={() => onGrainChange(option)}
-            >
-              <PeriodOption selected={option === grain}>{option}</PeriodOption>
-            </Menu.Item>
-          ))}
-        </Column>
-        <Box borderLeftWidth="1px" borderColor="border" />
-        <Column title="Refresh">
-          {DASHBOARD_AUTO_REFRESH_OPTIONS.map((option) => (
-            <Menu.Item
-              key={option}
-              value={`refresh-${option}`}
-              disabled={live && option !== "1m"}
-              title={live && option !== "1m" ? "Live refreshes every minute" : void 0}
-              onClick={() => onRefreshChange(option)}
-            >
-              <PeriodOption selected={option === refresh}>{REFRESH_LABEL[option]}</PeriodOption>
-            </Menu.Item>
-          ))}
-        </Column>
+      <Menu.Content padding={0}>
+        <HStack align="stretch" gap={0}>
+          <Column title="Range">
+            {BOARD_PERIOD_RANGES.map((option) => (
+              <Menu.Item
+                key={option}
+                value={`range-${option}`}
+                onClick={() => onRangeChange(option)}
+              >
+                <PeriodOption selected={option === range}>
+                  {option === "live" ? (
+                    <>
+                      <LiveDot />
+                      <Text as="span" fontFamily="body">
+                        Live
+                      </Text>
+                    </>
+                  ) : (
+                    option
+                  )}
+                </PeriodOption>
+              </Menu.Item>
+            ))}
+          </Column>
+          <Box borderLeftWidth="1px" borderColor="border" />
+          <Column title="Grain">
+            {BOARD_PERIOD_GRAINS.map((option) => (
+              <Menu.Item
+                key={option}
+                value={`grain-${option}`}
+                disabled={!boardGrainFits({ range, grain: option })}
+                onClick={() => onGrainChange(option)}
+              >
+                <PeriodOption selected={option === grain}>{option}</PeriodOption>
+              </Menu.Item>
+            ))}
+          </Column>
+          <Box borderLeftWidth="1px" borderColor="border" />
+          <Column title="Refresh">
+            {DASHBOARD_AUTO_REFRESH_OPTIONS.map((option) => (
+              <Menu.Item
+                key={option}
+                value={`refresh-${option}`}
+                disabled={live && option !== "1m"}
+                title={live && option !== "1m" ? "Live refreshes every minute" : void 0}
+                onClick={() => onRefreshChange(option)}
+              >
+                <PeriodOption selected={option === refresh}>{REFRESH_LABEL[option]}</PeriodOption>
+              </Menu.Item>
+            ))}
+          </Column>
+        </HStack>
+        <Box borderTopWidth="1px" borderColor="border" padding={1}>
+          <Menu.Item value="refresh-now" onClick={onRefreshNow}>
+            <HStack gap={2} fontSize="12.5px">
+              <Box as="span" display="flex" color="fg.muted">
+                <RefreshCw size={13} aria-hidden />
+              </Box>
+              Refresh now
+            </HStack>
+          </Menu.Item>
+        </Box>
       </Menu.Content>
     </Menu.Root>
   );

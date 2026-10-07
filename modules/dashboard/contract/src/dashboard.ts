@@ -53,6 +53,23 @@ export const dashboardSummarySchema = z
   .strict();
 export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
 
+/** A From LangWatch template's id, as the browser's catalogue names it (`release`, `data`). */
+export const dashboardTemplateIdSchema = z.string().trim().min(1).max(100);
+
+/** What a member stars: one of the project's boards, or a From LangWatch template board. */
+export const dashboardStarSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("board"), dashboardId: dashboardIdSchema }).strict(),
+  z.object({ kind: z.literal("template"), templateId: dashboardTemplateIdSchema }).strict(),
+]);
+export type DashboardStar = z.infer<typeof dashboardStarSchema>;
+
+/** One of the member's stars, in their order: a board with its row, or a template by id. */
+export const starredDashboardSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("board"), dashboard: dashboardSchema }).strict(),
+  z.object({ kind: z.literal("template"), templateId: dashboardTemplateIdSchema }).strict(),
+]);
+export type StarredDashboard = z.infer<typeof starredDashboardSchema>;
+
 /** A board's name and description, as the inline editor saves them. */
 export const dashboardDetailsUpdateSchema = z
   .object({

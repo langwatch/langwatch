@@ -34,11 +34,9 @@ import { ProductSidebar } from "../product-sidebar.tsx";
 
 const PROJECT: NavigationProject = { id: "project-1", slug: "demo", name: "Demo" };
 
-/** Stands in for analytics' lent list, echoing the board it was told is open. */
-function LentList({ activeDashboardId }: SavedDashboardsProps) {
-  return (
-    <div data-testid="saved-dashboards">Saved dashboards open:{activeDashboardId ?? "none"}</div>
-  );
+/** Stands in for analytics' lent list, echoing the address it was told is open. */
+function LentList({ openPath }: SavedDashboardsProps) {
+  return <div data-testid="saved-dashboards">Saved dashboards open:{openPath || "none"}</div>;
 }
 
 const analyticsLends = uiDeclarations([
@@ -95,6 +93,16 @@ describe("the Dashboards product sidebar", () => {
       expect(screen.queryByText("Observe")).toBeNull();
       expect(screen.queryByText("Test")).toBeNull();
       expect(screen.queryByText("Build")).toBeNull();
+    });
+  });
+
+  describe("given a From LangWatch board is open", () => {
+    it("hands the whole address under the area to the list", async () => {
+      renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards/curated/release" });
+
+      expect(await screen.findByTestId("saved-dashboards")).toHaveTextContent(
+        "open:curated/release",
+      );
     });
   });
 

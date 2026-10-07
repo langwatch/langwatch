@@ -1,6 +1,8 @@
 import type {
   Dashboard,
+  DashboardStar,
   DashboardSummary,
+  StarredDashboard,
   Graph,
   GraphLayout,
   SavedWorkbenchChart,
@@ -61,15 +63,15 @@ export interface DashboardRepository {
   deleteDashboard(input: { projectId: string; dashboardId: string }): Promise<DashboardRecord>;
   updateDashboardOrder(input: { projectId: string; dashboardIds: string[] }): Promise<void>;
 
-  /** The member's starred boards for this project, in their own position order. */
-  findStarredDashboards(input: { projectId: string; userId: string }): Promise<DashboardRecord[]>;
-  /** The ids the member has starred in this project, for marking a list. */
+  /** The member's stars for this project in their own order; a star on a gone board is skipped. */
+  findStarred(input: { projectId: string; userId: string }): Promise<StarredDashboard[]>;
+  /** The board ids the member has starred in this project, for marking a list. */
   findStarredDashboardIds(input: { projectId: string; userId: string }): Promise<string[]>;
   /** Appends a star at the end of the member's order; a no-op when already starred. */
-  starDashboard(input: { projectId: string; userId: string; dashboardId: string }): Promise<void>;
-  unstarDashboard(input: { projectId: string; userId: string; dashboardId: string }): Promise<void>;
-  /** Sets each starred board's position from the order of the ids; others untouched. */
-  reorderStars(input: { projectId: string; userId: string; dashboardIds: string[] }): Promise<void>;
+  addStar(input: { projectId: string; userId: string; star: DashboardStar }): Promise<void>;
+  removeStar(input: { projectId: string; userId: string; star: DashboardStar }): Promise<void>;
+  /** Sets each given star's position from the order given; other stars are untouched. */
+  reorderStars(input: { projectId: string; userId: string; stars: DashboardStar[] }): Promise<void>;
 
   findAllGraphs(input: { projectId: string; dashboardId?: string }): Promise<GraphRecord[]>;
   findGraph(input: { projectId: string; graphId: string }): Promise<GraphRecord | undefined>;

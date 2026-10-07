@@ -12,6 +12,7 @@ import type {
 import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
 import type {
   DashboardSourcePresence,
+  DashboardStar,
   dashboardTrpcRowSchema,
   dashboardTrpcSummarySchema,
   dashboardWidgetTrpcRowSchema,
@@ -19,6 +20,7 @@ import type {
   graphDetailSchema,
   graphListItemSchema,
   savedViewTrpc,
+  starredDashboardSchema,
 } from "@langwatch/dashboard-contract";
 import type { z } from "zod";
 
@@ -30,6 +32,7 @@ import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
 /** Dashboard owns these wire schemas; WireOf maps persisted values to their wire representation. */
 type DashboardSummaryRow = WireOf<z.infer<typeof dashboardTrpcSummarySchema>>;
 type DashboardRow = WireOf<z.infer<typeof dashboardTrpcRowSchema>>;
+type StarredDashboardRow = WireOf<z.infer<typeof starredDashboardSchema>>;
 type GraphListItem = WireOf<z.infer<typeof graphListItemSchema>>;
 type GraphDetail = WireOf<z.infer<typeof graphDetailSchema>>;
 type DashboardWidgetRow = WireOf<z.infer<typeof dashboardWidgetTrpcRowSchema>>;
@@ -214,17 +217,17 @@ type BorrowedProcedures = {
       };
     };
     listStarred: {
-      query: { input: ProjectScope; output: DashboardRow[] };
+      query: { input: ProjectScope; output: StarredDashboardRow[] };
     };
     star: {
-      mutation: { input: ProjectScope & { dashboardId: string }; output: { success: true } };
+      mutation: { input: ProjectScope & { star: DashboardStar }; output: { success: true } };
     };
     unstar: {
-      mutation: { input: ProjectScope & { dashboardId: string }; output: { success: true } };
+      mutation: { input: ProjectScope & { star: DashboardStar }; output: { success: true } };
     };
     reorderStars: {
       mutation: {
-        input: ProjectScope & { dashboardIds: string[] };
+        input: ProjectScope & { stars: DashboardStar[] };
         output: { success: true };
       };
     };

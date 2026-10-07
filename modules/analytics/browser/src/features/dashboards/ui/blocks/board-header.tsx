@@ -1,64 +1,56 @@
 /**
- * A board's header, after the reference: a star that pins the board, the title
- * with its rename pencil and "Add chart" on the first row, the description and
- * period on the second. Without `onRename`/`onDescribe` the text stays fixed.
+ * A board's header: title (badged on a From LangWatch board) and one action, then the
+ * description and period. Star and rename live in the sidebar.
  */
 
-import { Box, Button, Heading, HStack, IconButton, Spacer, Text, VStack } from "@chakra-ui/react";
-import { Pencil, Plus } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import {
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { Sparkles } from "lucide-react";
+import { type ReactNode, useState } from "react";
 
-import { BoardStar } from "../elements/board-star.tsx";
 import { InlineTextField } from "../elements/inline-text-field.tsx";
 
 export function BoardHeader({
   name,
   description,
-  isStarred,
-  onToggleStar,
-  onRename,
+  isFromLangWatch = false,
   onDescribe,
-  onAddChart,
+  action,
   periodControl,
-  refreshControl,
 }: {
   name: string;
   description: string;
-  isStarred: boolean;
-  onToggleStar: () => void;
-  onRename?: (name: string) => void;
+  /** A live From LangWatch template rather than a stored board. */
+  isFromLangWatch?: boolean;
   onDescribe?: (description: string) => void;
-  onAddChart: () => void;
+  /** "Add a widget" on a stored board, "Duplicate to edit" on a template board. */
+  action: ReactNode;
   periodControl: ReactNode;
-  /** Data age and the auto-refresh menu. */
-  refreshControl?: ReactNode;
 }) {
   return (
     <VStack align="stretch" gap={2} marginBottom={5}>
       <HStack gap={3}>
-        <HStack gap={2} flex={1} minWidth={0}>
-          <Box flexShrink={0}>
-            <BoardStar isStarred={isStarred} onToggle={onToggleStar} size={17} />
-          </Box>
-          <BoardTitle name={name} onRename={onRename} />
-        </HStack>
-        <HStack gap={3} flexShrink={0}>
-          {refreshControl}
-          <Button
-            variant="outline"
-            height={8}
-            paddingX={3}
-            gap={1.5}
-            borderRadius="lg"
-            borderColor="border"
-            fontSize="13px"
-            fontWeight="medium"
-            _hover={{ borderColor: "border.emphasized", background: "bg.muted" }}
-            onClick={onAddChart}
+        <HStack columnGap={2.5} rowGap={1} flex={1} minWidth={0} flexWrap="wrap">
+          {/* The prototype's 19px board title, a step under the standard page heading. */}
+          <Heading
+            as="h1"
+            lineClamp={2}
+            fontSize="19px"
+            fontWeight="semibold"
+            letterSpacing="tight"
           >
-            <Plus size={15} strokeWidth={2} /> Add chart
-          </Button>
+            {name}
+          </Heading>
+          {isFromLangWatch && <FromLangWatchBadge />}
         </HStack>
+        <Box flexShrink={0}>{action}</Box>
       </HStack>
       <HStack columnGap={4} rowGap={2} flexWrap="wrap">
         <BoardDescription description={description} onDescribe={onDescribe} />
@@ -69,63 +61,25 @@ export function BoardHeader({
   );
 }
 
-function BoardTitle({ name, onRename }: { name: string; onRename?: (name: string) => void }) {
-  const [renaming, setRenaming] = useState(false);
-
-  if (onRename && renaming) {
-    return (
-      <InlineTextField
-        value={name}
-        label="Dashboard name"
-        fontSize="19px"
-        fontWeight="semibold"
-        size="sm"
-        maxWidth="md"
-        onCancel={() => setRenaming(false)}
-        onCommit={(draft) => {
-          setRenaming(false);
-          const trimmed = draft.trim();
-          if (trimmed && trimmed !== name) onRename(trimmed);
-        }}
-      />
-    );
-  }
-
+function FromLangWatchBadge() {
   return (
-    <>
-      {/* The reference's 19px board title, a step under the standard page heading. */}
-      <Heading as="h1" truncate fontSize="19px" fontWeight="semibold" letterSpacing="tight">
-        {name}
-      </Heading>
-      {onRename && (
-        <IconButton
-          aria-label="Rename dashboard"
-          title="Rename dashboard"
-          variant="ghost"
-          size="2xs"
-          minWidth={0}
-          padding={1}
-          borderRadius="md"
-          color="gray.400"
-          _hover={{ background: "bg.muted", color: "fg" }}
-          flexShrink={0}
-          onClick={() => setRenaming(true)}
-        >
-          <Pencil size={13} />
-        </IconButton>
-      )}
-    </>
+    <HStack
+      as="span"
+      flexShrink={0}
+      gap={1}
+      borderRadius="full"
+      paddingX={2}
+      paddingY={0.5}
+      background="purple.50"
+      color="purple.600"
+      fontSize="10.5px"
+      fontWeight="medium"
+    >
+      <Sparkles size={11} aria-hidden />
+      From LangWatch
+    </HStack>
   );
 }
-
-const DESCRIPTION_TEXT = {
-  variant: "plain",
-  size: "sm",
-  height: "auto",
-  paddingX: 0,
-  fontWeight: "normal",
-  fontSize: "12.5px",
-} as const;
 
 function BoardDescription({
   description,
@@ -136,15 +90,7 @@ function BoardDescription({
 }) {
   const [editing, setEditing] = useState(false);
 
-  if (!onDescribe) {
-    return (
-      <Text fontSize="12.5px" color="fg.subtle">
-        {description}
-      </Text>
-    );
-  }
-
-  if (editing) {
+  if (onDescribe && editing) {
     return (
       <InlineTextField
         value={description}
@@ -161,29 +107,30 @@ function BoardDescription({
     );
   }
 
-  if (description) {
+  if (!onDescribe) {
+    if (!description) return null;
     return (
-      <Button
-        {...DESCRIPTION_TEXT}
-        color="fg.subtle"
-        _hover={{ color: "fg" }}
-        title="Edit description"
-        onClick={() => setEditing(true)}
-      >
+      <Text fontSize="12.5px" color="fg.muted" truncate minWidth={0}>
         {description}
-      </Button>
+      </Text>
     );
   }
 
   return (
     <Button
-      {...DESCRIPTION_TEXT}
-      fontStyle="italic"
-      color="gray.400"
-      _hover={{ color: "fg.subtle" }}
+      variant="plain"
+      size="sm"
+      height="auto"
+      paddingX={0}
+      fontWeight="normal"
+      fontSize="12.5px"
+      color="fg.muted"
+      cursor="text"
+      _hover={{ color: "fg" }}
+      title="Edit description"
       onClick={() => setEditing(true)}
     >
-      Add a description
+      {description || "Add a description"}
     </Button>
   );
 }

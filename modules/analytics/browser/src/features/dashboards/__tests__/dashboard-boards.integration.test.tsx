@@ -114,7 +114,7 @@ function inMemoryServer({
           name: String(input.name),
           description: null,
           createdById: "user-1",
-          isStarred: true,
+          isStarred: false,
           updatedAt: new Date("2026-01-01"),
         };
         state.boards.push(created);
@@ -132,13 +132,10 @@ function inMemoryServer({
       }
       case "dashboards.listStarred":
         return Promise.resolve(
-          state.boards.filter((each) => each.isStarred).map((each) => ({ ...each })),
+          state.boards
+            .filter((each) => each.isStarred)
+            .map((each) => ({ kind: "board", dashboard: { ...each } })),
         );
-      case "dashboards.star":
-      case "dashboards.unstar": {
-        board(input.dashboardId).isStarred = call.path === "dashboards.star";
-        return Promise.resolve({ success: true });
-      }
       case "dashboardWidgets.list":
         return Promise.resolve(state.widgets.map((widget) => ({ ...widget })));
       case "dashboardWidgets.create": {
@@ -266,7 +263,7 @@ function openBoard({
   const view = renderDashboards({
     element: (
       <>
-        {withSidebar && <SavedDashboardsSection activeDashboardId={dashboardId} />}
+        {withSidebar && <SavedDashboardsSection openPath={dashboardId} />}
         <DashboardBoardScreen />
       </>
     ),
@@ -291,36 +288,70 @@ afterEach(cleanup);
 
 describe("a member's board", () => {
   describe("given a member opens a board with nothing on it", () => {
-    /** @scenario 'AC1 The empty board has no "Add a block" box' */
-    /** @scenario "AC10 Blank board matches the reference" */
-    it("shows the Ask bar and one button to the templates library, and no template cards", async () => {
+    /** @scenario "Boards: every empty board shows one view" */
+    it("shows the ask bar, the suggested questions and the From LangWatch boards to start from", async () => {
       openBoard({
         server: inMemoryServer({ boards: OWN_BOARDS }),
         flags: LANGY_ON,
         permissions: LANGY_MEMBER,
       });
 
-      expect(await screen.findByText("Add a description")).toBeInTheDocument();
-      expect(await screen.findByText("This board is empty")).toBeInTheDocument();
-      expect(screen.getByText("What would you like to know?")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Start from a template" })).toHaveAttribute(
-        "href",
+      expect(await screen.findByText("Or start from a template")).toBeInTheDocument();
+      expect(
+        screen.getByRole("textbox", { name: "What do you want to know?" }),
+      ).toBeInTheDocument();
+      for (const question of ["Where does my money go?", "Is quality holding?"]) {
+        expect(screen.getByRole("button", { name: question })).toBeInTheDocument();
+      }
+      const start = within(screen.getByRole("region", { name: "Start from a template" }));
+      expect(start.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
+        "/test-project/dashboards/curated/release",
+        "/test-project/dashboards/curated/data",
+        "/test-project/dashboards/curated/breaks",
         "/test-project/dashboards/templates",
-      );
-      expect(screen.queryByRole("button", { name: / to this project$/ })).toBeNull();
-      expect(screen.queryByText(/^Coming soon/)).toBeNull();
-      expect(screen.queryByRole("button", { name: /Add a block/ })).toBeNull();
+      ]);
+      expect(start.getByRole("link", { name: "View all templates" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Add a widget Start/ })).toBeNull();
     });
 
-    describe("when the member presses Start from a template", () => {
-      /** @scenario 'AC1 The empty board has no "Add a block" box' */
-      it("opens the templates library", async () => {
+    describe("when the member opens a From LangWatch card", () => {
+      /** @scenario "Boards: every empty board shows one view" */
+      it("opens that live board", async () => {
         const user = userEvent.setup();
         const { host } = openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
 
-        await user.click(await screen.findByRole("link", { name: "Start from a template" }));
+        await user.click(await screen.findByRole("link", { name: "Release check" }));
 
-        expect(host.navigations).toEqual(["/test-project/dashboards/templates"]);
+        expect(host.navigations).toEqual(["/test-project/dashboards/curated/release"]);
+      });
+    });
+
+    describe("when Langy is not available to the member", () => {
+      /** @scenario "Boards: every board has the ask bar" */
+      it("keeps the ask bar for finding a widget, with no Ask and no suggested questions", async () => {
+        openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
+
+        expect(
+          await screen.findByRole("textbox", { name: "What do you want to know?" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Ask" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Where does my money go?" })).toBeNull();
+      });
+    });
+
+    describe("when the member types in the ask bar", () => {
+      /** @scenario "Boards: typing in the ask bar opens Add a widget with the text in its search" */
+      it("opens Add a widget with what was typed as its search", async () => {
+        const user = userEvent.setup();
+        const server = inMemoryServer({ boards: OWN_BOARDS });
+        const { host } = openBoard({ server });
+
+        await user.type(
+          await screen.findByRole("textbox", { name: "What do you want to know?" }),
+          "c",
+        );
+
+        expect(host.lastQuery).toEqual({ addBlock: "open" });
       });
     });
   });
@@ -673,15 +704,15 @@ describe("a member's board", () => {
     });
   });
 
-  describe("when the member presses Add chart", () => {
-    it("opens the widget drawer on a new widget, not the picker", async () => {
+  describe("when the member presses Add a widget in the header", () => {
+    /** @scenario "AC10 A non-empty board still offers a way to add a widget" */
+    it("opens the picker", async () => {
       const user = userEvent.setup();
       const { host } = openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
 
-      await user.click(await screen.findByRole("button", { name: /Add chart/ }));
+      await user.click(await screen.findByRole("button", { name: "Add a widget" }));
 
-      expect(await screen.findByRole("dialog")).toHaveTextContent("New widget");
-      expect(host.queries).toEqual([]);
+      expect(host.lastQuery).toEqual({ addBlock: "open" });
     });
   });
 
@@ -768,14 +799,15 @@ describe("a member's board", () => {
   });
 
   describe("given a member on their own board", () => {
-    describe("when they rename it inline", () => {
+    describe("when they rename it from the sidebar", () => {
       /** @scenario "AC14 Rename and describe" */
       it("saves the name and shows it on the board and in the sidebar", async () => {
-        const user = userEvent.setup();
-        const server = inMemoryServer({ boards: STARRED_BOARDS });
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const server = inMemoryServer({ boards: OWN_BOARDS });
         openBoard({ server, withSidebar: true });
 
-        await user.click(await screen.findByRole("button", { name: "Rename dashboard" }));
+        await user.click(await screen.findByRole("button", { name: "Actions for Weekly review" }));
+        await user.click(await screen.findByRole("menuitem", { name: "Rename" }));
         const field = screen.getByRole("textbox", { name: "Dashboard name" });
         await user.clear(field);
         await user.type(field, "Launch week{Enter}");
@@ -787,7 +819,7 @@ describe("a member's board", () => {
         });
         expect(await screen.findByRole("heading", { name: "Launch week" })).toBeInTheDocument();
         expect(
-          within(screen.getByRole("list", { name: "Starred dashboards" })).getByRole("link", {
+          within(screen.getByRole("list", { name: "Your dashboards" })).getByRole("link", {
             name: /Launch week/,
           }),
         ).toBeInTheDocument();
@@ -824,31 +856,29 @@ describe("a member's board", () => {
     });
   });
 
-  describe("given a board the member has not starred", () => {
-    describe("when they star and unstar it from the board header", () => {
-      /** @scenario "AC153 A member stars and unstars a board from a row and from the board header" */
-      it("stars it for them, then unstars it", async () => {
-        const user = userEvent.setup({ pointerEventsCheck: 0 });
-        const server = inMemoryServer({ boards: OWN_BOARDS });
-        openBoard({ server });
+  describe("given a member's board", () => {
+    /** @scenario "Boards: no star or pencil by the board title" */
+    it("has no star and no rename pencil by its title", async () => {
+      openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
 
-        await user.click(await screen.findByRole("button", { name: "Star dashboard" }));
-        await waitFor(() =>
-          expect(callsTo(server, "dashboards.star")[0]?.input).toEqual({
-            projectId: "proj-1",
-            dashboardId: "board-1",
-          }),
-        );
+      expect(await screen.findByRole("heading", { name: "Weekly review" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Star dashboard|Unstar dashboard/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Rename dashboard" })).toBeNull();
+    });
+  });
 
-        await user.click(await screen.findByRole("button", { name: "Unstar dashboard" }));
-        await waitFor(() =>
-          expect(callsTo(server, "dashboards.unstar")[0]?.input).toEqual({
-            projectId: "proj-1",
-            dashboardId: "board-1",
-          }),
-        );
-        expect(await screen.findByRole("button", { name: "Star dashboard" })).toBeInTheDocument();
+  describe("given the member's own My dashboard", () => {
+    /** @scenario "Boards: My dashboard has no description placeholder" */
+    it("offers no description placeholder", async () => {
+      openBoard({
+        server: inMemoryServer({
+          boards: [{ ...OWN_BOARDS[0]!, id: "mine", name: "My dashboard" }],
+        }),
+        dashboardId: "mine",
       });
+
+      expect(await screen.findByRole("heading", { name: "My dashboard" })).toBeInTheDocument();
+      expect(screen.queryByText("Add a description")).toBeNull();
     });
   });
 
@@ -927,13 +957,13 @@ describe("a member's board", () => {
       openBoard({ server });
     };
 
-    describe("when the member clicks the footer's Add a block box", () => {
+    describe("when the member clicks the footer's Add a widget box", () => {
       /** @scenario "AC10 A non-empty board still offers a way to add a widget" */
       it("opens the picker", async () => {
         const user = userEvent.setup();
         const { host } = openBoard({ server: boardWithOneWidget() });
 
-        await user.click(await screen.findByRole("button", { name: /Add a block/ }));
+        await user.click(await screen.findByRole("button", { name: /^Add a widget Start/ }));
 
         expect(host.lastQuery).toEqual({ addBlock: "open" });
       });
@@ -1001,7 +1031,7 @@ describe("a member's board", () => {
         await waitFor(() => expect(callsTo(server, "dashboardWidgets.delete")).toHaveLength(1));
         reload(server);
 
-        expect(await screen.findByText("This board is empty")).toBeInTheDocument();
+        expect(await screen.findByText("Or start from a template")).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "Actions for Traces" })).toBeNull();
       });
     });

@@ -26,6 +26,8 @@ import {
   SavedWorkbenchChartDashboardNotFoundError,
   dashboardConfig,
   type Dashboard,
+  type DashboardStar,
+  type StarredDashboard,
   type DashboardGraphCountScope,
   type DashboardSourcePresence,
   type DashboardSummary,
@@ -245,7 +247,7 @@ export class DashboardModule implements DashboardApi {
     return this.#dashboards.getById(input);
   }
 
-  /** A new dashboard, appended after the current last; starred for its creator. */
+  /** A new dashboard, appended after the current last. */
   create(input: { projectId: string; name: string; createdById?: string }): Promise<Dashboard> {
     return this.#dashboards.create(input);
   }
@@ -283,16 +285,16 @@ export class DashboardModule implements DashboardApi {
     return this.#dashboards.getOrCreateFirst(input);
   }
 
-  /** The member's starred boards for this project, in their own order. */
-  listStarred(input: { projectId: string; userId: string }): Promise<Dashboard[]> {
+  /** The member's stars (boards and templates) for this project, in their own order. */
+  listStarred(input: { projectId: string; userId: string }): Promise<StarredDashboard[]> {
     return this.#dashboards.listStarred(input);
   }
 
-  /** Stars a board for the member; appends at the end and is idempotent. */
+  /** Stars a board or template for the member; appends at the end and is idempotent. */
   star(input: {
     projectId: string;
     userId: string;
-    dashboardId: string;
+    star: DashboardStar;
   }): Promise<{ success: true }> {
     return this.#dashboards.star(input);
   }
@@ -300,16 +302,16 @@ export class DashboardModule implements DashboardApi {
   unstar(input: {
     projectId: string;
     userId: string;
-    dashboardId: string;
+    star: DashboardStar;
   }): Promise<{ success: true }> {
     return this.#dashboards.unstar(input);
   }
 
-  /** Rewrites the member's star order from the ids given, in the order given. */
+  /** Rewrites the member's star order from the stars given, in the order given. */
   reorderStars(input: {
     projectId: string;
     userId: string;
-    dashboardIds: string[];
+    stars: DashboardStar[];
   }): Promise<{ success: true }> {
     return this.#dashboards.reorderStars(input);
   }
