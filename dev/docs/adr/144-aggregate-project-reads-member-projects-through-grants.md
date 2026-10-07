@@ -620,9 +620,11 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   The write refusal is one guard in the permission middleware: a mutation
   whose declared permission writes (any action but view) on a project-tier
   resource is refused on an aggregate with `aggregate_project_is_read_only`
-  before its handler runs. Exempt by resource, never by router: the
-  organisation, project and team resources, so the rule edit, renaming and
-  archiving keep working. The exemption reaches fourteen mutations that name
+  before its handler runs. The kind is read, through the App's cached
+  reader, only for an organisation admin's mutation: decision 5 has already
+  refused everyone else on an aggregate. Exempt by resource, never by
+  router: the organisation, project and team resources, so the rule edit,
+  renaming and archiving keep working. The exemption reaches fourteen mutations that name
   a project, pinned in `aggregate-write-guard-exemptions.unit.test.ts`; they
   include settings-shaped writes that ride `project:update` (retention jobs,
   topic clustering, model providers, pinned traces, share revocation) and the

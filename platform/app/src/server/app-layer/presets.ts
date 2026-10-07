@@ -351,6 +351,7 @@ import { getOpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
 import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
+import { projectKindReaderFor } from "./permissions/aggregate-admin-gate";
 import { permissionsServiceFor } from "./permissions/runtime";
 import { PresenceService } from "./presence/presence.service";
 import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
@@ -2280,6 +2281,7 @@ export function initializeDefaultApp(options?: {
       prisma,
       ocsfRepository: governanceOcsfEventsRepository,
     }),
+    projectKinds: projectKindReaderFor(prisma),
     tokenizer,
     usage,
     planProvider,
@@ -2733,6 +2735,7 @@ export function createTestApp(overrides?: TestAppOverrides): App {
     permissions: permissionsServiceFor(testPrisma),
     authorization: authorizationServiceFor(testPrisma),
     aggregateReadAudit: NULL_AGGREGATE_READ_AUDIT,
+    projectKinds: projectKindReaderFor(testPrisma),
     tokenizer: new TokenizerService(new NullTokenizerClient()),
     usage: new UsageService(
       nullOrganizations,

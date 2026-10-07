@@ -89,6 +89,12 @@ export function appPermissionsMock() {
       authorization: {
         authorize: async () => APP_MOCK_AUTHORIZATION,
       },
+      // No project here is an aggregate (ADR-144): a write is never refused
+      // and a read is never audited for its kind.
+      projectKinds: {
+        kindOf: async () => null,
+        kindsOf: async () => new Map<string, string>(),
+      },
     }),
     tryGetApp: () => null,
   };

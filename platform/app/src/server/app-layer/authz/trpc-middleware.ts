@@ -43,10 +43,7 @@ import { type App, getApp } from "../app";
 import { PROOF_BEARING_PERMISSIONS } from "../clients/clickhouse/authorized-reads";
 import { organizationMfa } from "../identity/runtime";
 import { deploymentOffersTwoStepVerification } from "../identity/signin-method-policy";
-import {
-  type ProjectKindReader,
-  projectKindReaderFor,
-} from "../permissions/aggregate-admin-gate";
+import type { ProjectKindReader } from "../permissions/aggregate-admin-gate";
 import {
   DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
@@ -95,7 +92,7 @@ type MiddlewareParams = {
     mfaGate?: Partial<
       Pick<MfaGateDeps, "offered" | "scopes" | "organizationMfa">
     >;
-    /** How a project's kind is read (ADR-144); the process's cached reader
+    /** How a project's kind is read (ADR-144); the App's cached reader
      *  unless a test hands one in. */
     projectKinds?: ProjectKindReader;
   };
@@ -156,14 +153,20 @@ async function refuseWriteUnderAggregate({
   type,
   permission,
   scope,
+  organizationRole,
 }: {
   ctx: MiddlewareParams["ctx"];
   type: MiddlewareParams["type"];
   permission: AuthzPermission;
   scope: { tier: string; id: string };
+  organizationRole: OrganizationUserRole | null;
 }): Promise<void> {
   if (type !== "mutation" || scope.tier !== "project") return;
   if (!writesUnderProject(permission)) return;
+  // Only an organisation admin is ever admitted to an aggregate: the
+  // decision above already refused anyone else on one (decision 5), so a
+  // permitted non-admin is on some other kind of project and costs no read.
+  if (organizationRole !== "ADMIN") return;
   await assertProjectAcceptsWrites({
     kinds: projectKindsOf(ctx),
     projectId: scope.id,
@@ -226,9 +229,9 @@ const mfaGateDepsFor = (ctx: MiddlewareParams["ctx"]): MfaGateDeps => {
   };
 };
 
-/** The kind reader this request asks: the injected one, or the cached one. */
+/** The kind reader this request asks: the injected one, or the App's. */
 const projectKindsOf = (ctx: MiddlewareParams["ctx"]): ProjectKindReader =>
-  ctx.projectKinds ?? projectKindReaderFor(prisma);
+  ctx.projectKinds ?? appOf(ctx).projectKinds;
 
 /**
  * The App this request decides through: the one its context factory injected,
@@ -313,7 +316,13 @@ export const checkDeclaredPermission = ({
         scope,
       });
 
-      await refuseWriteUnderAggregate({ ctx, type, permission, scope });
+      await refuseWriteUnderAggregate({
+        ctx,
+        type,
+        permission,
+        scope,
+        organizationRole,
+      });
 
       // Legacy parity: the organization tier never carried a role onto the
       // context, so only the project/team resolutions (non-null role) do.

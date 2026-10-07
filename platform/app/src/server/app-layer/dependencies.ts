@@ -74,6 +74,7 @@ import type { ReplayService } from "./ops/replay.service";
 import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import type { OpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import type { OrganizationService } from "./organizations/organization.service";
+import type { ProjectKindReader } from "./permissions/aggregate-admin-gate";
 import type { PermissionsService } from "./permissions/permissions.service";
 import type { PresenceService } from "./presence/presence.service";
 import type { AggregateReadAudit } from "./projects/aggregate-read-audit";
@@ -416,6 +417,12 @@ export interface AppDependencies {
    * the admin workspace view row; the null port records nothing.
    */
   aggregateReadAudit: AggregateReadAudit;
+  /**
+   * ADR-144: a project's kind by id, remembered per process. The permission
+   * middleware asks it before refusing a write under an aggregate and before
+   * auditing an aggregate read.
+   */
+  projectKinds: ProjectKindReader;
   tokenizer: TokenizerService;
   usage: UsageService;
   planProvider: PlanProvider;
