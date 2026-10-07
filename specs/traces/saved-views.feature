@@ -317,7 +317,8 @@ Feature: Saved Views on Analytics
   Scenario Outline: A saved-view change the server refuses is rolled back
     Given the bar shows the saved views from the server
     When I <change> and the server refuses it
-    Then an error toast says "<title>"
+    Then an error toast explains the refusal
+    And its title is the registered one for a known cause, such as "Data can't be added to this project", or "<title>" otherwise
     And the bar reloads the views from the server, so it shows them as they were
 
     Examples:

@@ -391,7 +391,8 @@ Feature: An aggregate project reads its member projects
   Scenario: A lens the server refuses to save says so and leaves no phantom
     Given any project whose server refuses to save, rename or delete a lens
     When ana makes that change in the trace list
-    Then she sees an error saying the lens change was not saved
+    Then she sees an error toast explaining the refusal
+    And its title is the registered one for a known cause, such as "Data can't be added to this project", or one naming the lens change otherwise
     And the lens strip reloads from the server, so no unsaved lens lingers
     And a refused new lens leaves the strip even when the project has no saved lens yet
     And she is back on the lens she was on before, not sent to "All traces"

@@ -10,7 +10,9 @@
  * The lens list runs through a real QueryClient, so the reload behaves as it
  * does in the app. That matters: an empty list refetched as an empty list
  * keeps its reference, so a rollback that waits for the reload never happens
- * on a project's first lens.
+ * on a project's first lens. The toast goes through the real `showErrorToast`,
+ * so the title asserted is the one ana reads: the registered copy for a known
+ * refusal, the lens-specific fallback otherwise.
  *
  * @see specs/governance/aggregate-project.feature
  */
@@ -35,14 +37,15 @@ type SavedLensRow = {
   updatedAt: Date;
 };
 
-const { readLenses, createView, renameView, deleteView, showErrorToast } =
-  vi.hoisted(() => ({
+const { readLenses, createView, renameView, deleteView, toast } = vi.hoisted(
+  () => ({
     readLenses: vi.fn<(input: LensListInput) => Promise<SavedLensRow[]>>(),
     createView: vi.fn<(input: unknown) => Promise<unknown>>(),
     renameView: vi.fn<(input: unknown) => Promise<unknown>>(),
     deleteView: vi.fn<(input: unknown) => Promise<unknown>>(),
-    showErrorToast: vi.fn(),
-  }));
+    toast: vi.fn<(args: { title?: string }) => void>(),
+  }),
+);
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -51,7 +54,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-vi.mock("~/features/errors", () => ({ showErrorToast }));
+vi.mock("~/components/ui/toaster", () => ({ toaster: { create: toast } }));
 
 /** The tRPC hooks the lens sync uses, backed by the real react-query. */
 vi.mock("~/utils/api", () => {
@@ -118,7 +121,17 @@ const serverHas = (rows: SavedLensRow[]) =>
     rows.map((row) => ({ ...row, updatedAt: new Date(row.updatedAt) })),
   );
 
+/** A refusal with no code: the toast falls back to the lens-specific title. */
 const refusal = new Error("refused");
+/** The aggregate's refusal, shaped as the tRPC client receives it. */
+const readOnlyRefusal = {
+  data: {
+    error: { code: "aggregate_project_is_read_only", httpStatus: 403 },
+  },
+};
+
+/** The title of the error toast ana last saw. */
+const lastToastTitle = () => toast.mock.calls.at(-1)?.[0].title;
 
 const store = () => useExplorerStore.getState();
 const lensNamed = (name: string) =>
@@ -135,18 +148,15 @@ async function renderLensSync() {
   await waitFor(() => expect(readLenses).toHaveBeenCalledTimes(1));
   await waitFor(() =>
     expect(
-      client.getQueryState([
-        "savedViews.getAll",
-        "proj-1",
-        "v2-traces-lens",
-      ])?.status,
+      client.getQueryState(["savedViews.getAll", "proj-1", "v2-traces-lens"])
+        ?.status,
     ).toBe("success"),
   );
 }
 
 /** Waits for the failure to settle and the strip to reload from the server. */
 async function waitForReload() {
-  await waitFor(() => expect(showErrorToast).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(toast).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(readLenses).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(client.isFetching()).toBe(0));
 }
@@ -184,10 +194,7 @@ describe("useLensSync", () => {
 
       expect(lensNamed("Slow answers")).toBeUndefined();
       expect(store().activeLensId).toBe("conversations");
-      expect(showErrorToast).toHaveBeenCalledWith({
-        error: refusal,
-        fallbackTitle: "Couldn't save the lens",
-      });
+      expect(lastToastTitle()).toBe("Couldn't save the lens");
     });
   });
 
@@ -206,6 +213,23 @@ describe("useLensSync", () => {
 
       expect(lensNamed("Slow answers")).toBeUndefined();
       expect(store().activeLensId).toBe(SAVED_LENS.id);
+    });
+  });
+
+  describe("when the server refuses a new lens because the project is read only", () => {
+    /** @scenario "A lens the server refuses to save says so and leaves no phantom" */
+    it("titles the toast with the registered copy, not the lens fallback", async () => {
+      serverHas([]);
+      createView.mockRejectedValue(readOnlyRefusal);
+      await renderLensSync();
+
+      act(() => {
+        store().createLens("Slow answers");
+      });
+      await waitForReload();
+
+      expect(lastToastTitle()).toBe("Data can't be added to this project");
+      expect(lensNamed("Slow answers")).toBeUndefined();
     });
   });
 
@@ -238,10 +262,7 @@ describe("useLensSync", () => {
 
       expect(lensNamed("Renamed")).toBeUndefined();
       expect(lensNamed(SAVED_LENS.name)).toBeDefined();
-      expect(showErrorToast).toHaveBeenCalledWith({
-        error: refusal,
-        fallbackTitle: "Couldn't rename the lens",
-      });
+      expect(lastToastTitle()).toBe("Couldn't rename the lens");
     });
   });
 
@@ -256,10 +277,7 @@ describe("useLensSync", () => {
       await waitForReload();
 
       expect(lensNamed(SAVED_LENS.name)).toBeDefined();
-      expect(showErrorToast).toHaveBeenCalledWith({
-        error: refusal,
-        fallbackTitle: "Couldn't delete the lens",
-      });
+      expect(lastToastTitle()).toBe("Couldn't delete the lens");
     });
   });
 });
