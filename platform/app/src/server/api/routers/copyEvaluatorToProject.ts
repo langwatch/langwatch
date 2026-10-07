@@ -103,19 +103,28 @@ export async function copyEvaluatorToProject({
   sourceProjectId,
   targetProjectId,
   newEvaluatorId = `evaluator_${nanoid()}`,
+  checkEvaluatorCap = true,
 }: {
   ctx: CopyEvaluatorCtx;
   evaluatorId: string;
   sourceProjectId: string;
   targetProjectId: string;
   newEvaluatorId?: string;
+  /**
+   * Copying a library evaluator counts against the plan's evaluator cap.
+   * Copying an online evaluation brings its evaluator along as part of the
+   * monitor, and online evaluations are uncapped, so that caller passes false.
+   */
+  checkEvaluatorCap?: boolean;
 }) {
-  await enforceCreationLimit({
-    prisma: ctx.prisma,
-    projectId: targetProjectId,
-    limitType: "evaluators",
-    user: ctx.session.user,
-  });
+  if (checkEvaluatorCap) {
+    await enforceCreationLimit({
+      prisma: ctx.prisma,
+      projectId: targetProjectId,
+      limitType: "evaluators",
+      user: ctx.session.user,
+    });
+  }
 
   const source = await loadSourceEvaluator(ctx, evaluatorId, sourceProjectId);
   const newWorkflowId = await copyWorkflowForEvaluator(

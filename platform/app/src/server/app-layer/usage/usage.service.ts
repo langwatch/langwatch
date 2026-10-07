@@ -95,7 +95,18 @@ export class UsageService {
     const max = plan.maxScenarioSets;
     if (max === undefined || plan.overrideAddingLimitations) return;
 
-    const knownSetIds = await this.getKnownScenarioSetIds(organizationId);
+    let knownSetIds: string[];
+    try {
+      knownSetIds = await this.getKnownScenarioSetIds(organizationId);
+    } catch (error) {
+      // An unknown count must not block runs, so the cap is skipped for this
+      // event rather than refusing it.
+      logger.warn(
+        { error, organizationId, plan: plan.name },
+        "checkScenarioSetLimit: scenario set usage is unavailable, allowing the run",
+      );
+      return;
+    }
     if (knownSetIds.includes(scenarioSetId)) return;
 
     if (knownSetIds.length >= max) {

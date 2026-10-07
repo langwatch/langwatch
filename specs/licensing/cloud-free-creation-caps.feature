@@ -53,6 +53,13 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
     Then the run is accepted
 
   @unit
+  Scenario: An unknown simulation count does not block runs
+    Given the organization is on the cloud Free plan
+    And its simulation history cannot be read
+    When a run starts for a new scenario set
+    Then the run is accepted
+
+  @unit
   Scenario: Platform-owned runs do not count as simulations
     Given the organization is on the cloud Free plan
     And it has run 3 distinct scenario sets
@@ -103,6 +110,14 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
     And it has 3 active custom evaluators
     When a member copies one of them into another project
     Then the request fails as FORBIDDEN with limit type "evaluators", current 3 and max 3
+
+  @integration
+  Scenario: Copying an online evaluation is not capped
+    Given the organization is on the cloud Free plan
+    And it has 3 active custom evaluators
+    And an online evaluation that uses one of them
+    When a member copies the online evaluation into another project
+    Then the online evaluation is copied with its evaluator
 
   @integration
   Scenario: Duplicating a scenario past the cap is refused with the limit shape

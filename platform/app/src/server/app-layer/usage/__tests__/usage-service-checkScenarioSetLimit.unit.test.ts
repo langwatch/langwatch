@@ -115,6 +115,28 @@ describe("UsageService.checkScenarioSetLimit", () => {
     });
   });
 
+  describe("given the organization is on the cloud Free plan and its simulation history cannot be read", () => {
+    describe("when a run starts for a new set", () => {
+      /** @scenario An unknown simulation count does not block runs */
+      it("accepts the run", async () => {
+        const { service, simulations } = buildService({
+          plan: cloudFree,
+          knownSets: [],
+        });
+        simulations.getDistinctExternalSetIds.mockRejectedValue(
+          new Error("ClickHouse unavailable"),
+        );
+
+        await expect(
+          service.checkScenarioSetLimit({
+            organizationId,
+            scenarioSetId: "set-new",
+          }),
+        ).resolves.toBeUndefined();
+      });
+    });
+  });
+
   describe("given a plan without a simulation cap", () => {
     it.each([
       ["a paid cloud plan", PLAN_LIMITS[PlanTypes.LAUNCH]],

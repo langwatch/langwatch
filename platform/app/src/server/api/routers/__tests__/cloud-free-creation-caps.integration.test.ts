@@ -114,7 +114,9 @@ describe("cloud Free creation caps", () => {
       ["scenarioVersion", { projectId }],
       ["scenario", { projectId }],
       ["simulationSuite", { projectId }],
-      ["evaluator", { projectId: { in: [projectId, otherProjectId] } }],
+      ["monitor", { projectId: { in: [projectId, otherProjectId] } }],
+      ["evaluator", { projectId: otherProjectId }],
+      ["evaluator", { projectId }],
       ["workflow", { projectId }],
     ]);
   });
@@ -124,7 +126,9 @@ describe("cloud Free creation caps", () => {
       ["scenarioVersion", { projectId }],
       ["scenario", { projectId }],
       ["simulationSuite", { projectId }],
-      ["evaluator", { projectId: { in: [projectId, otherProjectId] } }],
+      ["monitor", { projectId: { in: [projectId, otherProjectId] } }],
+      ["evaluator", { projectId: otherProjectId }],
+      ["evaluator", { projectId }],
       ["workflow", { projectId }],
       ["project", { id: { in: [projectId, otherProjectId] } }],
       ["grant", { organizationId }],
@@ -250,6 +254,43 @@ describe("cloud Free creation caps", () => {
             where: { projectId: otherProjectId },
           }),
         ).toBe(0);
+      });
+    });
+  });
+
+  describe("given the organization is on the cloud Free plan with 3 custom evaluators and an online evaluation", () => {
+    describe("when a member copies the online evaluation into another project", () => {
+      /** @scenario Copying an online evaluation is not capped */
+      it("copies the online evaluation with its evaluator", async () => {
+        const created = [];
+        for (const name of ["One", "Two", "Three"]) {
+          created.push(await createEvaluator(name));
+        }
+        const source = await prisma.monitor.create({
+          data: {
+            id: `check_caps_${nanoid(8)}`,
+            projectId,
+            name: "ACME Online Evaluation",
+            slug: `acme-online-${nanoid(8)}`,
+            checkType: "langevals/exact_match",
+            preconditions: [],
+            parameters: {},
+            sample: 1,
+            enabled: true,
+            executionMode: "ON_MESSAGE",
+            level: "trace",
+            evaluatorId: created[0]!.id,
+          },
+        });
+
+        const replica = await caller.monitors.copy({
+          monitorId: source.id,
+          projectId: otherProjectId,
+          sourceProjectId: projectId,
+        });
+
+        expect(replica.projectId).toBe(otherProjectId);
+        expect(replica.evaluatorId).toBeTruthy();
       });
     });
   });

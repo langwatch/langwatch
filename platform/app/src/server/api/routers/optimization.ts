@@ -165,19 +165,19 @@ export const optimizationRouter = createTRPCRouter({
 
         // Saving as an evaluator creates one when none is linked yet, so the
         // plan's evaluator cap is checked before any flag changes.
-        if (isEvaluator) {
-          const linked = await ctx.prisma.evaluator.findFirst({
-            where: { workflowId, projectId, archivedAt: null },
-            select: { id: true },
+        const existingEvaluator = isEvaluator
+          ? await ctx.prisma.evaluator.findFirst({
+              where: { workflowId, projectId, archivedAt: null },
+              select: { id: true },
+            })
+          : null;
+        if (isEvaluator && !existingEvaluator) {
+          await enforceCreationLimit({
+            prisma: ctx.prisma,
+            projectId,
+            limitType: "evaluators",
+            user: ctx.session.user,
           });
-          if (!linked) {
-            await enforceCreationLimit({
-              prisma: ctx.prisma,
-              projectId,
-              limitType: "evaluators",
-              user: ctx.session.user,
-            });
-          }
         }
 
         // Update workflow flags
@@ -187,15 +187,6 @@ export const optimizationRouter = createTRPCRouter({
         });
 
         if (isEvaluator) {
-          // Check if an evaluator already exists for this workflow
-          const existingEvaluator = await ctx.prisma.evaluator.findFirst({
-            where: {
-              workflowId: workflowId,
-              projectId: projectId,
-              archivedAt: null,
-            },
-          });
-
           if (existingEvaluator) {
             // Update existing evaluator's name to match workflow
             await ctx.prisma.evaluator.update({
