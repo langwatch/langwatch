@@ -20,8 +20,9 @@
 2. **The text keeps today's labels.** The builder writes input, output and contexts as labelled sections, the way langevals `build_content_parts` does, so a prompt that says "the output answers the input" still has both to point at. Each section is cut on its own to fit the classifier's token cap, so a long input never pushes out the whole output.
 3. **Boolean keeps its polarity.** The question asks whether the instructions, applied to the text, call for `true`. Its criteria are "the instructions call for true" and "the instructions call for false". A prompt that states a fail condition ("return false if it mentions a competitor") then reads the same way it does today. `passed` is the probability of `true` against 0.5. The score stays 1 or 0, as today.
 4. **Score has a range setting, read as 0 to 1 when unset.** The score judge gains an optional `min` and `max`, shown when Instant Evals is the model. The schema gives them no default, so the REST route does not stamp them onto every judge. The builder reads a missing range as 0 to 1, matching the default prompt.
-   - When the range is whole numbers with at most 10 levels (1 to 5, 1 to 10), those levels are asked directly and the weighted mean is returned as is. Ten is the classifier's own cap (`maxScoreLevels`).
-   - Any other range (0 to 1, 0 to 10, 0 to 100) is asked as 1 to 10 and mapped back in a straight line, 1 to `min` and 10 to `max`. When `min` and `max` are whole numbers, the mapped score is rounded to a whole number, so 0 to 10 returns 0 to 10, not 1.11.
+   - 0 to 1 is a fraction scale, not two levels. It is asked as 1 to 10 and mapped back in a straight line with no rounding, so a weighted mean of 5.5 returns 0.5.
+   - Any other whole-number range with at most 10 levels (1 to 5, 1 to 10) is asked directly and the weighted mean is returned as is. Ten is the classifier's own cap (`maxScoreLevels`).
+   - Any other range (0 to 10, 0 to 100) is asked as 1 to 10 and mapped back in a straight line, 1 to `min` and 10 to `max`. When `min` and `max` are whole numbers, the mapped score is rounded to a whole number, so an answer of 2 on 0 to 10 returns 1, not 1.11.
    - The new optional fields reach the generated SDK types, the CLI catalogue and the API docs. That is the whole public change.
    - Trade-off accepted: when the judge is unsure between neighbouring levels, the weighted mean is pulled slightly toward the middle.
    - Rejected: always 0 to 1. A prompt that scores 1 to 5 would return 0 to 1, and its thresholds would stop firing.
@@ -29,12 +30,12 @@
 6. **Details is a fixed line with the confidence.** For example "Instant Evals: true, 82% confident" or "Instant Evals: refund, 64% confident". No second model call. Rejected: asking a model for a reason, which adds a call, cost and a second billing path.
 7. **A skip maps to today's statuses.**
 
-   | Classifier outcome | Result status |
-   |---|---|
-   | No content to judge | `skipped` |
-   | `classifier_input_too_large` | `skipped`, with the reason in details |
-   | `classifier_not_configured`, `classifier_rate_limited`, `classifier_failed` | `error`, so alerts fire |
-   | Free budget spent (decision 12) | `error`, with the refusal in details |
+   | Classifier outcome                                                          | Result status                                                   |
+   | --------------------------------------------------------------------------- | --------------------------------------------------------------- |
+   | No content to judge                                                         | `skipped`                                                       |
+   | `classifier_input_too_large`                                                | `skipped`, with the reason in details                           |
+   | `classifier_not_configured`, `classifier_rate_limited`, `classifier_failed` | `error`, so alerts fire                                         |
+   | Free budget spent (decision 12)                                             | `error`, carrying the code `instant_eval_free_budget_exhausted` |
 
    An `error` reaches each caller the way any judge error does today, such as a missing provider key. A guardrail follows its own fail-open or fail-closed setting, so a fail-closed guardrail blocks once a free organization is past $1. This was the user's call. A monitor records the error, so its alerts fire.
    - The Instant Evals branch catches the refusal and returns the `error` result itself. A thrown refusal would reach the outcome handler as a customer fault and become `skipped`, which a guardrail allows.
@@ -54,50 +55,50 @@
    - A client that retries a REST call pays twice, as it would at its own provider today.
 10. **A new method on the Instant Evals contract** answers one judge call. It takes the project, the text, the question and an optional request key, and returns the verdict plus the price charged.
 11. **The picker reuses the release flag `release_instant_evals`, and the option works in wave 1.** This was the user's call over a separate judge flag. The picker ships in the same pull request as the rest of wave 1. The judge model id is `langwatch/instant-evals`. The evaluation module answers it before any provider lookup, so a project with no model provider can pick it too.
-12. **Only usage-billed organizations judge without a cap.** The $1 cap applies to every organization the meter does not bill: free plans, and paid plans on tiered pricing. Before, the cap read only the plan's free flag and the meter read only the pricing model, so a paid tiered organization was neither capped nor charged. Nobody had decided that overlap. The cap now asks billing whether the meter bills the organization, by the meter's own rule: usage pricing, a Stripe customer and an active subscription, or a connected self-hosted account. Billing exposes that rule as `isUsageBilled`, and the monthly report reads the same rule. The Instant Evals run row cap reads it too, so the two caps agree. Consequence: a paying tiered customer stops at $1 until top-up lands in wave 3, then uses their own provider key. This also closes the gap for Instant Evals runs, which share the check. A tiered organization already past $1 is refused for runs as well as judges on the day this ships.
+12. **Only usage-billed organizations judge without a cap.** The $1 cap applies to every organization the meter does not bill: free plans, and paid plans on tiered pricing. Before, the cap read only the plan's free flag and the meter read only the pricing model, so a paid tiered organization was neither capped nor charged. Nobody had decided that overlap. The cap now asks billing whether the meter bills the organization, by the meter's own rule: usage pricing, a Stripe customer and an active subscription, or a connected self-hosted account. Billing exposes that rule as `isUsageBilled`, and the monthly report reads the same rule. The Instant Evals run row cap reads it too, so the two caps agree. Consequence: a paying tiered customer stops at $1 until top-up lands in wave 3, then uses their own provider key. This also closes the gap for Instant Evals runs, which share the check. A tiered organization already past $1 is refused for runs as well as judges on the day this ships. The refusal message must not tell an organization that already pays to upgrade to a paid plan, so its copy changes in wave 1 to fit both free and paid tiered organizations.
 
 ## Constants
 
-| Name | Value | Purpose |
-|---|---|---|
-| Score range default | min 0, max 1 | Matches the default score prompt |
-| Most levels asked directly | 10 (`maxScoreLevels`) | Wider or fractional ranges are asked as 1 to 10 and mapped |
-| Judge model id | `langwatch/instant-evals` | What the picker stores as the judge's model |
-| Boolean threshold | 0.5 (`INSTANT_EVAL_DEFAULT_THRESHOLD`) | `passed` on `llm_boolean` |
-| Free budget | $1 (`INSTANT_EVAL_FREE_BUDGET_USD`) | Unchanged, per free organization |
-| Flag | `release_instant_evals` | Shows the picker entry |
+| Name                       | Value                                  | Purpose                                                    |
+| -------------------------- | -------------------------------------- | ---------------------------------------------------------- |
+| Score range default        | min 0, max 1                           | Matches the default score prompt                           |
+| Most levels asked directly | 10 (`maxScoreLevels`)                  | Wider or fractional ranges are asked as 1 to 10 and mapped |
+| Judge model id             | `langwatch/instant-evals`              | What the picker stores as the judge's model                |
+| Boolean threshold          | 0.5 (`INSTANT_EVAL_DEFAULT_THRESHOLD`) | `passed` on `llm_boolean`                                  |
+| Free budget                | $1 (`INSTANT_EVAL_FREE_BUDGET_USD`)    | Unchanged, per free organization                           |
+| Flag                       | `release_instant_evals`                | Shows the picker entry                                     |
 
 ## Invariants
 
-| Invariant | Meaning | How it holds (test anchor) |
-|---|---|---|
-| One evaluation, one spend row | A redelivered command is not billed twice | Unit test: the same request key gives the same spend id, and a keyed ledger keeps one row |
-| No tokens, no row | A skipped judgement is never billed | Unit test on the judge method with a skipped classifier |
-| Unbilled orgs refused past $1 | A call after the spend shows $1 is refused before classifying | Unit test: the budget check throws `InstantEvalFreeBudgetExhaustedError` and the classifier is never called |
-| Overshoot is on record | A call that runs past $1 still writes its spend row | Unit test: a call admitted while the cached spend was under $1 records its full price |
-| Fail-condition prompts keep polarity | "Return false if X" fails when X holds | Builder unit test on the question text, plus one live classifier check before the picker merges |
-| Score stays on the customer's scale | A 1 to 5 prompt returns 1 to 5 | Builder unit tests for 0 to 1, 1 to 5 and 0 to 100 |
-| Every skip has a status | No skip reads as a pass or a crash | Unit test over every `skippedReason` |
-| Search bar stays unmetered | ADR-144 still holds | Existing `classify` path untouched; test that it records no spend |
+| Invariant                            | Meaning                                                       | How it holds (test anchor)                                                                                  |
+| ------------------------------------ | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| One evaluation, one spend row        | A redelivered command is not billed twice                     | Unit test: the same request key gives the same spend id, and a keyed ledger keeps one row                   |
+| No tokens, no row                    | A skipped judgement is never billed                           | Unit test on the judge method with a skipped classifier                                                     |
+| Unbilled orgs refused past $1        | A call after the spend shows $1 is refused before classifying | Unit test: the budget check throws `InstantEvalFreeBudgetExhaustedError` and the classifier is never called |
+| Overshoot is on record               | A call that runs past $1 still writes its spend row           | Unit test: a call admitted while the cached spend was under $1 records its full price                       |
+| Fail-condition prompts keep polarity | "Return false if X" fails when X holds                        | Builder unit test on the question text, plus one live classifier check before the picker merges             |
+| Score stays on the customer's scale  | A 1 to 5 prompt returns 1 to 5                                | Builder unit tests for 0 to 1, 1 to 5 and 0 to 100                                                          |
+| Every skip has a status              | No skip reads as a pass or a crash                            | Unit test over every `skippedReason`                                                                        |
+| Search bar stays unmetered           | ADR-144 still holds                                           | Existing `classify` path untouched; test that it records no spend                                           |
 
 ## Assumptions
 
-| Assumption | What breaks if false |
-|---|---|
-| Cloud runs Instant Evals with Redis and `IS_SAAS` | `INSTANT_EVAL_BOUNDED` arrives with the module tree and is not set in production (checked on the prod cluster, 2026-10-07), so unset follows `IS_SAAS`: cloud is bounded from the day the stack lands, self-hosted is not. Without Redis a bounded process refuses to boot |
-| Every project has an organization | A project with none is uncapped and its spend row is dropped, so it judges for free |
-| The langevals service port is internal in production | Anyone reaching it runs judges with no app in between. It never reaches Instant Evals, so it is not a billing hole |
-| The three judge settings shapes stay as generated today | The builder maps the wrong field. Its tests read the generated schemas |
+| Assumption                                              | What breaks if false                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cloud runs Instant Evals with Redis and `IS_SAAS`       | `INSTANT_EVAL_BOUNDED` arrives with the module tree and is not set in production (checked on the prod cluster, 2026-10-07), so unset follows `IS_SAAS`: cloud is bounded from the day the stack lands, self-hosted is not. Without Redis a bounded process refuses to boot |
+| Every project has an organization                       | A project with none is uncapped and its spend row is dropped, so it judges for free                                                                                                                                                                                        |
+| The langevals service port is internal in production    | Anyone reaching it runs judges with no app in between. It never reaches Instant Evals, so it is not a billing hole                                                                                                                                                         |
+| The three judge settings shapes stay as generated today | The builder maps the wrong field. Its tests read the generated schemas                                                                                                                                                                                                     |
 
 ## Gates
 
-| Path | Reversible? | Blast radius | Gate |
-|---|---|---|---|
-| Spend row per judge call | No, it feeds the monthly meter | Large | Human review of the judge method and the redelivery test before merge |
-| Budget check | Yes | Large | Unit tests that a refusal happens before the classifier is called and becomes an `error` result |
-| Cap moves to `isUsageBilled` | Yes | Large, paying tiered customers stop at $1 | Unit tests for usage billed, tiered and free organizations, and the monthly report reading the same rule |
-| Builder and result mapping | Yes | Large for guardrails | Unit tests against the generated schemas, plus the polarity check |
-| Picker entry | Yes | Large, customer-visible | Ships with wave 1 behind `release_instant_evals`. Reviewer confirms the bounded flag in the deploy config before merge |
+| Path                         | Reversible?                    | Blast radius                              | Gate                                                                                                                   |
+| ---------------------------- | ------------------------------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Spend row per judge call     | No, it feeds the monthly meter | Large                                     | Human review of the judge method and the redelivery test before merge                                                  |
+| Budget check                 | Yes                            | Large                                     | Unit tests that a refusal happens before the classifier is called and becomes an `error` result                        |
+| Cap moves to `isUsageBilled` | Yes                            | Large, paying tiered customers stop at $1 | Unit tests for usage billed, tiered and free organizations, and the monthly report reading the same rule               |
+| Builder and result mapping   | Yes                            | Large for guardrails                      | Unit tests against the generated schemas, plus the polarity check                                                      |
+| Picker entry                 | Yes                            | Large, customer-visible                   | Ships with wave 1 behind `release_instant_evals`. Reviewer confirms the bounded flag in the deploy config before merge |
 
 ## Schema
 
@@ -157,5 +158,5 @@ No database change. The score judge's settings gain an optional `min` and `max` 
   - The hold was refuted: release ran before the spend landed. The user accepted a small overshoot as long as it is recorded, so a call is check, classify, record (decision 8).
   - The user kept guardrails on their own fail setting (decision 7) and accepted per-attempt billing on experiment and simulation retries (decision 9).
   - Simulations left wave 1, since they never reach `runEvaluation` (decision 1).
-  - Whole-number score ranges return whole numbers, and the range has no schema default (decision 4).
+  - Whole-number score ranges wider than ten levels return whole numbers; 0 to 1 is a fraction scale and is not rounded. The range has no schema default (decision 4).
   - The run row cap reads `isUsageBilled` too (decision 12).

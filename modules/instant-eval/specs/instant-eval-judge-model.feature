@@ -108,10 +108,21 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the question asks the levels 1 to 10
 
     @unit
-    Scenario: A whole-number range asked on 1 to 10 returns whole numbers
+    Scenario Outline: A range wider than ten levels, other than 0 to 1, returns whole numbers
       Given a score judge with range 0 to 10
-      When the classifier answers between two of the levels it was asked
-      Then the score is a whole number from 0 to 10
+      When the classifier answers <answer> on the levels 1 to 10
+      Then the score is <score>
+
+      Examples:
+        | answer | score |
+        | 2      | 1     |
+        | 8      | 8     |
+
+    @unit
+    Scenario: A 0 to 1 range is a fraction and is not rounded
+      Given a score judge with range 0 to 1
+      When the classifier answers 5.5 on the levels 1 to 10
+      Then the score is 0.5
 
     @unit
     Scenario: A score judge saved before the range setting reads as 0 to 1
@@ -161,7 +172,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Given an organization whose free budget is spent
       When a trace is evaluated by a judge on Instant Evals
       Then the result status is error
-      And its details say the free budget is spent
+      And it carries the free budget exhausted error code
       And the refusal is returned as a result, not thrown
 
   Rule: One judge call is one spend row, once
@@ -264,23 +275,31 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then it is classified
 
     @unit
-    Scenario: A judge call past one dollar is still recorded in full
-      Given a free organization whose spend has not yet shown it past one dollar
-      And its real spend is past one dollar
-      When a judge call is classified
-      Then one spend row is recorded with the full customer price
+    Scenario: A judge call that crosses one dollar is recorded in full
+      Given a free organization that has spent $0.99
+      When a judge call priced $0.05 is classified
+      Then one spend row of $0.05 is recorded
 
     @unit
-    Scenario: A judge call holds nothing against the budget
-      Given a free organization under the budget
-      When a judge call is classifying
-      Then nothing is reserved against the budget
+    Scenario: Two judge calls that arrive together just under one dollar are both answered
+      Given a free organization one millionth of a dollar under one dollar
+      When two judge calls, each priced more than one millionth of a dollar, arrive together
+      Then both are classified
+      And both spend rows are recorded
 
     @unit
-    Scenario: The run row cap reads the same rule as the budget
+    Scenario: A paid organization refused by the free budget is not told to upgrade
+      Given a paid organization the meter does not bill that has spent one dollar
+      When a judge call arrives
+      Then it is refused with the free budget exhausted error
+      And its message does not ask it to upgrade to a paid plan
+
+    @integration
+    Scenario: A paid organization the meter does not bill gets the free row cap
       Given a paid organization the meter does not bill
-      When it asks for its Instant Evals run row cap
-      Then it gets the cap of an organization the meter does not bill
+      When it starts a run asking for 100,000 rows
+      Then it is refused with the row cap exceeded error
+      And the error names a cap of 10,000 rows
 
   Rule: Billing says which organizations the meter bills
 

@@ -320,7 +320,7 @@ describe("given a process that installs Instant Evals over the memory tier", () 
   });
 
   describe("when a paid plan asks for the same rows", () => {
-    /** @scenario "A paid plan may ask up to the raised cap" */
+    /** @scenario "An organization the meter bills may ask up to the raised cap" */
     it("accepts the run at the limit that was asked for", async () => {
       await withInstallation({ isFreePlan: false }, async (api) => {
         const run = await api.createRun({
