@@ -14,24 +14,24 @@ Feature: Serving processes refuse to start when the installation is behind their
   So that no process ever serves on a schema it was not built for
 
   Background:
-    Given an image for release "3.21.0" declaring blocking steps "prisma:20261006180000_upgrade_ledger_widen" and "clickhouse:00042"
+    Given an image for release "3.21.0" declaring blocking steps "prisma:20261006180000_add_column" and "clickhouse:00042"
 
   @unit
   Scenario: A process whose blocking steps are all done serves
-    Given the ledger records "prisma:20261006180000_upgrade_ledger_widen" as done and "clickhouse:00042" as not-needed
+    Given the ledger records "prisma:20261006180000_add_column" as done and "clickhouse:00042" as not-needed
     When the serving gate checks the image
     Then the process is admitted
 
   @unit
   Scenario: A process behind the ledger refuses, naming the outstanding steps and the command
-    Given the ledger records "prisma:20261006180000_upgrade_ledger_widen" as done and "clickhouse:00042" as failed
+    Given the ledger records "prisma:20261006180000_add_column" as done and "clickhouse:00042" as failed
     When the serving gate checks the image
     Then the process is refused
     And the refusal names step "clickhouse:00042" and the command "pnpm task upgrade"
 
   @unit
   Scenario: A blocking step the ledger has never recorded is outstanding
-    Given the ledger records only "prisma:20261006180000_upgrade_ledger_widen" as done
+    Given the ledger records only "prisma:20261006180000_add_column" as done
     When the serving gate checks the image
     Then the process is refused
     And the refusal names step "clickhouse:00042"

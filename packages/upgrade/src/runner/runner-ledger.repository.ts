@@ -1,18 +1,10 @@
-import {
-  copyLegacyLedgerSql,
-  LEDGER_TABLE,
-  type LedgerTableNames,
-  ledgerTables,
-} from "../ledger-tables.ts";
+import { type LedgerTableNames, ledgerTables } from "../ledger-tables.ts";
 import { type UpgradeLease, upgradeLeaseSchema, type UpgradeStepStatus } from "../ledger.ts";
 import type { ManifestStep } from "../manifest/manifest.ts";
 import type { UpgradePostgres } from "../ports.ts";
 
 const NOW_UTC = `(now() AT TIME ZONE 'UTC')`;
 const SETTLED: ReadonlySet<UpgradeStepStatus> = new Set(["done", "not-needed", "failed"]);
-
-/** What a one-time copy of a legacy ledger moved: from which schema, into which, how many rows. */
-export type LegacyLedgerCopy = { from: string; into: string; steps: number; runs: number };
 
 /** A step the runner registers: a manifest step with the release that shipped it. */
 export type RegisteredStep = ManifestStep & { release: string | null };
@@ -49,30 +41,6 @@ export class UpgradeRunnerRepository {
       `SELECT to_regclass('_prisma_migrations') IS NOT NULL AS present`,
     );
     return rows[0]?.present === true;
-  }
-
-  /**
-   * Copies a ledger an earlier build kept in the installation's own schema into the ledger
-   * schema, once, while the new ledger is empty; null when there was nothing to copy.
-   */
-  async copyLegacyLedger(): Promise<LegacyLedgerCopy | null> {
-    const { rows } = await this.query<{ legacy: string }>(
-      (t) => `SELECT current_schema() AS "legacy"
-         WHERE current_schema() <> '${t.schema}'
-           AND to_regclass(format('%I.%I', current_schema(), '${LEDGER_TABLE.step}')) IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM ${t.step})
-           AND NOT EXISTS (SELECT 1 FROM ${t.run})`,
-    );
-    const from = rows[0]?.legacy;
-    if (!from) return null;
-    const tables = await ledgerTables({ postgres: this.postgres });
-    await this.postgres.query(copyLegacyLedgerSql({ tables }));
-    const counted = await this.query<{ steps: string; runs: string }>(
-      (t) => `SELECT (SELECT count(*) FROM ${t.step})::text AS "steps",
-                     (SELECT count(*) FROM ${t.run})::text AS "runs"`,
-    );
-    const { steps = "0", runs = "0" } = counted.rows[0] ?? {};
-    return { from, into: tables.schema, steps: Number(steps), runs: Number(runs) };
   }
 
   async isEmpty(): Promise<boolean> {

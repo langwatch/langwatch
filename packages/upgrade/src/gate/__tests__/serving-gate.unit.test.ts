@@ -5,7 +5,7 @@ import type { ServingRosterLedger } from "../../serving-roster/index.ts";
 import { createServingRoster } from "../../serving-roster/index.ts";
 import { assertCurrent, createUpgradeGate, ledgerFloor, UPGRADE_COMMAND } from "../index.ts";
 
-const PRISMA = "prisma:20261006180000_upgrade_ledger_widen";
+const PRISMA = "prisma:20261006180000_add_column";
 const GOOSE = "clickhouse:00042";
 const image = { release: "3.21.0", blockingSteps: [PRISMA, GOOSE] };
 const allDone = [

@@ -327,8 +327,6 @@ export class UpgradeRunnerService {
     signal: AbortSignal;
     fresh: boolean;
   }): Promise<UpgradeOutcome> {
-    const copied = await this.runner.copyLegacyLedger();
-    if (copied) this.narrate.ledgerCopied(copied);
     if (await this.runner.isEmpty()) {
       const { postgres, clickhouse } = this.options;
       await UpgradeLedgerSeedService.create({ postgres, clickhouse }).seed();

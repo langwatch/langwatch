@@ -87,16 +87,6 @@ Feature: The upgrade command
     And the log says the ledger is ready and names its schema
 
   @integration
-  Scenario: A ledger kept in the installation's schema is copied into the ledger schema once
-    Given an earlier build left a ledger in the installation's schema with a run and a done step
-    When the upgrade runs
-    Then the run and the step are in the ledger schema, the step still done
-    And the log names both schemas and how many steps and runs were copied
-    And the old tables are left in place
-    When a row is added to the old tables and the upgrade runs again
-    Then nothing is copied a second time
-
-  @integration
   Scenario: A ledger that cannot be created fails the run naming the privilege it needs
     Given the DATABASE_URL role may not create the ledger schema
     When the upgrade runs

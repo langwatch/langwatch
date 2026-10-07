@@ -38,7 +38,7 @@ describe("formatStatus", () => {
         reason: "failed-step",
         summary: "1 step failed.",
         counts: { done: 3, failed: 1 },
-        failedStepIds: ["prisma:20261006130000_upgrade_ledger"],
+        failedStepIds: ["prisma:20261006130000_add_column"],
         lease: {
           name: "upgrade",
           owner: "runner-1",
@@ -61,7 +61,7 @@ describe("formatStatus", () => {
     expect(text).toContain("Installation: Needs attention (danger)");
     expect(text).toContain("Installed:    3.21.0");
     expect(text).toContain("Image:        3.21.0");
-    expect(text).toContain("Failed steps: prisma:20261006130000_upgrade_ledger");
+    expect(text).toContain("Failed steps: prisma:20261006130000_add_column");
     expect(text).toContain("held by runner-1 on pre-roll-abc");
     expect(text).toContain("upgraderun_1 (upgrade) unfinished");
   });

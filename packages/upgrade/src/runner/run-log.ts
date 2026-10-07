@@ -112,24 +112,6 @@ export class UpgradeRunLog implements UpgradeRunnerLog {
     });
   }
 
-  ledgerCopied({
-    from,
-    into,
-    steps,
-    runs,
-  }: {
-    from: string;
-    into: string;
-    steps: number;
-    runs: number;
-  }): void {
-    this.info(
-      `upgrade ledger copied from schema ${from} into ${into}: ${countOf(steps, "step")} and ` +
-        `${countOf(runs, "run")}; the old tables in ${from} are left in place and no longer read`,
-      { phase: "ledger", waitingOn: "nothing", steps, runs, next: WAIT },
-    );
-  }
-
   planned({
     runId,
     installed,

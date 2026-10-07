@@ -16,7 +16,7 @@ export type LedgerTableNames = {
   roster: string;
 };
 
-/** The unqualified table names; the copy from a legacy ledger walks the first three. */
+/** The unqualified table names inside the ledger schema. */
 export const LEDGER_TABLE = {
   run: "_langwatch_upgrade_run",
   step: "_langwatch_upgrade_step",
@@ -165,42 +165,6 @@ export function createLedgerTablesSql({ tables }: { tables: LedgerTableNames }):
     "END",
     "$ledger$",
   ].join("\n");
-}
-
-/**
- * Copies a ledger an earlier build kept in the installation's own schema into the ledger schema,
- * once: only while the new ledger holds no step and no run. The old tables are left as they are.
- */
-export function copyLegacyLedgerSql({ tables }: { tables: LedgerTableNames }): string {
-  const copied = [LEDGER_TABLE.run, LEDGER_TABLE.step, LEDGER_TABLE.target].map(literal).join(", ");
-  return `DO $ledger$
-DECLARE
-  legacy text := current_schema();
-  copied text;
-  columns text;
-BEGIN
-  ${lockOf({ tables })}
-  IF legacy IS NULL OR legacy = ${literal(tables.schema)}
-     OR to_regclass(format('%I.%I', legacy, ${literal(LEDGER_TABLE.step)})) IS NULL
-     OR EXISTS (SELECT 1 FROM ${tables.step})
-     OR EXISTS (SELECT 1 FROM ${tables.run}) THEN
-    RETURN;
-  END IF;
-  FOREACH copied IN ARRAY ARRAY[${copied}] LOOP
-    CONTINUE WHEN to_regclass(format('%I.%I', legacy, copied)) IS NULL;
-    SELECT string_agg(format('%I', old.column_name), ', ' ORDER BY old.ordinal_position)
-      INTO columns
-      FROM information_schema.columns old
-      JOIN information_schema.columns new
-        ON new.table_schema = ${literal(tables.schema)}
-       AND new.table_name = copied
-       AND new.column_name = old.column_name
-     WHERE old.table_schema = legacy AND old.table_name = copied;
-    EXECUTE format('INSERT INTO %I.%I (%s) SELECT %s FROM %I.%I ON CONFLICT DO NOTHING',
-      ${literal(tables.schema)}, copied, columns, columns, legacy, copied);
-  END LOOP;
-END
-$ledger$`;
 }
 
 /** Creates the ledger schema, tables and columns when absent; one already there stays as it is. */

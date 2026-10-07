@@ -11,7 +11,7 @@ import { UPGRADE_COMMAND } from "../serving-gate.ts";
 import { gatePoolConfig, upgradeGateOver } from "../serving-upgrade-gate.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
-const PRISMA_FOLDER = "20261006180000_upgrade_ledger_widen";
+const PRISMA_FOLDER = "20261006180000_add_column";
 const PRISMA = `prisma:${PRISMA_FOLDER}`;
 const GOOSE = "clickhouse:00042";
 const TREE: ReleaseTreeSteps = {

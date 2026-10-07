@@ -5,7 +5,7 @@ import { MemoryServingRosterLedger } from "../../serving-roster/__tests__/memory
 import { createServingRoster } from "../../serving-roster/index.ts";
 import { createUpgradeGate, SERVING_ROSTER_TIMING } from "../index.ts";
 
-const PRISMA = "prisma:20261006180000_upgrade_ledger_widen";
+const PRISMA = "prisma:20261006180000_add_column";
 const GOOSE = "clickhouse:00042";
 const ledgerStep = (id: string, status: UpgradeStepStatus) =>
   ({ id, status, mode: "blocking", release: "3.21.0" }) as const;

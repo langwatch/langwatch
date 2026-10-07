@@ -13,20 +13,21 @@ import { UpgradeLedgerSeedService } from "../ledger-seed.service.ts";
 import { createLedgerTables } from "../ledger-tables.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import type { UpgradeClickHouse } from "../ports.ts";
-import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 const CH_URL = process.env.LANGWATCH_TEST_CLICKHOUSE_URL;
 
-/** The S1 ledger as `20261006130000_upgrade_ledger` created it, in the installation's schema. */
-const LEGACY_S1_LEDGER = `CREATE TABLE "_langwatch_upgrade_run" ("id" TEXT NOT NULL, "kind" TEXT NOT NULL,
+/** The ledger before it was widened (no owner, description or floor), in its own schema. */
+const narrowLedgerDdl = ({ schema }: { schema: string }) =>
+  `CREATE SCHEMA "${schema}";
+CREATE TABLE "${schema}"."_langwatch_upgrade_run" ("id" TEXT NOT NULL, "kind" TEXT NOT NULL,
   "release" TEXT, "started_at" TIMESTAMP(3) NOT NULL, "finished_at" TIMESTAMP(3), "outcome" TEXT,
-  "plan" JSONB, "report" JSONB, CONSTRAINT "_langwatch_upgrade_run_pkey" PRIMARY KEY ("id"));
-CREATE TABLE "_langwatch_upgrade_step" ("id" TEXT NOT NULL, "kind" TEXT NOT NULL, "release" TEXT,
-  "mode" TEXT NOT NULL, "status" TEXT NOT NULL, "inferred" BOOLEAN NOT NULL DEFAULT false,
-  "attempt" INTEGER NOT NULL DEFAULT 0, "last_error" TEXT, "report" JSONB, "run_id" TEXT,
-  "started_at" TIMESTAMP(3), "finished_at" TIMESTAMP(3), "updated_at" TIMESTAMP(3) NOT NULL,
-  CONSTRAINT "_langwatch_upgrade_step_pkey" PRIMARY KEY ("id"));`;
+  "plan" JSONB, "report" JSONB, PRIMARY KEY ("id"));
+CREATE TABLE "${schema}"."_langwatch_upgrade_step" ("id" TEXT NOT NULL, "kind" TEXT NOT NULL,
+  "release" TEXT, "mode" TEXT NOT NULL, "status" TEXT NOT NULL,
+  "inferred" BOOLEAN NOT NULL DEFAULT false, "attempt" INTEGER NOT NULL DEFAULT 0,
+  "last_error" TEXT, "report" JSONB, "run_id" TEXT, "started_at" TIMESTAMP(3),
+  "finished_at" TIMESTAMP(3), "updated_at" TIMESTAMP(3) NOT NULL, PRIMARY KEY ("id"));`;
 
 let sequence = 0;
 const scratchName = () => `upgrade_ledger_${Date.now().toString(36)}_${sequence++}`;
@@ -402,22 +403,14 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
 
     /** @scenario "Widening a ledger that holds a recorded step keeps the step" */
     it("keeps a step recorded before the widening and leaves its owner and description empty", async () => {
-      await scratch.postgres.query(LEGACY_S1_LEDGER);
+      const schema = `${scratch.name}_upgrade_ledger`;
+      await scratch.postgres.query(narrowLedgerDdl({ schema }));
       await scratch.postgres.query(
-        `INSERT INTO "${scratch.name}"."_langwatch_upgrade_step" ("id", "kind", "mode", "status", "attempt", "updated_at")
+        `INSERT INTO "${schema}"."_langwatch_upgrade_step" ("id", "kind", "mode", "status", "attempt", "updated_at")
          VALUES ('prisma:20260101000000_recorded', 'postgres-schema', 'blocking', 'done', 1, now())`,
       );
 
       await ledgerOf(scratch).createTables();
-      const copied = await UpgradeRunnerRepository.create({
-        postgres: scratch.postgres,
-      }).copyLegacyLedger();
-      expect(copied).toEqual({
-        from: scratch.name,
-        into: `${scratch.name}_upgrade_ledger`,
-        steps: 1,
-        runs: 0,
-      });
 
       expect(await ledgerOf(scratch).findSteps()).toEqual([
         expect.objectContaining({
