@@ -66,6 +66,20 @@ function proof(
   });
 }
 
+/** The windowed fence on `column`, as the reader writes it for shared grants. */
+function windowedFence(column: string, { own = true } = {}): string {
+  const ids = "{tenantScope_ids:Array(String)}";
+  const edge = (name: string) =>
+    `transform(TenantId, ${ids}, {tenantScope_${name}:Array(Int64)}, toInt64(0))`;
+  const windowed =
+    `(TenantId IN (${ids}) AND ${column} >= fromUnixTimestamp64Milli(${edge("from")}) ` +
+    `AND (${edge("until")} = 0 OR ${column} < fromUnixTimestamp64Milli(${edge("until")})))`;
+  const picks = own
+    ? `(TenantId IN ({tenantScope_own:Array(String)}) OR ${windowed})`
+    : windowed;
+  return `(TenantId IN ({tenantScope_all:Array(String)}) AND ${picks})`;
+}
+
 function clientWith(
   query = vi.fn().mockResolvedValue({ json: async () => [] }),
 ) {
@@ -95,19 +109,15 @@ describe("AuthorizedClickHouse", () => {
         expect(resolveClient).toHaveBeenCalledWith(AGG);
         const sent = query.mock.calls[0]?.[0];
         expect(sent.query).toBe(
-          "SELECT TraceId FROM trace_summaries WHERE (TenantId IN ({tenantScope_own:Array(String)}) OR " +
-            "(TenantId = {tenantScope_s0:String} AND OccurredAt >= fromUnixTimestamp64Milli({tenantScope_s0_from:Int64})) OR " +
-            "(TenantId = {tenantScope_s1:String} AND OccurredAt >= fromUnixTimestamp64Milli({tenantScope_s1_from:Int64}) AND OccurredAt < fromUnixTimestamp64Milli({tenantScope_s1_until:Int64}))) " +
-            "AND TraceId = {traceId:String}",
+          `SELECT TraceId FROM trace_summaries WHERE ${windowedFence("OccurredAt")} AND TraceId = {traceId:String}`,
         );
         expect(sent.query_params).toEqual({
           traceId: "tr-1",
+          tenantScope_all: [AGG, A, B],
           tenantScope_own: [AGG],
-          tenantScope_s0: A,
-          tenantScope_s0_from: NOW - 1000,
-          tenantScope_s1: B,
-          tenantScope_s1_from: 0,
-          tenantScope_s1_until: NOW + 5000,
+          tenantScope_ids: [A, B],
+          tenantScope_from: [NOW - 1000, 0],
+          tenantScope_until: [0, NOW + 5000],
         });
         expect(sent.format).toBe("JSONEachRow");
       });
@@ -139,12 +149,33 @@ describe("AuthorizedClickHouse", () => {
       });
 
       it("keys a cache on who is in scope and under which window", () => {
-        expect(
-          tenantScopeKey({ authorization: proof(), reads: "traces" }),
-        ).toBe(`${AGG}|${A}@${NOW - 1000}-|${B}@0-${NOW + 5000}`);
+        const key = tenantScopeKey({ authorization: proof(), reads: "traces" });
+        expect(key).toMatch(new RegExp(`^${AGG}\\+2:[0-9a-f]{64}$`));
         expect(
           tenantScopeKey({ authorization: proof(), reads: "analytics" }),
         ).toBe(AGG);
+      });
+
+      it("keys the same windows the same way whatever order the grants come in", () => {
+        const [own, a, b] = proof().grants;
+        const reordered = proof({ grants: [own!, b!, a!] });
+        expect(
+          tenantScopeKey({ authorization: reordered, reads: "traces" }),
+        ).toBe(tenantScopeKey({ authorization: proof(), reads: "traces" }));
+      });
+
+      it("keys a different window differently", () => {
+        const [own, a, b] = proof().grants;
+        const widened = proof({
+          grants: [
+            own!,
+            { ...a!, condition: { type: "trace", from: 0, until: null } },
+            b!,
+          ],
+        });
+        expect(
+          tenantScopeKey({ authorization: widened, reads: "traces" }),
+        ).not.toBe(tenantScopeKey({ authorization: proof(), reads: "traces" }));
       });
 
       it("applies the same fence at every marker, inside subqueries too", () => {
@@ -154,9 +185,8 @@ describe("AuthorizedClickHouse", () => {
           queryParams: {},
           fence,
         });
-        expect(query.match(/TenantId IN/g)).toHaveLength(2);
-        expect(query).toContain("StartTime >= fromUnixTimestamp64Milli");
-        expect(query).toContain("OccurredAt >= fromUnixTimestamp64Milli");
+        expect(query).toContain(windowedFence("OccurredAt"));
+        expect(query).toContain(windowedFence("StartTime"));
       });
     });
   });
@@ -261,9 +291,7 @@ describe("AuthorizedClickHouse", () => {
         const { query } = expand(
           `SELECT 1 FROM evaluation_runs WHERE ${tenantScope("ScheduledAt")}`,
         );
-        expect(query).toContain(
-          "ScheduledAt >= fromUnixTimestamp64Milli({tenantScope_s0_from:Int64})",
-        );
+        expect(query).toContain(windowedFence("ScheduledAt"));
       });
     });
 
@@ -378,6 +406,68 @@ describe("AuthorizedClickHouse", () => {
     });
   });
 
+  describe("given an aggregate's proof with thousands of members", () => {
+    const withMembers = (count: number): Authorization =>
+      proof({
+        grants: [
+          proof().grants[0]!,
+          ...Array.from({ length: count }, (_, index) => ({
+            projectId: `proj_member_${index}`,
+            permissions: ["traces:view" as const],
+            via: [`grant_${index}`],
+            kind: "shared" as const,
+            condition: { type: "trace" as const, from: index, until: null },
+          })),
+        ],
+      });
+
+    describe("when the fence is built", () => {
+      it("writes the same statement text for 2,000 members as for two", () => {
+        const sqlFor = (count: number) =>
+          fenceExpression({
+            fence: fenceFor({
+              authorization: withMembers(count),
+              reads: "traces",
+            }),
+            column: "OccurredAt",
+          }).sql;
+        expect(sqlFor(2_000)).toBe(sqlFor(2));
+      });
+
+      it("keeps the cache key short at 2,000 members", () => {
+        const key = tenantScopeKey({
+          authorization: withMembers(2_000),
+          reads: "traces",
+        });
+        expect(key).toBe(`${AGG}+2000:${key.slice(-64)}`);
+      });
+    });
+  });
+
+  describe("given a shared grant whose window closes at the epoch", () => {
+    describe("when the fence binds its until", () => {
+      it("never binds it as the open-window value", () => {
+        const closed = proof({
+          grants: [
+            proof().grants[0]!,
+            {
+              projectId: A,
+              permissions: ["traces:view"],
+              via: ["grant_a"],
+              kind: "shared",
+              condition: { type: "trace", from: 0, until: 0 },
+            },
+          ],
+        });
+        const { params } = fenceExpression({
+          fence: fenceFor({ authorization: closed, reads: "traces" }),
+          column: "OccurredAt",
+        });
+        expect(params.tenantScope_until).toEqual([1]);
+      });
+    });
+  });
+
   describe("given an aggregate's proof narrowed to one member", () => {
     const narrowedTo = (projectId: string): Authorization => {
       const narrowed = narrowAuthorization({
@@ -394,12 +484,12 @@ describe("AuthorizedClickHouse", () => {
           fence: fenceFor({ authorization: narrowedTo(A), reads: "traces" }),
           column: "OccurredAt",
         });
-        expect(sql).toBe(
-          "((TenantId = {tenantScope_s0:String} AND OccurredAt >= fromUnixTimestamp64Milli({tenantScope_s0_from:Int64})))",
-        );
+        expect(sql).toBe(windowedFence("OccurredAt", { own: false }));
         expect(params).toEqual({
-          tenantScope_s0: A,
-          tenantScope_s0_from: NOW - 1000,
+          tenantScope_all: [A],
+          tenantScope_ids: [A],
+          tenantScope_from: [NOW - 1000],
+          tenantScope_until: [0],
         });
       });
 
@@ -425,8 +515,10 @@ describe("AuthorizedClickHouse", () => {
 
         expect(resolveClient).toHaveBeenCalledWith(AGG);
         expect(query.mock.calls[0]?.[0].query_params).toEqual({
-          tenantScope_s0: A,
-          tenantScope_s0_from: NOW - 1000,
+          tenantScope_all: [A],
+          tenantScope_ids: [A],
+          tenantScope_from: [NOW - 1000],
+          tenantScope_until: [0],
         });
       });
     });

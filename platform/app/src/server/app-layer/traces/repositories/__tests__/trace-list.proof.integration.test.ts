@@ -31,6 +31,18 @@ const TWIN_A = `proof-twin-a-${run}`;
 const TWIN_B = `proof-twin-b-${run}`;
 const TWIN_TRACE_ID = `twin-${run}`;
 
+/**
+ * An aggregate as wide as the ADR sizes it: one shared grant per member, with
+ * member ids as long as a production project id or longer. Only a handful of
+ * members hold rows; the rest are there to make the fence as wide as a real
+ * organisation's.
+ */
+const WIDE_AGGREGATE = `proof-wide-aggregate-${run}`;
+const WIDE_MEMBERS = 2_000;
+const wideMember = (index: number) =>
+  `proof-wide-member-${String(index).padStart(4, "0")}-${run}`;
+const WIDE_OUTSIDER = `proof-wide-outsider-${run}`;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 /**
  * The clock every proof and row is minted against. Taken once the containers
@@ -203,6 +215,33 @@ beforeAll(async () => {
     summaryRow({ tenantId: TWIN_B, traceId: TWIN_TRACE_ID, occurredAt: TODAY }),
     summaryRow({ tenantId: TWIN_A, traceId: "twin-a-only", occurredAt: TODAY }),
     summaryRow({ tenantId: TWIN_B, traceId: "twin-b-only", occurredAt: TODAY }),
+    // The wide aggregate: the first member open-ended, the second windowed,
+    // the last one open-ended, and a project outside the proof.
+    summaryRow({
+      tenantId: wideMember(0),
+      traceId: "wide-first",
+      occurredAt: YESTERDAY,
+    }),
+    summaryRow({
+      tenantId: wideMember(1),
+      traceId: "wide-windowed-in",
+      occurredAt: TODAY,
+    }),
+    summaryRow({
+      tenantId: wideMember(1),
+      traceId: "wide-windowed-out",
+      occurredAt: B_WINDOW.until + 60 * 1000,
+    }),
+    summaryRow({
+      tenantId: wideMember(WIDE_MEMBERS - 1),
+      traceId: "wide-last",
+      occurredAt: TODAY + 5,
+    }),
+    summaryRow({
+      tenantId: WIDE_OUTSIDER,
+      traceId: "wide-outsider",
+      occurredAt: TODAY + 6,
+    }),
     ...Array.from({ length: PLAIN_TRACES }, (_, i) =>
       summaryRow({
         tenantId: PLAIN,
@@ -375,6 +414,61 @@ describe("TraceListClickHouseRepository through the proof", () => {
 
         expect(refs.map(rowKey).sort()).toEqual(
           [`${tieA}:tie`, `${tieB}:tie`].sort(),
+        );
+      });
+    });
+  });
+
+  describe("given an aggregate with 2,000 members", () => {
+    const wideProof = () =>
+      aggregateProof({
+        projectId: WIDE_AGGREGATE,
+        members: Array.from({ length: WIDE_MEMBERS }, (_, index) =>
+          index === 1
+            ? { projectId: wideMember(index), ...B_WINDOW }
+            : { projectId: wideMember(index), from: 0 },
+        ),
+        now: NOW,
+      });
+
+    describe("when it lists, counts and facets its traces", () => {
+      it("answers every read with only the members' rows inside their windows", async () => {
+        const authorization = wideProof();
+        const expected = ["wide-first", "wide-last", "wide-windowed-in"];
+
+        expect((await listTraceIds(authorization)).sort()).toEqual(expected);
+
+        const count = await repo.findCount({
+          authorization,
+          timeRange: WINDOW,
+          since: WINDOW.from,
+        });
+        expect(count).toBe(expected.length);
+
+        const refs = await repo.findTraceRefs({
+          authorization,
+          timeRange: WINDOW,
+          limit: 100,
+        });
+        expect(refs.map((ref) => ref.traceId).sort()).toEqual(expected);
+
+        const facets = await repo.findBatchedFacets({
+          authorization,
+          timeRange: WINDOW,
+          table: "trace_summaries",
+          timeColumn: "OccurredAt",
+          categoricalSpecs: [{ key: "name", expression: "TraceName" }],
+          rangeSpecs: [],
+          topN: 50,
+        });
+        expect(
+          facets.categoricals.name?.values.map((v) => v.value).sort(),
+        ).toEqual(
+          [
+            `name-of-${wideMember(0)}`,
+            `name-of-${wideMember(1)}`,
+            `name-of-${wideMember(WIDE_MEMBERS - 1)}`,
+          ].sort(),
         );
       });
     });

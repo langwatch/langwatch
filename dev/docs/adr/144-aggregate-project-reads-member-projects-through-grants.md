@@ -664,3 +664,20 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   declared with no permission. Monitor create and copy answer the same
   read-only code on every surface, REST included; the monitor-specific code
   is gone.
+- v4.7 (2026-10-07, implementation note after the whole-PR review, no
+  decision changed). The fence is now constant in size. The earlier shape
+  wrote one bracketed clause per shared grant, two parameters each, at every
+  marker, so the statement grew by about 230 bytes per member and the list
+  failed ClickHouse's 256 KiB `max_query_size` from about 800 members, well
+  short of the 2,000 this ADR sizes for. That shape is gone. The client now
+  emits decision 6 as written: `TenantId IN all AND (TenantId IN own OR
+  (TenantId IN shared AND <time> inside the window))`, with the shared
+  tenants and their window edges bound as three parallel array parameters
+  and each tenant's edges looked up with `transform`, which builds one hash
+  table per block rather than scanning per row. An open window binds its
+  end as 0, and a real end is clamped to at least 1 ms so it is never read
+  as open. A plain project's proof keeps its one-clause form. The cache and
+  log key keeps the own project readable and hashes the shared windows with
+  sha256, so it no longer grows with the organisation either. A 2,000-member
+  list, count, trace selection and facet read run against real ClickHouse
+  in `trace-list.proof.integration.test.ts`.

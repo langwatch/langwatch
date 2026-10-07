@@ -10,10 +10,14 @@
  * in a predicate of its own, or binds a parameter in the reserved prefix.
  *
  * The fence is the same expression at every marker, so a subquery and its
- * outer statement cannot disagree on who is in scope.
+ * outer statement cannot disagree on who is in scope. Its size does not
+ * depend on how many projects the proof names: the shared windows are bound
+ * as parallel array parameters, so an aggregate over 2,000 members sends the
+ * same statement text as one over two.
  *
  * Home on `main`; ports to `packages/clickhouse-client` with PR 7536.
  */
+import { createHash } from "node:crypto";
 import type {
   ClickHouseClient,
   DataFormat,
@@ -100,6 +104,11 @@ export function tenantSet(): string {
  * A stable key for the fence a proof allows, for a cache keyed on who is in
  * scope. Two proofs that fence the same tenants under the same windows share
  * an entry; an aggregate and one of its members never do.
+ *
+ * The own projects stay readable, so a plain project's log line still names
+ * its tenant. The shared windows are hashed, so an aggregate's key stays the
+ * same length whether it reads two members or 2,000; it is a Redis key and a
+ * log field, and neither should grow with the organisation.
  */
 export function tenantScopeKey({
   authorization,
@@ -109,12 +118,14 @@ export function tenantScopeKey({
   reads: ReadResource;
 }): string {
   const fence = fenceFor({ authorization, reads });
-  return [
-    ...fence.own,
-    ...fence.shared.map(
-      (window) => `${window.projectId}@${window.from}-${window.until ?? ""}`,
-    ),
-  ].join("|");
+  const own = [...fence.own].sort().join(",");
+  if (fence.shared.length === 0) return own;
+  const windows = fence.shared
+    .map((window) => `${window.projectId}@${window.from}-${window.until ?? ""}`)
+    .sort()
+    .join("|");
+  const digest = createHash("sha256").update(windows).digest("hex");
+  return `${own}+${fence.shared.length}:${digest}`;
 }
 
 export type StatementScopeViolation =
@@ -158,10 +169,35 @@ export type TenantFence = {
   shared: readonly SharedWindow[];
 };
 
+/** The value an open window's `until` is bound as. */
+const OPEN_UNTIL = 0;
+
+/** A fence parameter's name, always under the reserved prefix. */
+const fenceParam = (name: string) => `${TENANT_SCOPE_PARAM_PREFIX}_${name}`;
+
+/** A fence parameter's placeholder in the statement text. */
+const slot = (name: string, type: string) => `{${fenceParam(name)}:${type}}`;
+
+/** Every tenant the fence names, own first, as the set-only marker binds it. */
+function tenantsOf(fence: TenantFence): string[] {
+  return [...fence.own, ...fence.shared.map((window) => window.projectId)];
+}
+
 /**
  * The fence as one bracketed expression plus the parameters it binds.
  * `column` is the table's occurrence time; the window on a shared grant is
  * applied to it. Own projects need no window.
+ *
+ * A plain project's proof keeps the one-clause form it always had. With
+ * shared grants the expression is constant in size however many there are:
+ *
+ * - the outer `TenantId IN all` is ADR-144 decision 6, the set the primary
+ *   key prunes on;
+ * - each shared tenant's window is looked up from parallel arrays with
+ *   `transform`, which builds one hash table per block for constant arrays,
+ *   rather than a linear `indexOf` per row;
+ * - an open window binds `until` as 0, and a closed one is clamped to at
+ *   least 1 ms so a real bound can never be read as open.
  */
 export function fenceExpression({
   fence,
@@ -170,29 +206,40 @@ export function fenceExpression({
   fence: TenantFence;
   column: TenantScopeTimeColumn;
 }): { sql: string; params: Record<string, unknown> } {
-  const params: Record<string, unknown> = {};
-  const parts: string[] = [];
-  if (fence.own.length > 0) {
-    params[`${TENANT_SCOPE_PARAM_PREFIX}_own`] = [...fence.own];
-    parts.push(
-      `TenantId IN ({${TENANT_SCOPE_PARAM_PREFIX}_own:Array(String)})`,
-    );
+  const ownClause = `TenantId IN (${slot("own", "Array(String)")})`;
+  if (fence.shared.length === 0) {
+    return {
+      sql: `(${ownClause})`,
+      params: { [fenceParam("own")]: [...fence.own] },
+    };
   }
-  fence.shared.forEach((window, index) => {
-    const id = `${TENANT_SCOPE_PARAM_PREFIX}_s${index}`;
-    params[id] = window.projectId;
-    params[`${id}_from`] = window.from;
-    const clauses = [
-      `TenantId = {${id}:String}`,
-      `${column} >= fromUnixTimestamp64Milli({${id}_from:Int64})`,
-    ];
-    if (window.until !== null) {
-      params[`${id}_until`] = window.until;
-      clauses.push(`${column} < fromUnixTimestamp64Milli({${id}_until:Int64})`);
-    }
-    parts.push(`(${clauses.join(" AND ")})`);
-  });
-  return { sql: `(${parts.join(" OR ")})`, params };
+
+  const ids = slot("ids", "Array(String)");
+  // The default is never read: `TenantId IN ids` gates every lookup.
+  const edgeOf = (edge: "from" | "until") =>
+    `transform(TenantId, ${ids}, ${slot(edge, "Array(Int64)")}, toInt64(0))`;
+  const windowed =
+    `(TenantId IN (${ids})` +
+    ` AND ${column} >= fromUnixTimestamp64Milli(${edgeOf("from")})` +
+    ` AND (${edgeOf("until")} = ${OPEN_UNTIL}` +
+    ` OR ${column} < fromUnixTimestamp64Milli(${edgeOf("until")})))`;
+  const params: Record<string, unknown> = {
+    [fenceParam("all")]: tenantsOf(fence),
+    [fenceParam("ids")]: fence.shared.map((window) => window.projectId),
+    [fenceParam("from")]: fence.shared.map((window) => window.from),
+    [fenceParam("until")]: fence.shared.map((window) =>
+      window.until === null ? OPEN_UNTIL : Math.max(window.until, 1),
+    ),
+  };
+  let picks = windowed;
+  if (fence.own.length > 0) {
+    params[fenceParam("own")] = [...fence.own];
+    picks = `(${ownClause} OR ${windowed})`;
+  }
+  return {
+    sql: `(TenantId IN (${slot("all", "Array(String)")}) AND ${picks})`,
+    params,
+  };
 }
 
 /** The set-only form: every tenant in the fence, no window. */
@@ -200,15 +247,9 @@ export function setExpression(fence: TenantFence): {
   sql: string;
   params: Record<string, unknown>;
 } {
-  const param = `${TENANT_SCOPE_PARAM_PREFIX}_all`;
   return {
-    sql: `(TenantId IN ({${param}:Array(String)}))`,
-    params: {
-      [param]: [
-        ...fence.own,
-        ...fence.shared.map((window) => window.projectId),
-      ],
-    },
+    sql: `(TenantId IN (${slot("all", "Array(String)")}))`,
+    params: { [fenceParam("all")]: tenantsOf(fence) },
   };
 }
 
