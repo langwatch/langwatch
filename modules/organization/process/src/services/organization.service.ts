@@ -399,6 +399,14 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.repository.updateSentPlanLimitAlert(input);
   }
 
+  setLicense(input: {
+    organizationId: string;
+    licenseKey: string;
+    expiresAt: Instant;
+  }): Promise<void> {
+    return this.repository.setLicense(input);
+  }
+
   getBillingProfile(
     input: GetOrganizationBillingProfileInput,
   ): Promise<OrganizationBillingProfile> {

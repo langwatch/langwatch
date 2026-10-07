@@ -154,6 +154,12 @@ export abstract class OrganizationRepository {
     organizationId: string;
     sentAt: Instant;
   }): Promise<void>;
+  /** Throws OrganizationNotFoundError. */
+  abstract setLicense(input: {
+    organizationId: string;
+    licenseKey: string;
+    expiresAt: Instant;
+  }): Promise<void>;
   abstract claimBillingCustomerId(input: {
     organizationId: string;
     billingCustomerId: string;

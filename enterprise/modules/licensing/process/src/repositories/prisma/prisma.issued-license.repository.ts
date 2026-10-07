@@ -40,6 +40,10 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
     return rowOf(row, this.cipher);
   }
 
+  async delete(id: string): Promise<void> {
+    await this.prisma.issuedLicense.deleteMany({ where: { id } });
+  }
+
   async findById(id: string): Promise<IssuedLicenseRecord | null> {
     const row = await this.prisma.issuedLicense.findUnique({ where: { id } });
     return row === null ? null : rowOf(row, this.cipher);

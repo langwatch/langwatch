@@ -17,6 +17,10 @@ export interface MemoryOrganizationRow {
   /** The email domain the organization claims for SSO auto-join (ADR-116). */
   ssoDomain?: string | null;
   ssoProvider?: string | null;
+  /** The licence a mint or an upload wrote; absent reads as unlicensed. */
+  license?: string | null;
+  licenseExpiresAt?: Instant | null;
+  licenseLastValidatedAt?: Instant | null;
   id: string;
   name: string;
   slug: string;
@@ -219,9 +223,9 @@ export function organizationOfRow(row: MemoryOrganizationRow): Organization {
     stripeCustomerId: row.stripeCustomerId,
     currency: "USD",
     pricingModel: "SEAT_EVENT",
-    license: null,
-    licenseExpiresAt: null,
-    licenseLastValidatedAt: null,
+    license: row.license ?? null,
+    licenseExpiresAt: row.licenseExpiresAt ?? null,
+    licenseLastValidatedAt: row.licenseLastValidatedAt ?? null,
   };
 }
 

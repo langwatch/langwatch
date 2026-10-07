@@ -1233,6 +1233,14 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.organizations.updateSentPlanLimitAlert(input);
   }
 
+  setLicense(input: {
+    organizationId: string;
+    licenseKey: string;
+    expiresAt: Instant;
+  }): Promise<void> {
+    return this.#dependencies.organizations.setLicense(input);
+  }
+
   /** The billing-facing profile, which is also where the display name lives. */
   getBillingProfile(
     input: GetOrganizationBillingProfileInput,

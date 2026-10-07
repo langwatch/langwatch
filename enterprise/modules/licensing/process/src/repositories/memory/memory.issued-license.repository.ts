@@ -111,6 +111,10 @@ export class MemoryIssuedLicenseRepository implements IssuedLicenseRepository {
     return { ...updated };
   }
 
+  async delete(id: string): Promise<void> {
+    this.rows.delete(id);
+  }
+
   async bindInstance({
     id,
     instanceId,

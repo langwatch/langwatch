@@ -440,6 +440,22 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     });
   }
 
+  async setLicense(input: {
+    organizationId: string;
+    licenseKey: string;
+    expiresAt: Instant;
+  }): Promise<void> {
+    const { count } = await this.database.organization.updateMany({
+      where: { id: input.organizationId },
+      data: {
+        license: input.licenseKey,
+        licenseExpiresAt: toDate(input.expiresAt),
+        licenseLastValidatedAt: null,
+      },
+    });
+    if (count === 0) throw new OrganizationNotFoundError();
+  }
+
   async getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile> {
     const organization = await this.database.organization.findUnique({
       where: { id: organizationId },

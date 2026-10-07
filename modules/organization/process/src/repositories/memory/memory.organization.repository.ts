@@ -341,6 +341,18 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     organization.sentPlanLimitAlert = input.sentAt;
   }
 
+  async setLicense(input: {
+    organizationId: string;
+    licenseKey: string;
+    expiresAt: Instant;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+    organization.license = input.licenseKey;
+    organization.licenseExpiresAt = input.expiresAt;
+    organization.licenseLastValidatedAt = null;
+  }
+
   async getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile> {
     const organization = this.memory.organizations.get(organizationId);
     if (!organization) throw new OrganizationNotFoundError();

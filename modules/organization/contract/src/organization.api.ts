@@ -567,6 +567,10 @@ export interface OrganizationApi {
   updateSentPlanLimitAlert(
     input: Readonly<{ organizationId: string; sentAt: Instant }>,
   ): Promise<void>;
+  /** Main's mint script write: the licence and its expiry, the validated stamp cleared. */
+  setLicense(
+    input: Readonly<{ organizationId: string; licenseKey: string; expiresAt: Instant }>,
+  ): Promise<void>;
   claimBillingCustomerId(
     input: Readonly<{ organizationId: string; billingCustomerId: string }>,
   ): Promise<boolean>;
