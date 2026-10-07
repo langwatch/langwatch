@@ -168,3 +168,36 @@ write both in operator words and name no secret (the console masks URLs and `key
 prose).
 
 Testing discipline: `.claude/skills/core/testing-rules.md`.
+
+## 8. Projection replay steps
+
+A new read model over events already in a log (a peer lane over another module's events, or a new
+lane on your own pipeline) is filled at deploy by `defineProjectionReplayStep` (`@langwatch/upgrade/step`),
+never by asking an operator to run a replay. It is a `data` step in `background` mode on the worker:
+
+```ts
+.withMigrations(({ repositories }) => [
+  defineProjectionReplayStep({
+    id: "<module>:replay-<lane>",
+    description: "Fills <lane> from <owner>'s log.",
+    lane: "<lane>",                       // the projection name, local or peer
+    replayer,                             // eventing's projectionLaneReplayer({ service, projections })
+  }),
+])
+```
+
+- **Where `replayer` comes from is not yet ruled** (handoff `replay-step`, Risks); ops builds the
+  same engine in `modules/ops/process/src/repositories/live/live.replay-runtime.repository.ts`.
+- **Cursor checkpoint.** The report carries `replayedThrough`, the instant taken before discovery; a
+  re-run (a rollback reopening the step) passes it back as `since`, so only aggregates touched after
+  it are rebuilt, each from its whole history. Nothing new: nothing written. Batch saves keep the
+  previous cursor and renew the lease.
+- **Pause and resume** are the engine's: each batch pauses the lane's live delivery
+  (`<pipeline|global>/projection|handler/<lane>`), takes cutoffs, unpauses, then writes behind its
+  cutoff markers. A failed batch throws `projection_lane_replay_failed`; the engine's markers make the
+  next attempt skip finished aggregates. An unknown lane throws `projection_lane_not_found`.
+- **Map lanes** re-append on a re-run of an aggregate; their store must dedupe (a ClickHouse
+  ReplacingMergeTree keyed on the record), as an operator replay already requires.
+- Spec: `specs/upgrade/projection-replay-step.feature`. Tests: the step over a fake replayer
+  (`packages/upgrade/src/step/__tests__`), the lane over the real engine
+  (`packages/eventing/src/replay/__tests__/projectionLaneReplay.unit.test.ts`).

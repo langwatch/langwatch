@@ -13,3 +13,8 @@ export {
   migrationStepKindSchema,
   migrationStepReportSchema,
 } from "./migration-step.ts";
+export {
+  PROJECTION_REPLAY_FROM_START,
+  type LaneReplayer,
+  defineProjectionReplayStep,
+} from "./projection-replay-step.ts";
