@@ -15,6 +15,7 @@ import { getTestUser } from "../../../../utils/testUtils";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 import { prisma } from "../../../db";
+import { WorkbenchMissingReferenceError } from "../../../experiments/errors";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -35,6 +36,8 @@ describe("experiments.copy", () => {
   let otherProjectId: string;
   const createdProjectIds: string[] = [];
   const seededIds: string[] = [];
+  const seededDatasetIds: string[] = [];
+  const seededPromptIds: string[] = [];
 
   const originalId = `experiment_${nanoid(8)}`;
   const originalSlug = `orig-${nanoid(6)}`;
@@ -99,6 +102,19 @@ describe("experiments.copy", () => {
         },
       })
       .catch(() => {});
+    await prisma.llmPromptConfig
+      .deleteMany({ where: { id: { in: seededPromptIds } } })
+      .catch(() => {});
+    await prisma.dataset
+      .deleteMany({
+        where: {
+          OR: [
+            { id: { in: seededDatasetIds } },
+            { projectId: { in: createdProjectIds } },
+          ],
+        },
+      })
+      .catch(() => {});
     for (const pid of createdProjectIds) {
       await prisma.experiment
         .deleteMany({ where: { projectId: pid } })
@@ -107,12 +123,18 @@ describe("experiments.copy", () => {
     }
   });
 
-  const replicate = async (projectId: string) => {
+  const replicate = async (
+    projectId: string,
+    {
+      experimentId = originalId,
+      copyDatasets = false,
+    }: { experimentId?: string; copyDatasets?: boolean } = {},
+  ) => {
     const { experiment } = await caller.experiments.copy({
-      experimentId: originalId,
+      experimentId,
       projectId,
       sourceProjectId: PROJECT_ID,
-      copyDatasets: false,
+      copyDatasets,
     });
     seededIds.push(experiment.id);
     return experiment;
@@ -156,6 +178,65 @@ describe("experiments.copy", () => {
 
   const workbenchName = (row: { workbenchState: unknown }) =>
     (row.workbenchState as Record<string, unknown>).name;
+
+  /** A source experiment in PROJECT_ID whose state is `stateOverrides` over a bare state. */
+  const seedSourceExperiment = async (
+    stateOverrides: Record<string, unknown>,
+  ) => {
+    const id = `experiment_${nanoid(8)}`;
+    seededIds.push(id);
+    await prisma.experiment.create({
+      data: {
+        id,
+        name: `Source ${id}`,
+        slug: `src-${nanoid(6)}`,
+        projectId: PROJECT_ID,
+        type: ExperimentType.EVALUATIONS_V3,
+        workbenchState: {
+          name: `Source ${id}`,
+          datasets: [],
+          activeDatasetId: "dataset-1",
+          evaluators: [],
+          targets: [],
+          ...stateOverrides,
+        },
+      },
+    });
+    return id;
+  };
+
+  const seedSavedDataset = async () => {
+    const id = `dataset_${nanoid(10)}`;
+    seededDatasetIds.push(id);
+    await prisma.dataset.create({
+      data: {
+        id,
+        name: `Saved ${id}`,
+        slug: `saved-${nanoid(8)}`,
+        projectId: PROJECT_ID,
+        columnTypes: [],
+      },
+    });
+    return id;
+  };
+
+  const seedPrompt = async () => {
+    const project = await prisma.project.findFirstOrThrow({
+      where: { id: PROJECT_ID },
+      select: { team: { select: { organizationId: true } } },
+    });
+    const id = `prompt_${nanoid(10)}`;
+    seededPromptIds.push(id);
+    await prisma.llmPromptConfig.create({
+      data: {
+        id,
+        name: `Prompt ${id}`,
+        projectId: PROJECT_ID,
+        organizationId: project.team?.organizationId ?? "",
+      },
+    });
+    return id;
+  };
 
   describe("given an experiment whose saved state holds its own id, slug and results", () => {
     describe("when the experiment is replicated", () => {
@@ -260,6 +341,92 @@ describe("experiments.copy", () => {
         const saved = await findRow(copy.id, otherProjectId);
         expect(saved.projectId).toBe(otherProjectId);
         expect(workbenchName(saved)).toBe("Edited cross-project copy");
+      });
+    });
+  });
+
+  describe("given an experiment with a saved dataset replicated into another project with its datasets copied", () => {
+    describe("when the copy is opened in the editor and saved in that project", () => {
+      /** @scenario "A copy into another project with its dataset copied can be saved" */
+      it("saves against the copied dataset and leaves the original unchanged", async () => {
+        const sourceDatasetId = await seedSavedDataset();
+        const sourceId = await seedSourceExperiment({
+          datasets: [
+            {
+              id: "saved-ds-1",
+              name: "Saved dataset",
+              type: "saved",
+              datasetId: sourceDatasetId,
+              columns: [],
+            },
+          ],
+          activeDatasetId: "saved-ds-1",
+        });
+        const before = await findRow(sourceId);
+
+        const copy = await replicate(otherProjectId, {
+          experimentId: sourceId,
+          copyDatasets: true,
+        });
+        await openInEditorAndSave({
+          projectId: otherProjectId,
+          slug: copy.slug,
+          edit: "Edited copy with copied dataset",
+        });
+
+        const saved = await findRow(copy.id, otherProjectId);
+        const savedDataset = (
+          saved.workbenchState as {
+            datasets: Array<{ datasetId?: string }>;
+          }
+        ).datasets[0];
+        expect(savedDataset?.datasetId).not.toBe(sourceDatasetId);
+        const copiedDataset = await prisma.dataset.findFirstOrThrow({
+          where: { id: savedDataset?.datasetId, projectId: otherProjectId },
+        });
+        expect(copiedDataset.projectId).toBe(otherProjectId);
+
+        const after = await findRow(sourceId);
+        expect(after.workbenchState).toEqual(before.workbenchState);
+        expect(after.updatedAt).toEqual(before.updatedAt);
+      });
+    });
+  });
+
+  describe("given an experiment whose target uses a prompt, replicated into another project", () => {
+    describe("when the copy is opened in the editor and saved in that project", () => {
+      /** @scenario "Saving a copy in another project that still uses a source-project prompt is refused" */
+      it("refuses the save and leaves the original unchanged", async () => {
+        const promptId = await seedPrompt();
+        const sourceId = await seedSourceExperiment({
+          targets: [{ id: "target-1", type: "prompt", promptId, mappings: {} }],
+        });
+        const before = await findRow(sourceId);
+
+        const copy = await replicate(otherProjectId, {
+          experimentId: sourceId,
+        });
+        const error = await openInEditorAndSave({
+          projectId: otherProjectId,
+          slug: copy.slug,
+          edit: "Edited copy with source prompt",
+        }).then(
+          () => undefined,
+          (e: unknown) => e,
+        );
+
+        // handledErrorMiddleware re-raises the domain error as a TRPCError
+        // whose cause is the HandledError itself.
+        expect((error as { cause?: unknown }).cause).toBeInstanceOf(
+          WorkbenchMissingReferenceError,
+        );
+        expect((error as { cause: { code: string } }).cause.code).toBe(
+          "experiment_workbench_missing_reference",
+        );
+
+        const after = await findRow(sourceId);
+        expect(after.workbenchState).toEqual(before.workbenchState);
+        expect(after.updatedAt).toEqual(before.updatedAt);
       });
     });
   });

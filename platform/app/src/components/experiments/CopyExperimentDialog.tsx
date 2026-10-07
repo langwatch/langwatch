@@ -7,6 +7,7 @@ import {
 } from "@chakra-ui/react";
 import { useState } from "react";
 import { showErrorToast } from "~/features/errors";
+import type { ExperimentType } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useProjectsForCopy } from "../../hooks/useProjectsForCopy";
 import { api } from "../../utils/api";
@@ -21,11 +22,13 @@ export const CopyExperimentDialog = ({
   onClose,
   experimentId,
   experimentName,
+  experimentType,
 }: {
   open: boolean;
   onClose: () => void;
   experimentId: string;
   experimentName: string;
+  experimentType: ExperimentType;
 }) => {
   const { project } = useOrganizationTeamProject();
   const utils = api.useUtils();
@@ -46,6 +49,7 @@ export const CopyExperimentDialog = ({
   });
 
   const note = replicateReferencesNote({
+    experimentType,
     sourceProjectId: project?.id,
     targetProjectId: selectedProjectId[0],
   });
