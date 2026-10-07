@@ -53,23 +53,3 @@ export class MonitorParametersUnusedError extends HandledError {
     this.name = "MonitorParametersUnusedError";
   }
 }
-
-/**
- * A monitor was aimed at an aggregate project (ADR-144 decision 8). An
- * aggregate is read only in v1: it owns no traces, so a monitor on it would
- * evaluate nothing, and running evaluations over the member traces it reads
- * belongs to each member. The owners' existing results still show on the
- * aggregate's traces.
- */
-export class MonitorOnAggregateProjectError extends HandledError {
-  declare readonly code: "monitor_on_aggregate_project";
-
-  constructor() {
-    super(
-      "monitor_on_aggregate_project",
-      "Online evaluations cannot run on a project that reads traces from other projects",
-      { httpStatus: 400, fault: "customer" },
-    );
-    this.name = "MonitorOnAggregateProjectError";
-  }
-}

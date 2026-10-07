@@ -94,7 +94,7 @@ describe("Feature: the aggregate project is read only", () => {
           .catch((error: unknown) => error);
 
         // Refused at the door with the general read-only answer (block G),
-        // before the monitor route's own aggregate check is reached.
+        // the same code the monitor route's own aggregate check answers.
         expect(handledCodeOf(refusal)).toBe("aggregate_project_is_read_only");
         expect(
           await prisma.monitor.count({ where: { projectId: aggregate.id } }),
