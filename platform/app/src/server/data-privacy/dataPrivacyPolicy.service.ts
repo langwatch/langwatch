@@ -9,6 +9,7 @@ import {
   type ResolvedDataPrivacy,
 } from "./dataPrivacy.types";
 import { DataPrivacyPolicyCache } from "./dataPrivacyPolicy.cache";
+import type { PrivacyPolicyRequestMemo } from "./privacyPolicyRequestMemo";
 import {
   DataPrivacyPolicyRepository,
   type DataPrivacyScope,
@@ -171,13 +172,35 @@ export class DataPrivacyPolicyService {
    * through its own cached entry and the fold runs per call, so no entry is
    * keyed on the set and a member's rule change reaches the next read. One
    * project is that project's policy, read exactly as `getResolvedForProject`.
+   *
+   * With a request `memo`, a set already folded in this request is answered
+   * from it: one drawer open asks for the protections several times with the
+   * same proof, and each ask would otherwise resolve every member again.
    */
-  async getResolvedForProjects({
+  getResolvedForProjects({
     projectIds,
+    memo,
   }: {
     projectIds: readonly string[];
+    memo?: PrivacyPolicyRequestMemo;
   }): Promise<ResolvedDataPrivacy> {
-    const distinct = [...new Set(projectIds)];
+    const distinct = [...new Set(projectIds)].sort();
+    if (!memo) return this.foldResolved(distinct);
+    const key = distinct.join(",");
+    const remembered = memo.get(key);
+    if (remembered) return remembered;
+    const folded = this.foldResolved(distinct);
+    memo.set(key, folded);
+    // A failure is not remembered: the next ask in the request tries again.
+    folded.catch(() => {
+      if (memo.get(key) === folded) memo.delete(key);
+    });
+    return folded;
+  }
+
+  private async foldResolved(
+    distinct: readonly string[],
+  ): Promise<ResolvedDataPrivacy> {
     const [only] = distinct;
     if (distinct.length === 1 && only !== undefined) {
       return this.getResolvedForProject({ projectId: only });

@@ -22,6 +22,7 @@ import {
 } from "~/server/data-privacy/dataPrivacy.types";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { policyProjectIdsOf } from "~/server/data-privacy/policyProjectIdsOf";
+import type { PrivacyPolicyRequestMemo } from "~/server/data-privacy/privacyPolicyRequestMemo";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { FREE_VISIBILITY_DAYS } from "../../../ee/licensing/constants";
@@ -226,6 +227,7 @@ export async function getUserProtectionsForProject(
     session: Session | null;
     publiclyShared?: boolean;
     authorization?: Authorization;
+    privacyPolicyMemo?: PrivacyPolicyRequestMemo;
   },
   {
     projectId,
@@ -266,6 +268,7 @@ export async function getUserProtectionsForProject(
           projectId,
           authorization: authorization ?? ctx.authorization,
         }),
+        memo: ctx.privacyPolicyMemo,
       });
     } catch (error) {
       // Fail closed: a resolver/cache/db failure must not expose content that a

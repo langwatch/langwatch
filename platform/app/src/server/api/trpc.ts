@@ -78,6 +78,10 @@ import {
   declaredNoPermission,
   declaredServiceAuthorization,
 } from "../app-layer/authz/trpc-middleware";
+import {
+  newPrivacyPolicyRequestMemo,
+  type PrivacyPolicyRequestMemo,
+} from "../data-privacy/privacyPolicyRequestMemo";
 import { rateLimit } from "../rateLimit";
 import { isAuditLogExempt } from "./auditLogExemptions";
 
@@ -132,6 +136,14 @@ interface CreateContextOptions {
   authorization?: Authorization;
   publiclyShared?: boolean;
   organizationRole?: OrganizationUserRole | null;
+  /**
+   * ADR-144 decision 9: the privacy policies this request has already
+   * folded, so the protections asked for several times with one proof fold
+   * once. Only a factory whose context lives for one HTTP request passes
+   * one; a long-lived context (an SSE subscription) leaves it unset and
+   * resolves every time, so a rule change still reaches it.
+   */
+  privacyPolicyMemo?: PrivacyPolicyRequestMemo;
   opsScope?: OpsScope;
   /**
    * Aborts when the client goes away. Long-lived subscriptions must pass this
@@ -165,6 +177,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     authorization: opts.authorization,
     publiclyShared: opts.publiclyShared ?? false,
     organizationRole: opts.organizationRole ?? undefined,
+    privacyPolicyMemo: opts.privacyPolicyMemo,
     opsScope: opts.opsScope,
     signal: opts.signal,
   };
@@ -189,6 +202,7 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
     app: getApp(),
     permissionChecked: false,
     publiclyShared: false,
+    privacyPolicyMemo: newPrivacyPolicyRequestMemo(),
   });
 };
 
