@@ -113,6 +113,7 @@ function browserUiCapabilitiesHook({
   session: auth,
   scope: organization,
   copyTargets: lending,
+  traceFilters: filtering,
 }: UiRootCapabilities) {
   return function useBrowserUiCapabilities({
     transport,
@@ -121,7 +122,7 @@ function browserUiCapabilitiesHook({
     transport: UiFeatureApiTransport;
     feedback: UiFeedback;
   }): UiSessionCapabilities {
-    const { pathname } = useLocation();
+    const { pathname, search } = useLocation();
     const isPublicRoute = organization.isUiPublicRoute(pathname);
     const sessionReading = auth.useUiSessionReading({ feedback, isPublicRoute });
     const scopeReading = organization.useUiScopeReading({ transport, session: sessionReading });
@@ -138,10 +139,17 @@ function browserUiCapabilitiesHook({
       userId: sessionReading.user?.id,
     });
 
+    const scope = organization.createBrowserUiScope({ reading: scopeReading, session });
+    const traceFilters = filtering.useUiTraceFiltersReading({
+      search,
+      projectId: scope.activeScope().projectId ?? void 0,
+    });
+
     return {
       session,
-      scope: organization.createBrowserUiScope({ reading: scopeReading, session }),
+      scope,
       copyTargets: lending.createBrowserUiCopyTargets({ reading: copyTargets }),
+      traceFilters: filtering.createBrowserUiTraceFilters({ reading: traceFilters }),
     };
   };
 }

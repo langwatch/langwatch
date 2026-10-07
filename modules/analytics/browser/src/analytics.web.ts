@@ -83,6 +83,8 @@ export const analyticsWeb = defineBrowserModule("analytics")
   })
   /** The trace filter sidebar, lent to the evaluator's sample picker (§3.4 rule 7). */
   .withCapabilities({
+    /** The reader's applied trace filters, installed by the shell beside copy targets (§10.1). */
+    traceFilters: { load: () => import("./behavior/trace-filters-capability.ts") },
     /** A custom graph over the project's traces, lent to modules that chart it (§3.4 rule 7). */
     customGraph: {
       load: async () => ({

@@ -7,10 +7,12 @@
 import {
   useUiCapabilities,
   useUiScope,
+  useUiTraceFilters,
   type UiFeedback,
   type UiNavigation,
   type UiRoute,
   type UiSession,
+  type UiTraceFilters,
 } from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useMemo, type ReactNode } from "react";
@@ -39,6 +41,8 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
       navigation: UiNavigation;
       route: UiRoute;
       feedback: UiFeedback;
+      /** Undefined where no module lent it: no filters applied. */
+      traceFilters: UiTraceFilters | undefined;
       drawers: {
         openDrawer: (drawer: string, props?: Record<string, unknown>) => void;
         drawerOpen: (drawer: string) => boolean;
@@ -80,9 +84,9 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
     return { params: reading.params, query: reading.query };
   }
 
-  /** No capability carries the reader's trace filters yet: absence, never an empty filter. */
+  /** What analytics lends through the shell; undefined while nothing narrows the read. */
   traceFilters(): AnnotationTraceFilters | undefined {
-    return void 0;
+    return this.deps.traceFilters?.applied();
   }
 
   setQuery(
@@ -124,6 +128,7 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
 export default function AnnotationHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
   const uiScope = useUiScope();
+  const traceFilters = useUiTraceFilters();
   const { organizationId } = uiScope.activeScope();
   const scopeHost = uiScope.scopeHost();
   const hostProject = scopeHost?.project();
@@ -150,6 +155,7 @@ export default function AnnotationHostMount({ children }: { children?: ReactNode
         navigation,
         route,
         feedback,
+        traceFilters,
         drawers: { openDrawer, drawerOpen },
       }),
     [
@@ -161,6 +167,7 @@ export default function AnnotationHostMount({ children }: { children?: ReactNode
       navigation,
       route,
       feedback,
+      traceFilters,
       openDrawer,
       drawerOpen,
     ],

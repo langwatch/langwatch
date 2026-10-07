@@ -1,8 +1,9 @@
 /**
- * What the composition root takes from auth, organization, navigation, trace and ops, loaded
- * through their declarations before anything renders (ARCHITECTURE.md 10.1).
+ * What the composition root takes from auth, organization, analytics, navigation, trace and
+ * ops, loaded through their declarations before anything renders (ARCHITECTURE.md 10.1).
  */
 
+import { analyticsWeb } from "@langwatch/analytics-browser/declaration";
 import { authWeb } from "@langwatch/auth-browser/declaration";
 import { navigationWeb } from "@langwatch/navigation-browser/declaration";
 import { opsWeb } from "@langwatch/ops-browser/declaration";
@@ -11,6 +12,7 @@ import { traceWeb } from "@langwatch/trace-browser/declaration";
 
 const auth = authWeb.installation.capabilities;
 const organization = organizationWeb.installation.capabilities;
+const analytics = analyticsWeb.installation.capabilities;
 const navigation = navigationWeb.installation.capabilities;
 const trace = traceWeb.installation.capabilities;
 const ops = opsWeb.installation.capabilities;
@@ -22,6 +24,7 @@ export type UiRootCapabilities = {
   scope: Awaited<ReturnType<typeof organization.scope.load>>;
   organizationFacts: Awaited<ReturnType<typeof organization.organizationFacts.load>>;
   copyTargets: Awaited<ReturnType<typeof organization.copyTargets.load>>;
+  traceFilters: Awaited<ReturnType<typeof analytics.traceFilters.load>>;
   navigationHost: Awaited<ReturnType<typeof navigation.host.load>>;
   navigationChrome: Awaited<ReturnType<typeof navigation.chrome.load>>;
   commandBar: Awaited<ReturnType<typeof navigation.commandBar.load>>;
@@ -37,6 +40,7 @@ export async function loadUiRootCapabilities(): Promise<UiRootCapabilities> {
     scope,
     organizationFacts,
     copyTargets,
+    traceFilters,
     navigationHost,
     navigationChrome,
     commandBar,
@@ -49,6 +53,7 @@ export async function loadUiRootCapabilities(): Promise<UiRootCapabilities> {
     organization.scope.load(),
     organization.organizationFacts.load(),
     organization.copyTargets.load(),
+    analytics.traceFilters.load(),
     navigation.host.load(),
     navigation.chrome.load(),
     navigation.commandBar.load(),
@@ -62,6 +67,7 @@ export async function loadUiRootCapabilities(): Promise<UiRootCapabilities> {
     scope,
     organizationFacts,
     copyTargets,
+    traceFilters,
     navigationHost,
     navigationChrome,
     commandBar,

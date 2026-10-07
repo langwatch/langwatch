@@ -58,3 +58,22 @@ Feature: Trace list page size cap
     When the annotations page collects trace ids
     Then no trace ids are used
     And the failure is reported
+
+  @integration
+  Scenario: The filtered annotations list reads the filters analytics lends
+    Given the address carries a trace filter and a period
+    When the annotations page asks the shell for the applied trace filters
+    Then analytics answers the filters with the period's start and end
+    And the answer carries no project id
+
+  @integration
+  Scenario: A free-text query alone leaves the annotations list unfiltered
+    Given the address carries a search query and no trace filter
+    When the annotations page asks the shell for the applied trace filters
+    Then no filters are applied
+
+  @integration
+  Scenario: A composition with no trace filters lender reads as unfiltered
+    Given no module lent the trace filters capability
+    When a screen asks for the applied trace filters
+    Then no filters are applied
