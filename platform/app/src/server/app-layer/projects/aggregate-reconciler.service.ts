@@ -154,9 +154,18 @@ export class AggregateReconciler {
     // missing, so a failed schedule at creation is repaired by the next run.
     await this.ensureSweepScheduled({ organizationId, aggregateProjectId });
     if (!aggregate.rule) {
+      // Reported as well as logged: nothing repairs a malformed column, and
+      // the nightly sweep would otherwise say this once a night to a log
+      // nobody reads while the aggregate's members drift.
       logger.error(
         { organizationId, aggregateProjectId },
         "aggregate project has a stored rule that does not parse; reconciling nothing",
+      );
+      captureException(
+        new Error(
+          "Aggregate project has a stored rule that does not parse; reconciling nothing",
+        ),
+        { extra: { organizationId, aggregateProjectId } },
       );
       return NOTHING;
     }

@@ -7,7 +7,7 @@
  * @see specs/governance/aggregate-project.feature
  */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AGGREGATE_ARCHIVED,
   AGGREGATE_RECONCILE_SWEEP,
@@ -24,6 +24,13 @@ import type {
   AggregateReconcileLock,
   StoredAggregateProject,
 } from "../repositories/aggregate-rule.repository";
+
+const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
+vi.mock("~/utils/posthogErrorCapture", () => ({
+  captureException,
+  toError: (error: unknown) =>
+    error instanceof Error ? error : new Error(String(error)),
+}));
 
 const ORG = "org_acme";
 const NOW = new Date("2026-10-07T10:00:00.000Z");
@@ -194,6 +201,10 @@ function reconcilerFor({
 }
 
 describe("AggregateReconciler", () => {
+  beforeEach(() => {
+    captureException.mockClear();
+  });
+
   describe("given an aggregate whose rule wants two members and holds none", () => {
     describe("when it is reconciled", () => {
       it("attaches one trace read per member from now on, with no end", async () => {
@@ -364,6 +375,20 @@ describe("AggregateReconciler", () => {
         expect(result).toEqual({ attached: [], revoked: [], unchanged: [], failed: [] });
         expect(rows).toHaveLength(1);
         expect(revoked).toHaveLength(0);
+      });
+
+      it("reports the malformed rule, naming the aggregate and its organisation", async () => {
+        const { ledger } = inMemoryLedger();
+
+        await reconcilerFor({
+          ledger,
+          stored: [aggregate({ rule: null })],
+        }).reconcile({ aggregateProjectId: "agg_1" });
+
+        expect(captureException).toHaveBeenCalledTimes(1);
+        expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
+          extra: { organizationId: ORG, aggregateProjectId: "agg_1" },
+        });
       });
     });
   });
