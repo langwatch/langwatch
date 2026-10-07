@@ -1,9 +1,10 @@
 /**
- * Overrides for the test suite and legacy event log views. The retired
+ * Overrides for the test suite views, and eventing's declared event tables (Q205). The retired
  * `automation_audit` table is not catalogued: its writer is gone (ADR-052
  * 2026-07 amendment); firing history is `GET /api/triggers/:id/fires`.
  */
 
+import { LWQL_CLICKHOUSE_EVENT_TABLES } from "./lwql-catalogue.rules.ts";
 import type { DatasetOverride } from "./lwql-dataset-derivation.rules.ts";
 
 export const AUDIT_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
@@ -13,10 +14,5 @@ export const AUDIT_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     timeColumn: "StartedAt",
     dedup: { versionColumn: "UpdatedAt" },
   },
-  event_log: {
-    description: "Legacy append-only event log, superseded by the canonical fact tables",
-    grain: "one row per (AggregateType, AggregateId, IdempotencyKey)",
-    timeColumn: "EventOccurredAt",
-    dedup: { versionColumn: "EventTimestamp" },
-  },
+  ...LWQL_CLICKHOUSE_EVENT_TABLES.overrides,
 };
