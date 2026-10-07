@@ -1,8 +1,8 @@
 # ADR-144: An aggregate project reads its member projects through shared grants
 
-**Date:** 2026-09-26, revised 2026-10-06
+**Date:** 2026-09-26, revised 2026-10-07
 
-**Status:** Accepted (v4, 2026-10-06)
+**Status:** Accepted (v4.7, 2026-10-07)
 
 **Builds on:** ADR-166 (grant-scoped data access: a sealed `Authorization`
 proof minted once at the door, carried by hand, applied by the store client),
@@ -226,7 +226,7 @@ on the Postgres side.
 | `GRANT_CONDITION_TYPES` | `"trace" \| "span" \| "log"` | `Grant.condition.type`; v1 writes only `"trace"` |
 | `AUTHORIZATION_GRANT_KINDS` | `"own" \| "shared"` | ADR-166 grant kind inside the proof |
 | `AUTHORIZATION_PURPOSES` | `"route" \| "event" \| "operator"` | ADR-166 purpose; v1 mints only `"route"` |
-| `CLICKHOUSE_READ_RESOURCES` | `"traces" \| "spans" \| "analytics"` | the `reads` declaration on `as()` |
+| `CLICKHOUSE_READ_RESOURCES` | `"traces" \| "analytics"` | the `reads` declaration on `as()`; span reads declare `"traces"` |
 | `AGGREGATE_RULE_KINDS` | `"all-personal" \| "personal-by-department" \| "explicit"` | discriminator of `Project.aggregateRule` |
 | `AGGREGATE_DEFAULT_RULE` | `{ kind: "all-personal" }` | preselected on creation |
 | `ADMIN_WORKSPACE_VIEW_DEDUP_MS` | `300000` (5 × 60 × 1000) | existing list-view audit dedup window, reused |
@@ -242,7 +242,7 @@ on the Postgres side.
 | Proof expires | A proof past `expiresAt` is refused; a revoked grant is absent from the next mint | `AuthorizationExpiredError` test; revoke-then-mint test |
 | No leak outside the proof | A tenant not named in the proof returns zero rows from every ClickHouse trace read | integration test per repository: list, summary, spans, analytics with a foreign tenant holding rows |
 | Repositories write no tenant | No trace repository query text contains `TenantId`; the client adds it | lint rule `store-call-carries-authorization` scoped to the trace repositories, plus a grep assertion in the repository tests |
-| Same organisation only | A member project in another organisation is never attached | reconciler test; refinement test; `TenantMismatchError` on a cross-organisation proof |
+| Same organisation only | A member project in another organisation is never attached, and the door reads shared rows only from the reader project's own organisation | reconciler test; refinement test; the rule edit refusing another organisation's project. `TenantMismatchError` is defined in `@langwatch/actor` for ADR-166 and never thrown here: the door takes the organisation from the project it mints for, so no proof can name another |
 | Hidden governance project never a member | `internal_governance` is excluded by every rule kind | reconciler test |
 | Admins only | A non-admin, including a Developer seat, is refused at the route guard and the tRPC guard | `projectFilter.invariant.integration.test.ts` extension plus guard unit test |
 | Reconciler is idempotent | Two runs, or a replay, produce the same grant ids and no duplicate rows | reconciler test comparing ledger state after two runs |
@@ -364,7 +364,8 @@ Negative: the ledger gains one row per (aggregate, member) pair, so an
 organisation with two thousand personal projects and three aggregates holds
 six thousand live rows; the reconciler is a new writer with its own failure
 modes, mitigated by idempotent ids and a nightly sweep; the proof adds one
-authz read per trace request, cached per org epoch; the blocks must be moved
+authz read per trace request, cached per organisation epoch for at most
+30 seconds behind the same rollout flag as the engine's snapshot cache; the blocks must be moved
 once PR 7536 lands; online evaluations and annotations on member traces wait
 for a later decision; the `aggregate` kind must be remembered by every future
 "send traces here" surface.
@@ -421,6 +422,13 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   analytics rollup) as time columns the client may window on. Until then
   an aggregate's logs and analytics read the aggregate's own tenant and
   show nothing. Owner: product and platform, for the next block.
+- Whether the organisation reconcile should leave the request path (v4.7).
+  Personal workspace creation, SCIM deprovisioning and department moves
+  run it inline: per aggregate a lock, two reads of every member, the
+  attaches, a projection wait of up to 8 s and an organisation-wide epoch
+  bump, under a semaphore of two per process. Enqueueing it, with the
+  nightly sweep as the retry, takes that off first login and invite
+  acceptance. Owner: platform, before an organisation with many aggregates.
 
 ## Revisions
 
@@ -681,3 +689,18 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   sha256, so it no longer grows with the organisation either. A 2,000-member
   list, count, trace selection and facet read run against real ClickHouse
   in `trace-list.proof.integration.test.ts`.
+
+  Four other details the review found, settled in code. Evaluation inputs,
+  details and error text follow the viewer's protections, resolved through
+  the read's proof, on the aggregate and on a plain project alike; decision
+  9 now covers evaluation results as it covers spans. Archiving a team
+  stops every aggregate on it, as archiving the aggregate does, and
+  reconciles the organisation so the team's projects leave every
+  aggregate. The door caches the shared-read lookup per organisation epoch,
+  as the Consequences said it would. `TenantMismatchError` is not thrown:
+  the invariant now says what the code guarantees.
+
+  Recorded as delivered, not changed: personal workspace creation, SCIM
+  deprovisioning and department moves run the organisation reconcile
+  inline on the request path. Moving it to a queue is listed under open
+  questions.
