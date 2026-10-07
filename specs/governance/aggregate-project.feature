@@ -370,3 +370,9 @@ Feature: An aggregate project reads its member projects
     Then the app lands on her first project that is not an aggregate
     And opening the aggregate by its address or from the switcher still opens it
     And opening the aggregate never makes it the remembered selection
+
+  @unit
+  Scenario: A refused annotation on the aggregate says why
+    When ana's annotation on an aggregate trace is refused as read only
+    Then the message she sees is "Data can't be added to this project"
+    And not a generic "Could not save annotation"
