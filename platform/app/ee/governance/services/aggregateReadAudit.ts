@@ -16,7 +16,10 @@ import type { GovernanceOcsfEventsClickHouseRepository } from "./governanceOcsfE
  * The enterprise half of the aggregate read audit (ADR-144 decision 9):
  * every read of an aggregate writes the admin workspace view row of kind
  * `aggregate`, behind the per-process window. The window and the row read
- * one clock, so the in-process dedup can never outlast the database's.
+ * one clock. The in-process window opens when this pod asks, even when the
+ * database answers that another pod's row already covers the read, so across
+ * pods it can outlast the database's by up to one window: under continuous
+ * reads, rows land up to two windows apart.
  */
 export function workspaceViewAggregateReadAudit({
   prisma,
