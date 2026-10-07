@@ -78,21 +78,14 @@ const RESOURCE_KIND_FROM_DB: Record<
 };
 
 /**
- * The stored column is a plain `TEXT` — Prisma has no enum behind it, and the
- * row can be read back from a database an older writer, a hand-run statement
- * or a partially applied migration also touched. So the value is PARSED, not
- * asserted: `undefined` for anything that is not one of the two kinds, which
- * `grantRowToFact` then treats exactly as it treats a missing column.
- *
- * Casting instead put `RESOURCE_KIND_FROM_DB[<anything>]` in front of the
- * engine as `kind: undefined`, which reads as a resource grant that names no
- * kind of thing — a share row that matches whichever resource is asked about.
+ * A stored grant condition, parsed. The column is JSONB with no schema
+ * behind it, so a row's condition has to PARSE through the same schema the
+ * event wire uses before it becomes a fact: an object that names a type the
+ * vocabulary lacks, carries a non-string field, or has a `from`/`until` that
+ * is not an ISO instant returns `undefined`. `grantRowToFact` then builds the
+ * fact with no condition, and the shared-read minter leaves the row out of
+ * every proof, so a malformed window is never read as a wider one.
  */
-/** The stored column is JSONB with no schema behind it, so a row's condition
- *  has to PARSE as one before it becomes a fact, through the same schema the
- *  event wire uses: an object that names a type the vocabulary lacks, carries
- *  a non-string field, or a `from`/`until` that is not an ISO instant, is
- *  treated as no condition rather than as a window the engine would widen. */
 export function grantConditionFromDb(
   value: unknown,
 ): GrantCondition | undefined {
@@ -100,6 +93,17 @@ export function grantConditionFromDb(
   return parsed.success ? parsed.data : undefined;
 }
 
+/**
+ * The stored column is a plain `TEXT`: Prisma has no enum behind it, and the
+ * row can be read back from a database an older writer, a hand-run statement
+ * or a partially applied migration also touched. So the value is PARSED, not
+ * asserted: `undefined` for anything that is not one of the two kinds, which
+ * `grantRowToFact` then treats exactly as it treats a missing column.
+ *
+ * Casting instead put `RESOURCE_KIND_FROM_DB[<anything>]` in front of the
+ * engine as `kind: undefined`, which reads as a resource grant that names no
+ * kind of thing, a share row that matches whichever resource is asked about.
+ */
 function resourceKindFromDb(
   value: string | null,
 ): ResourceGrantTerms["kind"] | undefined {
