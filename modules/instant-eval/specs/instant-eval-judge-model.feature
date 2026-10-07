@@ -141,7 +141,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the label is "refund"
       And passed is not set
 
-    @unit @unimplemented
+    @unit
     Scenario: The score judge's settings carry an optional range
       Given the generated settings of the score judge
       Then they hold an optional min and an optional max

@@ -29,10 +29,7 @@ const DEFAULT_SCORE_RANGE = { min: 0, max: 1 } as const;
 
 type SettingsOf<T extends keyof Evaluators> = Evaluators[T]["settings"];
 
-/**
- * The three LLM judges Instant Evals can answer, with the generated settings each one reads.
- * The score range is not in the generated settings yet; the range-setting step adds it there.
- */
+/** The three LLM judges Instant Evals can answer, with the generated settings each one reads. */
 export type InstantEvalJudge =
   | {
       readonly evaluatorType: "langevals/llm_boolean";
@@ -40,8 +37,7 @@ export type InstantEvalJudge =
     }
   | {
       readonly evaluatorType: "langevals/llm_score";
-      readonly settings: Pick<SettingsOf<"langevals/llm_score">, "prompt"> &
-        InstantEvalJudgeScoreRange;
+      readonly settings: Pick<SettingsOf<"langevals/llm_score">, "prompt" | "min" | "max">;
     }
   | {
       readonly evaluatorType: "langevals/llm_category";
@@ -60,10 +56,7 @@ export type InstantEvalJudgeRequest =
   | { readonly kind: "nothing_to_judge" };
 
 /** The score range a judge's settings name, with unset bounds read as 0 to 1. */
-export interface InstantEvalJudgeScoreRange {
-  readonly min?: number;
-  readonly max?: number;
-}
+export type InstantEvalJudgeScoreRange = Pick<SettingsOf<"langevals/llm_score">, "min" | "max">;
 
 export function buildInstantEvalJudgeRequest({
   judge,
