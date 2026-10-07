@@ -1464,8 +1464,10 @@ const presentations = {
   aggregate_project_is_read_only: {
     // Reached from any save, create or edit aimed at an aggregate, often a
     // form opened before the project was switched, so the copy says where
-    // the change belongs rather than what went wrong.
-    title: "This project can't be changed",
+    // the change belongs rather than what went wrong. Renaming, archiving
+    // and editing its rule still work, so the title names data, not the
+    // project.
+    title: "Data can't be added to this project",
     describe: () =>
       "It reads traces from other projects and keeps nothing of its own. Open the project the data belongs to and make the change there.",
   },

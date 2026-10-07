@@ -76,6 +76,15 @@ describe("assertProjectAcceptsWrites", () => {
         "aggregate_project_is_read_only",
       );
     });
+
+    it("answers forbidden, like the aggregate's other refusals", async () => {
+      const refusal = await assertProjectAcceptsWrites({
+        kinds: kindsFor("aggregate"),
+        projectId: "proj_company_view",
+      }).catch((error: unknown) => error);
+
+      expect(HandledError.isHandled(refusal) && refusal.httpStatus).toBe(403);
+    });
   });
 
   describe("when the project is any other kind, or unknown", () => {

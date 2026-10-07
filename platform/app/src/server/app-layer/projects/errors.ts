@@ -13,8 +13,10 @@ export class AggregateProjectIsReadOnlyError extends HandledError {
   constructor() {
     super(
       "aggregate_project_is_read_only",
-      "This project reads traces from other projects and cannot be changed",
-      { httpStatus: 400, fault: "customer" },
+      "This project reads traces from other projects, so no data can be added to it",
+      // Forbidden, like the aggregate's other refusals: the request is well
+      // formed, the project does not take it.
+      { httpStatus: 403, fault: "customer" },
     );
     this.name = "AggregateProjectIsReadOnlyError";
   }
