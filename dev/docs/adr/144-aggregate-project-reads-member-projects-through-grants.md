@@ -401,6 +401,14 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   v1 trace and span routers' other procedures, the coding-agent usage
   routes and the log records, which on an aggregate read its own tenant
   and find none.
+- Whether the viewer facts on an aggregate read (team role, groups, owner)
+  should be the least favourable across the members, as the policy is,
+  rather than read on the aggregate (v4.6). Owner: product, before
+  aggregates reach customers with personal projects under capturing
+  policies.
+- Whether the settings-shaped writes that ride `project:update` (pinned
+  traces, model providers, retention jobs, topic clustering) should also be
+  refused on an aggregate (v4.6). Owner: platform.
 - Whether to admit `TimeUnixMs` (log records) and `BucketStart` (the
   analytics rollup) as time columns the client may window on. Until then
   an aggregate's logs and analytics read the aggregate's own tenant and
@@ -559,3 +567,67 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   gate reads every route under the tRPC, legacy and REST roots, refuses a
   trace service taken apart or held under another name, and counts each
   route still handing a tenant rather than claiming none does.
+- v4.6 (2026-10-07, implementation note after block G, no decision
+  changed). Block G delivered decision 9 and the rest of decision 8: the
+  strictest member privacy policy on every aggregate read, the admin
+  workspace view row of kind `aggregate` on every aggregate read, and a
+  server-side refusal of every write under an aggregate's tenant. The four
+  section G scenarios are bound, with a fifth for the write refusal.
+
+  The policy is read from the proof, not from the rule. A route's protections
+  resolve each project its proof's grants name, through that project's own
+  cached entry, and fold them with `strictestDataPrivacy`: drop beats
+  restrict beats capture per category, two restricting audiences intersect,
+  the strictest PII level wins with entities unioned and exceptions
+  intersected, secrets redact when any member redacts, and custom attribute
+  rules union by pattern with drop beating restrict. Nothing is cached per
+  aggregate, so a member's rule change reaches the next aggregate read. A
+  plain project's proof holds one grant and reads exactly as before. A proof
+  narrowed to one member holds the own grant and that member's, so a detail
+  page opened from an aggregate applies the stricter of the aggregate's own
+  policy and that member's, never the other members'; a header opened with
+  no member named narrows after its summary read finds one. A route that
+  passes no proof of its own falls back to the context's route proof, so no
+  trace route can read an aggregate under the aggregate's policy alone.
+
+  What the text did not say, settled in code: who the viewer is (team role,
+  groups, owner) is still read on the shown project, the aggregate. An
+  organisation admin is on the aggregate's team, so a member's content under
+  a capturing policy is visible to them on the aggregate even where it is
+  hidden when they open that member directly, as a personal project is for
+  an admin who is not on its owner's team. Decision 9 promises the strictest
+  policy, not the strictest viewer; whether the viewer facts should also be
+  the least favourable across members is listed under open questions.
+
+  The audit is written at the door, in the permission middleware right after
+  the proof is minted, whenever the proof carries a shared grant and the
+  project is an aggregate; a deep link, a prefetch and a direct tRPC call are
+  audited like a rendered page. Core defines the `AggregateReadAudit` port;
+  the App takes the governance module's adapter and the test App the null
+  one. A per-process window keyed on actor and aggregate sits in front of
+  the database dedup, so a second read inside five minutes makes no database
+  call and one page's concurrent queries share one call; a failed record is
+  not remembered, so the next read retries, and a failure never fails the
+  read. The per-subject cached gate was not used because it caches a failed
+  read as a negative answer for its whole TTL. The window and the row read
+  one injectable clock. The row's target is the aggregate id with
+  `targetKind` `aggregate_project`, its metadata the kind and the aggregate's
+  name; it never names a member or a trace. There is no self-view
+  short-circuit for an aggregate. Across processes the database dedup is a
+  read then a write, so two pods may each write a row inside one window, as
+  for personal and team views today.
+
+  The write refusal is one guard in the permission middleware: a mutation
+  whose declared permission writes (any action but view) on a project-tier
+  resource is refused on an aggregate with `aggregate_project_is_read_only`
+  before its handler runs. Exempt by resource, never by router: the
+  organisation, project and team resources, so the rule edit, renaming and
+  archiving keep working. The exemption reaches fourteen mutations that name
+  a project, pinned in `aggregate-write-guard-exemptions.unit.test.ts`; they
+  include settings-shaped writes that ride `project:update` (retention jobs,
+  topic clustering, model providers, pinned traces, share revocation) and the
+  instant evaluation switch on `organization:manage`. Mutations declared
+  under a view permission (saved views, translation) and those authorised in
+  their service are not covered. Monitor create and copy on an aggregate now
+  answer the general read-only code at the door; the monitor route's own
+  refusal stays behind it and on the REST route.
