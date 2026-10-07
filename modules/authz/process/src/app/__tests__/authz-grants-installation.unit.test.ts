@@ -131,6 +131,7 @@ async function ledgerOf(role: "api" | "worker") {
 
 describe("given a background worker composing its own graph", () => {
   /** @scenario The worker mounts the grants ledger itself */
+  /** @scenario Every process installs AuthZ whole rather than a per-role slice */
   it("mounts the ledger without an AuthZ capability, as the pipeline the api process registers", async () => {
     const worker = await ledgerOf("worker");
     const application = await ledgerOf("api");

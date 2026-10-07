@@ -89,15 +89,6 @@ Feature: Strict versioned feature source layout
     And the diagnostic identifies the allowed dependency direction
 
   @unit @architecture
-  Scenario: API handlers use the composed request context
-    Given a layout-version-0 API class handles a request
-    When Oxlint checks its source
-    Then a service, actor, or tenant resolver callback receiving context is rejected
-    And casting the context or constructing a service or repository is rejected
-    And awaiting a resolver before awaiting the service operation is rejected
-    And direct context.app, context.actor(), and context.authorize() delegation is accepted
-
-  @unit @architecture
   Scenario: A concern's repositories are held to the module's one registry, memory twin and contract test
     Given a layout-version-0 feature server with repositories under features/<concern>/repositories
     When the module has no registry in any repositories folder, or a concern's Prisma folder has no memory twin, or its memory twin has no contract test

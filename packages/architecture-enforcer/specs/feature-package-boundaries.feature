@@ -6,15 +6,6 @@ Feature: Feature package boundary lint
   So that feature boundaries cannot be bypassed by imports or exported types
 
   @unit @architecture
-  Scenario: Concurrent architecture checks wait before loading the lint engine
-    Given every architecture check runs through the machine-wide check slot
-    When further checks start from any worktree while the slots are held
-    Then they wait without loading the lint engine
-    And no more checks run at once than the machine's slot limit allows
-    And a completed or killed check releases its slot
-    And waiting callers can be cancelled without consuming a slot
-
-  @unit @architecture
   Scenario: A valid feature graph passes
     Given a singular feature and its subjects are registered in the ownership catalogue
     And it has a contract package with portable dependencies

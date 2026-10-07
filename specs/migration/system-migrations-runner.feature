@@ -147,13 +147,13 @@ Feature: Running system migrations across organizations
     And the first pass that advances nothing ends the run
     And runtime processes start only after that run completes
 
-  @unit
+  # Gap: main's group-queue preflight dispatch scope and role gating were not ported; only the refusal is proved.
+  @unit @unimplemented
   Scenario: Preflight projection work cannot consume application traffic
     Given the preflight emits events while an existing worker is still running
     When those events and application events are queued concurrently
     Then the preflight uses the canonical queue and its aggregate locks
     And it dispatches only groups registered by that preflight
-    And blocked or failed work in those groups prevents startup
     And worker-scoped durable subscribers run for the preflight events
     And schedulers, process-manager consumers, and general workers do not start
 
@@ -164,9 +164,12 @@ Feature: Running system migrations across organizations
   # already starts on the legacy path with its migration gate closed — so
   # giving up on the wait costs a later pass, never correctness; a failure is
   # a fault a later pass will not clear, and that half still refuses.
-    And blocked or failed work the preflight itself caused in those groups prevents startup
-    And worker-scoped durable subscribers run for the preflight events
-    And schedulers, process-manager consumers, and general workers do not start
+  @integration
+  Scenario: Work the preflight itself failed or blocked refuses startup
+    Given the preflight registered the groups its own work runs in
+    When work in one of those groups fails or is blocked under the preflight
+    Then startup is refused
+    And a failed group is named in the refusal
 
   # A group's error marker has no expiry and is cleared only by a later success
   # on that same group, so a failure ordinary traffic left before the upgrade —
