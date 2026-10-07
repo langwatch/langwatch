@@ -11,6 +11,7 @@ import type { TraceAnalyticsFoldCacheRepository } from "../trace-analytics-fold-
 import { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
 import type { TraceSummaryFoldCacheRepository } from "../trace-summary-fold-cache.repository.ts";
 import type { TraceRepositories } from "../trace.repositories.ts";
+import { MemoryNullTraceAttributedRollupRepository } from "./memory.null-trace-attributed-rollup.repository.ts";
 import { MemoryNullTraceClusteringSampleRepository } from "./memory.null-trace-clustering-sample.repository.ts";
 import { MemoryNullTraceListRepository } from "./memory.null-trace-list.repository.ts";
 import { MemorySpanStorageRepository } from "./memory.span-storage.repository.ts";
@@ -125,6 +126,7 @@ export class MemoryTraceRepositories {
       usageCount: MemoryTraceUsageCountRepository.create(),
       modelSpend: MemoryTraceModelSpendRepository.create(),
       attributeSpend: MemoryTraceAttributeSpendRepository.create(),
+      attributedRollup: MemoryNullTraceAttributedRollupRepository.create(),
       spanDedup: MemoryTraceSpanDedupRepository.create(),
       exportSlots: MemoryTraceExportSlotRepository.create(),
       rateLimits: MemoryTraceRateLimitRepository.create(),

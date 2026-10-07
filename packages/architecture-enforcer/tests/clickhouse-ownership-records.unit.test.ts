@@ -198,7 +198,7 @@ describe("ClickHouse ownership records", () => {
         "automation_audit",
         "langy_messages",
       ]);
-      expect(DECLARED_OWNERSHIP.exceptions).toHaveLength(3);
+      expect(DECLARED_OWNERSHIP.exceptions).toHaveLength(5);
     });
   });
 });

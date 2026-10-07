@@ -40,14 +40,23 @@ import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { DiscoverResult, FacetValuesResult, TraceListPage } from "./trace-list-view.ts";
 import type { LogTraceContribution } from "./trace-log-contribution.ts";
 import type {
+  TraceAttributedRecency,
+  TraceAttributedSpendComparison,
+  TraceAttributedSpendSort,
   TraceAttributedTrace,
+  TraceAttributedTraceDetail,
+  TraceAttributedValueComparison,
+  TraceAttributedValueSpend,
   TraceAttributeMatch,
   TraceAttributeUsageBucket,
   TraceAttributeValueSpend,
+  TraceDailyGroupSpend,
   TraceDailySpend,
+  TraceDailySpendGroup,
   TraceModelRequests,
   TraceModelSpend,
   TraceModelSpendWindow,
+  TraceProjectValueSpend,
   TraceSpendSummary,
 } from "./trace-model-spend.ts";
 import type { CheckPreconditions } from "./trace-precondition.schemas.ts";
@@ -533,6 +542,70 @@ export interface TraceApi extends TraceOtlpIngestApi {
     model?: string;
     limit: number;
   }): Promise<TraceAttributedTrace[]>;
+  /** Current and previous window spend of the traces matching every attribute; distinct actors. */
+  getAttributedSpendComparison(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    actorKey: string;
+    previousStartMs: number;
+    currentStartMs: number;
+    endMs: number;
+  }): Promise<TraceAttributedSpendComparison>;
+  /** Spend per non-empty `valueKey` value of the matching traces, sorted and paged in the store. */
+  findAttributedSpendByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    window: TraceModelSpendWindow;
+    sortBy: TraceAttributedSpendSort;
+    sortDirection: "asc" | "desc";
+    limit: number;
+    offset: number;
+  }): Promise<TraceAttributedValueSpend[]>;
+  /** Per non-empty `valueKey` value, spend split at `currentStartMs`; unsorted. */
+  findAttributedSpendComparisonByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    previousStartMs: number;
+    currentStartMs: number;
+    endMs: number;
+  }): Promise<TraceAttributedValueComparison[]>;
+  /** Spend per (project, `valueKey` value) across one organisation's projects; unsorted. */
+  findSpendByProjectAndValue(input: {
+    projectIds: readonly string[];
+    valueKey: string;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceProjectValueSpend[]>;
+  /** Spend of the matching traces per UTC day and group value, oldest day first. */
+  findDailyAttributedSpend(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    groupBy: TraceDailySpendGroup;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceDailyGroupSpend[]>;
+  /** Matching traces since `sinceMs`, counted per `valueKey` value among `values`. */
+  countAttributedTracesByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    values: readonly string[];
+    sinceMs: number;
+  }): Promise<{ value: string; count: number }[]>;
+  /** The newest matching traces before `beforeMs`, at most `limit`, with the asked attributes. */
+  findAttributedTracesBefore(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    attributeKeys: readonly string[];
+    beforeMs: number;
+    limit: number;
+  }): Promise<TraceAttributedTraceDetail[]>;
+  /** Matching trace counts since each of `countSinceMs`, and their newest occurrence ever. */
+  getAttributedTraceRecency(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    countSinceMs: readonly number[];
+  }): Promise<TraceAttributedRecency>;
   readRecentSpansByModels(input: {
     projectId: string;
     models: string[];

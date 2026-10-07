@@ -138,8 +138,17 @@ import {
   type LangWatchQLTraceFilter,
   type ResolvedInstantEvalRun,
   type TraceDateField,
+  type TraceAttributedRecency,
+  type TraceAttributedSpendComparison,
+  type TraceAttributedSpendSort,
   type TraceAttributedTrace,
+  type TraceAttributedTraceDetail,
+  type TraceAttributedValueComparison,
+  type TraceAttributedValueSpend,
   type TraceAttributeMatch,
+  type TraceDailyGroupSpend,
+  type TraceDailySpendGroup,
+  type TraceProjectValueSpend,
   type TraceAttributeUsageBucket,
   type TraceAttributeValueSpend,
   type TraceDailySpend,
@@ -233,6 +242,7 @@ import {
   type TraceQueryFieldValuesResult,
 } from "../repositories/query-field-values.repository.ts";
 import type { TraceAttributeSpendRepository } from "../repositories/trace-attribute-spend.repository.ts";
+import type { TraceAttributedRollupRepository } from "../repositories/trace-attributed-rollup.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
 import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "../repositories/trace-payload-reader.repository.ts";
@@ -932,6 +942,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
     app.#modelSpend = setup.repositories.modelSpend;
     app.#attributeSpend = setup.repositories.attributeSpend;
+    app.#attributedRollup = setup.repositories.attributedRollup;
     app.#usageCount = setup.repositories.usageCount;
     app.#preconditionSamples = TracePreconditionSampleService.create({
       traces: app,
@@ -1194,6 +1205,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   #usageCounts: TraceUsageCountService | null = null;
   #modelSpend: TraceModelSpendRepository | null = null;
   #attributeSpend: TraceAttributeSpendRepository | null = null;
+  #attributedRollup: TraceAttributedRollupRepository | null = null;
   #usageCount: TraceUsageCountRepository | null = null;
   #preconditionSamples: TracePreconditionSampleService | null = null;
 
@@ -2916,6 +2928,122 @@ export class TraceModule implements TraceApi, CollectorApp {
   }): Promise<TraceAttributedTrace[]> {
     const { projectId, ...query } = input;
     return this.#attributeSpendRead().findAttributedTraces({ tenantId: projectId, ...query });
+  }
+
+  getAttributedSpendComparison(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    actorKey: string;
+    previousStartMs: number;
+    currentStartMs: number;
+    endMs: number;
+  }): Promise<TraceAttributedSpendComparison> {
+    const { projectId, ...query } = input;
+    return this.#attributedRollupRead().getAttributedSpendComparison({
+      tenantId: projectId,
+      ...query,
+    });
+  }
+
+  findAttributedSpendByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    window: TraceModelSpendWindow;
+    sortBy: TraceAttributedSpendSort;
+    sortDirection: "asc" | "desc";
+    limit: number;
+    offset: number;
+  }): Promise<TraceAttributedValueSpend[]> {
+    const { projectId, ...query } = input;
+    return this.#attributedRollupRead().findAttributedSpendByValue({
+      tenantId: projectId,
+      ...query,
+    });
+  }
+
+  findAttributedSpendComparisonByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    previousStartMs: number;
+    currentStartMs: number;
+    endMs: number;
+  }): Promise<TraceAttributedValueComparison[]> {
+    const { projectId, ...query } = input;
+    return this.#attributedRollupRead().findAttributedSpendComparisonByValue({
+      tenantId: projectId,
+      ...query,
+    });
+  }
+
+  findSpendByProjectAndValue(input: {
+    projectIds: readonly string[];
+    valueKey: string;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceProjectValueSpend[]> {
+    const { projectIds, ...query } = input;
+    return this.#attributedRollupRead().findSpendByProjectAndValue({
+      tenantIds: projectIds,
+      ...query,
+    });
+  }
+
+  findDailyAttributedSpend(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    groupBy: TraceDailySpendGroup;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceDailyGroupSpend[]> {
+    const { projectId, ...query } = input;
+    return this.#attributedRollupRead().findDailyAttributedSpend({ tenantId: projectId, ...query });
+  }
+
+  countAttributedTracesByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    values: readonly string[];
+    sinceMs: number;
+  }): Promise<{ value: string; count: number }[]> {
+    const { projectId, ...query } = input;
+    return this.#attributedRollupRead().countAttributedTracesByValue({
+      tenantId: projectId,
+      ...query,
+    });
+  }
+
+  findAttributedTracesBefore(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    attributeKeys: readonly string[];
+    beforeMs: number;
+    limit: number;
+  }): Promise<TraceAttributedTraceDetail[]> {
+    const { projectId, ...query } = input;
+    return this.#attributedRollupRead().findAttributedTracesBefore({
+      tenantId: projectId,
+      ...query,
+    });
+  }
+
+  getAttributedTraceRecency(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    countSinceMs: readonly number[];
+  }): Promise<TraceAttributedRecency> {
+    const { projectId, ...query } = input;
+    return this.#attributedRollupRead().getAttributedTraceRecency({
+      tenantId: projectId,
+      ...query,
+    });
+  }
+
+  #attributedRollupRead(): TraceAttributedRollupRepository {
+    if (!this.#attributedRollup) {
+      throw new TraceCapabilityUnavailableError("this process", "the attributed trace rollup read");
+    }
+    return this.#attributedRollup;
   }
 
   #attributeSpendRead(): TraceAttributeSpendRepository {
