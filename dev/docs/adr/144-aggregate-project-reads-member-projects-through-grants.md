@@ -388,7 +388,13 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   pull request reusing this grant? Owner: the seat's author.
 - Which trace routes outside `tracesV2` (REST, share links, exports) take
   the proof in v1 and which keep their hand-written tenant behind the lint
-  baseline. Owner: this decision's author, settled in block F.
+  baseline. Settled in block F (v4.5): every trace read carries a proof;
+  REST and share links mint an own-only internal one, and the reads still
+  handing a tenant by hand are named in the gate's counted baseline.
+- Whether to admit `TimeUnixMs` (log records) and `BucketStart` (the
+  analytics rollup) as time columns the client may window on. Until then
+  an aggregate's logs and analytics read the aggregate's own tenant and
+  show nothing. Owner: product and platform, for the next block.
 
 ## Revisions
 
@@ -507,3 +513,34 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   personal project remains a member. Role bindings attached in the same
   second as a revoke share the latent id collision; block E does not
   reach that path and it is left for block F.
+- v4.5 (2026-10-07, implementation note after block F, no decision
+  changed). The detail read "uses the proof, not the shown project id, to
+  pick its tenants" by narrowing it: `narrowAuthorization` in
+  `@langwatch/actor` returns the same sealed proof fenced to one project
+  its grants name, never widened and never moved sideways, and the store
+  client honours it while still sending the read through the own
+  project's client. The summary read returns the tenant it read; every
+  per-trace route narrows its proof to the member the caller names (the
+  list row and the header carry it as `projectId`, the drawer hands it
+  back as `tenantId`) or, with none named, to the member the summary read
+  finds, so one drawer reads one member even when two hold the same trace
+  id. A named member outside the proof is answered as not found. Data a
+  fence cannot reach is read only for a member the fenced read already
+  returned: offloaded span bodies resolve under that member, coding-agent
+  session counters under the session's member. List rows carry their
+  owning project and their own evaluations, matched by tenant and trace;
+  sessions group by tenant and conversation; a filter's trace selection
+  returns (tenant, trace) pairs. The three evaluation-run reads go through
+  the proof, the fold store and the settle confirm with an own-only
+  internal one. The lint gate refuses any call from a trace router into a
+  proof-taking service whose own arguments carry no proof, positional or
+  named; log records and coding-agent sessions stay behind a counted
+  baseline. An aggregate is never the project the app lands on. Not
+  delivered: analytics across members, because every analytics read goes
+  through a raw client over three tables and the rollup windows on
+  `BucketStart`, a time column the client does not admit; the scenario
+  stays unbound until that decision is taken. Role-binding attaches keep
+  their caller-minted ids: the only content-derived ones are the
+  migration's and the legacy key mint's, and stepping a legacy key's id
+  past a revoked row would re-mint a revoked credential, so the block E
+  rule does not carry over.
