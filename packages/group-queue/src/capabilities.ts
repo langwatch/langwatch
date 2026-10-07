@@ -224,6 +224,16 @@ export class RunningGroupQueueConsumer<
     this.#processor.setConcurrency(value);
   }
 
+  /** Claims no new job; jobs already claimed run to completion. Idempotent. */
+  pause(): void {
+    this.#processor.pause();
+  }
+
+  /** Claims again after `pause`. Idempotent. */
+  resume(): void {
+    this.#processor.resume();
+  }
+
   async close(): Promise<void> {
     try {
       await this.#processor.close();

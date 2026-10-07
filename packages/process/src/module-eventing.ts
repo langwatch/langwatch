@@ -336,10 +336,26 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
     ...(typeof host.notifyOutbox === "function"
       ? { notifyOutbox: host.notifyOutbox.bind(candidate) }
       : {}),
+    ...consumerControls(host, candidate),
+  };
+}
+
+/** The consumer start and pause pairs a host offers, each copied only whole. */
+function consumerControls(
+  host: Partial<EventingHost>,
+  candidate: object,
+): Pick<EventingHost, "holdConsumers" | "startConsumers" | "pauseConsumers" | "resumeConsumers"> {
+  return {
     ...(typeof host.holdConsumers === "function" && typeof host.startConsumers === "function"
       ? {
           holdConsumers: host.holdConsumers.bind(candidate),
           startConsumers: host.startConsumers.bind(candidate),
+        }
+      : {}),
+    ...(typeof host.pauseConsumers === "function" && typeof host.resumeConsumers === "function"
+      ? {
+          pauseConsumers: host.pauseConsumers.bind(candidate),
+          resumeConsumers: host.resumeConsumers.bind(candidate),
         }
       : {}),
   };

@@ -141,6 +141,7 @@ export class EventSourcing {
   >();
   private _initialized = false;
   private _consumersHeld = false;
+  private _consumersPaused = false;
   private _loggedDisabledWarning = false;
 
   // Options
@@ -236,6 +237,7 @@ export class EventSourcing {
         consumersEnabled: this._consumersEnabled,
         held: this._consumersHeld,
       });
+      if (this._consumersPaused) this._processRuntimeInstance.pause();
     }
     return this._processRuntimeInstance;
   }
@@ -254,7 +256,22 @@ export class EventSourcing {
     if (!this._consumersHeld) return;
     this._consumersHeld = false;
     this._globalQueue?.start?.();
+    if (this._consumersPaused) this._globalQueue?.pause?.();
     this._processRuntimeInstance?.start();
+  }
+
+  /** Takes no new job, intent or wake; work already claimed finishes. Idempotent. */
+  pauseConsumers(): void {
+    this._consumersPaused = true;
+    this._globalQueue?.pause?.();
+    this._processRuntimeInstance?.pause();
+  }
+
+  /** Takes jobs, intents and wakes again after `pauseConsumers`. Idempotent. */
+  resumeConsumers(): void {
+    this._consumersPaused = false;
+    this._globalQueue?.resume?.();
+    this._processRuntimeInstance?.resume();
   }
 
   /** The process managers this runtime registered producer-only and will not run. */
@@ -882,6 +899,7 @@ export class EventSourcing {
       ? this._queueFactory(definition)
       : new EventSourcedQueueProcessorMemory(definition);
     if (!this._consumersHeld) this._globalQueue.start?.();
+    if (this._consumersPaused) this._globalQueue.pause?.();
   }
 
   private globalQueueGroupKey(payload: Record<string, unknown>): string {

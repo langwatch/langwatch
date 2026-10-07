@@ -2689,6 +2689,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     this.processingQueue.concurrency = n;
   }
 
+  /** Stops claiming jobs; claimed ones run to completion. Idempotent; a producer ignores it. */
+  pause(): void {
+    this.dispatcher?.pause();
+  }
+
+  /** Claims again after `pause`, starting with the backlog staged meanwhile. Idempotent. */
+  resume(): void {
+    this.dispatcher?.resume();
+  }
+
   async waitUntilReady(): Promise<void> {
     const bc = this.blockingConnection;
     // The shared connection's readiness is owned by whoever created it.

@@ -97,6 +97,8 @@ export function createEventingGroupQueueFactory({
       start() {
         if (consumersEnabled) consumer ??= startConsuming();
       },
+      pause: () => consumer?.pause(),
+      resume: () => consumer?.resume(),
       async waitUntilReady() {
         await Promise.all([producer.waitUntilReady(), consumer?.waitUntilReady()]);
       },
