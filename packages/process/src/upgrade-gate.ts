@@ -28,6 +28,14 @@ export type UpgradeGate = Readonly<{
   backgroundSteps?: UpgradeGateBackgroundSteps;
 }>;
 
+/** What an operator reads on the gate's lines: the phase, what it waits on, what to do next. */
+const GATE_PHASE = "upgrade-gate";
+const LEDGER = "the upgrade ledger (DATABASE_URL)";
+const PRESENCE_WAIT = "a presence write to the upgrade ledger (DATABASE_URL)";
+const LEDGER_UNREADABLE_NEXT =
+  "check DATABASE_URL reaches Postgres and `pnpm task upgrade status` answers, then start this process again";
+const REFUSED_NEXT = "do what the refusal names, then start this process again";
+
 /** How often an admitted gate is asked whether it still serves. */
 export const UPGRADE_GATE_SERVING_POLL_MS = 1_000;
 
@@ -82,23 +90,47 @@ export function upgradeGateComponent({
   let admitted = false;
   let poll: ReturnType<typeof setInterval> | undefined;
   const watch = servingWatcher({ server, role, gate, logger, onServingChange });
-  const refuse = (refusal: string): never => {
-    const error = new UpgradeGateRefusedError({ server, role, refusal });
-    logger.error({ role, code: error.code }, error.message);
+  const refuse = (refusal: string, next: string): never => {
+    const error = new UpgradeGateRefusedError({ server, role, refusal: redactUrls(refusal) });
+    logger.error(
+      { role, code: error.code, phase: GATE_PHASE, waitingOn: "nothing", next },
+      error.message,
+    );
     throw error;
   };
   return {
     name: `${server} upgrade gate`,
     start: async () => {
+      const startedAt = performance.now();
+      logger.info(
+        {
+          role,
+          phase: GATE_PHASE,
+          waitingOn: LEDGER,
+          next: "nothing to do: the check takes a moment",
+        },
+        `${server} (${role}): checking the upgrade ledger before serving`,
+      );
       let verdict: UpgradeGateVerdict;
       try {
         verdict = await gate.admit();
       } catch (error) {
-        return refuse(`the upgrade ledger could not be read: ${messageOf(error)}`);
+        const cause = `the upgrade ledger could not be read (DATABASE_URL): ${messageOf(error)}`;
+        return refuse(cause, LEDGER_UNREADABLE_NEXT);
       }
-      if (!verdict.admitted) return refuse(verdict.refusal);
+      if (!verdict.admitted) return refuse(verdict.refusal, REFUSED_NEXT);
       admitted = true;
-      logger.info({ role }, `${server}: the installation is current for this image`);
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      logger.info(
+        {
+          role,
+          phase: GATE_PHASE,
+          waitingOn: "nothing",
+          elapsedMs,
+          next: "nothing to do: it serves",
+        },
+        `${server} (${role}): the installation is current for this image; serving (checked in ${elapsedMs} ms)`,
+      );
       if (gate.serving) {
         poll = setInterval(watch, pollEveryMs);
         poll.unref?.();
@@ -131,12 +163,26 @@ function servingWatcher({
   onServingChange?: (serving: boolean) => void | Promise<void>;
 }): () => void {
   let serving = true;
+  let stoppedAt = 0;
   return () => {
     const now = gate.serving?.() ?? true;
     if (now === serving) return;
     serving = now;
-    if (now) logger.info({ role }, `${server} (${role}) serves again: its presence was written`);
-    else logger.error({ role }, `${server} (${role}) stopped serving: its upgrade presence lapsed`);
+    const phase = "presence";
+    if (now) {
+      const stoppedForMs = Math.round(performance.now() - stoppedAt);
+      logger.info(
+        { role, phase, waitingOn: "nothing", stoppedForMs, next: "nothing to do: it serves" },
+        `${server} (${role}) serves again: its presence was written after ${stoppedForMs} ms`,
+      );
+    } else {
+      stoppedAt = performance.now();
+      logger.error(
+        { role, phase, waitingOn: PRESENCE_WAIT, next: LEDGER_UNREADABLE_NEXT },
+        `${server} (${role}) stopped serving: its upgrade presence lapsed; readiness answers 503 ` +
+          "until a presence write succeeds",
+      );
+    }
     void Promise.resolve(onServingChange?.(now)).catch((error: unknown) =>
       logger.error({ role, error }, `${server}: a serving change was not applied`),
     );
@@ -144,5 +190,10 @@ function servingWatcher({
 }
 
 function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return redactUrls(error instanceof Error ? error.message : String(error));
+}
+
+/** A connection URL's password never reaches a log line. */
+function redactUrls(text: string): string {
+  return text.replace(/([a-z][a-z0-9+.-]*:\/\/[^\s:/@]*):[^\s@/]*@/gi, "$1:***@");
 }
