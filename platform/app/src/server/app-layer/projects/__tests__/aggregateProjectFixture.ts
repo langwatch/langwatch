@@ -13,8 +13,17 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { NullLwqlKeyMapRepository } from "~/server/analytics/lwql/lwqlKeyMap.repository";
+import { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
+import { AggregateReconciler } from "~/server/app-layer/projects/aggregate-reconciler.service";
+import { AggregateRuleService } from "~/server/app-layer/projects/aggregate-rule.service";
+import { ProjectService } from "~/server/app-layer/projects/project.service";
+import { PrismaAggregateReconcileLock } from "~/server/app-layer/projects/repositories/aggregate-reconcile-lock.prisma.repository";
+import { PrismaAggregateRuleRepository } from "~/server/app-layer/projects/repositories/aggregate-rule.prisma.repository";
+import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
+import { PrismaScheduledJobRepository } from "~/server/app-layer/scheduler/scheduled-job.repository";
 import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
@@ -30,6 +39,30 @@ export function realOrganizationService(prisma: PrismaClient) {
       /* not exercised */
     },
   } as unknown as PromptTagRepository);
+}
+
+/**
+ * The project service with the real aggregate machinery: the rule service
+ * and the reconciler over the grants ledger, so creating an aggregate or
+ * editing its rule attaches and revokes real grants.
+ */
+export function realAggregateProjectService(prisma: PrismaClient) {
+  const ruleRepository = new PrismaAggregateRuleRepository(prisma);
+  const rules = new AggregateRuleService(ruleRepository);
+  return new ProjectService(
+    new PrismaProjectRepository(prisma),
+    new NullLwqlKeyMapRepository(),
+    {
+      rules,
+      reconciler: new AggregateReconciler({
+        aggregates: ruleRepository,
+        lock: new PrismaAggregateReconcileLock(prisma),
+        rules,
+        ledger: () => new GrantsLedgerWriter(prisma),
+        schedule: new PrismaScheduledJobRepository(prisma),
+      }),
+    },
+  );
 }
 
 export type AggregateFixture = Awaited<

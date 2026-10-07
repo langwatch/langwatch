@@ -8,12 +8,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { HandledError } from "@langwatch/handled-error";
 import { nanoid } from "nanoid";
-import { NullLwqlKeyMapRepository } from "~/server/analytics/lwql/lwqlKeyMap.repository";
 import { globalForApp } from "~/server/app-layer/app";
-import {
-  GrantsLedgerWriter,
-  resetAuthzGrantsCommandsForTests,
-} from "~/server/app-layer/authz/ledger";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { AuthorizedClickHouse } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import { TraceEvaluationsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
@@ -21,14 +17,10 @@ import {
   createTestApp,
   type TestAppOverrides,
 } from "~/server/app-layer/presets";
-import { realOrganizationService } from "~/server/app-layer/projects/__tests__/aggregateProjectFixture";
-import { AggregateReconciler } from "~/server/app-layer/projects/aggregate-reconciler.service";
-import { AggregateRuleService } from "~/server/app-layer/projects/aggregate-rule.service";
-import { ProjectService } from "~/server/app-layer/projects/project.service";
-import { PrismaAggregateReconcileLock } from "~/server/app-layer/projects/repositories/aggregate-reconcile-lock.prisma.repository";
-import { PrismaAggregateRuleRepository } from "~/server/app-layer/projects/repositories/aggregate-rule.prisma.repository";
-import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
-import { PrismaScheduledJobRepository } from "~/server/app-layer/scheduler/scheduled-job.repository";
+import {
+  realAggregateProjectService,
+  realOrganizationService,
+} from "~/server/app-layer/projects/__tests__/aggregateProjectFixture";
 import { NullTopicRepository } from "~/server/app-layer/topic-clustering/repositories/null-topic.repository";
 import { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
@@ -57,27 +49,12 @@ export function installAggregateTraceApp({
   const evaluationRuns = new EvaluationRunService(
     evaluationRunRepositoryFor({ resolveClient }),
   );
-  const ruleRepository = new PrismaAggregateRuleRepository(prisma);
-  const rules = new AggregateRuleService(ruleRepository);
 
   resetAuthzGrantsCommandsForTests();
   const defaults = createTestApp();
   globalForApp.__langwatch_app = createTestApp({
     organizations: realOrganizationService(prisma),
-    projects: new ProjectService(
-      new PrismaProjectRepository(prisma),
-      new NullLwqlKeyMapRepository(),
-      {
-        rules,
-        reconciler: new AggregateReconciler({
-          aggregates: ruleRepository,
-          lock: new PrismaAggregateReconcileLock(prisma),
-          rules,
-          ledger: () => new GrantsLedgerWriter(prisma),
-          schedule: new PrismaScheduledJobRepository(prisma),
-        }),
-      },
-    ),
+    projects: realAggregateProjectService(prisma),
     _eventSourcing: createAuthzTestEventSourcing(prisma),
     traces: {
       ...defaults.traces,
