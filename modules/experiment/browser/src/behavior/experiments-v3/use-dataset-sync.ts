@@ -1,5 +1,5 @@
-import type { UiDatasetRecordSyncProps } from "@langwatch/browser-host/declarations";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import type { DatasetRecordSyncProps } from "@langwatch/dataset-client";
 import { useCallback } from "react";
 
 import type { AutosaveState } from "../../model/dataset/dataset-table-context.tsx";
@@ -10,7 +10,7 @@ import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
  * What dataset's lent record sync needs from the workbench store: full records
  * resolved out of the store's dataset state, and status into its autosave indicator.
  */
-export const useDatasetSyncProps = (): UiDatasetRecordSyncProps => {
+export const useDatasetSyncProps = (): DatasetRecordSyncProps => {
   const { project } = useOrganizationTeamProject();
 
   const { datasets, pendingSavedChanges, clearPendingChange, setAutosaveStatus } =

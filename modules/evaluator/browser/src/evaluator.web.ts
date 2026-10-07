@@ -5,7 +5,8 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { EvaluatorSettingsFormToken, evaluatorTrpc } from "@langwatch/evaluator-contract";
+import { EvaluatorSettingsFormToken } from "@langwatch/evaluator-client";
+import { evaluatorTrpc } from "@langwatch/evaluator-contract";
 
 import { evaluatorApi } from "./behavior/evaluator-api.ts";
 

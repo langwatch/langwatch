@@ -102,7 +102,7 @@ export type UiProjectDepartmentFieldProps = {
 /** A dataset column as a dataset surface names it: its name and its type's name. */
 export type UiDatasetColumn = DatasetColumn;
 
-/** What a screen hands dataset's lent create-or-edit drawer. */
+/** What trace hands dataset's create-or-edit drawer by name, until it opens the client token. */
 export type UiAddOrEditDatasetDrawerProps = {
   datasetToSave?: {
     datasetId?: string;
@@ -124,48 +124,6 @@ export type UiAddOrEditDatasetDrawerProps = {
     onToggleVisibility: (columnName: string) => void;
   };
   isColumnsLocked?: boolean;
-};
-
-/** A dataset a borrower holds in memory, with plain columns, as dataset's lent editor reads it. */
-export type UiInMemoryDataset = {
-  datasetId?: string;
-  name?: string;
-  datasetRecords: ({ id: string } & Record<string, unknown>)[];
-  columnTypes: UiDatasetColumn[];
-};
-
-/** What a screen hands dataset's lent editor table: a saved dataset by id, or one in memory. */
-export type UiDatasetEditorTableProps = {
-  datasetId?: string;
-  inMemoryDataset?: UiInMemoryDataset;
-  onUpdateDataset?: (dataset: UiInMemoryDataset & { datasetId?: string }) => void;
-  title?: ReactNode;
-  headerActions?: ReactNode;
-  readEnabled?: boolean;
-  floatingSelectionBar?: boolean;
-  /** Called after column changes are saved, so the host can follow the new shape. */
-  onColumnsChanged?: (columnTypes: UiDatasetColumn[]) => void;
-  /** The dialog's portal target, so the floating cell editor stays inside its pointer scope. */
-  editorPortalRef?: { readonly current: HTMLDivElement | null };
-};
-
-/** What a screen hands dataset's lent record sync, which renders nothing and saves edits. */
-/** What a screen hands dataset's lent picker list: whether to fetch yet, and where a pick goes. */
-export type UiDatasetPickerListProps = {
-  enabled?: boolean;
-  onSelect: (dataset: { datasetId: string; name: string; columnTypes: UiDatasetColumn[] }) => void;
-};
-
-export type UiDatasetRecordSyncProps = {
-  projectId: string | undefined;
-  /** dbDatasetId -> recordId -> changed columns; `_delete: true` marks a deletion. */
-  pendingSavedChanges: Record<string, Record<string, Record<string, unknown>>>;
-  resolveFullRecord: (
-    dbDatasetId: string,
-    recordId: string,
-  ) => ({ id: string } & Record<string, unknown>) | undefined;
-  clearPendingChange: (dbDatasetId: string, recordId: string) => void;
-  onStatus: (state: "idle" | "saving" | "saved" | "error", error?: string) => void;
 };
 
 /**
@@ -334,15 +292,6 @@ export type UiStudioEvaluatorEditorProps = {
     initialMappings: Record<string, FieldMapping>;
     onMappingChange: (identifier: string, mapping: FieldMapping | undefined) => void;
   };
-};
-
-/** What the studio hands evaluator's settings form for an inline evaluator node. */
-export type UiEvaluatorSettingsFormProps = {
-  evaluatorType: string;
-  initialSettings: Record<string, unknown>;
-  /** Fill in the evaluator's default settings on first render. */
-  applyDefaults: boolean;
-  onChange: (settings: Record<string, unknown>) => void;
 };
 
 /** One declared prompt input or output, as the prompt editor reports it. */
@@ -522,7 +471,6 @@ export type UiFirstTouchAttribution = {
 };
 
 export type UiDeclaredCapabilities = {
-  addOrEditDatasetDrawer: UiDeclaredComponent<UiAddOrEditDatasetDrawerProps>;
   agentActionsMenu: UiDeclaredComponent<UiAgentActionsMenuProps>;
   /** A card on the Authentication overview; `section` places it, sign-in first. */
   authenticationOverviewCard: UiDeclaredComponent<UiAuthenticationOverviewCardProps> & {
@@ -532,9 +480,6 @@ export type UiDeclaredCapabilities = {
   /** The directory's status band, drawn above the Directory's tabs; scim lends it. */
   directorySummary: UiDeclaredComponent<UiDirectorySummaryProps>;
   customGraph: UiDeclaredComponent<UiCustomGraphProps>;
-  datasetEditorTable: UiDeclaredComponent<UiDatasetEditorTableProps>;
-  datasetPickerList: UiDeclaredComponent<UiDatasetPickerListProps>;
-  datasetRecordSync: UiDeclaredComponent<UiDatasetRecordSyncProps>;
   guidedOnboarding: UiLangyGuidedOnboarding;
   guidedOnboardingOffer: UiDeclaredComponent<UiGuidedOnboardingOfferProps>;
   guidedPathActive: UiGuidedPathActive;
@@ -545,7 +490,6 @@ export type UiDeclaredCapabilities = {
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
   comparisonConfigForm: UiDeclaredComponent<UiComparisonConfigFormProps>;
   evaluatorTracesMapping: UiDeclaredComponent<UiEvaluatorTracesMappingProps>;
-  evaluatorSettingsForm: UiDeclaredComponent<UiEvaluatorSettingsFormProps>;
   filterSidebar: UiDeclaredComponent<UiFilterSidebarProps>;
   firstTouchAttribution: UiFirstTouchAttribution;
   httpConfigEditor: UiDeclaredComponent<UiHttpConfigEditorProps>;

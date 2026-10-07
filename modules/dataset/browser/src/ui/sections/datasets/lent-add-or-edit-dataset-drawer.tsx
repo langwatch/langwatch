@@ -1,6 +1,6 @@
 /** Dataset's create-or-edit drawer, lent to other modules (ARCHITECTURE.md §3.4, rule 7). */
 
-import type { UiAddOrEditDatasetDrawerProps } from "@langwatch/browser-host/declarations";
+import type { AddOrEditDatasetDrawerProps } from "@langwatch/dataset-client";
 import { datasetColumnsSchema } from "@langwatch/dataset-contract";
 
 import { AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer.tsx";
@@ -9,7 +9,7 @@ import { AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer.tsx";
 export function LentAddOrEditDatasetDrawer({
   datasetToSave,
   ...props
-}: UiAddOrEditDatasetDrawerProps) {
+}: AddOrEditDatasetDrawerProps) {
   return (
     <AddOrEditDatasetDrawer
       {...props}

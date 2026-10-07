@@ -1,5 +1,4 @@
 export * from "./dataset.ts";
-export * from "./dataset-lent-components.ts";
 export * from "./dataset.responses.ts";
 export * from "./dataset-file.ts";
 export * from "./dataset-attachment-policy.ts";

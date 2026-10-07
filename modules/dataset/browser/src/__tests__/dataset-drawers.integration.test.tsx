@@ -26,7 +26,8 @@ vi.mock("../behavior/dataset-api.ts", () => ({
     useUtils: () => ({ dataset: { getAll: { invalidate: () => void 0 } } }),
   },
 }));
-vi.mock("@langwatch/dataset-client", () => ({
+vi.mock("@langwatch/dataset-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   datasetClient: {
     useUtils: () => ({ dataset: { getAll: { invalidate: () => void 0 } } }),
     dataset: {

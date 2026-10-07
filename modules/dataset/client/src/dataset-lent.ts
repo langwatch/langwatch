@@ -1,8 +1,8 @@
-/** Dataset UI lent by token to the modules that pick, create and sync datasets (§10, §10.1). */
+/** Dataset UI lent by token to the modules that pick, create, edit and sync datasets (§10.1). */
 
+import type { DatasetColumn, DatasetColumns } from "@langwatch/dataset-contract";
 import { uiTokens } from "@langwatch/module";
-
-import type { DatasetColumn, DatasetColumns } from "./dataset.ts";
+import type { ReactNode } from "react";
 
 /** What a screen hands dataset's lent create-or-edit drawer. */
 export type AddOrEditDatasetDrawerProps = {
@@ -43,14 +43,28 @@ export type DatasetRecordSyncProps = {
   onStatus: (state: "idle" | "saving" | "saved" | "error", error?: string) => void;
 };
 
-export const AddOrEditDatasetDrawerToken =
-  uiTokens("dataset").component<AddOrEditDatasetDrawerProps>("addOrEditDatasetDrawer");
-export const DatasetPickerListToken =
-  uiTokens("dataset").component<DatasetPickerListProps>("datasetPickerList");
-export const DatasetRecordSyncToken =
-  uiTokens("dataset").component<DatasetRecordSyncProps>("datasetRecordSync");
+/** A dataset a borrower holds in memory, with plain columns, as dataset's lent editor reads it. */
+export type DatasetEditorTableDataset = {
+  datasetId?: string;
+  name?: string;
+  datasetRecords: ({ id: string } & Record<string, unknown>)[];
+  columnTypes: DatasetColumn[];
+};
 
-/** Dataset's drawers another module opens, by token (ARCHITECTURE.md §10.1). */
+/** What a screen hands dataset's lent editor table: a saved dataset by id, or one in memory. */
+export type DatasetEditorTableProps = {
+  datasetId?: string;
+  inMemoryDataset?: DatasetEditorTableDataset;
+  onUpdateDataset?: (dataset: DatasetEditorTableDataset & { datasetId?: string }) => void;
+  title?: ReactNode;
+  headerActions?: ReactNode;
+  readEnabled?: boolean;
+  floatingSelectionBar?: boolean;
+  /** Called after column changes are saved, so the host can follow the new shape. */
+  onColumnsChanged?: (columnTypes: DatasetColumn[]) => void;
+  /** The dialog's portal target, so the floating cell editor stays inside its pointer scope. */
+  editorPortalRef?: { readonly current: HTMLDivElement | null };
+};
 
 /** What a caller hands dataset's picker drawer: where the picked dataset goes. */
 export type UiSelectDatasetDrawerProps = {
@@ -67,7 +81,17 @@ export type UiUploadCsvDrawerProps = {
   enableDirectUpload?: boolean;
 };
 
-const drawers = uiTokens("dataset");
+const tokens = uiTokens("dataset");
 
-export const SelectDatasetDrawerToken = drawers.drawer<UiSelectDatasetDrawerProps>("selectDataset");
-export const UploadCsvDrawerToken = drawers.drawer<UiUploadCsvDrawerProps>("uploadCSV");
+export const AddOrEditDatasetDrawerToken =
+  tokens.component<AddOrEditDatasetDrawerProps>("addOrEditDatasetDrawer");
+export const DatasetPickerListToken = tokens.component<DatasetPickerListProps>("datasetPickerList");
+export const DatasetRecordSyncToken = tokens.component<DatasetRecordSyncProps>("datasetRecordSync");
+export const DatasetEditorTableToken =
+  tokens.component<DatasetEditorTableProps>("datasetEditorTable");
+
+/** Dataset's drawers another module opens, by token. */
+export const AddOrEditDatasetRoutedDrawerToken =
+  tokens.drawer<AddOrEditDatasetDrawerProps>("addOrEditDataset");
+export const SelectDatasetDrawerToken = tokens.drawer<UiSelectDatasetDrawerProps>("selectDataset");
+export const UploadCsvDrawerToken = tokens.drawer<UiUploadCsvDrawerProps>("uploadCSV");

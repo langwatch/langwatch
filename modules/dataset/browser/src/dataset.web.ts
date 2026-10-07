@@ -6,11 +6,13 @@
 import { defineBrowserModule } from "@langwatch/browser";
 import {
   AddOrEditDatasetDrawerToken,
+  AddOrEditDatasetRoutedDrawerToken,
+  DatasetEditorTableToken,
   DatasetPickerListToken,
   DatasetRecordSyncToken,
   SelectDatasetDrawerToken,
   UploadCsvDrawerToken,
-} from "@langwatch/dataset-contract";
+} from "@langwatch/dataset-client";
 
 export const datasetWeb = defineBrowserModule("dataset")
   .withHosts({
@@ -31,13 +33,11 @@ export const datasetWeb = defineBrowserModule("dataset")
       load: () => import("./ui/sections/dataset-editor.screen.tsx"),
     },
   })
-  .withDrawers({
-    addOrEditDataset: {
-      load: async () => ({
-        default: (await import("./ui/sections/datasets/lent-add-or-edit-dataset-drawer.tsx"))
-          .LentAddOrEditDatasetDrawer,
-      }),
-    },
+  .drawer(AddOrEditDatasetRoutedDrawerToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/datasets/lent-add-or-edit-dataset-drawer.tsx"))
+        .LentAddOrEditDatasetDrawer,
+    }),
   })
   .drawer(SelectDatasetDrawerToken, {
     load: async () => ({
@@ -51,13 +51,11 @@ export const datasetWeb = defineBrowserModule("dataset")
     }),
   })
   /** The create-or-edit drawer, editor table, picker list and record sync, lent (§3.4 rule 7). */
-  .withCapabilities({
-    datasetEditorTable: {
-      load: async () => ({
-        default: (await import("./ui/sections/datasets/lent-dataset-editor-table.tsx"))
-          .LentDatasetEditorTable,
-      }),
-    },
+  .lends(DatasetEditorTableToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/datasets/lent-dataset-editor-table.tsx"))
+        .LentDatasetEditorTable,
+    }),
   })
   .lends(AddOrEditDatasetDrawerToken, {
     load: async () => ({

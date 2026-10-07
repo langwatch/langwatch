@@ -7520,6 +7520,9 @@ importers:
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -8128,6 +8131,9 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
     devDependencies:
       typescript:
         specifier: 'catalog:'
