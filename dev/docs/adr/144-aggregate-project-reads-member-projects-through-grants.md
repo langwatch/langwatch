@@ -739,3 +739,17 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   shared-read lookup nothing consumed. The client keeps its `analytics`
   read resource, so a proof minted for traces is still refused when
   analytics is asked of it.
+
+  Saved views and lenses, settled in code after the use-proof, no decision
+  changed. Decision 8's write guard already refuses a saved view or lens
+  write under the aggregate's tenant; the client now stops offering one.
+  The analytics saved-views bar mounts only where the project's navigation
+  shows Analytics, so an aggregate reads and offers none. The lens store
+  refuses create, duplicate, rename and delete on a project that takes no
+  writes, at the one entry point every caller (the draft dot, the AI search
+  `create_lens` answer) goes through. A lens or saved-view write the server
+  refuses on any project now shows its registered error copy and reloads
+  from the server, so a refused change is reported and undone instead of
+  lingering until the next refetch. Scenarios: the refused-write rollback
+  in `specs/traces/saved-views.feature` and the lens refusals in
+  `specs/governance/aggregate-project.feature`.
