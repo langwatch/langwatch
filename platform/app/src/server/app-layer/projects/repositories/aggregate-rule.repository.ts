@@ -45,3 +45,16 @@ export interface AggregateProjectRepository {
   /** The organisation's live aggregates, ordered by id. */
   findLiveAggregateIds(params: { organizationId: string }): Promise<string[]>;
 }
+
+/**
+ * Serialises the reconciles of one aggregate (ADR-144 block E). Two runs of
+ * the same aggregate that overlap both read "no live row" for a member and
+ * both attach it; held around the whole reconcile, the second run reads the
+ * first one's rows and attaches nothing.
+ */
+export interface AggregateReconcileLock {
+  withAggregateLock<T>(
+    params: { aggregateProjectId: string },
+    reconcile: () => Promise<T>,
+  ): Promise<T>;
+}

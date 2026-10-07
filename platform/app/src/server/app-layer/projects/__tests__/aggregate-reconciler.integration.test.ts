@@ -44,6 +44,7 @@ import type { AggregateRule } from "../aggregate-rule";
 import { AggregateRuleService } from "../aggregate-rule.service";
 import { ProjectService } from "../project.service";
 import { AGGREGATE_PROJECT_KIND } from "../project-kinds";
+import { PrismaAggregateReconcileLock } from "../repositories/aggregate-reconcile-lock.prisma.repository";
 import { PrismaAggregateRuleRepository } from "../repositories/aggregate-rule.prisma.repository";
 import { PrismaProjectRepository } from "../repositories/project.prisma.repository";
 import {
@@ -83,6 +84,7 @@ const ruleRepository = new PrismaAggregateRuleRepository(prisma);
 const rules = new AggregateRuleService(ruleRepository);
 const reconciler = new AggregateReconciler({
   aggregates: ruleRepository,
+  lock: new PrismaAggregateReconcileLock(prisma),
   rules,
   ledger: () => new GrantsLedgerWriter(prisma),
   schedule: new PrismaScheduledJobRepository(prisma),
@@ -388,6 +390,75 @@ describe("Feature: the reconciler keeps members current", () => {
         expect(after).toEqual(before);
         const live = after.filter((row) => row.revokedAt === null);
         expect(new Set(live.map((row) => row.scopeId)).size).toBe(live.length);
+      });
+    });
+  });
+
+  describe("given aggregate projects whose members no reconcile has attached yet", () => {
+    describe("when two reconciles of the same aggregate run at once", () => {
+      it("Two reconciles at once leave one live row per pair", async () => {
+        // Three races in a row: one can be won cleanly by luck, three rarely
+        // are. One aggregate at a time, so each race is only the two runs.
+        for (const index of [0, 1, 2]) {
+          const aggregate = await prisma.project.create({
+            data: {
+              name: `Raced view ${index} ${fixture.ns}`,
+              slug: `--test-raced-aggregate-${index}-${fixture.ns}`,
+              apiKey: `test-key-raced-aggregate-${index}-${fixture.ns}`,
+              teamId: fixture.team.id,
+              language: "other",
+              framework: "other",
+              kind: AGGREGATE_PROJECT_KIND,
+              aggregateRule: { kind: "all-personal" },
+            },
+          });
+
+          await Promise.all([
+            reconciler.reconcile({ aggregateProjectId: aggregate.id }),
+            reconciler.reconcile({ aggregateProjectId: aggregate.id }),
+          ]);
+
+          const live = await liveMembersOf(aggregate.id);
+          expect(live.length).toBeGreaterThanOrEqual(2);
+          expect(new Set(live).size).toBe(live.length);
+          expect(await sharedProjectsInProof(aggregate.id)).toEqual(live);
+        }
+      });
+    });
+
+    describe("when more reconciles run at once than the connection pool holds", () => {
+      it("finishes every one, each aggregate with one live row per pair", async () => {
+        // Twelve at once against the adapter's ten pooled connections: if each
+        // lock pinned a connection, the bodies would wait on the pool forever.
+        const aggregates = await Promise.all(
+          [0, 1, 2, 3, 4, 5].map((index) =>
+            prisma.project.create({
+              data: {
+                name: `Crowded view ${index} ${fixture.ns}`,
+                slug: `--test-crowded-aggregate-${index}-${fixture.ns}`,
+                apiKey: `test-key-crowded-aggregate-${index}-${fixture.ns}`,
+                teamId: fixture.team.id,
+                language: "other",
+                framework: "other",
+                kind: AGGREGATE_PROJECT_KIND,
+                aggregateRule: { kind: "all-personal" },
+              },
+            }),
+          ),
+        );
+
+        await Promise.all(
+          aggregates.flatMap((aggregate) => [
+            reconciler.reconcile({ aggregateProjectId: aggregate.id }),
+            reconciler.reconcile({ aggregateProjectId: aggregate.id }),
+          ]),
+        );
+
+        for (const aggregate of aggregates) {
+          const live = await liveMembersOf(aggregate.id);
+          expect(live.length).toBeGreaterThanOrEqual(2);
+          expect(new Set(live).size).toBe(live.length);
+        }
       });
     });
   });

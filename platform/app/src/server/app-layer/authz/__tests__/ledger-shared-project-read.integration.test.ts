@@ -259,6 +259,92 @@ describe("given a shared project read in the ledger", () => {
     }
   });
 
+  it("returns a live row that landed this second after its first read, rather than a second live row", async () => {
+    const frozenMs = Date.UTC(2026, 9, 7, 11, 0, 0, 400);
+    const racedMember = await project({
+      teamId: reader.teamId,
+      suffix: "raced",
+    });
+    // What a concurrent attach of the same pair leaves: the live row on the
+    // id this second derives.
+    const landedConcurrently = deriveGrantId({
+      organizationId: organization.id,
+      principal: { type: "project", id: reader.id },
+      scope: { type: "PROJECT", id: racedMember.id },
+      occurredAtMs: frozenMs,
+    });
+    await prisma.grant.create({
+      data: {
+        id: landedConcurrently,
+        organizationId: organization.id,
+        principalType: GrantPrincipalType.PROJECT,
+        principalId: reader.id,
+        roleKey: "project-reader",
+        source: "aggregate-reconciler",
+        scopeType: GrantScopeType.PROJECT,
+        scopeId: racedMember.id,
+        condition: CONDITION,
+        occurredAt: new Date(frozenMs),
+      },
+    });
+    // The writer's first look for a live row of the pair ran before that row
+    // landed, so it answers nothing; every later read sees the table.
+    let firstLookup = true;
+    const racedPrisma = new Proxy(prisma, {
+      get(target, property, receiver) {
+        if (property !== "grant") return Reflect.get(target, property, receiver);
+        return new Proxy(target.grant, {
+          get(grants, method, grantsReceiver) {
+            if (method === "findFirst" && firstLookup) {
+              firstLookup = false;
+              return async () => null;
+            }
+            return Reflect.get(grants, method, grantsReceiver);
+          },
+        });
+      },
+    });
+    const sent = appended.length;
+
+    try {
+      const outcome = await new GrantsLedgerWriter(racedPrisma, {
+        now: () => frozenMs,
+        commands: async () => ({
+          commands: Object.fromEntries(
+            COMMAND_VERBS.map((verb) => [
+              verb,
+              {
+                send: async (data: unknown) => {
+                  appended.push({ verb, data });
+                },
+              },
+            ]),
+          ) as unknown as AuthzGrantsCommandSenders,
+        }),
+      }).attachSharedProjectGrant({
+        organizationId: organization.id,
+        readerProjectId: reader.id,
+        memberProjectId: racedMember.id,
+        condition: CONDITION,
+        actor: { type: "system", id: SYSTEM_ACTORS.aggregateReconciler },
+        awaitProjection: false,
+      });
+
+      expect(firstLookup).toBe(false);
+      expect(outcome).toEqual({
+        grantId: landedConcurrently,
+        attached: false,
+      });
+      expect(appended).toHaveLength(sent);
+    } finally {
+      appended.splice(sent);
+      await prisma.grant.deleteMany({
+        where: { id: landedConcurrently, organizationId: organization.id },
+      });
+      await prisma.project.deleteMany({ where: { id: racedMember.id } });
+    }
+  });
+
   it("lands a shared read through the projection's raw upsert with its condition and no legacy head", async () => {
     projectedGrantId = `grant_${ns}_projected`;
     await new PrismaAuthzGrantsWriteRepository(prisma).append({

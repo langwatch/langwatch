@@ -361,6 +361,7 @@ import {
 } from "./projects/aggregate-reconciler.service";
 import { AggregateRuleService } from "./projects/aggregate-rule.service";
 import { ProjectService } from "./projects/project.service";
+import { PrismaAggregateReconcileLock } from "./projects/repositories/aggregate-reconcile-lock.prisma.repository";
 import { PrismaAggregateRuleRepository } from "./projects/repositories/aggregate-rule.prisma.repository";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
@@ -547,6 +548,7 @@ export function initializeDefaultApp(options?: {
   const aggregateReconciler = traced(
     new AggregateReconciler({
       aggregates: aggregateRuleRepository,
+      lock: new PrismaAggregateReconcileLock(prisma),
       rules: aggregateRules,
       ledger: grantsLedgerWriter,
       schedule: new PrismaScheduledJobRepository(prisma),
@@ -2364,6 +2366,7 @@ export function createTestApp(overrides?: TestAppOverrides): App {
       rules: testAggregateRules,
       reconciler: new AggregateReconciler({
         aggregates: testAggregateRuleRepository,
+        lock: new PrismaAggregateReconcileLock(testPrisma),
         rules: testAggregateRules,
         ledger: () => new GrantsLedgerWriter(testPrisma),
         schedule: new PrismaScheduledJobRepository(testPrisma),

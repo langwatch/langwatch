@@ -8,7 +8,10 @@ import type {
   SchedulerHandler,
 } from "../scheduler/scheduler.types";
 import type { AggregateRuleService } from "./aggregate-rule.service";
-import type { AggregateProjectRepository } from "./repositories/aggregate-rule.repository";
+import type {
+  AggregateProjectRepository,
+  AggregateReconcileLock,
+} from "./repositories/aggregate-rule.repository";
 
 const logger = createLogger("langwatch:projects:aggregate-reconciler");
 
@@ -92,6 +95,8 @@ export class AggregateReconciler {
   constructor(
     private readonly deps: {
       aggregates: AggregateProjectRepository;
+      /** Held around each reconcile, so two runs of one aggregate never overlap. */
+      lock: AggregateReconcileLock;
       rules: Pick<AggregateRuleService, "membersOf">;
       /** Composed per call, like every ledger writer. */
       ledger: () => SharedProjectGrantsLedger;
@@ -109,8 +114,22 @@ export class AggregateReconciler {
    * Brings one aggregate's grants in line with its rule. A missing, archived
    * or rule-less aggregate reconciles nothing: an unreadable rule is not an
    * empty one, so it revokes nothing either.
+   *
+   * Runs under the aggregate's lock: two overlapping runs (a trigger and the
+   * sweep, two admins' edits) would otherwise both read a member as missing
+   * and both attach it, leaving two live rows for one pair.
    */
   async reconcile({
+    aggregateProjectId,
+  }: {
+    aggregateProjectId: string;
+  }): Promise<AggregateReconcileResult> {
+    return this.deps.lock.withAggregateLock({ aggregateProjectId }, () =>
+      this.reconcileHoldingLock({ aggregateProjectId }),
+    );
+  }
+
+  private async reconcileHoldingLock({
     aggregateProjectId,
   }: {
     aggregateProjectId: string;
@@ -168,7 +187,9 @@ export class AggregateReconciler {
         actor: ACTOR,
         source: "aggregate-reconciler",
       });
-      // A concurrent run got there first; its row is the one that stands.
+      // Someone else attached the pair since the read above (a direct
+      // ledger write, not another reconcile, which the lock keeps out); its
+      // row is the one that stands.
       (outcome.attached ? attached : unchanged).push(memberProjectId);
     }
 

@@ -19,11 +19,17 @@ import {
 import type { AggregateRule } from "../aggregate-rule";
 import type {
   AggregateProjectRepository,
+  AggregateReconcileLock,
   StoredAggregateProject,
 } from "../repositories/aggregate-rule.repository";
 
 const ORG = "org_acme";
 const NOW = new Date("2026-10-07T10:00:00.000Z");
+
+/** One caller at a time is all these tests make; the lock has its own suite. */
+const NO_CONTENTION: AggregateReconcileLock = {
+  withAggregateLock: (_params, reconcile) => reconcile(),
+};
 
 type LiveRow = {
   grantId: string;
@@ -145,6 +151,7 @@ function reconcilerFor({
 }) {
   return new AggregateReconciler({
     aggregates: aggregatesOf(stored),
+    lock: NO_CONTENTION,
     rules: rulesResolvingTo(members),
     ledger: () => ledger,
     schedule,
@@ -353,6 +360,7 @@ describe("AggregateReconciler", () => {
               throw new Error("database unavailable");
             },
           },
+          lock: NO_CONTENTION,
           rules: rulesResolvingTo({}),
           ledger: () => ledger,
         });

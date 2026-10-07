@@ -729,11 +729,16 @@ export class GrantsLedgerWriter {
 
     const principal = { type: "project" as const, id: readerProjectId };
     const scope = { type: "PROJECT" as const, id: memberProjectId };
-    const { grantId, occurredAtMs } = await this.freshGrantIdentity({
+    const fresh = await this.freshGrantIdentity({
       organizationId,
       principal,
       scope,
     });
+    // A concurrent attach of the same pair landed between the read above and
+    // this one: its row is the pair's live grant, so it is returned, not
+    // shadowed by a second live row a second later.
+    if (fresh.live) return { grantId: fresh.grantId, attached: false };
+    const { grantId, occurredAtMs } = fresh;
     const { commands } = await this.commands();
     await commands.attachGrant.send({
       tenantId: organizationId,
@@ -792,13 +797,17 @@ export class GrantsLedgerWriter {
   }
 
   /**
-   * A grant id no row holds yet, and the business time it encodes. The id is
-   * a function of the pair and the SECOND it was attached in, so
-   * re-attaching a pair revoked earlier in the same second derives the
-   * revoked row's id, and the attach lands on a row that stays revoked: the
-   * read never returns and the projection wait times out. A reconciler that
-   * revokes on one trigger and re-attaches on the next can do exactly that,
-   * so the fact moves to the next free second instead.
+   * The grant id an attach of this pair lands on, and the business time it
+   * encodes. The id is a function of the pair and the SECOND it was attached
+   * in, so re-attaching a pair revoked earlier in the same second derives
+   * the revoked row's id, and the attach would land on a row that stays
+   * revoked: the read never returns and the projection wait times out. A
+   * reconciler that revokes on one trigger and re-attaches on the next can do
+   * exactly that, so the fact moves past a REVOKED row to the next second.
+   *
+   * A LIVE row on the id is the same pair attached this second by someone
+   * else, and is the answer itself (`live: true`): stepping past it too is
+   * what wrote two live rows for one pair when two reconciles raced.
    */
   private async freshGrantIdentity({
     organizationId,
@@ -808,7 +817,7 @@ export class GrantsLedgerWriter {
     organizationId: string;
     principal: { type: "project"; id: string };
     scope: { type: "PROJECT"; id: string };
-  }): Promise<{ grantId: string; occurredAtMs: number }> {
+  }): Promise<{ grantId: string; occurredAtMs: number; live: boolean }> {
     let occurredAtMs = this.now();
     for (;;) {
       const grantId = deriveGrantId({
@@ -819,9 +828,10 @@ export class GrantsLedgerWriter {
       });
       const taken = await this.prisma.grant.findFirst({
         where: { id: grantId, organizationId },
-        select: { id: true },
+        select: { id: true, revokedAt: true },
       });
-      if (!taken) return { grantId, occurredAtMs };
+      if (!taken) return { grantId, occurredAtMs, live: false };
+      if (taken.revokedAt === null) return { grantId, occurredAtMs, live: true };
       occurredAtMs = (Math.floor(occurredAtMs / 1000) + 1) * 1000;
     }
   }
