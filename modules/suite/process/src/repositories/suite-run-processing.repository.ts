@@ -6,4 +6,6 @@ export interface SuiteRunProcessingRepository {
   openRunStateFoldStore(input: {
     defaultRetentionDays: () => number;
   }): FoldProjectionStore<SuiteRunStateData>;
+  /** One tenant's suite runs not yet finished (PENDING or IN_PROGRESS), latest state each. */
+  findOpenRuns(input: { tenantId: string }): Promise<SuiteRunStateData[]>;
 }

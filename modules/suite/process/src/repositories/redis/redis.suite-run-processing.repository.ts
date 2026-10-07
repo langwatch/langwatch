@@ -8,6 +8,7 @@ import { SUITE_RUN_PROJECTION_VERSIONS, type SuiteRunStateData } from "@langwatc
 import type { Cluster, Redis } from "ioredis";
 
 import { ClickhouseSuiteEventingRepository } from "../clickhouse/clickhouse.suite-eventing.repository.ts";
+import { ClickHouseSuiteRunRepository } from "../clickhouse/clickhouse.suite-run.repository.ts";
 import type { SuiteRunProcessingRepository } from "../suite-run-processing.repository.ts";
 
 /**
@@ -64,5 +65,13 @@ export class RedisSuiteRunProcessingRepository implements SuiteRunProcessingRepo
           : { ttlSeconds: this.options.foldCacheTtlSeconds }),
       },
     );
+  }
+
+  /** Reads ClickHouse directly: an open run's latest row is the one the fold last stored. */
+  findOpenRuns(input: { tenantId: string }): Promise<SuiteRunStateData[]> {
+    return ClickHouseSuiteRunRepository.create({
+      clickhouse: this.options.clickhouse,
+      defaultRetentionDays: () => 0,
+    }).findOpenRuns(input);
   }
 }
