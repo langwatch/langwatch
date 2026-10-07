@@ -15,6 +15,14 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+// An ordinary project: the bar's tips depend on whether it can save lenses.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj-1", kind: "application" },
+    hasPermission: () => true,
+  }),
+}));
+
 vi.mock("@paper-design/shaders-react", () => ({
   MeshGradient: () => null,
 }));

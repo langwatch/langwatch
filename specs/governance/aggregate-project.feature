@@ -379,6 +379,7 @@ Feature: An aggregate project reads its member projects
     Then it offers no button to create a lens and no "Save current filtered view"
     And a lens tab's menu offers no save as new lens, rename, duplicate or delete
     And a lens with unsaved changes offers to discard them but not to save them as a new lens
+    And the Ask AI tips never suggest saving the result as a lens, while an ordinary project's still do
 
   @integration
   Scenario: No path creates a lens on the aggregate
