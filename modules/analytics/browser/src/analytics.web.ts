@@ -4,11 +4,8 @@
  * Drawer -> Dialog on this branch; the wire name did not change.
  */
 
-import {
-  FilterSidebarToken,
-  analyticsLwqlTrpc,
-  analyticsTrpc,
-} from "@langwatch/analytics-contract";
+import { FilterSidebarToken } from "@langwatch/analytics-client";
+import { analyticsLwqlTrpc, analyticsTrpc } from "@langwatch/analytics-contract";
 import { defineBrowserModule } from "@langwatch/browser";
 import { savedViewTrpc } from "@langwatch/dashboard-contract";
 import { createElement } from "react";

@@ -1,6 +1,6 @@
 /** What analytics, trace, experiment and prompt lend this module (§3.4 rule 7). */
 
-import { FilterSidebarToken, type FilterSidebarProps } from "@langwatch/analytics-contract";
+import { FilterSidebarToken, type FilterSidebarProps } from "@langwatch/analytics-client";
 import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
 import type {
   UiEvaluatorTracesMappingProps,
@@ -10,7 +10,7 @@ import { Lent } from "@langwatch/browser-host/lent";
 import {
   ComparisonConfigFormToken,
   type ComparisonConfigFormProps,
-} from "@langwatch/experiment-contract";
+} from "@langwatch/experiment-client";
 import { lazy, Suspense, useMemo } from "react";
 
 /** Analytics' filter sidebar for the sample traces. */

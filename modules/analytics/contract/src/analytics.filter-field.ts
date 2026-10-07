@@ -1,4 +1,3 @@
-import { uiTokens } from "@langwatch/module";
 import { z } from "zod";
 
 /**
@@ -37,11 +36,3 @@ export const filterFieldsEnum = z.enum([
 ]);
 
 export type FilterField = z.infer<typeof filterFieldsEnum>;
-
-/** The filter sidebar analytics lends the screens that filter traces (§10, §10.1). */
-
-/** What a screen hands analytics' filter sidebar; it reads the filters from the URL itself. */
-export type FilterSidebarProps = { defaultShowFilters?: boolean; hideTopics?: boolean };
-
-export const FilterSidebarToken =
-  uiTokens("analytics").component<FilterSidebarProps>("filterSidebar");
