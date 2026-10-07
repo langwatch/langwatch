@@ -95,13 +95,7 @@
       "path": "../react-rum/tsconfig.build.json"
     },
     {
-      "path": "../../modules/scenario/contract/tsconfig.build.json"
-    },
-    {
       "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/trace/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/workflow/contract/tsconfig.build.json"

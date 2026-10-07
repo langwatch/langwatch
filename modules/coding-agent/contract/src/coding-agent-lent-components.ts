@@ -1,7 +1,5 @@
 /** The activity tables coding-agent lends by token to the workspace screens (§10, §10.1). */
 
-import { uiTokens } from "@langwatch/module";
-
 /** The surface the lent tables read: where they are, who asks, and toasts. */
 export type CodingAgentActivityHost = {
   hasPermission(permission: string): boolean;
@@ -30,10 +28,3 @@ export type CodingAgentSessionsTableProps = {
   projectSlug: string | null;
   host: CodingAgentActivityHost;
 };
-
-export const CodingAgentPullRequestsTableToken = uiTokens(
-  "coding-agent",
-).component<CodingAgentPullRequestsTableProps>("codingAgentPullRequestsTable");
-export const CodingAgentSessionsTableToken = uiTokens(
-  "coding-agent",
-).component<CodingAgentSessionsTableProps>("codingAgentSessionsTable");

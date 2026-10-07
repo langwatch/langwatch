@@ -7,7 +7,7 @@ import {
   type AnnotateBodyProps,
   type AnnotationFormFooterProps,
   type SuggestBodyProps,
-} from "@langwatch/annotation-contract";
+} from "@langwatch/annotation-client";
 import { Lent } from "@langwatch/browser-host/lent";
 
 /** Annotation's comment-and-scores body, rendered as annotation lends it. */

@@ -7,6 +7,7 @@ import {
   PendingJoinRequestsToken,
   ProjectDepartmentFieldToken,
 } from "@langwatch/organization-client";
+import { AgentActionsMenuToken } from "@langwatch/trace-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -20,6 +21,7 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
 }));
 
 import {
+  AgentActionsMenu,
   InlineCommandPalette,
   PendingJoinRequests,
   ProjectDepartmentField,
@@ -62,7 +64,30 @@ const peerLends = uiDeclarations([
       ],
     },
   },
+  {
+    name: "trace",
+    installation: {
+      capabilities: {},
+      lends: [
+        {
+          token: AgentActionsMenuToken,
+          load: async () => ({
+            default: ({ triggerLabel }: { triggerLabel?: string }) => (
+              <button>{triggerLabel}</button>
+            ),
+          }),
+        },
+      ],
+    },
+  },
 ]);
+
+const agentActions = {
+  triggerLabel: "Set up with your agent",
+  langy: null,
+  copy: { label: "Copy prompt", hint: "", copiedTitle: "Copied" },
+  docs: { href: "https://docs.langwatch.ai", label: "Docs", hint: "" },
+};
 
 afterEach(() => {
   cleanup();
@@ -112,6 +137,26 @@ describe("what navigation and organization lend project", () => {
     it("draws nothing in their place", () => {
       declarations.current = uiDeclarations([]);
       const { container } = render(<InlineCommandPalette placeholder="Ask anything" />);
+      expect(container).toBeEmptyDOMElement();
+    });
+  });
+
+  describe("given trace lends its agent actions menu", () => {
+    /** @scenario Project draws trace's agent actions menu through its client token */
+    it("draws trace's menu with the trigger label it is handed", async () => {
+      declarations.current = peerLends;
+      render(<AgentActionsMenu {...agentActions} />);
+      expect(
+        await screen.findByRole("button", { name: "Set up with your agent" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("given no installed module lends the agent actions menu token", () => {
+    /** @scenario Project draws trace's agent actions menu through its client token */
+    it("draws nothing in the menu's place", () => {
+      declarations.current = uiDeclarations([]);
+      const { container } = render(<AgentActionsMenu {...agentActions} />);
       expect(container).toBeEmptyDOMElement();
     });
   });

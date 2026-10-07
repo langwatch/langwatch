@@ -1,8 +1,5 @@
-import type {
-  UiConversationAudioPlayback,
-  UiConversationThreadProps,
-} from "@langwatch/browser-host/declarations";
 import { Box, VStack } from "@langwatch/design-system/primitives";
+import type { ConversationAudioPlayback, ConversationThreadProps } from "@langwatch/trace-client";
 import { groupIntoTurns } from "@langwatch/trace-contract/conversation";
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
@@ -36,7 +33,7 @@ function ConversationPart({
   projectId: string;
   shouldRenderStructuredOutput: boolean;
   actions?: ReactNode;
-  audioPlayback?: UiConversationAudioPlayback;
+  audioPlayback?: ConversationAudioPlayback;
   renderMediaPart: RenderMediaPart;
 }) {
   switch (part.kind) {
@@ -82,7 +79,7 @@ function threadBodyLayout({
   panel,
 }: {
   compact: boolean;
-  panel: UiConversationThreadProps["panel"];
+  panel: ConversationThreadProps["panel"];
 }) {
   return {
     align: "stretch",
@@ -114,7 +111,7 @@ export function ConversationThread({
   renderMediaPart,
   renderTurnSeparator,
   audioPlaybackFor,
-}: UiConversationThreadProps) {
+}: ConversationThreadProps) {
   const compact = variant === "compact";
   const scrollRef = useRef<HTMLDivElement>(null);
 

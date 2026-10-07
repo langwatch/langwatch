@@ -16312,15 +16312,9 @@ importers:
       '@langwatch/react-rum':
         specifier: workspace:*
         version: link:../react-rum
-      '@langwatch/scenario-contract':
-        specifier: workspace:*
-        version: link:../../modules/scenario/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../time
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../modules/trace/contract
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../modules/workflow/contract

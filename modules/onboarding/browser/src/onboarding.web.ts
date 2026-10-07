@@ -18,8 +18,6 @@ import { onboardingGuidedTour } from "./features/guided-onboarding/behavior/guid
 import { onboardingGuidedTourHooks } from "./features/guided-onboarding/behavior/guided-tour.lend.ts";
 
 export const onboardingWeb = defineBrowserModule("onboarding")
-  // Trace reads the guided path by name until it converts to the token (r-lends-4).
-  .withCapabilities({ guidedPathActive: onboardingGuidedPath })
   .withHosts({
     requires: ["OnboardingHostApi", "GuidedOnboardingHostApi"],
     mounts: {

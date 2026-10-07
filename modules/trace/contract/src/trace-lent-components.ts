@@ -1,7 +1,5 @@
 /** Trace UI that reads trace's own data, lent by token to the modules that show it (§10, §10.1). */
 
-import { uiTokens } from "@langwatch/module";
-
 /** What a screen hands trace's input/output viewer. */
 export type RenderInputOutputProps = {
   value: unknown;
@@ -24,9 +22,3 @@ export type SetupWithAgentButtonProps = {
   surface: "simulations" | "simulationRuns" | "connectedAgents" | "prompts" | "evaluators";
   size?: "sm" | "md";
 };
-
-export const RenderInputOutputToken =
-  uiTokens("trace").component<RenderInputOutputProps>("renderInputOutput");
-export const TraceIdPeekToken = uiTokens("trace").component<TraceIdPeekProps>("traceIdPeek");
-export const SetupWithAgentButtonToken =
-  uiTokens("trace").component<SetupWithAgentButtonProps>("setupWithAgentButton");

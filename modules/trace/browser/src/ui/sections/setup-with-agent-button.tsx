@@ -1,8 +1,8 @@
-import type { UiAgentActionsMenuProps } from "@langwatch/browser-host/declarations";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
+import type { AgentActionsMenuProps } from "@langwatch/trace-client";
 import { useState } from "react";
 import { LuBookOpen, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/lu";
 
@@ -184,7 +184,7 @@ export function AgentActionsMenu({
   langy,
   copy,
   docs,
-}: UiAgentActionsMenuProps) {
+}: AgentActionsMenuProps) {
   const canAsk = useCanAskLangy();
   const askLangy = useLangyStore((s) => s.askLangy);
   const [isOpen, setIsOpen] = useState(false);

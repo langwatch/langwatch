@@ -8,8 +8,6 @@ import type { CustomGraphInput } from "@langwatch/dashboard-contract";
 import type { DatasetColumn, MappingState } from "@langwatch/dataset-contract";
 import type { SystemStyleObject } from "@langwatch/design-system/primitives";
 import type { UiTokenIdentity } from "@langwatch/module";
-import type { MediaAudioElement } from "@langwatch/scenario-contract";
-import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
 import type {
   AvailableSource,
   Field,
@@ -18,50 +16,11 @@ import type {
   LocalPromptConfig,
   Signature,
 } from "@langwatch/workflow-contract";
-import type { ComponentType, ReactElement, ReactNode } from "react";
-import type { IconType } from "react-icons";
+import type { ComponentType, ReactNode } from "react";
 
 /** A component a module declares, loaded the first time something draws it. */
 export type UiDeclaredComponent<Props> = {
   readonly load: () => Promise<{ readonly default: ComponentType<Props> }>;
-};
-
-/** What a surface hands trace's lent agent actions menu: copy a prompt, ask Langy, or read docs. */
-export type UiAgentActionsMenuProps = {
-  /** Labels the default outline button. Ignored when `trigger` is given. */
-  triggerLabel?: string;
-  /** The surface's own trigger: one element, because `Menu.Trigger asChild` clones it. */
-  trigger?: ReactElement;
-  /** Match the sibling buttons of the surface this sits in. */
-  size?: "sm" | "md";
-  /** Null where the surface knows Langy is out of reach; otherwise `useCanAskLangy` decides. */
-  langy: {
-    prompt: string;
-    label: string;
-    hint: string;
-    /** Takes the prompt instead of the Langy store, for a surface animating its own composer. */
-    onAsk?: (prompt: string) => void;
-  } | null;
-  copy: {
-    /** What the reader gets while the skill is on its way; absent, the setup prompt of `skill`. */
-    prompt?: string;
-    label: string;
-    hint: string;
-    copiedTitle: string;
-    /** The skill whose instructions the copy carries, when there is one. */
-    skill?: string;
-    /** A freshly minted token to put in front of those instructions. */
-    apiKey?: string;
-    /** The endpoint that token belongs to, on a self-hosted deployment. */
-    endpoint?: string;
-  };
-  docs: {
-    href: string;
-    label: string;
-    hint: string;
-    /** Overrides the book glyph where the surface reads better with another. */
-    icon?: IconType;
-  };
 };
 
 /** What organization's Authentication overview hands each card. */
@@ -135,70 +94,6 @@ export type UiLicenseBillingSectionProps = {
   seatRateCents: number | null;
   seatCurrency: "USD" | "EUR" | null;
   commitUsdCents: number;
-};
-
-/**
- * Playback coordination for one audio part, as the host's sequential player
- * hands it out. The thread never starts a clip; it passes these to the media.
- */
-export type UiConversationAudioPlayback = {
-  ref: (element: MediaAudioElement | null) => void;
-  onPlay: () => void;
-  onEnded: () => void;
-};
-
-/** Draws one media part; the host owns stored-object probing and playback. */
-export type UiRenderMediaPart = (input: {
-  part: Extract<DisplayPart, { kind: "media" }>["part"];
-  projectId: string;
-  audioPlayback?: UiConversationAudioPlayback;
-}) => ReactNode;
-
-/** What a screen hands trace's conversation renderer: parts flattened by the trace kit. */
-export type UiConversationThreadProps = {
-  parts: DisplayPart[];
-  /** `compact` is a grid-cell preview: smaller type, no turn separators. */
-  variant?: "compact" | "regular";
-  /** `scenario` swaps the sides so the agent under test reads as the subject. */
-  roleMode?: ConversationRoleMode;
-  labels?: { user?: string; assistant?: string };
-  /** Owns the stored objects behind any media parts. */
-  projectId: string;
-  renderPartActions?: (part: DisplayPart) => ReactNode;
-  shouldAutoScroll?: boolean;
-  /** Draws a reply that parses as JSON as a value tree, not markdown. */
-  shouldRenderStructuredOutput?: boolean;
-  panel?: { contentMaxWidth: string };
-  /** A reply was asked for and has not begun arriving. */
-  hasPendingReply?: boolean;
-  /** Numbers turns from the start and offers trace affordances as traces land. */
-  live?: boolean;
-  renderMediaPart: UiRenderMediaPart;
-  renderTurnSeparator?: (input: { index: number; traceId?: string; live: boolean }) => ReactNode;
-  audioPlaybackFor?: (part: DisplayPart) => UiConversationAudioPlayback | undefined;
-};
-
-/** What a screen hands trace's eye-icon peek at one trace. */
-export type UiTraceIdPeekProps = {
-  traceId: string;
-};
-
-/** What a screen hands trace's hover peek around a trigger of its own. */
-export type UiTracePreviewHoverCardProps = {
-  traceId: string;
-  children: ReactNode;
-};
-
-/** What a screen hands trace's input/output viewer. */
-export type UiRenderInputOutputProps = {
-  value: unknown;
-  showTools?: boolean | "copy-only";
-  collapsed?: boolean;
-  collapseStringsAfterLength?: number;
-  /** Per-node collapse decision, e.g. "start every array collapsed". */
-  shouldCollapse?: (field: { type: string }) => boolean;
-  /** Show the entry count beside each object and array. */
-  displayObjectSize?: boolean;
 };
 
 /** An evaluator's name and settings as the studio holds them. */
@@ -290,12 +185,6 @@ export type UiLlmConfigPopoverProps = {
   onChange: (llmConfig: LLMConfig) => void;
 };
 
-/** What an empty state hands trace's "Setup via Agent" menu. */
-export type UiSetupWithAgentButtonProps = {
-  surface: "simulations" | "simulationRuns" | "connectedAgents" | "prompts" | "evaluators";
-  size?: "sm" | "md";
-};
-
 /** A usage-against-limit row licensing lends: a limit type it names, or a caller's label. */
 export type UiResourceLimitRowProps = { current: number; max?: number } & (
   | { label: string; limitType?: never }
@@ -305,38 +194,28 @@ export type UiResourceLimitRowProps = { current: number; max?: number } & (
 /** Governance's sample-data choice, written by onboarding's guided tour. */
 export type UiGovernanceSampleChoice = { setSampleChoice(choice: boolean): void };
 
-/** Onboarding's guided path; `useIsActive` is a hook, call it during render. */
-export type UiGuidedPathActive = { useIsActive(): boolean };
-
 /**
  * Each capability a peer reads by name, and the shape a declaration must have
  * to fill it: the CORE side of the contract.
  */
 export type UiDeclaredCapabilities = {
-  agentActionsMenu: UiDeclaredComponent<UiAgentActionsMenuProps>;
   /** A card on the Authentication overview; `section` places it, sign-in first. */
   authenticationOverviewCard: UiDeclaredComponent<UiAuthenticationOverviewCardProps> & {
     readonly section?: "sign-in" | "provisioning";
   };
-  conversationThread: UiDeclaredComponent<UiConversationThreadProps>;
   /** The directory's status band, drawn above the Directory's tabs; scim lends it. */
   directorySummary: UiDeclaredComponent<UiDirectorySummaryProps>;
   customGraph: UiDeclaredComponent<UiCustomGraphProps>;
-  guidedPathActive: UiGuidedPathActive;
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
   evaluatorTracesMapping: UiDeclaredComponent<UiEvaluatorTracesMappingProps>;
   llmConfigField: UiDeclaredComponent<UiLlmConfigFieldProps>;
   llmConfigPopover: UiDeclaredComponent<UiLlmConfigPopoverProps>;
   outputsSection: UiDeclaredComponent<UiOutputsSectionProps>;
-  renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   resourceLimitRow: UiDeclaredComponent<UiResourceLimitRowProps>;
   sampleChoice: UiGovernanceSampleChoice;
-  setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
   studioEvaluatorEditor: UiDeclaredComponent<UiStudioEvaluatorEditorProps>;
   studioPromptEditor: UiDeclaredComponent<UiStudioPromptEditorProps>;
-  traceIdPeek: UiDeclaredComponent<UiTraceIdPeekProps>;
-  tracePreviewHoverCard: UiDeclaredComponent<UiTracePreviewHoverCardProps>;
 };
 
 export type UiDeclaredName = keyof UiDeclaredCapabilities;

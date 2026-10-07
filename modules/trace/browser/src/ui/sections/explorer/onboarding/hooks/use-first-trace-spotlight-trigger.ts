@@ -1,5 +1,5 @@
-import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
-import type { UiGuidedPathActive } from "@langwatch/browser-host/declarations";
+import { useLentHooks } from "@langwatch/browser-host/lent";
+import { type GuidedPathActive, GuidedPathActiveToken } from "@langwatch/onboarding-client";
 import { useEffect, useRef } from "react";
 
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
@@ -8,7 +8,7 @@ import { writeSpotlightFragment } from "../spotlights/spotlight-overlay.tsx";
 import { useTraceExplorerTourPreference } from "./use-trace-explorer-tour-preference.ts";
 
 /** A composition without onboarding has no guided path to stay quiet for. */
-const NO_GUIDED_PATH: UiGuidedPathActive = { useIsActive: () => false };
+const NO_GUIDED_PATH: GuidedPathActive = { useIsActive: () => false };
 
 interface UseFirstTraceSpotlightTriggerArgs {
   projectId: string | null;
@@ -79,8 +79,8 @@ export function useFirstTraceSpotlightTrigger({
   const tourActive = useOnboardingStore((s) => s.tourActive);
   const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
   const setCurrentSpotlightId = useOnboardingStore((s) => s.setCurrentSpotlightId);
-  const guidedPath = useUiDeclarations().declared("guidedPathActive")[0]?.capability;
-  const guidedPathActive = (guidedPath ?? NO_GUIDED_PATH).useIsActive();
+  const guidedPath = useLentHooks(GuidedPathActiveToken) ?? NO_GUIDED_PATH;
+  const guidedPathActive = guidedPath.useIsActive();
   const hasLegacyTourHistoryOnMount = useRef(
     firstTraceSpotlightFired || Object.keys(seenDrawerSpotlights).length > 0,
   ).current;

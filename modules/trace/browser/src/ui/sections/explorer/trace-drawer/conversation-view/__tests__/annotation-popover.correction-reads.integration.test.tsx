@@ -3,7 +3,7 @@ import {
   SuggestBodyToken,
   type AnnotationFormFooterProps,
   type SuggestBodyProps,
-} from "@langwatch/annotation-contract";
+} from "@langwatch/annotation-client";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 /**
  * A suggested output is stored as a correction to the trace, so writing one has to make

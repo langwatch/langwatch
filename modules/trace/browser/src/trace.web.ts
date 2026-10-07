@@ -6,12 +6,15 @@
 
 import { defineBrowserModule } from "@langwatch/browser";
 import {
+  AgentActionsMenuToken,
   AnnotationQueueConversationToken,
+  ConversationThreadToken,
   RenderInputOutputToken,
   SetupWithAgentButtonToken,
   TraceEditButtonToken,
   TraceIdPeekToken,
-} from "@langwatch/trace-contract";
+  TracePreviewHoverCardToken,
+} from "@langwatch/trace-client";
 
 // Declare the `trace:` slices at install, so langy and annotation read them from first paint.
 import "./behavior/annotation-queue-session.store.ts";
@@ -50,19 +53,8 @@ export const traceWeb = defineBrowserModule("trace")
       }),
     },
   })
-  /** Trace UI that reads trace's own data, lent to the modules that show it (§3.4 rule 7). */
+  /** Held: evaluator's traces mapping and the presence menu item still travel by name. */
   .withCapabilities({
-    agentActionsMenu: {
-      load: async () => ({
-        default: (await import("./ui/sections/setup-with-agent-button.tsx")).AgentActionsMenu,
-      }),
-    },
-    conversationThread: {
-      load: async () => ({
-        default: (await import("./ui/sections/conversation/conversation-thread.tsx"))
-          .ConversationThread,
-      }),
-    },
     evaluatorTracesMapping: {
       load: async () => ({
         default: (await import("./ui/sections/evaluations/evaluator-traces-mapping.tsx"))
@@ -74,11 +66,23 @@ export const traceWeb = defineBrowserModule("trace")
         default: (await import("./ui/sections/presence/presence-menu-item.tsx")).PresenceMenuItem,
       }),
     },
-    tracePreviewHoverCard: {
-      load: async () => ({
-        default: (await import("./ui/sections/explorer/trace-id-peek.tsx")).TracePreviewHoverCard,
-      }),
-    },
+  })
+  /** Trace UI that reads trace's own data, lent to the modules that show it (§10.1). */
+  .lends(AgentActionsMenuToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/setup-with-agent-button.tsx")).AgentActionsMenu,
+    }),
+  })
+  .lends(ConversationThreadToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/conversation/conversation-thread.tsx"))
+        .ConversationThread,
+    }),
+  })
+  .lends(TracePreviewHoverCardToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/explorer/trace-id-peek.tsx")).TracePreviewHoverCard,
+    }),
   })
   .lends(RenderInputOutputToken, {
     load: async () => ({

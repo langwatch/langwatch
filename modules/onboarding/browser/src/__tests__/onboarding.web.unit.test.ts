@@ -5,7 +5,6 @@ import { FirstTouchAttributionToken, GuidedTourToken } from "@langwatch/onboardi
 import { describe, expect, it } from "vitest";
 
 import { onboardingFirstTouchAttribution } from "../behavior/first-touch-attribution.capability.ts";
-import { onboardingGuidedPath } from "../features/guided-onboarding/behavior/guided-path-active.capability.ts";
 import { onboardingGuidedTourHooks } from "../features/guided-onboarding/behavior/guided-tour.lend.ts";
 import { onboardingWeb } from "../onboarding.web.ts";
 
@@ -91,12 +90,6 @@ describe("given a browser that installs onboarding", () => {
       );
 
       expect(lend).toMatchObject({ value: onboardingFirstTouchAttribution });
-    });
-  });
-
-  describe("when a peer reads whether a guided path is active", () => {
-    it("lends the guided path as guidedPathActive", () => {
-      expect(onboardingWeb.installation.capabilities.guidedPathActive).toBe(onboardingGuidedPath);
     });
   });
 });
