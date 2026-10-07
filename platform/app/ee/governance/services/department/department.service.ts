@@ -70,19 +70,28 @@ export interface DepartmentAssignments {
 }
 
 export class DepartmentService {
+  private readonly repo: DepartmentRepository;
+  private readonly aggregateMembers?: Pick<
+    AggregateReconciler,
+    "reconcileOrganizationOrLog"
+  >;
+
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly repo: DepartmentRepository = new DepartmentRepository(),
-    /**
-     * ADR-144 block E: an aggregate may read the personal projects of one
-     * department, so a member's move re-reads the organisation's aggregates.
-     * Unset means the App's reconciler, resolved when a member moves.
-     */
-    private readonly aggregateMembers?: Pick<
-      AggregateReconciler,
-      "reconcileOrganizationOrLog"
-    >,
-  ) {}
+    deps: {
+      repo?: DepartmentRepository;
+      /**
+       * ADR-144 block E: an aggregate may read the personal projects of one
+       * department, so a member's move re-reads the organisation's
+       * aggregates. Unset means the App's reconciler, resolved when a member
+       * moves.
+       */
+      aggregateMembers?: Pick<AggregateReconciler, "reconcileOrganizationOrLog">;
+    } = {},
+  ) {
+    this.repo = deps.repo ?? new DepartmentRepository();
+    this.aggregateMembers = deps.aggregateMembers;
+  }
 
   static create(prisma: PrismaClient): DepartmentService {
     return new DepartmentService(prisma);
