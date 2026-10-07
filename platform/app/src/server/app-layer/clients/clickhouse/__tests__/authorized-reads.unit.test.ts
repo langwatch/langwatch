@@ -14,7 +14,6 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import {
   AuthorizedClickHouse,
-  ClickHouseClientUnavailableError,
   expandFragment,
   expandStatement,
   fenceExpression,
@@ -22,6 +21,7 @@ import {
   ownProjectIdOf,
   StatementScopeError,
   singleTenantOf,
+  TenantReaderClientUnavailableError,
   tenantScope,
   tenantScopeKey,
   tenantSet,
@@ -434,7 +434,7 @@ describe("AuthorizedClickHouse", () => {
           clickhouse.as(proof(), { reads: "traces" }).query({
             query: `SELECT 1 FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
           }),
-        ).rejects.toBeInstanceOf(ClickHouseClientUnavailableError);
+        ).rejects.toBeInstanceOf(TenantReaderClientUnavailableError);
       });
     });
   });

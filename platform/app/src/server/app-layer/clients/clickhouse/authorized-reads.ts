@@ -378,13 +378,13 @@ type ScopedQueryParams<Format extends DataFormat = "JSON"> = Omit<
  * caller that treats an unreachable store as "nothing to show" can do so
  * without reaching for the client itself.
  */
-export class ClickHouseClientUnavailableError extends Error {
+export class TenantReaderClientUnavailableError extends Error {
   constructor({ cause }: { cause: unknown }) {
     super(
       `ClickHouse client unavailable: ${cause instanceof Error ? cause.message : String(cause)}`,
       { cause },
     );
-    this.name = "ClickHouseClientUnavailableError";
+    this.name = "TenantReaderClientUnavailableError";
   }
 }
 
@@ -392,7 +392,7 @@ export class ClickHouseClientUnavailableError extends Error {
  * A reader bound to one fence. `query` expands the markers and sends the
  * statement through the own project's client; the result is the client's
  * own result set, so a repository's row mapping does not change. A client
- * that cannot be resolved surfaces as `ClickHouseClientUnavailableError`.
+ * that cannot be resolved surfaces as `TenantReaderClientUnavailableError`.
  */
 export class TenantScopedReader {
   constructor(
@@ -416,7 +416,7 @@ export class TenantScopedReader {
       fence: this.deps.fence,
     });
     const client = await this.deps.client().catch((cause: unknown) => {
-      throw new ClickHouseClientUnavailableError({ cause });
+      throw new TenantReaderClientUnavailableError({ cause });
     });
     return client.query({
       ...params,

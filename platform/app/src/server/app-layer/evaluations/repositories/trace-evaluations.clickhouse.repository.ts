@@ -16,7 +16,7 @@ import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import {
   type AuthorizedClickHouse,
-  ClickHouseClientUnavailableError,
+  TenantReaderClientUnavailableError,
   tenantScope,
   tenantScopeKey,
 } from "~/server/app-layer/clients/clickhouse/authorized-reads";
@@ -260,7 +260,7 @@ export class TraceEvaluationsClickHouseRepository
         inputs: asPlainObject(safeJsonParse(row.Inputs ?? null)),
       };
     } catch (error) {
-      if (error instanceof ClickHouseClientUnavailableError) {
+      if (error instanceof TenantReaderClientUnavailableError) {
         logger.warn(
           {
             evaluationId,
