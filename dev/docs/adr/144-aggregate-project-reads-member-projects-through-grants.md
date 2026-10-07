@@ -467,3 +467,43 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   `aggregateRule` back yet; block E adds a parsing read in the repository,
   on the pattern of `grantConditionFromDb`. The default landing project
   can still be an aggregate for an admin, left to block F.
+- v4.4 (2026-10-07, implementation note after block E, two details of
+  decision 3 corrected). The reconciler lives in
+  `projects/aggregate-reconciler.service.ts`; `reconcile` reads the rule
+  through `aggregateRuleFromDb`, lists the aggregate's live shared reads
+  from the ledger writer, revokes before it attaches, and reports
+  attached, revoked, unchanged and failed project ids. Two details of
+  the text did not survive contact with the code. The condition is
+  written as `{ type: "trace", from: <attach time> }` with no `until`
+  key, because the stored condition schema has no null and a row with
+  `until: null` would be dropped on read; "open-ended" means the key is
+  absent. The nightly sweep is one scheduled job per aggregate, not per
+  organisation, because the scheduler keys every job by project; an
+  organisation-wide entry point exists for operators. The sweep row is
+  written on creation, put back by every reconcile when missing, and
+  put back at worker boot for live aggregates without one; an
+  operator-paused row stays paused. Triggers: creation, a personal
+  workspace appearing or being revived, a real department move,
+  offboarding through member deletion or SCIM, archiving any project,
+  and an explicit rule edit through `project.updateAggregateRule`
+  (organisation admin only). Every trigger runs after its transaction
+  commits and never fails the action that fired it; the rule edit alone
+  propagates a reconcile failure. Creation reconciles inside the request:
+  attaches go out without waiting, then one convergence wait covers the
+  batch; a refused attach is listed as failed and left to the next
+  trigger. A grant id derives from the pair and the attach second, so a
+  pair revoked and re-attached inside one second moves to the next free
+  second; a derived id already held by a live row of the same identity
+  is returned as already attached. Reconciles of one aggregate are
+  serialised under a transaction-scoped Postgres advisory lock keyed on
+  the aggregate id, capped at two held locks per process so the
+  connection pool cannot deadlock. Archiving an aggregate revokes all its
+  shared reads with reason `aggregate_archived` and stops its sweep;
+  there is no unarchive path. A stored rule that fails to parse
+  reconciles nothing, revokes nothing, logs and reports the exception.
+  The audit row for a shared read carries its condition; safe while
+  `where` must be empty, to be revisited when the filter compiler lands.
+  Disabling a member changes nothing, because a disabled member's
+  personal project remains a member. Role bindings attached in the same
+  second as a revoke share the latent id collision; block E does not
+  reach that path and it is left for block F.
