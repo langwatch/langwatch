@@ -29,7 +29,44 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import type { Node, SourceFile } from "typescript/unstable/ast";
+import {
+  isArrowFunction,
+  isAwaitExpression,
+  isBinaryExpression,
+  isBindingElement,
+  isCallExpression,
+  isClassLikeDeclaration,
+  isConstructorDeclaration,
+  isElementAccessExpression,
+  isFunctionDeclaration,
+  isFunctionExpression,
+  isGetAccessorDeclaration,
+  isIdentifier,
+  isImportDeclaration,
+  isImportSpecifier,
+  isMethodDeclaration,
+  isNamedImports,
+  isNoSubstitutionTemplateLiteral,
+  isObjectBindingPattern,
+  isObjectLiteralExpression,
+  isParameterDeclaration,
+  isPrivateIdentifier,
+  isPropertyAccessExpression,
+  isPropertyAssignment,
+  isPropertyDeclaration,
+  isQualifiedName,
+  isSetAccessorDeclaration,
+  isSourceFile,
+  isStringLiteral,
+  isTemplateExpression,
+  isVariableDeclaration,
+  isVariableDeclarationList,
+  isVariableStatement,
+  SyntaxKind,
+} from "typescript/unstable/ast";
 import { describe, expect, it } from "vitest";
+import { parseSourceText, parseSourceTexts } from "~/test-utils/tsAst";
 import { HAND_WRITTEN_TENANT_PREDICATE } from "../authorized-reads";
 
 const SRC = path.resolve(import.meta.dirname, "../../../../..");
@@ -124,14 +161,22 @@ const TRACE_ROUTERS = [
 ];
 
 /**
- * A call into, or a hand-over of, a service whose repository reads through
- * the proof: the trace list, summary, spans and session groups services, and
- * the evaluation runs service that owns the evaluation summaries. Narrowing
- * the detail proof reaches the summary service too, so a router that only
- * calls `traceDetailAuthorization` reaches a converted read as surely.
+ * The services whose repository reads through the proof: the trace list,
+ * summary, spans and session groups services under `traces`, and the
+ * evaluation runs service under `evaluations` that owns the evaluation
+ * summaries. A call into one, or a hand-over of one, reaches a converted
+ * read.
  */
-const CONVERTED_SERVICE_READ =
-  /\b(?:traces\.(?:list|summary|spans|sessionGroups)|evaluations\.runs|traceDetailAuthorization)\b/;
+const PROOF_TAKING_SERVICES = new Map<string, string[]>([
+  ["traces", ["list", "summary", "spans", "sessionGroups"]],
+  ["evaluations", ["runs"]],
+]);
+
+/**
+ * Narrowing the detail proof reaches the summary service too, so a router
+ * that only calls this reaches a converted read as surely.
+ */
+const DETAIL_PROOF_NARROWER = "traceDetailAuthorization";
 
 /**
  * Router chunks that reach one of those services and carry no proof. Every
@@ -146,16 +191,6 @@ const ROUTE_CHUNKS_WITHOUT_PROOF: Array<{
   reason: string;
   owner: string;
 }> = [];
-
-/**
- * The proof-taking trace services and the evaluation runs service, reached
- * as `traces.<service>.<method>(` or `evaluations.runs.<method>(`. Every such
- * call in a trace router names the proof in its own argument object: a call
- * that hands the service a project id, by name or by position, picks its
- * tenant by hand and is refused (ADR-144 blocks B and F).
- */
-const PROOF_TAKING_CALL =
-  /\b(?:traces\.(?:list|summary|spans|sessionGroups)|evaluations\.runs)\.(\w+)\s*\(/g;
 
 /**
  * Trace reads a route still hands a tenant by hand, kept behind the
@@ -270,211 +305,336 @@ const HAND_TENANT_READS: Array<{
 ];
 
 /** Services whose reads take a tenant by hand; see {@link HAND_TENANT_READS}. */
-const HAND_TENANT_SERVICE =
-  /\b(traces\.logRecords|codingAgents\.sessions|TraceService|EvaluationService|ClickHouseTraceService)\b/g;
+const HAND_TENANT_MEMBERS = new Set([
+  "traces.logRecords",
+  "codingAgents.sessions",
+]);
 
-/** An import of a service that takes a project id for every trace read. */
-const IMPORTS_HAND_TENANT_SERVICE =
-  /import\s*(?:type\s*)?\{[^}]*\b(?:TraceService|EvaluationService|ClickHouseTraceService)\b[^}]*\}\s*from/;
-
-/**
- * A trace or evaluations service taken apart or held under another name:
- * `const { spans } = app.traces` or `const list = getApp().traces.list`.
- * Either moves the call out of reach of the checks above, which read
- * `traces.<service>.<method>(` at the call, so a route may do neither.
- */
-const SERVICE_TAKEN_APART =
-  /\}\s*=\s*(?:await\s+)?[\w$.()]*\b(?:traces|evaluations)\s*(?:;|\n|$)/;
-const SERVICE_HELD_BY_NAME =
-  /=\s*(?:await\s+)?[\w$.()]*\b(?:traces\.(?:list|summary|spans|sessionGroups|logRecords)|evaluations\.runs)\s*(?:;|\n|$)/;
+/** The services that take a project id for every trace read. */
+const HAND_TENANT_CLASSES = new Set([
+  "TraceService",
+  "EvaluationService",
+  "ClickHouseTraceService",
+]);
 
 function read(relativeToSrc: string): string {
   return readFileSync(path.join(SRC, relativeToSrc), "utf8");
 }
 
-function lineAt(source: string, offset: number): number {
-  return source.slice(0, offset).split("\n").length;
+/**
+ * Parses sources through the one compiler session, all in a single exchange,
+ * keyed by the name each was read under. Every check below walks the parsed
+ * tree, so a comment is never code: it is trivia, and no walk visits it.
+ */
+function parseAll({
+  files,
+  readText,
+}: {
+  files: readonly string[];
+  readText: (file: string) => string;
+}): Map<string, SourceFile> {
+  const parsed = parseSourceTexts({
+    sources: files.map((file) => ({
+      fileName: file,
+      sourceText: readText(file),
+    })),
+  });
+  return new Map(parsed.map(({ fileName, source }) => [fileName, source]));
+}
+
+/** A fixture's lines, parsed the way a real source is. */
+function parseFixture(lines: readonly string[]): SourceFile {
+  return parseSourceText({
+    fileName: "fixture.ts",
+    sourceText: lines.join("\n"),
+  });
+}
+
+/** 1-based line of the first character of `node`, its leading trivia skipped. */
+function lineOf(tree: SourceFile, node: Node): number {
+  return tree.text.slice(0, node.getStart(tree)).split("\n").length;
 }
 
 /**
- * The source with every line and block comment blanked to spaces, newlines
- * kept, so offsets and line numbers still point into the original. String
- * literals are stepped over whole: a `//` inside a URL is not a comment.
+ * Calls `visit` on `root` and every node below it, in source order. A node
+ * `visit` answers false for is not entered.
  */
-function withoutComments(source: string): string {
-  let out = "";
-  let i = 0;
-  while (i < source.length) {
-    const ch = source[i];
-    const next = source[i + 1];
-    if (ch === "/" && next === "/") {
-      const end = source.indexOf("\n", i);
-      const stop = end === -1 ? source.length : end;
-      out += " ".repeat(stop - i);
-      i = stop;
-    } else if (ch === "/" && next === "*") {
-      const end = source.indexOf("*/", i + 2);
-      const stop = end === -1 ? source.length : end + 2;
-      out += source.slice(i, stop).replace(/[^\n]/g, " ");
-      i = stop;
-    } else if (ch === '"' || ch === "'") {
-      const end = quotedEnd(source, i);
-      out += source.slice(i, end + 1);
-      i = end + 1;
-    } else if (ch === "`") {
-      const end = templateEnd(source, i);
-      out += source.slice(i, end + 1);
-      i = end + 1;
-    } else {
-      out += ch;
-      i += 1;
-    }
-  }
-  return out;
+function walk(root: Node, visit: (node: Node) => boolean): void {
+  if (!visit(root)) return;
+  root.forEachChild((child) => {
+    walk(child, visit);
+  });
 }
 
-/**
- * Every string literal in a TypeScript source, with the offset of its first
- * character. A template literal is returned whole, `${}` expressions
- * included, so a nested template never splits the SQL around it. Comments
- * are skipped so a commented-out predicate does not count as query text.
- */
-function stringLiteralsIn(
-  source: string,
-): Array<{ text: string; offset: number }> {
-  const found: Array<{ text: string; offset: number }> = [];
-  let i = 0;
-  while (i < source.length) {
-    const ch = source[i];
-    const next = source[i + 1];
-    if (ch === "/" && next === "/") {
-      const end = source.indexOf("\n", i);
-      i = end === -1 ? source.length : end;
-    } else if (ch === "/" && next === "*") {
-      const end = source.indexOf("*/", i + 2);
-      i = end === -1 ? source.length : end + 2;
-    } else if (ch === '"' || ch === "'") {
-      const end = quotedEnd(source, i);
-      found.push({ text: source.slice(i + 1, end), offset: i + 1 });
-      i = end + 1;
-    } else if (ch === "`") {
-      const end = templateEnd(source, i);
-      found.push({ text: source.slice(i + 1, end), offset: i + 1 });
-      i = end + 1;
-    } else {
-      i += 1;
-    }
-  }
+/** Every node from `root` down that `matches` accepts, never entering a node `stop` names. */
+function findNodes({
+  root,
+  matches,
+  stop = () => false,
+}: {
+  root: Node;
+  matches: (node: Node) => boolean;
+  stop?: (node: Node) => boolean;
+}): Node[] {
+  const found: Node[] = [];
+  walk(root, (node) => {
+    if (node !== root && stop(node)) return false;
+    if (matches(node)) found.push(node);
+    return true;
+  });
   return found;
 }
 
-/** Offset of the closing quote of the literal opened at `start`. */
-function quotedEnd(source: string, start: number): number {
-  const quote = source[start];
-  let i = start + 1;
-  while (i < source.length) {
-    if (source[i] === "\\") i += 2;
-    else if (source[i] === quote || source[i] === "\n") return i;
-    else i += 1;
-  }
-  return source.length;
+function isIdentifierNamed(node: Node, name: string): boolean {
+  return isIdentifier(node) && node.text === name;
 }
 
-/** Offset of the closing backtick of the template opened at `start`. */
-function templateEnd(source: string, start: number): number {
-  let i = start + 1;
-  while (i < source.length) {
-    const ch = source[i];
-    if (ch === "\\") i += 2;
-    else if (ch === "`") return i;
-    else if (ch === "$" && source[i + 1] === "{")
-      i = expressionEnd(source, i + 1) + 1;
-    else i += 1;
-  }
-  return source.length;
+/** The last name of an access path: `traces` for `getApp().traces`. */
+function lastNameOf(node: Node): Node | undefined {
+  if (isIdentifier(node)) return node;
+  if (isPropertyAccessExpression(node)) return node.name;
+  if (isQualifiedName(node)) return node.right;
+  return undefined;
 }
-
-/** Offset of the `}` closing the `${` expression whose `{` is at `start`. */
-function expressionEnd(source: string, start: number): number {
-  let depth = 0;
-  let i = start;
-  while (i < source.length) {
-    const ch = source[i];
-    if (ch === "{") depth += 1;
-    else if (ch === "}") {
-      depth -= 1;
-      if (depth === 0) return i;
-    } else if (ch === "`") i = templateEnd(source, i);
-    else if (ch === '"' || ch === "'") i = quotedEnd(source, i);
-    i += 1;
-  }
-  return source.length;
-}
-
-type Method = { name: string; start: number; end: number };
 
 /**
- * The methods of the first class in a source, each spanning from its
- * declaration line to the next one. A method head is a two-space-indented
- * `name(` declaration or a `name = (` / `name = async (` arrow property; SQL
- * inside a method sits deeper, so a query line never opens a method. If one
- * ever did, it would split a method in two under a bogus name, and a client
- * reached in the second half would fail the gate as a read, not pass it: the
- * fragility is on the closed side.
+ * The owner and member a member access ends in, `traces.spans` for
+ * `getApp().traces.spans`, with the owner's own name node for its line.
+ * A type query (`typeof app.traces.spans`) reads the same as an expression.
  */
-function methodsOf(source: string): Method[] {
-  const classAt = source.search(/^(?:export\s+)?class\s/m);
-  if (classAt === -1) return [];
-  const declaration =
-    /^ {2}(?:(?:public|private|protected|static|readonly|async|get)\s+)*([A-Za-z_$][\w$]*)\s*(?:<[^>\n]*>)?\s*(?:\(|=\s*(?:async\s*)?(?:<[^>\n]*>\s*)?\()/gm;
-  const heads = [...source.slice(classAt).matchAll(declaration)].map(
-    (match) => ({
-      name: match[1] as string,
-      start: classAt + (match.index as number),
-    }),
-  );
-  return heads.map((head, index) => ({
-    ...head,
-    end: heads[index + 1]?.start ?? source.length,
-  }));
+function memberAccessOf(
+  node: Node,
+): { owner: Node; label: string } | undefined {
+  const [object, member] = isPropertyAccessExpression(node)
+    ? [node.expression, node.name]
+    : isQualifiedName(node)
+      ? [node.left, node.right]
+      : [undefined, undefined];
+  const owner = object && lastNameOf(object);
+  if (!owner || !isIdentifier(owner) || !isIdentifier(member)) return undefined;
+  return { owner, label: `${owner.text}.${member.text}` };
 }
 
-function methodAt(methods: Method[], offset: number): Method | undefined {
-  return methods.find(
-    (method) => offset >= method.start && offset < method.end,
+/** Whether `node` names a service whose repository reads through the proof. */
+function isProofTakingService(node: Node): boolean {
+  const access = memberAccessOf(node);
+  if (!access) return false;
+  const [owner, member] = access.label.split(".") as [string, string];
+  return PROOF_TAKING_SERVICES.get(owner)?.includes(member) ?? false;
+}
+
+/**
+ * A call into, or a hand-over of, a service whose repository reads through
+ * the proof. Importing the detail proof's narrower is neither: the chunk
+ * that calls it is.
+ */
+function reachesConvertedRead(node: Node): boolean {
+  return (
+    isProofTakingService(node) ||
+    (isIdentifierNamed(node, DETAIL_PROOF_NARROWER) &&
+      !isImportSpecifier(node.parent))
   );
+}
+
+/** The proof, named in code: a binding, a property or an argument called `authorization`. */
+function isProof(node: Node): boolean {
+  return isIdentifierNamed(node, "authorization");
+}
+
+/**
+ * Every string literal in a source, or under one node of it, with the offset
+ * of its first character, its text read raw so a line of it is a line of the
+ * file. A template literal is returned whole, `${}` expressions included, so
+ * a nested template never splits the SQL around it.
+ */
+function stringLiteralsIn({
+  tree,
+  root = tree,
+}: {
+  tree: SourceFile;
+  root?: Node;
+}): Array<{ text: string; offset: number }> {
+  const found: Array<{ text: string; offset: number }> = [];
+  walk(root, (node) => {
+    const isLiteral =
+      isStringLiteral(node) ||
+      isNoSubstitutionTemplateLiteral(node) ||
+      isTemplateExpression(node);
+    if (!isLiteral) return true;
+    const offset = node.getStart(tree) + 1;
+    found.push({ text: tree.text.slice(offset, node.end - 1), offset });
+    return false;
+  });
+  return found;
+}
+
+type Method = { name: string; node: Node; start: number; end: number };
+
+/** The name a class member is called by, if it is a method. */
+function methodNameOf(member: Node): string | undefined {
+  if (isConstructorDeclaration(member)) return "constructor";
+  const isFunctionProperty =
+    isPropertyDeclaration(member) &&
+    member.initializer !== undefined &&
+    (isArrowFunction(member.initializer) ||
+      isFunctionExpression(member.initializer));
+  const isMethod =
+    isMethodDeclaration(member) ||
+    isGetAccessorDeclaration(member) ||
+    isSetAccessorDeclaration(member) ||
+    isFunctionProperty;
+  if (!isMethod) return undefined;
+  const name = member.name;
+  return isIdentifier(name) ||
+    isPrivateIdentifier(name) ||
+    isStringLiteral(name)
+    ? name.text
+    : undefined;
+}
+
+/**
+ * The methods of every class in a source, each spanning its own declaration:
+ * method declarations, accessors, the constructor, and arrow or function
+ * properties, since a class arrow property is a method.
+ */
+function methodsOf(tree: SourceFile): Method[] {
+  const methods: Method[] = [];
+  walk(tree, (node) => {
+    if (!isClassLikeDeclaration(node)) return true;
+    for (const member of node.members) {
+      const name = methodNameOf(member);
+      if (name === undefined) continue;
+      methods.push({
+        name,
+        node: member,
+        start: member.getStart(tree),
+        end: member.end,
+      });
+    }
+    return true;
+  });
+  return methods;
+}
+
+/** The innermost method spanning `offset`. */
+function methodAt(methods: Method[], offset: number): Method | undefined {
+  return methods
+    .filter((method) => offset >= method.start && offset < method.end)
+    .at(-1);
 }
 
 /**
  * Every query-text line of a repository that names the tenant in a predicate
  * of its own, as `file:line text`, with the not-yet-converted methods left
- * out. This is the function the fixture check drives, so the two agree.
+ * out. `root` narrows the scan to one node of the source. This is the
+ * function the fixture check drives, so the two agree.
  */
 function handWrittenTenantPredicatesIn({
   file,
-  source,
+  tree,
+  root = tree,
   skipMethods = [],
 }: {
   file: string;
-  source: string;
+  tree: SourceFile;
+  root?: Node;
   skipMethods?: string[];
 }): string[] {
-  const methods = methodsOf(source);
+  const methods = methodsOf(tree);
   const offending: string[] = [];
-  for (const literal of stringLiteralsIn(source)) {
+  for (const literal of stringLiteralsIn({ tree, root })) {
     const method = methodAt(methods, literal.offset);
     if (method && skipMethods.includes(method.name)) continue;
+    const firstLine = tree.text.slice(0, literal.offset).split("\n").length;
     literal.text.split("\n").forEach((line, index) => {
       if (!HAND_WRITTEN_TENANT_PREDICATE.test(line)) return;
-      const number = lineAt(source, literal.offset) + index;
-      offending.push(`${file}:${number} ${line.trim()}`);
+      offending.push(`${file}:${firstLine + index} ${line.trim()}`);
     });
   }
   return offending;
 }
 
 /** The injected resolver, and the client factories it stands in front of. */
-const CLIENT_RESOLVER = /\b(?:resolveClient|getClickHouseClientFor\w+)\b/g;
+const CLIENT_RESOLVER = /^(?:resolveClient|getClickHouseClientFor\w+)$/;
+
+/**
+ * Every name of the resolver or a client factory in a source: an identifier,
+ * or a string key that reaches one through an element access.
+ */
+function resolverMentionsIn(root: Node): Array<{ name: string; node: Node }> {
+  return findNodes({
+    root,
+    matches: (node) =>
+      (isIdentifier(node) && CLIENT_RESOLVER.test(node.text)) ||
+      (isStringLiteral(node) &&
+        isElementAccessExpression(node.parent) &&
+        node.parent.argumentExpression === node &&
+        CLIENT_RESOLVER.test(node.text)),
+  }).map((node) => ({
+    name: isIdentifier(node) || isStringLiteral(node) ? node.text : "",
+    node,
+  }));
+}
+
+/** Whether `name` is the callee of a call, reached directly or as a member. */
+function isCalled(name: Node): boolean {
+  const parent = name.parent;
+  const isMember =
+    (isPropertyAccessExpression(parent) && parent.name === name) ||
+    (isElementAccessExpression(parent) && parent.argumentExpression === name);
+  const callee = isMember ? parent : name;
+  return isCallExpression(callee.parent) && callee.parent.expression === callee;
+}
+
+const FIELD_MODIFIERS = new Set<SyntaxKind>([
+  SyntaxKind.ReadonlyKeyword,
+  SyntaxKind.PrivateKeyword,
+  SyntaxKind.ProtectedKeyword,
+  SyntaxKind.PublicKeyword,
+]);
+
+/** Whether `name` is a class field declaring its type, `private readonly x: T`. */
+function isTypedFieldName(name: Node): boolean {
+  const field = name.parent;
+  return (
+    isPropertyDeclaration(field) &&
+    field.name === name &&
+    field.type !== undefined &&
+    (field.modifiers ?? []).some((modifier) =>
+      FIELD_MODIFIERS.has(modifier.kind),
+    )
+  );
+}
+
+/** What one mention of the resolver or a factory amounts to, if anything. */
+function reachOf({
+  file,
+  tree,
+  mention,
+  methods,
+  allowedMethods,
+}: {
+  file: string;
+  tree: SourceFile;
+  mention: { name: string; node: Node };
+  methods: Method[];
+  allowedMethods: string[];
+}): string | undefined {
+  const line = lineOf(tree, mention.node);
+  if (mention.name !== "resolveClient") {
+    return `${file}:${line} reaches ${mention.name} past the injected resolver`;
+  }
+  const method = methodAt(methods, mention.node.getStart(tree));
+  const where = method?.name ?? "<outside any method>";
+  if (allowedMethods.includes(where)) return undefined;
+  if (isCalled(mention.node)) {
+    return `${file}:${line} resolves a tenant's client in ${where}`;
+  }
+  if (method?.name === "constructor" || isTypedFieldName(mention.node)) {
+    return undefined;
+  }
+  return `${file}:${line} takes hold of the resolver in ${where}`;
+}
 
 /**
  * Every place a repository reaches a tenant's own client, as `file:line
@@ -487,56 +647,45 @@ const CLIENT_RESOLVER = /\b(?:resolveClient|getClickHouseClientFor\w+)\b/g;
  */
 function clientReachesIn({
   file,
-  source,
+  tree,
   allowedMethods,
 }: {
   file: string;
-  source: string;
+  tree: SourceFile;
   allowedMethods: string[];
 }): string[] {
-  const code = withoutComments(source);
-  const methods = methodsOf(code);
-  const reaches: string[] = [];
-  for (const match of code.matchAll(CLIENT_RESOLVER)) {
-    const offset = match.index as number;
-    const name = match[0];
-    const line = lineAt(code, offset);
-    if (name !== "resolveClient") {
-      reaches.push(
-        `${file}:${line} reaches ${name} past the injected resolver`,
-      );
-      continue;
-    }
-    const method = methodAt(methods, offset);
-    const where = method?.name ?? "<outside any method>";
-    if (allowedMethods.includes(where)) continue;
-    const isCall = /^\s*\(/.test(code.slice(offset + name.length));
-    if (isCall) {
-      reaches.push(`${file}:${line} resolves a tenant's client in ${where}`);
-      continue;
-    }
-    if (method?.name === "constructor") continue;
-    const declaresField =
-      /(?:readonly|private|protected|public)\s+$/.test(code.slice(0, offset)) &&
-      /^\s*\??:/.test(code.slice(offset + name.length));
-    if (declaresField) continue;
-    reaches.push(`${file}:${line} takes hold of the resolver in ${where}`);
-  }
-  return reaches;
+  const methods = methodsOf(tree);
+  return resolverMentionsIn(tree).flatMap((mention) => {
+    const reach = reachOf({ file, tree, mention, methods, allowedMethods });
+    return reach ? [reach] : [];
+  });
+}
+
+/** How many calls under `root` call a function of this name, directly or as a member. */
+function callsNamed(root: Node, name: string): number {
+  return findNodes({
+    root,
+    matches: (node) => isIdentifierNamed(node, name) && isCalled(node),
+  }).length;
+}
+
+/** Whether anything under `root` calls the injected resolver. */
+function callsResolver(root: Node): boolean {
+  return callsNamed(root, "resolveClient") > 0;
 }
 
 /** Every `.ts`/`.tsx` under `dir`, as paths relative to `APP`. */
 function sourceFilesUnder(dir: string): string[] {
   const files: string[] = [];
-  const walk = (current: string) => {
+  const walkDir = (current: string) => {
     for (const entry of readdirSync(current, { withFileTypes: true })) {
       if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
       const full = path.join(current, entry.name);
-      if (entry.isDirectory()) walk(full);
+      if (entry.isDirectory()) walkDir(full);
       else if (/\.tsx?$/.test(entry.name)) files.push(path.relative(APP, full));
     }
   };
-  walk(dir);
+  walkDir(dir);
   return files;
 }
 
@@ -544,65 +693,120 @@ function isTestFile(file: string): boolean {
   return /\.test\.tsx?$/.test(file) || file.includes("/__tests__/");
 }
 
-const IMPORTS_FRAGMENT_EXPANDER =
-  /import\s*\{[^}]*\bexpandFragment\b[^}]*\}\s*from/;
+/** The names a source imports by name, under their exported name and their local one. */
+function namedImportsOf(tree: SourceFile): Set<string> {
+  const names = tree.statements.flatMap((statement) => {
+    const bindings = isImportDeclaration(statement)
+      ? statement.importClause?.namedBindings
+      : undefined;
+    if (!bindings || !isNamedImports(bindings)) return [];
+    return bindings.elements.flatMap((element) =>
+      [element.name, element.propertyName].map((name) => name?.text),
+    );
+  });
+  return new Set(names.filter((name) => name !== undefined));
+}
 
-type Chunk = { name: string; line: number; text: string };
+type Chunk = {
+  name: string;
+  line: number;
+  reachesConvertedRead: boolean;
+  carriesProof: boolean;
+};
+
+/** The procedure a handler function belongs to, if it is one: `.query(` / `.mutation(`. */
+function procedureNameOf(tree: SourceFile, node: Node): string | undefined {
+  const opener = procedureOpenerOf(node);
+  if (!opener) return undefined;
+  let owner: Node = opener;
+  while (!isSourceFile(owner) && !isPropertyAssignment(owner))
+    owner = owner.parent;
+  return isPropertyAssignment(owner) && isIdentifier(owner.name)
+    ? `procedure ${owner.name.text}`
+    : `procedure at ${lineOf(tree, opener)}`;
+}
+
+/** The `query` / `mutation` name a handler function is handed to, if it is one. */
+function procedureOpenerOf(node: Node): Node | undefined {
+  const isHandler = isArrowFunction(node) || isFunctionExpression(node);
+  const call = node.parent;
+  if (!isHandler || !isCallExpression(call) || call.arguments[0] !== node) {
+    return undefined;
+  }
+  const opener = isPropertyAccessExpression(call.expression)
+    ? call.expression.name
+    : undefined;
+  return opener?.text === "query" || opener?.text === "mutation"
+    ? opener
+    : undefined;
+}
+
+/** Whether a variable declaration sits at the top of a module, `const x = ...;`. */
+function isTopLevelVariable(node: Node): boolean {
+  const list = node.parent;
+  return (
+    isVariableDeclarationList(list) &&
+    isVariableStatement(list.parent) &&
+    isSourceFile(list.parent.parent)
+  );
+}
+
+/** The top-level function a node declares, if it does: a declaration or a function-valued const. */
+function functionNameOf(node: Node): string | undefined {
+  if (isFunctionDeclaration(node) && isSourceFile(node.parent) && node.name) {
+    return `function ${node.name.text}`;
+  }
+  if (!isVariableDeclaration(node) || !isTopLevelVariable(node)) {
+    return undefined;
+  }
+  const { name, initializer } = node;
+  const isFunctionConst =
+    isIdentifier(name) &&
+    initializer !== undefined &&
+    (isArrowFunction(initializer) || isFunctionExpression(initializer));
+  return isFunctionConst ? `function ${name.text}` : undefined;
+}
 
 /**
  * A router source cut into the pieces a proof has to live in: one chunk per
- * procedure body (from its `.query(` / `.mutation(` opener to the next) and
- * one per top-level function, since the loaders a procedure delegates to
- * receive the proof as a parameter and call the service themselves. The
- * source is read without its comments, so a chunk's text is code only. Kept
- * as a plain function so block F can lift it when the rule widens to every
- * router.
+ * procedure body (the function handed to `.query(` / `.mutation(`) and one
+ * per top-level function, since the loaders a procedure delegates to
+ * receive the proof as a parameter and call the service themselves. What no
+ * piece claims is the module preamble. A chunk never reaches into another,
+ * and being read from the tree, it holds code only. Kept as a plain function
+ * so block F can lift it when the rule widens to every router.
  */
-function routeChunksOf(source: string): Chunk[] {
-  const code = withoutComments(source);
-  const openers = [
-    ...code.matchAll(/\.(?:query|mutation)\(\s*(?:async\s*)?\(/g),
-  ].map((match) => ({
-    offset: match.index as number,
-    name: procedureNameBefore(code, match.index as number),
-  }));
-  const functions = [
-    ...code.matchAll(
-      /^(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/gm,
-    ),
-  ].map((match) => ({
-    offset: match.index as number,
-    name: `function ${match[1]}`,
-  }));
-  const boundaries = [
-    { offset: 0, name: "module preamble" },
-    ...openers,
-    ...functions,
-  ].sort((a, b) => a.offset - b.offset);
-  return boundaries.map((boundary, index) => ({
-    name: boundary.name,
-    line: lineAt(code, boundary.offset),
-    text: code.slice(
-      boundary.offset,
-      boundaries[index + 1]?.offset ?? code.length,
-    ),
-  }));
-}
-
-/** The `name: xProcedure` key the opener at `offset` belongs to. */
-function procedureNameBefore(source: string, offset: number): string {
-  const keys = [
-    ...source
-      .slice(0, offset)
-      .matchAll(/^\s+([A-Za-z_$][\w$]*):\s*\w*[pP]rocedure\b/gm),
+function routeChunksOf(tree: SourceFile): Chunk[] {
+  const roots: Array<{ name: string; line: number; node: Node }> = [
+    { name: "module preamble", line: 1, node: tree },
   ];
-  const last = keys[keys.length - 1];
-  return last
-    ? `procedure ${last[1]}`
-    : `procedure at ${lineAt(source, offset)}`;
+  walk(tree, (node) => {
+    const name = procedureNameOf(tree, node) ?? functionNameOf(node);
+    if (name) roots.push({ name, line: chunkLine(tree, node), node });
+    return true;
+  });
+  const isRoot = new Set(roots.map((root) => root.node));
+  return roots.map(({ name, line, node }) => {
+    const found = findNodes({
+      root: node,
+      matches: (candidate) =>
+        reachesConvertedRead(candidate) || isProof(candidate),
+      stop: (candidate) => isRoot.has(candidate),
+    });
+    return {
+      name,
+      line,
+      reachesConvertedRead: found.some(reachesConvertedRead),
+      carriesProof: found.some(isProof),
+    };
+  });
 }
 
-const PROOF = /\bauthorization\b/;
+/** The line a chunk is reported on: its `.query(` opener, or its declaration. */
+function chunkLine(tree: SourceFile, node: Node): number {
+  const declaration = isVariableDeclaration(node) ? node.parent.parent : node;
+  return lineOf(tree, procedureOpenerOf(node) ?? declaration);
+}
 
 /**
  * Every chunk of a router that reaches a converted read and carries no
@@ -611,72 +815,69 @@ const PROOF = /\bauthorization\b/;
  */
 function routeReadsWithoutProofIn({
   file,
-  source,
+  tree,
   allowedChunks = [],
 }: {
   file: string;
-  source: string;
+  tree: SourceFile;
   allowedChunks?: string[];
 }): string[] {
-  return routeChunksOf(source)
-    .filter((chunk) => CONVERTED_SERVICE_READ.test(chunk.text))
-    .filter((chunk) => !PROOF.test(chunk.text))
+  return routeChunksOf(tree)
+    .filter((chunk) => chunk.reachesConvertedRead && !chunk.carriesProof)
     .filter((chunk) => !allowedChunks.includes(chunk.name))
     .map(
       (chunk) => `${file}:${chunk.line} ${chunk.name} reads without a proof`,
     );
 }
 
-/** Offset of the `)` closing the call whose `(` is at `open`. */
-function callEnd(code: string, open: number): number {
-  let depth = 0;
-  let i = open;
-  while (i < code.length) {
-    const ch = code[i];
-    if (ch === "(" || ch === "{" || ch === "[") depth += 1;
-    else if (ch === ")" || ch === "}" || ch === "]") {
-      depth -= 1;
-      if (depth === 0) return i;
-    } else if (ch === '"' || ch === "'") i = quotedEnd(code, i);
-    else if (ch === "`") i = templateEnd(code, i);
-    i += 1;
-  }
-  return code.length;
-}
-
 /**
  * Every call into a proof-taking trace service whose own arguments carry no
- * proof, as `file:line service.method passes no proof`. The arguments are
- * read without comments, so a comment naming the proof does not count, and
- * a positional project id has nowhere to hide.
+ * proof, as `file:line service.method passes no proof`. A call reaches the
+ * service as `traces.<service>.<method>(` or `evaluations.runs.<method>(`,
+ * and names the proof in its own argument object: a call that hands the
+ * service a project id, by name or by position, picks its tenant by hand and
+ * is refused (ADR-144 blocks B and F). A comment naming the proof is not in
+ * the tree, so it does not count.
  */
 function serviceCallsWithoutProofIn({
   file,
-  source,
+  tree,
 }: {
   file: string;
-  source: string;
+  tree: SourceFile;
 }): string[] {
-  const code = withoutComments(source);
-  const missing: string[] = [];
-  for (const match of code.matchAll(PROOF_TAKING_CALL)) {
-    const start = match.index as number;
-    const open = start + match[0].length - 1;
-    const args = code.slice(open + 1, callEnd(code, open));
-    if (PROOF.test(args)) continue;
-    const callee = match[0].replace(/\s*\($/, "");
-    missing.push(`${file}:${lineAt(code, start)} ${callee} passes no proof`);
-  }
-  return missing;
+  const calls = findNodes({
+    root: tree,
+    matches: (node) =>
+      isCallExpression(node) &&
+      isPropertyAccessExpression(node.expression) &&
+      isProofTakingService(node.expression.expression),
+  });
+  return calls.flatMap((call) => {
+    if (!isCallExpression(call) || !isPropertyAccessExpression(call.expression))
+      return [];
+    const passesProof = call.arguments.some(
+      (argument) => findNodes({ root: argument, matches: isProof }).length > 0,
+    );
+    const service = memberAccessOf(call.expression.expression);
+    if (passesProof || !service) return [];
+    const callee = `${service.label}.${call.expression.name.text}`;
+    return [`${file}:${lineOf(tree, service.owner)} ${callee} passes no proof`];
+  });
 }
 
 /** How many times each hand-tenant service is referenced in a source. */
-function handTenantReferencesIn(source: string): Record<string, number> {
+function handTenantReferencesIn(tree: SourceFile): Record<string, number> {
   const counts: Record<string, number> = {};
-  for (const match of withoutComments(source).matchAll(HAND_TENANT_SERVICE)) {
-    const service = match[1] as string;
-    counts[service] = (counts[service] ?? 0) + 1;
-  }
+  walk(tree, (node) => {
+    const label = isIdentifier(node) ? node.text : memberAccessOf(node)?.label;
+    const isHandTenant =
+      label !== undefined &&
+      ((isIdentifier(node) && HAND_TENANT_CLASSES.has(label)) ||
+        (!isIdentifier(node) && HAND_TENANT_MEMBERS.has(label)));
+    if (isHandTenant) counts[label] = (counts[label] ?? 0) + 1;
+    return true;
+  });
   return counts;
 }
 
@@ -689,39 +890,108 @@ function routeSources(): string[] {
 }
 
 /**
+ * Every source the gate reads, parsed once on first use: the converted
+ * repositories and every route.
+ */
+let parsedSources: Map<string, SourceFile> | undefined;
+function parsed(file: string): SourceFile {
+  parsedSources ??= parseAll({
+    files: [...new Set([...CONVERTED_REPOSITORIES, ...routeSources()])],
+    readText: read,
+  });
+  const tree = parsedSources.get(file);
+  if (!tree) throw new Error(`${file} was not parsed; add it to the scan`);
+  return tree;
+}
+
+/**
  * Every route that calls, or hands over, a proof-taking service: a router
  * passing `traces.spans` to a helper reaches it as surely as one calling it.
  */
 function routersReachingProofTakingServices(): string[] {
-  return routeSources().filter((file) =>
-    CONVERTED_SERVICE_READ.test(withoutComments(read(file))),
+  return routeSources().filter(
+    (file) =>
+      findNodes({ root: parsed(file), matches: reachesConvertedRead }).length >
+      0,
   );
 }
 
 /** Every route that imports a service taking a project id for trace reads. */
 function routesImportingHandTenantServices(): string[] {
   return routeSources().filter((file) =>
-    IMPORTS_HAND_TENANT_SERVICE.test(read(file)),
+    [...namedImportsOf(parsed(file))].some((name) =>
+      HAND_TENANT_CLASSES.has(name),
+    ),
   );
 }
 
-/** Every place a source takes a trace service apart or holds it by name. */
+/** The value a binding or an assignment takes, and what it binds it to. */
+function bindingOf(node: Node): { target: Node; value: Node } | undefined {
+  const hasInitializer =
+    isVariableDeclaration(node) ||
+    isBindingElement(node) ||
+    isParameterDeclaration(node);
+  if (hasInitializer && node.initializer) {
+    return { target: node.name, value: node.initializer };
+  }
+  if (
+    isBinaryExpression(node) &&
+    node.operatorToken.kind === SyntaxKind.EqualsToken
+  ) {
+    return { target: node.left, value: node.right };
+  }
+  return undefined;
+}
+
+/**
+ * Whether a binding takes a trace or evaluations service apart,
+ * `const { spans } = app.traces`, or holds one under another name,
+ * `const list = getApp().traces.list`.
+ */
+function movesServiceOutOfSight(binding: {
+  target: Node;
+  value: Node;
+}): boolean {
+  const value = isAwaitExpression(binding.value)
+    ? binding.value.expression
+    : binding.value;
+  const owner = lastNameOf(value);
+  const takenApart =
+    (isObjectBindingPattern(binding.target) ||
+      isObjectLiteralExpression(binding.target)) &&
+    owner !== undefined &&
+    isIdentifier(owner) &&
+    PROOF_TAKING_SERVICES.has(owner.text);
+  const heldByName =
+    isProofTakingService(value) ||
+    memberAccessOf(value)?.label === "traces.logRecords";
+  return takenApart || heldByName;
+}
+
+/**
+ * Every line where a source takes a trace or evaluations service apart or
+ * holds it under another name. Either moves the call out of reach of the
+ * checks above, which read `traces.<service>.<method>(` at the call, so a
+ * route may do neither.
+ */
 function servicesTakenApartIn({
   file,
-  source,
+  tree,
 }: {
   file: string;
-  source: string;
+  tree: SourceFile;
 }): string[] {
-  const code = withoutComments(source);
-  return code.split("\n").flatMap((line, index) => {
-    // Each line with the next, so a binding split before its `;` is read
-    // whole.
-    const text = `${line}\n`;
-    return SERVICE_TAKEN_APART.test(text) || SERVICE_HELD_BY_NAME.test(text)
-      ? [`${file}:${index + 1} ${line.trim()}`]
-      : [];
-  });
+  const lines = findNodes({
+    root: tree,
+    matches: (node) => {
+      const binding = bindingOf(node);
+      return binding !== undefined && movesServiceOutOfSight(binding);
+    },
+  }).map((node) => lineOf(tree, bindingOf(node)?.value ?? node));
+  const sourceLines = tree.text.split("\n");
+  return [...new Set(lines)].map(
+    (line) => `${file}:${line} ${sourceLines[line - 1]?.trim()}`,
+  );
 }
 
 describe("store calls carry authorization", () => {
@@ -729,15 +999,16 @@ describe("store calls carry authorization", () => {
     /** @scenario "Trace repositories write no tenant of their own" */
     it("finds no hand-written tenant predicate in the converted repositories", () => {
       const offending = CONVERTED_REPOSITORIES.flatMap((file) => {
-        const source = read(file);
+        const tree = parsed(file);
         // A converted repository carries the marker; a file that does not
         // is the wrong file, and "nothing offends" would be vacuous.
-        expect(source, `${file} carries no tenantScope marker`).toMatch(
-          /\btenantScope\(/,
-        );
+        expect(
+          callsNamed(tree, "tenantScope"),
+          `${file} carries no tenantScope marker`,
+        ).toBeGreaterThan(0);
         return handWrittenTenantPredicatesIn({
           file,
-          source,
+          tree,
           skipMethods: notYetConvertedMethodsOf(file),
         });
       });
@@ -747,7 +1018,7 @@ describe("store calls carry authorization", () => {
 
     /** @scenario "Trace repositories write no tenant of their own" */
     it("fails a repository that filters on the tenant column", () => {
-      const source = [
+      const tree = parseFixture([
         "export class FixtureRepository {",
         "  async findAll() {",
         "    return this.client.query({",
@@ -760,10 +1031,10 @@ describe("store calls carry authorization", () => {
         "    });",
         "  }",
         "}",
-      ].join("\n");
+      ]);
 
       expect(
-        handWrittenTenantPredicatesIn({ file: "fixture.ts", source }),
+        handWrittenTenantPredicatesIn({ file: "fixture.ts", tree }),
       ).toEqual(["fixture.ts:7 WHERE TenantId = {tenantId:String}"]);
     });
   });
@@ -771,14 +1042,14 @@ describe("store calls carry authorization", () => {
   describe("given a repository could reach past the client", () => {
     it("reaches a tenant's own client only from a listed write method", () => {
       const reaches = CONVERTED_REPOSITORIES.flatMap((file) => {
-        const source = read(file);
+        const tree = parsed(file);
         expect(
-          methodsOf(source).length,
+          methodsOf(tree).length,
           `${file} has no methods to scan`,
         ).toBeGreaterThan(0);
         return clientReachesIn({
           file,
-          source,
+          tree,
           allowedMethods: clientHoldersOf(file),
         });
       });
@@ -873,7 +1144,7 @@ describe("store calls carry authorization", () => {
       expect(
         clientReachesIn({
           file: "fixture.ts",
-          source: source.join("\n"),
+          tree: parseFixture(source),
           allowedMethods: writeMethods,
         }),
       ).toEqual(expected);
@@ -881,14 +1152,12 @@ describe("store calls carry authorization", () => {
 
     it("keeps the write list to methods that still resolve a client", () => {
       const stale = Object.entries(WRITE_METHODS).flatMap(([file, names]) => {
-        const source = withoutComments(read(file));
-        const methods = methodsOf(source);
+        const methods = methodsOf(parsed(file));
         return names.flatMap((name) => {
           const method = methods.find((candidate) => candidate.name === name);
           if (!method)
             return [`${file} has no method ${name}; remove it from the list`];
-          const body = source.slice(method.start, method.end);
-          return /\bresolveClient\s*\(/.test(body)
+          return callsResolver(method.node)
             ? []
             : [`${file}#${name} resolves no client; remove it from the list`];
         });
@@ -899,16 +1168,16 @@ describe("store calls carry authorization", () => {
 
     it("keeps the not-yet-converted list to methods that still read by tenant id", () => {
       const stale = NOT_YET_CONVERTED.flatMap(({ file, method: name }) => {
-        const source = read(file);
-        const method = methodsOf(source).find(
+        const tree = parsed(file);
+        const method = methodsOf(tree).find(
           (candidate) => candidate.name === name,
         );
         if (!method)
           return [`${file} has no method ${name}; remove it from the list`];
-        const body = source.slice(method.start, method.end);
         const stillByTenantId =
-          /\bresolveClient\s*\(/.test(withoutComments(body)) &&
-          handWrittenTenantPredicatesIn({ file, source: body }).length > 0;
+          callsResolver(method.node) &&
+          handWrittenTenantPredicatesIn({ file, tree, root: method.node })
+            .length > 0;
         return stillByTenantId
           ? []
           : [
@@ -922,15 +1191,20 @@ describe("store calls carry authorization", () => {
 
   describe("given the fragment expander bypasses the whole-statement check", () => {
     it("is imported by its one production caller and the test helper only", () => {
-      const importers = [
+      const readFromApp = (file: string) =>
+        readFileSync(path.join(APP, file), "utf8");
+      // Only a file whose text names the expander can import it, so only
+      // those are parsed.
+      const candidates = [
         ...sourceFilesUnder(path.join(APP, "src")),
         ...sourceFilesUnder(path.join(APP, "ee")),
       ]
         .filter((file) => !isTestFile(file))
+        .filter((file) => readFromApp(file).includes("expandFragment"));
+      const trees = parseAll({ files: candidates, readText: readFromApp });
+      const importers = candidates
         .filter((file) =>
-          IMPORTS_FRAGMENT_EXPANDER.test(
-            readFileSync(path.join(APP, file), "utf8"),
-          ),
+          namedImportsOf(trees.get(file) as SourceFile).has("expandFragment"),
         )
         .sort();
 
@@ -947,16 +1221,15 @@ describe("store calls carry authorization", () => {
   describe("given a trace route reaches a converted read", () => {
     it("carries a proof in the same procedure body or loader", () => {
       const missing = TRACE_ROUTERS.flatMap((file) => {
-        const source = read(file);
+        const tree = parsed(file);
         expect(
-          routeChunksOf(source).filter((chunk) =>
-            CONVERTED_SERVICE_READ.test(chunk.text),
-          ).length,
+          routeChunksOf(tree).filter((chunk) => chunk.reachesConvertedRead)
+            .length,
           `${file} reaches no converted read; the router list is stale`,
         ).toBeGreaterThan(0);
         return routeReadsWithoutProofIn({
           file,
-          source,
+          tree,
           allowedChunks: ROUTE_CHUNKS_WITHOUT_PROOF.filter(
             (allowed) => allowed.file === file,
           ).map((allowed) => allowed.chunk),
@@ -1002,7 +1275,7 @@ describe("store calls carry authorization", () => {
       expect(
         routeReadsWithoutProofIn({
           file: "fixture.ts",
-          source: source.join("\n"),
+          tree: parseFixture(source),
         }),
       ).toEqual(expected);
     });
@@ -1010,13 +1283,13 @@ describe("store calls carry authorization", () => {
     it("keeps the no-proof list to chunks that still read without one", () => {
       const stale = ROUTE_CHUNKS_WITHOUT_PROOF.flatMap(
         ({ file, chunk: name }) => {
-          const chunk = routeChunksOf(read(file)).find(
+          const chunk = routeChunksOf(parsed(file)).find(
             (candidate) => candidate.name === name,
           );
           if (!chunk)
             return [`${file} has no ${name}; remove it from the list`];
           const stillWithoutProof =
-            CONVERTED_SERVICE_READ.test(chunk.text) && !PROOF.test(chunk.text);
+            chunk.reachesConvertedRead && !chunk.carriesProof;
           return stillWithoutProof
             ? []
             : [`${file} ${name} carries a proof now; remove it from the list`];
@@ -1031,7 +1304,7 @@ describe("store calls carry authorization", () => {
     /** @scenario "A trace route without a proof fails the build" */
     it("hands every proof-taking service the proof by name", () => {
       const missing = TRACE_ROUTERS.flatMap((file) =>
-        serviceCallsWithoutProofIn({ file, source: read(file) }),
+        serviceCallsWithoutProofIn({ file, tree: parsed(file) }),
       );
 
       expect(missing).toEqual([]);
@@ -1101,7 +1374,7 @@ describe("store calls carry authorization", () => {
       expect(
         serviceCallsWithoutProofIn({
           file: "fixture.ts",
-          source: source.join("\n"),
+          tree: parseFixture(source),
         }),
       ).toEqual(expected);
     });
@@ -1113,7 +1386,7 @@ describe("store calls carry authorization", () => {
       ) => a.file.localeCompare(b.file) || a.service.localeCompare(b.service);
       const counted = routeSources()
         .flatMap((file) =>
-          Object.entries(handTenantReferencesIn(read(file))).map(
+          Object.entries(handTenantReferencesIn(parsed(file))).map(
             ([service, references]) => ({ file, service, references }),
           ),
         )
@@ -1144,7 +1417,7 @@ describe("store calls carry authorization", () => {
   describe("given a route could move a trace service out of the checks' sight", () => {
     it("takes no trace service apart and holds none under another name", () => {
       const found = routeSources().flatMap((file) =>
-        servicesTakenApartIn({ file, source: read(file) }),
+        servicesTakenApartIn({ file, tree: parsed(file) }),
       );
 
       expect(found).toEqual([]);
@@ -1184,7 +1457,10 @@ describe("store calls carry authorization", () => {
       },
     ])("reports $shape", ({ source, expected }) => {
       expect(
-        servicesTakenApartIn({ file: "fixture.ts", source: source.join("\n") }),
+        servicesTakenApartIn({
+          file: "fixture.ts",
+          tree: parseFixture(source),
+        }),
       ).toEqual(expected);
     });
   });
