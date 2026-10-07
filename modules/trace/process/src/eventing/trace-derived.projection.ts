@@ -144,7 +144,7 @@ export interface TraceAnalyticsRow {
 
   /**
    * The persistable-signal verdict. NOT a table column — readers derive it
-   * via {@link TRACE_ANALYTICS_HAS_SIGNAL_SQL}. Monotonic: readers may
+   * via analytics' has-signal predicate (Q207). Monotonic: readers may
    * filter on the LATEST version's flag alone.
    */
   hasSignal: boolean;
@@ -251,17 +251,6 @@ export interface TraceAnalyticsData {
 
 /** The storage-anchor rule lives in {@link ./services/storage-anchor.ts}, shared with
  * `traceSummary` (ADR-087) so a second copy can't drift. */
-
-/**
- * {@link hasPersistableSignal} as a SQL predicate over existing columns. The 4th door (version
- * < pre-split) covers rows predating the 00056 columns. Applied by every trace-table reader
- * except the fold read-back.
- */
-export const TRACE_ANALYTICS_HAS_SIGNAL_SQL =
-  `(SpanCount > 0` +
-  ` OR EarliestSpanStartMs > 0` +
-  ` OR Attributes['langwatch.reserved.log_record_count'] NOT IN ('', '0')` +
-  ` OR Version < '${TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}')`;
 
 // ─── Service composition ────────────────────────────────────────────
 
@@ -754,7 +743,7 @@ export class TraceAnalyticsFoldProjection
   /**
    * Does this state describe a trace the PRODUCT should count? True on real
    * telemetry, false for dimension-only signal. `storageAnchorMs` is
-   * deliberately NOT a door — see {@link TRACE_ANALYTICS_HAS_SIGNAL_SQL}.
+   * deliberately NOT a door in analytics' has-signal predicate (Q207).
    */
   static hasPersistableSignal(state: TraceAnalyticsData): boolean {
     if (state.spanCount > 0) return true;

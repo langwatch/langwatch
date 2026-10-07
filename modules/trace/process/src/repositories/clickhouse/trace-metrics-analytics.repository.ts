@@ -395,7 +395,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
       // NOTE: `row.hasSignal` is deliberately NOT serialised — there is no
       // HasSignal column. Readers derive the verdict from the columns above via
-      // TRACE_ANALYTICS_HAS_SIGNAL_SQL, and `fromRecord` re-derives it on the
+      // analytics' has-signal predicate, and `fromRecord` re-derives it on the
       // way back, so the flag round-trips without a schema change.
       _retention_days: retentionDays,
     };
@@ -456,7 +456,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       attributes: TraceAnalyticsClickHouseRepository.asStringMap(record.Attributes),
 
       // Derived, not read — there is no HasSignal column. Mirrors
-      // TRACE_ANALYTICS_HAS_SIGNAL_SQL door for door, including the version
+      // analytics' has-signal predicate door for door, including the version
       // door: a pre-00056 row decodes SpanCount/EarliestSpanStartMs as default
       // 0, but everything written back then had passed the write-gate.
       hasSignal:
