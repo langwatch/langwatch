@@ -496,6 +496,9 @@
       "path": "modules/navigation/client/tsconfig.json"
     },
     {
+      "path": "modules/navigation/contract/tsconfig.json"
+    },
+    {
       "path": "modules/notification/browser/tsconfig.json"
     },
     {

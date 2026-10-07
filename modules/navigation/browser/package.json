@@ -39,6 +39,7 @@
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/navigation-client": "workspace:*",
+    "@langwatch/navigation-contract": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/organization-client": "workspace:*",
     "@langwatch/prompt-client": "workspace:*",

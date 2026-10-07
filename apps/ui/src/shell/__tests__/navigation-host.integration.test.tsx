@@ -29,15 +29,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import UiAppChrome from "../ui-app-chrome";
 import { loadUiRootCapabilities } from "../ui-root-capabilities";
 
-const ROOT = await loadUiRootCapabilities();
+const LOADED = await loadUiRootCapabilities();
+/** The lent chrome capability stands in for the shell, so the test reads the host alone. */
+const ROOT: typeof LOADED = {
+  ...LOADED,
+  navigationChrome: {
+    ...LOADED.navigationChrome,
+    useNavigationTracking: () => undefined,
+    NavigationShell: ({ children }: { children?: ReactNode }) => (
+      <div data-testid="navigation-shell">{children}</div>
+    ),
+  },
+};
 const { useOptionalNavigationHost } = ROOT.navigationHost;
-
-vi.mock("@langwatch/navigation-browser/chrome", () => ({
-  useNavigationTracking: () => undefined,
-  NavigationShell: ({ children }: { children: ReactNode }) => (
-    <div data-testid="navigation-shell">{children}</div>
-  ),
-}));
 
 const ORGANIZATION_ID = "org_1";
 const PROJECT_ID = "project_1";

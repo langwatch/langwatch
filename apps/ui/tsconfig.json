@@ -137,6 +137,9 @@
       "path": "../../modules/navigation/browser/tsconfig.build.json"
     },
     {
+      "path": "../../modules/navigation/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/notification/browser/tsconfig.build.json"
     },
     {
