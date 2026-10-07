@@ -49,3 +49,10 @@ Feature: Open suite runs are caught up with scenario's runs after the cut
     Given a checkpoint naming a tenant already replayed
     When the replay step resumes from it
     Then that tenant's suite runs are not read again
+
+  @unit
+  Scenario: The worker collects suite's replay step as a background step
+    Given suite installed in a worker process
+    When the worker collects its modules' migration steps
+    Then it holds suite's replay step, background and run after old writers are gone
+    And a second pass over it changes nothing
