@@ -173,8 +173,6 @@ async function migrateClickHouse({ input }: { input: TaskInput }): Promise<Schem
 function oneReleaseApplier({ input }: { input: TaskInput }): UpgradeSchemaApplier {
   let applied: readonly SchemaTargetReport[] | null = null;
   return {
-    bootstrapPostgres: ({ lockTimeoutMs, signal }) =>
-      deployPrisma({ input, lockTimeoutMs, signal }),
     async apply({ lockTimeoutMs, signal }) {
       if (applied?.every((report) => report.ok)) return applied;
       applied = [

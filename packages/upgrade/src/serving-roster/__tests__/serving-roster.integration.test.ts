@@ -1,5 +1,6 @@
 /**
- * Presence over the real ledger: every test gets its own Postgres schema and drops it afterwards.
+ * The serving roster over the real ledger: every test gets its own Postgres schema and drops it
+ * afterwards.
  * Requires LANGWATCH_TEST_DATABASE_URL; the clock that judges liveness is the database's.
  */
 import { Pool } from "pg";
@@ -7,19 +8,19 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createLedgerTables } from "../../ledger-tables.ts";
 import { UpgradeLedgerRepository } from "../../ledger.repository.ts";
-import { type PresenceDeclaration, createPresence } from "../index.ts";
+import { type ServingRosterDeclaration, createServingRoster } from "../index.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 const STEP = "trace:backfill-cost";
 
-const newWorker: PresenceDeclaration = {
+const newWorker: ServingRosterDeclaration = {
   processId: "worker-new-1",
   role: "worker",
   image: "git-abc1234",
   release: null,
   steps: [STEP],
 };
-const oldApi: PresenceDeclaration = {
+const oldApi: ServingRosterDeclaration = {
   processId: "api-old-1",
   role: "api",
   image: "git-0ld0000",
@@ -33,29 +34,29 @@ interface Scratch {
 }
 
 async function openScratch(): Promise<Scratch> {
-  const name = `upgrade_presence_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+  const name = `upgrade_roster_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
   const admin = new Pool({ connectionString: DB_URL, max: 1 });
   await admin.query(`CREATE SCHEMA "${name}"`);
   const postgres = new Pool({
     connectionString: DB_URL,
     max: 2,
-    options: `-c search_path=${name}`,
+    options: `-c search_path=${name},${name}_upgrade_ledger`,
   });
   return {
     postgres,
     drop: async () => {
       await postgres.end();
-      await admin.query(`DROP SCHEMA "${name}" CASCADE`);
+      await admin.query(`DROP SCHEMA IF EXISTS "${name}_upgrade_ledger", "${name}" CASCADE`);
       await admin.end();
     },
   };
 }
 
-describe.skipIf(!DB_URL)("presence over the upgrade ledger", () => {
+describe.skipIf(!DB_URL)("the serving roster over the upgrade ledger", () => {
   let scratch: Scratch;
 
-  const presenceOf = () =>
-    createPresence({
+  const rosterOf = () =>
+    createServingRoster({
       ledger: UpgradeLedgerRepository.create({ postgres: scratch.postgres }),
       staleAfterMs: 60_000,
       refreshEveryMs: 15_000,
@@ -73,8 +74,8 @@ describe.skipIf(!DB_URL)("presence over the upgrade ledger", () => {
   describe("when old and new builds serve side by side", () => {
     /** @scenario "Old writers are gone only when every live process declares the step" */
     it("answers gone only once the old api has stopped", async () => {
-      const api = presenceOf();
-      const worker = presenceOf();
+      const api = rosterOf();
+      const worker = rosterOf();
       await api.record(oldApi);
       await worker.record(newWorker);
 
@@ -88,8 +89,8 @@ describe.skipIf(!DB_URL)("presence over the upgrade ledger", () => {
   describe("when a process stops gracefully", () => {
     /** @scenario "A gracefully stopped process is no longer live" */
     it("leaves no live row for it and keeps the other process live", async () => {
-      const api = presenceOf();
-      const worker = presenceOf();
+      const api = rosterOf();
+      const worker = rosterOf();
       await api.record(oldApi);
       await worker.record(newWorker);
 

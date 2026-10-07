@@ -93,7 +93,7 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
 
   /**
    * The serving gate (D5): api and worker refuse to start, by name, when the installation is
-   * behind their image, and write presence once admitted. Tasks is never gated.
+   * behind their image, and write a roster entry once admitted. Tasks is never gated.
    */
   withUpgradeGate({
     role,

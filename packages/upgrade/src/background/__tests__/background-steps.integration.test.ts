@@ -26,7 +26,7 @@ beforeEach(async () => {
   const postgres = new pg.Pool({
     connectionString: DB_URL,
     max: 2,
-    options: `-c search_path=${name}`,
+    options: `-c search_path=${name},${name}_upgrade_ledger`,
   });
   await createLedgerTables({ postgres });
   scratch = { name, admin, postgres };
@@ -35,7 +35,9 @@ beforeEach(async () => {
 afterEach(async () => {
   if (!DB_URL) return;
   await scratch.postgres.end();
-  await scratch.admin.query(`DROP SCHEMA "${scratch.name}" CASCADE`);
+  await scratch.admin.query(
+    `DROP SCHEMA IF EXISTS "${scratch.name}_upgrade_ledger", "${scratch.name}" CASCADE`,
+  );
   await scratch.admin.end();
 });
 

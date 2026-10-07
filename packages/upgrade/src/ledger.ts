@@ -101,8 +101,8 @@ export const upgradeLeaseSchema = z.object({
 });
 export type UpgradeLease = z.infer<typeof upgradeLeaseSchema>;
 
-/** One row of `_langwatch_upgrade_presence`: a serving process and the steps its image declares. */
-export const upgradePresenceSchema = z.object({
+/** One row of `_langwatch_serving_roster`: a serving process and the steps its image declares. */
+export const servingRosterEntrySchema = z.object({
   processId: z.string(),
   role: z.string(),
   image: z.string(),
@@ -111,4 +111,4 @@ export const upgradePresenceSchema = z.object({
   startedAt: z.date(),
   heartbeatAt: z.date(),
 });
-export type UpgradePresence = z.infer<typeof upgradePresenceSchema>;
+export type ServingRosterEntry = z.infer<typeof servingRosterEntrySchema>;

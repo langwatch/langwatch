@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UpgradeStepStatus } from "../../ledger.ts";
-import { MemoryPresenceLedger } from "../../presence/__tests__/memory-presence-ledger.ts";
-import { createPresence } from "../../presence/index.ts";
-import { createUpgradeGate, PRESENCE_TIMING } from "../index.ts";
+import { MemoryServingRosterLedger } from "../../serving-roster/__tests__/memory-serving-roster-ledger.ts";
+import { createServingRoster } from "../../serving-roster/index.ts";
+import { createUpgradeGate, SERVING_ROSTER_TIMING } from "../index.ts";
 
 const PRISMA = "prisma:20261006180000_upgrade_ledger_widen";
 const GOOSE = "clickhouse:00042";
@@ -11,11 +11,11 @@ const ledgerStep = (id: string, status: UpgradeStepStatus) =>
   ({ id, status, mode: "blocking", release: "3.21.0" }) as const;
 
 function workerGate({ goose = "done" }: { goose?: UpgradeStepStatus } = {}) {
-  const presenceLedger = new MemoryPresenceLedger();
+  const rosterLedger = new MemoryServingRosterLedger();
   const changes: boolean[] = [];
-  const presence = createPresence({
-    ledger: presenceLedger,
-    ...PRESENCE_TIMING,
+  const roster = createServingRoster({
+    ledger: rosterLedger,
+    ...SERVING_ROSTER_TIMING,
     onRefreshError: () => undefined,
     onLapseChange: (lapsed) => changes.push(lapsed),
   });
@@ -27,13 +27,13 @@ function workerGate({ goose = "done" }: { goose?: UpgradeStepStatus } = {}) {
       findSteps: async () => [ledgerStep(PRISMA, "done"), ledgerStep(GOOSE, goose)],
       findRuns: async () => [],
     },
-    presence,
+    roster,
     schemaIsEmpty: async () => false,
   });
-  return { gate, presenceLedger, changes };
+  return { gate, rosterLedger, changes };
 }
 
-describe("the serving gate's lapsed presence", () => {
+describe("the serving gate's lapsed roster entry", () => {
   beforeEach(() => {
     vi.useFakeTimers({ now: new Date("2026-10-06T22:00:00Z") });
   });
@@ -41,13 +41,13 @@ describe("the serving gate's lapsed presence", () => {
     vi.useRealTimers();
   });
 
-  /** @scenario "A process whose presence writes keep failing stops serving past the stale bound" */
+  /** @scenario "A process whose roster writes keep failing stops serving past the stale bound" */
   it("stops serving once the last good write is older than 60 s, and says so once", async () => {
-    const { gate, presenceLedger, changes } = workerGate();
+    const { gate, rosterLedger, changes } = workerGate();
     await gate.admit();
-    for (let refused = 0; refused < 5; refused++) presenceLedger.refuseNextWrite();
+    for (let refused = 0; refused < 5; refused++) rosterLedger.refuseNextWrite();
 
-    await vi.advanceTimersByTimeAsync(PRESENCE_TIMING.staleAfterMs);
+    await vi.advanceTimersByTimeAsync(SERVING_ROSTER_TIMING.staleAfterMs);
     expect(gate.serving()).toBe(true);
     await vi.advanceTimersByTimeAsync(1);
     expect(gate.serving()).toBe(false);
@@ -56,15 +56,15 @@ describe("the serving gate's lapsed presence", () => {
     await gate.release();
   });
 
-  /** @scenario "A process that stopped serving on a lapsed presence serves again after a good write" */
+  /** @scenario "A process that stopped serving on a lapsed roster entry serves again after a good write" */
   it("serves again after the next good write, and says so once", async () => {
-    const { gate, presenceLedger, changes } = workerGate();
+    const { gate, rosterLedger, changes } = workerGate();
     await gate.admit();
-    for (let refused = 0; refused < 4; refused++) presenceLedger.refuseNextWrite();
-    await vi.advanceTimersByTimeAsync(PRESENCE_TIMING.staleAfterMs + 1);
+    for (let refused = 0; refused < 4; refused++) rosterLedger.refuseNextWrite();
+    await vi.advanceTimersByTimeAsync(SERVING_ROSTER_TIMING.staleAfterMs + 1);
     expect(gate.serving()).toBe(false);
 
-    await vi.advanceTimersByTimeAsync(PRESENCE_TIMING.refreshEveryMs);
+    await vi.advanceTimersByTimeAsync(SERVING_ROSTER_TIMING.refreshEveryMs);
 
     expect(gate.serving()).toBe(true);
     expect(changes).toEqual([true, false]);

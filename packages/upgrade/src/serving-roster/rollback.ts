@@ -1,16 +1,16 @@
-import type { UpgradePresence, UpgradeRun, UpgradeStep } from "../ledger.ts";
+import type { ServingRosterEntry, UpgradeRun, UpgradeStep } from "../ledger.ts";
 import { compareReleases } from "../manifest/manifest.ts";
 
 export type RollbackLedgerStep = Pick<UpgradeStep, "id" | "mode" | "status" | "release">;
 export type RollbackLedgerRun = Pick<UpgradeRun, "id" | "kind" | "outcome" | "finishedAt">;
-export type RollbackPresence = Pick<
-  UpgradePresence,
+export type RollbackRosterEntry = Pick<
+  ServingRosterEntry,
   "processId" | "image" | "release" | "steps" | "startedAt"
 >;
 
 /** One older image seen serving after the last run, and the done steps it does not declare. */
 export type RollbackSighting = Readonly<{
-  row: RollbackPresence;
+  row: RollbackRosterEntry;
   runId: string;
   stepIds: string[];
 }>;
@@ -29,7 +29,7 @@ function lastFinishedUpgrade({ runs }: { runs: readonly RollbackLedgerRun[] }) {
  * steps and every unreleased one; a `git-<sha>` build only the unreleased ones. A step retired
  * below the floor is never newer, so it is never reopened.
  */
-function newerThanImage({ step, row }: { step: RollbackLedgerStep; row: RollbackPresence }) {
+function newerThanImage({ step, row }: { step: RollbackLedgerStep; row: RollbackRosterEntry }) {
   if (step.release === null) return true;
   return row.release !== null && compareReleases({ left: step.release, right: row.release }) > 0;
 }
@@ -45,7 +45,7 @@ export function detectRollbacks({
 }: {
   runs: readonly RollbackLedgerRun[];
   steps: readonly RollbackLedgerStep[];
-  live: readonly RollbackPresence[];
+  live: readonly RollbackRosterEntry[];
 }): RollbackSighting[] {
   const last = lastFinishedUpgrade({ runs });
   if (!last?.finishedAt) return [];

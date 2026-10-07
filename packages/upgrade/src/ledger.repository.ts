@@ -1,14 +1,14 @@
 import { generate } from "@langwatch/ksuid";
 
-import { createLedgerTables } from "./ledger-tables.ts";
+import { createLedgerTables, type LedgerTableNames, ledgerTables } from "./ledger-tables.ts";
 import {
   type DeclaredStep,
   declaredStepSchema,
   type InferredStep,
   type UpgradeLease,
   upgradeLeaseSchema,
-  type UpgradePresence,
-  upgradePresenceSchema,
+  type ServingRosterEntry,
+  servingRosterEntrySchema,
   type UpgradeRun,
   type UpgradeRunKind,
   type UpgradeRunOutcome,
@@ -76,7 +76,7 @@ const LEASE_COLUMNS = [
   utc("expires_at", "expiresAt"),
 ].join(", ");
 
-const PRESENCE_COLUMNS = [
+const ROSTER_COLUMNS = [
   `"process_id" AS "processId"`,
   `"role"`,
   `"image"`,
@@ -94,8 +94,17 @@ export class UpgradeLedgerRepository {
     return new UpgradeLedgerRepository(postgres);
   }
 
-  async createTables(): Promise<void> {
-    await createLedgerTables({ postgres: this.postgres });
+  /** Runs `text` against this installation's ledger tables (`ledgerTables`). */
+  private async query<Row extends object>(
+    text: (tables: LedgerTableNames) => string,
+    values?: unknown[],
+  ): Promise<{ rows: Row[] }> {
+    return this.postgres.query<Row>(text(await ledgerTables({ postgres: this.postgres })), values);
+  }
+
+  /** Creates the ledger schema and tables when absent and answers their names. */
+  async createTables(): Promise<LedgerTableNames> {
+    return createLedgerTables({ postgres: this.postgres });
   }
 
   async startRun({
@@ -105,8 +114,8 @@ export class UpgradeLedgerRepository {
     kind: UpgradeRunKind;
     floor?: string | null;
   }): Promise<UpgradeRun> {
-    const { rows } = await this.postgres.query<object>(
-      `INSERT INTO "_langwatch_upgrade_run" ("id", "kind", "floor", "started_at")
+    const { rows } = await this.query<object>(
+      (t) => `INSERT INTO ${t.run} ("id", "kind", "floor", "started_at")
        VALUES ($1, $2, $3, ${NOW_UTC})
        RETURNING ${RUN_COLUMNS}`,
       [generate("upgraderun").toString(), kind, floor ?? null],
@@ -123,8 +132,8 @@ export class UpgradeLedgerRepository {
     outcome: UpgradeRunOutcome;
     report: Record<string, unknown>;
   }): Promise<UpgradeRun> {
-    const { rows } = await this.postgres.query<object>(
-      `UPDATE "_langwatch_upgrade_run"
+    const { rows } = await this.query<object>(
+      (t) => `UPDATE ${t.run}
           SET "finished_at" = ${NOW_UTC}, "outcome" = $2, "report" = $3::jsonb
         WHERE "id" = $1
        RETURNING ${RUN_COLUMNS}`,
@@ -145,8 +154,8 @@ export class UpgradeLedgerRepository {
     steps: readonly InferredStep[];
   }): Promise<UpgradeStepKind[]> {
     if (steps.length === 0) return [];
-    const { rows } = await this.postgres.query<{ kind: string }>(
-      `INSERT INTO "_langwatch_upgrade_step" AS step
+    const { rows } = await this.query<{ kind: string }>(
+      (t) => `INSERT INTO ${t.step} AS step
               ("id", "kind", "mode", "status", "last_error", "inferred", "run_id", "updated_at")
        SELECT source.id, source.kind, source.mode, source.status, source.last_error, true, $6, ${NOW_UTC}
          FROM unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[])
@@ -183,8 +192,8 @@ export class UpgradeLedgerRepository {
   }): Promise<UpgradeStep[]> {
     if (steps.length === 0) return [];
     const parsed = steps.map((step) => upcastStepInputSchema.parse(step));
-    const { rows } = await this.postgres.query<object>(
-      `INSERT INTO "_langwatch_upgrade_step" AS step
+    const { rows } = await this.query<object>(
+      (t) => `INSERT INTO ${t.step} AS step
               ("id", "kind", "mode", "status", "report", "inferred", "run_id", "updated_at")
        SELECT source.id, 'event-upcast', 'background', source.status, source.report, false, $4, ${NOW_UTC}
          FROM unnest($1::text[], $2::text[], $3::jsonb[]) AS source(id, status, report)
@@ -215,8 +224,8 @@ export class UpgradeLedgerRepository {
   }): Promise<UpgradeStep[]> {
     if (steps.length === 0) return [];
     const parsed = steps.map((step) => declaredStepSchema.parse(step));
-    const { rows } = await this.postgres.query<object>(
-      `INSERT INTO "_langwatch_upgrade_step" AS step
+    const { rows } = await this.query<object>(
+      (t) => `INSERT INTO ${t.step} AS step
               ("id", "kind", "mode", "owner", "description", "status", "inferred", "updated_at")
        SELECT source.id, source.kind, source.mode, source.owner, source.description,
               'pending', false, ${NOW_UTC}
@@ -251,8 +260,8 @@ export class UpgradeLedgerRepository {
     version?: string | null;
     lastError?: string | null;
   }): Promise<UpgradeTarget> {
-    const { rows } = await this.postgres.query<object>(
-      `INSERT INTO "_langwatch_upgrade_target"
+    const { rows } = await this.query<object>(
+      (t) => `INSERT INTO ${t.target}
               ("step_id", "target", "status", "version", "last_error", "updated_at")
        VALUES ($1, $2, $3, $4, $5, ${NOW_UTC})
        ON CONFLICT ("step_id", "target") DO UPDATE
@@ -267,8 +276,8 @@ export class UpgradeLedgerRepository {
   }
 
   async findTargets({ stepId }: { stepId: string }): Promise<UpgradeTarget[]> {
-    const { rows } = await this.postgres.query<object>(
-      `SELECT ${TARGET_COLUMNS} FROM "_langwatch_upgrade_target"
+    const { rows } = await this.query<object>(
+      (t) => `SELECT ${TARGET_COLUMNS} FROM ${t.target}
         WHERE "step_id" = $1 ORDER BY "target"`,
       [stepId],
     );
@@ -292,8 +301,8 @@ export class UpgradeLedgerRepository {
     host: string;
     ttlMs: number;
   }): Promise<UpgradeLease | null> {
-    const { rows } = await this.postgres.query<object>(
-      `INSERT INTO "_langwatch_upgrade_lease" AS lease
+    const { rows } = await this.query<object>(
+      (t) => `INSERT INTO ${t.lease} AS lease
               ("name", "owner", "image", "host", "heartbeat_at", "expires_at")
        VALUES ($1, $2, $3, $4, ${NOW_UTC}, ${NOW_UTC} + ($5::double precision * interval '1 millisecond'))
        ON CONFLICT ("name") DO UPDATE
@@ -319,8 +328,8 @@ export class UpgradeLedgerRepository {
     owner: string;
     ttlMs: number;
   }): Promise<UpgradeLease | null> {
-    const { rows } = await this.postgres.query<object>(
-      `UPDATE "_langwatch_upgrade_lease"
+    const { rows } = await this.query<object>(
+      (t) => `UPDATE ${t.lease}
           SET "heartbeat_at" = ${NOW_UTC},
               "expires_at" = ${NOW_UTC} + ($3::double precision * interval '1 millisecond')
         WHERE "name" = $1 AND "owner" = $2
@@ -332,15 +341,15 @@ export class UpgradeLedgerRepository {
 
   /** Frees a lease its owner holds. Answers false when another owner holds it or none does. */
   async releaseLease({ name, owner }: { name: string; owner: string }): Promise<boolean> {
-    const { rows } = await this.postgres.query<{ name: string }>(
-      `DELETE FROM "_langwatch_upgrade_lease" WHERE "name" = $1 AND "owner" = $2 RETURNING "name"`,
+    const { rows } = await this.query<{ name: string }>(
+      (t) => `DELETE FROM ${t.lease} WHERE "name" = $1 AND "owner" = $2 RETURNING "name"`,
       [name, owner],
     );
     return rows.length > 0;
   }
 
-  /** Writes a serving process's presence; a refresh keeps the row's original start. */
-  async writePresence({
+  /** Writes a serving process's roster entry; a refresh keeps the row's original start. */
+  async writeRosterEntry({
     processId,
     role,
     image,
@@ -352,9 +361,9 @@ export class UpgradeLedgerRepository {
     image: string;
     release: string | null;
     steps: readonly string[];
-  }): Promise<UpgradePresence> {
-    const { rows } = await this.postgres.query<object>(
-      `INSERT INTO "_langwatch_upgrade_presence"
+  }): Promise<ServingRosterEntry> {
+    const { rows } = await this.query<object>(
+      (t) => `INSERT INTO ${t.roster}
               ("process_id", "role", "image", "release", "steps", "started_at", "heartbeat_at")
        VALUES ($1, $2, $3, $4, $5::jsonb, ${NOW_UTC}, ${NOW_UTC})
        ON CONFLICT ("process_id") DO UPDATE
@@ -363,40 +372,38 @@ export class UpgradeLedgerRepository {
               "release" = EXCLUDED."release",
               "steps" = EXCLUDED."steps",
               "heartbeat_at" = EXCLUDED."heartbeat_at"
-       RETURNING ${PRESENCE_COLUMNS}`,
+       RETURNING ${ROSTER_COLUMNS}`,
       [processId, role, image, release, JSON.stringify(steps)],
     );
-    return upgradePresenceSchema.parse(rows[0]);
+    return servingRosterEntrySchema.parse(rows[0]);
   }
 
-  /** Presence rows written within `staleAfterMs` of the database clock; an older row is dead. */
-  async findLivePresence({ staleAfterMs }: { staleAfterMs: number }): Promise<UpgradePresence[]> {
-    const { rows } = await this.postgres.query<object>(
-      `SELECT ${PRESENCE_COLUMNS} FROM "_langwatch_upgrade_presence"
+  /** Roster entries written within `staleAfterMs` of the database clock; an older one is dead. */
+  async findLiveRoster({ staleAfterMs }: { staleAfterMs: number }): Promise<ServingRosterEntry[]> {
+    const { rows } = await this.query<object>(
+      (t) => `SELECT ${ROSTER_COLUMNS} FROM ${t.roster}
         WHERE "heartbeat_at" >= ${NOW_UTC} - ($1::double precision * interval '1 millisecond')
         ORDER BY "process_id"`,
       [staleAfterMs],
     );
-    return rows.map((row) => upgradePresenceSchema.parse(row));
+    return rows.map((row) => servingRosterEntrySchema.parse(row));
   }
 
-  /** Deletes a process's presence on a graceful stop; a missing row is not an error. */
-  async removePresence({ processId }: { processId: string }): Promise<void> {
-    await this.postgres.query(`DELETE FROM "_langwatch_upgrade_presence" WHERE "process_id" = $1`, [
-      processId,
-    ]);
+  /** Deletes a process's roster entry on a graceful stop; a missing row is not an error. */
+  async removeRosterEntry({ processId }: { processId: string }): Promise<void> {
+    await this.query((t) => `DELETE FROM ${t.roster} WHERE "process_id" = $1`, [processId]);
   }
 
   async findSteps(): Promise<UpgradeStep[]> {
-    const { rows } = await this.postgres.query<object>(
-      `SELECT ${STEP_COLUMNS} FROM "_langwatch_upgrade_step" ORDER BY "id"`,
+    const { rows } = await this.query<object>(
+      (t) => `SELECT ${STEP_COLUMNS} FROM ${t.step} ORDER BY "id"`,
     );
     return rows.map((row) => upgradeStepSchema.parse(row));
   }
 
   async findRuns(): Promise<UpgradeRun[]> {
-    const { rows } = await this.postgres.query<object>(
-      `SELECT ${RUN_COLUMNS} FROM "_langwatch_upgrade_run" ORDER BY "started_at", "id"`,
+    const { rows } = await this.query<object>(
+      (t) => `SELECT ${RUN_COLUMNS} FROM ${t.run} ORDER BY "started_at", "id"`,
     );
     return rows.map((row) => upgradeRunSchema.parse(row));
   }

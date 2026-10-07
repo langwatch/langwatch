@@ -21,7 +21,6 @@ import { createUpgradeGate } from "../gate/upgrade-gate.service.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import type { ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
 import type { UpgradeClickHouse } from "../ports.ts";
-import { createPresence } from "../presence/presence.service.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
 import {
   gooseAppliedStepIds,
@@ -29,6 +28,7 @@ import {
   type UpgradeSchemaApplier,
 } from "../runner/schema-applier.ts";
 import { createUpgradeRunner, type UpgradeRunnerOptions } from "../runner/upgrade-runner.ts";
+import { createServingRoster } from "../serving-roster/serving-roster.service.ts";
 import { defineMigrationStep, type MigrationStep } from "../step/migration-step.ts";
 import { applyRelease, type ReleaseApplyReport } from "../stepping/apply-release.ts";
 
@@ -165,6 +165,15 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
+/** The tables one Postgres schema of the scratch database holds, by name. */
+async function tablesIn(schema: string): Promise<string[]> {
+  const { rows } = await scratch.postgres.query<{ name: string }>(
+    `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = $1 ORDER BY 1`,
+    [schema],
+  );
+  return rows.map((row) => row.name);
+}
+
 function reader(client: ClickHouseClient): UpgradeClickHouse {
   return {
     async queryRows<Row extends object>(sql: string): Promise<Row[]> {
@@ -216,7 +225,6 @@ function realApplier({ image }: { image: string }): UpgradeSchemaApplier {
     return { engine: "postgres", target: "postgres", ok, error };
   };
   return {
-    bootstrapPostgres: async ({ signal }) => postgresOf(await apply(upTo(image), false, signal)),
     async apply({ release, signal }) {
       const report = await apply(upTo(release), true, signal);
       const clickhouse = report.targets.find((each) => each.target === "shared");
@@ -316,16 +324,26 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade, end to end over live stores", 
       const second = await run(again);
       expect(second).toMatchObject({ code: "done", detail: { applied: [] } });
       expect(await ledger().findSteps()).toEqual(before);
+      expect(await tablesIn("public")).toEqual(["Alpha", "_prisma_migrations"]);
+      expect(await tablesIn("public_upgrade_ledger")).toEqual([
+        "_langwatch_serving_roster",
+        "_langwatch_upgrade_lease",
+        "_langwatch_upgrade_run",
+        "_langwatch_upgrade_step",
+        "_langwatch_upgrade_target",
+      ]);
     });
 
     /** @scenario "A first run announces itself, the number of migrations, and that serving follows" */
     it("narrates the first run from its first line to its last", async () => {
       const lines: Line[] = [];
       await run(runnerFor({ release: "3.21.0", lines, codeSteps: [copyNotes(async () => ({}))] }));
-      expect(lines[0]?.message).toMatch(/^first run: .*creates the Postgres schema/);
+      expect(lines[0]?.message).toMatch(
+        /^first run: .*creates its ledger in its own Postgres schema/,
+      );
       expect(lines.map((line) => line.message)).toContainEqual(
         expect.stringMatching(
-          /^first run: applying 2 schema migrations \(0 Postgres, 2 ClickHouse\).*then the api and worker serve/,
+          /^first run: applying 4 schema migrations \(2 Postgres, 2 ClickHouse\).*then the api and worker serve/,
         ),
       );
       expect(lines.at(-1)?.message).toMatch(/^first run finished in \d+ ms/);
@@ -493,15 +511,15 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade, end to end over live stores", 
         description: HOSTILE,
       });
       const tables = await scratch.postgres.query<{ present: string | null }>(
-        "SELECT to_regclass('_langwatch_upgrade_run')::text AS present",
+        "SELECT to_regclass('public_upgrade_ledger._langwatch_upgrade_run')::text AS present",
       );
-      expect(tables.rows[0]?.present).toBe("_langwatch_upgrade_run");
+      expect(tables.rows[0]?.present).toBe("public_upgrade_ledger._langwatch_upgrade_run");
     });
 
-    /** @scenario "A lapsed presence stops serving and the next good write serves again" */
-    it("stops serving once its presence writes fail past the stale bound, and serves after a good one", async () => {
+    /** @scenario "A lapsed roster entry stops serving and the next good write serves again" */
+    it("stops serving once its roster writes fail past the stale bound, and serves after a good one", async () => {
       const repository = ledger();
-      const presence = createPresence({
+      const roster = createServingRoster({
         ledger: repository,
         staleAfterMs: 600,
         refreshEveryMs: 100,
@@ -511,18 +529,18 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade, end to end over live stores", 
         processId: "pod-c:1:worker",
         image: { release: "3.20.1", blockingSteps: [], name: "3.20.1", declaredSteps: [] },
         ledger: { findSteps: () => repository.findSteps(), findRuns: () => repository.findRuns() },
-        presence,
+        roster,
         schemaIsEmpty: async () => false,
       });
       expect(await gate.admit()).toMatchObject({ admitted: true });
       expect(gate.serving()).toBe(true);
       await scratch.postgres.query(
-        'ALTER TABLE "_langwatch_upgrade_presence" RENAME TO "_presence_away"',
+        'ALTER TABLE "public_upgrade_ledger"."_langwatch_serving_roster" RENAME TO "_roster_away"',
       );
       await sleep(1_200);
       expect(gate.serving()).toBe(false);
       await scratch.postgres.query(
-        'ALTER TABLE "_presence_away" RENAME TO "_langwatch_upgrade_presence"',
+        'ALTER TABLE "public_upgrade_ledger"."_roster_away" RENAME TO "_langwatch_serving_roster"',
       );
       await sleep(400);
       expect(gate.serving()).toBe(true);

@@ -1,15 +1,15 @@
-import type { UpgradePresence } from "../ledger.ts";
+import type { ServingRosterEntry } from "../ledger.ts";
 import {
-  type PresenceDeclaration,
-  type PresenceLedger,
-  presenceDeclarationSchema,
-} from "./presence-ledger.ts";
+  type ServingRosterDeclaration,
+  type ServingRosterLedger,
+  servingRosterDeclarationSchema,
+} from "./serving-roster-ledger.ts";
 
-export interface Presence {
-  record(declaration: PresenceDeclaration): Promise<void>;
+export interface ServingRoster {
+  record(declaration: ServingRosterDeclaration): Promise<void>;
   refresh(): Promise<void>;
   stop(): Promise<void>;
-  live(): Promise<UpgradePresence[]>;
+  live(): Promise<ServingRosterEntry[]>;
   oldWritersGoneFor(input: { stepId: string }): Promise<boolean>;
   /** True once this process's last good write is older than the stale bound (round 9). */
   lapsed(): boolean;
@@ -56,26 +56,26 @@ function watchLapse({
  * `record` writes the row and refreshes it every `refreshEveryMs` until `stop`; a failed refresh
  * goes to `onRefreshError`. `onLapseChange` hears the last good write pass the stale bound.
  */
-export function createPresence({
+export function createServingRoster({
   ledger,
   staleAfterMs,
   refreshEveryMs,
   onRefreshError,
   onLapseChange,
 }: {
-  ledger: PresenceLedger;
+  ledger: ServingRosterLedger;
   staleAfterMs: number;
   refreshEveryMs: number;
   onRefreshError?: (error: unknown) => void;
   onLapseChange?: (lapsed: boolean) => void;
-}): Presence {
+}): ServingRoster {
   if (!(refreshEveryMs > 0 && refreshEveryMs < staleAfterMs)) {
     throw new RangeError(
-      `presence refresh interval (${refreshEveryMs} ms) must be positive and below the stale bound (${staleAfterMs} ms)`,
+      `roster refresh interval (${refreshEveryMs} ms) must be positive and below the stale bound (${staleAfterMs} ms)`,
     );
   }
 
-  let current: PresenceDeclaration | null = null;
+  let current: ServingRosterDeclaration | null = null;
   let timer: ReturnType<typeof setInterval> | null = null;
   let inFlight: Promise<unknown> = Promise.resolve();
   const lapse = watchLapse({ staleAfterMs, onLapseChange });
@@ -88,19 +88,19 @@ export function createPresence({
 
   const refresh = async (): Promise<void> => {
     if (!current) return;
-    const write = ledger.writePresence(current);
+    const write = ledger.writeRosterEntry(current);
     inFlight = write.catch(() => undefined);
     await write;
     if (current) lapse.wrote();
   };
 
-  const live = (): Promise<UpgradePresence[]> => ledger.findLivePresence({ staleAfterMs });
+  const live = (): Promise<ServingRosterEntry[]> => ledger.findLiveRoster({ staleAfterMs });
 
   return {
     async record(declaration) {
-      const parsed = presenceDeclarationSchema.parse(declaration);
+      const parsed = servingRosterDeclarationSchema.parse(declaration);
       clearTimer();
-      await ledger.writePresence(parsed);
+      await ledger.writeRosterEntry(parsed);
       current = parsed;
       lapse.wrote();
       timer = setInterval(() => {
@@ -115,7 +115,7 @@ export function createPresence({
       clearTimer();
       await inFlight;
       if (!declared) return;
-      await ledger.removePresence({ processId: declared.processId }).catch(() => undefined);
+      await ledger.removeRosterEntry({ processId: declared.processId }).catch(() => undefined);
     },
     live,
     async oldWritersGoneFor({ stepId }) {

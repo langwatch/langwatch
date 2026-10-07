@@ -82,23 +82,47 @@ export class UpgradeRunLog implements UpgradeRunnerLog {
 
   firstRun(): void {
     this.info(
-      "first run: this database holds no LangWatch schema. The upgrade creates the Postgres " +
-        "schema, records the ledger, applies every migration on Postgres and ClickHouse, then " +
-        "exits so the api and worker can serve",
-      { phase: "first-run", waitingOn: "the Postgres schema (DATABASE_URL)", next: WAIT },
+      "first run: this database holds no LangWatch schema. The upgrade creates its ledger in " +
+        "its own Postgres schema, takes the upgrade lease, applies every migration on Postgres " +
+        "and ClickHouse, then exits so the api and worker can serve",
+      { phase: "first-run", waitingOn: "the upgrade ledger (DATABASE_URL)", next: WAIT },
     );
   }
 
-  bootstrapped({ ok, startedAt }: { ok: boolean; startedAt: number }): void {
+  ledgerReady({ schema, startedAt }: { schema: string; startedAt: number }): void {
     const elapsedMs = elapsedSince(startedAt);
-    const fields = { phase: "first-run", waitingOn: "nothing", phaseElapsedMs: elapsedMs };
-    if (ok)
-      this.info(`first run: Postgres schema created in ${elapsedMs} ms`, { ...fields, next: WAIT });
-    else
-      this.warn("first run: the Postgres schema failed", {
-        ...fields,
-        next: UPGRADE_NEXT_ACTION.schema_failed,
-      });
+    this.info(`upgrade ledger ready in Postgres schema ${schema} after ${elapsedMs} ms`, {
+      phase: "ledger",
+      waitingOn: "nothing",
+      phaseElapsedMs: elapsedMs,
+      next: WAIT,
+    });
+  }
+
+  ledgerFailed({ error }: { error: string }): void {
+    this.warn(`the upgrade ledger could not be created: ${error}`, {
+      phase: "ledger",
+      waitingOn: "nothing",
+      next: UPGRADE_NEXT_ACTION.schema_failed,
+    });
+  }
+
+  ledgerCopied({
+    from,
+    into,
+    steps,
+    runs,
+  }: {
+    from: string;
+    into: string;
+    steps: number;
+    runs: number;
+  }): void {
+    this.info(
+      `upgrade ledger copied from schema ${from} into ${into}: ${countOf(steps, "step")} and ` +
+        `${countOf(runs, "run")}; the old tables in ${from} are left in place and no longer read`,
+      { phase: "ledger", waitingOn: "nothing", steps, runs, next: WAIT },
+    );
   }
 
   planned({

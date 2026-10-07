@@ -1,6 +1,6 @@
 Feature: Consumer pause and resume
 
-  While the upgrade presence is lapsed a worker stops serving: its readiness
+  While the serving roster entry is lapsed a worker stops serving: its readiness
   answers 503 and its eventing consumers pause. A paused consumer claims no new
   job, intent or wake; work it had already claimed runs to completion. Resuming
   picks up the backlog where it stopped. Pause and resume are synchronous to

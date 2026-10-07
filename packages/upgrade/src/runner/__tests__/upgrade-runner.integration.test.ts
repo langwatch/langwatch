@@ -61,6 +61,16 @@ const MANIFESTS: ReleaseManifest[] = [
 ];
 const FLOOR = { release: "3.20.1", namedAt: "2026-10-06" };
 
+/** The ledger as an earlier build created it in the installation's schema (S1, before widening). */
+const LEGACY_LEDGER_DDL = [
+  `CREATE TABLE "_langwatch_upgrade_run" ("id" TEXT PRIMARY KEY, "kind" TEXT NOT NULL, "release" TEXT,
+    "started_at" TIMESTAMP(3) NOT NULL, "finished_at" TIMESTAMP(3), "outcome" TEXT, "plan" JSONB, "report" JSONB)`,
+  `CREATE TABLE "_langwatch_upgrade_step" ("id" TEXT PRIMARY KEY, "kind" TEXT NOT NULL, "release" TEXT,
+    "mode" TEXT NOT NULL, "status" TEXT NOT NULL, "inferred" BOOLEAN NOT NULL DEFAULT false,
+    "attempt" INTEGER NOT NULL DEFAULT 0, "last_error" TEXT, "report" JSONB, "run_id" TEXT,
+    "started_at" TIMESTAMP(3), "finished_at" TIMESTAMP(3), "updated_at" TIMESTAMP(3) NOT NULL)`,
+];
+
 let sequence = 0;
 let scratch: { name: string; postgres: Pool; admin: Pool };
 
@@ -71,7 +81,7 @@ beforeEach(async () => {
   const postgres = new Pool({
     connectionString: DB_URL,
     max: 4,
-    options: `-c search_path=${name}`,
+    options: `-c search_path=${name},${name}_upgrade_ledger`,
   });
   await postgres.query(`CREATE TABLE "_prisma_migrations" (
     "migration_name" TEXT NOT NULL, "logs" TEXT, "started_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -81,7 +91,9 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await scratch.postgres.end();
-  await scratch.admin.query(`DROP SCHEMA "${scratch.name}" CASCADE`);
+  await scratch.admin.query(
+    `DROP SCHEMA IF EXISTS "${scratch.name}_upgrade_ledger", "${scratch.name}" CASCADE`,
+  );
   await scratch.admin.end();
 });
 
@@ -341,27 +353,102 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
   });
 
   describe("when the database has no Prisma history", () => {
-    /** @scenario "A database with no Prisma history gets its Postgres schema before the ledger exists" */
-    it("bootstraps the Postgres schema before creating any ledger table", async () => {
+    /** @scenario "The ledger gets its own Postgres schema first, so Prisma's first deploy runs under the lease" */
+    it("creates the ledger schema and lease before the schema applier runs, inside the lease", async () => {
       await scratch.postgres.query(`DROP TABLE "_prisma_migrations"`);
-      let ledgerAtBootstrap: unknown = "not called";
-      const applier = {
-        ...fakeApplier({ release: "3.21.0" }),
-        bootstrapPostgres: async () => {
-          const { rows } = await scratch.postgres.query<{ present: boolean }>(
-            `SELECT to_regclass('_langwatch_upgrade_lease') IS NOT NULL AS present`,
+      const seen: { lease?: string | null; installationTables?: string[] } = {};
+      const lines: string[] = [];
+      const base = fakeApplier({ release: "3.21.0" });
+      const applier: UpgradeSchemaApplier = {
+        async apply(args) {
+          const lease = await scratch.postgres.query<{ owner: string }>(
+            `SELECT "owner" FROM "${scratch.name}_upgrade_ledger"."_langwatch_upgrade_lease"`,
           );
-          ledgerAtBootstrap = rows[0]?.present;
+          const tables = await scratch.postgres.query<{ name: string }>(
+            `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = $1`,
+            [scratch.name],
+          );
+          seen.lease = lease.rows[0]?.owner ?? null;
+          seen.installationTables = tables.rows.map((row) => row.name);
           await scratch.postgres.query(`CREATE TABLE "_prisma_migrations" (
             "migration_name" TEXT NOT NULL, "logs" TEXT, "started_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
             "finished_at" TIMESTAMPTZ, "rolled_back_at" TIMESTAMPTZ)`);
-          return { engine: "postgres" as const, target: "postgres", ok: true, error: null };
+          return base.apply(args);
         },
       };
-      const outcome = await run(runnerFor({ release: "3.21.0", applier }));
-      expect(ledgerAtBootstrap).toBe(false);
+      const log = { info: (message: string) => void lines.push(message), warn: () => {} };
+      const outcome = await run(runnerFor({ release: "3.21.0", applier, log }));
+      expect(seen.lease).toMatch(/^pod-b:/);
+      expect(seen.installationTables).toEqual([]);
       expect(outcome.code).toBe("done");
       expect(await statusOf("dataset:copy-keys")).toBe("not-needed");
+      expect(lines).toContainEqual(
+        expect.stringMatching(
+          new RegExp(`^upgrade ledger ready in Postgres schema ${scratch.name}_upgrade_ledger`),
+        ),
+      );
+    });
+  });
+
+  describe("when an earlier build kept the ledger in the installation's own schema", () => {
+    /** @scenario "A ledger kept in the installation's schema is copied into the ledger schema once" */
+    it("copies its runs, steps and targets once, logs the copy and leaves the old tables", async () => {
+      for (const statement of LEGACY_LEDGER_DDL) await scratch.postgres.query(statement);
+      await scratch.postgres.query(
+        `INSERT INTO "${scratch.name}"."_langwatch_upgrade_run" ("id", "kind", "release", "started_at", "finished_at", "outcome")
+         VALUES ('run_legacy', 'upgrade', '3.20.1', now(), now(), 'succeeded')`,
+      );
+      await scratch.postgres.query(
+        `INSERT INTO "${scratch.name}"."_langwatch_upgrade_step" ("id", "kind", "release", "mode", "status", "attempt", "updated_at")
+         VALUES ('dataset:copy-keys', 'data', '3.21.0', 'blocking', 'done', 1, now())`,
+      );
+      const lines: string[] = [];
+      const log = { info: (message: string) => void lines.push(message), warn: () => {} };
+      const outcome = await run(
+        runnerFor({ release: "3.21.0", applier: fakeApplier({ release: "3.21.0" }), log }),
+      );
+      expect(outcome.code).toBe("done");
+      expect(await statusOf("dataset:copy-keys")).toBe("done");
+      expect((await ledger().findRuns()).map((each) => each.id)).toContain("run_legacy");
+      expect(lines).toContainEqual(
+        expect.stringMatching(
+          new RegExp(
+            `^upgrade ledger copied from schema ${scratch.name} into ${scratch.name}_upgrade_ledger: 1 step and 1 run`,
+          ),
+        ),
+      );
+      const legacy = await scratch.postgres.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM "${scratch.name}"."_langwatch_upgrade_step"`,
+      );
+      expect(legacy.rows[0]?.count).toBe("1");
+
+      await scratch.postgres.query(
+        `INSERT INTO "${scratch.name}"."_langwatch_upgrade_step" ("id", "kind", "mode", "status", "updated_at")
+         VALUES ('dataset:written-by-the-old-build', 'data', 'background', 'pending', now())`,
+      );
+      lines.length = 0;
+      await run(runnerFor({ release: "3.21.0", applier: fakeApplier({ release: "3.21.0" }), log }));
+      expect(lines.some((line) => line.startsWith("upgrade ledger copied"))).toBe(false);
+      expect(await statusOf("dataset:written-by-the-old-build")).toBeUndefined();
+    });
+  });
+
+  describe("when the ledger schema cannot be created", () => {
+    /** @scenario "A ledger that cannot be created fails the run naming the privilege it needs" */
+    it("fails with schema_failed, names CREATE on the database and applies nothing", async () => {
+      const applier = fakeApplier({ release: "3.21.0" });
+      const refusing = {
+        query: async <Row extends object>(text: string, values?: unknown[]) => {
+          if (text.startsWith("DO $ledger$"))
+            throw new Error("permission denied for database langwatch");
+          return scratch.postgres.query<Row>(text, values);
+        },
+      };
+      const outcome = await run(runnerFor({ release: "3.21.0", applier, postgres: refusing }));
+      expect(outcome.code).toBe("schema_failed");
+      expect(outcome.message).toContain("needs CREATE on the database");
+      expect(outcome.message).toContain("permission denied");
+      expect(applier.calls).toEqual([]);
     });
   });
 

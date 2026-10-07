@@ -44,10 +44,10 @@ Feature: The upgrade holds up end to end over live stores
     Then it is refused with outcome "no-clickhouse" and the refusal names "CLICKHOUSE_URL"
 
   @integration
-  Scenario: A lapsed presence stops serving and the next good write serves again
-    Given an admitted worker whose presence writes then fail past the stale bound
+  Scenario: A lapsed roster entry stops serving and the next good write serves again
+    Given an admitted worker whose roster writes then fail past the stale bound
     Then the gate reports it no longer serves
-    When its presence writes succeed again
+    When its roster writes succeed again
     Then the gate reports it serves again
 
   @integration

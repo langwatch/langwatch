@@ -17,7 +17,7 @@ function switchableGate({ events }: { events: Recorded }) {
   const state = { serving: true };
   const gate: UpgradeGate = {
     admit: async () => ({ admitted: true }),
-    release: async () => void events.push("presence removed"),
+    release: async () => void events.push("roster entry removed"),
     serving: () => state.serving,
     backgroundSteps: {
       isStep: (contribution): contribution is { readonly id: string } =>
@@ -66,8 +66,8 @@ const start = (gate: UpgradeGate, port = 0) =>
 const readiness = async (port: number): Promise<number> =>
   (await fetch(`http://127.0.0.1:${port}/readyz`)).status;
 
-describe("a gated process whose presence lapses", () => {
-  /** @scenario "Readiness fails while the presence is lapsed and passes again after a good write" */
+describe("a gated process whose roster entry lapses", () => {
+  /** @scenario "Readiness fails while the roster entry is lapsed and passes again after a good write" */
   it("turns readiness off while lapsed and on again after a good write", async () => {
     const events: Recorded = [];
     const { gate, state } = switchableGate({ events });
@@ -89,7 +89,7 @@ describe("a gated process whose presence lapses", () => {
     }
   });
 
-  /** @scenario "A worker pauses taking jobs while its presence is lapsed and resumes after a good write" */
+  /** @scenario "A worker pauses taking jobs while its roster entry is lapsed and resumes after a good write" */
   it("pauses the worker's work while lapsed and resumes it after a good write", async () => {
     const events: Recorded = [];
     const { gate, state } = switchableGate({ events });
@@ -124,7 +124,7 @@ describe("a gated worker's background steps", () => {
       "background started: identity:reopen-unproven-accounts",
       "background stopped",
       "application stopped",
-      "presence removed",
+      "roster entry removed",
     ]);
   });
 });

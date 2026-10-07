@@ -7,7 +7,7 @@
 import { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { createLedgerTables } from "../../ledger-tables.ts";
+import { createLedgerTables, LEDGER_TABLE } from "../../ledger-tables.ts";
 import { UpgradeReadError } from "../reader.errors.ts";
 import type { UpgradeImage } from "../reader.schema.ts";
 import { type UpgradeReader, createUpgradeReader } from "../reader.service.ts";
@@ -17,20 +17,21 @@ const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 let sequence = 0;
 const scratchName = () => `upgrade_reader_${Date.now().toString(36)}_${sequence++}`;
 
-const WIDEN = [
-  `ALTER TABLE "_langwatch_upgrade_step" ADD COLUMN IF NOT EXISTS "owner" TEXT`,
-  `ALTER TABLE "_langwatch_upgrade_step" ADD COLUMN IF NOT EXISTS "description" TEXT`,
-  `ALTER TABLE "_langwatch_upgrade_run" ADD COLUMN IF NOT EXISTS "floor" TEXT`,
-  `CREATE TABLE IF NOT EXISTS "_langwatch_upgrade_target" (
+const widen = ({ ledger }: { ledger: string }) => [
+  `ALTER TABLE "${ledger}"."_langwatch_upgrade_step" ADD COLUMN IF NOT EXISTS "owner" TEXT`,
+  `ALTER TABLE "${ledger}"."_langwatch_upgrade_step" ADD COLUMN IF NOT EXISTS "description" TEXT`,
+  `ALTER TABLE "${ledger}"."_langwatch_upgrade_run" ADD COLUMN IF NOT EXISTS "floor" TEXT`,
+  `CREATE TABLE IF NOT EXISTS "${ledger}"."_langwatch_upgrade_target" (
     "step_id" TEXT NOT NULL, "target" TEXT NOT NULL, "status" TEXT NOT NULL, "version" TEXT,
     "last_error" TEXT, "updated_at" TIMESTAMP(3) NOT NULL, PRIMARY KEY ("step_id", "target"))`,
-  `CREATE TABLE IF NOT EXISTS "_langwatch_upgrade_lease" (
+  `CREATE TABLE IF NOT EXISTS "${ledger}"."_langwatch_upgrade_lease" (
     "name" TEXT NOT NULL PRIMARY KEY, "owner" TEXT NOT NULL, "image" TEXT NOT NULL,
     "host" TEXT NOT NULL, "heartbeat_at" TIMESTAMP(3) NOT NULL, "expires_at" TIMESTAMP(3) NOT NULL)`,
 ];
 
 interface Scratch {
   postgres: Pool;
+  ledgerSchema: string;
   widen(): Promise<void>;
   drop(): Promise<void>;
 }
@@ -42,20 +43,22 @@ async function openScratch(): Promise<Scratch> {
   const postgres = new Pool({
     connectionString: DB_URL,
     max: 3,
-    options: `-c search_path=${name}`,
+    options: `-c search_path=${name},${name}_upgrade_ledger`,
   });
   await createLedgerTables({ postgres });
-  for (const table of ["target", "lease", "presence"]) {
-    await postgres.query(`DROP TABLE IF EXISTS "_langwatch_upgrade_${table}"`);
+  for (const table of [LEDGER_TABLE.target, LEDGER_TABLE.lease, LEDGER_TABLE.roster]) {
+    await postgres.query(`DROP TABLE IF EXISTS "${name}_upgrade_ledger"."${table}"`);
   }
+  const ledgerSchema = `${name}_upgrade_ledger`;
   return {
     postgres,
+    ledgerSchema,
     widen: async () => {
-      for (const statement of WIDEN) await postgres.query(statement);
+      for (const statement of widen({ ledger: ledgerSchema })) await postgres.query(statement);
     },
     drop: async () => {
       await postgres.end();
-      await admin.query(`DROP SCHEMA "${name}" CASCADE`);
+      await admin.query(`DROP SCHEMA IF EXISTS "${name}_upgrade_ledger", "${name}" CASCADE`);
       await admin.end();
     },
   };
@@ -584,7 +587,8 @@ describe.skipIf(!DB_URL)("UpgradeReader over the ledger tables", () => {
     await insertRun({ scratch, id: "run_up", release: "3.21.0", startedAt: "2026-10-05 10:00:00" });
     await insertStep({ scratch, id: "prisma:1", release: "3.21.0", runId: "run_up" });
     const { rows } = await scratch.postgres.query<{ name: string }>(
-      `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = current_schema()`,
+      `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = $1`,
+      [scratch.ledgerSchema],
     );
     expect(rows.map((row) => row.name).toSorted()).toEqual([
       "_langwatch_upgrade_run",

@@ -107,7 +107,7 @@ Feature: Every entry point runs the upgrade once; serving processes never migrat
     Given an installation whose Postgres steps are done
     When a gate with a database and no ClickHouse target asks
     Then it refuses, naming CLICKHOUSE_URL as required
-    And no presence is written
+    And no roster entry is written
 
   @unit
   Scenario: A process with no database configured has no installation to gate

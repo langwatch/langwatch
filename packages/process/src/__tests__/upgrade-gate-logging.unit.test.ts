@@ -59,8 +59,8 @@ describe("the upgrade gate's console lines", () => {
     });
   });
 
-  describe("given an admitted worker whose presence lapses and is written again", () => {
-    /** @scenario "A lapsed presence is logged with what to check, and the recovery says how long serving stopped" */
+  describe("given an admitted worker whose roster entry lapses and is written again", () => {
+    /** @scenario "A lapsed roster entry is logged with what to check, and the recovery says how long serving stopped" */
     it("says readiness answers 503 and what it waits on, then how long serving stopped", async () => {
       const state = { serving: true };
       const { hosted, lines } = component({
@@ -84,8 +84,8 @@ describe("the upgrade gate's console lines", () => {
         "the worker takes new jobs again",
       );
       expect(lapsed).toMatchObject({
-        phase: "presence",
-        waitingOn: expect.stringContaining("presence write"),
+        phase: "roster",
+        waitingOn: expect.stringContaining("roster write"),
       });
       expect(lines.findLine("info", "serves again")).toMatchObject({
         stoppedForMs: expect.any(Number),

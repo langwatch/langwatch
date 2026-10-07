@@ -21,7 +21,7 @@ export {
 } from "./first-install-upgrade.ts";
 export { IMAGE_MIGRATION_DIRECTORIES, imageGateSteps, readImageTree } from "./image-tree.ts";
 export {
-  PRESENCE_TIMING,
+  SERVING_ROSTER_TIMING,
   type ServingGateWarn,
   servingUpgradeGate,
   upgradeGateOver,

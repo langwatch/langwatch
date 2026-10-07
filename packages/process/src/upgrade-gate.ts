@@ -23,7 +23,7 @@ export type UpgradeGateBackgroundSteps = Readonly<{
 export type UpgradeGate = Readonly<{
   admit: () => Promise<UpgradeGateVerdict>;
   release: () => Promise<void>;
-  /** False once its presence lapsed, true after a good write (round 22); absent: always true. */
+  /** False once its roster entry lapsed, true after a good write (round 22); absent: true. */
   serving?: () => boolean;
   backgroundSteps?: UpgradeGateBackgroundSteps;
 }>;
@@ -31,7 +31,7 @@ export type UpgradeGate = Readonly<{
 /** What an operator reads on the gate's lines: the phase, what it waits on, what to do next. */
 const GATE_PHASE = "upgrade-gate";
 const LEDGER = "the upgrade ledger (DATABASE_URL)";
-const PRESENCE_WAIT = "a presence write to the upgrade ledger (DATABASE_URL)";
+const ROSTER_WAIT = "a roster write to the upgrade ledger (DATABASE_URL)";
 const LEDGER_UNREADABLE_NEXT =
   "check DATABASE_URL reaches Postgres and `pnpm task upgrade status` answers, then start this process again";
 const REFUSED_NEXT = "do what the refusal names, then start this process again";
@@ -69,7 +69,7 @@ export function assertGatedRole(role: string): asserts role is UpgradeGatedRole 
 
 /**
  * Hosted by the preamble, so it starts after boot and before the application runtime, and stops
- * after it: presence outlives the last write. A refusal, or a gate that cannot answer, throws.
+ * after it: the roster entry outlives the last write. A refusal, or an unanswering gate, throws.
  * Once admitted, a lapse fails readiness and `onServingChange` hears each turn (round 22).
  */
 export function upgradeGateComponent({
@@ -138,7 +138,7 @@ export function upgradeGateComponent({
     },
     ready: async () => {
       if (admitted && gate.serving?.() === false) {
-        throw new Error(`${server} (${role}) stopped serving: its upgrade presence lapsed`);
+        throw new Error(`${server} (${role}) stopped serving: its serving roster entry lapsed`);
       }
     },
     stop: async () => {
@@ -170,19 +170,19 @@ function servingWatcher({
     const now = gate.serving?.() ?? true;
     if (now === serving) return;
     serving = now;
-    const phase = "presence";
+    const phase = "roster";
     if (now) {
       const stoppedForMs = Math.round(performance.now() - stoppedAt);
       logger.info(
         { role, phase, waitingOn: "nothing", stoppedForMs, next: "nothing to do: it serves" },
-        `${server} (${role}) serves again: its presence was written after ${stoppedForMs} ms${resumes}`,
+        `${server} (${role}) serves again: its roster entry was written after ${stoppedForMs} ms${resumes}`,
       );
     } else {
       stoppedAt = performance.now();
       logger.error(
-        { role, phase, waitingOn: PRESENCE_WAIT, next: LEDGER_UNREADABLE_NEXT },
-        `${server} (${role}) stopped serving: its upgrade presence lapsed; readiness answers 503 ` +
-          `until a presence write succeeds${pauses}`,
+        { role, phase, waitingOn: ROSTER_WAIT, next: LEDGER_UNREADABLE_NEXT },
+        `${server} (${role}) stopped serving: its serving roster entry lapsed; readiness answers 503 ` +
+          `until a roster write succeeds${pauses}`,
       );
     }
     void Promise.resolve(onServingChange?.(now)).catch((error: unknown) =>

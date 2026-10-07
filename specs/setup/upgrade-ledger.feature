@@ -103,15 +103,8 @@ Feature: The upgrade ledger records every step an installation has taken
 # The widened ledger (mig-ledger-widen; dev/docs/plans/migrations-blitz-2026-10-06.md 5.3, D2, D4,
 # Q-U11). Additive only: a step gains an owner and a description, a run gains the floor it applied
 # with, and three runner-owned tables arrive beside the first two: one row per ClickHouse target of
-# a step, the runner's lease, and one presence row per serving process. Storage only; plans, gates
+# a step, the runner's lease, and one serving roster entry per serving process. Storage only; plans, gates
 # and runs read and write these through the repository and decide for themselves.
-
-  @integration
-  Scenario: Creating the widened ledger gives the same shape as Prisma's migration
-    Given a Postgres database where the S1 ledger already exists
-    When the widened ledger is created by the runner, and separately by Prisma's migration
-    Then both hold the owner, description, floor, target, lease and presence columns identically
-    And Prisma reports no drift from its models
 
   @integration
   Scenario: Widening a ledger that holds a recorded step keeps the step
@@ -152,21 +145,21 @@ Feature: The upgrade ledger records every step an installation has taken
     And the holder renews it, then releases it, and the lease is free
 
   @integration
-  Scenario: A process writes its presence and refreshes it in place
-    Given a process that wrote its presence with two declared steps
-    When it writes its presence again with three declared steps
+  Scenario: A process writes its roster entry and refreshes it in place
+    Given a process that wrote its roster entry with two declared steps
+    When it writes its roster entry again with three declared steps
     Then the ledger holds one row for the process with three steps and its original start
 
   @integration
-  Scenario: A presence row older than the stale bound is not live
-    Given one process that wrote its presence just now and one whose last write is older than the bound
-    When the live presence is read
+  Scenario: A roster entry older than the stale bound is not live
+    Given one process that wrote its roster entry just now and one whose last write is older than the bound
+    When the live roster is read
     Then only the recent process is returned
 
   @integration
-  Scenario: Removing a process's presence deletes only its row
-    Given two processes that wrote their presence
-    When the presence of one of them is removed, and then removed again
+  Scenario: Removing a process's roster entry deletes only its row
+    Given two processes that wrote their roster entries
+    When the roster entry of one of them is removed, and then removed again
     Then only the other process's row remains and the second removal is not an error
 
   @integration

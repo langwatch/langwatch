@@ -15,7 +15,7 @@ Feature: An upgrade tells the operator what it is doing and what to do next
   Scenario: A first run announces itself, the number of migrations, and that serving follows
     Given a database with no LangWatch schema
     When the upgrade runs
-    Then the first line says this is a first run that creates the schema
+    Then the first line says this is a first run that creates its ledger in its own Postgres schema
     And a line names how many schema migrations it will apply before the api and worker serve
     And the last line says the first run finished, how long it took and what to start next
 
@@ -82,10 +82,10 @@ Feature: An upgrade tells the operator what it is doing and what to do next
     Then the refusal names "DATABASE_URL" and the line carries the next action
 
   @unit
-  Scenario: A lapsed presence is logged with what to check, and the recovery says how long serving stopped
+  Scenario: A lapsed roster entry is logged with what to check, and the recovery says how long serving stopped
     Given an admitted worker
-    When its presence lapses and is later written again
-    Then the lapse line says readiness answers 503 and names the presence write it waits on
+    When its roster entry lapses and is later written again
+    Then the lapse line says readiness answers 503 and names the roster write it waits on
     And the recovery line carries how many milliseconds serving stopped
 
   @unit

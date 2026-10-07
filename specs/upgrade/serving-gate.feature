@@ -4,7 +4,7 @@
 # An api or worker reads the upgrade ledger once its stores are open and before its
 # application runs. It refuses to start, by name, when a blocking step its image declares is
 # not done or not-needed, or when its release is below the highest floor any upgrade run
-# recorded. Admitted, it writes its presence and refreshes it until a graceful stop removes it.
+# recorded. Admitted, it writes its roster entry and refreshes it until a graceful stop removes it.
 # The tasks role runs `upgrade` and is never gated. On a Helm first install (empty ledger, empty
 # schema) the api detects it; running `upgrade` then is mig-entry-points' (Q10).
 
@@ -105,39 +105,39 @@ Feature: Serving processes refuse to start when the installation is behind their
     Then composing it fails, naming the tasks role
 
   @unit
-  Scenario: Presence is written on start and removed on graceful stop
+  Scenario: The roster entry is written on start and removed on graceful stop
     Given every blocking step the image declares is done
     When the worker's serving gate admits it
-    Then the presence names the worker, its image, its release and its declared steps
+    Then the roster entry names the worker, its image, its release and its declared steps
     When the process stops gracefully
-    Then the presence is removed after the application stopped
+    Then the roster entry is removed after the application stopped
 
   @unit
-  Scenario: A refused process writes no presence
+  Scenario: A refused process writes no roster entry
     Given the ledger records "clickhouse:00042" as pending
     When the serving gate checks the image
-    Then no presence is written
+    Then no roster entry is written
 
-  # Lapsed gate (round 9): a process whose own presence lapses stops serving, so it cannot
+  # Lapsed gate (round 9): a process whose own roster entry lapses stops serving, so it cannot
   # serve unseen while a step waits on old writers being gone (ADR-173, Consequences).
   @unit
-  Scenario: A process whose presence writes keep failing stops serving past the stale bound
-    Given a worker was admitted and recorded its presence
-    And the ledger refuses every later presence write
-    When more than 60 seconds pass since its last good presence write
+  Scenario: A process whose roster writes keep failing stops serving past the stale bound
+    Given a worker was admitted and recorded its roster entry
+    And the ledger refuses every later roster write
+    When more than 60 seconds pass since its last good roster write
     Then the gate says the worker is not serving
     And the change is reported once
 
   @unit
-  Scenario: A process that stopped serving on a lapsed presence serves again after a good write
-    Given a worker stopped serving because its presence lapsed
-    When the next presence write succeeds
+  Scenario: A process that stopped serving on a lapsed roster entry serves again after a good write
+    Given a worker stopped serving because its roster entry lapsed
+    When the next roster write succeeds
     Then the gate says the worker is serving
     And the change is reported once
 
   @unit
   Scenario: A healthy process never stops serving
-    Given a worker was admitted and every presence write succeeds
+    Given a worker was admitted and every roster write succeeds
     When ten minutes pass
     Then the gate says the worker is serving throughout
 
@@ -149,16 +149,16 @@ Feature: Serving processes refuse to start when the installation is behind their
 
 
   # Stop serving (round 22): a lapse turns /readyz 503 so the load balancer drains the process,
-  # and a worker pauses taking jobs; both resume after a good presence write.
+  # and a worker pauses taking jobs; both resume after a good roster write.
   @unit
-  Scenario: Readiness fails while the presence is lapsed and passes again after a good write
+  Scenario: Readiness fails while the roster entry is lapsed and passes again after a good write
     Given an admitted process whose readiness passed and latched
     When its gate stops serving
-    Then the next readiness probe answers 503 naming the lapsed presence
+    Then the next readiness probe answers 503 naming the lapsed roster entry
     And when its gate serves again the next readiness probe answers 200
 
   @unit
-  Scenario: A worker pauses taking jobs while its presence is lapsed and resumes after a good write
+  Scenario: A worker pauses taking jobs while its roster entry is lapsed and resumes after a good write
     Given an admitted worker running its application
     When its gate stops serving
     Then every runtime service that can pause is paused

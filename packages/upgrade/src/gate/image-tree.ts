@@ -26,8 +26,8 @@ export function readImageTree({
 }
 
 /**
- * What the serving gate requires and what presence declares (blitz plan 3.1, 5.3): the blocking
- * ids are the tree's schema steps plus its blocking code steps, the same ids the runner registers.
+ * What the serving gate requires and what the serving roster declares (blitz plan 3.1, 5.3): the
+ * blocking ids are the tree's schema and blocking code steps, the same ids the runner registers.
  * `withClickHouse: false` leaves the ClickHouse ids out (held question S3-NO-CLICKHOUSE).
  */
 export function imageGateSteps({

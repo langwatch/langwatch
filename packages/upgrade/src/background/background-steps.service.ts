@@ -63,7 +63,7 @@ export interface BackgroundStepsOptions {
 /**
  * Runs the background steps the worker's modules declare (ADR-173 §1, round 14: the framework
  * runs). One step at a time under its own lease, only while the process serves, and a step that
- * needs old writers gone only once presence says so. Spec: specs/upgrade/background-steps.feature.
+ * needs old writers gone only once the serving roster says so. Spec: background-steps.feature.
  */
 export class BackgroundStepsService {
   private constructor(private readonly options: BackgroundStepsOptions) {}

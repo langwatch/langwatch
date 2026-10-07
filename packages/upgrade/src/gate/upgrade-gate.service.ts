@@ -1,11 +1,11 @@
 import type { UpgradeRun, UpgradeStep } from "../ledger.ts";
-import type { Presence } from "../presence/index.ts";
+import type { ServingRoster } from "../serving-roster/index.ts";
 import {
   detectRollbacks,
   type RollbackLedgerRun,
   type RollbackLedgerStep,
   rollbackReason,
-} from "../presence/rollback.ts";
+} from "../serving-roster/rollback.ts";
 import {
   assertCurrent,
   firstInstallVerdict,
@@ -31,30 +31,30 @@ export interface ServingGateRollback {
 }
 
 export type ServingGateImage = ServingImage & {
-  /** What presence names the build by: its release, or `git-<sha>` on cloud. */
+  /** What the serving roster names the build by: its release, or `git-<sha>` on cloud. */
   name: string;
-  /** The background and tenant step ids presence declares (plan 3.1, D2). */
+  /** The background and tenant step ids the serving roster declares (plan 3.1, D2). */
   declaredSteps: readonly string[];
 };
 
 export interface UpgradeGate {
   admit(): Promise<ServingVerdict>;
   release(): Promise<void>;
-  /** Admitted and its own presence not lapsed; false once it lapses, true after a good write. */
+  /** Admitted and its roster entry not lapsed; false once it lapses, true after a good write. */
   serving(): boolean;
 }
 
 /**
  * One serving process's gate (plan D5): `admit` reads the ledger, refuses by name when behind or
- * below the floor, and records presence only once admitted; `release` removes it at a graceful
- * stop. Spec: specs/upgrade/serving-gate.feature.
+ * below the floor, and records its roster entry only once admitted; `release` removes it at a
+ * graceful stop. Spec: specs/upgrade/serving-gate.feature.
  */
 export function createUpgradeGate({
   role,
   processId,
   image,
   ledger,
-  presence,
+  roster,
   schemaIsEmpty,
   rollback,
 }: {
@@ -62,7 +62,7 @@ export function createUpgradeGate({
   processId: string;
   image: ServingGateImage;
   ledger: ServingGateLedger;
-  presence: Presence;
+  roster: ServingRoster;
   /** True when the application schema holds nothing yet (Q10's first install). */
   schemaIsEmpty: () => Promise<boolean>;
   /** Round 9 (S3-ROLLBACK): absent, an admitted process reopens nothing. */
@@ -84,7 +84,7 @@ export function createUpgradeGate({
         if (gatedRole === "api" && empty && (await schemaIsEmpty())) return firstInstallVerdict();
         return verdict;
       }
-      await presence.record({
+      await roster.record({
         processId,
         role: gatedRole,
         image: image.name,
@@ -92,32 +92,32 @@ export function createUpgradeGate({
         steps: [...image.declaredSteps],
       });
       admitted = true;
-      if (rollback) await reopenAfterRollback({ ledger, presence, rollback });
+      if (rollback) await reopenAfterRollback({ ledger, roster, rollback });
       return verdict;
     },
     async release() {
       admitted = false;
-      await presence.stop();
+      await roster.stop();
     },
-    serving: () => admitted && !presence.lapsed(),
+    serving: () => admitted && !roster.lapsed(),
   };
 }
 
 /** A reopen never refuses a start: the failure is reported; the next admitted process retries. */
 async function reopenAfterRollback({
   ledger,
-  presence,
+  roster,
   rollback,
 }: {
   ledger: ServingGateLedger;
-  presence: Presence;
+  roster: ServingRoster;
   rollback: ServingGateRollback;
 }): Promise<void> {
   try {
     const [steps, runs, live] = await Promise.all([
       ledger.findSteps(),
       ledger.findRuns(),
-      presence.live(),
+      roster.live(),
     ]);
     for (const sighting of detectRollbacks({ runs, steps, live })) {
       const reason = rollbackReason({ sighting });

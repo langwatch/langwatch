@@ -9,16 +9,19 @@ import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import { loadReleases } from "../manifest/manifest-loader.ts";
 import type { ReleaseTreeSteps } from "../manifest/stamp.ts";
 import type { UpgradePostgres } from "../ports.ts";
-import { createPresence, type Presence } from "../presence/presence.service.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
+import {
+  createServingRoster,
+  type ServingRoster,
+} from "../serving-roster/serving-roster.service.ts";
 import { isMigrationStep } from "../step/migration-step.ts";
 import { type FirstInstallUpgrade, spawnFirstInstallUpgrade } from "./first-install-upgrade.ts";
 import { imageGateSteps, readImageTree } from "./image-tree.ts";
 import { type ServingRole, type ServingVerdict, UPGRADE_COMMAND } from "./serving-gate.ts";
 import { createUpgradeGate, type UpgradeGate } from "./upgrade-gate.service.ts";
 
-/** Presence refresh and stale bound (held question "cloud presence timings", default taken). */
-export const PRESENCE_TIMING = { staleAfterMs: 60_000, refreshEveryMs: 15_000 } as const;
+/** Roster refresh and stale bound (held question "cloud presence timings", default taken). */
+export const SERVING_ROSTER_TIMING = { staleAfterMs: 60_000, refreshEveryMs: 15_000 } as const;
 
 /** A process with no database (the memory tier) has no installation to be behind. */
 const NO_LEDGER_GATE: UpgradeGate = {
@@ -79,17 +82,17 @@ export function upgradeGateOver({
   const ledger = UpgradeLedgerRepository.create({ postgres });
   const runner = UpgradeRunnerRepository.create({ postgres });
   const { blockingSteps, declaredSteps } = imageGateSteps({ tree, withClickHouse });
-  const presence = createPresence({
+  const roster = createServingRoster({
     ledger,
-    ...PRESENCE_TIMING,
+    ...SERVING_ROSTER_TIMING,
     onRefreshError: (error) =>
-      warn("presence refresh failed", { processId, error: messageOf(error) }),
+      warn("roster refresh failed", { processId, error: messageOf(error) }),
     onLapseChange: (lapsed) =>
       warn(
         lapsed
-          ? `presence lapsed past ${PRESENCE_TIMING.staleAfterMs} ms: ${processId} stops serving; ` +
-              "readiness answers 503 until a presence write succeeds (check DATABASE_URL reaches Postgres)"
-          : `presence written again: ${processId} serves again`,
+          ? `roster entry lapsed past ${SERVING_ROSTER_TIMING.staleAfterMs} ms: ${processId} stops serving; ` +
+              "readiness answers 503 until a roster write succeeds (check DATABASE_URL reaches Postgres)"
+          : `roster entry written again: ${processId} serves again`,
         { processId },
       ),
   });
@@ -101,7 +104,7 @@ export function upgradeGateOver({
       findSteps: async () => ((await runner.ledgerExists()) ? ledger.findSteps() : []),
       findRuns: async () => ((await runner.ledgerExists()) ? ledger.findRuns() : []),
     },
-    presence,
+    roster,
     schemaIsEmpty: async () => !(await runner.prismaHistoryExists()),
     rollback: {
       reopen: (input) => runner.reopenDoneSteps(input),
@@ -134,7 +137,7 @@ export function upgradeGateOver({
       ? {
           backgroundSteps: backgroundStepsOver({
             postgres,
-            presence,
+            roster,
             gate,
             processId,
             release,
@@ -174,14 +177,14 @@ export async function admitAfterFirstInstall({
 /** The worker's background steps over the gate's own connection (round 14: framework runs). */
 function backgroundStepsOver({
   postgres,
-  presence,
+  roster,
   gate,
   processId,
   release,
   warn,
 }: {
   postgres: UpgradePostgres;
-  presence: Pick<Presence, "oldWritersGoneFor">;
+  roster: Pick<ServingRoster, "oldWritersGoneFor">;
   gate: Pick<UpgradeGate, "serving">;
   processId: string;
   release: string | null;
@@ -206,7 +209,7 @@ function backgroundStepsOver({
         },
         steps: steps.filter(isMigrationStep),
         serving: () => gate.serving(),
-        oldWritersGoneFor: (input) => presence.oldWritersGoneFor(input),
+        oldWritersGoneFor: (input) => roster.oldWritersGoneFor(input),
         identity: { owner: processId, image: release ?? "unreleased", host: hostname() },
         log,
       });

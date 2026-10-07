@@ -28,7 +28,7 @@ function gateAnswering({
       events.push("gate asked");
       return admit();
     },
-    release: async () => void events.push("presence removed"),
+    release: async () => void events.push("roster entry removed"),
   };
 }
 
@@ -56,8 +56,8 @@ describe("the preamble's upgrade gate", () => {
       await server.close();
     });
 
-    /** @scenario "Presence is written on start and removed on graceful stop" */
-    it("releases the gate's presence after the application stopped", async () => {
+    /** @scenario "The roster entry is written on start and removed on graceful stop" */
+    it("releases the gate's roster entry after the application stopped", async () => {
       const events: Recorded = [];
       const server = await start({
         role: "api",
@@ -71,7 +71,7 @@ describe("the preamble's upgrade gate", () => {
         "gate asked",
         "application started",
         "application stopped",
-        "presence removed",
+        "roster entry removed",
       ]);
     });
   });

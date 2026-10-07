@@ -16,17 +16,9 @@ export type SchemaTargetReport =
 /**
  * Applies the image's schema. `release` is the release to stop at (null: every step the image
  * ships); an applier that cannot step applies everything on its first call (rethink 6.4, 6.5).
- * Postgres sessions it opens carry `lockTimeoutMs` as `lock_timeout` (rethink 6.7).
+ * Postgres sessions carry `lock_timeout`; it runs under the lease, the first Prisma deploy too.
  */
 export interface UpgradeSchemaApplier {
-  /**
-   * Applies the Postgres schema alone, before the ledger exists, on a database with no Prisma
-   * history: Prisma refuses a non-empty schema it has no record of (P3005).
-   */
-  bootstrapPostgres?(args: {
-    lockTimeoutMs: number;
-    signal: AbortSignal;
-  }): Promise<SchemaTargetReport>;
   apply(args: {
     release: string | null;
     lockTimeoutMs: number;

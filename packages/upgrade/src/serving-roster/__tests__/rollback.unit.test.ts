@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createUpgradeGate, PRESENCE_TIMING } from "../../gate/index.ts";
+import { createUpgradeGate, SERVING_ROSTER_TIMING } from "../../gate/index.ts";
 import type { UpgradeStepStatus } from "../../ledger.ts";
-import { createPresence, detectRollbacks, type PresenceDeclaration } from "../index.ts";
-import { MemoryPresenceLedger } from "./memory-presence-ledger.ts";
+import { createServingRoster, detectRollbacks, type ServingRosterDeclaration } from "../index.ts";
+import { MemoryServingRosterLedger } from "./memory-serving-roster-ledger.ts";
 
 const STEP = "trace:backfill-cost";
 const RUN_FINISHED = new Date("2026-10-06T21:00:00Z");
@@ -17,7 +17,7 @@ const lastRun = {
 
 function installation({ runs = [lastRun] }: { runs?: readonly (typeof lastRun)[] } = {}) {
   const status = new Map<string, UpgradeStepStatus>([[STEP, "done"]]);
-  const presenceLedger = new MemoryPresenceLedger();
+  const rosterLedger = new MemoryServingRosterLedger();
   const reopened: { ids: readonly string[]; reason: string }[] = [];
   const errors: unknown[] = [];
   let refuseReopen = false;
@@ -28,8 +28,10 @@ function installation({ runs = [lastRun] }: { runs?: readonly (typeof lastRun)[]
       ),
     findRuns: async () => runs,
   };
-  const admit = async (declaration: Pick<PresenceDeclaration, "processId" | "image" | "steps">) => {
-    const presence = createPresence({ ledger: presenceLedger, ...PRESENCE_TIMING });
+  const admit = async (
+    declaration: Pick<ServingRosterDeclaration, "processId" | "image" | "steps">,
+  ) => {
+    const roster = createServingRoster({ ledger: rosterLedger, ...SERVING_ROSTER_TIMING });
     const gate = createUpgradeGate({
       role: "worker",
       processId: declaration.processId,
@@ -40,7 +42,7 @@ function installation({ runs = [lastRun] }: { runs?: readonly (typeof lastRun)[]
         declaredSteps: declaration.steps,
       },
       ledger,
-      presence,
+      roster,
       schemaIsEmpty: async () => false,
       rollback: {
         reopen: async ({ ids }) => {
@@ -54,13 +56,13 @@ function installation({ runs = [lastRun] }: { runs?: readonly (typeof lastRun)[]
       },
     });
     const verdict = await gate.admit();
-    await presence.stop().catch(() => undefined);
+    await roster.stop().catch(() => undefined);
     return verdict;
   };
   return { status, reopened, errors, admit, refuse: () => void (refuseReopen = true) };
 }
 
-describe("rollback detection from presence", () => {
+describe("rollback detection from the serving roster", () => {
   beforeEach(() => {
     vi.useFakeTimers({ now: new Date("2026-10-06T22:00:00Z") });
   });
@@ -71,7 +73,7 @@ describe("rollback detection from presence", () => {
   /** @scenario "An older image serving after the last run reopens the background steps it does not declare" */
   it("reopens the done step the older image does not declare, naming the image", async () => {
     const { status, reopened, admit } = installation();
-    // presence.stop removes the row, so the sighting is made inside admit, while the row is live.
+    // roster.stop removes the row, so the sighting is made inside admit, while the row is live.
     await admit({ processId: "worker-old-1", image: "git-0ld0000", steps: [] });
     expect(status.get(STEP)).toBe("pending");
     expect(reopened).toEqual([

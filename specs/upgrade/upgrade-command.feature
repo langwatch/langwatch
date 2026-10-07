@@ -73,13 +73,36 @@ Feature: The upgrade command
     And every data and tenant step is recorded not-needed
     And the run is recorded succeeded with the image's release and the LTS floor
 
+  # The ledger has its own Postgres schema, `<installation schema>_upgrade_ledger` (round 21), so
+  # it exists before Prisma's first deploy, which refuses a non-empty schema it has no record of
+  # (P3005). The runner creates it first on every database, then takes the lease in it.
   @integration
-  Scenario: A database with no Prisma history gets its Postgres schema before the ledger exists
+  Scenario: The ledger gets its own Postgres schema first, so Prisma's first deploy runs under the lease
     Given an empty database with no _prisma_migrations table
     When the upgrade runs
-    Then the Postgres schema is applied before any ledger table is created
-    And the run still plans as a fresh install, marking data steps not-needed
-    And the upgrade completes with code 0
+    Then the ledger schema and its lease table exist before the schema applier is called
+    And the schema applier runs while this runner holds the lease
+    And the installation's own schema holds no ledger table when the applier starts
+    And the run plans as a fresh install, marking data steps not-needed
+    And the log says the ledger is ready and names its schema
+
+  @integration
+  Scenario: A ledger kept in the installation's schema is copied into the ledger schema once
+    Given an earlier build left a ledger in the installation's schema with a run and a done step
+    When the upgrade runs
+    Then the run and the step are in the ledger schema, the step still done
+    And the log names both schemas and how many steps and runs were copied
+    And the old tables are left in place
+    When a row is added to the old tables and the upgrade runs again
+    Then nothing is copied a second time
+
+  @integration
+  Scenario: A ledger that cannot be created fails the run naming the privilege it needs
+    Given the DATABASE_URL role may not create the ledger schema
+    When the upgrade runs
+    Then it exits 1 with schema_failed
+    And the message says the role needs CREATE on the database, or the schema created beforehand
+    And nothing is applied
 
   @unit
   Scenario: A ClickHouse database goose has not created yet reads as holding no goose history

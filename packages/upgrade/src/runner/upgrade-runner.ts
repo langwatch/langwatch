@@ -154,9 +154,8 @@ export class UpgradeRunnerService {
     signal: AbortSignal;
     fresh: boolean;
   }): Promise<UpgradeOutcome> {
-    const bootstrapFailed = await this.bootstrapFreshDatabase({ signal });
-    if (bootstrapFailed) return bootstrapFailed;
-    await this.ledger.createTables();
+    const ledgerFailed = await this.prepareLedger();
+    if (ledgerFailed) return ledgerFailed;
     const { identity } = this.options;
     const owner = `${identity.host}:${generate("upgradelease").toString()}`;
     const held = await holdUpgradeLease({
@@ -174,24 +173,27 @@ export class UpgradeRunnerService {
     return upgradeOutcome({ code: "lease_lost", message: `lease lost: ${message}`, runId, detail });
   }
 
-  /** A database with no Prisma history gets its Postgres schema before the ledger tables exist. */
-  private async bootstrapFreshDatabase({ signal }: { signal: AbortSignal }) {
-    const { applier } = this.options;
-    if (!applier.bootstrapPostgres || (await this.runner.prismaHistoryExists())) return null;
-    this.narrate.info("first run: applying the Postgres schema before the ledger exists", {
-      phase: "first-run",
-      waitingOn: "prisma migrate deploy on Postgres (DATABASE_URL)",
-    });
+  /**
+   * The ledger schema and its tables, lease included, exist before anything else on every
+   * database (round 21), so Prisma's first deploy runs under the lease like any other step.
+   */
+  private async prepareLedger(): Promise<UpgradeOutcome | null> {
     const startedAt = performance.now();
-    const lockTimeoutMs = this.options.lockTimeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS;
-    const report = await applier.bootstrapPostgres({ lockTimeoutMs, signal });
-    this.narrate.bootstrapped({ ok: report.ok, startedAt });
-    if (report.ok) return null;
-    return upgradeOutcome({
-      code: "schema_failed",
-      message: `the Postgres schema failed before the ledger existed: ${redactSecrets(report.error ?? "no error given")}`,
-      detail: { targets: [{ target: report.target, error: report.error }] },
-    });
+    try {
+      const tables = await this.ledger.createTables();
+      this.narrate.ledgerReady({ schema: tables.schema, startedAt });
+      return null;
+    } catch (failure) {
+      const error = redactSecrets(failure instanceof Error ? failure.message : String(failure));
+      this.narrate.ledgerFailed({ error });
+      return upgradeOutcome({
+        code: "schema_failed",
+        message:
+          `the upgrade ledger could not be created in its own Postgres schema: ${error}. ` +
+          "The DATABASE_URL role needs CREATE on the database, or the schema created for it beforehand",
+        detail: { targets: [{ target: "postgres", error }] },
+      });
+    }
   }
 
   /** What `upgrade plan` prints: read-only, no lease, nothing written. */
@@ -280,6 +282,8 @@ export class UpgradeRunnerService {
     signal: AbortSignal;
     fresh: boolean;
   }): Promise<UpgradeOutcome> {
+    const copied = await this.runner.copyLegacyLedger();
+    if (copied) this.narrate.ledgerCopied(copied);
     if (await this.runner.isEmpty()) {
       const { postgres, clickhouse } = this.options;
       await UpgradeLedgerSeedService.create({ postgres, clickhouse }).seed();

@@ -1,9 +1,18 @@
+import {
+  copyLegacyLedgerSql,
+  LEDGER_TABLE,
+  type LedgerTableNames,
+  ledgerTables,
+} from "../ledger-tables.ts";
 import { type UpgradeLease, upgradeLeaseSchema, type UpgradeStepStatus } from "../ledger.ts";
 import type { ManifestStep } from "../manifest/manifest.ts";
 import type { UpgradePostgres } from "../ports.ts";
 
 const NOW_UTC = `(now() AT TIME ZONE 'UTC')`;
 const SETTLED: ReadonlySet<UpgradeStepStatus> = new Set(["done", "not-needed", "failed"]);
+
+/** What a one-time copy of a legacy ledger moved: from which schema, into which, how many rows. */
+export type LegacyLedgerCopy = { from: string; into: string; steps: number; runs: number };
 
 /** A step the runner registers: a manifest step with the release that shipped it. */
 export type RegisteredStep = ManifestStep & { release: string | null };
@@ -19,10 +28,18 @@ export class UpgradeRunnerRepository {
     return new UpgradeRunnerRepository(postgres);
   }
 
+  /** Runs `text` against this installation's ledger tables (`ledgerTables`). */
+  private async query<Row extends object>(
+    text: (tables: LedgerTableNames) => string,
+    values?: unknown[],
+  ): Promise<{ rows: Row[] }> {
+    return this.postgres.query<Row>(text(await ledgerTables({ postgres: this.postgres })), values);
+  }
+
   async ledgerExists(): Promise<boolean> {
-    const { rows } = await this.postgres.query<{ present: boolean }>(
-      `SELECT to_regclass('_langwatch_upgrade_step') IS NOT NULL
-          AND to_regclass('_langwatch_upgrade_run') IS NOT NULL AS present`,
+    const { rows } = await this.query<{ present: boolean }>(
+      (t) => `SELECT to_regclass('${t.step}') IS NOT NULL
+          AND to_regclass('${t.run}') IS NOT NULL AS present`,
     );
     return rows[0]?.present === true;
   }
@@ -34,20 +51,44 @@ export class UpgradeRunnerRepository {
     return rows[0]?.present === true;
   }
 
+  /**
+   * Copies a ledger an earlier build kept in the installation's own schema into the ledger
+   * schema, once, while the new ledger is empty; null when there was nothing to copy.
+   */
+  async copyLegacyLedger(): Promise<LegacyLedgerCopy | null> {
+    const { rows } = await this.query<{ legacy: string }>(
+      (t) => `SELECT current_schema() AS "legacy"
+         WHERE current_schema() <> '${t.schema}'
+           AND to_regclass(format('%I.%I', current_schema(), '${LEDGER_TABLE.step}')) IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM ${t.step})
+           AND NOT EXISTS (SELECT 1 FROM ${t.run})`,
+    );
+    const from = rows[0]?.legacy;
+    if (!from) return null;
+    const tables = await ledgerTables({ postgres: this.postgres });
+    await this.postgres.query(copyLegacyLedgerSql({ tables }));
+    const counted = await this.query<{ steps: string; runs: string }>(
+      (t) => `SELECT (SELECT count(*) FROM ${t.step})::text AS "steps",
+                     (SELECT count(*) FROM ${t.run})::text AS "runs"`,
+    );
+    const { steps = "0", runs = "0" } = counted.rows[0] ?? {};
+    return { from, into: tables.schema, steps: Number(steps), runs: Number(runs) };
+  }
+
   async isEmpty(): Promise<boolean> {
-    const { rows } = await this.postgres.query<{ empty: boolean }>(
-      `SELECT NOT EXISTS (SELECT 1 FROM "_langwatch_upgrade_step")
-          AND NOT EXISTS (SELECT 1 FROM "_langwatch_upgrade_run") AS empty`,
+    const { rows } = await this.query<{ empty: boolean }>(
+      (t) => `SELECT NOT EXISTS (SELECT 1 FROM ${t.step})
+          AND NOT EXISTS (SELECT 1 FROM ${t.run}) AS empty`,
     );
     return rows[0]?.empty === true;
   }
 
   async findLease({ name }: { name: string }): Promise<UpgradeLease | null> {
-    const { rows } = await this.postgres.query<object>(
-      `SELECT "name", "owner", "image", "host",
+    const { rows } = await this.query<object>(
+      (t) => `SELECT "name", "owner", "image", "host",
               "heartbeat_at" AT TIME ZONE 'UTC' AS "heartbeatAt",
               "expires_at" AT TIME ZONE 'UTC' AS "expiresAt"
-         FROM "_langwatch_upgrade_lease" WHERE "name" = $1`,
+         FROM ${t.lease} WHERE "name" = $1`,
       [name],
     );
     return rows[0] ? upgradeLeaseSchema.parse(rows[0]) : null;
@@ -59,8 +100,8 @@ export class UpgradeRunnerRepository {
    */
   async registerSteps({ steps }: { steps: readonly RegisteredStep[] }): Promise<void> {
     if (steps.length === 0) return;
-    await this.postgres.query(
-      `INSERT INTO "_langwatch_upgrade_step" AS step
+    await this.query(
+      (t) => `INSERT INTO ${t.step} AS step
               ("id", "kind", "mode", "release", "owner", "description", "status", "inferred", "updated_at")
        SELECT source.id, source.kind, source.mode, source.release, source.owner, source.description,
               'pending', false, ${NOW_UTC}
@@ -86,8 +127,8 @@ export class UpgradeRunnerRepository {
 
   /** Marks a step `running` for this run and counts the attempt. */
   async markRunning({ id, runId }: { id: string; runId: string }): Promise<void> {
-    await this.postgres.query(
-      `UPDATE "_langwatch_upgrade_step"
+    await this.query(
+      (t) => `UPDATE ${t.step}
           SET "status" = 'running', "run_id" = $2, "attempt" = "attempt" + 1,
               "started_at" = ${NOW_UTC}, "finished_at" = NULL, "updated_at" = ${NOW_UTC}
         WHERE "id" = $1`,
@@ -110,8 +151,8 @@ export class UpgradeRunnerRepository {
     report?: Record<string, unknown>;
   }): Promise<void> {
     if (ids.length === 0) return;
-    await this.postgres.query(
-      `UPDATE "_langwatch_upgrade_step"
+    await this.query(
+      (t) => `UPDATE ${t.step}
           SET "status" = $2, "run_id" = $3, "last_error" = $4, "inferred" = false,
               "report" = COALESCE($5::jsonb, "report"),
               "finished_at" = CASE WHEN $6::boolean THEN ${NOW_UTC} ELSE NULL END,
@@ -130,8 +171,8 @@ export class UpgradeRunnerRepository {
 
   /** Saves a running step's checkpoint report, so a resumed attempt starts from it. */
   async saveReport({ id, report }: { id: string; report: Record<string, unknown> }): Promise<void> {
-    await this.postgres.query(
-      `UPDATE "_langwatch_upgrade_step" SET "report" = $2::jsonb, "updated_at" = ${NOW_UTC}
+    await this.query(
+      (t) => `UPDATE ${t.step} SET "report" = $2::jsonb, "updated_at" = ${NOW_UTC}
         WHERE "id" = $1`,
       [id, JSON.stringify(report)],
     );
@@ -155,8 +196,8 @@ export class UpgradeRunnerRepository {
     runId: string;
     report: Record<string, unknown>;
   }): Promise<void> {
-    await this.postgres.query(
-      `UPDATE "_langwatch_upgrade_run" SET "report" = $2::jsonb
+    await this.query(
+      (t) => `UPDATE ${t.run} SET "report" = $2::jsonb
         WHERE "id" = $1 AND "finished_at" IS NULL`,
       [runId, JSON.stringify(report)],
     );
@@ -174,8 +215,8 @@ export class UpgradeRunnerRepository {
     reason: string;
   }): Promise<string[]> {
     if (ids.length === 0) return [];
-    const { rows } = await this.postgres.query<{ id: string }>(
-      `UPDATE "_langwatch_upgrade_step"
+    const { rows } = await this.query<{ id: string }>(
+      (t) => `UPDATE ${t.step}
           SET "status" = 'pending', "last_error" = $2, "inferred" = false, "finished_at" = NULL,
               "report" = NULL,
               "updated_at" = ${NOW_UTC}
@@ -196,8 +237,8 @@ export class UpgradeRunnerRepository {
     release: string | null;
     plan: Record<string, unknown>;
   }): Promise<void> {
-    await this.postgres.query(
-      `UPDATE "_langwatch_upgrade_run" SET "release" = $2, "plan" = $3::jsonb WHERE "id" = $1`,
+    await this.query(
+      (t) => `UPDATE ${t.run} SET "release" = $2, "plan" = $3::jsonb WHERE "id" = $1`,
       [runId, release, JSON.stringify(plan)],
     );
   }

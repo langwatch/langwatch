@@ -29,14 +29,18 @@ describe.skipIf(!DB_URL)("the migrations ledger", () => {
   beforeEach(async () => {
     admin = new Pool({ connectionString: DB_URL, max: 1 });
     await admin.query(`CREATE SCHEMA "${schema}"`);
-    postgres = new Pool({ connectionString: DB_URL, max: 2, options: `-c search_path=${schema}` });
+    postgres = new Pool({
+      connectionString: DB_URL,
+      max: 2,
+      options: `-c search_path=${schema},${schema}_upgrade_ledger`,
+    });
     ledger = UpgradeLedgerRepository.create({ postgres });
     await ledger.createTables();
   });
 
   afterEach(async () => {
     await postgres.end();
-    await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+    await admin.query(`DROP SCHEMA IF EXISTS "${schema}_upgrade_ledger", "${schema}" CASCADE`);
     await admin.end();
   });
 

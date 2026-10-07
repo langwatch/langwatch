@@ -4,12 +4,6 @@
  * Requires LANGWATCH_TEST_DATABASE_URL and LANGWATCH_TEST_CLICKHOUSE_URL; every test gets its own
  * Postgres schema and ClickHouse database, so the shared test databases are never touched.
  */
-import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { Pool } from "pg";
@@ -19,16 +13,20 @@ import { UpgradeLedgerSeedService } from "../ledger-seed.service.ts";
 import { createLedgerTables } from "../ledger-tables.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import type { UpgradeClickHouse } from "../ports.ts";
+import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 const CH_URL = process.env.LANGWATCH_TEST_CLICKHOUSE_URL;
 
-const PRISMA_DIR = fileURLToPath(new URL("../../../prisma-client/prisma/", import.meta.url));
-const LEDGER_MIGRATIONS = [
-  "20261006130000_upgrade_ledger",
-  "20261006180000_upgrade_ledger_widen",
-].map((folder) => join(PRISMA_DIR, "migrations", folder, "migration.sql"));
-const PRISMA_BIN = fileURLToPath(new URL("../../node_modules/.bin/prisma", import.meta.url));
+/** The S1 ledger as `20261006130000_upgrade_ledger` created it, in the installation's schema. */
+const LEGACY_S1_LEDGER = `CREATE TABLE "_langwatch_upgrade_run" ("id" TEXT NOT NULL, "kind" TEXT NOT NULL,
+  "release" TEXT, "started_at" TIMESTAMP(3) NOT NULL, "finished_at" TIMESTAMP(3), "outcome" TEXT,
+  "plan" JSONB, "report" JSONB, CONSTRAINT "_langwatch_upgrade_run_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "_langwatch_upgrade_step" ("id" TEXT NOT NULL, "kind" TEXT NOT NULL, "release" TEXT,
+  "mode" TEXT NOT NULL, "status" TEXT NOT NULL, "inferred" BOOLEAN NOT NULL DEFAULT false,
+  "attempt" INTEGER NOT NULL DEFAULT 0, "last_error" TEXT, "report" JSONB, "run_id" TEXT,
+  "started_at" TIMESTAMP(3), "finished_at" TIMESTAMP(3), "updated_at" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "_langwatch_upgrade_step_pkey" PRIMARY KEY ("id"));`;
 
 let sequence = 0;
 const scratchName = () => `upgrade_ledger_${Date.now().toString(36)}_${sequence++}`;
@@ -48,7 +46,7 @@ async function openScratch(): Promise<Scratch> {
   const postgres = new Pool({
     connectionString: DB_URL,
     max: 2,
-    options: `-c search_path=${name}`,
+    options: `-c search_path=${name},${name}_upgrade_ledger`,
   });
   const root = createClient({ url: CH_URL });
   await root.command({ query: `CREATE DATABASE ${name}` });
@@ -64,7 +62,7 @@ async function openScratch(): Promise<Scratch> {
     clickhouseClient,
     drop: async () => {
       await postgres.end();
-      await admin.query(`DROP SCHEMA "${name}" CASCADE`);
+      await admin.query(`DROP SCHEMA IF EXISTS "${name}_upgrade_ledger", "${name}" CASCADE`);
       await admin.end();
       await clickhouseClient.close();
       await root.command({ query: `DROP DATABASE IF EXISTS ${name}` });
@@ -155,45 +153,6 @@ async function describeTables(postgres: Pool, schema: string): Promise<unknown> 
   return { columns: columns.rows, constraints: constraints.rows, indexes: indexes.rows };
 }
 
-/** `prisma migrate diff` from the scratch schema to the ledger's models; 0 means no drift. */
-async function prismaDriftExitCode(schema: string): Promise<number> {
-  const prismaSchema = await readFile(join(PRISMA_DIR, "schema.prisma"), "utf8");
-  const models = [...prismaSchema.matchAll(/^model LangwatchUpgrade\w+ \{[\s\S]*?^\}/gm)].map(
-    (match) => match[0],
-  );
-  expect(models).toHaveLength(5);
-  const dir = await mkdtemp(join(tmpdir(), "upgrade-ledger-"));
-  try {
-    const url = new URL(DB_URL ?? "");
-    url.searchParams.set("schema", schema);
-    await writeFile(
-      join(dir, "ledger.prisma"),
-      `datasource db {\n  provider = "postgresql"\n}\n\n${models.join("\n\n")}\n`,
-    );
-    await writeFile(
-      join(dir, "prisma.config.mjs"),
-      `export default ${JSON.stringify({ schema: "./ledger.prisma", datasource: { url: url.toString() } })};\n`,
-    );
-    const run = promisify(execFile)(
-      PRISMA_BIN,
-      [
-        "migrate",
-        "diff",
-        "--config",
-        join(dir, "prisma.config.mjs"),
-        "--from-config-datasource",
-      ].concat(["--to-schema", join(dir, "ledger.prisma"), "--exit-code"]),
-      { cwd: dir, env: { ...process.env, CHECKPOINT_DISABLE: "1" } },
-    );
-    return await run.then(
-      () => 0,
-      (error: { code?: number }) => error.code ?? 1,
-    );
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-}
-
 describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
   let scratch: Scratch;
 
@@ -207,30 +166,19 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
 
   describe("when the ledger is created", () => {
     /** @scenario "Creating the ledger leaves Prisma's migration history in sync" */
-    it("creates the same tables as Prisma's migration, with no drift from Prisma's models", async () => {
-      const migrated = await openScratch();
-      try {
-        for (const file of LEDGER_MIGRATIONS) {
-          await migrated.postgres.query(await readFile(file, "utf8"));
-        }
-        await createLedgerTables({ postgres: scratch.postgres });
+    it("creates the run and step tables in the ledger schema and nothing in Prisma's schema", async () => {
+      await givenPrismaHistory(scratch, [{ name: "20260101000000_init", finished: true }]);
+      const before = await describeTables(scratch.postgres, scratch.name);
 
-        const present = await scratch.postgres.query<{ run: string | null; step: string | null }>(
-          `SELECT to_regclass('_langwatch_upgrade_run')::text AS run,
-                  to_regclass('_langwatch_upgrade_step')::text AS step`,
-        );
-        expect(present.rows[0]).toEqual({
-          run: "_langwatch_upgrade_run",
-          step: "_langwatch_upgrade_step",
-        });
-        expect(await describeTables(scratch.postgres, scratch.name)).toEqual(
-          await describeTables(migrated.postgres, migrated.name),
-        );
-        expect(await prismaDriftExitCode(scratch.name)).toBe(0);
-        expect(await prismaDriftExitCode(migrated.name)).toBe(0);
-      } finally {
-        await migrated.drop();
-      }
+      const tables = await createLedgerTables({ postgres: scratch.postgres });
+
+      expect(tables.schema).toBe(`${scratch.name}_upgrade_ledger`);
+      const present = await scratch.postgres.query<{ run: boolean; step: boolean }>(
+        `SELECT to_regclass('${tables.run}') IS NOT NULL AS run,
+                to_regclass('${tables.step}') IS NOT NULL AS step`,
+      );
+      expect(present.rows[0]).toEqual({ run: true, step: true });
+      expect(await describeTables(scratch.postgres, scratch.name)).toEqual(before);
     });
 
     /** @scenario "Creating the ledger twice changes nothing" */
@@ -432,35 +380,44 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
   });
 
   describe("when the widened ledger is created", () => {
-    /** @scenario "Creating the widened ledger gives the same shape as Prisma's migration" */
-    it("matches Prisma's migrations when the runner widens an S1 ledger, with no drift", async () => {
-      const migrated = await openScratch();
-      try {
-        for (const file of LEDGER_MIGRATIONS) {
-          await migrated.postgres.query(await readFile(file, "utf8"));
-        }
-        await scratch.postgres.query(await readFile(LEDGER_MIGRATIONS[0] as string, "utf8"));
-        await createLedgerTables({ postgres: scratch.postgres });
-
-        expect(await describeTables(scratch.postgres, scratch.name)).toEqual(
-          await describeTables(migrated.postgres, migrated.name),
-        );
-        expect(await prismaDriftExitCode(scratch.name)).toBe(0);
-        expect(await prismaDriftExitCode(migrated.name)).toBe(0);
-      } finally {
-        await migrated.drop();
-      }
+    /** @scenario "The ledger schema holds the widened ledger's tables and columns" */
+    it("creates every ledger table and the widened columns in the ledger schema", async () => {
+      const tables = await createLedgerTables({ postgres: scratch.postgres });
+      const { rows } = await scratch.postgres.query<{ table_name: string; column_name: string }>(
+        `SELECT table_name, column_name FROM information_schema.columns
+          WHERE table_schema = $1 AND column_name IN ('owner', 'description', 'floor', 'step_id', 'expires_at', 'process_id')
+          ORDER BY table_name, column_name`,
+        [tables.schema],
+      );
+      expect(rows.map((row) => `${row.table_name}.${row.column_name}`)).toEqual([
+        "_langwatch_serving_roster.process_id",
+        "_langwatch_upgrade_lease.expires_at",
+        "_langwatch_upgrade_lease.owner",
+        "_langwatch_upgrade_run.floor",
+        "_langwatch_upgrade_step.description",
+        "_langwatch_upgrade_step.owner",
+        "_langwatch_upgrade_target.step_id",
+      ]);
     });
 
     /** @scenario "Widening a ledger that holds a recorded step keeps the step" */
     it("keeps a step recorded before the widening and leaves its owner and description empty", async () => {
-      await scratch.postgres.query(await readFile(LEDGER_MIGRATIONS[0] as string, "utf8"));
+      await scratch.postgres.query(LEGACY_S1_LEDGER);
       await scratch.postgres.query(
-        `INSERT INTO "_langwatch_upgrade_step" ("id", "kind", "mode", "status", "attempt", "updated_at")
+        `INSERT INTO "${scratch.name}"."_langwatch_upgrade_step" ("id", "kind", "mode", "status", "attempt", "updated_at")
          VALUES ('prisma:20260101000000_recorded', 'postgres-schema', 'blocking', 'done', 1, now())`,
       );
 
       await ledgerOf(scratch).createTables();
+      const copied = await UpgradeRunnerRepository.create({
+        postgres: scratch.postgres,
+      }).copyLegacyLedger();
+      expect(copied).toEqual({
+        from: scratch.name,
+        into: `${scratch.name}_upgrade_ledger`,
+        steps: 1,
+        runs: 0,
+      });
 
       expect(await ledgerOf(scratch).findSteps()).toEqual([
         expect.objectContaining({
@@ -569,7 +526,7 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
     });
   });
 
-  describe("when serving processes report presence", () => {
+  describe("when serving processes report to the serving roster", () => {
     const serving = (processId: string, steps: string[]) => ({
       processId,
       role: "worker",
@@ -578,49 +535,49 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
       steps,
     });
 
-    /** @scenario "A process writes its presence and refreshes it in place" */
+    /** @scenario "A process writes its roster entry and refreshes it in place" */
     it("keeps one row per process, refreshed with its steps and its original start", async () => {
       const ledger = ledgerOf(scratch);
       await ledger.createTables();
-      const first = await ledger.writePresence(serving("p1", ["a:one", "a:two"]));
+      const first = await ledger.writeRosterEntry(serving("p1", ["a:one", "a:two"]));
 
-      const second = await ledger.writePresence(serving("p1", ["a:one", "a:two", "a:three"]));
+      const second = await ledger.writeRosterEntry(serving("p1", ["a:one", "a:two", "a:three"]));
 
-      const live = await ledger.findLivePresence({ staleAfterMs: 60_000 });
+      const live = await ledger.findLiveRoster({ staleAfterMs: 60_000 });
       expect(live).toEqual([second]);
       expect(second.steps).toEqual(["a:one", "a:two", "a:three"]);
       expect(second.startedAt).toEqual(first.startedAt);
       expect(second.heartbeatAt.getTime()).toBeGreaterThanOrEqual(first.heartbeatAt.getTime());
     });
 
-    /** @scenario "A presence row older than the stale bound is not live" */
+    /** @scenario "A roster entry older than the stale bound is not live" */
     it("does not return a process whose last write is older than the stale bound", async () => {
       const ledger = ledgerOf(scratch);
       await ledger.createTables();
-      await ledger.writePresence(serving("old", []));
+      await ledger.writeRosterEntry(serving("old", []));
       await scratch.postgres.query(
-        `UPDATE "_langwatch_upgrade_presence" SET "heartbeat_at" = "heartbeat_at" - interval '10 minutes'
+        `UPDATE "_langwatch_serving_roster" SET "heartbeat_at" = "heartbeat_at" - interval '10 minutes'
           WHERE "process_id" = 'old'`,
       );
-      await ledger.writePresence(serving("recent", ["a:one"]));
+      await ledger.writeRosterEntry(serving("recent", ["a:one"]));
 
-      const live = await ledger.findLivePresence({ staleAfterMs: 60_000 });
+      const live = await ledger.findLiveRoster({ staleAfterMs: 60_000 });
 
       expect(live.map((row) => row.processId)).toEqual(["recent"]);
     });
 
-    /** @scenario "Removing a process's presence deletes only its row" */
+    /** @scenario "Removing a process's roster entry deletes only its row" */
     it("deletes the named process's row, keeps the other, and ignores a missing row", async () => {
       const ledger = ledgerOf(scratch);
       await ledger.createTables();
-      await ledger.writePresence(serving("stopping", ["a:one"]));
-      await ledger.writePresence(serving("serving", ["a:one"]));
+      await ledger.writeRosterEntry(serving("stopping", ["a:one"]));
+      await ledger.writeRosterEntry(serving("serving", ["a:one"]));
 
-      await ledger.removePresence({ processId: "stopping" });
-      await ledger.removePresence({ processId: "stopping" });
+      await ledger.removeRosterEntry({ processId: "stopping" });
+      await ledger.removeRosterEntry({ processId: "stopping" });
 
       const { rows } = await scratch.postgres.query<{ process_id: string }>(
-        `SELECT "process_id" FROM "_langwatch_upgrade_presence" ORDER BY "process_id"`,
+        `SELECT "process_id" FROM "_langwatch_serving_roster" ORDER BY "process_id"`,
       );
       expect(rows.map((row) => row.process_id)).toEqual(["serving"]);
     });

@@ -14,7 +14,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { LEDGER_TABLES_DDL } from "@langwatch/upgrade";
+import { createLedgerTables } from "@langwatch/upgrade";
 import type { UpgradeStatus, UpgradeStepPage } from "@langwatch/upgrade/reader";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -49,11 +49,15 @@ describe.skipIf(!DB_URL)("ops' upgrade ledger on Postgres", () => {
       let read: unknown;
       await expect(
         prisma.$transaction(async (tx) => {
-          for (const statement of LEDGER_TABLES_DDL) {
-            await tx.$executeRawUnsafe(`${TENANCY}${statement}`);
-          }
+          const tables = await createLedgerTables({
+            postgres: {
+              query: async <Row extends object>(text: string, values: unknown[] = []) => ({
+                rows: await tx.$queryRawUnsafe<Row[]>(`${TENANCY}${text}`, ...values),
+              }),
+            },
+          });
           await tx.$executeRawUnsafe(
-            `${TENANCY}INSERT INTO "_langwatch_upgrade_step"
+            `${TENANCY}INSERT INTO ${tables.step}
                ("id", "kind", "mode", "status", "updated_at")
              VALUES ($1, 'postgres-schema', 'blocking', 'pending', now()),
                     ($2, 'clickhouse-schema', 'blocking', 'failed', now())`,

@@ -1,12 +1,12 @@
-import type { UpgradePresence } from "../../ledger.ts";
-import type { PresenceDeclaration, PresenceLedger } from "../presence-ledger.ts";
+import type { ServingRosterEntry } from "../../ledger.ts";
+import type { ServingRosterDeclaration, ServingRosterLedger } from "../serving-roster-ledger.ts";
 
 /**
- * The presence table in memory, as `UpgradeLedgerRepository` keeps it: the store's clock
+ * The serving roster table in memory, as `UpgradeLedgerRepository` keeps it: the store's clock
  * stamps both times, a refresh keeps `startedAt`, and a row exactly `staleAfterMs` old is live.
  */
-export class MemoryPresenceLedger implements PresenceLedger {
-  readonly rows = new Map<string, UpgradePresence>();
+export class MemoryServingRosterLedger implements ServingRosterLedger {
+  readonly rows = new Map<string, ServingRosterEntry>();
   private writesToRefuse = 0;
   private removesRefused = false;
   private held: Promise<void> | null = null;
@@ -31,14 +31,14 @@ export class MemoryPresenceLedger implements PresenceLedger {
     };
   }
 
-  async writePresence(declaration: PresenceDeclaration): Promise<UpgradePresence> {
+  async writeRosterEntry(declaration: ServingRosterDeclaration): Promise<ServingRosterEntry> {
     if (this.held) await this.held;
     if (this.writesToRefuse > 0) {
       this.writesToRefuse -= 1;
-      throw new Error("presence write refused");
+      throw new Error("roster write refused");
     }
     const now = new Date();
-    const row: UpgradePresence = {
+    const row: ServingRosterEntry = {
       ...declaration,
       steps: [...declaration.steps],
       startedAt: this.rows.get(declaration.processId)?.startedAt ?? now,
@@ -48,15 +48,15 @@ export class MemoryPresenceLedger implements PresenceLedger {
     return row;
   }
 
-  async findLivePresence({ staleAfterMs }: { staleAfterMs: number }): Promise<UpgradePresence[]> {
+  async findLiveRoster({ staleAfterMs }: { staleAfterMs: number }): Promise<ServingRosterEntry[]> {
     const now = Date.now();
     return [...this.rows.values()]
       .filter((row) => row.heartbeatAt.getTime() >= now - staleAfterMs)
       .toSorted((a, b) => a.processId.localeCompare(b.processId));
   }
 
-  async removePresence({ processId }: { processId: string }): Promise<void> {
-    if (this.removesRefused) throw new Error("presence delete refused");
+  async removeRosterEntry({ processId }: { processId: string }): Promise<void> {
+    if (this.removesRefused) throw new Error("roster delete refused");
     this.rows.delete(processId);
   }
 }

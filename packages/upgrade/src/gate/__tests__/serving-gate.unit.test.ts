@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { UpgradePresence } from "../../ledger.ts";
-import type { PresenceLedger } from "../../presence/index.ts";
-import { createPresence } from "../../presence/index.ts";
+import type { ServingRosterEntry } from "../../ledger.ts";
+import type { ServingRosterLedger } from "../../serving-roster/index.ts";
+import { createServingRoster } from "../../serving-roster/index.ts";
 import { assertCurrent, createUpgradeGate, ledgerFloor, UPGRADE_COMMAND } from "../index.ts";
 
 const PRISMA = "prisma:20261006180000_upgrade_ledger_widen";
@@ -13,18 +13,20 @@ const allDone = [
   { id: GOOSE, status: "done" as const },
 ];
 
-function memoryPresenceLedger(): PresenceLedger & { rows: Map<string, UpgradePresence> } {
-  const rows = new Map<string, UpgradePresence>();
+function memoryServingRosterLedger(): ServingRosterLedger & {
+  rows: Map<string, ServingRosterEntry>;
+} {
+  const rows = new Map<string, ServingRosterEntry>();
   return {
     rows,
-    writePresence: async (declaration) => {
+    writeRosterEntry: async (declaration) => {
       const at = new Date(0);
       const row = { ...declaration, steps: [...declaration.steps], startedAt: at, heartbeatAt: at };
       rows.set(row.processId, row);
       return row;
     },
-    findLivePresence: async () => [...rows.values()],
-    removePresence: async ({ processId }) => void rows.delete(processId),
+    findLiveRoster: async () => [...rows.values()],
+    removeRosterEntry: async ({ processId }) => void rows.delete(processId),
   };
 }
 
@@ -41,8 +43,8 @@ function gateOver({
   runs?: readonly { floor: string | null }[];
   schemaIsEmpty?: boolean;
 } = {}) {
-  const ledger = memoryPresenceLedger();
-  const presence = createPresence({
+  const ledger = memoryServingRosterLedger();
+  const roster = createServingRoster({
     ledger,
     staleAfterMs: 60_000,
     refreshEveryMs: 15_000,
@@ -68,7 +70,7 @@ function gateOver({
           finishedAt: null,
         })),
     },
-    presence,
+    roster,
     schemaIsEmpty: async () => schemaIsEmpty,
   });
   return { gate, rows: ledger.rows };
@@ -169,8 +171,8 @@ describe("createUpgradeGate", () => {
     });
   });
 
-  /** @scenario "Presence is written on start and removed on graceful stop" */
-  it("records presence once admitted and removes it on release", async () => {
+  /** @scenario "The roster entry is written on start and removed on graceful stop" */
+  it("records its roster entry once admitted and removes it on release", async () => {
     const { gate, rows } = gateOver();
     await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
     expect(rows.get("worker-1")).toMatchObject({
@@ -183,8 +185,8 @@ describe("createUpgradeGate", () => {
     expect(rows.size).toBe(0);
   });
 
-  /** @scenario "A refused process writes no presence" */
-  it("writes no presence when it refuses", async () => {
+  /** @scenario "A refused process writes no roster entry" */
+  it("writes no roster entry when it refuses", async () => {
     const { gate, rows } = gateOver({ steps: [{ id: GOOSE, status: "pending" }] });
     await expect(gate.admit()).resolves.toMatchObject({ admitted: false });
     expect(rows.size).toBe(0);

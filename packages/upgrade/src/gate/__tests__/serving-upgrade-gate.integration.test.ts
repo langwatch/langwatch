@@ -30,14 +30,16 @@ beforeEach(async () => {
   const postgres = new pg.Pool({
     connectionString: DB_URL,
     max: 1,
-    options: `-c search_path=${name}`,
+    options: `-c search_path=${name},${name}_upgrade_ledger`,
   });
   scratch = { name, admin, postgres, closed: false };
 });
 
 afterEach(async () => {
   if (!scratch.closed) await scratch.postgres.end();
-  await scratch.admin.query(`DROP SCHEMA "${scratch.name}" CASCADE`);
+  await scratch.admin.query(
+    `DROP SCHEMA IF EXISTS "${scratch.name}_upgrade_ledger", "${scratch.name}" CASCADE`,
+  );
   await scratch.admin.end();
 });
 
@@ -94,13 +96,13 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
 
   describe("given every blocking step done", () => {
     /** @scenario "A serving process is admitted once the upgrade has run" */
-    it("admits the api and records its presence until release", async () => {
+    it("admits the api and records its roster entry until release", async () => {
       await recordSteps({ [PRISMA]: "done", [GOOSE]: "done" });
       const gate = gateFor({ role: "api" });
 
       await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
       const { rows } = await scratch.postgres.query(
-        `SELECT "process_id" FROM "_langwatch_upgrade_presence"`,
+        `SELECT "process_id" FROM "_langwatch_serving_roster"`,
       );
       expect(rows).toEqual([{ process_id: "test:api" }]);
 

@@ -1,7 +1,7 @@
 # Background steps on the worker (ADR-173 section 1; round 14: the framework runs, ops reads and
 # requests). A worker that passed the serving gate runs the background steps its modules declare
 # with .withMigrations, one at a time under a lease of their own, resuming from the checkpoint.
-# A step that needs old writers gone waits on presence. A paused (lapsed) worker runs none.
+# A step that needs old writers gone waits on the serving roster. A paused (lapsed) worker runs none.
 
 Feature: The worker runs declared background steps
   As an operator of a LangWatch installation
@@ -42,7 +42,7 @@ Feature: The worker runs declared background steps
   @integration
   Scenario: A step that needs old writers gone waits while an old writer is live
     Given a pending background step that needs old writers gone
-    And presence says an old writer is still live
+    And the serving roster says an old writer is still live
     When the worker sweeps its declared background steps
     Then the step does not run and is reported as waiting
 
