@@ -268,6 +268,12 @@ export const eSBatchEvaluationRESTParamsSchema = z.object({
 
 export type ESBatchEvaluationRESTParams = z.infer<typeof eSBatchEvaluationRESTParamsSchema>;
 
+/** What the SDK's batch result log reports, for one project. */
+export type LogBatchEvaluationInput = Readonly<{
+  projectId: string;
+  params: ESBatchEvaluationRESTParams;
+}>;
+
 export const appliedOptimizationFieldSchema = z.object({
   identifier: z.string(),
   field_type: z.union([z.literal("input"), z.literal("output")]),

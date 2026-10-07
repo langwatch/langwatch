@@ -14,7 +14,6 @@ import type {
   EvaluationSlugMatch,
   GuardrailCheckInput,
   GuardrailCheckOutcome,
-  LogBatchEvaluationInput,
   RunEvaluatorInput,
   SavedEvaluatorLookup,
   SavedEvaluatorResolution,
@@ -87,13 +86,9 @@ export interface EvaluationApi {
     input: MonitorPerformanceForProjectInput,
   ): Promise<OnlineEvaluationPerformance[]>;
 
-  // The public evaluation doors: the SDK's batch result log and the four
-  // evaluate paths reach the same capability every other caller does.
+  // The public evaluation doors: the evaluate paths reach the same capability
+  // every other caller does.
 
-  /** Refuses an SDK batch body larger than the project's organization accepts in one request. */
-  assertBatchLogWithinLimit(input: { projectId: string; payloadBytes: number }): Promise<void>;
-  /** Records one SDK batch evaluation: its run, its rows and its verdicts. */
-  logBatchEvaluation(input: LogBatchEvaluationInput): Promise<void>;
   /** Runs one evaluator over one input, and never rejects for a domain reason. */
   runEvaluator(input: RunEvaluatorInput): Promise<SingleEvaluationResult>;
   /** Runs one guardrail's evaluator until its deadline or the caller's abort; records its cost. */

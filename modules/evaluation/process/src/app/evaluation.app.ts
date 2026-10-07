@@ -59,11 +59,6 @@ import type { EvaluationRepositories } from "../repositories/evaluation.reposito
 import type { EvaluationRetentionLookup } from "../repositories/evaluation.repository.ts";
 import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
 import { AzureSafetyCredentialsService } from "../services/azure-safety-credentials.service.ts";
-import {
-  EvaluationBatchLogService,
-  type EvaluationExperimentDirectory,
-  type EvaluationExperimentRunWriter,
-} from "../services/evaluation-batch-log.service.ts";
 import { EvaluationCommandDispatcherService } from "../services/evaluation-command-dispatcher.service.ts";
 import { EvaluationCostService } from "../services/evaluation-cost.service.ts";
 import { EvaluationDatasetLookupService } from "../services/evaluation-dataset-lookup.service.ts";
@@ -71,7 +66,10 @@ import { EvaluationExecutionIntentService } from "../services/evaluation-executi
 import { EvaluationExecutionMetricsService } from "../services/evaluation-execution-metrics.service.ts";
 import { EvaluationExecutionReceiptService } from "../services/evaluation-execution-receipt.service.ts";
 import { EvaluationExecutionService } from "../services/evaluation-execution.service.ts";
-import { EvaluationExperimentRunService } from "../services/evaluation-experiment-run.service.ts";
+import {
+  EvaluationExperimentLookupService,
+  type EvaluationExperimentDirectory,
+} from "../services/evaluation-experiment-lookup.service.ts";
 import { EvaluationFilterMatchingService } from "../services/evaluation-filter-matching.service.ts";
 import { EvaluationGuardrailCheckService } from "../services/evaluation-guardrail-check.service.ts";
 import { FlaggedEvaluationInputsOffloadService } from "../services/evaluation-inputs-offload-switch.service.ts";
@@ -110,10 +108,9 @@ export type EvaluationInfrastructure = Readonly<{
   analytics: EvaluationRunAnalytics;
   report: Pick<EvaluationCommandDispatcherService, "reportEvaluation">;
   // What the public evaluation doors reach beyond the module: the experiment
-  // an SDK batch is written into, the rows a slug names, the saved-evaluator
+  // a dataset evaluation names, the rows a slug names, the saved-evaluator
   // directory, the model cascade, the cost ledger and the evaluator runtime.
   experiments: EvaluationExperimentDirectory;
-  experimentRuns: EvaluationExperimentRunWriter;
   slugs: EvaluationSlugDirectory;
   savedEvaluators: EvaluationSavedEvaluatorDirectory;
   models: EvaluationModelCascade;
@@ -140,16 +137,7 @@ function createUnavailableEvaluationInfrastructure(processName: string): Evaluat
     warmup: { probe: async () => unavailable("evaluator warmup runtime") },
     analytics: { evaluationRan: () => void 0 },
     report: { reportEvaluation: async () => unavailable("evaluation report pipeline") },
-    experiments: {
-      findOrCreate: async () => unavailable("experiment directory"),
-      findBySlug: async () => unavailable("experiment directory"),
-    },
-    experimentRuns: {
-      startRun: async () => unavailable("experiment run writer"),
-      recordTargetResult: async () => unavailable("experiment run writer"),
-      recordEvaluatorResult: async () => unavailable("experiment run writer"),
-      completeRun: async () => unavailable("experiment run writer"),
-    },
+    experiments: { findBySlug: async () => unavailable("experiment directory") },
     slugs: {
       findMonitorBySlug: async () => unavailable("monitor directory"),
       findDatasetBySlug: async () => unavailable("dataset directory"),
@@ -280,7 +268,7 @@ export class EvaluationModule implements EvaluationApiContract {
     analytics: AnalyticsApi,
     /** The dataset a dataset evaluation names by slug, and the batch-evaluation rows it writes. */
     datasets: DatasetApi,
-    /** The experiment and run history SDK batches and dataset evaluations are written into. */
+    /** The experiment a dataset evaluation names by slug. */
     experiments: ExperimentApi,
   };
   static readonly secrets = {
@@ -296,7 +284,6 @@ export class EvaluationModule implements EvaluationApiContract {
   readonly #warmup: EvaluationWarmupProbe;
   readonly #analytics: EvaluationRunAnalytics;
   readonly #report: Pick<EvaluationCommandDispatcherService, "reportEvaluation">;
-  readonly #batchLog: EvaluationBatchLogService;
   readonly #autoslug: EvaluationNameAutoslugService;
   readonly #filterMatching: EvaluationFilterMatchingService;
   readonly #experiments: EvaluationExperimentDirectory;
@@ -365,12 +352,6 @@ export class EvaluationModule implements EvaluationApiContract {
     this.#commands = commands;
     this.#autoslug = EvaluationNameAutoslugService.create();
     this.#filterMatching = EvaluationFilterMatchingService.create();
-    this.#batchLog = EvaluationBatchLogService.create({
-      experiments: members.experiments,
-      runs: members.experimentRuns,
-      report: members.report,
-      limits: dependencies.datasets,
-    });
   }
 
   /** The closed stub answers what has no port yet (see the port-evaluation-runtime handoff). */
@@ -405,7 +386,7 @@ export class EvaluationModule implements EvaluationApiContract {
     const unavailable = createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME);
     const monitorLookup = EvaluationMonitorLookupService.create(dependencies.monitors);
     const datasets = EvaluationDatasetLookupService.create(dependencies.datasets);
-    const experiments = EvaluationExperimentRunService.create(dependencies.experiments);
+    const experiments = EvaluationExperimentLookupService.create(dependencies.experiments);
     const costs = EvaluationCostService.create({ repository: repositories.costs });
     const azureSafety = AzureSafetyCredentialsService.create(dependencies.modelProviders);
     const inputs = EvaluationInputsOffloadService.create({
@@ -448,7 +429,6 @@ export class EvaluationModule implements EvaluationApiContract {
           findAll: (input) => dependencies.workflows.findEvaluatorWorkflows(input),
         },
         experiments,
-        experimentRuns: experiments,
         slugs: {
           findMonitorBySlug: (input) => monitorLookup.findMonitorBySlug(input),
           findDatasetBySlug: (input) => datasets.findDatasetBySlug(input),
@@ -623,10 +603,6 @@ export class EvaluationModule implements EvaluationApiContract {
   findMonitorPerformance: EvaluationApiContract["findMonitorPerformance"] = (input) =>
     this.#monitorTrend.findForProject(input);
 
-  assertBatchLogWithinLimit: EvaluationApiContract["assertBatchLogWithinLimit"] = (input) =>
-    this.#batchLog.assertWithinLimit(input);
-  logBatchEvaluation: EvaluationApiContract["logBatchEvaluation"] = (input) =>
-    this.#batchLog.log(input);
   runEvaluator: EvaluationApiContract["runEvaluator"] = (input) =>
     this.#runner.runEvaluation(input);
   checkGuardrail: EvaluationApiContract["checkGuardrail"] = (input) =>

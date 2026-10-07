@@ -385,76 +385,17 @@ const NIGHTLY: Experiment = {
   workbenchVersion: 0,
 };
 
-describe("given an SDK logs a batch of evaluation results", () => {
+describe("given a dataset evaluation names an experiment by slug", () => {
   function recordingExperiments() {
-    const calls: [string, Record<string, unknown>][] = [];
     const experiments = createApiFixture<ExperimentApi>({
       findBySlug: async ({ projectId, slug }) =>
         projectId === PROJECT_ID && slug === "nightly" ? NIGHTLY : null,
-      findOrCreateForRun: async (input) => {
-        calls.push(["findOrCreateForRun", { ...input }]);
-        return NIGHTLY;
-      },
-      startExperimentRun: async (input) => {
-        calls.push(["startExperimentRun", { ...input }]);
-      },
-      recordTargetResult: async (input) => {
-        calls.push(["recordTargetResult", { ...input }]);
-      },
-      recordEvaluatorResult: async (input) => {
-        calls.push(["recordEvaluatorResult", { ...input }]);
-      },
-      completeExperimentRun: async (input) => {
-        calls.push(["completeExperimentRun", { ...input }]);
-      },
     });
 
-    return { calls, experiments };
+    return { experiments };
   }
 
-  /** @scenario "An SDK batch is written into its experiment's run history through the experiment module" */
-  it("finds or creates the experiment, then starts, fills and completes its run", async () => {
-    const { calls, experiments } = recordingExperiments();
-    const { runtime, evaluation } = await boot({ experiments });
-
-    try {
-      await evaluation.logBatchEvaluation({
-        projectId: PROJECT_ID,
-        params: {
-          experiment_slug: "nightly",
-          run_id: "run-1",
-          dataset: [{ index: 0, entry: { input: "hello" }, predicted: { output: "hi" } }],
-          evaluations: [{ evaluator: "exact", index: 0, status: "processed", score: 1 }],
-          timestamps: { finished_at: 1_700_000_000_000 },
-        },
-      });
-
-      expect(calls.map(([name]) => name)).toEqual([
-        "findOrCreateForRun",
-        "startExperimentRun",
-        "recordTargetResult",
-        "recordEvaluatorResult",
-        "completeExperimentRun",
-      ]);
-      expect(calls[0]?.[1]).toMatchObject({
-        projectId: PROJECT_ID,
-        experimentSlug: "nightly",
-        experimentType: "BATCH_EVALUATION_V2",
-      });
-      expect(calls[3]?.[1]).toMatchObject({
-        tenantId: PROJECT_ID,
-        runId: "run-1",
-        experimentId: "experiment-1",
-        evaluatorId: "exact",
-        status: "processed",
-        score: 1,
-      });
-    } finally {
-      await runtime.stop();
-    }
-  });
-
-  /** @scenario "An SDK batch is written into its experiment's run history through the experiment module" */
+  /** @scenario "A dataset evaluation's experiment slug resolves through the experiment owner" */
   it("answers the experiment a dataset evaluation names by slug", async () => {
     const { experiments } = recordingExperiments();
     const { runtime, evaluation } = await boot({ experiments });

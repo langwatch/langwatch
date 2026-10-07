@@ -18,7 +18,7 @@ import type {
   ExperimentDspyStepSummary,
   ExperimentDspyStepsLookup,
 } from "./experiment-dspy.ts";
-import type { DSPyRunsSummary } from "./experiment-legacy.ts";
+import type { DSPyRunsSummary, LogBatchEvaluationInput } from "./experiment-legacy.ts";
 import type { ComputeExperimentRunMetricsCommandData } from "./experiment-run-eventing.commands.ts";
 import type {
   CompleteExperimentRunInput,
@@ -191,6 +191,10 @@ export interface ExperimentApi {
   recordTargetResult(input: RecordTargetResultInput): Promise<void>;
   recordEvaluatorResult(input: RecordEvaluatorResultInput): Promise<void>;
   completeExperimentRun(input: CompleteExperimentRunInput): Promise<void>;
+  /** Refuses an SDK batch body larger than the project's organization accepts in one request. */
+  assertBatchLogWithinLimit(input: { projectId: string; payloadBytes: number }): Promise<void>;
+  /** Records one SDK batch evaluation: its run, its rows and its verdicts. */
+  logBatchEvaluation(input: LogBatchEvaluationInput): Promise<void>;
   /** One experiment trace's cost, sent to the run pipeline to fold into its run. */
   computeRunMetrics(input: ComputeExperimentRunMetricsCommandData): Promise<void>;
   /** The experiment a run was recorded against, or that no experiment recorded it. */

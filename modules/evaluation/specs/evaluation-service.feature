@@ -141,12 +141,10 @@ Feature: Evaluation service boundary
     And the scored entry is written as a batch-evaluation row by the dataset owner
 
   @unit
-  Scenario: An SDK batch is written into its experiment's run history through the experiment module
+  Scenario: A dataset evaluation's experiment slug resolves through the experiment owner
     Given a process that installs the evaluation feature beside an experiment owner
-    When an SDK logs a batch of evaluation results
-    Then the experiment is found or created, and its run is started, filled and completed in that order
-    And an evaluator result carries the status the batch reported
-    And a dataset evaluation's experiment slug resolves through the same owner
+    When a dataset evaluation names an experiment by slug
+    Then the experiment's id comes back, and a slug the project does not hold answers no experiment
 
   @unit
   Scenario: An evaluate call reads the project's default models from the cascade
@@ -357,35 +355,6 @@ Feature: Evaluation service boundary
     Then it answers 400 with the validation sentence under error
     And the refusal is logged with the zod issues
     And the evaluator is not run
-
-  # One SDK batch of results is sized to carry one dataset row with its images
-  # inline: about 267 MB unless the organization's file limit was raised.
-
-  @unit
-  Scenario: A batch of results within the organization's limit is accepted
-    Given an organization that sets no file limit of its own
-    When an SDK reports a batch of results smaller than one full dataset row
-    Then the batch is accepted
-
-  @unit
-  Scenario: A batch of results above the organization's limit is refused by name
-    Given an organization that sets no file limit of its own
-    When an SDK reports a batch of results larger than one full dataset row
-    Then the batch is refused as "evaluation_log_results_too_large"
-    And the refusal carries the organization's limit
-
-  @unit
-  Scenario: An organization with a raised file limit reports a batch the default limit refuses
-    Given an organization whose file limit was raised
-    When an SDK reports a batch larger than the default limit and smaller than its own
-    Then the batch is accepted
-
-  @unit
-  Scenario: The batch log route reads a body up to the largest limit any organization holds
-    Given the route that receives SDK batches has no project in reach when it reads the body
-    Then it reads a body up to the largest limit an organization can be raised to
-    And a body past that is refused as "evaluation_log_results_too_large"
-
 
   @unit
   Scenario: The monitors page's seven-day trend is read through evaluation

@@ -26,6 +26,7 @@ import {
   type ExperimentWorkflowVersionInput,
   type CommitWorkbenchVersionInput,
   type CompleteExperimentRunInput,
+  type LogBatchEvaluationInput,
   type ComputeExperimentRunMetricsCommandData,
   type ExperimentIdLookupResult,
   type CreateEvaluationsV3Input,
@@ -117,6 +118,7 @@ import {
   slugifyExperimentName,
 } from "../rules/experiment-slug.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
+import { ExperimentBatchLogService } from "../services/experiment-batch-log.service.ts";
 import { ExperimentCopyService } from "../services/experiment-copy.service.ts";
 import { ExperimentDspyRetentionService } from "../services/experiment-dspy-retention.service.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
@@ -184,6 +186,8 @@ export interface ExperimentAppDependencies {
   }>;
   /** The run pipeline, its senders and run lookup; absent where a suite builds none. */
   runProcessing?: ExperimentRunProcessing;
+  /** The SDK's batch result log; absent where a suite builds none. */
+  batchLog?: Pick<ExperimentBatchLogService, "assertWithinLimit" | "log">;
 }
 
 /** An experiment nobody has run yet. Defaulted here so no door decides it. */
@@ -256,10 +260,11 @@ export class ExperimentModule implements ExperimentApi {
     });
     const targetNames = ExperimentWorkbenchTargetNamesService.create();
     const entities = ExperimentTargetEntityNamesService.create({ agents, evaluators });
+    const runLookup = ExperimentFindOrCreateService.create(experiments);
 
     return new ExperimentModule({
       experiments,
-      runLookup: ExperimentFindOrCreateService.create(experiments),
+      runLookup,
       slugify: slugifyExperimentName,
       workbenchTargetNames: (input) => targetNames.resolve({ ...input, prompts, entities }),
       workflows,
@@ -274,6 +279,12 @@ export class ExperimentModule implements ExperimentApi {
       workbenchObserver: ExperimentWorkbenchObserverService.create({ logger, senders }),
       lifecycle: { pipeline: buildExperimentLifecyclePipeline(), senders },
       runProcessing: runs.processing,
+      batchLog: ExperimentBatchLogService.create({
+        runLookup,
+        runs: experiments,
+        report: dependencies.evaluation,
+        limits: dataset,
+      }),
     });
   }
 
@@ -534,6 +545,21 @@ export class ExperimentModule implements ExperimentApi {
   /** Closes a run, whether it finished or was stopped. */
   completeExperimentRun(input: CompleteExperimentRunInput): Promise<void> {
     return this.#dependencies.experiments.completeExperimentRun(input);
+  }
+
+  assertBatchLogWithinLimit(input: { projectId: string; payloadBytes: number }): Promise<void> {
+    return this.#batchLog().assertWithinLimit(input);
+  }
+
+  logBatchEvaluation(input: LogBatchEvaluationInput): Promise<void> {
+    return this.#batchLog().log(input);
+  }
+
+  #batchLog(): NonNullable<ExperimentAppDependencies["batchLog"]> {
+    const batchLog = this.#dependencies.batchLog;
+    if (!batchLog) throw new Error("this experiment process composes no batch result log");
+
+    return batchLog;
   }
 
   /** One trace's cost, folded into its run by the run pipeline. */

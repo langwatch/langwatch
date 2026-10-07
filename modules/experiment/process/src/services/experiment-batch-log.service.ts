@@ -1,111 +1,49 @@
 /**
  * One SDK batch evaluation, recorded: its experiment, its run, its target and
- * evaluator rows, and the verdicts it puts on the processing pipeline.
+ * evaluator rows, and the verdicts it reports to evaluation.
  * @see specs/monitors/guardrails-api-compatibility.feature
  */
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import {
   EvaluationLogResultsTooLargeError,
-  type EvaluationSlugLookup,
-  type EvaluationSlugMatch,
-  type LogBatchEvaluationInput,
+  type EvaluationApi,
 } from "@langwatch/evaluation-contract";
 import {
   eSBatchEvaluationSchema,
   mapLegacyExperimentTargets,
   type ESBatchEvaluation,
-  type ExperimentRunCommandTarget,
-  type RecordEvaluatorResultInput,
+  type LogBatchEvaluationInput,
 } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import { gatedVerdictFields, normalizeTargets } from "../rules/evaluation-dispatch.rules.ts";
-import type { EvaluationCommandDispatcherService } from "./evaluation-command-dispatcher.service.ts";
+import { gatedVerdictFields, normalizeTargets } from "../rules/experiment-batch-log.rules.ts";
+import type { ExperimentFindOrCreateService } from "./experiment-find-or-create.service.ts";
+import type { ExperimentService } from "./experiment.service.ts";
 
-const logger = createLogger("langwatch:evaluation:batch-log");
-
-/** The experiment an SDK batch's rows are grouped under, found or created. */
-export interface EvaluationExperimentDirectory {
-  findOrCreate(input: {
-    projectId: string;
-    experimentId?: string | undefined;
-    experimentSlug?: string | undefined;
-    experimentType: "BATCH_EVALUATION_V2";
-    experimentName?: string | undefined;
-    workflowId?: string | undefined;
-  }): Promise<EvaluationSlugMatch>;
-  findBySlug(input: EvaluationSlugLookup): Promise<EvaluationSlugMatch | null>;
-}
-
-/** The run history an SDK batch is written into, one call per phase. */
-export interface EvaluationExperimentRunWriter {
-  startRun(input: {
-    tenantId: string;
-    runId: string;
-    experimentId: string;
-    total: number;
-    targets: ExperimentRunCommandTarget[];
-    occurredAt: number;
-  }): Promise<unknown>;
-  recordTargetResult(input: {
-    tenantId: string;
-    runId: string;
-    experimentId: string;
-    index: number;
-    targetId: string;
-    entry: Record<string, unknown>;
-    predicted?: Record<string, unknown> | undefined;
-    cost?: number | undefined;
-    duration?: number | undefined;
-    error?: string | undefined;
-    traceId?: string | undefined;
-    targets: ExperimentRunCommandTarget[];
-    occurredAt: number;
-  }): Promise<unknown>;
-  recordEvaluatorResult(input: {
-    tenantId: string;
-    runId: string;
-    experimentId: string;
-    index: number;
-    targetId: string;
-    evaluatorId: string;
-    evaluatorName?: string | undefined;
-    status: RecordEvaluatorResultInput["status"];
-    score?: number | undefined;
-    label?: string | undefined;
-    passed?: boolean | undefined;
-    details?: string | undefined;
-    cost?: number | undefined;
-    inputs?: Record<string, unknown> | undefined;
-    duration?: number | undefined;
-    occurredAt: number;
-  }): Promise<unknown>;
-  completeRun(input: {
-    tenantId: string;
-    runId: string;
-    experimentId: string;
-    finishedAt?: number | undefined;
-    stoppedAt?: number | undefined;
-    occurredAt: number;
-  }): Promise<unknown>;
-}
+const logger = createLogger("langwatch:experiment:batch-log");
 
 /** What one batch's rows are written through. */
-type EvaluationBatchLogDeps = Readonly<{
-  experiments: EvaluationExperimentDirectory;
-  runs: EvaluationExperimentRunWriter;
-  report: Pick<EvaluationCommandDispatcherService, "reportEvaluation">;
+type ExperimentBatchLogDeps = Readonly<{
+  /** The experiment an SDK batch's rows are grouped under, found or created. */
+  runLookup: Pick<ExperimentFindOrCreateService, "resolve">;
+  /** The run history the batch is written into, one call per phase. */
+  runs: Pick<
+    ExperimentService,
+    "startExperimentRun" | "recordTargetResult" | "recordEvaluatorResult" | "completeExperimentRun"
+  >;
+  /** Each verdict travels evaluation's own processing pipeline. */
+  report: Pick<EvaluationApi, "reportEvaluation">;
   /** The size limits the project's organization answers. */
   limits: Pick<DatasetApi, "getLimits">;
 }>;
 
-export class EvaluationBatchLogService {
-  static create(deps: EvaluationBatchLogDeps): EvaluationBatchLogService {
-    return new EvaluationBatchLogService(deps);
+export class ExperimentBatchLogService {
+  static create(deps: ExperimentBatchLogDeps): ExperimentBatchLogService {
+    return new ExperimentBatchLogService(deps);
   }
 
-  private constructor(private readonly deps: EvaluationBatchLogDeps) {}
+  private constructor(private readonly deps: ExperimentBatchLogDeps) {}
 
   /**
    * One batch is sized to carry one full dataset row with its images inline,
@@ -131,7 +69,7 @@ export class EvaluationBatchLogService {
    * row is dispatched.
    */
   async log({ projectId, params }: LogBatchEvaluationInput): Promise<void> {
-    const experiment = await this.deps.experiments.findOrCreate({
+    const experiment = await this.deps.runLookup.resolve({
       projectId,
       experimentId: params.experiment_id ?? undefined,
       experimentSlug: params.experiment_slug ?? undefined,
@@ -173,7 +111,7 @@ export class EvaluationBatchLogService {
     const targets = mapLegacyExperimentTargets(batchEvaluation.targets ?? []);
 
     try {
-      await this.deps.runs.startRun({
+      await this.deps.runs.startExperimentRun({
         tenantId: projectId,
         runId,
         experimentId,
@@ -260,7 +198,7 @@ export class EvaluationBatchLogService {
     if (!finishedAt && !stoppedAt) return;
 
     try {
-      await this.deps.runs.completeRun({
+      await this.deps.runs.completeExperimentRun({
         tenantId: projectId,
         runId: batchEvaluation.run_id,
         experimentId,
