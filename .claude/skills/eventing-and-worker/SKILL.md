@@ -206,3 +206,5 @@ definePipeline({ name: "entitlement", aggregate: defineAggregate({ type: "entitl
 Pipelines are tested over memory twins and the event store memory tier; redelivery gets its own test
 (`eventing/__tests__/trace-alert-trigger-match.subscriber.redelivery.test.ts` delivers twice and asserts one
 effect). Worker installation: `app/__tests__/automation-worker-installation.unit.test.ts`. See `testing`.
+After adding a pipeline, subscriber, process manager or task, run `pnpm generate:readmes`: the Workers
+section of the module's `process/README.md` is the review artefact (`readmes` skill).

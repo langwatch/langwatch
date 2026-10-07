@@ -102,6 +102,9 @@ declared edge whose peer reaches back (258 findings on 2026-10-05); the list tha
 deleted, so the ratchet test stays red until none remain. `dev/docs/plans/peer-cycles-2026-10-05.md`
 maps the back edges.
 
+Before adding a peer, read your module page's "Peers" table and the target's "Who depends on"
+line (`modules/<id>/README.md`): if the target already depends on you, the edge closes a cycle.
+
 Before touching an edge: **ask Alex.** Ruled cuts so far: `secret -> project`, `gateway -> webhook`,
 and workflow dropping `ProjectApi` and `OrganizationApi`. Everything else waits.
 
