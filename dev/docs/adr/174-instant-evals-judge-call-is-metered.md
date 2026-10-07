@@ -99,6 +99,7 @@
 
     - A project whose created fact is lost is refused until someone re-runs the project job. The failure log names `backfill-project-created`, and the judge's unknown-project refusal logs the project, so the gap shows on its first refused call.
     - Two billing changes send no usage-billing fact today: an operator setting the self-hosted flag, which lives in the organization module, and the tiered-to-usage pricing task, which moves only organizations with no subscription, so their answer stays "not billed". A re-run of the usage-billing catch-up corrects both.
+    - A real usage-billing fact whose send fails is retried in place, three attempts in all, each stamped again before it reads billing. If the last attempt fails, billing logs an error that names the organization and `usage-billing-catch-up`, and a re-run of that job fixes it. A lost fact on a cancel would otherwise leave the judge uncapped for an organization the meter no longer bills, and a Stripe redelivery of the cancel does not re-send it: billing skips a subscription it already cancelled.
 
 ## Constants
 
@@ -190,6 +191,7 @@ The score judge's settings gain an optional `min` and `max` in the langevals set
 - Positive: one dispatch point covers every in-app judge.
 - Positive: results keep today's shape and scale.
 - Negative: a busy unbilled organization can go past $1 by the calls in flight together. The spend rows record all of it.
+- Negative: the overshoot is not a flat dollar. It is the organization's call rate times the time until each call's spend row is written, and every call is still recorded.
 - Negative: a retried experiment cell or simulation grading is billed per attempt.
 - Negative: a fail-closed guardrail blocks a free organization's traffic once it is past $1.
 - Negative: connected self-hosted accounts are billed only up to their contract ceiling, and the meter stops reporting when its breaker trips. Those organizations stay uncapped either way. A past-due organization stays usage billed, since billing has no past-due state.
@@ -305,3 +307,5 @@ The score judge's settings gain an optional `min` and `max` in the langevals set
   - Tests now cover the judge app building no classifier off cloud with a key set, and the usage-billing catch-up stopping at the first organization it cannot record (decisions 14 and 17).
   - The Instant Evals process drops the evaluator contract it never imported. The score judge's `min` and `max` are in the published evaluator API reference (decision 4).
   - The open question on runs and the search bar honouring an operator-set key is closed: v17 settled it, since the leaf builds no classifier off cloud.
+- v19, 2026-10-07, after the final review. Captain: Sergio Esteban.
+  - A real usage-billing fact whose send fails is retried in place, and a last failure logs the organization and `usage-billing-catch-up`, so a lost cancel cannot leave the judge uncapped unnoticed (decision 17).

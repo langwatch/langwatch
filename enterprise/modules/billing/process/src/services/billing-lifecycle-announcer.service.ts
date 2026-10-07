@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { EventingCommands } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { type Instant, nowInstant } from "@langwatch/time";
 
 import {
@@ -12,6 +12,12 @@ import type { BillingReportOrganizationRepository } from "../repositories/billin
 import { usageBilledOf } from "../rules/usage-billed.rules.ts";
 
 const logger = createLogger("langwatch:billing:lifecycle");
+
+/** Attempts at a real usage-billing fact before billing logs it lost (ADR-174 decision 17). */
+export const USAGE_BILLING_SEND_ATTEMPTS = 3;
+const USAGE_BILLING_FIRST_PAUSE_MS = 200;
+
+const pauseFor = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 type BillingLifecycleAnnouncerDeps = Readonly<{
   /** The webhook subscription repository, read only for whether a live subscription remains. */
@@ -28,6 +34,10 @@ type BillingLifecycleAnnouncerDeps = Readonly<{
   billingOrganizations: Pick<BillingReportOrganizationRepository, "getOrganizationForBilling">;
   /** The clock a usage-billing fact is stamped by; a test names its own. */
   now?: () => Instant;
+  /** The wait between usage-billing attempts; a test names its own. */
+  pause?: (ms: number) => Promise<void>;
+  /** Where a lost usage-billing fact is logged; a test names its own. */
+  logger?: Pick<Logger, "error">;
 }>;
 
 /**
@@ -90,13 +100,34 @@ export class BillingLifecycleAnnouncerService {
 
   /**
    * Records whether the meter bills the organization, after a write that may change it committed.
-   * Stamped before billing is read, so a fact never carries a newer stamp than the answer it
-   * read: a later change's fact always out-stamps it (ADR-174 decision 17).
+   * Each attempt re-stamps before it reads billing, so no fact out-stamps its answer. A Stripe
+   * redelivery never re-sends a lost fact, so a failed send is retried here, and a last failure
+   * names the catch-up that fixes it. Never throws (ADR-174 decision 17).
    */
   async usageBillingChanged({ organizationId }: { organizationId: string }): Promise<void> {
-    await this.#record(organizationId, async (commands) => {
-      await this.#sendUsageBilling({ commands, organizationId, fromCatchUp: false });
-    });
+    const pause = this.deps.pause ?? pauseFor;
+    for (let attempt = 1; attempt <= USAGE_BILLING_SEND_ATTEMPTS; attempt += 1) {
+      try {
+        if (!this.#commands) {
+          throw new Error("billing_lifecycle pipeline senders are not connected yet");
+        }
+        await this.#sendUsageBilling({
+          commands: this.#commands,
+          organizationId,
+          fromCatchUp: false,
+        });
+        return;
+      } catch (error) {
+        if (attempt === USAGE_BILLING_SEND_ATTEMPTS) {
+          (this.deps.logger ?? logger).error(
+            { error, organizationId },
+            "a usage-billing fact was not recorded; re-run usage-billing-catch-up",
+          );
+          return;
+        }
+        await pause(USAGE_BILLING_FIRST_PAUSE_MS * 2 ** (attempt - 1));
+      }
+    }
   }
 
   /**

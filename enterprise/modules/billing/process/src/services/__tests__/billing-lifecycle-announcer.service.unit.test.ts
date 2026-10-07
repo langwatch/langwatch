@@ -5,6 +5,7 @@
  * @see specs/analytics/posthog-campaign-conversion.feature
  */
 import type { EventingCommandSender } from "@langwatch/eventing";
+import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -14,7 +15,10 @@ import type {
   RecordUsageBillingChangedCommandData,
 } from "../../eventing/billing-lifecycle.events.ts";
 import type { BillingReportOrganizationLookup } from "../../repositories/billing-report-organization.repository.ts";
-import { BillingLifecycleAnnouncerService } from "../billing-lifecycle-announcer.service.ts";
+import {
+  BillingLifecycleAnnouncerService,
+  USAGE_BILLING_SEND_ATTEMPTS,
+} from "../billing-lifecycle-announcer.service.ts";
 
 function recorder<Payload>(sent: Payload[]): EventingCommandSender<Payload> {
   return {
@@ -42,11 +46,16 @@ const billedLookup: BillingReportOrganizationLookup = {
 function announcerOver(input: {
   remaining: boolean;
   lookup?: () => Promise<BillingReportOrganizationLookup>;
+  /** Fails the usage-billing send on these attempts, counted from 1. */
+  failingUsageSends?: readonly number[];
 }) {
   const changed: RecordSubscriptionChangedCommandData[] = [];
   const started: RecordSubscriptionStartedCommandData[] = [];
   const checkouts: RecordCheckoutCompletedCommandData[] = [];
   const usageBilling: RecordUsageBillingChangedCommandData[] = [];
+  const pauses: number[] = [];
+  const usageSends = { attempts: 0 };
+  const { logger, lines } = createTestLogger();
   const service = BillingLifecycleAnnouncerService.create({
     subscriptions: { findLastNonCancelled: async () => (input.remaining ? { id: "sub-2" } : null) },
     organizations: { getAllMembers: async () => [{ id: "user-1" }, { id: "user-2" }] },
@@ -55,14 +64,28 @@ function announcerOver(input: {
     billingOrganizations: {
       getOrganizationForBilling: input.lookup ?? (async () => billedLookup),
     },
+    pause: async (ms) => {
+      pauses.push(ms);
+    },
+    logger,
   });
+  const usageRecorder = recorder(usageBilling);
   service.connect({
     recordSubscriptionChanged: recorder(changed),
     recordSubscriptionStarted: recorder(started),
     recordCheckoutCompleted: recorder(checkouts),
-    recordUsageBillingChanged: recorder(usageBilling),
+    recordUsageBillingChanged: {
+      ...usageRecorder,
+      send: async (payload) => {
+        usageSends.attempts += 1;
+        if (input.failingUsageSends?.includes(usageSends.attempts)) {
+          throw new Error("event store down");
+        }
+        await usageRecorder.send(payload);
+      },
+    },
   });
-  return { service, changed, started, checkouts, usageBilling };
+  return { service, changed, started, checkouts, usageBilling, usageSends, pauses, lines };
 }
 
 const activation = { organizationId: "org-1", subscriptionId: "sub-1", plan: "LAUNCH" };
@@ -234,6 +257,69 @@ describe("BillingLifecycleAnnouncerService", () => {
         service.usageBillingChanged({ organizationId: "org-1" }),
       ).resolves.toBeUndefined();
       expect(usageBilling).toEqual([]);
+    });
+
+    it("retries a failed send and records the fact once", async () => {
+      const { service, usageBilling, usageSends, pauses } = announcerOver({
+        remaining: false,
+        failingUsageSends: [1, 2],
+      });
+
+      await expect(
+        service.subscriptionCancelled({ organizationId: "org-1" }),
+      ).resolves.toBeUndefined();
+
+      expect(usageSends.attempts).toBe(3);
+      expect(usageBilling).toHaveLength(1);
+      expect(pauses).toEqual([200, 400]);
+    });
+
+    it("logs one error naming the organization and the catch-up job once every attempt fails", async () => {
+      const { service, usageBilling, usageSends, lines } = announcerOver({
+        remaining: false,
+        failingUsageSends: [1, 2, 3, 4],
+      });
+
+      await expect(
+        service.subscriptionCancelled({ organizationId: "org-1" }),
+      ).resolves.toBeUndefined();
+
+      expect(usageSends.attempts).toBe(USAGE_BILLING_SEND_ATTEMPTS);
+      expect(usageBilling).toEqual([]);
+      const errors = lines.filter((line) => line.level === 50);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toEqual(
+        expect.objectContaining({
+          organizationId: "org-1",
+          msg: expect.stringContaining("usage-billing-catch-up"),
+        }),
+      );
+    });
+
+    it("re-stamps and re-reads billing on each retry", async () => {
+      vi.useFakeTimers({ now: 1_000 });
+      const answers: BillingReportOrganizationLookup[] = [
+        billedLookup,
+        { outcome: "not_usage_billed" },
+      ];
+      let reads = 0;
+      const { service, usageBilling } = announcerOver({
+        remaining: false,
+        failingUsageSends: [1],
+        lookup: async () => {
+          const answer = answers[reads] ?? billedLookup;
+          reads += 1;
+          vi.setSystemTime(1_000 + reads * 1_000);
+          return answer;
+        },
+      });
+
+      await service.usageBillingChanged({ organizationId: "org-1" });
+
+      expect(reads).toBe(2);
+      expect(usageBilling).toEqual([
+        expect.objectContaining({ occurredAt: 2_000, usageBilled: false }),
+      ]);
     });
   });
 });
