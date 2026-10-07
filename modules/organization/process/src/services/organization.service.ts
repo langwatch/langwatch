@@ -240,6 +240,12 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.repository.saveJoinSetting(input);
   }
 
+  findBySsoDomain(input: {
+    domain: string;
+  }): Promise<{ id: string; name: string; ssoProvider: string | null } | null> {
+    return this.repository.findBySsoDomain(input);
+  }
+
   getSessionPolicy(input: { organizationId: string }): Promise<{ maxSessionDurationDays: number }> {
     return this.repository.getSessionPolicy(input);
   }

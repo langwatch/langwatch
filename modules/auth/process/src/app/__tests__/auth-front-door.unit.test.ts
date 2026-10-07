@@ -11,6 +11,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -74,6 +75,7 @@ async function appFor(
     },
     repositories: withRateLimits(MemoryAuthRepositories.create(), limiter),
     dependencies: {
+      projects: createApiFixture<ProjectApi>(),
       users: new TestUserApi({}) as never,
       apiKeys: {
         findResolvedToken: async () => ({ project: { slug: "acme" } }),

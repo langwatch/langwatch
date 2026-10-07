@@ -444,6 +444,13 @@ export const createAuthOptions = ({
       pendingSsoSetup: { type: "boolean", defaultValue: false, input: false },
       deactivatedAt: { type: "date", required: false, input: false },
       lastLoginAt: { type: "date", required: false, input: false },
+      // Read by the session-create refusal; hidden so get-session stays unchanged.
+      signupConfirmationPending: {
+        type: "boolean",
+        defaultValue: false,
+        input: false,
+        returned: false,
+      },
     },
   },
   session: {
@@ -562,7 +569,6 @@ export const createAuthOptions = ({
         before: createBeforeUserCreateHook({ policy: signUpPolicy, findGoverningConnections }),
         after: async (user) => {
           await afterUserCreate({
-            repo,
             user: {
               id: user.id,
               email: user.email,
@@ -587,10 +593,12 @@ export const createAuthOptions = ({
     account: {
       create: {
         before: async (account, context) => {
-          await createBeforeAccountCreateHook({ repo, federation, findGoverningConnections })(
-            account,
-            context,
-          );
+          await createBeforeAccountCreateHook({
+            repo,
+            organizations: hooks.organizations,
+            federation,
+            findGoverningConnections,
+          })(account, context);
           // ADR-101 §2: the account row is an identifier attach. Returning
           // the row data pins its id, which is what makes the live identifier id and the backfill's
           // derived id the same id.
@@ -662,6 +670,7 @@ export const createAuthOptions = ({
         after: async (session) => {
           await afterSessionCreate({
             repo,
+            organizations: hooks.organizations,
             userId: session.userId,
             announcements: hooks.announcements,
           });
@@ -865,6 +874,7 @@ type BetterAuthTransportOptions = Readonly<{
   federation: BetterAuthFederation;
   identity: BetterAuthIdentityCeremonies;
   invites: BetterAuthHookCollaborators["invites"];
+  organizations: BetterAuthHookCollaborators["organizations"];
   announcements: BetterAuthAnnouncements;
   shadow: SignInRouterShadow;
   /** The grant ledger an SSO auto-join writes its membership through. */
@@ -915,6 +925,7 @@ const transportOptions = ({
   federation,
   identity,
   invites,
+  organizations,
   redis,
   secondaryStorage,
   sendResetPassword,
@@ -953,6 +964,7 @@ const transportOptions = ({
     hooks: {
       federation,
       invites,
+      organizations,
       announcements,
       authzGrants,
       arrivals,

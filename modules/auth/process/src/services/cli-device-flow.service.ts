@@ -29,15 +29,12 @@ import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
 import type * as zodModule from "zod";
 
-import type {
-  AuthDirectoryRepository,
-  AuthDirectoryProject,
-} from "../repositories/auth-directory.repository.ts";
 import type { CliAccessProject } from "./api-rest-credentials.service.ts";
 import {
   type CliDeviceApprovalFrame,
   CliDeviceApprovalService,
 } from "./cli-device-approval.service.ts";
+import type { AuthDirectoryProject, CliDeviceDirectory } from "./cli-device-directory.service.ts";
 import {
   DEVICE_CODE_TTL_SECONDS,
   MIN_POLL_INTERVAL_SECONDS,
@@ -88,7 +85,7 @@ export interface CliDeviceFlowCollaborators {
    * re-derived from rows, not trusted from the record: an admin can disable a
    * seat between approve and exchange.
    */
-  directory: () => AuthDirectoryRepository;
+  directory: () => CliDeviceDirectory;
   /** The person a browser cookie names, for the three approval-page routes. */
   session: (headers: Headers) => Promise<CliBrowserSession | null>;
   /**

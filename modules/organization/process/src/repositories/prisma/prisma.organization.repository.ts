@@ -112,6 +112,17 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     };
   }
 
+  async findBySsoDomain({
+    domain,
+  }: {
+    domain: string;
+  }): Promise<{ id: string; name: string; ssoProvider: string | null } | null> {
+    return this.database.organization.findUnique({
+      where: { ssoDomain: domain },
+      select: { id: true, name: true, ssoProvider: true },
+    });
+  }
+
   async getSessionPolicy({
     organizationId,
   }: {

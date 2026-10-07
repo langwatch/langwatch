@@ -106,6 +106,22 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     };
   }
 
+  async findBySsoDomain({
+    domain,
+  }: {
+    domain: string;
+  }): Promise<{ id: string; name: string; ssoProvider: string | null } | null> {
+    const organization = [...this.memory.organizations.values()].find(
+      (candidate) => candidate.ssoDomain === domain,
+    );
+    if (!organization) return null;
+    return {
+      id: organization.id,
+      name: organization.name,
+      ssoProvider: organization.ssoProvider ?? null,
+    };
+  }
+
   async getSessionPolicy({
     organizationId,
   }: {

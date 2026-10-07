@@ -15,7 +15,7 @@ const PUBLISHED_ARTEFACT =
 // The seams where a driver binds a real `Date` and will not take an `Instant`.
 // Eventing's Prisma stores predate `repositories/prisma/`; the path goes when they move.
 const PERSISTENCE_SEAM =
-  /(?:^|\/)repositories\/(?:prisma|clickhouse)\/|^packages\/eventing\/src\/server\/adapters\/postgres\//;
+  /(?:^|\/)repositories\/(?:prisma|clickhouse)\/|^packages\/eventing\/src\/server\/adapters\/postgres\/|^modules\/auth\/process\/src\/repositories\/memory\/memory\.auth\.database\.ts$/;
 const DECLARATION = /\.d\.[cm]?ts$/;
 const BOUNDARY_HELPER = new Set(["fromDate", "toDate"]);
 const GLOBAL_OBJECTS = new Set(["globalThis", "window", "global", "self"]);

@@ -1,11 +1,9 @@
-import { OrganizationNotFoundError } from "@langwatch/organization-contract";
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate } from "@langwatch/time";
 import { UserNotFoundError } from "@langwatch/user-contract";
 
 import {
   BetterAuthHooksRepository,
-  type BetterAuthHookOrganization,
   type BetterAuthHookUser,
   type FederatedAccountRow,
 } from "../better-auth-hooks.repository.ts";
@@ -38,19 +36,6 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
       ...user,
       deactivatedAt: user.deactivatedAt === null ? null : fromDate(user.deactivatedAt),
     };
-  }
-
-  async getOrganizationBySsoDomain({
-    domain,
-  }: {
-    domain: string;
-  }): Promise<BetterAuthHookOrganization> {
-    const organization = await this.prisma.organization.findUnique({
-      where: { ssoDomain: domain },
-      select: { id: true, name: true, ssoProvider: true },
-    });
-    if (organization === null) throw new OrganizationNotFoundError();
-    return organization;
   }
 
   async countAccountsForUser({ userId }: { userId: string }): Promise<number> {
@@ -109,29 +94,6 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
     });
   }
 
-  async createOrganizationMembership({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<"created" | "already-exists"> {
-    try {
-      await this.prisma.organizationUser.create({
-        data: { userId, organizationId, role: "MEMBER" },
-      });
-      return "created";
-    } catch (err) {
-      // P2002 (unique constraint) means another concurrent OAuth callback or a
-      // retry already created this membership. Any other error is a real
-      // failure and propagates instead of being read as an already-present row.
-      if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") {
-        throw err;
-      }
-      return "already-exists";
-    }
-  }
-
   async reconcileSsoAccounts({
     userId,
     providerId,
@@ -161,13 +123,5 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
       where: { id: userId },
       data: { lastLoginAt: new Date() },
     });
-  }
-
-  async countOrgMembershipsForUser({ userId }: { userId: string }): Promise<number> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { _count: { select: { orgMemberships: true } } },
-    });
-    return user?._count.orgMemberships ?? 0;
   }
 }

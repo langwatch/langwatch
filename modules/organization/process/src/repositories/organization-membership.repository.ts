@@ -429,6 +429,15 @@ export abstract class OrganizationMembershipRepository {
     origin?: "web" | "cli";
   }) => Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
 
+  /** The plain MEMBER row an SSO domain auto-join writes; an existing row is "already-present". */
+  abstract createSsoDomainMembership: (input: {
+    organizationId: string;
+    userId: string;
+  }) => Promise<"created" | "already-present">;
+
+  /** Every membership row the person holds, disabled ones included. */
+  abstract countMembershipsForUser: (input: { userId: string }) => Promise<number>;
+
   abstract deleteMember: (input: DeleteMemberInput) => Promise<void>;
 
   abstract setMemberDisabled: (input: SetMemberDisabledInput) => Promise<void>;

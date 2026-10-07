@@ -362,7 +362,14 @@ type BuildBetterAuthOptions = Readonly<{
    * Where a domain auto-join applies the pending invite an address already
    * holds, and who the installation lets create an account.
    */
-  organizations: Pick<OrganizationApi, "applyPendingInvite" | "checkSignUp">;
+  organizations: Pick<
+    OrganizationApi,
+    | "applyPendingInvite"
+    | "checkSignUp"
+    | "findBySsoDomain"
+    | "createSsoDomainMembership"
+    | "countMembershipsForUser"
+  >;
   /** Sends a requested reset link; see {@link passwordResetSender}. */
   sendResetPassword: (reset: { email: string; token: string }) => Promise<void>;
   /** The same user directory the rest of this process serves from. */
@@ -486,6 +493,7 @@ export async function buildBetterAuth(
     }),
     identity: IdentityBetterAuthCeremonies.create(options.identityApi),
     invites: options.organizations,
+    organizations: options.organizations,
     announcements: LoggedBetterAuthAnnouncements.create({
       logger,
       signups: options.signupAnnouncements,

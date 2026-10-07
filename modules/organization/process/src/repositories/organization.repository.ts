@@ -101,6 +101,10 @@ export abstract class OrganizationRepository {
     organizationId: string;
     setting: JoinRequestJoining;
   }): Promise<void>;
+  /** The organization claiming this SSO domain, or null. */
+  abstract findBySsoDomain(input: {
+    domain: string;
+  }): Promise<{ id: string; name: string; ssoProvider: string | null } | null>;
   /** Main's `?? 0`: an unknown organization reads as unbounded. */
   abstract getSessionPolicy(input: {
     organizationId: string;

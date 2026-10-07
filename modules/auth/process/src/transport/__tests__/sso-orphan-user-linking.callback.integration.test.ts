@@ -127,21 +127,14 @@ function hooksRepositoryOver({ db }: { db: MemoryDb }): BetterAuthHooksRepositor
         signupConfirmationPending: false,
       };
     },
-    getOrganizationBySsoDomain: async () => ({
-      id: "org_example",
-      name: "Example",
-      ssoProvider: "okta",
-    }),
     countAccountsForUser: async ({ userId }) =>
       db.Account?.filter((account) => account.userId === userId).length ?? 0,
     findFederatedAccountsForUser: async () => [],
     findFederatedAccountsForUsers: async () => [],
     deleteAccounts: unused,
     flagPendingSsoSetup: unused,
-    createOrganizationMembership: async () => "created",
     reconcileSsoAccounts: async () => undefined,
     recordLastLogin: async () => undefined,
-    countOrgMembershipsForUser: async () => 1,
   };
 }
 
@@ -160,6 +153,11 @@ async function completeSignIn({ db, email }: { db: MemoryDb; email: string }) {
     {
       storage: { adapter: () => memoryAdapter(db) } as never,
       database: hooksRepositoryOver({ db }),
+      organizations: {
+        findBySsoDomain: async () => ({ id: "org_example", name: "Example", ssoProvider: "okta" }),
+        createSsoDomainMembership: async () => "created",
+        countMembershipsForUser: async () => 1,
+      },
       ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
         decideAccountLink: async () => ({ kind: "not_migrating" }),
         authorizeAndRecordAuthentication: async () => ({ action: "continue" }),

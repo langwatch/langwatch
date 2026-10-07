@@ -65,6 +65,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
+import { ProjectApi } from "@langwatch/project-contract";
 import {
   internalSlackSignupsWebhook,
   Secret,
@@ -107,6 +108,7 @@ import {
 import { AuthProviderService } from "../services/auth-provider.service.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
 import type { CliDeviceApprovalFrame } from "../services/cli-device-approval.service.ts";
+import { CliDeviceDirectoryService } from "../services/cli-device-directory.service.ts";
 import {
   CliDeviceFlowService,
   type CliBrowserSession,
@@ -230,6 +232,8 @@ export class AuthModule implements AuthApiContract {
     sso: SsoApi,
     /** Whether a CLI person may bind a session to a project (`project:view`). */
     authz: AuthzApi,
+    /** The live project a CLI device grant binds a session to. */
+    projects: ProjectApi,
   };
   static readonly config = authServerConfig;
   static readonly publicConfig = authBrowserConfig.project;
@@ -458,12 +462,18 @@ export class AuthModule implements AuthApiContract {
         : cliDeviceSettlementChannels.memory.create(),
     });
 
+    const cliDeviceDirectory = CliDeviceDirectoryService.create({
+      people: PrismaAuthDirectoryRepository.create(members.prisma),
+      organizations: dependencies.organizations,
+      projects: dependencies.projects,
+    });
+
     const app = new AuthModule({
       sessions,
       cliSessions,
       cliDeviceFlow: {
         sessions: () => cliSessions,
-        directory: () => PrismaAuthDirectoryRepository.create(members.prisma),
+        directory: () => cliDeviceDirectory,
         apiKeys: () => dependencies.apiKeys,
         ensurePersonalWorkspace: (input) => dependencies.users.ensurePersonalWorkspace(input),
         canViewProject: ({ userId, projectId }) =>
@@ -501,7 +511,10 @@ export class AuthModule implements AuthApiContract {
         memberships: legacyAccessMemberships(dependencies.organizations),
         connections: legacyAccessConnections(dependencies.identity),
       }),
-      federatedAccounts: FederatedAccountReadsService.create({ accounts: accountRows }),
+      federatedAccounts: FederatedAccountReadsService.create({
+        accounts: accountRows,
+        organizations: dependencies.organizations,
+      }),
       signInSecurity: SignInSecuritySettingsService.create({
         settings: repositories.signInSecurity,
         locks: repositories.signInLocks,

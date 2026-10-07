@@ -1756,6 +1756,31 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   /**
    * Removes a membership, and the personal workspace that came with it.
    */
+  async createSsoDomainMembership({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<"created" | "already-present"> {
+    try {
+      await this.prisma.organizationUser.create({
+        data: { userId, organizationId, role: OrganizationUserRole.MEMBER },
+      });
+      return "created";
+    } catch (error) {
+      // P2002 is a concurrent callback or a retry; any other failure propagates.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        return "already-present";
+      }
+      throw error;
+    }
+  }
+
+  async countMembershipsForUser({ userId }: { userId: string }): Promise<number> {
+    return this.prisma.organizationUser.count({ where: { userId } });
+  }
+
   async deleteMember(input: DeleteMemberInput): Promise<void> {
     const { organizationId, userId, actingUserId } = input;
     const actor = ledgerActorFor({

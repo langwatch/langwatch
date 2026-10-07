@@ -9,7 +9,7 @@ import type {
  * arriving through the wrong provider.
  * @see specs/auth/phase-1-better-auth-config.feature
  */
-import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
@@ -23,9 +23,9 @@ import {
   afterUserCreate,
   createBeforeAccountCreateHook,
   type BetterAuthHookCollaborators,
+  type SsoDomainOrganizations,
 } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import type {
-  BetterAuthHookOrganization,
   BetterAuthHookUser,
   BetterAuthHooksRepository,
 } from "../../repositories/better-auth-hooks.repository.ts";
@@ -81,39 +81,41 @@ class RecordingAnnouncements implements BetterAuthAnnouncements {
 
 const ACME = { id: "org_acme", name: "Acme", ssoDomain: "acme.com", ssoProvider: "google" };
 
+type SsoDomainOrganization = { id: string; name: string; ssoProvider: string | null };
+
+function organizationsOver(mocks: Partial<SsoDomainOrganizations>): SsoDomainOrganizations {
+  return createApiFixture<SsoDomainOrganizations>(mocks);
+}
+
 function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooksRepository {
   const unused = (): never => {
     throw new Error("this repository member is not used by this test");
   };
   return {
     getUserForHooks: unused,
-    getOrganizationBySsoDomain: unused,
     countAccountsForUser: unused,
     findFederatedAccountsForUser: unused,
     findFederatedAccountsForUsers: unused,
     deleteAccounts: unused,
     flagPendingSsoSetup: unused,
-    createOrganizationMembership: unused,
     reconcileSsoAccounts: unused,
     recordLastLogin: unused,
-    countOrgMembershipsForUser: unused,
     ...members,
   };
 }
 
-function signupRepo(organization: BetterAuthHookOrganization | null) {
+function signupRepo(organization: SsoDomainOrganization | null) {
   const mocks = {
-    getOrganizationBySsoDomain: vi
-      .fn<BetterAuthHooksRepository["getOrganizationBySsoDomain"]>()
+    findBySsoDomain: vi
+      .fn<SsoDomainOrganizations["findBySsoDomain"]>()
       .mockImplementation(async () => {
-        if (organization === null) throw new OrganizationNotFoundError();
         return organization;
       }),
-    createOrganizationMembership: vi
-      .fn<BetterAuthHooksRepository["createOrganizationMembership"]>()
+    createSsoDomainMembership: vi
+      .fn<SsoDomainOrganizations["createSsoDomainMembership"]>()
       .mockResolvedValue("created"),
   };
-  return { double: hooksRepo(mocks), mocks };
+  return { double: hooksRepo({}), mocks, organizations: organizationsOver(mocks) };
 }
 
 function accountRepo({
@@ -121,7 +123,7 @@ function accountRepo({
   accountCount,
   user = { id: "user_1", email: "existing@acme.com", deactivatedAt: null },
 }: {
-  organization: BetterAuthHookOrganization | null;
+  organization: SsoDomainOrganization | null;
   accountCount: number;
   user?: Pick<BetterAuthHookUser, "id" | "email" | "deactivatedAt">;
 }) {
@@ -132,10 +134,9 @@ function accountRepo({
       pendingSsoSetup: false,
       signupConfirmationPending: false,
     }),
-    getOrganizationBySsoDomain: vi
-      .fn<BetterAuthHooksRepository["getOrganizationBySsoDomain"]>()
+    findBySsoDomain: vi
+      .fn<SsoDomainOrganizations["findBySsoDomain"]>()
       .mockImplementation(async () => {
-        if (organization === null) throw new OrganizationNotFoundError();
         return organization;
       }),
     countAccountsForUser: vi
@@ -145,20 +146,20 @@ function accountRepo({
       .fn<BetterAuthHooksRepository["flagPendingSsoSetup"]>()
       .mockResolvedValue(undefined),
   };
-  return { double: hooksRepo(mocks), mocks };
+  return { double: hooksRepo(mocks), mocks, organizations: organizationsOver(mocks) };
 }
 
 describe("signing in through a domain-matched organization's identity provider", () => {
   describe("given nobody with that email has an account yet", () => {
     /** @scenario New user with matching SSO domain joins the SSO org */
     it("joins the new user to the organization as a member", async () => {
-      const { double: repo, mocks } = signupRepo(ACME);
+      const { mocks, organizations } = signupRepo(ACME);
       const attachBindings = vi.fn().mockResolvedValue(undefined);
 
       await afterUserCreate({
-        repo,
         user: { id: "user_new", email: "new@acme.com", name: "New User", emailVerified: true },
         collaborators: {
+          organizations,
           federation: new LicensedFederation(),
           invites: new NoInvites(),
           announcements: new RecordingAnnouncements(),
@@ -173,7 +174,7 @@ describe("signing in through a domain-matched organization's identity provider",
         },
       });
 
-      expect(mocks.createOrganizationMembership).toHaveBeenCalledWith({
+      expect(mocks.createSsoDomainMembership).toHaveBeenCalledWith({
         userId: "user_new",
         organizationId: "org_acme",
       });
@@ -183,15 +184,15 @@ describe("signing in through a domain-matched organization's identity provider",
     });
 
     it("applies the pending invite the address holds there instead of the default membership", async () => {
-      const { double: repo, mocks } = signupRepo(ACME);
+      const { mocks, organizations } = signupRepo(ACME);
       const invites = pendingInvites("invite_1");
       const announcements = new RecordingAnnouncements();
       const attachBindings = vi.fn().mockResolvedValue(undefined);
 
       await afterUserCreate({
-        repo,
         user: { id: "user_new", email: "invited@acme.com", name: "New User", emailVerified: true },
         collaborators: {
+          organizations,
           federation: new LicensedFederation(),
           invites,
           announcements,
@@ -211,7 +212,7 @@ describe("signing in through a domain-matched organization's identity provider",
         organizationId: "org_acme",
         email: "invited@acme.com",
       });
-      expect(mocks.createOrganizationMembership).not.toHaveBeenCalled();
+      expect(mocks.createSsoDomainMembership).not.toHaveBeenCalled();
       expect(attachBindings).not.toHaveBeenCalled();
     });
   });
@@ -219,11 +220,10 @@ describe("signing in through a domain-matched organization's identity provider",
   describe("given a credential signup whose email nobody has verified", () => {
     /** @scenario Unverified signup with a matching ssoDomain does not auto-join the SSO org */
     it("creates no membership and no grant at the domain-matched organization", async () => {
-      const { double: repo, mocks } = signupRepo(ACME);
+      const { mocks, organizations } = signupRepo(ACME);
       const attachBindings = vi.fn().mockResolvedValue(undefined);
 
       await afterUserCreate({
-        repo,
         user: {
           id: "user_new",
           email: "new@acme.com",
@@ -231,6 +231,7 @@ describe("signing in through a domain-matched organization's identity provider",
           emailVerified: false,
         },
         collaborators: {
+          organizations,
           federation: new LicensedFederation(),
           invites: new NoInvites(),
           announcements: new RecordingAnnouncements(),
@@ -245,19 +246,18 @@ describe("signing in through a domain-matched organization's identity provider",
         },
       });
 
-      expect(mocks.getOrganizationBySsoDomain).not.toHaveBeenCalled();
-      expect(mocks.createOrganizationMembership).not.toHaveBeenCalled();
+      expect(mocks.findBySsoDomain).not.toHaveBeenCalled();
+      expect(mocks.createSsoDomainMembership).not.toHaveBeenCalled();
       expect(attachBindings).not.toHaveBeenCalled();
     });
 
     /** @scenario Unverified signup does not claim a pending invite addressed to its email */
     it("leaves the pending invite unapplied and grants nothing", async () => {
-      const { double: repo, mocks } = signupRepo(ACME);
+      const { mocks, organizations } = signupRepo(ACME);
       const invites = pendingInvites("invite_1");
       const attachBindings = vi.fn().mockResolvedValue(undefined);
 
       await afterUserCreate({
-        repo,
         user: {
           id: "user_new",
           email: "invited@acme.com",
@@ -265,6 +265,7 @@ describe("signing in through a domain-matched organization's identity provider",
           emailVerified: false,
         },
         collaborators: {
+          organizations,
           federation: new LicensedFederation(),
           invites,
           announcements: new RecordingAnnouncements(),
@@ -280,7 +281,7 @@ describe("signing in through a domain-matched organization's identity provider",
       });
 
       expect(invites.applyPendingInvite).not.toHaveBeenCalled();
-      expect(mocks.createOrganizationMembership).not.toHaveBeenCalled();
+      expect(mocks.createSsoDomainMembership).not.toHaveBeenCalled();
       expect(attachBindings).not.toHaveBeenCalled();
     });
   });
@@ -289,10 +290,15 @@ describe("signing in through a domain-matched organization's identity provider",
     /** @scenario Existing user with correct SSO provider auto-links */
     /** @scenario "An organization pinned to Google still signs in with Google" */
     it("lets the account row be created and leaves the pending flag alone", async () => {
-      const { double: repo, mocks } = accountRepo({ organization: ACME, accountCount: 1 });
+      const {
+        double: repo,
+        mocks,
+        organizations,
+      } = accountRepo({ organization: ACME, accountCount: 1 });
 
       await createBeforeAccountCreateHook({
         repo,
+        organizations,
         federation: new LicensedFederation(),
         findGoverningConnections: async () => [],
       })(googleAccountFor("user_1"), null);
@@ -304,13 +310,18 @@ describe("signing in through a domain-matched organization's identity provider",
   describe("given an existing user signs in through a provider the organization does not use", () => {
     /** @scenario "Existing user with wrong brokered SSO provider gets pending flag" */
     it("lets them in, and flags the account for setup", async () => {
-      const { double: repo, mocks } = accountRepo({
+      const {
+        double: repo,
+        mocks,
+        organizations,
+      } = accountRepo({
         organization: { ...ACME, ssoProvider: "waad|acme-conn" },
         accountCount: 1,
       });
 
       await createBeforeAccountCreateHook({
         repo,
+        organizations,
         federation: new LicensedFederation(),
         findGoverningConnections: async () => [],
       })(
@@ -328,11 +339,16 @@ describe("signing in through a domain-matched organization's identity provider",
     /** @scenario "A native social sign-in at an SSO-enforced domain is refused" */
     /** @scenario "SSO-domain guard still blocks the wrong provider" */
     it("refuses the first link and leaves the pending flag alone", async () => {
-      const { double: repo, mocks } = accountRepo({ organization: BROKERED, accountCount: 0 });
+      const {
+        double: repo,
+        mocks,
+        organizations,
+      } = accountRepo({ organization: BROKERED, accountCount: 0 });
 
       await expect(
         createBeforeAccountCreateHook({
           repo,
+          organizations,
           federation: new LicensedFederation(),
           findGoverningConnections: async () => [],
         })(googleAccountFor("user_1"), null),
@@ -342,7 +358,10 @@ describe("signing in through a domain-matched organization's identity provider",
 
     /** @scenario "A native social sign-in on an already-linked account is refused too" */
     it("refuses the sign-in that refreshes an already-linked Google account", async () => {
-      const { double: repo } = accountRepo({ organization: BROKERED, accountCount: 1 });
+      const { double: repo, organizations } = accountRepo({
+        organization: BROKERED,
+        accountCount: 1,
+      });
 
       await expect(
         afterAccountUpdate({
@@ -350,6 +369,7 @@ describe("signing in through a domain-matched organization's identity provider",
           account: { userId: "user_1", providerId: "google", accountId: "google|123" },
           collaborators: createApiFixture<BetterAuthHookCollaborators>({
             federation: new LicensedFederation(),
+            organizations,
           }),
           findGoverningConnections: async () => [],
         }),

@@ -34,3 +34,27 @@ Feature: Better Auth's storage seam
     Given auth is composed over the memory repository registry
     When a user signs in
     Then the session is cached in the memory secondary storage the registry built
+
+  @unit
+  Scenario: The memory tier refuses a session to a deactivated person
+    Given auth's sign-in transport over the memory adapter and the hooks' memory twin
+    And a person with a password has been deactivated
+    When they sign in with the right password
+    Then the sign-in is refused
+    And no session row is written
+
+  @unit
+  Scenario: The memory tier refuses a session while sign-up confirmation is pending
+    Given auth's sign-in transport over the memory adapter and the hooks' memory twin
+    And a person with a password has not yet confirmed their sign-up
+    When they sign in with the right password
+    Then the sign-in is refused
+    And no session row is written
+
+  @unit
+  Scenario: The hidden sign-up confirmation flag stays out of the session payload
+    Given auth's sign-in transport over the memory adapter and the hooks' memory twin
+    And a person with a password whose sign-up is confirmed
+    When they sign in and read their session
+    Then the session payload names them
+    And it carries no signupConfirmationPending field

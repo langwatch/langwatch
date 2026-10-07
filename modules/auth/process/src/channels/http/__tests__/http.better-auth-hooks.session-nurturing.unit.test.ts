@@ -15,12 +15,12 @@ function signIn({ memberships }: { memberships: () => Promise<number> }) {
   const sessionNurturing = vi.fn();
   const repo = createApiFixture<BetterAuthHooksRepository>({
     recordLastLogin: async () => undefined,
-    countOrgMembershipsForUser: memberships,
   });
+  const organizations = { countMembershipsForUser: memberships };
   const announcements = createApiFixture<BetterAuthAnnouncements>({ sessionNurturing });
   return {
     sessionNurturing,
-    run: () => afterSessionCreate({ repo, userId: "user_ada", announcements }),
+    run: () => afterSessionCreate({ repo, organizations, userId: "user_ada", announcements }),
   };
 }
 

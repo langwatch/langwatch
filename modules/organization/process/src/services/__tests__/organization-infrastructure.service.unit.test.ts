@@ -40,6 +40,10 @@ import type { PersonalWorkspaceIdentity } from "../personal-workspace-identity.s
 import type { TeamIdentity } from "../team-identity.service.ts";
 
 class StubRepository extends OrganizationRepository {
+  async findBySsoDomain(): Promise<null> {
+    return null;
+  }
+
   async findAllIds(): Promise<string[]> {
     return [];
   }

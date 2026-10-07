@@ -15,6 +15,7 @@ import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type { Logger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -78,6 +79,7 @@ async function appFor(
     },
     repositories: MemoryAuthRepositories.create(),
     dependencies: {
+      projects: createApiFixture<ProjectApi>(),
       users: new TestUserApi({}) as never,
       apiKeys: { findResolvedToken: async () => null } as never,
       featureFlags: {} as never,

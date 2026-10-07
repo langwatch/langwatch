@@ -15,6 +15,7 @@ import type {
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { resolvedSecrets } from "@langwatch/process-stores";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
@@ -87,6 +88,7 @@ async function bootAuth({
       }),
       sso: createApiFixture<SsoApi>(),
       authz: createApiFixture<AuthzApi>(),
+      project: createApiFixture<ProjectApi>(),
     })
     .boot();
 }

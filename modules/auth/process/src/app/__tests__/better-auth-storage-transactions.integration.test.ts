@@ -20,6 +20,7 @@ import {
   PrismaConnectionService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
@@ -59,6 +60,7 @@ async function storage() {
     },
     repositories: MemoryAuthRepositories.create(),
     dependencies: {
+      projects: createApiFixture<ProjectApi>(),
       users: new TestUserApi({}) as never,
       apiKeys: { findResolvedToken: async () => null } as never,
       featureFlags: {} as never,

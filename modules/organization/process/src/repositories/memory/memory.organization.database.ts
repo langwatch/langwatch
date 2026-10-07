@@ -14,6 +14,9 @@ import type { Instant } from "@langwatch/time";
 
 /** One organization row, the fields the organization repository owns. */
 export interface MemoryOrganizationRow {
+  /** The email domain the organization claims for SSO auto-join (ADR-116). */
+  ssoDomain?: string | null;
+  ssoProvider?: string | null;
   id: string;
   name: string;
   slug: string;

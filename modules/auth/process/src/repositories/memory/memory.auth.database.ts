@@ -13,7 +13,7 @@ export type MemorySessionRow = {
   actorUserId?: string | null;
   subjectUserId?: string | null;
   impersonationReason?: string | null;
-  impersonationExpiresAt?: Session["expiresAt"] | null;
+  impersonationExpiresAt?: Date | null;
   expires?: Session["expiresAt"];
   createdAt?: Session["createdAt"];
   updatedAt?: Session["updatedAt"];
@@ -22,7 +22,7 @@ export type MemorySessionRow = {
   amr?: readonly string[];
   identifierId?: string | null;
   /** The idle-window stamp (GAC-10), absent on a session never under one. */
-  lastSeenAt?: Session["updatedAt"];
+  lastSeenAt?: Date;
 };
 
 /** One `VerificationToken` row; the `id` is what a transaction commit merges by. */
@@ -33,6 +33,25 @@ export type MemoryVerificationTokenRow = {
   expires: Verification["expiresAt"];
   createdAt?: Verification["createdAt"];
   updatedAt?: Verification["updatedAt"];
+};
+
+/** The `User` columns auth's own repositories read; Better Auth writes the rest. */
+export type MemoryUserRow = {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+  deactivatedAt?: Date | null;
+  pendingSsoSetup?: boolean;
+  signupConfirmationPending?: boolean;
+  lastLoginAt?: Date | null;
+};
+
+/** One `Account` row, under the column names the channel maps Better Auth's onto. */
+export type MemoryAccountRow = {
+  id: string;
+  userId: string;
+  provider: string;
+  providerAccountId: string;
 };
 
 /** Better Auth's tables by the model names the channel maps them to. */

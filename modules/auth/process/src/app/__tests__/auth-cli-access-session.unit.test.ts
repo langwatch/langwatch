@@ -11,6 +11,7 @@ import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
@@ -42,6 +43,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
     },
     repositories,
     dependencies: {
+      projects: createApiFixture<ProjectApi>(),
       users: createApiFixture<UserApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),

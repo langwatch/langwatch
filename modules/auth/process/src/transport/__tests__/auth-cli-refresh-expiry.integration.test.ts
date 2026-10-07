@@ -14,8 +14,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryCliDeviceSettlementChannel } from "../../channels/memory/memory.cli-device-settlement.channel.ts";
-import type { AuthDirectoryRepository } from "../../repositories/auth-directory.repository.ts";
 import { MemoryCliDeviceSessionRepository } from "../../repositories/memory/memory.cli-device-session.repository.ts";
+import type { CliDeviceDirectory } from "../../services/cli-device-directory.service.ts";
 import {
   CliDeviceFlowService,
   type CliDeviceFlowCollaborators,
@@ -142,7 +142,7 @@ function refreshWorld() {
     revocations: [] as SessionRevocation[],
     extensions: [] as KeyExpiryExtension[],
   };
-  const directory: AuthDirectoryRepository = {
+  const directory: CliDeviceDirectory = {
     getOrganizationIdBySsoDomain: () => Promise.reject(new OrganizationNotFoundError()),
     getPerson: () => Promise.resolve({ id: USER_ID, name: "Jane", email: "jane@example.test" }),
     getOrganization: () => Promise.resolve({ id: ORGANIZATION_ID, name: "Acme", slug: "acme" }),

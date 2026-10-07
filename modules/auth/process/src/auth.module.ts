@@ -24,8 +24,11 @@ export const authProcessModule = defineProcessModule("auth")
   .withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest)
   .withEventing(authEventing)
   .withEventing(authLifecycleEventing)
-  .withTasks(({ members }) => [
-    ClearStalePendingSsoSetupTask.create({ database: () => members.prisma }),
+  .withTasks(({ members, dependencies }) => [
+    ClearStalePendingSsoSetupTask.create({
+      database: () => members.prisma,
+      organizations: dependencies.organizations,
+    }),
   ])
   .withTransportFacts(({ app, dependencies }) => {
     if (!(app instanceof AuthModule)) {

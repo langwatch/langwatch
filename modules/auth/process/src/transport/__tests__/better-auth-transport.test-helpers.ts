@@ -69,6 +69,12 @@ export function betterAuthTransportFor(
     invites: {
       applyPendingInvite: async () => ({ applied: false }),
     },
+    /** No organization claims any domain, and nobody belongs to one. */
+    organizations: {
+      findBySsoDomain: async () => null,
+      createSsoDomainMembership: async () => "created",
+      countMembershipsForUser: async () => 0,
+    },
     announcements: {
       signUpNurturing: () => undefined,
       reportError: () => undefined,
