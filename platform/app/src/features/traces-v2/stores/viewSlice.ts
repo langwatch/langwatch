@@ -137,7 +137,10 @@ export interface ViewSlice {
    * reloaded as an empty list keeps its reference, so `setUserLenses` never
    * runs on a project's first lens.
    */
-  discardRefusedLens: (args: { lensId: string; fallbackLensId: string }) => void;
+  discardRefusedLens: (args: {
+    lensId: string;
+    fallbackLensId: string;
+  }) => void;
 }
 
 /**
@@ -604,6 +607,16 @@ function setDraft(
   return next;
 }
 
+/** What a lens shows, its unsaved changes applied. */
+function lensView(lens: LensConfig, draft: DraftLensState | undefined) {
+  return {
+    filterText: draft?.filter ?? lens.filterText,
+    sort: draft?.sort ?? lens.sort,
+    grouping: draft?.grouping ?? lens.grouping,
+    columnOrder: draft?.columns ?? lens.columns,
+  };
+}
+
 function clearDraftFor(
   drafts: Map<string, DraftLensState>,
   lensId: string,
@@ -1043,27 +1056,19 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
   },
 
   discardRefusedLens: ({ lensId, fallbackLensId }) => {
-    set((s) => {
-      const lens = s.allLenses.find((l) => l.id === lensId);
-      if (!lens || lens.isBuiltIn) return s;
-      const allLenses = s.allLenses.filter((l) => l.id !== lensId);
-      const draftState = clearDraftFor(s.draftState, lensId);
-      // The user moved on while the save was in flight: leave them there.
-      if (s.activeLensId !== lensId) return { allLenses, draftState };
-      const next =
-        allLenses.find((l) => l.id === fallbackLensId) ?? allLenses[0];
-      if (!next) return { allLenses, draftState };
-      // Back to the lens as the user left it, unsaved changes included.
-      const draft = draftState.get(next.id);
-      get().setFilterFromLens(draft?.filter ?? next.filterText);
-      return {
-        allLenses,
-        draftState,
-        activeLensId: next.id,
-        sort: draft?.sort ?? next.sort,
-        grouping: draft?.grouping ?? next.grouping,
-        columnOrder: draft?.columns ?? next.columns,
-      };
-    });
+    const s = get();
+    if (!s.allLenses.some((l) => l.id === lensId && !l.isBuiltIn)) return;
+    const allLenses = s.allLenses.filter((l) => l.id !== lensId);
+    const draftState = clearDraftFor(s.draftState, lensId);
+    const next = allLenses.find((l) => l.id === fallbackLensId) ?? allLenses[0];
+    // The user moved on while the save was in flight: leave them there.
+    if (s.activeLensId !== lensId || !next) {
+      set({ allLenses, draftState });
+      return;
+    }
+    // Back to the lens as the user left it, unsaved changes included.
+    const { filterText, ...view } = lensView(next, draftState.get(next.id));
+    get().setFilterFromLens(filterText);
+    set({ allLenses, draftState, activeLensId: next.id, ...view });
   },
 });
