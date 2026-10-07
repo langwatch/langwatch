@@ -4,8 +4,10 @@ import {
   type RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
 import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
+import { EventLogRetention } from "@langwatch/eventing/server";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
+import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
 import type { RetroactiveRetentionRepository } from "../retroactive-retention.repository.ts";
 
 /**
@@ -20,6 +22,11 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
   /** Every mutation this process has been asked for, by project. */
   readonly #mutations = new Map<string, RetroactiveMutationProgress[]>();
   #nextId = 1;
+  /** Eventing's own check of a category, over a store this twin does not have. */
+  readonly #eventLogRetention = EventLogRetention.create({
+    client: { command: async () => {} },
+    classification: EVENT_LOG_RETENTION_CLASSIFICATION,
+  });
 
   private constructor(private readonly now: () => Instant) {}
 
@@ -28,14 +35,25 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
     category: RetentionCategory;
     newRetentionDays: number;
   }): Promise<{ tables: string[] }> {
-    const tables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
+    const categoryTables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
       .filter(([, category]) => category === input.category)
       .map(([table]) => table);
+    const eventingTables: readonly string[] = this.#eventLogRetention.tables;
+    const tables = [...new Set([...categoryTables, ...eventingTables])];
 
+    // Another category's eventing rewrite touches disjoint rows, so only this category's blocks.
     const active = (this.#mutations.get(input.projectId) ?? []).filter(
-      (mutation) => !mutation.isDone && tables.includes(mutation.table),
+      (mutation) =>
+        !mutation.isDone &&
+        tables.includes(mutation.table) &&
+        (!eventingTables.includes(mutation.table) || mutation.category === input.category),
     );
     if (active.length > 0) throw new RetroactiveMutationInProgressError(active);
+    await this.#eventLogRetention.retainCategory({
+      tenantId: input.projectId,
+      category: input.category,
+      retentionDays: input.newRetentionDays,
+    });
 
     const started = this.#mutations.get(input.projectId) ?? [];
     started.push(

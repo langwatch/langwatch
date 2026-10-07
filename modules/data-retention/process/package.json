@@ -28,6 +28,7 @@
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",

@@ -352,7 +352,7 @@ recommendation, and "default taken" if a lane proceeded on it.
 ### r-retention-event-tables
 
 - Q205 B, contract map: `event_log: "traces"` in `modules/data-retention/contract/src/retention-tables.ts:4` (an eventing-table-access finding) also feeds the storage meter (`PRODUCTION_STORAGE_METER_TABLES`, billing), the TTL reconciler (`RETENTION_TTL_MANAGED_TABLES` in `apps/tasks/src/clickhouse-migrate.ts:9`) and trace's retention floor; `EventLogRetention` covers only the rewrite. Options: (a) eventing also surfaces event_log's TTL enrolment and storage size, and data-retention composes `retention.tables` into both lists; (b) a named, linted exception for the map entry (a name, no SQL); (c) leave metering and TTL as they are and accept the finding until a later round. No recommendation in the ruling: item stopped, held for Alex.
-- Q205 B, dependency: `@langwatch/data-retention-process` does not declare `@langwatch/eventing`; the swap needs the package.json line, `pnpm install --filter @langwatch/data-retention-process...` and `pnpm sync:references` (handoff section 10). Swap not started, held for the coordinator.
+- Q205 B, dependency: resolved; the coordinator added `@langwatch/eventing` to data-retention-process and the swap has landed.
 
 ### r-analytics-event-catalogue
 
