@@ -52,7 +52,7 @@ Three things, briefly:
 
 If the handover names one, do that. If it names a manifest, spawn it:
 
-1. Write the roster row in `.claude/coordinator/LANES.md` **first**.
+1. Write the roster row in the local lane roster file (gitignored, beside LANE.md) **first**.
 2. Spawn with the Agent tool: `subagent_type` `lane`, `model` set to what the
    manifest names, prompt built from the paste in `.claude/coordinator/LANE.md`.
 3. Add to the prompt the one or two things a lane is most likely to get wrong on
