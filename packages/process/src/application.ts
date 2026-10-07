@@ -46,6 +46,7 @@ import {
   type EventingHost,
 } from "./module-eventing.ts";
 import { buildClaimedMembers, membersFor, noMembers, type MemberSource } from "./module-members.ts";
+import { processProjectionReplayer } from "./projection-replayer.ts";
 import {
   assertRepositoryOwnership,
   snapshotRepositories,
@@ -513,6 +514,7 @@ export class ApplicationBuilder<
     assertRepositoryBackend(declarations, selections);
     const eventing = eventingHostFrom(eventingMemberFor(declarations, this.source), role);
     const consumers = eventingConsumers(eventing);
+    const replayer = processProjectionReplayer({ eventing });
     const scope = new ResourceScope();
     const featureServices: RuntimeService[] = [];
     const installed = new Map<string, InstalledFeatureState>();
@@ -535,6 +537,7 @@ export class ApplicationBuilder<
           members: membersFor(members, declaration.requiredMembers) as Members,
           repositorySelection: selections.get(declaration.name),
           role,
+          replayer,
           resolve: (token) => resolveInstallToken({ token, provided, apis }),
         });
         featureServices.push(...resources.sealServices());

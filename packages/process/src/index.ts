@@ -41,6 +41,7 @@ export {
   ProjectionReadError,
   type ProjectionReadMap,
   type ProjectionReadTarget,
+  type ProjectionReplayEngine,
 } from "./module-eventing.ts";
 export { LocalFeatureApis } from "./local-feature-api.ts";
 export {
@@ -59,6 +60,7 @@ export {
   type InstalledFeatureState,
   type ModuleContributions,
   type ModuleMigrationBinder,
+  type ModuleMigrationSetup,
   type ModuleTaskBinder,
   type ModuleTaskSetup,
   type ModuleTransportFacts,
@@ -109,6 +111,10 @@ export {
   ShutdownPhaseTimeoutError,
   type ShutdownSignalHost,
 } from "./graceful-shutdown.ts";
+export {
+  processProjectionReplayer,
+  ProjectionReplayUnavailableError,
+} from "./projection-replayer.ts";
 export {
   MigrationStepCollectionError,
   type MigrationStepCollectionRefusal,

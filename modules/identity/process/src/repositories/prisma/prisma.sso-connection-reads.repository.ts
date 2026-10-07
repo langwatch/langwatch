@@ -4,7 +4,7 @@ import {
   routingStateOf,
   SsoConnectionNotFoundError,
   type SsoConnectionState,
-  ssoConnectionStateSchema,
+  ssoConnectionLifecycleStateSchema,
 } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -179,7 +179,7 @@ export class PrismaSsoConnectionStrandingRepository implements SsoConnectionStra
     const routing = new Map(
       referenced.map(({ id, state }) => [
         id,
-        routingStateOf(ssoConnectionStateSchema.parse(state)),
+        routingStateOf(ssoConnectionLifecycleStateSchema.parse(state)),
       ]),
     );
 

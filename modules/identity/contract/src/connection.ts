@@ -31,8 +31,8 @@ export const SSO_CONNECTION_STATES = [
   "TEARDOWN_PENDING",
   "TORN_DOWN",
 ] as const;
-export const ssoConnectionStateSchema = z.enum(SSO_CONNECTION_STATES);
-export type SsoConnectionLifecycleState = z.infer<typeof ssoConnectionStateSchema>;
+export const ssoConnectionLifecycleStateSchema = z.enum(SSO_CONNECTION_STATES);
+export type SsoConnectionLifecycleState = z.infer<typeof ssoConnectionLifecycleStateSchema>;
 
 /**
  * Where a connection's identity provider settings may be replaced: every setup
@@ -660,13 +660,13 @@ const ssoIdpMetadataStateSchema = z.object({
 /**
  * One connection as the projection knows it: one row of `SsoConnection`, the
  * state every guard is evaluated against, and what a peer fold stores and
- * parses back (`ssoConnectionFoldedStateSchema`).
+ * parses back (`ssoConnectionStateSchema`).
  */
-export const ssoConnectionFoldedStateSchema = z.object({
+export const ssoConnectionStateSchema = z.object({
   connectionId: z.string(),
   organizationId: z.string(),
   type: ssoConnectionTypeSchema,
-  state: ssoConnectionStateSchema,
+  state: ssoConnectionLifecycleStateSchema,
   /** Claimed but not yet approved. */
   claimedDomains: z.array(z.string()),
   /** Every claim this connection has made, in order: where each stands,
@@ -720,7 +720,7 @@ export const ssoConnectionFoldedStateSchema = z.object({
   finalizationRequestedAtMs: z.number().nullable(),
   finalizedAtMs: z.number().nullable(),
 });
-export type SsoConnectionState = z.infer<typeof ssoConnectionFoldedStateSchema>;
+export type SsoConnectionState = z.infer<typeof ssoConnectionStateSchema>;
 
 const EMPTY_IDP: SsoIdpMetadata = {
   issuer: null,

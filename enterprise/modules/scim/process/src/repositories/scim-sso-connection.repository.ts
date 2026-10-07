@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { FoldProjectionStore } from "@langwatch/eventing";
-import { ssoConnectionFoldedStateSchema } from "@langwatch/identity-contract";
+import { ssoConnectionStateSchema } from "@langwatch/identity-contract";
 import { z } from "zod";
 
 /** One connection as identity's reducer folds it, plus the business time of its newest fact. */
 export const scimSsoConnectionFoldStateSchema = z.object({
-  ...ssoConnectionFoldedStateSchema.shape,
+  ...ssoConnectionStateSchema.shape,
   LastEventOccurredAt: z.number(),
 });
 export type ScimSsoConnectionFoldState = z.infer<typeof scimSsoConnectionFoldStateSchema>;
