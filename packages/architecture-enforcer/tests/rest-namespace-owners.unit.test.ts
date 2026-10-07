@@ -1,4 +1,7 @@
-/** Spec: packages/architecture-enforcer/specs/rest-namespace-owners.feature. Record: ARCHITECTURE.md §8. */
+/**
+ * Spec: packages/architecture-enforcer/specs/rest-namespace-owners.feature.
+ * Record: ARCHITECTURE.md §8.
+ */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";

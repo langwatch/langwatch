@@ -388,7 +388,7 @@ export type UiGuidedPathActive = { useIsActive(): boolean };
  * `useCapture` is a hook: the shell calls it at its outermost provider position.
  */
 export type UiFirstTouchAttribution = {
-  useCapture(): void;
+  readonly useCapture: () => void;
   /**
    * Attribution as analytics event properties, from one source as a whole: the
    * UTM and `ref` params of the current URL when it has any, otherwise the
