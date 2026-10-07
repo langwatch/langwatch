@@ -5,8 +5,11 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { ParameterLineFieldToken, TalkToItPanelToken } from "@langwatch/scenario-client";
-import { MediaPartToken } from "@langwatch/scenario-contract";
+import {
+  MediaPartToken,
+  ParameterLineFieldToken,
+  TalkToItPanelToken,
+} from "@langwatch/scenario-client";
 
 export const scenarioWeb = defineBrowserModule("scenario")
   .withHosts({

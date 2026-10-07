@@ -1,7 +1,7 @@
 /** Scenario UI lent by token to the modules that test an agent (§10.1). */
 
 import { uiTokens } from "@langwatch/module";
-import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
+import type { MediaPartProps, ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 
 /** What agent's test panel hands scenario's parameter line: the agent's own parameters. */
 export type ParameterLineFieldProps = {
@@ -27,3 +27,5 @@ export const ParameterLineFieldToken =
   uiTokens("scenario").component<ParameterLineFieldProps>("parameterLineField");
 export const TalkToItPanelToken =
   uiTokens("scenario").component<TalkToItPanelProps>("talkToItPanel");
+/** Scenario's media renderer, lent to the modules that show media parts (§10, §10.1). */
+export const MediaPartToken = uiTokens("scenario").component<MediaPartProps>("mediaPart");
