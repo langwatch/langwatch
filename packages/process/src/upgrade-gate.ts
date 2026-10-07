@@ -164,6 +164,8 @@ function servingWatcher({
 }): () => void {
   let serving = true;
   let stoppedAt = 0;
+  const pauses = role === "worker" ? "; the worker takes no new jobs (in-flight ones finish)" : "";
+  const resumes = role === "worker" ? "; the worker takes new jobs again" : "";
   return () => {
     const now = gate.serving?.() ?? true;
     if (now === serving) return;
@@ -173,14 +175,14 @@ function servingWatcher({
       const stoppedForMs = Math.round(performance.now() - stoppedAt);
       logger.info(
         { role, phase, waitingOn: "nothing", stoppedForMs, next: "nothing to do: it serves" },
-        `${server} (${role}) serves again: its presence was written after ${stoppedForMs} ms`,
+        `${server} (${role}) serves again: its presence was written after ${stoppedForMs} ms${resumes}`,
       );
     } else {
       stoppedAt = performance.now();
       logger.error(
         { role, phase, waitingOn: PRESENCE_WAIT, next: LEDGER_UNREADABLE_NEXT },
         `${server} (${role}) stopped serving: its upgrade presence lapsed; readiness answers 503 ` +
-          "until a presence write succeeds",
+          `until a presence write succeeds${pauses}`,
       );
     }
     void Promise.resolve(onServingChange?.(now)).catch((error: unknown) =>

@@ -79,6 +79,10 @@ describe("the upgrade gate's console lines", () => {
       await hosted.stop?.();
       const lapsed = lines.findLine("error", "stopped serving");
       expect(lapsed?.msg).toContain("readiness answers 503");
+      expect(lapsed?.msg).toContain("the worker takes no new jobs (in-flight ones finish)");
+      expect(lines.findLine("info", "serves again")?.msg).toContain(
+        "the worker takes new jobs again",
+      );
       expect(lapsed).toMatchObject({
         phase: "presence",
         waitingOn: expect.stringContaining("presence write"),
