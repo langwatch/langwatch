@@ -86,6 +86,7 @@ export interface InstalledFeature<Provided, Rest, Trpc, Worker> {
 /** A booted application: everything constructed, nothing serving yet. */
 export class BootedRuntime<Members, Rest = never, Trpc = never> {
   private readonly lifecycle: RuntimeLifecycle;
+  private readonly services: readonly RuntimeService[];
   readonly name: string;
   readonly role: ServerRole;
   /** Members built: union of modules' required members, nothing else. */
@@ -139,6 +140,7 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
     this.declaredBy = declaredBy;
     this.handler = handler;
     this.lifecycle = new RuntimeLifecycle(services, scope);
+    this.services = services;
   }
 
   /**
@@ -233,6 +235,11 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
 
   stop(): Promise<void> {
     return this.lifecycle.stop();
+  }
+
+  /** Pauses or resumes every service that can stop taking work (round 22: lapsed presence). */
+  async holdWork(held: boolean): Promise<void> {
+    for (const service of this.services) await (held ? service.pause?.() : service.resume?.());
   }
 }
 

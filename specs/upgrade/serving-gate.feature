@@ -147,3 +147,25 @@ Feature: Serving processes refuse to start when the installation is behind their
     When the serving gate checks the image
     Then the gate says the worker is not serving
 
+
+  # Stop serving (round 22): a lapse turns /readyz 503 so the load balancer drains the process,
+  # and a worker pauses taking jobs; both resume after a good presence write.
+  @unit
+  Scenario: Readiness fails while the presence is lapsed and passes again after a good write
+    Given an admitted process whose readiness passed and latched
+    When its gate stops serving
+    Then the next readiness probe answers 503 naming the lapsed presence
+    And when its gate serves again the next readiness probe answers 200
+
+  @unit
+  Scenario: A worker pauses taking jobs while its presence is lapsed and resumes after a good write
+    Given an admitted worker running its application
+    When its gate stops serving
+    Then every runtime service that can pause is paused
+    And when its gate serves again every paused service resumes
+
+  @unit
+  Scenario: The worker's runtime pauses and resumes its eventing consumers
+    Given a booted runtime whose eventing host can pause its consumers
+    When the runtime is told to hold its work, then to release it
+    Then the eventing host pauses its consumers, then resumes them

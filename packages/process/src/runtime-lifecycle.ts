@@ -4,6 +4,9 @@ export interface RuntimeService {
   readonly name: string;
   start(): void | Promise<void>;
   stop(): void | Promise<void>;
+  /** Stops taking new work without stopping (round 22: a lapsed presence); absent: never pauses. */
+  pause?(): void | Promise<void>;
+  resume?(): void | Promise<void>;
 }
 
 /** Serialises lifecycle transitions and owns rollback of partially started services. */
