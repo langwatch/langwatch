@@ -209,6 +209,7 @@ export class EntitlementModule implements EntitlementApiContract {
       isSaas: config.isSaas,
       planResolver: (organizationId) => plans.getActivePlan({ organizationId }),
       peers: dependencies,
+      meter: repositories.billableEvents,
     });
     const warnings = UsageWarningService.create({
       billing: dependencies.billing,

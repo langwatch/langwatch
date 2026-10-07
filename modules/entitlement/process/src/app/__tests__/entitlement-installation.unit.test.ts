@@ -104,8 +104,6 @@ describe("entitlement app installation", () => {
           billing: createApiFixture<BillingApi>({
             getActiveSubscriptionPlan: async () => free,
             getPricingModel: async () => ({ pricingModel: null }),
-            countBillableEventsByProjects: async ({ projectIds }) =>
-              projectIds.map((projectId) => ({ projectId, count: 11 })),
             sendUsageWarning: async (input) => {
               warned.push(input);
               return { sent: true, notificationId: "notification-1" };
@@ -140,7 +138,7 @@ describe("entitlement app installation", () => {
         });
 
         await expect(app.getUsage({ organizationId: "organization-1" })).resolves.toMatchObject({
-          currentMonthMessagesCount: 11,
+          currentMonthMessagesCount: 0,
           membersCount: 0,
           usageUnit: "events",
         });
@@ -159,7 +157,7 @@ describe("entitlement app installation", () => {
             currentMonthMessagesCount: 900,
             maxMonthlyUsageLimit: 1_000,
             crossedThreshold: 90,
-            projectCounts: [{ projectId: "project-1", count: 11 }],
+            projectCounts: [{ projectId: "project-1", count: 0 }],
           },
         ]);
       } finally {

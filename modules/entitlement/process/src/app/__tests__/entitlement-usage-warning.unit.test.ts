@@ -22,10 +22,6 @@ function warningsOver(counts: ProjectUsageCounts) {
       throw new Error("off Cloud, no subscription is read");
     },
     getPricingModel: async () => ({ pricingModel: null }),
-    countBillableEventsByProjects: async ({ projectIds }) => {
-      counted.push(projectIds);
-      return counts;
-    },
     sendUsageWarning: async (input) => {
       sent.push(input);
       return { sent: true, notificationId: "notification-1" };
@@ -46,10 +42,25 @@ function warningsOver(counts: ProjectUsageCounts) {
     license: { resolve: async () => ({ granted: false }) },
     enrichers: [{ enrich: applyPlanTypeEntitlements }],
   });
-  const counter = UsageService.overPeers({
-    isSaas: false,
+  const counter = UsageService.create({
+    organizations: {
+      getOrganizationIdByTeamId: async () => "org-1",
+      getProjectIds: peers.projects.listIdsByOrganization,
+      getPricingModel: async () => ({ pricingModel: null }),
+    },
+    traceCounter: {
+      getCountByProjects: async () => {
+        throw new Error("a free plan off Cloud is metered in events");
+      },
+    },
+    eventCounter: {
+      getCountByProjects: async ({ projectIds }) => {
+        counted.push(projectIds);
+        return counts;
+      },
+    },
     planResolver: (organizationId) => plans.getActivePlan({ organizationId }),
-    peers,
+    deployment: { isSaas: false },
   });
   const warnings = UsageWarningService.create({
     billing,

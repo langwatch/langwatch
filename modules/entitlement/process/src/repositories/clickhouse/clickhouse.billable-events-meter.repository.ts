@@ -5,11 +5,13 @@ import {
   BillableEventsMeterRepository,
   type BillableEventRecord,
   type MeterWindow,
+  type ProjectMeterCount,
 } from "../billable-events-meter.repository.ts";
 
 const TABLE_NAME = "billable_events" as const;
 
 type TotalRow = { total: string | number };
+type ProjectRow = { projectId: string; total: string | number };
 
 /** ClickHouse twin of the meter, moved from billing under the same table and row shape. */
 export class BillableEventsMeterClickHouseRepository extends BillableEventsMeterRepository {
@@ -69,7 +71,39 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
       },
       unscoped: { reason: "The organization's meter counts every project the organization owns." },
     });
-    const total = result.rows[0]?.total;
-    return typeof total === "number" ? total : Number.parseInt(total ?? "0", 10);
+    return numberOf(result.rows[0]?.total);
   }
+
+  /** Billing's former `findByProjectApprox`, kept `uniq` so enforcement's numbers do not move. */
+  async countByProjects(input: {
+    organizationId: string;
+    projectIds: readonly string[];
+    window: MeterWindow;
+  }): Promise<ProjectMeterCount[]> {
+    const result = await this.#clickhouse.query<ProjectRow>({
+      tenantId: "",
+      organizationId: input.organizationId,
+      sql: `
+        SELECT TenantId as projectId, uniq(DeduplicationKeyHash) as total
+        FROM ${TABLE_NAME}
+        WHERE OrganizationId = {organizationId:String}
+          AND TenantId IN {projectIds:Array(String)}
+          AND EventTimestamp >= {startDate:DateTime64(3)}
+          AND EventTimestamp < {endDate:DateTime64(3)}
+        GROUP BY TenantId
+      `,
+      params: {
+        organizationId: input.organizationId,
+        projectIds: [...input.projectIds],
+        startDate: input.window.startDate,
+        endDate: input.window.endDate,
+      },
+      unscoped: { reason: "The organization's meter counts every project the organization owns." },
+    });
+    return result.rows.map((row) => ({ projectId: row.projectId, count: numberOf(row.total) }));
+  }
+}
+
+function numberOf(value: string | number | undefined): number {
+  return typeof value === "number" ? value : Number.parseInt(value ?? "0", 10);
 }
