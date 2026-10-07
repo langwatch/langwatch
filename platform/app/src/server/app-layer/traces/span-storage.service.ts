@@ -1,6 +1,6 @@
 import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
-import { ownProjectIdOf } from "~/server/app-layer/clients/clickhouse/authorized-reads";
+import { singleTenantOf } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
@@ -8,6 +8,10 @@ import {
   mapNormalizedSpansToSpans,
   mapNormalizedSpanToSpan,
 } from "~/server/traces/mappers/span.mapper";
+import {
+  hasEventRefs,
+  parseSpanEventRefs,
+} from "~/server/traces/offloaded-eventref-parsing";
 import { resolveOffloadedTraces } from "~/server/traces/resolve-offloaded-traces";
 import type { BlobStore } from "./blob-store.service";
 import type {
@@ -43,8 +47,9 @@ export interface SpanReadBlobResolutionDeps {
 
 /**
  * Every read carries the sealed ADR-166 proof (ADR-144 block C). The
- * repository fences the statement by it; the service reaches for the own
- * project only where a store outside ClickHouse keys on a project id.
+ * repository fences the statement by it; where a store outside ClickHouse
+ * keys on a project id, the service reads it only for the one project the
+ * proof reads.
  */
 type ByTraceId = {
   authorization: Authorization;
@@ -82,6 +87,15 @@ const applyVisibilityGate = <T extends Span>(
       : span,
   );
 };
+
+/** A span with its reserved eventref pointers dropped and its previews kept. */
+const withoutEventRefs = (span: NormalizedSpan): NormalizedSpan =>
+  hasEventRefs(span.spanAttributes)
+    ? {
+        ...span,
+        spanAttributes: parseSpanEventRefs(span.spanAttributes).cleanedAttrs,
+      }
+    : span;
 
 export class SpanStorageService {
   private readonly blobResolutionDeps?: SpanReadBlobResolutionDeps;
@@ -124,18 +138,10 @@ export class SpanStorageService {
     // Fetch normalized spans so resolution can access raw spanAttributes.
     const normalizedSpans =
       await this.repository.getNormalizedSpansByTraceId(params);
-    const { resolvedSpans } = await resolveOffloadedTraces({
-      // Offloaded bodies live under the project the route minted the proof
-      // for. A member's offloaded span read through an aggregate keeps its
-      // preview value, the same way a stale pointer does.
-      projectId: ownProjectIdOf({
-        authorization: params.authorization,
-        reads: "traces",
-      }),
+    const resolvedSpans = await this.resolveOffloadedBodies({
+      authorization: params.authorization,
       normalizedSpans,
-      blobStore: this.blobResolutionDeps.blobStore,
-      ioExtractionService: this.blobResolutionDeps.ioExtractionService,
-      logger: this.logger,
+      deps: this.blobResolutionDeps,
     });
     return applyVisibilityGate(
       mapNormalizedSpansToSpans(resolvedSpans),
@@ -193,22 +199,45 @@ export class SpanStorageService {
     // Resolve the single span via the normalized+resolve path.
     const normalizedSpans =
       await this.repository.getNormalizedSpansByTraceId(params);
-    const { resolvedSpans } = await resolveOffloadedTraces({
-      // Offloaded bodies live under the project the route minted the proof
-      // for. A member's offloaded span read through an aggregate keeps its
-      // preview value, the same way a stale pointer does.
-      projectId: ownProjectIdOf({
-        authorization: params.authorization,
-        reads: "traces",
-      }),
+    const resolvedSpans = await this.resolveOffloadedBodies({
+      authorization: params.authorization,
       normalizedSpans,
-      blobStore: this.blobResolutionDeps.blobStore,
-      ioExtractionService: this.blobResolutionDeps.ioExtractionService,
-      logger: this.logger,
+      deps: this.blobResolutionDeps,
     });
     const resolved = resolvedSpans.find((s) => s.spanId === params.spanId);
     if (!resolved) return null;
     return gateOne(mapNormalizedSpanToSpan(resolved));
+  }
+
+  /**
+   * Restores the full bodies of a trace's offloaded spans (ADR-022). Bodies
+   * live outside ClickHouse under one project id, so they are read only when
+   * the proof reads exactly one project: the member a detail read was
+   * narrowed to, or the plain project itself. While the proof still spans
+   * several projects each span keeps its preview, as the trace header does,
+   * and its reserved pointers are dropped so they never reach the client.
+   */
+  private async resolveOffloadedBodies({
+    authorization,
+    normalizedSpans,
+    deps,
+  }: {
+    authorization: Authorization;
+    normalizedSpans: NormalizedSpan[];
+    deps: SpanReadBlobResolutionDeps;
+  }): Promise<NormalizedSpan[]> {
+    const projectId = singleTenantOf({ authorization, reads: "traces" });
+    if (projectId === undefined) {
+      return normalizedSpans.map(withoutEventRefs);
+    }
+    const { resolvedSpans } = await resolveOffloadedTraces({
+      projectId,
+      normalizedSpans,
+      blobStore: deps.blobStore,
+      ioExtractionService: deps.ioExtractionService,
+      logger: this.logger,
+    });
+    return resolvedSpans;
   }
 
   async getTraceEventsByTraceId(

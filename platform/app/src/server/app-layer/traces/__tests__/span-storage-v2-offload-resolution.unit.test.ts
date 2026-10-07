@@ -11,8 +11,9 @@
  * BDD structure: given/when nested describes, action-based it() names.
  */
 
+import { narrowAuthorization } from "@langwatch/actor";
 import { describe, expect, it, vi } from "vitest";
-import { ownProof } from "~/test-utils/authorizationProofs";
+import { aggregateProof, ownProof } from "~/test-utils/authorizationProofs";
 
 // Passthrough mock for langwatch tracer used by TraceIOExtractionService.
 vi.mock("langwatch", () => ({
@@ -352,6 +353,113 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
             : JSON.stringify(outputValue);
         // Falls back to preview value when event_log row is missing.
         expect(outputStr).toBe(PREVIEW_OUTPUT);
+      });
+    });
+  });
+
+  describe("given a member's offloaded span read through an aggregate", () => {
+    const AGGREGATE = "proj-aggregate";
+    const MEMBER = "proj-member";
+    const memberSpan = makeNormalizedSpan({
+      spanId: "span-member",
+      traceId: "trace-member",
+      tenantId: MEMBER,
+      spanAttributes: {
+        "langwatch.output": PREVIEW_OUTPUT,
+        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: JSON.stringify({
+          field: "langwatch.output",
+          eventId: "evt-member",
+        }),
+      },
+    });
+    const aggregateReadsMember = () =>
+      aggregateProof({
+        projectId: AGGREGATE,
+        members: [{ projectId: MEMBER, from: 0 }],
+      });
+    /** A blob store that holds the full body under the member only. */
+    const memberBlobStore = () =>
+      ({
+        getFromEventLog: vi.fn(async ({ tenantId }: { tenantId: string }) => {
+          if (tenantId === MEMBER) return FULL_OUTPUT;
+          throw new BlobNotFoundError(
+            "evt-member",
+            "langwatch.output",
+            tenantId,
+          );
+        }),
+        putSpool: vi.fn(),
+        getSpool: vi.fn(),
+        deleteSpool: vi.fn(),
+      }) as unknown as BlobStore;
+    const outputOf = (span: { output?: unknown } | null | undefined) => {
+      const output = span?.output as
+        | { type: string; value: unknown }
+        | null
+        | undefined;
+      return output?.type === "text" ? output.value : JSON.stringify(output);
+    };
+
+    describe("when the proof is narrowed to the member", () => {
+      const narrowedToMember = () =>
+        narrowAuthorization({
+          authorization: aggregateReadsMember(),
+          projectId: MEMBER,
+        })!;
+
+      it("resolves the body under the member for the trace's spans", async () => {
+        const blobStore = memberBlobStore();
+        const service = new SpanStorageService(
+          makeStubRepository([memberSpan]),
+          { blobStore, ioExtractionService: new TraceIOExtractionService() },
+        );
+
+        const spans = await service.getSpansByTraceId({
+          authorization: narrowedToMember(),
+          traceId: "trace-member",
+        });
+
+        expect(outputOf(spans[0])).toBe(FULL_OUTPUT);
+        expect(blobStore.getFromEventLog).toHaveBeenCalledWith(
+          expect.objectContaining({ tenantId: MEMBER }),
+        );
+      });
+
+      it("resolves the body under the member for one span", async () => {
+        const blobStore = memberBlobStore();
+        const service = new SpanStorageService(
+          makeStubRepository([memberSpan]),
+          { blobStore, ioExtractionService: new TraceIOExtractionService() },
+        );
+
+        const span = await service.getSpanById({
+          authorization: narrowedToMember(),
+          traceId: "trace-member",
+          spanId: "span-member",
+        });
+
+        expect(outputOf(span)).toBe(FULL_OUTPUT);
+      });
+    });
+
+    describe("when the proof still spans the aggregate and its member", () => {
+      it("keeps the preview, reads no body and hides the reserved pointer", async () => {
+        const blobStore = memberBlobStore();
+        const service = new SpanStorageService(
+          makeStubRepository([memberSpan]),
+          { blobStore, ioExtractionService: new TraceIOExtractionService() },
+        );
+
+        const spans = await service.getSpansByTraceId({
+          authorization: aggregateReadsMember(),
+          traceId: "trace-member",
+        });
+
+        expect(outputOf(spans[0])).toBe(PREVIEW_OUTPUT);
+        expect(blobStore.getFromEventLog).not.toHaveBeenCalled();
+        expect(JSON.stringify(spans[0]?.params ?? {})).not.toContain(
+          EVENTREF_ATTR_PREFIX,
+        );
       });
     });
   });
