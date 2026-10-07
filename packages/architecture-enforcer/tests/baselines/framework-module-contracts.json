@@ -9,10 +9,7 @@
     "packages/browser-host -> @langwatch/evaluator-contract": 1,
     "packages/browser-host -> @langwatch/experiment-contract": 1,
     "packages/browser-host -> @langwatch/feature-flag-contract": 1,
-    "packages/browser-host -> @langwatch/langy-contract": 1,
     "packages/browser-host -> @langwatch/prompt-contract": 1,
-    "packages/browser-host -> @langwatch/scenario-contract": 1,
-    "packages/browser-host -> @langwatch/trace-contract": 1,
     "packages/browser-host -> @langwatch/workflow-contract": 1,
     "packages/prisma-client -> @langwatch/api-key-contract": 1
   }
