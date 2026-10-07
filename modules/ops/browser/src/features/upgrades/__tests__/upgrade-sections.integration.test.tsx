@@ -54,11 +54,14 @@ function stepWith(overrides: Partial<UpgradeStepView>): UpgradeStepView {
     owner: "ops",
     description: null,
     recorded: true,
+    inferred: false,
     attempt: 1,
     lastError: null,
     report: null,
+    runId: null,
     startedAt: "2026-10-06T10:00:00.000Z",
     finishedAt: "2026-10-06T10:00:02.000Z",
+    updatedAt: null,
     ...overrides,
   };
 }
@@ -275,6 +278,53 @@ describe("UpgradeRunPhases", () => {
           .getAllByTestId("upgrade-run-step")
           .map((s) => s.textContent),
       ).toEqual([expect.stringContaining("prisma:a"), expect.stringContaining("clickhouse:00042")]);
+    });
+  });
+});
+
+describe("UpgradeRunPhases, phases", () => {
+  describe("when a run from 3.21.0 to 3.23.0 passed through two releases", () => {
+    /** @scenario "A run's phases are listed in the order they ran" */
+    it("lists the preflight first, each release's schema phases in order, the reconcile last", () => {
+      const at = "2026-10-06T10:00:00.000Z";
+      const phase = (name: string, release: string | null) => ({
+        name,
+        release,
+        startedAt: at,
+        finishedAt: at,
+        outcome: "succeeded",
+      });
+      const run: UpgradeRunDetailView = {
+        id: "run_2",
+        kind: "upgrade",
+        release: "3.23.0",
+        floor: "3.20.1",
+        startedAt: at,
+        finishedAt: at,
+        outcome: "succeeded",
+        plan: null,
+        report: null,
+        phases: [
+          phase("preflight", null),
+          phase("postgres-schema", "3.22.0"),
+          phase("clickhouse-schema", "3.22.0"),
+          phase("postgres-schema", "3.23.0"),
+          phase("clickhouse-schema", "3.23.0"),
+          phase("reconcile", null),
+        ],
+        steps: [],
+      };
+      renderIn(<UpgradeRunPhases run={run} />);
+
+      const rows = screen.getAllByTestId("upgrade-run-phase").map((row) => row.textContent);
+      expect(rows).toEqual([
+        expect.stringMatching(/^Preflight/),
+        expect.stringMatching(/^Postgres schema3\.22\.0/),
+        expect.stringMatching(/^ClickHouse schema3\.22\.0/),
+        expect.stringMatching(/^Postgres schema3\.23\.0/),
+        expect.stringMatching(/^ClickHouse schema3\.23\.0/),
+        expect.stringMatching(/^Reconcile/),
+      ]);
     });
   });
 });

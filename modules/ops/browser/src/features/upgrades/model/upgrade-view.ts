@@ -1,84 +1,25 @@
 /**
- * UpgradeReader's answers as they cross the wire (packages/upgrade/src/reader/reader.schema.ts,
- * dates as ISO strings). Scaffolding: once ops-api.ts maps the ops.upgrade contract, each alias
- * becomes `RouterOutputs["ops"]["upgrade"][...]`. Handoff: .claude/handoffs/mig-u2-ops-ui.md.
+ * The ops.upgrade reads' answers, in ops' own contract shapes, named the way the sections read
+ * them. Nothing here restates a shape.
  */
+import type {
+  OpsUpgradeRelease,
+  OpsUpgradeRun,
+  OpsUpgradeRunPhase,
+  OpsUpgradeRunSummary,
+  OpsUpgradeStatus,
+  OpsUpgradeStep,
+  OpsUpgradeStepDetail,
+  OpsUpgradeTarget,
+} from "@langwatch/ops-contract";
 
-export type UpgradeRunSummaryView = {
-  id: string;
-  kind: string;
-  release: string | null;
-  floor: string | null;
-  startedAt: string;
-  finishedAt: string | null;
-  outcome: string | null;
-};
-
+export type UpgradeRunSummaryView = OpsUpgradeRunSummary;
 /** One phase of a run's report (round 9, U2-PHASES); an unknown name or outcome reads raw. */
-export type UpgradeRunPhaseView = {
-  name: string;
-  release: string | null;
-  startedAt: string;
-  finishedAt: string | null;
-  outcome: string;
-};
-
+export type UpgradeRunPhaseView = OpsUpgradeRunPhase;
 /** `state` includes `never-upgraded` (round 17, U1-a), labelled "Never upgraded" by the reader. */
-export type UpgradeStatusView = {
-  state: string;
-  label: string;
-  tone: string;
-  reason: string;
-  summary: string;
-  installed: string | null;
-  origin: string;
-  image: string;
-  floor: string | null;
-  ledgerFloor: string | null;
-  lease: { owner: string | null; image: string | null; expiresAt: string | null } | null;
-  lastRun: UpgradeRunSummaryView | null;
-  counts: Record<string, number>;
-  failedStepIds: string[];
-  failedTargets: number;
-};
-
-export type UpgradeReleaseView = {
-  release: string | null;
-  installed: boolean;
-  image: boolean;
-  stepCount: number;
-  counts: Record<string, number>;
-};
-
-export type UpgradeStepView = {
-  id: string;
-  kind: string;
-  release: string | null;
-  mode: string;
-  status: string;
-  statusLabel: string;
-  owner: string | null;
-  description: string | null;
-  recorded: boolean;
-  attempt: number;
-  lastError: string | null;
-  report: Record<string, unknown> | null;
-  startedAt: string | null;
-  finishedAt: string | null;
-};
-
-export type UpgradeTargetView = {
-  target: string;
-  status: string;
-  version: string | null;
-  lastError: string | null;
-};
-
-export type UpgradeStepDetailView = UpgradeStepView & { targets: UpgradeTargetView[] };
-
-export type UpgradeRunDetailView = UpgradeRunSummaryView & {
-  plan: Record<string, unknown> | null;
-  report: Record<string, unknown> | null;
-  phases: UpgradeRunPhaseView[];
-  steps: UpgradeStepView[];
-};
+export type UpgradeStatusView = OpsUpgradeStatus;
+export type UpgradeReleaseView = OpsUpgradeRelease;
+export type UpgradeStepView = OpsUpgradeStep;
+export type UpgradeTargetView = OpsUpgradeTarget;
+export type UpgradeStepDetailView = OpsUpgradeStepDetail;
+export type UpgradeRunDetailView = OpsUpgradeRun;

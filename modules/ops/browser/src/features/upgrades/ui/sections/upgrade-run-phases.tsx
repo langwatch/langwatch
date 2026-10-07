@@ -5,11 +5,17 @@ import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 import {
   groupStepsByRelease,
   modeLabel,
+  phaseLabel,
+  phaseOutcomeLabel,
   runOutcomeLabel,
   statusTone,
   tonePalette,
 } from "../../model/upgrade-labels.ts";
-import type { UpgradeRunDetailView, UpgradeStepView } from "../../model/upgrade-view.ts";
+import type {
+  UpgradeRunDetailView,
+  UpgradeRunPhaseView,
+  UpgradeStepView,
+} from "../../model/upgrade-view.ts";
 import { UpgradeStatusBadge } from "../elements/upgrade-status-badge.tsx";
 
 function StepRow({ step }: { step: UpgradeStepView }) {
@@ -34,7 +40,24 @@ function StepRow({ step }: { step: UpgradeStepView }) {
   );
 }
 
-/** W4: a run's steps per release, in the order the reader lists them, then its plan and report. */
+function PhaseRow({ phase }: { phase: UpgradeRunPhaseView }) {
+  return (
+    <HStack gap={3} data-testid="upgrade-run-phase">
+      <Text textStyle="sm" flex={1}>
+        {phaseLabel(phase.name)}
+      </Text>
+      <Text textStyle="xs" color="fg.muted" fontFamily="mono">
+        {phase.release ?? ""}
+      </Text>
+      <UpgradeStatusBadge label={phaseOutcomeLabel(phase.outcome)} size="sm" />
+      <Text textStyle="xs" color="fg.muted" minWidth="64px" textAlign="end">
+        {formatDuration(phase.startedAt, phase.finishedAt)}
+      </Text>
+    </HStack>
+  );
+}
+
+/** W4: a run's phases in the order they ran, its steps per release, then its plan and report. */
 export function UpgradeRunPhases({ run }: { run: UpgradeRunDetailView }) {
   const releases = groupStepsByRelease(run.steps);
   return (
@@ -48,6 +71,14 @@ export function UpgradeRunPhases({ run }: { run: UpgradeRunDetailView }) {
           {run.kind} · {formatDuration(run.startedAt, run.finishedAt)}
         </Text>
       </HStack>
+      {run.phases.length > 0 && (
+        <Stack gap={2} data-testid="upgrade-run-phases">
+          <Heading size="sm">Phases</Heading>
+          {run.phases.map((phase, index) => (
+            <PhaseRow key={`${phase.name}:${phase.release ?? ""}:${index}`} phase={phase} />
+          ))}
+        </Stack>
+      )}
       {releases.length === 0 ? (
         <Text color="fg.muted">The run recorded no step yet.</Text>
       ) : (

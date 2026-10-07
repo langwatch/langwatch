@@ -33,6 +33,31 @@ const RUN_OUTCOMES: Record<string, UpgradeLabel> = {
   abandoned: { label: "Abandoned", tone: "warning" },
 };
 
+const PHASE_LABELS: Record<string, string> = {
+  preflight: "Preflight",
+  "postgres-schema": "Postgres schema",
+  "clickhouse-schema": "ClickHouse schema",
+  reconcile: "Reconcile",
+};
+
+const PHASE_OUTCOMES: Record<string, UpgradeLabel> = {
+  running: { label: "Running", tone: "info" },
+  succeeded: { label: "Succeeded", tone: "success" },
+  failed: { label: "Failed", tone: "danger" },
+};
+
+/** A run phase's name as the page words it; a name this release does not know reads raw. */
+export function phaseLabel(name: string): string {
+  return Object.hasOwn(PHASE_LABELS, name) ? PHASE_LABELS[name]! : name;
+}
+
+/** A phase's outcome; one this page does not know reads as stored, in a neutral tone. */
+export function phaseOutcomeLabel(outcome: string): UpgradeLabel {
+  return Object.hasOwn(PHASE_OUTCOMES, outcome)
+    ? PHASE_OUTCOMES[outcome]!
+    : { label: outcome, tone: "neutral" };
+}
+
 /** The order a release's step groups are shown in (UI plan W2). */
 export const UPGRADE_MODE_ORDER = ["blocking", "background", "operator"] as const;
 
