@@ -1,10 +1,15 @@
 import { useMemo } from "react";
+import {
+  type ProjectNavigation,
+  projectNavigation,
+} from "~/components/sidebar/projectKindNavigation";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import {
   type CommandFeatureFlagValues,
   filterCommandsByFeatureFlags,
+  filterCommandsByProjectNavigation,
   topLevelNavigationCommands,
 } from "../command-registry";
 import type { Command } from "../types";
@@ -39,18 +44,36 @@ export function useCommandFeatureFlags(): CommandFeatureFlagValues {
 }
 
 /**
+ * What the current project's navigation shows, read from the same rule the
+ * sidebar reads. Quick Search also opens on organization pages, which hold
+ * no project and so keep every section.
+ */
+export function useCommandProjectNavigation(): ProjectNavigation {
+  const { project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
+  return useMemo(() => projectNavigation(project?.kind), [project?.kind]);
+}
+
+/**
  * The navigation commands offered on an empty bar, with the flagged ones
- * resolved for this person.
+ * resolved for this person and the sections this project's navigation
+ * hides left out.
  */
 export function useTopLevelNavigationCommands(): Command[] {
   const flags = useCommandFeatureFlags();
+  const navigation = useCommandProjectNavigation();
 
   return useMemo(
     () =>
-      filterCommandsByFeatureFlags({
-        commands: topLevelNavigationCommands,
-        flags,
+      filterCommandsByProjectNavigation({
+        commands: filterCommandsByFeatureFlags({
+          commands: topLevelNavigationCommands,
+          flags,
+        }),
+        navigation,
       }),
-    [flags],
+    [flags, navigation],
   );
 }

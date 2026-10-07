@@ -12,6 +12,7 @@ import {
   actionCommands,
   filterCommands,
   filterCommandsByFeatureFlags,
+  filterCommandsByProjectNavigation,
   navigationCommands,
   supportCommands,
   themeCommands,
@@ -22,7 +23,10 @@ import {
 } from "../constants";
 import { getPageCommands } from "../pageCommands";
 import type { Command } from "../types";
-import { useCommandFeatureFlags } from "./useCommandFeatureFlags";
+import {
+  useCommandFeatureFlags,
+  useCommandProjectNavigation,
+} from "./useCommandFeatureFlags";
 
 export interface FilteredCommands {
   navigation: Command[];
@@ -44,16 +48,20 @@ export function useFilteredCommands(
 ): FilteredCommands {
   const { hasAccess: hasOpsAccess } = useOpsPermission();
   const commandFeatureFlags = useCommandFeatureFlags();
+  const projectNavigation = useCommandProjectNavigation();
 
   const availableNavCommands = useMemo(() => {
     const commands = hasOpsAccess
       ? navigationCommands
       : navigationCommands.filter((cmd) => !cmd.id.startsWith("nav-ops"));
-    return filterCommandsByFeatureFlags({
-      commands,
-      flags: commandFeatureFlags,
+    return filterCommandsByProjectNavigation({
+      commands: filterCommandsByFeatureFlags({
+        commands,
+        flags: commandFeatureFlags,
+      }),
+      navigation: projectNavigation,
     });
-  }, [hasOpsAccess, commandFeatureFlags]);
+  }, [hasOpsAccess, commandFeatureFlags, projectNavigation]);
 
   const filteredNavigation = useMemo(() => {
     if (!query.trim()) return [];
@@ -157,8 +165,21 @@ export function useFilteredCommands(
     if (!isDevMode && !hasOpsAccess) {
       commands = commands.filter((cmd) => cmd.id !== "action-feature-flags");
     }
-    return [...commands, ...featureFlagToggleCommands, ...opsPinCommand];
-  }, [hasOpsAccess, isDevMode, featureFlagToggleCommands, opsPinCommand]);
+    return [
+      ...filterCommandsByProjectNavigation({
+        commands,
+        navigation: projectNavigation,
+      }),
+      ...featureFlagToggleCommands,
+      ...opsPinCommand,
+    ];
+  }, [
+    hasOpsAccess,
+    isDevMode,
+    featureFlagToggleCommands,
+    opsPinCommand,
+    projectNavigation,
+  ]);
 
   const filteredActions = useMemo(() => {
     if (!query.trim()) return [];

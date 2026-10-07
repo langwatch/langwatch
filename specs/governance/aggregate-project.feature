@@ -210,6 +210,7 @@ Feature: An aggregate project reads its member projects
     Then the navigation shows Traces
     And Analytics, Prompts, Experiments and Online Evaluations are absent
     # Analytics leaves the navigation until analytics across members ships.
+    And Quick Search offers the same pages as the navigation and no action that creates data
     And no monitor can be created on the aggregate
 
   # ── E. The reconciler keeps members current ──────────────────────────────

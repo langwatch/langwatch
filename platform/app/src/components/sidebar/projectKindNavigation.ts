@@ -14,6 +14,15 @@ export interface ProjectNavigation {
   build: boolean;
 }
 
+/**
+ * A part of the navigation a project can go without. Observe is not one:
+ * every project that can be opened has Traces.
+ */
+export type ProjectNavigationSection = Exclude<
+  keyof ProjectNavigation,
+  "observe"
+>;
+
 const EVERYTHING: ProjectNavigation = {
   home: true,
   observe: true,
