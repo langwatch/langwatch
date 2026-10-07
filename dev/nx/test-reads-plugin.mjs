@@ -73,6 +73,7 @@ export const reads = {
   "@langwatch/clickhouse-client": ["packages/clickhouse-migrations/**/*"],
   "@langwatch/clickhouse-migrations": ["packages/upgrade/releases/lts-floor.json"],
   "@langwatch/prisma-client": ["packages/upgrade/releases/lts-floor.json"],
+  "@langwatch/upgrade": ["packages/clickhouse-migrations/**/*"],
   "@langwatch/evaluator-contract": [
     "skills/**/*",
     "feature-map.json",
@@ -88,7 +89,12 @@ export const reads = {
   ],
   "@langwatch/evaluation-process": ["charts/langwatch/**/*", "docs/self-hosting/**/*"],
   "@langwatch/auth-process": ["charts/langwatch/**/*", "docs/self-hosting/**/*"],
-  "@langwatch/ops-process": ["docs/self-hosting/**/*", "docs/ai-gateway/**/*", "docs/docs.json"],
+  "@langwatch/ops-process": [
+    "docs/self-hosting/**/*",
+    "docs/ai-gateway/**/*",
+    "docs/docs.json",
+    "packages/clickhouse-migrations/**/*",
+  ],
   "@langwatch/webhook-process": ["specs/webhooks/**/*"],
   "@langwatch/egress": ["pkg/ssrf/testdata/**/*", "go.work"],
   "@langwatch/langy-browser": ["services/langyagent/**/*", "infra/docker/Dockerfile.langyagent"],
