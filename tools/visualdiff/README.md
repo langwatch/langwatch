@@ -469,7 +469,7 @@ push cancels the one still going. It follows `apidiff.yml` and `e2e-ci.yml`:
    then boots on the candidate's schema with its migrations skipped, the same
    as every rolling deploy's old release does.
 3. The `run` job is a matrix of eight shards. Each runs `visualdiff run
-   -no-haven -no-publish -no-baseline -shard i/8 -deadline 50m`: every eighth
+-no-haven -no-publish -no-baseline -shard i/8 -deadline 50m`: every eighth
    route and flow from the i-th, booted on plain ports from worktrees under
    the runner's temp directory, enterprise edition only. Shard 1 alone records
    coverage. The Playwright browser is cached by version.

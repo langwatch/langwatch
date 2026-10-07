@@ -127,13 +127,7 @@
   {
     "round": 2,
     "group": "D",
-    "ids": [
-      "ingest-api-key-lifecycle:233",
-      "Q157",
-      "P8484-R1",
-      "P8484-R2",
-      "P8484-R3"
-    ],
+    "ids": ["ingest-api-key-lifecycle:233", "Q157", "P8484-R1", "P8484-R2", "P8484-R3"],
     "questions": [
       {
         "question": "ingest-api-key-lifecycle.feature:233: when the CLI refreshes a session past the organisation's maximum session duration, main refused and revoked its login and ingest keys with cause 'expired'. Here the refresh is refused and only the refresh token dropped; a separate reaper revokes the keys later. Which is wanted? (Q157)",
@@ -216,15 +210,7 @@
   {
     "round": 3,
     "group": "D",
-    "ids": [
-      "Q209",
-      "Q205(A)",
-      "Q207(A)",
-      "Q207(B)",
-      "Q207(C)",
-      "Q207(D)",
-      "Q207(F)"
-    ],
+    "ids": ["Q209", "Q205(A)", "Q207(A)", "Q207(B)", "Q207(C)", "Q207(D)", "Q207(F)"],
     "questions": [
       {
         "question": "Offloaded trace fields: trace reads one event's payload from event_log in the api, but the api's event store refuses every read by ruled design, so offloaded fields silently fall back to the 64 KB preview, a regression against main. How should trace read one event? (Q209)",
@@ -303,13 +289,7 @@
   {
     "round": 4,
     "group": "D",
-    "ids": [
-      "Q205(B)",
-      "Q205(C)",
-      "Q208(D)",
-      "Q208(A)",
-      "Q208(B)"
-    ],
+    "ids": ["Q205(B)", "Q205(C)", "Q208(D)", "Q208(A)", "Q208(B)"],
     "questions": [
       {
         "question": "Eventing's event tables: data-retention rewrites them, and analytics publishes them as customer-queryable LWQL views behind project:manage. Both break the table-ownership policy. How may other modules touch eventing's tables? (Q205)",
@@ -384,12 +364,7 @@
   {
     "round": 5,
     "group": "D",
-    "ids": [
-      "Q212(R4)",
-      "Q212(R2)",
-      "Q212(R3)",
-      "Q211(C)"
-    ],
+    "ids": ["Q212(R4)", "Q212(R2)", "Q212(R3)", "Q211(C)"],
     "questions": [
       {
         "question": "Better Auth's storage adapter needs raw Prisma, Redis and the cipher, and ops' event replay needs raw Redis and ClickHouse plus eventing's pipeline definitions. Repositories normally receive only their own store. May these two sites hold raw clients? (Q212)",
@@ -460,14 +435,7 @@
   {
     "round": 6,
     "group": "D",
-    "ids": [
-      "Q211(B)",
-      "Q211(D)",
-      "Q202(2)",
-      "Q203",
-      "Q202(3)",
-      "Q204(A)"
-    ],
+    "ids": ["Q211(B)", "Q211(D)", "Q202(2)", "Q203", "Q202(3)", "Q204(A)"],
     "questions": [
       {
         "question": "packages/clickhouse-migrations (framework) depends on data-retention's contract to learn which tables retention manages. How should that managed-table list reach the ClickHouse reconciler? (Q211)",
@@ -542,14 +510,7 @@
   {
     "round": 7,
     "group": "D",
-    "ids": [
-      "Q204(B)",
-      "Q202(1)",
-      "Q204(C)",
-      "Q206",
-      "Q39",
-      "D3"
-    ],
+    "ids": ["Q204(B)", "Q202(1)", "Q204(C)", "Q206", "Q39", "D3"],
     "questions": [
       {
         "question": "Some lends are plain objects of methods or hooks rather than components (guidedOnboarding, guidedPathActive, sidebar, sampleChoice). Which token kind should carry them? (Q204)",
@@ -624,12 +585,7 @@
   {
     "round": 8,
     "group": "D",
-    "ids": [
-      "T1-D2-canon",
-      "T1-D2-deps-extra",
-      "U2-API",
-      "U2-LIVE"
-    ],
+    "ids": ["T1-D2-canon", "T1-D2-deps-extra", "U2-API", "U2-LIVE"],
     "questions": [
       {
         "question": "Cutting trace's peer call to coding-agent: coding-agent's session facts need spans decoded and canonicalised (the model and token counts lifted to gen_ai.* fields). TraceApi has canonicalizeLogRecord but no span twin, and the ruling said no new TraceApi operation. The span-facts cut waits on this. (T1-D2-canon)",
@@ -708,13 +664,7 @@
   {
     "round": 9,
     "group": "D",
-    "ids": [
-      "U2-PHASES",
-      "held:72",
-      "S3-ROLLBACK",
-      "CH-1",
-      "Trace-9-wire"
-    ],
+    "ids": ["U2-PHASES", "held:72", "S3-ROLLBACK", "CH-1", "Trace-9-wire"],
     "questions": [
       {
         "question": "The Upgrades run view shows steps per release but not the run's phases (preflight, schema per release, reconcile); the phases scenario is @unimplemented. Record phases? (U2-PHASES)",
@@ -785,12 +735,7 @@
   {
     "round": 10,
     "group": "D",
-    "ids": [
-      "OTLP-REPORT",
-      "Q-U9",
-      "Q-U6",
-      "Q-U7"
-    ],
+    "ids": ["OTLP-REPORT", "Q-U9", "Q-U6", "Q-U7"],
     "questions": [
       {
         "question": "TraceApi.otlpReportError has no production caller since main's #8489 port: OTLP parse failures now log a client warning instead. Remove the unused operation from the trace contract and app? (OTLP-REPORT)",
@@ -857,12 +802,7 @@
   {
     "round": 11,
     "group": "C",
-    "ids": [
-      "D1",
-      "D2",
-      "D4",
-      "D5"
-    ],
+    "ids": ["D1", "D2", "D4", "D5"],
     "questions": [
       {
         "question": "Upgrade ledger model: cloud and self-hosted share one ledger keyed by step id (and target). Version numbers matter only for self-hosted stepping and the support floor; cloud, released gradually, is tracked by step id plus presence, never a build number. Keep? (D1)",
@@ -941,12 +881,7 @@
   {
     "round": 12,
     "group": "C",
-    "ids": [
-      "D6",
-      "D7",
-      "D8",
-      "D9"
-    ],
+    "ids": ["D6", "D7", "D8", "D9"],
     "questions": [
       {
         "question": "The migration guard also refuses lock-heavy shapes (a plain index on an existing table without the pre-build note, enum recreation, a unique or validated constraint on an existing table, a column type change), and migration sessions set lock_timeout. Keep? (D6)",
@@ -1013,12 +948,7 @@
   {
     "round": 13,
     "group": "C",
-    "ids": [
-      "D10",
-      "D11",
-      "Q-U5",
-      "Q-U10"
-    ],
+    "ids": ["D10", "D11", "Q-U5", "Q-U10"],
     "questions": [
       {
         "question": "The first LTS floor is the last release cut before this branch merges (3.20.1 today); installs older than that must upgrade to it first. Keep, moving it to whatever is newest at merge? (D10)",
@@ -1089,13 +1019,7 @@
   {
     "round": 14,
     "group": "C",
-    "ids": [
-      "Q-U11",
-      "Q-U8",
-      "UP-3",
-      "Q-U8 (ops-upgrade-image-steps)",
-      "S4-TARGETS"
-    ],
+    "ids": ["Q-U11", "Q-U8", "UP-3", "Q-U8 (ops-upgrade-image-steps)", "S4-TARGETS"],
     "questions": [
       {
         "question": "Every migration step must carry a one-line description shown in the Upgrades UI and the CLI; SQL steps take their first comment line, and a step without one is refused. Keep this requirement? (Q-U11)",
@@ -1166,12 +1090,7 @@
   {
     "round": 15,
     "group": "C",
-    "ids": [
-      "mig-declare (checkpoint)",
-      "mig-declare (upcasts)",
-      "mig-declare (rules)",
-      "UP-1"
-    ],
+    "ids": ["mig-declare (checkpoint)", "mig-declare (upcasts)", "mig-declare (rules)", "UP-1"],
     "questions": [
       {
         "question": "A long migration step's checkpoint is { resumeFrom, save({ report }) }: the step resumes from its last saved report, and the runner keeps both in the ledger's step report. Keep this shape? (mig-declare)",
@@ -1242,12 +1161,7 @@
   {
     "round": 16,
     "group": "C",
-    "ids": [
-      "UP-2",
-      "UP-4",
-      "UP-5",
-      "held:69 (fresh-install upcast)"
-    ],
+    "ids": ["UP-2", "UP-4", "UP-5", "held:69 (fresh-install upcast)"],
     "questions": [
       {
         "question": "Upcast step ids read upcast:<pipeline>:<stored type>, not the usual <module>:<name>, because a pipeline does not know its module and pipeline names are already unique. Keep? (UP-2)",
@@ -1314,12 +1228,7 @@
   {
     "round": 17,
     "group": "C",
-    "ids": [
-      "U1-a",
-      "U1-b",
-      "U1-c",
-      "S3-REFUSED-RUN"
-    ],
+    "ids": ["U1-a", "U1-b", "U1-c", "S3-REFUSED-RUN"],
     "questions": [
       {
         "question": "An install with no upgrade recorded yet: the Upgrades page reads 'Behind' with reason no-upgrade-recorded and the summary 'No upgrade recorded yet', rather than an eighth state beside the UI plan's seven. Keep? (U1-a)",
@@ -1386,12 +1295,7 @@
   {
     "round": 18,
     "group": "C",
-    "ids": [
-      "S3-IMAGE",
-      "held:67 (ledger widening)",
-      "U3-a",
-      "U3-b"
-    ],
+    "ids": ["S3-IMAGE", "held:67 (ledger widening)", "U3-a", "U3-b"],
     "questions": [
       {
         "question": "An image's release is its newest manifest in packages/upgrade/releases/; a git-<sha> build is that release plus a virtual release for its unreleased steps. Keep? (S3-IMAGE)",
@@ -1606,12 +1510,7 @@
   {
     "round": 21,
     "group": "C",
-    "ids": [
-      "S3-BOOTSTRAP",
-      "S3-TIMINGS",
-      "S3-RETRY",
-      "held:64 (NEW_RULES_FROM)"
-    ],
+    "ids": ["S3-BOOTSTRAP", "S3-TIMINGS", "S3-RETRY", "held:64 (NEW_RULES_FROM)"],
     "questions": [
       {
         "question": "On a database with tables but no Prisma history, Prisma refuses its first deploy, so the runner cannot create its ledger first. The runner applies the Postgres schema first, outside its lease (Prisma's own lock serialises it), then plans a fresh install. Keep? (S3-BOOTSTRAP)",
@@ -1754,12 +1653,7 @@
   {
     "round": 23,
     "group": "C",
-    "ids": [
-      "mig-ci D7a",
-      "mig-ci D7b",
-      "mig-ci D7c",
-      "mig-ci D7d"
-    ],
+    "ids": ["mig-ci D7a", "mig-ci D7b", "mig-ci D7c", "mig-ci D7d"],
     "questions": [
       {
         "question": "The migration-compat CI checks run only on PRs touching migrations, so they cannot be required checks as they stand. Keep them advisory for one green month, then convert them to always-run with a skipped job and an all-green gate? (mig-ci D7a)",
@@ -1826,12 +1720,7 @@
   {
     "round": 24,
     "group": "C",
-    "ids": [
-      "mig-ci D11",
-      "AD-2",
-      "oversized-operator-surface",
-      "LE-1"
-    ],
+    "ids": ["mig-ci D11", "AD-2", "oversized-operator-surface", "LE-1"],
     "questions": [
       {
         "question": "For PRs into a long-running branch, a goose migration number already used on main's tip is refused (the check fails), not merely warned; Prisma timestamps are exempt. Released code-step files are frozen by their quoted id; helper files they import are not. Keep? (mig-ci D11)",
@@ -1902,12 +1791,7 @@
   {
     "round": 25,
     "group": "C",
-    "ids": [
-      "LE-3",
-      "Q29",
-      "apidiff (dataset records)",
-      "AD-1"
-    ],
+    "ids": ["LE-3", "Q29", "apidiff (dataset records)", "AD-1"],
     "questions": [
       {
         "question": "Other legacy error shapes are not restored: {error, kind?, meta?} on evaluations-legacy, guardrails and dataset evaluate, and the CLI OAuth {error, error_description} (about 20 operations). They change only if the apidiff tool names a client break. Keep? (LE-3)",
@@ -1974,12 +1858,7 @@
   {
     "round": 26,
     "group": "C",
-    "ids": [
-      "Q166(1)",
-      "T1-D2-deps",
-      "T1-D2-deps (review)",
-      "Q55"
-    ],
+    "ids": ["Q166(1)", "T1-D2-deps", "T1-D2-deps (review)", "Q55"],
     "questions": [
       {
         "question": "REST 402 (payment required) refusals carry error type internal_error today, because the status-to-type map has no 402 entry; main's builder never had one either. Proposed: add type payment_required. (Q166)",
@@ -2046,12 +1925,7 @@
   {
     "round": 27,
     "group": "C",
-    "ids": [
-      "Q62 (binds)",
-      "Q62 (sso-onboarding-tiers:85)",
-      "Q88",
-      "Q168 (OKTA)"
-    ],
+    "ids": ["Q62 (binds)", "Q62 (sso-onboarding-tiers:85)", "Q88", "Q168 (OKTA)"],
     "questions": [
       {
         "question": "Two identity binds are weak: the operator invite-resend test proves only that it delegates, and the SSO tiers test asserts one lifecycle order. Proposed: accept these binds as they are. (Q62)",
@@ -2190,12 +2064,7 @@
   {
     "round": 29,
     "group": "C",
-    "ids": [
-      "Q172",
-      "Q201(1)",
-      "Q201(2)",
-      "audit-log:83"
-    ],
+    "ids": ["Q172", "Q201(1)", "Q201(2)", "audit-log:83"],
     "questions": [
       {
         "question": "cli-login-personal-guard.feature ('allows an org admin who is not a direct team member') says that admin can write; the code asks project:view. Proposed: reword to 'can view' and bind it with an authz-side test. (Q172)",
@@ -2266,12 +2135,7 @@
   {
     "round": 30,
     "group": "C",
-    "ids": [
-      "audit-log:91",
-      "audit-log:177",
-      "authz package-boundary:125",
-      "Q195"
-    ],
+    "ids": ["audit-log:91", "audit-log:177", "authz package-boundary:125", "Q195"],
     "questions": [
       {
         "question": "audit-log.feature:91 says the trail resolves its connection when a row is written; stores are now handed over at boot. Proposed rewording: 'A process that installed no audit log says so once per unrecorded mutation'. (audit-log:91)",
@@ -2416,12 +2280,7 @@
   {
     "round": 32,
     "group": "C",
-    "ids": [
-      "Q173",
-      "Q199(1)",
-      "Q199(2)",
-      "Q199(3)"
-    ],
+    "ids": ["Q173", "Q199(1)", "Q199(2)", "Q199(3)"],
     "questions": [
       {
         "question": "A memory-store stack has no product rate limiter (only Redis stacks do), so rate-limiting.feature:35's in-memory path holds only vacuously. Default: leave memory stacks without a limiter. (Q173)",
@@ -2488,12 +2347,7 @@
   {
     "round": 33,
     "group": "C",
-    "ids": [
-      "Q210(1)",
-      "Q210(2)",
-      "Q210(5)",
-      "Q214(1)"
-    ],
+    "ids": ["Q210(1)", "Q210(2)", "Q210(5)", "Q214(1)"],
     "questions": [
       {
         "question": "Ten channel-registry findings need .withChannels / defineChannels, which packages/process lacks; hand-calling registry.live.create is a deleted spelling. Proposed: build the framework piece first, with the names the record states, then convert. (Q210)",
@@ -2568,13 +2422,7 @@
   {
     "round": 34,
     "group": "C",
-    "ids": [
-      "Q214(2)",
-      "Q220",
-      "Q197",
-      "Q146",
-      "feature-package-boundaries:9"
-    ],
+    "ids": ["Q214(2)", "Q220", "Q197", "Q146", "feature-package-boundaries:9"],
     "questions": [
       {
         "question": "Trace still exports its 'has signal' SQL predicate, now unread because analytics keeps its own copy. Proposed: keep trace's export until the owner of trace's analytics tables is ruled (asked separately). (Q214)",
@@ -2718,13 +2566,7 @@
   {
     "round": 36,
     "group": "C",
-    "ids": [
-      "Q217(2)",
-      "Q217(5)",
-      "ui-contract:314",
-      "Q156",
-      "Q167(1)"
-    ],
+    "ids": ["Q217(2)", "Q217(5)", "ui-contract:314", "Q156", "Q167(1)"],
     "questions": [
       {
         "question": "For review: with STORED_OBJECTS_BACKEND=azure and an incomplete Azure block, boot no longer refuses; projects without their own S3 account are refused by name on first use, as main did. Accept? (Q217)",
@@ -2791,12 +2633,7 @@
   {
     "round": 37,
     "group": "C",
-    "ids": [
-      "Q167(2)",
-      "Q54",
-      "Q75",
-      "Q165"
-    ],
+    "ids": ["Q167(2)", "Q54", "Q75", "Q165"],
     "questions": [
       {
         "question": "typed-permission-declarations.feature:208 'An endpoint's middleware array cannot displace its declared check' is bound in packages/api tests. Proposed: rewrite it to what those tests prove instead of retiring it. (Q167)",
@@ -2936,11 +2773,7 @@
   {
     "round": 39,
     "group": "C",
-    "ids": [
-      "langy-trace-explorer-actions:220",
-      "shared-scope-host:82",
-      "Q121"
-    ],
+    "ids": ["langy-trace-explorer-actions:220", "shared-scope-host:82", "Q121"],
     "questions": [
       {
         "question": "langy-trace-explorer-actions.feature:220 (Langy applies the thumbs-down filter and answers the Explorer's count) was proved on main by a 240-line live-LLM scenario test. Proposed: port that test in an end-to-end lane. (langy:220)",

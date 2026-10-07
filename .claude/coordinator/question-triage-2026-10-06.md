@@ -18,21 +18,21 @@ and leftover parts of ids a ruling cites only in part (9).
 
 ## 1. Counts
 
-| Group                                   | Total |  A |  B |   C |  D |  E |
-| --------------------------------------- | ----: | -: | -: | --: | -: | -: |
-| Upgrade UI (Q-U5 to Q-U11)              |     7 |  0 |  1 |   3 |  3 |  0 |
-| Legacy error body (LE-1 to LE-3)        |     3 |  1 |  0 |   2 |  0 |  0 |
-| Migrations blitz (held lines 45-91)     |    47 |  0 |  5 |  38 |  3 |  1 |
-| SDK paths (SDK-1, U2-*, Q-U2, S4)       |     6 |  1 |  0 |   1 |  3 |  1 |
-| Event upcaster and mig-ci               |    11 |  0 |  0 |  11 |  0 |  0 |
-| Peer cut T1                             |     1 |  0 |  0 |   1 |  0 |  0 |
-| apidiff (Q29, dataset records)          |     2 |  0 |  0 |   2 |  0 |  0 |
-| Main #8484 port (P8484-R1 to R3)        |     3 |  0 |  0 |   0 |  3 |  0 |
-| apidiff on 087ec10 (AD-1, AD-2, CH-1)   |     3 |  0 |  0 |   2 |  1 |  0 |
-| Older numbered questions (uncited ids)  |    85 | 21 | 22 |  24 | 16 |  2 |
-| Unbound scenarios (bind rows, recount)  |    82 | 23 |  0 |  16 | 37 |  6 |
-| Leftover parts of partly cited ids      |     9 |  0 |  4 |   2 |  1 |  2 |
-| **All**                                 |   259 | 46 | 32 | 102 | 67 | 12 |
+| Group                                  | Total |   A |   B |   C |   D |   E |
+| -------------------------------------- | ----: | --: | --: | --: | --: | --: |
+| Upgrade UI (Q-U5 to Q-U11)             |     7 |   0 |   1 |   3 |   3 |   0 |
+| Legacy error body (LE-1 to LE-3)       |     3 |   1 |   0 |   2 |   0 |   0 |
+| Migrations blitz (held lines 45-91)    |    47 |   0 |   5 |  38 |   3 |   1 |
+| SDK paths (SDK-1, U2-*, Q-U2, S4)      |     6 |   1 |   0 |   1 |   3 |   1 |
+| Event upcaster and mig-ci              |    11 |   0 |   0 |  11 |   0 |   0 |
+| Peer cut T1                            |     1 |   0 |   0 |   1 |   0 |   0 |
+| apidiff (Q29, dataset records)         |     2 |   0 |   0 |   2 |   0 |   0 |
+| Main #8484 port (P8484-R1 to R3)       |     3 |   0 |   0 |   0 |   3 |   0 |
+| apidiff on 087ec10 (AD-1, AD-2, CH-1)  |     3 |   0 |   0 |   2 |   1 |   0 |
+| Older numbered questions (uncited ids) |    85 |  21 |  22 |  24 |  16 |   2 |
+| Unbound scenarios (bind rows, recount) |    82 |  23 |   0 |  16 |  37 |   6 |
+| Leftover parts of partly cited ids     |     9 |   0 |   4 |   2 |   1 |   2 |
+| **All**                                |   259 |  46 |  32 | 102 |  67 |  12 |
 
 The 67 D entries collapse into **28 questions in 7 rounds** (section 4): the 37 bind rows and five
 older ids that are the same rows go into four batch questions.
@@ -139,10 +139,12 @@ Leftover parts:
 Suggested AskUserQuestion item: header "Confirm all", question "Confirm the defaults below as taken (or proposed)?", options "Confirm all (Recommended)" / "Confirm all except the ids I name" / "Ask me per group".
 
 Upgrade UI and legacy body:
+
 - Q-U5 both rollback rules; Q-U10 no organization surface; Q-U11 required one-line step description (all built).
 - LE-1 root `error` only on published statuses; LE-3 other legacy shapes left until apidiff names a break.
 
 Migrations blitz (coordinator design; ADR-173, Proposed, adopts D1, D2, D8):
+
 - D1 one model keyed by step id; D2 presence; D4 child target table; D5 `withUpgradeGate` preamble; D6 lock-heavy guard and `lock_timeout`; D7 four CI gates; D8 contract waits for the floor on cloud; D9 manifests in `packages/upgrade/releases/`; D10 first floor = newest release at merge (3.20.1 today); D11 refuse a goose number main used.
 - Q-U8: `upgrade` registers declared steps; ops builds `UpgradeReader`; the record's "the runner belongs to ops" (ARCHITECTURE.md:1311) becomes "ops reads and requests; the framework runs".
 - mig-declare: checkpoint shape `{ resumeFrom, save }`; upcasts declared with `.withUpcasts` as `upcast:<pipeline>:<type>`; per-step rules refuse at boot, list rules at collection.
@@ -154,6 +156,7 @@ Migrations blitz (coordinator design; ADR-173, Proposed, adopts D1, D2, D8):
 - U3-a reuse `checkup_clickhouse_migrations_pending`, at most five ids; U3-b doctor runs `upgrade status`.
 
 Upcaster, CI, SDK, apidiff:
+
 - UP-1 kind `event-upcast` (the record already says so, ARCHITECTURE.md:1796); UP-2 id `upcast:<pipeline>:<type>`; _proposed_ UP-3 wired as Q-U8; _proposed_ UP-4 rewrite by re-inserting copies, originals deleted only at the floor; _proposed_ UP-5 a lint names drains older than one release (rulings:3, drift caught by lint).
 - mig-ci D7a advisory until a green month; D7b fail only drift a PR adds; D7c warn on a base without the live suite; D7d the N-1 and floor smokes as built; D11 refuse a main goose number; stamp without owners until D3 lands.
 - S4-TARGETS every ClickHouse target runs and a failed one fails the release (consistent with rulings:347 Q-U1 (a)).
@@ -162,6 +165,7 @@ Upcaster, CI, SDK, apidiff:
 - AD-1 accept `agents.testRun/testTurn` -> `scenarios.testAgent*` as an internal rename (d9936d6739); AD-2 live fixtures run `upgrade` once (3f5394a2b5).
 
 Older numbered:
+
 - 53 _proposed_ platform-health:95 blank key: tag @unimplemented (main has no such test; rulings:159 rule).
 - 54 `completeCode` keeps no userId (`modules/workflow/process/src/app/workflow.app.ts:1007`).
 - 55 _proposed_ move the two credential scenarios into auth's spec.
@@ -188,6 +192,7 @@ Older numbered:
 - 220 delete `BuiltInPullerRegistryService` and the uninstalled registry.
 
 Bind rows (all _proposed_ unless noted):
+
 - authz package-boundary:125 reword to "every process installs every module; api registers pipelines producer-only".
 - github-branch-maintenance:90 tag @unimplemented (main has no test; rulings:159 rule).
 - invitations:123 delete with the dead branch (= 68).
@@ -202,6 +207,7 @@ Bind rows (all _proposed_ unless noted):
 - shared-scope-host:82 reword to the no-false-completion half (the walker never claims completion while loading or failed).
 
 Leftover parts:
+
 - Q121 fix scim `copy-input.tsx:40`'s raw error toast and re-add the tree-wide guard.
 - Q166(1) _proposed_ 402 gets its own error type `payment_required` (today it reads `internal_error`).
 
