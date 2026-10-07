@@ -67,7 +67,7 @@
     - Instant Evals keeps its gateway dependency, and its run check keeps reading the gateway total. Its runs and judged queries record spend through the leaf instead of calling gateway. The leaf's total then counts runs, queries and judges against one $1. The new Instant Evals to leaf edge closes no loop, since the leaf calls nobody.
     - A run keeps today's rule: if its priced event cannot be stored, the recording fails and the run retries it.
     - Search-bar classification moves with the classifier client and stays unmetered (ADR-144).
-    - No opt-in check: the organization's Instant Evals opt-in gates only the trace explorer feature. An evaluator that names Instant Evals is the organization choosing it.
+    - The picker checks the opt-in. The judge call does not recheck it, since the $1 cap already guards spend.
 
 ## Constants
 
@@ -190,4 +190,4 @@ No database change. The score judge's settings gain an optional `min` and `max` 
   - Renumbered from 173, which the upgrades record already holds.
   - Instant Evals keeps its gateway dependency, since cutting an edge needs a ruling. Runs and judged queries record through the leaf instead (decision 13).
   - Gateway looks up the team itself. The leaf folds only project creation, since a move stays inside the organization (decision 13).
-  - The judge needs no opt-in check (decision 13). The spend row lag joins the overshoot (decision 8).
+  - The picker checks the opt-in and the judge call does not recheck it (decision 13). The spend row lag joins the overshoot (decision 8).
