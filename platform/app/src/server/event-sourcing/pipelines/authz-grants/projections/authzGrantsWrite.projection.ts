@@ -98,6 +98,16 @@ const authzGrantsEvents = [
   roleDeletedEventSchema,
 ] as const;
 
+/**
+ * The row's `condition`, present only when the event carried one, so a row
+ * without a condition has no such key at all rather than an undefined one.
+ */
+function conditionField(
+  condition: GrantAttachedEvent["data"]["condition"],
+): { condition: NonNullable<typeof condition> } | Record<string, never> {
+  return condition !== undefined ? { condition } : {};
+}
+
 export const AUTHZ_GRANTS_WRITE_PROJECTION_NAME = "authzGrantsWrite" as const;
 
 export class AuthzGrantsWriteProjection
@@ -147,7 +157,7 @@ export class AuthzGrantsWriteProjection
           ? new Date(data.resource.expiresAtMs)
           : null,
         maxViews: data.resource?.maxViews ?? null,
-        ...(data.condition !== undefined ? { condition: data.condition } : {}),
+        ...conditionField(data.condition),
         occurredAt: new Date(event.occurredAt),
       },
     };
