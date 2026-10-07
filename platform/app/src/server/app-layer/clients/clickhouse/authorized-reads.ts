@@ -373,9 +373,26 @@ type ScopedQueryParams<Format extends DataFormat = "JSON"> = Omit<
 > & { format?: Format };
 
 /**
+ * The reader could not get a ClickHouse client for the project it queries
+ * through, so no statement was sent. Told apart from a failed query so a
+ * caller that treats an unreachable store as "nothing to show" can do so
+ * without reaching for the client itself.
+ */
+export class ClickHouseClientUnavailableError extends Error {
+  constructor({ cause }: { cause: unknown }) {
+    super(
+      `ClickHouse client unavailable: ${cause instanceof Error ? cause.message : String(cause)}`,
+      { cause },
+    );
+    this.name = "ClickHouseClientUnavailableError";
+  }
+}
+
+/**
  * A reader bound to one fence. `query` expands the markers and sends the
  * statement through the own project's client; the result is the client's
- * own result set, so a repository's row mapping does not change.
+ * own result set, so a repository's row mapping does not change. A client
+ * that cannot be resolved surfaces as `ClickHouseClientUnavailableError`.
  */
 export class TenantScopedReader {
   constructor(
@@ -398,7 +415,9 @@ export class TenantScopedReader {
       queryParams: params.query_params ?? {},
       fence: this.deps.fence,
     });
-    const client = await this.deps.client();
+    const client = await this.deps.client().catch((cause: unknown) => {
+      throw new ClickHouseClientUnavailableError({ cause });
+    });
     return client.query({
       ...params,
       query: expanded.query,

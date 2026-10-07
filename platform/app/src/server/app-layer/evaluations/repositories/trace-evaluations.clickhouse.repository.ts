@@ -16,7 +16,7 @@ import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import {
   type AuthorizedClickHouse,
-  ownProjectIdOf,
+  ClickHouseClientUnavailableError,
   tenantScope,
   tenantScopeKey,
 } from "~/server/app-layer/clients/clickhouse/authorized-reads";
@@ -235,9 +235,6 @@ export class TraceEvaluationsClickHouseRepository
   }: FindInputsByEvaluationIdInput): Promise<EvaluationInputsRead | null> {
     try {
       const reader = this.clickhouse.as(authorization, { reads: "traces" });
-      if (!(await this.#clientResolves({ authorization, evaluationId }))) {
-        return null;
-      }
       const result = await reader.query({
         query: `
           SELECT TenantId, argMax(Inputs, UpdatedAt) AS Inputs
@@ -262,6 +259,17 @@ export class TraceEvaluationsClickHouseRepository
         inputs: asPlainObject(safeJsonParse(row.Inputs ?? null)),
       };
     } catch (error) {
+      if (error instanceof ClickHouseClientUnavailableError) {
+        logger.warn(
+          {
+            evaluationId,
+            scope: tenantScopeKey({ authorization, reads: "traces" }),
+            error: error.message,
+          },
+          "ClickHouse client unavailable for evaluation inputs read",
+        );
+        return null;
+      }
       if (isMemoryLimitError(error)) {
         logger.warn(
           { evaluationId },
@@ -277,34 +285,6 @@ export class TraceEvaluationsClickHouseRepository
         "Failed to fetch evaluation inputs from ClickHouse",
       );
       throw new Error("Failed to fetch evaluation inputs");
-    }
-  }
-
-  /**
-   * An unreachable ClickHouse means "nothing to show" for the inputs read,
-   * not a failure worth surfacing: the caller renders an empty inputs panel.
-   * Resolves the client of the project the reader queries through, ahead of
-   * the query, so a failed lookup is told apart from a failed query.
-   */
-  async #clientResolves({
-    authorization,
-    evaluationId,
-  }: FindInputsByEvaluationIdInput): Promise<boolean> {
-    try {
-      await this.resolveClient(
-        ownProjectIdOf({ authorization, reads: "traces" }),
-      );
-      return true;
-    } catch (error) {
-      logger.warn(
-        {
-          evaluationId,
-          scope: tenantScopeKey({ authorization, reads: "traces" }),
-          error: error instanceof Error ? error.message : error,
-        },
-        "ClickHouse client unavailable for evaluation inputs read",
-      );
-      return false;
     }
   }
 
