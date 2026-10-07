@@ -71,7 +71,6 @@ const renderDraftLens = () => {
   store.setUserLenses([USER_LENS]);
   store.selectLens(USER_LENS.id);
   useExplorerStore.getState().setGrouping("by-service");
-  expect(useExplorerStore.getState().isDraft(USER_LENS.id)).toBe(true);
 
   return render(
     <ChakraProvider value={defaultSystem}>
@@ -131,7 +130,9 @@ describe("Lens save controls", () => {
 
         renderDraftLens();
         await openDraftDot();
-        fireEvent.click(screen.getByRole("button", { name: "Save as new lens" }));
+        fireEvent.click(
+          screen.getByRole("button", { name: "Save as new lens" }),
+        );
         const nameInput = await screen.findByPlaceholderText("Lens name");
         fireEvent.change(nameInput, { target: { value: "Grouped answers" } });
         fireEvent.keyDown(nameInput, { key: "Enter" });
@@ -180,8 +181,11 @@ describe("Lens save controls", () => {
           screen.queryByRole("button", { name: "Save as new lens" }),
         ).toBeNull();
         expect(screen.queryByText("Save changes as new lens")).toBeNull();
+        expect(useExplorerStore.getState().isDraft(USER_LENS.id)).toBe(true);
 
-        fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+        fireEvent.click(
+          screen.getByRole("button", { name: "Discard changes" }),
+        );
 
         expect(useExplorerStore.getState().isDraft(USER_LENS.id)).toBe(false);
       });
