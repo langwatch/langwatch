@@ -20,6 +20,7 @@ import {
   namedTenantAuthorization,
   spanReadHintShape,
   traceDetailAuthorization,
+  traceTenantShape,
 } from "../trace-detail-authorization";
 import { getUserProtectionsForProject } from "../utils";
 import { getAllForProjectInput, tracesFilterInput } from "./traces.schemas";
@@ -116,7 +117,7 @@ export const tracesRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         evaluationId: z.string(),
-        tenantId: spanReadHintShape.tenantId,
+        ...traceTenantShape,
       }),
     )
     .permission("traces:view")

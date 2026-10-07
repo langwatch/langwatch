@@ -109,6 +109,7 @@ import {
   occurredAtFromInput,
   spanReadHintShape,
   traceDetailAuthorization,
+  traceTenantShape,
 } from "../trace-detail-authorization";
 import { getUserProtectionsForProject } from "../utils";
 import {
@@ -134,16 +135,6 @@ import { spanTreeCursorSchema } from "./tracesV2.schemas";
 // ---------------------------------------------------------------------------
 // Shared input fragments
 // ---------------------------------------------------------------------------
-
-/**
- * The project that owns the trace a detail read is for, as the list row or
- * the header named it (ADR-144 block F). Spread into every per-trace input.
- * Optional: a plain project's reads never need it, and an aggregate's reads
- * fall back to the member the summary read finds.
- */
-const traceTenantShape = {
-  tenantId: z.string().min(1).optional(),
-} as const;
 
 /**
  * The Instant Eval runs the Explorer registered for the query's `eval`
