@@ -2,6 +2,7 @@ import { Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { api } from "~/utils/api";
+import { useTraceQueryArgs } from "../../../hooks/useTraceQueryArgs";
 import { TERMINAL_TOKENS } from "./palette";
 import { deriveSessionBanner } from "./sessionBanner";
 import { TerminalSkeleton } from "./TerminalSkeleton";
@@ -52,26 +53,36 @@ export function TerminalTab({
   sessionName,
   conversationId,
 }: TerminalTabProps) {
-  const transcriptQuery = api.tracesV2.codingAgentTranscript.useQuery(
-    { projectId, traceId, occurredAtMs },
-    { refetchOnWindowFocus: false, staleTime: 60_000 },
-  );
+  // On an aggregate every read names the member the drawer is on, so the
+  // transcript, its tools and the banner come from the same member as the
+  // header (ADR-144 block F).
+  const { tenantId } = useTraceQueryArgs();
+  const input = {
+    projectId,
+    traceId,
+    occurredAtMs,
+    ...(tenantId !== null ? { tenantId } : {}),
+  };
+  const transcriptQuery = api.tracesV2.codingAgentTranscript.useQuery(input, {
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+  });
 
-  const spansQuery = api.tracesV2.spansFull.useQuery(
-    { projectId, traceId, occurredAtMs },
-    { refetchOnWindowFocus: false, staleTime: 60_000 },
-  );
-  const eventsQuery = api.tracesV2.traceEvents.useQuery(
-    { projectId, traceId, occurredAtMs },
-    { refetchOnWindowFocus: false, staleTime: 60_000 },
-  );
+  const spansQuery = api.tracesV2.spansFull.useQuery(input, {
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+  });
+  const eventsQuery = api.tracesV2.traceEvents.useQuery(input, {
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+  });
   // The version/model/repo Claude Code itself would print above the prompt,
   // off the resource attributes (the session fold deliberately carries no
   // identity strings, ADR-041).
-  const resourceQuery = api.tracesV2.resourceInfo.useQuery(
-    { projectId, traceId, occurredAtMs },
-    { refetchOnWindowFocus: false, staleTime: 60_000 },
-  );
+  const resourceQuery = api.tracesV2.resourceInfo.useQuery(input, {
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+  });
   const sessionCostUsd = useSessionCostUsd({ projectId, traceId });
 
   const toolSpans = useMemo(

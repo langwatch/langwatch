@@ -17,6 +17,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { formatDuration } from "~/shared/format/time";
 import { api } from "~/utils/api";
 import { formatCost, formatTokens, STATUS_COLORS } from "../utils/formatters";
+import { memberTenantOf, traceDrawerParams } from "../utils/traceDrawerParams";
 
 interface TracePreviewHoverCardProps {
   traceId: string;
@@ -30,6 +31,13 @@ interface TracePreviewHoverCardProps {
    * omitted the popover falls back to the unconstrained by-id fetch.
    */
   occurredAtMs?: number;
+  /**
+   * The project that owns the trace, from the surrounding row. On an
+   * aggregate it is a member (ADR-144 block F), and the peek and the drawer
+   * it opens read that member; on a plain project it is the project itself
+   * and changes nothing.
+   */
+  ownerProjectId?: string;
   /**
    * Defaults to "bottom-start" — sits below the trigger and aligns to
    * its leading edge. Override when the trigger is on the far right of
@@ -54,6 +62,7 @@ export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
   traceId,
   children,
   occurredAtMs,
+  ownerProjectId,
   placement = "bottom-start",
 }) => {
   const [hasHovered, setHasHovered] = useState(false);
@@ -84,6 +93,7 @@ export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
               <PeekPopoverContent
                 traceId={traceId}
                 occurredAtMs={occurredAtMs}
+                ownerProjectId={ownerProjectId}
               />
             )}
           </HoverCard.Content>
@@ -101,6 +111,13 @@ interface TraceIdPeekProps {
    * See {@link TracePreviewHoverCardProps.occurredAtMs}.
    */
   occurredAtMs?: number;
+  /**
+   * The project that owns the trace, from the surrounding row. On an
+   * aggregate it is a member (ADR-144 block F), and the peek and the drawer
+   * it opens read that member; on a plain project it is the project itself
+   * and changes nothing.
+   */
+  ownerProjectId?: string;
 }
 
 /**
@@ -115,22 +132,35 @@ interface TraceIdPeekProps {
 export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({
   traceId,
   occurredAtMs,
+  ownerProjectId,
 }) => {
   const { openDrawer } = useDrawer();
+  const { project } = useOrganizationTeamProject();
 
   const handleOpenDrawer = (e: React.MouseEvent) => {
     e.stopPropagation();
     // Forward the timestamp as the drawer's `t` partition hint so the
     // opened drawer's per-trace reads prune partitions instead of
     // walking every weekly partition by id.
-    openDrawer("traceV2Details", {
-      traceId,
-      ...(occurredAtMs !== undefined ? { t: String(occurredAtMs) } : {}),
-    });
+    openDrawer(
+      "traceV2Details",
+      traceDrawerParams({
+        traceId,
+        occurredAtMs,
+        tenantId: memberTenantOf({
+          ownerProjectId,
+          projectId: project?.id,
+        }),
+      }),
+    );
   };
 
   return (
-    <TracePreviewHoverCard traceId={traceId} occurredAtMs={occurredAtMs}>
+    <TracePreviewHoverCard
+      traceId={traceId}
+      occurredAtMs={occurredAtMs}
+      ownerProjectId={ownerProjectId}
+    >
       <Box
         as="button"
         onClick={handleOpenDrawer}
@@ -156,17 +186,21 @@ export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({
 function PeekPopoverContent({
   traceId,
   occurredAtMs,
+  ownerProjectId,
 }: {
   traceId: string;
   occurredAtMs?: number;
+  ownerProjectId?: string;
 }) {
   const { project } = useOrganizationTeamProject();
+  const tenantId = memberTenantOf({ ownerProjectId, projectId: project?.id });
 
   const { data: trace, isLoading } = api.tracesV2.header.useQuery(
     {
       projectId: project?.id ?? "",
       traceId,
       ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
+      ...(tenantId !== null ? { tenantId } : {}),
       // The popover only ever shows a 2-line clamp of input/output — never
       // worth the extra spans read full resolution costs.
       full: false,

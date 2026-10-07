@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { api } from "~/utils/api";
+import { useTraceQueryArgs } from "../../../hooks/useTraceQueryArgs";
 import {
   type ConversationTurn,
   useConversationContext,
@@ -82,16 +83,20 @@ export interface SessionScrollback {
 async function readTurn({
   utils,
   projectId,
+  tenantId,
   target,
 }: {
   utils: ReturnType<typeof api.useUtils>;
   projectId: string;
+  /** The member the drawer is on, on an aggregate; its session's turns. */
+  tenantId: string | null;
   target: TurnTarget;
 }): Promise<LoadedTurn> {
   const input = {
     projectId,
     traceId: target.traceId,
     occurredAtMs: target.timestamp,
+    ...(tenantId !== null ? { tenantId } : {}),
   };
   const [transcript, spans, events] = await Promise.all([
     utils.tracesV2.codingAgentTranscript.fetch(input, EARLIER_TURN_FETCH),
@@ -169,6 +174,7 @@ function deriveStatus({
 async function loadTurnIntoLedger({
   utils,
   projectId,
+  tenantId,
   target,
   key,
   epoch,
@@ -177,6 +183,7 @@ async function loadTurnIntoLedger({
 }: {
   utils: ReturnType<typeof api.useUtils>;
   projectId: string;
+  tenantId: string | null;
   target: TurnTarget;
   key: string;
   epoch: number;
@@ -184,7 +191,7 @@ async function loadTurnIntoLedger({
   setLedger: (update: (prev: Ledger) => Ledger) => void;
 }): Promise<void> {
   try {
-    const loaded = await readTurn({ utils, projectId, target });
+    const loaded = await readTurn({ utils, projectId, tenantId, target });
     if (epochRef.current !== epoch) return;
     setLedger((prev) => ({
       key,
@@ -209,9 +216,11 @@ async function loadTurnIntoLedger({
 function useTurnLedger({
   key,
   projectId,
+  tenantId,
 }: {
   key: string;
   projectId: string;
+  tenantId: string | null;
 }): { current: Ledger; loadTurn: (target: TurnTarget) => void } {
   const utils = api.useUtils();
   const [ledger, setLedger] = useState<Ledger>(() => ({
@@ -248,6 +257,7 @@ function useTurnLedger({
       void loadTurnIntoLedger({
         utils,
         projectId,
+        tenantId,
         target,
         key,
         epoch,
@@ -257,7 +267,7 @@ function useTurnLedger({
         inFlightRef.current = false;
       });
     },
-    [utils, key, projectId],
+    [utils, key, projectId, tenantId],
   );
 
   return { current, loadTurn };
@@ -428,8 +438,9 @@ export function useSessionScrollback({
     conversationId,
     traceId,
   );
-  const key = `${projectId}|${traceId}|${conversationId ?? ""}`;
-  const { current, loadTurn } = useTurnLedger({ key, projectId });
+  const { tenantId } = useTraceQueryArgs();
+  const key = `${projectId}|${traceId}|${conversationId ?? ""}${tenantId !== null ? `|${tenantId}` : ""}`;
+  const { current, loadTurn } = useTurnLedger({ key, projectId, tenantId });
 
   const { openedIndex, hasSession, oldestLoadedIndex } = useSessionPosition({
     turns,

@@ -26,7 +26,7 @@ export type DrawerTab = "span";
 
 type AccordionSection = "events" | "evals" | "conversation";
 
-interface TraceHistoryEntry {
+export interface TraceHistoryEntry {
   traceId: string;
   viewMode: DrawerViewMode;
   /**
@@ -36,6 +36,11 @@ interface TraceHistoryEntry {
    * back loses the hint and re-opens the drawer on a cold partition scan.
    */
   occurredAtMs?: number;
+  /**
+   * The member that owns the trace, on an aggregate, so going back reopens
+   * the same member's trace rather than whichever member sorts first.
+   */
+  tenantId?: string;
 }
 
 /**
@@ -269,6 +274,7 @@ export interface OpenTraceOptions {
 interface InitialFromURL extends DrawerUrlState {
   traceId: string | null;
   projectId: string | null;
+  tenantId: string | null;
   occurredAtMs: number | null;
   isOpen: boolean;
 }
@@ -362,6 +368,7 @@ function readInitialFromURL(): InitialFromURL {
   const fallback: InitialFromURL = {
     traceId: null,
     projectId: null,
+    tenantId: null,
     occurredAtMs: null,
     selectedSpanId: null,
     // Summary is the friendlier landing tab for users who haven't
@@ -381,6 +388,9 @@ function readInitialFromURL(): InitialFromURL {
     const isOpen = params.get("drawer.open") === "traceV2Details";
     const traceId = params.get("drawer.traceId");
     const projectId = params.get("drawer.projectId");
+    // Written only when the trace's member is not the drawer's project, so a
+    // reload of an aggregate's drawer reopens the member it was on.
+    const tenantId = params.get("drawer.tenantId") || null;
     const tRaw = params.get("drawer.t");
     const t = tRaw ? Number(tRaw) : NaN;
     const occurredAtMs = Number.isFinite(t) && t > 0 ? t : null;
@@ -408,6 +418,7 @@ function readInitialFromURL(): InitialFromURL {
     return {
       traceId,
       projectId,
+      tenantId,
       occurredAtMs,
       selectedSpanId,
       viewMode: viewModeForEditState({ viewMode, isEditing }),
@@ -631,7 +642,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   paneState: readPaneStateFromStorage(),
   traceId: initial.traceId,
   projectId: initial.projectId,
-  tenantId: null,
+  tenantId: initial.tenantId,
   occurredAtMs: initial.occurredAtMs,
   expectedSpanCount: null,
   selectedSpanId: initial.selectedSpanId,
