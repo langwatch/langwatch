@@ -82,7 +82,7 @@ export class ProjectCreatedNoticeService {
     } catch (error) {
       this.dependencies.logger.error(
         { projectId: input.projectId, error },
-        "recording the new project failed; the next deploy's key-map backfill writes its row",
+        "recording the new project failed; re-run the backfill-project-created task to record it",
       );
     }
   }

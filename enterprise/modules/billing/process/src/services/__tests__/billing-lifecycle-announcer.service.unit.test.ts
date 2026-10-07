@@ -5,13 +5,15 @@
  * @see specs/analytics/posthog-campaign-conversion.feature
  */
 import type { EventingCommandSender } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
   RecordCheckoutCompletedCommandData,
   RecordSubscriptionChangedCommandData,
   RecordSubscriptionStartedCommandData,
+  RecordUsageBillingChangedCommandData,
 } from "../../eventing/billing-lifecycle.events.ts";
+import type { BillingReportOrganizationLookup } from "../../repositories/billing-report-organization.repository.ts";
 import { BillingLifecycleAnnouncerService } from "../billing-lifecycle-announcer.service.ts";
 
 function recorder<Payload>(sent: Payload[]): EventingCommandSender<Payload> {
@@ -27,22 +29,40 @@ function recorder<Payload>(sent: Payload[]): EventingCommandSender<Payload> {
   };
 }
 
-function announcerOver(input: { remaining: boolean }) {
+const billedLookup: BillingReportOrganizationLookup = {
+  outcome: "usage_billed",
+  organization: {
+    id: "org-1",
+    stripeCustomerId: "cus_1",
+    subscriptions: [{ id: "sub-1" }],
+    contract: "cloud",
+  },
+};
+
+function announcerOver(input: {
+  remaining: boolean;
+  lookup?: () => Promise<BillingReportOrganizationLookup>;
+}) {
   const changed: RecordSubscriptionChangedCommandData[] = [];
   const started: RecordSubscriptionStartedCommandData[] = [];
   const checkouts: RecordCheckoutCompletedCommandData[] = [];
+  const usageBilling: RecordUsageBillingChangedCommandData[] = [];
   const service = BillingLifecycleAnnouncerService.create({
     subscriptions: { findLastNonCancelled: async () => (input.remaining ? { id: "sub-2" } : null) },
     organizations: { getAllMembers: async () => [{ id: "user-1" }, { id: "user-2" }] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },
+    billingOrganizations: {
+      getOrganizationForBilling: input.lookup ?? (async () => billedLookup),
+    },
   });
   service.connect({
     recordSubscriptionChanged: recorder(changed),
     recordSubscriptionStarted: recorder(started),
     recordCheckoutCompleted: recorder(checkouts),
+    recordUsageBillingChanged: recorder(usageBilling),
   });
-  return { service, changed, started, checkouts };
+  return { service, changed, started, checkouts, usageBilling };
 }
 
 const activation = { organizationId: "org-1", subscriptionId: "sub-1", plan: "LAUNCH" };
@@ -128,11 +148,13 @@ describe("BillingLifecycleAnnouncerService", () => {
       },
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
       planLimitAlerts: { notifyPlanLimitReached: async () => {} },
+      billingOrganizations: { getOrganizationForBilling: async () => billedLookup },
     });
     service.connect({
       recordSubscriptionChanged: recorder(changed),
       recordSubscriptionStarted: recorder(started),
       recordCheckoutCompleted: recorder<RecordCheckoutCompletedCommandData>([]),
+      recordUsageBillingChanged: recorder<RecordUsageBillingChangedCommandData>([]),
     });
 
     await expect(service.subscriptionActivated(activation)).resolves.toBeUndefined();
@@ -146,8 +168,72 @@ describe("BillingLifecycleAnnouncerService", () => {
       organizations: { getAllMembers: async () => [] },
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
       planLimitAlerts: { notifyPlanLimitReached: async () => {} },
+      billingOrganizations: { getOrganizationForBilling: async () => billedLookup },
     });
 
     await expect(service.subscriptionActivated(activation)).resolves.toBeUndefined();
+  });
+
+  describe("the usage-billing fact", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("records the meter's answer as a real fact after an activation", async () => {
+      const { service, usageBilling } = announcerOver({ remaining: false });
+
+      await service.subscriptionActivated(activation);
+
+      expect(usageBilling).toEqual([
+        expect.objectContaining({
+          tenantId: "org-1",
+          organizationId: "org-1",
+          usageBilled: true,
+          fromCatchUp: false,
+        }),
+      ]);
+    });
+
+    it("records the answer billing reads after a cancellation", async () => {
+      const { service, usageBilling } = announcerOver({
+        remaining: false,
+        lookup: async () => ({ outcome: "not_usage_billed" }),
+      });
+
+      await service.subscriptionCancelled({ organizationId: "org-1" });
+
+      expect(usageBilling).toEqual([
+        expect.objectContaining({ organizationId: "org-1", usageBilled: false }),
+      ]);
+    });
+
+    it("stamps the fact before reading billing, never after", async () => {
+      vi.useFakeTimers({ now: 1_000 });
+      const { service, usageBilling } = announcerOver({
+        remaining: false,
+        lookup: async () => {
+          vi.setSystemTime(5_000);
+          return billedLookup;
+        },
+      });
+
+      await service.usageBillingChanged({ organizationId: "org-1" });
+
+      expect(usageBilling[0]?.occurredAt).toBe(1_000);
+    });
+
+    it("never throws when billing cannot be read", async () => {
+      const { service, usageBilling } = announcerOver({
+        remaining: false,
+        lookup: async () => {
+          throw new Error("database down");
+        },
+      });
+
+      await expect(
+        service.usageBillingChanged({ organizationId: "org-1" }),
+      ).resolves.toBeUndefined();
+      expect(usageBilling).toEqual([]);
+    });
   });
 });

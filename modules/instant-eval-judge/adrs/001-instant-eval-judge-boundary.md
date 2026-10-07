@@ -27,9 +27,13 @@ reasons, the classifier limits, `INSTANT_EVAL_PRICING`, `instantEvalCostUsd` and
 `instantEvalPriceUsd`. `InstantEvalJudgeApi` is declared with no methods yet. The judge method lands
 on it later (ADR-174 decision 10). There is no transport.
 
+`@langwatch/instant-eval-judge-process` exports the process module only.
+
 ## Dependencies
 
-None. The contract depends on `zod` only, and the module names no peer `*Api`.
+No peer `*Api`. The contract depends on `zod` only. The process half reads two peers' event
+contracts, never their Apis: project's `lw.project.created` and billing's
+`lw.billing.usage_billing_changed`. A peer subscriber is not a dependency edge.
 
 ## Persistence
 
@@ -42,11 +46,23 @@ Schema). Each is the leaf's own copy of a fact; none has a relation or foreign k
 - `InstantEvalJudgeSpend`, keyed by `organizationId` and `requestId`: one judge request's spend in
   nano USD. The organization's total is the sum of its rows.
 
-The repositories that claim them land with the folds (ADR-174 decision 13).
+One Prisma repository claims each table, with an in-memory twin. Every query names the project or
+the organization. Each write is safe to repeat, since a peer event is delivered at least once:
+
+- The project row is written once and never changed, since a project never leaves its organization.
+- The billing row keeps the newest stamp, and a real fact wins a tie over a catch-up
+  (`usageBillingFactWins`, ADR-174 decision 17). The Postgres update states the same rule in SQL, so
+  two folds racing on one row cannot both land.
+- A spend row is never rewritten. A request that already has one keeps it.
 
 ## Runtime and registration
 
-None yet: there is no process package, so nothing is installed.
+`defineProcessModule("instant-eval-judge")` with its repositories, `InstantEvalJudgeModule` as its
+Api and one eventing module. Installed by api, worker and tasks from each app's generated list.
+
+The pipeline `instant_eval_judge_facts` (aggregate `global`) appends no events. Its two peer
+subscribers fold project's created fact and billing's usage-billing fact into the tables above. The
+spend rows have no event source yet. The judge's priced event lands with the judge method.
 
 ## Environment and configuration
 
@@ -59,6 +75,8 @@ None yet. The judge's refusal codes are listed in ADR-174 decision 7.
 ## Contracts and validation
 
 The question schemas are Zod. The scenarios under `specs/` are bound by the contract's unit tests.
+The process half binds the fold scenarios of Instant Evals' judge model spec. Its repository
+contract test runs every case against memory and Postgres.
 
 ## Consequences
 

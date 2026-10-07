@@ -4,9 +4,11 @@ import {
   CHECKOUT_COMPLETED_EVENT_TYPE,
   SUBSCRIPTION_CHANGED_EVENT_TYPE,
   SUBSCRIPTION_STARTED_EVENT_TYPE,
+  USAGE_BILLING_CHANGED_EVENT_TYPE,
   checkoutCompletedEventDataSchema,
   subscriptionChangedEventDataSchema,
   subscriptionStartedEventDataSchema,
+  usageBillingChangedEventDataSchema,
 } from "@langwatch/enterprise-billing-contract";
 import { EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
@@ -17,6 +19,8 @@ export const RECORD_SUBSCRIPTION_STARTED_COMMAND_TYPE =
   "lw.billing.record_subscription_started" as const;
 export const RECORD_CHECKOUT_COMPLETED_COMMAND_TYPE =
   "lw.billing.record_checkout_completed" as const;
+export const RECORD_USAGE_BILLING_CHANGED_COMMAND_TYPE =
+  "lw.billing.record_usage_billing_changed" as const;
 
 export const recordSubscriptionChangedCommandDataSchema = subscriptionChangedEventDataSchema;
 export type RecordSubscriptionChangedCommandData = z.infer<
@@ -29,6 +33,11 @@ export type RecordSubscriptionStartedCommandData = z.infer<
 export const recordCheckoutCompletedCommandDataSchema = checkoutCompletedEventDataSchema;
 export type RecordCheckoutCompletedCommandData = z.infer<
   typeof recordCheckoutCompletedCommandDataSchema
+>;
+
+export const recordUsageBillingChangedCommandDataSchema = usageBillingChangedEventDataSchema;
+export type RecordUsageBillingChangedCommandData = z.infer<
+  typeof recordUsageBillingChangedCommandDataSchema
 >;
 
 export const subscriptionChangedEventSchema = z.object({
@@ -55,7 +64,16 @@ export const checkoutCompletedEventSchema = z.object({
 });
 export type CheckoutCompletedEvent = z.infer<typeof checkoutCompletedEventSchema>;
 
+export const usageBillingChangedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(USAGE_BILLING_CHANGED_EVENT_TYPE),
+  version: z.literal(BILLING_LIFECYCLE_EVENT_VERSION),
+  data: usageBillingChangedEventDataSchema,
+});
+export type UsageBillingChangedEvent = z.infer<typeof usageBillingChangedEventSchema>;
+
 export type BillingLifecycleEvent =
   | SubscriptionChangedEvent
   | SubscriptionStartedEvent
-  | CheckoutCompletedEvent;
+  | CheckoutCompletedEvent
+  | UsageBillingChangedEvent;

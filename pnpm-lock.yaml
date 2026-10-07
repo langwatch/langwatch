@@ -1012,6 +1012,9 @@ importers:
       '@langwatch/identity-process':
         specifier: workspace:*
         version: link:../../modules/identity/process
+      '@langwatch/instant-eval-judge-process':
+        specifier: workspace:*
+        version: link:../../modules/instant-eval-judge/process
       '@langwatch/instant-eval-process':
         specifier: workspace:*
         version: link:../../modules/instant-eval/process
@@ -1839,6 +1842,9 @@ importers:
       '@langwatch/identity-process':
         specifier: workspace:*
         version: link:../../modules/identity/process
+      '@langwatch/instant-eval-judge-process':
+        specifier: workspace:*
+        version: link:../../modules/instant-eval-judge/process
       '@langwatch/instant-eval-process':
         specifier: workspace:*
         version: link:../../modules/instant-eval/process
@@ -2598,6 +2604,9 @@ importers:
       '@langwatch/identity-process':
         specifier: workspace:*
         version: link:../../modules/identity/process
+      '@langwatch/instant-eval-judge-process':
+        specifier: workspace:*
+        version: link:../../modules/instant-eval-judge/process
       '@langwatch/instant-eval-process':
         specifier: workspace:*
         version: link:../../modules/instant-eval/process
@@ -9687,6 +9696,49 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/instant-eval-judge/process:
+    dependencies:
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
+    devDependencies:
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../packages/observability
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
 
   modules/instant-eval/contract:
     dependencies:

@@ -7,6 +7,7 @@ export const BILLING_LIFECYCLE_AGGREGATE_TYPE = "billing_lifecycle" as const;
 export const SUBSCRIPTION_CHANGED_EVENT_TYPE = "lw.billing.subscription_changed" as const;
 export const SUBSCRIPTION_STARTED_EVENT_TYPE = "lw.billing.subscription_started" as const;
 export const CHECKOUT_COMPLETED_EVENT_TYPE = "lw.billing.checkout_completed" as const;
+export const USAGE_BILLING_CHANGED_EVENT_TYPE = "lw.billing.usage_billing_changed" as const;
 export const BILLING_LIFECYCLE_EVENT_VERSION = "2026-09-30" as const;
 
 /** An organization gained or lost its subscription, with the members who carry the fact. */
@@ -40,3 +41,17 @@ export const checkoutCompletedEventDataSchema = z.object({
   checkoutCreatedAt: z.string().min(1),
 });
 export type CheckoutCompletedEventData = z.infer<typeof checkoutCompletedEventDataSchema>;
+
+/**
+ * Whether the meter bills an organization, as billing read it (ADR-174 decisions 12, 17). A real
+ * fact is stamped after the write that changed the answer committed; a catch-up fact is stamped
+ * when it read billing. Folders keep the newest stamp, and a real fact wins a tie.
+ */
+export const usageBillingChangedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+  usageBilled: z.boolean(),
+  fromCatchUp: z.boolean(),
+});
+export type UsageBillingChangedEventData = z.infer<typeof usageBillingChangedEventDataSchema>;

@@ -407,7 +407,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
 
   Rule: Billing says which organizations the meter bills
 
-    @unit @unimplemented
+    @unit
     Scenario Outline: The meter's own rule answers whether an organization is usage billed
       Given an organization <state>
       When billing is asked whether the meter bills it
@@ -432,13 +432,13 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the judge knows each project's organization
       And each project appears once
 
-    @unit @unimplemented
+    @unit
     Scenario: A failed project created fact logs the catch-up that recovers it
       Given recording a new project's created fact fails
       When the failure is logged
       Then the log names the backfill-project-created catch-up
 
-    @unit @unimplemented
+    @unit
     Scenario: A repeated project created fact leaves one judge row
       Given the judge already holds a project
       When the same project created fact is folded again
@@ -452,13 +452,13 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the judge reads the first as usage billed and the second as not
       And the judge holds one billing row for each
 
-    @integration @unimplemented
+    @integration
     Scenario: A billing change after the catch-up is kept
       Given the usage-billing catch-up marked an organization usage billed
       When billing later reports it is no longer usage billed
       Then the judge reads it as not usage billed
 
-    @integration @unimplemented
+    @integration
     Scenario Outline: A catch-up read before a billing change never overrides it
       Given billing stopped billing an organization and stamped that fact after saving it
       And the usage-billing catch-up read billing <read> that change

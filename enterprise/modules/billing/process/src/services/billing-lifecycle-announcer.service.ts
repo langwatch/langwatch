@@ -8,6 +8,8 @@ import {
   type BillingLifecyclePipeline,
   type BuildBillingLifecyclePipelineInput,
 } from "../eventing/billing-lifecycle.pipeline.ts";
+import type { BillingReportOrganizationRepository } from "../repositories/billing-report-organization.repository.ts";
+import { usageBilledOf } from "../rules/usage-billed.rules.ts";
 
 const logger = createLogger("langwatch:billing:lifecycle");
 
@@ -22,6 +24,8 @@ type BillingLifecycleAnnouncerDeps = Readonly<{
   resourceLimitAlerts: BuildBillingLifecyclePipelineInput["alerts"];
   /** The ops alert usage's limit-reached fact ends in, subscribed on the same pipeline. */
   planLimitAlerts: BuildBillingLifecyclePipelineInput["planLimitAlerts"];
+  /** The meter's own read of an organization, uncached, for the usage-billing fact. */
+  billingOrganizations: Pick<BillingReportOrganizationRepository, "getOrganizationForBilling">;
 }>;
 
 /**
@@ -60,6 +64,7 @@ export class BillingLifecycleAnnouncerService {
       organizationId,
       hasSubscription: () => Promise.resolve(true),
     });
+    await this.usageBillingChanged({ organizationId });
     await this.#record(organizationId, async (commands) => {
       const members = await this.deps.organizations.getAllMembers({ organizationId });
       await commands.recordSubscriptionStarted.send({
@@ -72,11 +77,31 @@ export class BillingLifecycleAnnouncerService {
   }
 
   /** Whether the organization still holds another live subscription is read after the cancel. */
-  subscriptionCancelled(input: { organizationId: string }): Promise<void> {
-    return this.#subscriptionChanged({
+  async subscriptionCancelled(input: { organizationId: string }): Promise<void> {
+    await this.#subscriptionChanged({
       ...input,
       hasSubscription: async () =>
         (await this.deps.subscriptions.findLastNonCancelled(input.organizationId)) != null,
+    });
+    await this.usageBillingChanged(input);
+  }
+
+  /**
+   * Records whether the meter bills the organization, after a write that may change it committed.
+   * Stamped before billing is read, so a fact never carries a newer stamp than the answer it
+   * read: a later change's fact always out-stamps it (ADR-174 decision 17).
+   */
+  async usageBillingChanged({ organizationId }: { organizationId: string }): Promise<void> {
+    await this.#record(organizationId, async (commands) => {
+      const occurredAt = nowInstant().epochMilliseconds;
+      const lookup = await this.deps.billingOrganizations.getOrganizationForBilling(organizationId);
+      await commands.recordUsageBillingChanged.send({
+        tenantId: organizationId,
+        occurredAt,
+        organizationId,
+        usageBilled: usageBilledOf({ lookup }).usageBilled,
+        fromCatchUp: false,
+      });
     });
   }
 

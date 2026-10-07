@@ -261,6 +261,7 @@ export class BillingModule
           organizations: setup.dependencies.organizations,
           resourceLimitAlerts,
           planLimitAlerts: BillingModule.#composePlanLimitAlerts(setup, notices),
+          billingOrganizations: setup.repositories.reportOrganizations,
         }),
         webhook: {
           host: billingWebhookHostChannels.slack.create({ notices }),
@@ -931,6 +932,8 @@ export class BillingModule
       termEndsAt: Temporal.Instant.from(input.termEndsAt),
       operatorId: staff.id,
     });
+    // Onboarding opens the account and its usage subscription, which the meter's rule reads.
+    await this.#lifecycle?.usageBillingChanged({ organizationId: input.organizationId });
     await this.#record({
       staff,
       action: "connectedBilling.onboard",
