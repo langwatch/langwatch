@@ -9,6 +9,7 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { describe, expect, it } from "vitest";
 import {
+  AGGREGATE_ARCHIVED,
   AGGREGATE_RECONCILE_SWEEP,
   AGGREGATE_RULE_NO_LONGER_MATCHES,
   AggregateReconciler,
@@ -96,7 +97,9 @@ function inMemoryLedger(
       const out = rows.filter(
         (row) =>
           row.readerProjectId === readerProjectId &&
-          (memberProjectIds ?? []).includes(row.memberProjectId),
+          // Absent means every member, as the ledger reads it.
+          (memberProjectIds === undefined ||
+            memberProjectIds.includes(row.memberProjectId)),
       );
       for (const row of out) {
         rows.splice(rows.indexOf(row), 1);
@@ -551,6 +554,44 @@ describe("AggregateReconciler", () => {
         });
 
         expect(upserts).toEqual([]);
+      });
+    });
+  });
+
+  describe("given an archived aggregate that still holds shared reads", () => {
+    describe("when it is retired", () => {
+      it("switches its sweep off and revokes every read with the archived reason", async () => {
+        const { ledger, rows, revoked } = inMemoryLedger([
+          { readerProjectId: "agg_1", memberProjectId: "p_a" },
+          { readerProjectId: "agg_1", memberProjectId: "p_b" },
+          { readerProjectId: "agg_other", memberProjectId: "p_a" },
+        ]);
+        const deactivated: unknown[] = [];
+        const { schedule } = inMemorySchedule(["agg_1"]);
+
+        await reconcilerFor({
+          stored: [aggregate({ archived: true })],
+          ledger,
+          schedule: {
+            ...schedule,
+            async deactivateForTarget(params) {
+              deactivated.push(params);
+            },
+          },
+        }).retire({ aggregateProjectId: "agg_1" });
+
+        expect(deactivated).toEqual([
+          {
+            projectId: "agg_1",
+            targetType: AGGREGATE_RECONCILE_SWEEP.targetType,
+            targetId: "agg_1",
+          },
+        ]);
+        expect(revoked.map((row) => row.revokedReason)).toEqual([
+          AGGREGATE_ARCHIVED,
+          AGGREGATE_ARCHIVED,
+        ]);
+        expect(rows.map((row) => row.readerProjectId)).toEqual(["agg_other"]);
       });
     });
   });

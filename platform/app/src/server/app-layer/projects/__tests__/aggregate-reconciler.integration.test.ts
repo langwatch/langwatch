@@ -35,6 +35,7 @@ import { SchedulerRegistry } from "~/server/app-layer/scheduler/scheduler.regist
 import { prisma } from "~/server/db";
 import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import {
+  AGGREGATE_ARCHIVED,
   AGGREGATE_RECONCILE_SWEEP,
   AGGREGATE_RULE_NO_LONGER_MATCHES,
   AggregateReconciler,
@@ -742,6 +743,24 @@ describe("Feature: the reconciler keeps members current", () => {
           },
         });
         expect(job.active).toBe(false);
+      });
+
+      it("leaves it no live shared read, each row marked archived rather than deleted", async () => {
+        const aggregate = await createAggregate({ kind: "all-personal" });
+        const before = await sharedReadRowsOf(aggregate.id);
+        expect(before.length).toBeGreaterThanOrEqual(2);
+
+        await getApp().projects.archive({
+          id: aggregate.id,
+          organizationId: fixture.organizationId,
+        });
+
+        expect(await liveMembersOf(aggregate.id)).toEqual([]);
+        const after = await sharedReadRowsOf(aggregate.id);
+        expect(after.map((row) => row.id)).toEqual(before.map((row) => row.id));
+        expect(after.map((row) => row.revokedReason)).toEqual(
+          before.map(() => AGGREGATE_ARCHIVED),
+        );
       });
     });
   });

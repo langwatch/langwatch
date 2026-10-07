@@ -33,6 +33,9 @@ export const AGGREGATE_RECONCILE_SWEEP = {
 export const AGGREGATE_RULE_NO_LONGER_MATCHES =
   "aggregate_rule_no_longer_matches";
 
+/** The revocation reason every shared read of an archived aggregate carries. */
+export const AGGREGATE_ARCHIVED = "aggregate_archived";
+
 /** What the reconciler needs of the grants ledger, and nothing more. */
 export type SharedProjectGrantsLedger = Pick<
   GrantsLedgerWriter,
@@ -460,6 +463,41 @@ export class AggregateReconciler {
         timezone: AGGREGATE_RECONCILE_SWEEP.timezone,
         after: this.now(),
       }),
+    });
+  }
+
+  /**
+   * An archived aggregate reads nothing: its nightly sweep is switched off
+   * and every shared read it holds is revoked, marked rather than deleted.
+   * Under the aggregate's lock, so a reconcile already running cannot attach
+   * behind it. Returns the grant ids revoked.
+   */
+  async retire({
+    aggregateProjectId,
+  }: {
+    aggregateProjectId: string;
+  }): Promise<string[]> {
+    return this.deps.lock.withAggregateLock({ aggregateProjectId }, async () => {
+      await this.unscheduleSweep({ aggregateProjectId });
+      const aggregate = await this.deps.aggregates.findAggregate({
+        aggregateProjectId,
+      });
+      if (!aggregate) return [];
+      const revoked = await this.deps.ledger().revokeSharedProjectGrants({
+        organizationId: aggregate.organizationId,
+        readerProjectId: aggregateProjectId,
+        actor: ACTOR,
+        reason: AGGREGATE_ARCHIVED,
+      });
+      logger.info(
+        {
+          organizationId: aggregate.organizationId,
+          aggregateProjectId,
+          revoked: revoked.length,
+        },
+        "retired an archived aggregate project's shared reads",
+      );
+      return revoked;
     });
   }
 

@@ -15,7 +15,7 @@ import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import type {
   AggregateReconcileResult,
@@ -697,11 +697,12 @@ export class ProjectService {
   }
 
   /**
-   * An archived aggregate reads nothing, so its nightly sweep is switched
-   * off. Its grants are left as they stand: an archived project is opened by
-   * no route, and leaving them keeps an unarchive a matter of one reconcile.
-   * Never throws: a sweep left running on an archived aggregate reconciles
-   * nothing, which is noise, not harm.
+   * An archived aggregate reads nothing: its nightly sweep is switched off
+   * and its shared reads are revoked with the reason "aggregate_archived".
+   * Bringing one back is then a matter of one reconcile, which attaches its
+   * members afresh. Never throws: the archive stands, a sweep left running on
+   * an archived aggregate reconciles nothing, and no route opens an archived
+   * project to read through a grant left behind.
    */
   private async stopAggregate({
     aggregateProjectId,
@@ -709,12 +710,15 @@ export class ProjectService {
     aggregateProjectId: string;
   }): Promise<void> {
     try {
-      await this.aggregateReconciler?.unscheduleSweep({ aggregateProjectId });
+      await this.aggregateReconciler?.retire({ aggregateProjectId });
     } catch (error) {
       logger.error(
         { projectId: aggregateProjectId, error },
-        "failed to switch off an archived aggregate's nightly sweep; it will reconcile nothing until it is",
+        "failed to retire an archived aggregate's sweep and shared reads; they stay until it is retried",
       );
+      captureException(toError(error), {
+        extra: { projectId: aggregateProjectId },
+      });
     }
   }
 
