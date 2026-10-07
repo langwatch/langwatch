@@ -1,6 +1,6 @@
 /** "Run via API" for an evaluations-v3 experiment, lent to the experiment workbench. */
 
-import type { RunExperimentViaApiDialogProps } from "@langwatch/workflow-contract";
+import type { RunExperimentViaApiDialogProps } from "@langwatch/workflow-client";
 
 import { buildRunSnippet } from "../../../model/run-via-api/run-snippets.ts";
 import { DataSourcePicker } from "../../elements/run-via-api/data-source-picker.tsx";

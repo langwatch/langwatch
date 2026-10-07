@@ -215,23 +215,6 @@ export type UiRenderInputOutputProps = {
   displayObjectSize?: boolean;
 };
 
-/** What a screen hands workflow's clamped text that expands into a dialog. */
-export type UiHoverableBigTextProps = {
-  children: ReactNode;
-  lineClamp?: number;
-  expandedVersion?: string;
-  expandable?: boolean;
-};
-
-/** What a screen hands workflow's marker for a trace field the reader may not see. */
-export type UiRedactedFieldProps = {
-  field: "input" | "output";
-  children: ReactNode;
-  loadingComponent?: ReactNode;
-  redacted?: boolean;
-  visibleTo?: string | null;
-};
-
 /** An evaluator's name and settings as the studio holds them. */
 export type UiEvaluatorEditorValues = { name: string; settings: Record<string, unknown> };
 
@@ -411,7 +394,6 @@ export type UiDeclaredCapabilities = {
   guidedOnboardingOffer: UiDeclaredComponent<UiGuidedOnboardingOfferProps>;
   guidedPathActive: UiGuidedPathActive;
   guidedTour: UiGuidedTour;
-  hoverableBigText: UiDeclaredComponent<UiHoverableBigTextProps>;
   inlineCommandPalette: UiDeclaredComponent<UiInlineCommandPaletteProps>;
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
@@ -422,7 +404,6 @@ export type UiDeclaredCapabilities = {
   outputsSection: UiDeclaredComponent<UiOutputsSectionProps>;
   pendingJoinRequests: UiDeclaredComponent<UiPendingJoinRequestsProps>;
   projectDepartmentField: UiDeclaredComponent<UiProjectDepartmentFieldProps>;
-  redactedField: UiDeclaredComponent<UiRedactedFieldProps>;
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   resourceLimitRow: UiDeclaredComponent<UiResourceLimitRowProps>;
   sampleChoice: UiGovernanceSampleChoice;
