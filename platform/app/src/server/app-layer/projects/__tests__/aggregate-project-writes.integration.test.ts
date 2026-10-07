@@ -158,6 +158,8 @@ afterAll(async () => {
         data: { latestVersionId: null, currentVersionId: null },
       });
       await cleanupTestRows(prisma, [
+        ["dashboard", { projectId: { in: projectIds } }],
+        ["savedView", { projectId: { in: projectIds } }],
         ["traceEditOverlay", { projectId: { in: projectIds } }],
         ["annotation", { projectId: { in: projectIds } }],
         ["llmPromptConfigVersion", { projectId: { in: projectIds } }],
@@ -250,6 +252,53 @@ describe("Feature: every write under the aggregate's tenant is refused", () => {
         expect(archived.every((project) => project.archivedAt !== null)).toBe(
           true,
         );
+      });
+    });
+  });
+});
+
+/**
+ * Two reads seed a default on first open: the reports page asks for the
+ * project's first dashboard and creates one, and the trace list asks for its
+ * saved views and seeds the origin views. They are queries, so the mutation
+ * guard above never sees them; on an aggregate they read and write nothing.
+ */
+describe("Feature: opening an aggregate page never writes a default row", () => {
+  const defaultsUnder = async (projectId: string) => ({
+    dashboards: await prisma.dashboard.count({ where: { projectId } }),
+    savedViews: await prisma.savedView.count({ where: { projectId } }),
+  });
+
+  describe("given an aggregate project and one of its members", () => {
+    describe("when ana opens the aggregate's reports and trace list for the first time", () => {
+      /** @scenario "Opening an aggregate page never writes a default row under it" */
+      it("returns no dashboard and no views, and writes no row", async () => {
+        const dashboard = await admin.dashboards.getOrCreateFirst({
+          projectId: aggregate.id,
+        });
+        const views = await admin.savedViews.getAll({
+          projectId: aggregate.id,
+        });
+
+        expect(dashboard).toBeNull();
+        expect(views).toEqual([]);
+        expect(await defaultsUnder(aggregate.id)).toEqual({
+          dashboards: 0,
+          savedViews: 0,
+        });
+      });
+    });
+
+    describe("when ana opens the member the same way", () => {
+      /** @scenario "Opening an aggregate page never writes a default row under it" */
+      it("still creates its first dashboard and default views", async () => {
+        const dashboard = await admin.dashboards.getOrCreateFirst({
+          projectId: member.id,
+        });
+        const views = await admin.savedViews.getAll({ projectId: member.id });
+
+        expect(dashboard?.projectId).toBe(member.id);
+        expect(views.length).toBeGreaterThan(0);
       });
     });
   });

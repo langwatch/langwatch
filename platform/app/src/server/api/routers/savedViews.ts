@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { getApp } from "~/server/app-layer/app";
+import { projectAcceptsWrites } from "~/server/app-layer/projects/project-write-guard";
 import type { Prisma } from "~/generated/prisma/client";
 import { savedViewErrorHandler } from "../../saved-views/middleware";
 import { SavedViewService } from "../../saved-views/saved-view.service";
@@ -35,6 +37,12 @@ export const savedViewsRouter = createTRPCRouter({
         projectId: input.projectId,
         userId: ctx.session.user.id,
         kind: input.kind,
+        // A query, so the mutation write guard never sees the seed: on an
+        // aggregate it reads what exists and writes nothing.
+        acceptsWrites: await projectAcceptsWrites({
+          kinds: getApp().projectKinds,
+          projectId: input.projectId,
+        }),
       });
     }),
 

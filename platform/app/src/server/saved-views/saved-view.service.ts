@@ -36,15 +36,20 @@ export class SavedViewService {
   /**
    * Gets all saved views for a project visible to a user.
    * Returns project-level views (userId IS NULL) plus the user's personal views.
-   * Auto-seeds with default origin views on first access.
+   * Auto-seeds with default origin views on first access, unless the
+   * project takes no writes (an aggregate, ADR-144): then it returns what
+   * exists and seeds nothing.
    */
   async getAll({
     projectId,
     userId,
     kind,
+    acceptsWrites = true,
   }: {
     projectId: string;
     userId?: string;
+    /** False on a project nothing may be written under; skips the seed. */
+    acceptsWrites?: boolean;
     /**
      * Storage shape to read. Omit for the legacy default
      * ("v1-traces-filter"). The new traces v2 lens UI passes
@@ -60,7 +65,7 @@ export class SavedViewService {
     // double-populate the user's tab strip.
     const isLegacyKind = !kind || kind === "v1-traces-filter";
 
-    if (isLegacyKind) {
+    if (isLegacyKind && acceptsWrites) {
       const count = await this.repository.count({ projectId, userId, kind });
       if (count === 0) {
         await this.seedViews({ projectId });

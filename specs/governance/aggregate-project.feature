@@ -349,6 +349,14 @@ Feature: An aggregate project reads its member projects
     And the same calls on the member are not refused
     And ana can still edit the aggregate's rule, rename it and archive it
 
+  @integration
+  Scenario: Opening an aggregate page never writes a default row under it
+    Given an aggregate project and one of its members
+    When ana opens the aggregate's reports and its trace list for the first time
+    Then she sees no dashboard and no saved views, and no error
+    And no dashboard or saved view row exists under the aggregate
+    And opening the member the same way still creates its first dashboard and default views
+
   # ── H. The aggregate in the app ──────────────────────────────────────────
   # The server refuses every write; these keep the app from inviting one, and
   # from waiting on ingestion an aggregate never receives.

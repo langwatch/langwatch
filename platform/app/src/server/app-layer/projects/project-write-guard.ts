@@ -55,10 +55,29 @@ export async function assertProjectAcceptsWrites({
   kinds,
   projectId,
 }: {
-  kinds: { kindOf(projectId: string): Promise<string | null> };
+  kinds: ProjectKinds;
   projectId: string;
 }): Promise<void> {
-  if (isAggregateProjectKind(await kinds.kindOf(projectId))) {
+  if (!(await projectAcceptsWrites({ kinds, projectId }))) {
     throw new AggregateProjectIsReadOnlyError();
   }
 }
+
+/**
+ * Whether data may be written under this project. The question a read that
+ * seeds a default on first open (the first dashboard, the trace list's
+ * saved views) asks before it writes: it is a query, so the mutation guard
+ * never sees it, and on an aggregate it returns what exists and writes
+ * nothing instead of refusing a page the admin is allowed to open.
+ */
+export async function projectAcceptsWrites({
+  kinds,
+  projectId,
+}: {
+  kinds: ProjectKinds;
+  projectId: string;
+}): Promise<boolean> {
+  return !isAggregateProjectKind(await kinds.kindOf(projectId));
+}
+
+type ProjectKinds = { kindOf(projectId: string): Promise<string | null> };
