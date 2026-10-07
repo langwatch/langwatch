@@ -37,9 +37,6 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../user/contract/tsconfig.build.json"
     }
   ]
 }
