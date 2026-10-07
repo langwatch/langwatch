@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-26, revised 2026-10-07
 
-**Status:** Accepted (v4.8, 2026-10-07)
+**Status:** Accepted (v4.9, 2026-10-07)
 
 **Builds on:** ADR-166 (grant-scoped data access: a sealed `Authorization`
 proof minted once at the door, carried by hand, applied by the store client),
