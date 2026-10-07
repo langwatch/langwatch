@@ -40,11 +40,11 @@ export const authzRouter = createTRPCRouter({
       // ADR-144 decision 5: only an organisation admin opens an aggregate,
       // so anyone else is told they may do nothing there. The kind is read
       // first (cached) so ordinary projects never pay for the role read.
-      const app = scope.type === "project" ? getApp() : undefined;
       if (
-        app &&
-        isAggregateProjectKind(await app.projectKinds.kindOf(scope.id))
+        scope.type === "project" &&
+        isAggregateProjectKind(await getApp().projectKinds.kindOf(scope.id))
       ) {
+        const app = getApp();
         const closed = await aggregatesClosedTo({
           projectIds: [scope.id],
           organizationRole: await app.organizations.getUserOrgRole({
