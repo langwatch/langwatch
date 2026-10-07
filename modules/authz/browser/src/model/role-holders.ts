@@ -35,6 +35,8 @@ export type Holder = {
   /** The directory a group is managed by, when it is. */
   directory: string | null;
   grants: CollapsedGrant[];
+  /** The grants themselves, widest scope first: the expanded row lists each one. */
+  assignments: ManagedGrant[];
   assignmentCount: number;
 };
 
@@ -136,11 +138,27 @@ export function holdersOf(assignments: readonly ManagedGrant[]): Holder[] {
     image: first.userImage,
     directory: first.groupScimSource,
     grants: collapseGrants(rows),
+    assignments: rows.toSorted(byScope),
     assignmentCount: rows.length,
   }));
   return holders.toSorted(
     (a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.name.localeCompare(b.name),
   );
+}
+
+/** "Team Platform", never an abbreviation; an unresolved name says its kind and stops. */
+export function scopeLabel({ scopeType, scopeName }: Omit<GrantScope, "scopeId">): string {
+  if (scopeType === "ORGANIZATION") return "Organization";
+  const kind = scopeType === "TEAM" ? "Team" : "Project";
+  return scopeName ? `${kind} ${scopeName}` : kind;
+}
+
+/** The one colour on a holder row: how much the role can do. */
+export function roleTone(tier: string): string {
+  if (tier === "ADMIN") return "red";
+  if (tier === "MEMBER") return "blue";
+  if (tier === "VIEWER") return "gray";
+  return "purple";
 }
 
 function plural({ count, word }: { count: number; word: string }): string {

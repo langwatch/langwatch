@@ -5,7 +5,8 @@ Feature: Roles & access settings page
 
   The page has two tabs. Roles lists the built-in Admin, Member and Viewer roles,
   which cannot be changed, beside the organization's custom roles. Access lists
-  every grant, one row each: who holds it, which role, where, and until when.
+  everyone who holds a role, one row each (specs/identity/org-access-cluster.feature),
+  and each row opens onto that holder's grants: which role, where, and until when.
   It replaced the Role Bindings page, whose address forwards onto the Access tab.
 
   The server's escalation guard is the authority: nobody grants a role carrying a
@@ -29,17 +30,18 @@ Feature: Roles & access settings page
     And no grant is read at all
 
   @integration
-  Scenario: The Access tab lists every grant in the organization
+  Scenario: The Access tab lists every grant in the organization, under its holder
     Given grants to a member, a group and an API key
     When the Access tab renders
-    Then each grant is one row naming who holds it, the role, the scope and its end date
+    Then each holder is one row, naming who holds the grants
+    And opening a holder's row lists each of its grants with the role, the scope and its end date
     And an expired grant says it has expired
 
   @integration
   Scenario: The Access tab narrows by scope and status
     When the reader picks the team scope and the expired status
-    Then the grants are read for teams and expired grants only
-    And paging onward asks for the next page by its cursor
+    Then only holders of an expired team grant are listed, each with only those grants
+    And a list longer than a page is paged, paging onward showing the next holders
 
   # ============================================================================
   # Granting, changing and revoking
@@ -53,12 +55,12 @@ Feature: Roles & access settings page
 
   @integration
   Scenario: The role of a grant is changed in place
-    When the reader changes a grant's role to "Member"
+    When the reader opens a holder's row and changes one of its grants' role to "Member"
     Then that grant's role is changed and its holder and scope stay
 
   @integration
   Scenario: Revoking access is confirmed first
-    When the reader revokes a grant
+    When the reader opens a holder's row and revokes one of its grants
     Then they are asked to confirm, naming who loses what and where
     And the grant is revoked only after they confirm
 
@@ -66,7 +68,7 @@ Feature: Roles & access settings page
   Scenario: A reader without manage cannot grant, change or revoke
     Given a reader who may not manage the organization
     When the Access tab renders
-    Then granting a role is disabled and no row offers to change or revoke
+    Then granting a role is disabled and no grant in an opened holder's row offers to change or revoke
 
   # ============================================================================
   # Nobody grants beyond their own access
