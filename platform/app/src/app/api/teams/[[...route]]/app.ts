@@ -11,6 +11,7 @@ import {
   type TeamRestService,
 } from "~/server/app-layer/teams/team.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { appFromContext } from "../../middleware/app-context";
 import type { TeamServiceMiddlewareVariables } from "../../middleware/team-service";
 import { teamServiceMiddleware } from "../../middleware/team-service";
 import { handleTeamError } from "./error-handler";
@@ -172,6 +173,12 @@ secured.access(requires("team:manage")).delete(
 
     const team = await service.archive({
       id,
+      organizationId: organization.id,
+    });
+    // ADR-144: the team's aggregates stop and its projects leave every
+    // aggregate, as archiving each project would do.
+    await appFromContext(c).projects.afterTeamArchive({
+      teamId: team.id,
       organizationId: organization.id,
     });
 

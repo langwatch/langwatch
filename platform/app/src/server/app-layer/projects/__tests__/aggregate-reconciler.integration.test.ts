@@ -665,6 +665,100 @@ describe("Feature: the reconciler keeps members current", () => {
     });
   });
 
+  describe("given an aggregate on a team of its own reading a project on another team", () => {
+    /** A non-personal team of the organisation, which an admin may archive. */
+    const makeTeam = (handle: string) =>
+      prisma.team.create({
+        data: {
+          name: `${handle} ${nanoid(6)}`,
+          slug: `--test-team-${handle}-${nanoid(8)}`,
+          organizationId: fixture.organizationId,
+        },
+      });
+
+    const aggregateOnTeam = async ({
+      teamId,
+      projectIds,
+    }: {
+      teamId: string;
+      projectIds: string[];
+    }) => {
+      const { projectSlug } = await callerFor(fixture.admin.id).project.create({
+        organizationId: fixture.organizationId,
+        teamId,
+        name: `Team view ${nanoid(6)}`,
+        language: "other",
+        framework: "other",
+        kind: AGGREGATE_PROJECT_KIND,
+        aggregateRule: { kind: "explicit", projectIds },
+      });
+      return prisma.project.findFirstOrThrow({
+        where: { slug: projectSlug, teamId },
+      });
+    };
+
+    const memberOnTeam = (teamId: string) =>
+      prisma.project.create({
+        data: {
+          name: `Member ${nanoid(6)}`,
+          slug: `--test-project-member-${nanoid(8)}`,
+          apiKey: `test-key-member-${nanoid(8)}`,
+          teamId,
+          language: "python",
+          framework: "openai",
+        },
+      });
+
+    describe("when ana archives the aggregate's team", () => {
+      it("stops the aggregate: no live shared read and no nightly sweep", async () => {
+        const viewTeam = await makeTeam("view");
+        const aggregate = await aggregateOnTeam({
+          teamId: viewTeam.id,
+          projectIds: [fixture.shared.id],
+        });
+        expect(await liveMembersOf(aggregate.id)).toEqual([fixture.shared.id]);
+
+        await callerFor(fixture.admin.id).team.archiveById({
+          teamId: viewTeam.id,
+        });
+
+        expect(await liveMembersOf(aggregate.id)).toEqual([]);
+        expect(
+          (await sharedReadRowsOf(aggregate.id)).map(
+            (row) => row.revokedReason,
+          ),
+        ).toEqual([AGGREGATE_ARCHIVED]);
+        const sweep = await prisma.scheduledJob.findFirstOrThrow({
+          where: {
+            projectId: aggregate.id,
+            targetType: AGGREGATE_RECONCILE_SWEEP.targetType,
+          },
+        });
+        expect(sweep.active).toBe(false);
+      });
+    });
+
+    describe("when ana archives the member project's team", () => {
+      it("revokes that project's read and keeps the others", async () => {
+        const memberTeam = await makeTeam("member");
+        const member = await memberOnTeam(memberTeam.id);
+        const aggregate = await aggregateOnTeam({
+          teamId: fixture.team.id,
+          projectIds: [member.id, fixture.shared.id],
+        });
+        expect(await liveMembersOf(aggregate.id)).toEqual(
+          [member.id, fixture.shared.id].sort(),
+        );
+
+        await callerFor(fixture.admin.id).team.archiveById({
+          teamId: memberTeam.id,
+        });
+
+        expect(await liveMembersOf(aggregate.id)).toEqual([fixture.shared.id]);
+      });
+    });
+  });
+
   describe("given aggregate projects whose members no reconcile has attached yet", () => {
     describe("when one reconcile attaches several members", () => {
       it("waits for the projection once and lands every member", async () => {

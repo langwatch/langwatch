@@ -345,6 +345,19 @@ export class PrismaProjectRepository implements ProjectRepository {
     return this.prisma.project.findFirst({ where: { slug, teamId } });
   }
 
+  async findLiveKindsByTeam({
+    teamId,
+    organizationId,
+  }: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<Pick<Project, "id" | "kind">[]> {
+    return this.prisma.project.findMany({
+      where: { teamId, archivedAt: null, team: { organizationId } },
+      select: { id: true, kind: true },
+    });
+  }
+
   async findActiveTeamInOrganization({
     teamId,
     organizationId,

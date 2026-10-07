@@ -78,6 +78,7 @@ export type AggregateReconcileTrigger =
   | "department-assigned"
   | "member-offboarded"
   | "member-project-archived"
+  | "team-archived"
   | "nightly-sweep";
 
 const NOTHING: AggregateReconcileResult = {

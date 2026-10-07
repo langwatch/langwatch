@@ -193,6 +193,15 @@ export interface ProjectRepository extends ProjectKindRepository {
     slug: string;
     teamId: string;
   }): Promise<Project | null>;
+  /**
+   * The unarchived projects of one team of the organization, with their
+   * kind: what archiving the team takes out of every aggregate (ADR-144
+   * block E). Empty for a team of another organization.
+   */
+  findLiveKindsByTeam(params: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<Pick<Project, "id" | "kind">[]>;
   findActiveTeamInOrganization(params: {
     teamId: string;
     organizationId: string;
@@ -308,6 +317,13 @@ export class NullProjectRepository implements ProjectRepository {
   async findAllIdsByOrganization(_params: {
     organizationId: string;
   }): Promise<string[]> {
+    return [];
+  }
+
+  async findLiveKindsByTeam(_params: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<Pick<Project, "id" | "kind">[]> {
     return [];
   }
 

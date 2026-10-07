@@ -269,7 +269,7 @@ export const teamRouter = createTRPCRouter({
       // without a personal workspace in that organization for good.
       const team = await prisma.team.findUnique({
         where: { id: input.teamId },
-        select: { isPersonal: true },
+        select: { isPersonal: true, organizationId: true },
       });
       if (!team) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
@@ -284,6 +284,12 @@ export const teamRouter = createTRPCRouter({
       await prisma.team.update({
         where: { id: input.teamId },
         data: { archivedAt: new Date() },
+      });
+      // ADR-144: the team's aggregates stop and its projects leave every
+      // aggregate, as archiving each project would do.
+      await getApp().projects.afterTeamArchive({
+        teamId: input.teamId,
+        organizationId: team.organizationId,
       });
       return { success: true };
     }),

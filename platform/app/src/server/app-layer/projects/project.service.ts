@@ -697,6 +697,48 @@ export class ProjectService {
   }
 
   /**
+   * What archiving a team means for aggregates, the team-wide form of
+   * {@link afterArchive}. Every aggregate on the team stops, as if archived
+   * itself, and once any other project of the team may have been a member,
+   * the organisation is reconciled once, which drops them: a project on an
+   * archived team is never a member. Both team archive paths call this once
+   * the team row is archived. Never throws: the archive stands.
+   */
+  async afterTeamArchive({
+    teamId,
+    organizationId,
+  }: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<void> {
+    let projects: Pick<Project, "id" | "kind">[];
+    try {
+      projects = await this.repo.findLiveKindsByTeam({
+        teamId,
+        organizationId,
+      });
+    } catch (error) {
+      logger.error(
+        { teamId, organizationId, error },
+        "failed to read an archived team's projects; their aggregate reads stay until the nightly sweep",
+      );
+      captureException(toError(error), { extra: { teamId, organizationId } });
+      return;
+    }
+    for (const project of projects) {
+      if (isAggregateProjectKind(project.kind)) {
+        await this.stopAggregate({ aggregateProjectId: project.id });
+      }
+    }
+    if (projects.some((project) => !isAggregateProjectKind(project.kind))) {
+      await this.aggregateReconciler?.reconcileOrganizationOrLog({
+        organizationId,
+        trigger: "team-archived",
+      });
+    }
+  }
+
+  /**
    * An archived aggregate reads nothing: its nightly sweep is switched off
    * and its shared reads are revoked with the reason "aggregate_archived".
    * Bringing one back is then a matter of one reconcile, which attaches its
