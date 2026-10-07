@@ -42,6 +42,7 @@ import {
   SEEDED_CONTENT,
   SEEDED_DIMENSION_ATTRIBUTE,
   seedEveryCatalogSource,
+  seedTracesOnTopics,
   selectRows,
   selectScalar,
   startLangWatchQLClickHouse,
@@ -1154,4 +1155,31 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
       `deduplicating costs more than reading undeduplicated. ${report}`,
     ).toBeLessThanOrEqual(measured.none!.filteredRows);
   }, 300_000);
+});
+
+describe("given traces assigned to topics when a caller asks for traffic by topic name", () => {
+  /** @scenario "Traffic by topic name" */
+  it("counts the caller's traces per topic name and shows no other project's topic", async () => {
+    const { tenantA: a, tenantB: b } = harness;
+    await seedTracesOnTopics({
+      admin: harness.admin,
+      database: facts,
+      assignments: [
+        { tenantId: a.tenantId, topicId: `${a.tenantId}-topic-1`, traces: 3 },
+        { tenantId: a.tenantId, topicId: `${a.tenantId}-topic-2`, traces: 2 },
+        { tenantId: b.tenantId, topicId: `${b.tenantId}-topic-1`, traces: 4 },
+      ],
+    });
+
+    const rows = await selectRows<{ TopicName: string; traces: string }>(
+      tenantA,
+      `SELECT t.TopicName AS TopicName, count() AS traces FROM ${database}.traces ` +
+        `JOIN ${database}.topics AS t ON traces.TopicId = t.TopicId GROUP BY 1 ORDER BY 1 LIMIT 50`,
+    );
+
+    expect(rows.map((row) => [row.TopicName, Number(row.traces)])).toEqual([
+      [`Topic ${a.tenantId} 1`, 3],
+      [`Topic ${a.tenantId} 2`, 2],
+    ]);
+  });
 });
