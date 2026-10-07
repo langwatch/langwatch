@@ -45,6 +45,8 @@ function traceRow(over: Partial<TraceAnalyticsRow> = {}): TraceAnalyticsRow {
     labels: ["alpha", "beta"],
     totalCost: 0.42,
     nonBilledCost: 0.1,
+    unpricedSpanCount: 2,
+    unpricedModels: ["my-finetune-v2"],
     totalDurationMs: 4200,
     timeToFirstTokenMs: 350,
     tokensPerSecond: 42,

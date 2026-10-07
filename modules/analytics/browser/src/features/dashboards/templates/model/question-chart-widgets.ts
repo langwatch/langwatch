@@ -49,7 +49,7 @@ export const SATISFACTION_CODE = widgetCode({
   parts: SERIES_PARTS,
   queries: ["trend", "comparison"],
   body: `  if (trend.data.length === 0) return <Panel><CallToAction /></Panel>;
-  const score = (value) => num(value).toFixed(2);
+  const score = (value) => (known(value) ? num(value).toFixed(2) : GAP);
   const now = num(comparison.data[0]?.satisfaction);
   const previous = num(comparison.data[0]?.satisfaction_prev);
   const points = trend.data.map((row) => ({
@@ -58,12 +58,13 @@ export const SATISFACTION_CODE = widgetCode({
   }));
   let moved;
   points.forEach((point, index) => {
-    if (index === 0) return;
-    const step = Math.abs(point.satisfaction - points[index - 1].satisfaction);
+    const before = points[index - 1];
+    if (!before || !known(point.satisfaction) || !known(before.satisfaction)) return;
+    const step = Math.abs(point.satisfaction - before.satisfaction);
     if (!moved || step > moved.step) moved = { x: point.x, step };
   });
   let label = "average satisfaction";
-  if (previous !== 0) {
+  if (known(now) && known(previous)) {
     const delta = now - previous;
     label += ", " + (delta >= 0 ? "+" : "") + delta.toFixed(2) + " against the period before";
   }
@@ -89,10 +90,10 @@ export const TOKEN_DRIFT_CODE = widgetCode({
     prompt: num(row.prompt_tokens),
     completion: num(row.completion_tokens),
   }));
-  const totals = points.map((point) => point.prompt + point.completion);
-  if (totals.every((total) => total === 0)) return <Panel><CallToAction /></Panel>;
+  const totals = points.map((point) => add(point.prompt, point.completion));
+  if (totals.every((total) => !total)) return <Panel><CallToAction /></Panel>;
   const change = drift(totals[0], totals[totals.length - 1]);
-  let direction = "flat";
+  let direction = known(change) ? "flat" : "not enough data";
   if (change > 0.05) direction = "drifting up";
   if (change < -0.05) direction = "drifting down";
   const series = [
@@ -115,7 +116,7 @@ export const CONVERSATION_LENGTH_CODE = widgetCode({
   parts: SERIES_PARTS,
   queries: ["main"],
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
-  const turns = (value) => num(value).toFixed(1);
+  const turns = (value) => (known(value) ? num(value).toFixed(1) : GAP);
   const points = main.data.map((row) => ({ x: bucketLabel(row.bucket), turns: num(row.turns) }));
   const first = points[0].turns;
   const last = points[points.length - 1].turns;
@@ -144,7 +145,9 @@ export const P95_LATENCY_CODE = widgetCode({
     period: p95,
   }));
   const latest = points[points.length - 1].p95;
-  const above = points.filter((point) => point.p95 > p95 * 1.5).length;
+  const above = known(p95)
+    ? points.filter((point) => known(point.p95) && point.p95 > p95 * 1.5).length
+    : 0;
   const label = "p95 in the latest bucket · " + ms(p95) + " over the period · " + above +
     " buckets above 1.5×";
   const series = [
@@ -200,9 +203,9 @@ export const LATENCY_SPREAD_CODE = widgetCode({
     p90: num(row.p90_ms),
     p99: num(row.p99_ms),
   }));
-  const tail = (point) => (point.p50 > 0 ? point.p99 / point.p50 : 0);
+  const tail = (point) => ratio(point.p99, point.p50) ?? 0;
   const longest = points.reduce((worst, point) => (tail(point) > tail(worst) ? point : worst));
-  const ratio = p50 > 0 ? (p99 / p50).toFixed(1) + "×" : "-";
+  const tailRatio = known(ratio(p99, p50)) ? ratio(p99, p50).toFixed(1) + "×" : GAP;
   const series = [
     { key: "p50", label: "p50", colour: C.teal },
     { key: "p90", label: "p90", colour: C.orange },
@@ -215,7 +218,7 @@ export const LATENCY_SPREAD_CODE = widgetCode({
         <Stat label="p50" value={ms(p50)} />
         <Stat label="p90" value={ms(num(spread.p90_ms))} />
         <Stat label="p99" value={ms(p99)} />
-        <Stat label="p99 / p50" value={ratio} />
+        <Stat label="p99 / p50" value={tailRatio} />
       </div>
       <div style={{ fontSize: 11, color: C.subtle, marginBottom: 4 }}>
         Longest tail at {longest.x}
@@ -236,9 +239,10 @@ export const SPEND_CODE = widgetCode({
     x: bucketLabel(row.bucket),
     cost: num(row.cost),
   }));
-  const total = points.reduce((sum, point) => sum + point.cost, 0);
-  if (total === 0) return <Panel><CallToAction /></Panel>;
-  const priciest = points.reduce((top, point) => (point.cost > top.cost ? point : top));
+  const total = add(...points.map((point) => point.cost));
+  if (!total) return <Panel><CallToAction /></Panel>;
+  const priced = points.filter((point) => known(point.cost));
+  const priciest = priced.reduce((top, point) => (point.cost > top.cost ? point : top));
   const label = "spent · most expensive " + priciest.x + " (" + usd(priciest.cost) + ")";
   return (
     <Panel>
@@ -272,7 +276,7 @@ function passRateCode({
     parts: SERIES_PARTS,
     queries: ["totals", "trend"],
     body: `  const runs = num(totals.data[0]?.runs);
-  if (runs === 0) return <Panel><CallToAction /></Panel>;
+  if (!runs) return <Panel><CallToAction /></Panel>;
   const passed = num(totals.data[0]?.passed);
   const points = trend.data.map((row) => ({
     x: bucketLabel(row.bucket),

@@ -24,18 +24,38 @@ const C = {
   green: dark ? "#4ade80" : "#16a34a",
 };`;
 
-export const NUMBERS = `const num = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
+/**
+ * Number helpers. A missing value (null, undefined, NaN) stays null and prints as a dash:
+ * a widget never shows missing as 0. `add` and `ratio` keep the gap through arithmetic,
+ * which plain `+` and `/` would turn into 0.
+ */
+export const NUMBERS = `// null, undefined, NaN and "" stay null: a gap, never 0.
+const num = (value) =>
+  value === null || value === undefined || value === "" || !Number.isFinite(Number(value))
+    ? null
+    : Number(value);
+const known = (value) => num(value) !== null;
+// The known values summed; null only when none is known.
+const add = (...values) =>
+  values.some(known) ? values.filter(known).reduce((sum, value) => sum + num(value), 0) : null;
+// A share, or null when the part is unknown or the whole is not above zero.
+const ratio = (part, whole) => (known(part) && num(whole) > 0 ? num(part) / num(whole) : null);
+const GAP = "–";
 const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
-const count = (value) => compact.format(value);
-const pct = (value, digits = 1) => (value * 100).toFixed(digits) + "%";
-function usd(value) {
-  if (!Number.isFinite(value) || value === 0) return "$0.00";
+const count = (value) => (known(value) ? compact.format(num(value)) : GAP);
+const pct = (value, digits = 1) => (known(value) ? (num(value) * 100).toFixed(digits) + "%" : GAP);
+function usd(raw) {
+  const value = num(raw);
+  if (value === null) return GAP;
+  if (value === 0) return "$0.00";
   const abs = Math.abs(value);
   const sign = value < 0 ? "-$" : "$";
   if (abs < 1000) return sign + abs.toFixed(abs < 0.01 ? 4 : 2);
   return sign + compact.format(abs);
 }
-function ms(value) {
+function ms(raw) {
+  const value = num(raw);
+  if (value === null) return GAP;
   if (value >= 1000) return (value / 1000).toFixed(value >= 10000 ? 0 : 1) + "s";
   return Math.round(value) + "ms";
 }`;
@@ -224,9 +244,9 @@ function SeriesChart({ points, series, format, domain }) {
 }`;
 
 /** The one big figure over a panel, and the change helpers; reads `NUMBERS`. */
-export const HEADLINE = `const signed = (value) => (value > 0 ? "+" : "") + pct(value, 0);
-// The change from the first value to the last, as a share of the first.
-const drift = (first, last) => (first > 0 ? (last - first) / first : 0);
+export const HEADLINE = `const signed = (value) => (known(value) ? (value > 0 ? "+" : "") + pct(value, 0) : GAP);
+// The change from the first value to the last, as a share of the first; null when unknown.
+const drift = (first, last) => (known(last) && num(first) > 0 ? (last - first) / first : null);
 
 function Headline({ value, label }) {
   return (

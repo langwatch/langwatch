@@ -20757,6 +20757,30 @@ func (e PostApiV1QueryJSONBodyGranularitySeconds4) Valid() bool {
 	}
 }
 
+// Defines values for PostApiV1Query200JSONResponseBodyCompletenessState.
+const (
+	Complete  PostApiV1Query200JSONResponseBodyCompletenessState = "complete"
+	Missing   PostApiV1Query200JSONResponseBodyCompletenessState = "missing"
+	NoTraffic PostApiV1Query200JSONResponseBodyCompletenessState = "no_traffic"
+	Partial   PostApiV1Query200JSONResponseBodyCompletenessState = "partial"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1Query200JSONResponseBodyCompletenessState enum.
+func (e PostApiV1Query200JSONResponseBodyCompletenessState) Valid() bool {
+	switch e {
+	case Complete:
+		return true
+	case Missing:
+		return true
+	case NoTraffic:
+		return true
+	case Partial:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiV1Query200JSONResponseBodyDiagnosticsCode.
 const (
 	INCOMPLETECOMPARISONPERIOD PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INCOMPLETE_COMPARISON_PERIOD"
@@ -43375,6 +43399,9 @@ type PostApiV1QueryJSONBodyTimeWindowStart2 = time.Time
 type PostApiV1QueryJSONBody_TimeWindow_Start struct {
 	union json.RawMessage
 }
+
+// PostApiV1Query200JSONResponseBodyCompletenessState defines parameters for PostApiV1Query.
+type PostApiV1Query200JSONResponseBodyCompletenessState string
 
 // PostApiV1Query200JSONResponseBodyDiagnosticsCode defines parameters for PostApiV1Query.
 type PostApiV1Query200JSONResponseBodyDiagnosticsCode string
@@ -154721,6 +154748,24 @@ type PostApiV1QueryResponse struct {
 			Name string `json:"name"`
 			Type string `json:"type"`
 		} `json:"columns,omitempty"`
+		Completeness *struct {
+			Buckets *[]struct {
+				N     float32 `json:"n"`
+				Start string  `json:"start"`
+			} `json:"buckets,omitempty"`
+			Fields []struct {
+				Field   string  `json:"field"`
+				Label   string  `json:"label"`
+				Present float32 `json:"present"`
+			} `json:"fields"`
+			State    PostApiV1Query200JSONResponseBodyCompletenessState `json:"state"`
+			Total    float32                                            `json:"total"`
+			Unit     string                                             `json:"unit"`
+			Unpriced *struct {
+				Count  float32  `json:"count"`
+				Models []string `json:"models"`
+			} `json:"unpriced,omitempty"`
+		} `json:"completeness,omitempty"`
 		Diagnostics *[]struct {
 			Code    PostApiV1Query200JSONResponseBodyDiagnosticsCode `json:"code"`
 			Message string                                           `json:"message"`
@@ -184037,6 +184082,24 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 				Name string `json:"name"`
 				Type string `json:"type"`
 			} `json:"columns,omitempty"`
+			Completeness *struct {
+				Buckets *[]struct {
+					N     float32 `json:"n"`
+					Start string  `json:"start"`
+				} `json:"buckets,omitempty"`
+				Fields []struct {
+					Field   string  `json:"field"`
+					Label   string  `json:"label"`
+					Present float32 `json:"present"`
+				} `json:"fields"`
+				State    PostApiV1Query200JSONResponseBodyCompletenessState `json:"state"`
+				Total    float32                                            `json:"total"`
+				Unit     string                                             `json:"unit"`
+				Unpriced *struct {
+					Count  float32  `json:"count"`
+					Models []string `json:"models"`
+				} `json:"unpriced,omitempty"`
+			} `json:"completeness,omitempty"`
 			Diagnostics *[]struct {
 				Code    PostApiV1Query200JSONResponseBodyDiagnosticsCode `json:"code"`
 				Message string                                           `json:"message"`

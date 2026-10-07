@@ -19,7 +19,6 @@ import {
   MARKED_CHART_IMPORTS,
   OUTCOME_EMPTY,
   PIVOT,
-  RATIO,
   SEEN_OR_SETUP,
   TRACES_LINK,
   WORDS,
@@ -31,13 +30,13 @@ export const KPIS_CODE = widgetCode({
   subtitle: "Each figure against the period before",
   source: "traces",
   compactCallToAction: true,
-  parts: [NUMBERS, RATIO, FIGURES],
+  parts: [NUMBERS, FIGURES],
   queries: ["outcomes", "spend", "checks"],
   body: `  const o = outcomes.data[0] || {};
   const s = spend.data[0] || {};
   const k = checks.data[0] || {};
   const conversations = num(s.conversations);
-  if (conversations === 0) return <Panel><CallToAction /></Panel>;
+  if (!conversations) return <Panel><CallToAction /></Panel>;
   const resolved = num(o.resolved);
   const resolvedPrev = num(o.resolved_prev);
   const perSuccess = ratio(num(s.cost), resolved);
@@ -140,7 +139,7 @@ export const ATTENTION_CODE = widgetCode({
   subtitle: "The one thing that got worse the most",
   source: "evaluations",
   compactCallToAction: true,
-  parts: [NUMBERS, RATIO, WORDS, TRACES_LINK],
+  parts: [NUMBERS, WORDS, TRACES_LINK],
   components: `${PROBLEM}
 
 ${ATTENTION_RULES}`,
@@ -279,7 +278,6 @@ export const TASK_SUCCESS_CODE = widgetCode({
   recharts: MARKED_CHART_IMPORTS,
   parts: [
     NUMBERS,
-    RATIO,
     DATES,
     CHART_STYLE,
     BARS,
@@ -331,17 +329,7 @@ export const ACCEPTANCE_CODE = widgetCode({
   subtitle: "What users did with each generated output",
   source: "requests",
   recharts: MARKED_CHART_IMPORTS,
-  parts: [
-    NUMBERS,
-    RATIO,
-    DATES,
-    CHART_STYLE,
-    FIGURES,
-    MARKED_CHART,
-    PIVOT,
-    TRACES_LINK,
-    SEEN_OR_SETUP,
-  ],
+  parts: [NUMBERS, DATES, CHART_STYLE, FIGURES, MARKED_CHART, PIVOT, TRACES_LINK, SEEN_OR_SETUP],
   queries: ["actions"],
   body: `  if (actions.data.length === 0) {
     return (

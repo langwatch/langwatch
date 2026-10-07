@@ -36,6 +36,8 @@ const heavyRow = {
   Models: [],
   TotalCost: null,
   NonBilledCost: null,
+  UnpricedSpanCount: 0,
+  UnpricedModels: [],
   TokensEstimated: false,
   TotalPromptTokenCount: null,
   TotalCompletionTokenCount: null,

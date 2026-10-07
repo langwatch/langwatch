@@ -40382,9 +40382,10 @@ Inside `code`, a global `LW` object gives the widget everything it needs:
 - `LW.query(name, params?)`: runs one of the widget's named queries and
   returns its rows.
 - `LW.useChartQuery(name, params?)`: the React hook version of `LW.query`.
-  Gives `data`, `isLoading`, `isFetching`, `isError`, `error`, `status`, and
-  `refetch`, and refetches automatically when the dashboard's time window or
-  granularity changes. Use this instead of `LW.query` in most widgets.
+  Gives `data`, `completeness`, `isLoading`, `isFetching`, `isError`, `error`,
+  `status`, and `refetch`, and refetches automatically when the dashboard's
+  time window or granularity changes. Use this instead of `LW.query` in most
+  widgets.
 - `LW.setHeight(px)`: resizes the widget's frame once its content's height is
   known.
 - `LW.onDashboardContextChange(callback)` / `LW.useDashboardContext()`:
@@ -40393,6 +40394,44 @@ Inside `code`, a global `LW` object gives the widget everything it needs:
 - `LW.error(err)`: report an error without throwing.
 - `LW.navigate(target, params?)`: navigate the host to an allowlisted target,
   such as a trace list or a single trace.
+
+### Missing data: the `completeness` report
+
+A query that follows the dashboard's time window also returns a
+`completeness` report next to its rows. `POST /api/v1/query` returns it too
+when you pass a `timeWindow`. Use it so a widget never shows missing data as
+zero.
+
+```ts
+completeness: {
+  state: "complete" | "partial" | "missing" | "no_traffic";
+  unit: string;   // what `total` counts: "traces", "spans", "evaluations"
+  total: number;  // rows of that view in the window
+  fields: { field: string; label: string; present: number }[];
+  buckets?: { start: string; n: number }[];        // ISO start, UTC
+  unpriced?: { count: number; models: string[] };
+}
+```
+
+- `state`: `no_traffic` means nothing arrived in the period. `missing` means a
+  field the query reads is on no row: show a setup step that names the field
+  to send. `partial` means some rows lack a field, or some cost has no price.
+- `fields`: one entry per field the query reads that can be empty, with how
+  many of `total` rows carry it.
+- `buckets`: only when the query follows the dashboard granularity. It lists
+  every bucket in the window, including empty ones at the start and the end,
+  with `n: 0`. Draw an empty bucket as a gap for a rate, an average or a
+  percentile, never as 0. A count may be 0.
+- `unpriced`: only when the query reads cost. `count` is the rows with at
+  least one span whose model has no price, and `models` names those models. A
+  cost total with unpriced rows is a lower bound: show it as "$830+".
+  Traces recorded before LangWatch started tracking this report no unpriced
+  spans, so on older periods the absence of `unpriced` rows is not proof that
+  every span was priced.
+
+The report is absent when the query does not follow the dashboard's time
+window, when it reads a per-minute rollup view, or when it could not be built.
+Treat an absent report as "unknown", not as "complete".
 
 ### Example prompt
 

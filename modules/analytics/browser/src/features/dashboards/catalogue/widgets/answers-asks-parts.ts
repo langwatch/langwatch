@@ -37,21 +37,30 @@ function ShareRows({ rows }) {
   );
 }`;
 
-/** A small line of values over time; a missing value breaks nothing, it is skipped. */
+/** A small line of values over time; a missing value breaks the line rather than reading 0. */
 export const SPARK = `function Spark({ values, colour, width = 72, height = 22 }) {
-  const known = values.filter((value) => value !== null);
-  if (known.length < 2) return <span style={{ width }} />;
-  const top = Math.max(...known);
-  const bottom = Math.min(...known);
+  const isGap = (value) => value === null || value === undefined;
+  const present = values.filter((value) => !isGap(value));
+  if (present.length < 2) return <span style={{ width }} />;
+  const top = Math.max(...present);
+  const bottom = Math.min(...present);
   const step = width / Math.max(1, values.length - 1);
   const y = (value) => height - 2 - ((value - bottom) / (top - bottom || 1)) * (height - 4);
-  const points = values
-    .map((value, index) => (value === null ? null : index * step + "," + y(value)))
-    .filter(Boolean)
+  let pen = "M";
+  const path = values
+    .map((value, index) => {
+      if (isGap(value)) {
+        pen = "M";
+        return "";
+      }
+      const command = pen + index * step + "," + y(value);
+      pen = "L";
+      return command;
+    })
     .join(" ");
   return (
     <svg width={width} height={height} style={{ flexShrink: 0 }}>
-      <polyline points={points} fill="none" stroke={colour} strokeWidth="1.5" />
+      <path d={path} fill="none" stroke={colour} strokeWidth="1.5" />
     </svg>
   );
 }`;

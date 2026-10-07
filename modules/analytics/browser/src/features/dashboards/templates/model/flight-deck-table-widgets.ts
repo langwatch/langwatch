@@ -22,9 +22,8 @@ export const COST_EFFICIENCY_CODE = widgetCode({
   parts: [NUMBERS, BARS, STAT],
   queries: ["summary", "models"],
   body: `  const totals = summary.data[0] || {};
-  if (num(totals.traces) === 0) return <Panel><CallToAction /></Panel>;
-  const successes = num(totals.successes);
-  const perSuccess = successes > 0 ? num(totals.cost) / successes : 0;
+  if (!num(totals.traces)) return <Panel><CallToAction /></Panel>;
+  const perSuccess = ratio(totals.cost, totals.successes);
   const ranked = models.data.map((row) => ({ label: row.model, value: num(row.cost) }));
   return (
     <Panel>
@@ -79,11 +78,8 @@ export const SCENARIOS_CODE = widgetCode({
   queries: ["summary", "suites"],
   body: `  const runs = num(summary.data[0]?.runs);
   const passed = num(summary.data[0]?.passed);
-  if (runs === 0) return <Panel><CallToAction /></Panel>;
-  const ranked = suites.data.map((row) => ({
-    label: row.suite,
-    value: num(row.runs) > 0 ? num(row.passed) / num(row.runs) : 0,
-  }));
+  if (!runs) return <Panel><CallToAction /></Panel>;
+  const ranked = suites.data.map((row) => ({ label: row.suite, value: ratio(row.passed, row.runs) }));
   return (
     <Panel>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
@@ -124,12 +120,15 @@ export const CODING_AGENTS_CODE = widgetCode({
   codex: "Codex",
 };
 
+// A missing point lifts the pen, so the line breaks instead of dropping to 0.
 function Sparkline({ points }) {
-  const max = Math.max(1, ...points);
+  const max = Math.max(1, ...points.filter(known));
   const step = 48 / Math.max(1, points.length - 1);
   const path = points.map((point, index) => {
+    if (!known(point)) return "";
     const y = 14 - (point / max) * 14;
-    return (index === 0 ? "M" : "L") + (index * step).toFixed(1) + "," + y.toFixed(1);
+    const moveTo = index === 0 || !known(points[index - 1]);
+    return (moveTo ? "M" : "L") + (index * step).toFixed(1) + "," + y.toFixed(1);
   });
   return (
     <svg width="48" height="14">
@@ -194,7 +193,11 @@ function Feedback({ value }) {
     { header: "Latency", align: "right", cell: (row) => ms(num(row.latency_ms)) },
     { header: "Cost", align: "right", cell: (row) => usd(num(row.cost)) },
     { header: "Feedback", align: "center", cell: (row) => <Feedback value={row.feedback} /> },
-    { header: "Impact", align: "right", cell: (row) => <b>{Math.round(num(row.impact))}</b> },
+    {
+      header: "Impact",
+      align: "right",
+      cell: (row) => <b>{known(row.impact) ? Math.round(num(row.impact)) : GAP}</b>,
+    },
   ];
   return (
     <Panel>

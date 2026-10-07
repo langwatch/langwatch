@@ -25,8 +25,8 @@ export const CANNOT_SERVE_CODE = widgetCode({
   queries: ["topics", "totals"],
   body: `  const closed = num(totals.data[0]?.closed);
   const cannot = num(totals.data[0]?.cannot);
-  if (closed === 0) return <Panel><CallToAction /></Panel>;
-  if (cannot === 0) {
+  if (!closed) return <Panel><CallToAction /></Panel>;
+  if (!cannot) {
     return <Panel><Note>Nothing people asked for was out of reach</Note></Panel>;
   }
   const widest = Math.max(...topics.data.map((row) => num(row.requests)), 1);
@@ -156,14 +156,14 @@ export const ASKED_AGAIN_CODE = widgetCode({
   const returning = num(users.data[0]?.returning);
   const points = trend.data.map((row) => ({
     x: bucketLabel(row.bucket),
-    misread: num(row.closed) > 0 ? num(row.misunderstood) / num(row.closed) : 0,
+    misread: ratio(row.misunderstood, row.closed),
   }));
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8,
         marginBottom: 8 }}>
         <Stat label={"Misread first time, " + count(misread) + " of " + count(closed)}
-          value={pct(misread / closed, 1)} />
+          value={pct(ratio(misread, closed), 1)} />
         {active > 0 ? (
           <Stat label={"Came back, " + count(returning) + " of " + count(active) + " people"}
             value={pct(returning / active, 0)} />

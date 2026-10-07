@@ -236,7 +236,7 @@ export const LOOPS_AND_RETRIES_CODE = widgetCode({
   parts: [NUMBERS, DATES, CHART_STYLE, STAT, SERIES_CHART],
   queries: ["daily", "steps", "totals"],
   body: `  const traffic = num(totals.data[0]?.traces);
-  if (traffic === 0) return <Panel><CallToAction /></Panel>;
+  if (!traffic) return <Panel><CallToAction /></Panel>;
   if (daily.data.length === 0) {
     return <Panel><Note>No trace looped or retried in this period.</Note></Panel>;
   }
@@ -259,7 +259,7 @@ export const LOOPS_AND_RETRIES_CODE = widgetCode({
         marginBottom: 8 }}>
         <Stat label={"Looped or retried, " + pct(repeated / traffic) + " of traces"}
           value={count(repeated)} />
-        <Stat label={"Cost of the repeats, " + pct(spend > 0 ? repeatCost / spend : 0) +
+        <Stat label={"Cost of the repeats, " + pct(ratio(repeatCost, spend)) +
           " of spend"} value={usd(repeatCost)} />
         <div style={{ minWidth: 0, fontSize: 11 }}>
           <div style={{ fontSize: 10, color: C.faint }}>Most repeated steps</div>
@@ -300,15 +300,15 @@ export const WRONG_TOOL_CODE = widgetCode({
   const totals = halves.data[0] || {};
   const judged = num(totals.judged);
   const firstJudged = num(totals.judged_first);
-  const first = firstJudged > 0 ? num(totals.wrong_first) / firstJudged : 0;
+  const first = ratio(totals.wrong_first, firstJudged);
   const secondJudged = judged - firstJudged;
-  const second = secondJudged > 0 ? (num(totals.wrong) - num(totals.wrong_first)) / secondJudged : 0;
+  const second = ratio(num(totals.wrong) - num(totals.wrong_first), secondJudged);
   const points = trend.data.map((row) => ({ x: bucketLabel(row.bucket), wrong: num(row.wrong_rate) }));
   const label = "wrong first tool, " + count(num(totals.wrong)) + " of " + count(judged) +
     " judged tasks · first half " + pct(first) + ", second half " + pct(second);
   return (
     <Panel>
-      <Headline value={pct(judged > 0 ? num(totals.wrong) / judged : 0)} label={label} />
+      <Headline value={pct(ratio(totals.wrong, judged))} label={label} />
       <MarkedChart points={points} bars={[]} marks={changeMarks(changes.data)}
         line={{ key: "wrong", label: "wrong first tool", colour: C.red }}
         lineFormat={(value) => pct(value)} />

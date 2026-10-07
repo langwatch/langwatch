@@ -214,6 +214,8 @@ export const LWQL_TRACES_CATALOGUE = defineTableCatalogue({
     Models: "inherit",
     TotalCost: { access: { allOf: ["cost:view"] } },
     NonBilledCost: "omit",
+    UnpricedSpanCount: { access: { allOf: ["cost:view"] } },
+    UnpricedModels: { access: { allOf: ["cost:view"] } },
     TokensEstimated: "inherit",
     TotalPromptTokenCount: "inherit",
     TotalCompletionTokenCount: "inherit",

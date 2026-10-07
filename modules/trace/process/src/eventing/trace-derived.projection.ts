@@ -128,6 +128,9 @@ export interface TraceAnalyticsRow {
   // Metric scalars.
   totalCost: number | null;
   nonBilledCost: number | null;
+  /** Spans whose model had no price, and those models sorted (trace_summaries' twins). */
+  unpricedSpanCount: number;
+  unpricedModels: string[];
   totalDurationMs: number;
   timeToFirstTokenMs: number | null;
   tokensPerSecond: number | null;
@@ -216,6 +219,8 @@ export interface TraceAnalyticsData {
   totalDurationMs: number;
   totalCost: number | null;
   nonBilledCost: number | null;
+  unpricedSpanCount: number;
+  unpricedModels: string[];
   totalPromptTokenCount: number | null;
   totalCompletionTokenCount: number | null;
   timeToFirstTokenMs: number | null;
@@ -359,6 +364,8 @@ export class TraceAnalyticsFoldProjection
       totalDurationMs: 0,
       totalCost: null,
       nonBilledCost: null,
+      unpricedSpanCount: 0,
+      unpricedModels: [],
       totalPromptTokenCount: null,
       totalCompletionTokenCount: null,
       timeToFirstTokenMs: null,
@@ -618,6 +625,8 @@ export class TraceAnalyticsFoldProjection
       models: state.models,
       totalCost: state.totalCost,
       nonBilledCost: state.nonBilledCost,
+      unpricedSpanCount: state.unpricedSpanCount,
+      unpricedModels: state.unpricedModels,
       tokensEstimated: false,
       totalPromptTokenCount: state.totalPromptTokenCount,
       totalCompletionTokenCount: state.totalCompletionTokenCount,
@@ -823,6 +832,8 @@ export class TraceAnalyticsFoldProjection
 
       totalCost: state.totalCost,
       nonBilledCost: state.nonBilledCost,
+      unpricedSpanCount: state.unpricedSpanCount ?? 0,
+      unpricedModels: state.unpricedModels ?? [],
       totalDurationMs: state.totalDurationMs,
       timeToFirstTokenMs: state.timeToFirstTokenMs,
       tokensPerSecond: state.tokensPerSecond,
@@ -898,6 +909,8 @@ export class TraceAnalyticsFoldProjection
       totalDurationMs: row.totalDurationMs,
       totalCost: row.totalCost,
       nonBilledCost: row.nonBilledCost,
+      unpricedSpanCount: row.unpricedSpanCount,
+      unpricedModels: row.unpricedModels,
       totalPromptTokenCount: row.promptTokens,
       totalCompletionTokenCount: row.completionTokens,
       timeToFirstTokenMs: row.timeToFirstTokenMs,
@@ -993,6 +1006,8 @@ export class TraceAnalyticsFoldProjection
       rootSpanStartTimeMs,
       totalCost: tokens.totalCost,
       nonBilledCost: tokens.nonBilledCost,
+      unpricedSpanCount: tokens.unpricedSpanCount,
+      unpricedModels: tokens.unpricedModels,
       totalPromptTokenCount: tokens.totalPromptTokenCount,
       totalCompletionTokenCount: tokens.totalCompletionTokenCount,
       timeToFirstTokenMs: tokens.timeToFirstTokenMs,

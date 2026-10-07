@@ -38,6 +38,7 @@ import {
   type LangWatchQLViewDefinition,
 } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
+import { LangWatchQLCompletenessService } from "./langwatch-ql-completeness.service.ts";
 import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service.ts";
 import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
 import {
@@ -53,6 +54,7 @@ const lwqlCapability = LangWatchQLCapabilityService.create();
 const timeWindows = LangWatchQLTimeWindowService.create();
 const lwqlSchema = LangWatchQLSchemaService.create();
 const lwqlDiagnostics = LangWatchQLDiagnosticsService.create();
+const lwqlCompleteness = LangWatchQLCompletenessService.create();
 const lwqlValidationErrors = LangWatchQLValidationErrorService.create();
 
 const logger = createLogger("langwatch:analytics:lwql");
@@ -358,6 +360,7 @@ export class LangWatchQLService {
       sql,
       validation,
       granularity,
+      ...(timeWindow ? { timeWindow } : {}),
     });
   }
 
@@ -400,17 +403,22 @@ export class LangWatchQLService {
     sql,
     validation,
     granularity,
+    timeWindow,
   }: {
     readonly executor: LangWatchQLExecutorRepository;
     readonly projects: readonly LangWatchQLCaller[];
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
+    readonly timeWindow?: LangWatchQLTimeWindow;
   }): Promise<LangWatchQLQueryResult> {
     // The resolved record plus the step this run was bucketed at, when the
     // statement declares the parameter. Built unconditionally and omitted when
     // empty, so an unparameterised query keeps the request shape it had.
     const executionParameters = executionParametersOf({ validation, granularity });
+    const tenantCapability = lwqlCapability.tenantCapabilitySet({
+      secrets: projects.map((project) => project.lwqlKey),
+    });
 
     const execution = await executor.execute({
       // The submitted statement with one edit and no other: a default `LIMIT` when the caller
@@ -422,9 +430,7 @@ export class LangWatchQLService {
       // granularity merge, so passing it drops `period_granularity_seconds`
       // from every statement that declares one.
       ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
-      tenantCapability: lwqlCapability.tenantCapabilitySet({
-        secrets: projects.map((project) => project.lwqlKey),
-      }),
+      tenantCapability,
     });
     // Refused rather than cut: a body that looks whole but is missing its tail is the worse
     // failure for an analytics caller. The row count is already bounded by the LIMIT above.
@@ -442,6 +448,20 @@ export class LangWatchQLService {
       now: this.now(),
     });
 
+    // After the main query, never beside it: a refused or failed query costs no second read.
+    // Only a statement bound to the window gets a report; a hard-coded range is not the period.
+    const completeness = await lwqlCompleteness.assess({
+      executor,
+      tenantCapability,
+      validation,
+      database: this.deps.database,
+      views: this.views,
+      ...(validation.followsTimeWindow && timeWindow ? { timeWindow } : {}),
+      ...(granularity.followsGranularity && granularity.granularitySeconds !== undefined
+        ? { granularitySeconds: granularity.granularitySeconds }
+        : {}),
+    });
+
     logger.info(
       {
         projectIds: projects.map((project) => project.id),
@@ -452,6 +472,8 @@ export class LangWatchQLService {
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
         followsTimeWindow: validation.followsTimeWindow,
         followsGranularity: granularity.followsGranularity,
+        completeness:
+          completeness.kind === "reported" ? completeness.completeness.state : completeness.reason,
       },
       "LangWatchQL executed",
     );
@@ -469,6 +491,7 @@ export class LangWatchQLService {
       ...(granularity.coarsenedFromSeconds === undefined
         ? {}
         : { coarsenedFromSeconds: granularity.coarsenedFromSeconds }),
+      ...(completeness.kind === "reported" ? { completeness: completeness.completeness } : {}),
     };
   }
 }

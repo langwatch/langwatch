@@ -77,8 +77,11 @@ const TONE = { Worse: "bad", Unclear: "warn", Better: "good" };`,
   const side = (isNew) => costs.data.find((row) => num(row.is_new) === (isNew ? 1 : 0)) || {};
   const next = side(true);
   const current = side(false);
-  const slower = num(next.typical_ms) > num(current.typical_ms) * 1.25;
-  const dearer = num(next.cost_per_run) > num(current.cost_per_run) * 1.1;
+  // An unknown side compares as no change, never as a rise from 0.
+  const rose = (key, factor) =>
+    known(next[key]) && known(current[key]) && num(next[key]) > num(current[key]) * factor;
+  const slower = rose("typical_ms", 1.25);
+  const dearer = rose("cost_per_run", 1.1);
   let sentence = "The newest run can ship: no scenario got worse.";
   if (slower || dearer) sentence = "No scenario got worse, but check the " +
     (slower ? "run time" : "cost") + ".";
@@ -208,9 +211,9 @@ const MEASURES = [
   const baseline = runs[Math.min(1, runs.length - 1)];
   const cell = (run) => (measure) => {
     const value = measure.of(run);
-    if (value === undefined) return <span style={{ color: C.faint }}>n/a</span>;
+    if (!known(value)) return <span style={{ color: C.faint }}>n/a</span>;
     const base = measure.of(baseline);
-    const delta = run === baseline || base === undefined ? 0 : (value - base) * measure.better;
+    const delta = run === baseline || !known(base) ? 0 : (value - base) * measure.better;
     const color = delta > measure.tolerance ? C.green : delta < -measure.tolerance ? C.red : C.text;
     return <span style={{ color }}>{measure.format(value)}</span>;
   };
@@ -238,6 +241,7 @@ export const ROLLOUT_CODE = widgetCode({
 
 // better: which way is good; a relative change under 5% (1 point for rates) is no change.
 function verdict({ before, after, better, rate }) {
+  if (!known(before) || !known(after)) return <span style={{ color: C.faint }}>n/a</span>;
   const change = rate ? after - before : before > 0 ? (after - before) / before : 0;
   const limit = rate ? 0.01 : 0.05;
   if (change * better > limit) return <span style={{ color: C.green }}>better</span>;
@@ -356,7 +360,7 @@ ${experimentFace("No experiment ran in this period. Run your test set as an expe
         <Stat label={"Latest run, " + count(num(latest.judged)) + " checks"} value={pct(raw, 0)} />
         <Stat label="Weighted to real traffic" value={pct(weighted, 0)} />
         <Stat label="Gap, test set against traffic"
-          value={Math.round((raw - weighted) * 100) + " pts"} />
+          value={known(raw) && known(weighted) ? Math.round((raw - weighted) * 100) + " pts" : GAP} />
       </div>
       <SeriesChart points={points} series={series} format={(value) => pct(value, 0)} />
     </Panel>

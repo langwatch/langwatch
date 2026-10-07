@@ -242,6 +242,8 @@ export class SpanCostService {
     totalCompletionTokenCount: number | null;
     totalCost: number | null;
     nonBilledCost: number | null;
+    unpricedSpanCount: number;
+    unpricedModels: string[];
     tokensEstimated: boolean;
     timeToFirstTokenMs: number | null;
     timeToLastTokenMs: number | null;
@@ -288,11 +290,44 @@ export class SpanCostService {
       totalCompletionTokenCount: totalCompletionTokenCount > 0 ? totalCompletionTokenCount : null,
       totalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
       nonBilledCost: nonBilledCost > 0 ? Number(nonBilledCost.toFixed(6)) : null,
+      ...this.#accumulateUnpriced({ state, span, metrics }),
       tokensEstimated: state.tokensEstimated || metrics.estimated,
       timeToFirstTokenMs,
       timeToLastTokenMs,
       tokensPerSecond,
     };
+  }
+
+  /**
+   * Counts the span when its zero cost is unknown rather than free: it reports usage that no
+   * price rule covers. A span priced at zero by a rule, a positive cost, or a skipped span is
+   * not counted. Models stay distinct and sorted, stable however spans arrive.
+   */
+  #accumulateUnpriced({
+    state,
+    span,
+    metrics,
+  }: {
+    state: TraceSummaryData;
+    span: NormalizedSpan;
+    metrics: { promptTokens: number; completionTokens: number; cost: number };
+  }): { unpricedSpanCount: number; unpricedModels: string[] } {
+    const counted = state.unpricedSpanCount ?? 0;
+    const models = state.unpricedModels ?? [];
+    const model = this.extractModelsFromSpan(span)[0];
+    const isUnpriced =
+      !this.isTokenAccumulationSkipped(span) &&
+      metrics.cost <= 0 &&
+      this.modelCosts.isUnpriced({
+        attributes: span.spanAttributes,
+        model,
+        promptTokens: metrics.promptTokens,
+        completionTokens: metrics.completionTokens,
+      });
+    if (!isUnpriced) return { unpricedSpanCount: counted, unpricedModels: [...models] };
+    const withModel =
+      model === undefined || models.includes(model) ? models : [...models, model].toSorted();
+    return { unpricedSpanCount: counted + 1, unpricedModels: [...withModel] };
   }
 
   private static coerceToNumber(value: unknown): number | null {

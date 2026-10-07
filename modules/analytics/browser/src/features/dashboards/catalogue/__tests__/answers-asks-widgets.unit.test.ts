@@ -83,7 +83,7 @@ describe("given the Answer quality widgets", () => {
     const { sql, tsx } = buildOf("rag-empty-retrieval");
     expect(sql.trend).toContain("SpanAttributes['langwatch.span.type'] = 'rag'");
     expect(sql.trend).toContain("countIf(found_nothing = 1) AS empty_searches");
-    expect(tsx).toContain("num(row.empty_searches) / num(row.questions)");
+    expect(tsx).toContain("ratio(row.empty_searches, row.questions)");
   });
 });
 

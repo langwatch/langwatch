@@ -126,7 +126,7 @@ describe("given the Running costs widgets", () => {
     expect(queries.spend).toContain("FROM evaluation_metrics");
     expect(queries.month).toContain("toStartOfMonth(now())");
     expect(queries.month).toContain("subtractDays(now(), 7)");
-    expect(code).toContain("(num(m.last_7_days) / 7) * daysLeft");
+    expect(code).toContain("const pace = ratio(m.last_7_days, 7);");
     expect(code).toContain('label="Cost per success"');
   });
 
@@ -164,5 +164,26 @@ describe("given the Running costs widgets", () => {
     expect(queries.halves).toContain("subtractSeconds(");
     expect(code).toContain('row.kind === "model"');
     expect(code).toContain('label="Cheapest model"');
+  });
+});
+
+describe("given the cost widgets' queries", () => {
+  const COST_WIDGETS = ["cost-verdict", "cost-by-source", "cost-waste", "voice-cost-per-call"];
+
+  /** @scenario "Template cost queries never count a missing cost as $0" */
+  it("sum the cost column as it is, so an unpriced trace adds nothing rather than $0", () => {
+    for (const id of [...COST_WIDGETS, "ext-cost-per-doc"]) {
+      for (const sql of Object.values(build(id).queries)) {
+        expect(sql).not.toContain("ifNull(TotalCost, 0)");
+      }
+    }
+    expect(build("cost-verdict").queries.spend).toContain("sumIf(TotalCost, OccurredAt >= ");
+  });
+
+  /** @scenario "Template cost queries never count a missing cost as $0" */
+  it("adds trace and evaluator cost so the total is null only when neither has a price", () => {
+    const { month } = build("cost-verdict").queries;
+
+    expect(month).toContain("coalesce((SELECT sum(TotalCost) FROM trace_metrics");
   });
 });

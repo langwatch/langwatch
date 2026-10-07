@@ -20,11 +20,12 @@ export const MARKED_CHART_IMPORTS = [
 ] as const;
 
 /** Figure tiles with their change against the period before; reads `NUMBERS`. */
-export const FIGURES = `const signedPct = (value) => (value > 0 ? "+" : "") + pct(value, 0);
+export const FIGURES = `const signedPct = (value) => (known(value) && value > 0 ? "+" : "") + pct(value, 0);
 
 // better is the direction that is good for this figure: "up" or "down".
 function Change({ now, before, better, format }) {
   const line = { marginTop: 2, fontSize: 11, fontWeight: 500 };
+  if (!known(now)) return null;
   if (!(before > 0)) return <div style={{ ...line, color: C.faint }}>No earlier data</div>;
   const delta = (now - before) / before;
   const flat = Math.abs(delta) < 0.005;
@@ -68,9 +69,6 @@ function Hint({ children, onClick }) {
     </div>
   );
 }`;
-
-/** A share that is zero, not NaN, when the whole is zero. */
-export const RATIO = `const ratio = (part, whole) => (whole > 0 ? part / whole : 0);`;
 
 /** The trace explorer over the board's period, filtered by trace search fields. */
 export const TRACES_LINK = `function openTraces(filter = {}) {
@@ -159,7 +157,7 @@ function MarkedChart({ points, series, format, rightFormat, markers = [], domain
             ) : (
               <Line key={item.key} yAxisId={item.right ? "right" : "left"} type="monotone"
                 dataKey={item.key} name={item.label} stroke={item.colour} strokeWidth={2}
-                strokeDasharray={item.dashed ? "4 3" : undefined} dot={false} connectNulls
+                strokeDasharray={item.dashed ? "4 3" : undefined} dot={false}
                 isAnimationActive={false} />
             ))}
           </ComposedChart>
