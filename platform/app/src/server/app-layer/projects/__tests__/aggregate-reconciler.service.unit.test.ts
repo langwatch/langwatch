@@ -95,7 +95,7 @@ function inMemoryLedger(
           row.readerProjectId === readerProjectId &&
           row.memberProjectId === memberProjectId,
       );
-      if (existing) return { grantId: existing.grantId, attached: false };
+      if (existing) return { grantId: existing.grantId, wasAttached: false };
       const grantId = `grant_${++minted}`;
       rows.push({
         grantId,
@@ -105,7 +105,7 @@ function inMemoryLedger(
         actor,
         source,
       });
-      return { grantId, attached: true };
+      return { grantId, wasAttached: true };
     },
     async revokeSharedProjectGrants({
       readerProjectId,

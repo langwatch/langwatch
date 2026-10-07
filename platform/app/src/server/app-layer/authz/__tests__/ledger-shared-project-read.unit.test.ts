@@ -62,7 +62,7 @@ describe("attachSharedProjectGrant", () => {
         awaitProjection: false,
       });
 
-      expect(outcome.attached).toBe(true);
+      expect(outcome.wasAttached).toBe(true);
       expect(sent).toHaveLength(1);
       expect(sent[0]).toMatchObject({
         verb: "attachGrant",
@@ -103,7 +103,10 @@ describe("attachSharedProjectGrant", () => {
         awaitProjection: false,
       });
 
-      expect(outcome).toEqual({ grantId: "grant_existing", attached: false });
+      expect(outcome).toEqual({
+        grantId: "grant_existing",
+        wasAttached: false,
+      });
       expect(sent).toHaveLength(0);
       expect(db.grant.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({

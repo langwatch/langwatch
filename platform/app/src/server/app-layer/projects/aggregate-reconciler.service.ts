@@ -263,7 +263,7 @@ export class AggregateReconciler {
         // Someone else attached the pair since the live read (a direct
         // ledger write, not another reconcile, which the lock keeps out);
         // its row is the one that stands.
-        if (outcome.attached) {
+        if (outcome.wasAttached) {
           attached.push({ memberProjectId, grantId: outcome.grantId });
         } else {
           alreadyHeld.push(memberProjectId);

@@ -692,7 +692,7 @@ export class GrantsLedgerWriter {
     source?: GrantEventSource;
     commandId?: string;
     awaitProjection?: boolean;
-  }): Promise<{ grantId: string; attached: boolean }> {
+  }): Promise<{ grantId: string; wasAttached: boolean }> {
     if (readerProjectId === memberProjectId) {
       throw new GrantValidationError(
         "A project cannot share a read with itself",
@@ -721,7 +721,7 @@ export class GrantsLedgerWriter {
       where: identity,
       select: { id: true },
     });
-    if (existing) return { grantId: existing.id, attached: false };
+    if (existing) return { grantId: existing.id, wasAttached: false };
 
     const principal = { type: "project" as const, id: readerProjectId };
     const scope = { type: "PROJECT" as const, id: memberProjectId };
@@ -733,7 +733,7 @@ export class GrantsLedgerWriter {
     // A concurrent attach of the same pair landed between the read above and
     // this one: its row is the pair's live grant, so it is returned, not
     // shadowed by a second live row a second later.
-    if (fresh.live) return { grantId: fresh.grantId, attached: false };
+    if (fresh.live) return { grantId: fresh.grantId, wasAttached: false };
     const { grantId, occurredAtMs } = fresh;
     const { commands } = await this.commands();
     await commands.attachGrant.send({
@@ -765,7 +765,7 @@ export class GrantsLedgerWriter {
       });
     }
     await bumpAuthzEpoch({ organizationId });
-    return { grantId, attached: true };
+    return { grantId, wasAttached: true };
   }
 
   /**

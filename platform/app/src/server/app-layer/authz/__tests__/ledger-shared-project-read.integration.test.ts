@@ -183,7 +183,7 @@ describe("given a shared project read in the ledger", () => {
       condition: CONDITION,
       actor: { type: "system", id: SYSTEM_ACTORS.aggregateReconciler },
     });
-    expect(outcome).toEqual({ grantId: sharedGrantId, attached: false });
+    expect(outcome).toEqual({ grantId: sharedGrantId, wasAttached: false });
     expect(appended).toHaveLength(0);
   });
 
@@ -242,7 +242,7 @@ describe("given a shared project read in the ledger", () => {
         awaitProjection: false,
       });
 
-      expect(outcome.attached).toBe(true);
+      expect(outcome.wasAttached).toBe(true);
       expect(outcome.grantId).not.toBe(revokedSameSecond);
       const command = appended[sent]?.data as {
         grant: { grantId: string; occurredAtMs: number };
@@ -335,7 +335,7 @@ describe("given a shared project read in the ledger", () => {
       expect(firstLookup).toBe(false);
       expect(outcome).toEqual({
         grantId: landedConcurrently,
-        attached: false,
+        wasAttached: false,
       });
       expect(appended).toHaveLength(sent);
     } finally {
