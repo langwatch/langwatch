@@ -695,7 +695,7 @@ Contract `../contract/src/dashboard.trpc.ts:22`, router `src/transport/dashboard
 
 ### `graphs`
 
-Contract `../contract/src/graph.trpc.ts:139`, router `src/transport/graph.trpc.ts:34`.
+Contract `../contract/src/graph.trpc.ts:140`, router `src/transport/graph.trpc.ts:31`.
 
 | Procedure                   | Kind     | Gate                          | Input                                   | Output                      |
 | --------------------------- | -------- | ----------------------------- | --------------------------------------- | --------------------------- |

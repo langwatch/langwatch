@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Portable User use cases exposed to process peers and transports.
 
-Peers call these through the token, declared at `../contract/src/user.api.ts:83`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/user.api.ts:84`; nothing else in this package is public.
 
 #### `findById`
 
@@ -140,6 +140,14 @@ Mints an account whose only sign-in method is the passkey about to be registered
 
 ```typescript
 createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser>;
+```
+
+#### `adoptUnconfirmedAccount`
+
+An address proof adopts the unfinished account on it: one transaction confirms the address and drops every sign-in method set before the proof; memberships stay (rulings 2026-10-06).
+
+```typescript
+adoptUnconfirmedAccount(input: UserEmailInput): Promise<AdoptUnconfirmedAccountOutcome>;
 ```
 
 #### `registerCredentialAccount`

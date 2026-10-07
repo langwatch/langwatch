@@ -10,7 +10,7 @@ Annotations on traces: comments, scores and reviews, and the annotation queues r
 | -------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Classification | core (`modules/catalogue.json`)                                                                                    |
 | Subjects       | annotation                                                                                                         |
-| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                           |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                        |
 | Api token      | `AnnotationApi` = `moduleApi<AnnotationApi>()("annotation")`, `contract/src/annotation.api.ts:118` (32 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                         |
 

@@ -545,7 +545,7 @@ Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 
 ```typescript
 type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:142
-type Response = z.infer<typeof successSchema>; // ../../../packages/api/src/rest/response.ts:247
+type Response = z.infer<typeof successSchema>; // ../../../packages/api/src/rest/response.ts:248
 ```
 
 ## tRPC transport

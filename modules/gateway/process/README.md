@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`GatewayApi`)
 
-Peers call these through the token, declared at `../contract/src/gateway.api.ts:519`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/gateway.api.ts:544`; nothing else in this package is public.
 It extends `GatewayInternalProtocol`.
 
 #### `internalDoor`
@@ -677,6 +677,22 @@ One page of the spend-event ledger for a project, newest first, with virtual-key
 
 ```typescript
 listSpendEventsPage(input: GatewaySpendEventsPageQuery): Promise<GatewaySpendEventPage>;
+```
+
+#### `listSpendEventsAcrossTenants`
+
+Spend events across these tenants in these statuses, newest first by occurrence then request id; an empty page where this deployment has no spend source.
+
+```typescript
+listSpendEventsAcrossTenants(input: GatewaySpendEventsAcrossTenantsQuery): Promise<GatewaySpendEventsAcrossTenantsPage>;
+```
+
+#### `findSpendEventAcrossTenants`
+
+One request's spend row across these tenants, null when none holds it.
+
+```typescript
+findSpendEventAcrossTenants(input: GatewaySpendEventAcrossTenantsQuery): Promise<SpendEventRow | null>;
 ```
 
 #### `findSpendDaysForOrganizationProjects`
@@ -1443,9 +1459,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1128`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1129`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1130`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1132`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1133`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1134`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:25` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:27` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:29` |

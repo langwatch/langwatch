@@ -6,13 +6,13 @@ The server half of [ops](../README.md). Platform administration for every deploy
 
 ## Installation
 
-`defineProcessModule("ops").withRepositories(opsRepositories).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).withTransportFacts(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…)`, `src/ops.module.ts:24`.
+`defineProcessModule("ops").withRepositories(opsRepositories).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).withTransportFacts(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…)`, `src/ops.module.ts:25`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`OpsApi`)
 
-Peers call these through the token, declared at `../contract/src/ops.api.ts:393`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/ops.api.ts:404`; nothing else in this package is public.
 
 #### `startAdminImpersonation`
 
@@ -820,6 +820,46 @@ The paid checks over a project key; refused on LangWatch Cloud.
 runProjectCheckup(input: { projectId: string } & ExplicitCheckInput): Promise<CheckupResult>;
 ```
 
+#### `getUpgradeStatus`
+
+```typescript
+getUpgradeStatus(): Promise<OpsUpgradeStatus>;
+```
+
+#### `listUpgradeReleases`
+
+```typescript
+listUpgradeReleases(): Promise<OpsUpgradeReleasePage>;
+```
+
+#### `listUpgradeSteps`
+
+```typescript
+listUpgradeSteps(input: OpsUpgradeListStepsInput): Promise<OpsUpgradeStepPage>;
+```
+
+#### `getUpgradeStep`
+
+Refuses with `upgrade_not_found` when the ledger and the image hold no such step.
+
+```typescript
+getUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;
+```
+
+#### `listUpgradeRuns`
+
+```typescript
+listUpgradeRuns(input: OpsUpgradeListRunsInput): Promise<OpsUpgradeRunPage>;
+```
+
+#### `getUpgradeRun`
+
+Refuses with `upgrade_not_found` when the ledger holds no such run.
+
+```typescript
+getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun>;
+```
+
 ## REST transport
 
 ### `adminRest`
@@ -1104,6 +1144,19 @@ Contract `../contract/src/ops-queue.trpc.ts:47`, router `src/transport/ops-queue
 | `ops.canaryRedrive`          | mutation | Platform permission `ops:manage` | `opsQueueCanaryInputSchema`          | `opsQueueCanaryRedrivenSchema`     |
 | `ops.canaryUnblock`          | mutation | Platform permission `ops:manage` | `opsQueueCanaryInputSchema`          | `opsQueueCanaryUnblockedSchema`    |
 
+### `ops.upgrade`
+
+Contract `../contract/src/ops-upgrade.ts:148`, router `src/transport/ops-upgrade.trpc.ts:9`.
+
+| Procedure                  | Kind  | Gate                           | Input                            | Output                        |
+| -------------------------- | ----- | ------------------------------ | -------------------------------- | ----------------------------- |
+| `ops.upgrade.status`       | query | Platform permission `ops:view` | inline                           | `opsUpgradeStatusSchema`      |
+| `ops.upgrade.listReleases` | query | Platform permission `ops:view` | inline                           | `opsUpgradeReleasePageSchema` |
+| `ops.upgrade.listSteps`    | query | Platform permission `ops:view` | `opsUpgradeListStepsInputSchema` | `opsUpgradeStepPageSchema`    |
+| `ops.upgrade.getStep`      | query | Platform permission `ops:view` | `opsUpgradeIdInputSchema`        | `opsUpgradeStepDetailSchema`  |
+| `ops.upgrade.listRuns`     | query | Platform permission `ops:view` | `opsUpgradeListRunsInputSchema`  | `opsUpgradeRunPageSchema`     |
+| `ops.upgrade.getRun`       | query | Platform permission `ops:view` | `opsUpgradeIdInputSchema`        | `opsUpgradeRunSchema`         |
+
 ## Sockets
 
 None: this module declares no websocket, rawsocket or rawhttp door.
@@ -1176,11 +1229,11 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                             | Environment variable                | Declared at                        |
 | ------ | -------------------------------- | ----------------------------------- | ---------------------------------- |
-| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`     | `src/app/ops.app.ts:735`           |
-| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:737`           |
-| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:739`           |
-| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:740`           |
-| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:741`           |
+| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`     | `src/app/ops.app.ts:774`           |
+| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:776`           |
+| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:778`           |
+| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:779`           |
+| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:780`           |
 | config | `apiKey`                         | `LANGWATCH_OPS_API_KEY`             | `../contract/src/ops.config.ts:26` |
 | config | `metricsApiKey`                  | `METRICS_API_KEY`                   | `../contract/src/ops.config.ts:28` |
 | config | `clickhouseOpsUrl`               | `CLICKHOUSE_OPS_URL`                | `../contract/src/ops.config.ts:30` |

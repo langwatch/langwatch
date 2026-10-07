@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Public Trace operations shared by process peers after boot composition.
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:152`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:161`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -166,7 +166,7 @@ findSummary(input: TraceSummaryLookupInput): Promise<TraceSummaryData | null>;
 #### `listTraces`
 
 ```typescript
-listTraces(input: { query: TraceLegacyListInput; protections: unknown; options?: { dateField?: TraceDateField; downloadMode?: boolean; includeSpans?: boolean; resolveBlobs?: boolean; scrollId?: string | null; /** The v1 REST search's compiled query-language filter, ANDed into the read. */ filterWhere?: { sql: string; params: Record<string, unknown> }; }; }): Promise<TracesForProjectResult>;
+listTraces(input: { query: TraceLegacyListInput; protections: unknown; options?: { dateField?: TraceDateField; downloadMode?: boolean; includeSpans?: boolean; resolveBlobs?: boolean; scrollId?: string | null; /** The v1 REST search's compiled query-language filter, ANDed into the read. */ filterWhere?: { sql: string; params: Record<string, unknown> }; /** Refuse above this plan bound instead of clamping to the list bound. */ refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax"; }; }): Promise<TracesForProjectResult>;
 ```
 
 #### `listTraceSummaries`
@@ -531,6 +531,70 @@ The project's newest traces carrying the attribute, at most `limit`; `model` is 
 
 ```typescript
 findAttributedTraces(input: { projectId: string; attributeKey: string; window: TraceModelSpendWindow; values?: string[]; model?: string; limit: number; }): Promise<TraceAttributedTrace[]>;
+```
+
+#### `getAttributedSpendComparison`
+
+Current and previous window spend of the traces matching every attribute; distinct actors.
+
+```typescript
+getAttributedSpendComparison(input: { projectId: string; matches: readonly TraceAttributeMatch[]; actorKey: string; previousStartMs: number; currentStartMs: number; endMs: number; }): Promise<TraceAttributedSpendComparison>;
+```
+
+#### `findAttributedSpendByValue`
+
+Spend per non-empty `valueKey` value of the matching traces, sorted and paged in the store.
+
+```typescript
+findAttributedSpendByValue(input: { projectId: string; matches: readonly TraceAttributeMatch[]; valueKey: string; window: TraceModelSpendWindow; sortBy: TraceAttributedSpendSort; sortDirection: "asc" | "desc"; limit: number; offset: number; }): Promise<TraceAttributedValueSpend[]>;
+```
+
+#### `findAttributedSpendComparisonByValue`
+
+Per non-empty `valueKey` value, spend split at `currentStartMs`; unsorted.
+
+```typescript
+findAttributedSpendComparisonByValue(input: { projectId: string; matches: readonly TraceAttributeMatch[]; valueKey: string; previousStartMs: number; currentStartMs: number; endMs: number; }): Promise<TraceAttributedValueComparison[]>;
+```
+
+#### `findSpendByProjectAndValue`
+
+Spend per (project, `valueKey` value) across one organisation's projects; unsorted.
+
+```typescript
+findSpendByProjectAndValue(input: { projectIds: readonly string[]; valueKey: string; window: TraceModelSpendWindow; }): Promise<TraceProjectValueSpend[]>;
+```
+
+#### `findDailyAttributedSpend`
+
+Spend of the matching traces per UTC day and group value, oldest day first.
+
+```typescript
+findDailyAttributedSpend(input: { projectId: string; matches: readonly TraceAttributeMatch[]; groupBy: TraceDailySpendGroup; window: TraceModelSpendWindow; }): Promise<TraceDailyGroupSpend[]>;
+```
+
+#### `countAttributedTracesByValue`
+
+Matching traces since `sinceMs`, counted per `valueKey` value among `values`.
+
+```typescript
+countAttributedTracesByValue(input: { projectId: string; matches: readonly TraceAttributeMatch[]; valueKey: string; values: readonly string[]; sinceMs: number; }): Promise<{ value: string; count: number }[]>;
+```
+
+#### `findAttributedTracesBefore`
+
+The newest matching traces before `beforeMs`, at most `limit`, with the asked attributes.
+
+```typescript
+findAttributedTracesBefore(input: { projectId: string; matches: readonly TraceAttributeMatch[]; attributeKeys: readonly string[]; beforeMs: number; limit: number; }): Promise<TraceAttributedTraceDetail[]>;
+```
+
+#### `getAttributedTraceRecency`
+
+Matching trace counts since each of `countSinceMs`, and their newest occurrence ever.
+
+```typescript
+getAttributedTraceRecency(input: { projectId: string; matches: readonly TraceAttributeMatch[]; countSinceMs: readonly number[]; }): Promise<TraceAttributedRecency>;
 ```
 
 #### `readRecentSpansByModels`
@@ -1301,7 +1365,7 @@ Contract `../contract/src/export-progress.trpc.ts:20`, router `src/transport/exp
 
 ### `sharedTrace`
 
-Contract `../contract/src/traces.trpc.ts:598`, router `src/transport/shared-trace.trpc.ts:30`.
+Contract `../contract/src/traces.trpc.ts:608`, router `src/transport/shared-trace.trpc.ts:30`.
 
 | Procedure         | Kind  | Gate                                                                                                                                                | Input                       | Output                 |
 | ----------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ---------------------- |
@@ -1309,7 +1373,7 @@ Contract `../contract/src/traces.trpc.ts:598`, router `src/transport/shared-trac
 
 ### `spans`
 
-Contract `../contract/src/traces.trpc.ts:607`, router `src/transport/spans.trpc.ts:10`.
+Contract `../contract/src/traces.trpc.ts:617`, router `src/transport/spans.trpc.ts:10`.
 
 | Procedure                  | Kind  | Gate                     | Input              | Output                   |
 | -------------------------- | ----- | ------------------------ | ------------------ | ------------------------ |
@@ -1341,7 +1405,7 @@ Contract `../contract/src/traces-instant-eval.trpc.ts:20`, router `src/transport
 
 ### `traces`
 
-Contract `../contract/src/traces.trpc.ts:155`, router `src/transport/traces.trpc.ts:47`.
+Contract `../contract/src/traces.trpc.ts:159`, router `src/transport/traces.trpc.ts:47`.
 
 | Procedure                              | Kind         | Gate                       | Input                               | Output                             |
 | -------------------------------------- | ------------ | -------------------------- | ----------------------------------- | ---------------------------------- |

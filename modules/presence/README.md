@@ -11,7 +11,7 @@ Presence: who else is looking at this project, where they are, and where their c
 | Classification | core (`modules/catalogue.json`)                                                                           |
 | Subjects       | presence                                                                                                  |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                  |
-| Api token      | `PresenceApi` = `moduleApi<PresenceApi>()("presence")`, `contract/src/presence.api.ts:61` (11 operations) |
+| Api token      | `PresenceApi` = `moduleApi<PresenceApi>()("presence")`, `contract/src/presence.api.ts:63` (12 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                |
 
 ## What presence owns
