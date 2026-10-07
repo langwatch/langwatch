@@ -11,11 +11,9 @@ import {
   type InstantEvalRunInput,
   type InstantEvalJudgmentStatus,
   type InstantEvalEstimateWire,
-  type InstantEvalJudgement,
   type InstantEvalOptInAccess,
   type InstantEvalQueryJudging,
   type InstantEvalQueryJudgingInput,
-  type InstantEvalQuestion,
   type InstantEvalResultsWire,
   type InstantEvalSampleWire,
   type InstantEvalRunProgress,
@@ -27,6 +25,10 @@ import {
   instantEvalConfig,
   isInstantEvalBounded,
 } from "@langwatch/instant-eval-contract";
+import {
+  type InstantEvalJudgement,
+  type InstantEvalQuestion,
+} from "@langwatch/instant-eval-judge-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";

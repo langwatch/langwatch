@@ -50,38 +50,6 @@ export const INSTANT_EVAL_REQUEST_TYPE = "instant_eval";
 /** The flag that releases Instant Evals to a project. */
 export const INSTANT_EVALS_FLAG = "release_instant_evals";
 
-/** What the judge takes, and what it answers with. */
-export interface InstantEvalClassifierLimits {
-  /** Text and questions together may not exceed this. */
-  readonly stateTokens: number;
-  readonly totalTokens: number;
-  readonly maxCategoryOptions: number;
-  readonly maxScoreLevels: number;
-  /** Covers the envelope and the space the answers need. */
-  readonly reserveTokens: number;
-  /** Transcripts tokenise denser than prose; measured, not the generic four. */
-  readonly bytesPerInputToken: number;
-  /** The densest judged text measured (JSON-heavy digests); such text is fitted at this ratio. */
-  readonly fitBytesPerInputToken: number;
-  /** The densest markdown transcript measured; a transcript is cut to fit at this ratio. */
-  readonly transcriptFitBytesPerInputToken: number;
-  /** Below any judged text measured; the too-large retry cuts at this ratio. */
-  readonly retryBytesPerInputToken: number;
-}
-
-/** The shipped classifier's caps, measured against the live API. */
-export const INSTANT_EVAL_CLASSIFIER_LIMITS: InstantEvalClassifierLimits = {
-  stateTokens: 32_000,
-  totalTokens: 64_000,
-  maxCategoryOptions: 255,
-  maxScoreLevels: 10,
-  reserveTokens: 768,
-  bytesPerInputToken: 2.7,
-  fitBytesPerInputToken: 2,
-  transcriptFitBytesPerInputToken: 2.4,
-  retryBytesPerInputToken: 1.5,
-};
-
 /** Whether a judgement was made, declined, or attempted and lost. */
 export const INSTANT_EVAL_JUDGMENT_STATUSES = ["judged", "skipped", "failed"] as const;
 

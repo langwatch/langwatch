@@ -5,7 +5,10 @@
  */
 
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import type { InstantEvalJudgement, InstantEvalSkipReason } from "@langwatch/instant-eval-contract";
+import type {
+  InstantEvalJudgement,
+  InstantEvalSkipReason,
+} from "@langwatch/instant-eval-judge-contract";
 
 import {
   INSTANT_EVAL_JUDGE_QUESTION_ID,

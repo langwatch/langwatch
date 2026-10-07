@@ -9,7 +9,7 @@ import type {
   InstantEvalJudgement,
   InstantEvalPricing,
   InstantEvalQuestion,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
 
 export interface InstantEvalClassifyRequest {
   /**

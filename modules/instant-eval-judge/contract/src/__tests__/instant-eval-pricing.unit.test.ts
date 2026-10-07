@@ -1,6 +1,6 @@
 /**
  * What a judgement costs us, and what it is sold for.
- * @see modules/instant-eval/specs/instant-eval-cost.feature
+ * @see modules/instant-eval-judge/specs/instant-eval-judge-pricing.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -9,7 +9,7 @@ import {
   INSTANT_EVAL_PRICING,
   instantEvalCostUsd,
   instantEvalPriceUsd,
-} from "../instant-eval-pricing.rules.ts";
+} from "../instant-eval-pricing.ts";
 
 describe("given a response from the classifier", () => {
   describe("when the cost is computed", () => {

@@ -56,6 +56,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../instant-eval-judge/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {

@@ -1,8 +1,8 @@
 {
-  "name": "@langwatch/instant-eval-contract",
+  "name": "@langwatch/instant-eval-judge-contract",
   "version": "0.1.0",
   "private": true,
-  "description": "Instant Evals: a judgment run over an LWQL statement, metered on the gateway spend spine",
+  "description": "The Instant Evals judge: what it is asked, what it answers and what each judgement costs",
   "files": [
     "src"
   ],
@@ -20,15 +20,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/analytics-contract": "workspace:*",
-    "@langwatch/api": "workspace:*",
-    "@langwatch/authorization": "workspace:*",
-    "@langwatch/config": "workspace:*",
-    "@langwatch/handled-error": "workspace:*",
-    "@langwatch/instant-eval-judge-contract": "workspace:*",
     "@langwatch/module": "workspace:*",
-    "@langwatch/secrets": "workspace:*",
-    "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

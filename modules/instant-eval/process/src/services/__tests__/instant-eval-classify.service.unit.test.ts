@@ -4,12 +4,15 @@
  * @see modules/instant-eval/specs/classifier.feature
  */
 
-import type { InstantEvalJudgement, InstantEvalQuestion } from "@langwatch/instant-eval-contract";
+import type {
+  InstantEvalJudgement,
+  InstantEvalQuestion,
+} from "@langwatch/instant-eval-judge-contract";
+import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
 import type { InstantEvalClassifyRequest } from "../../channels/instant-eval-judge.channel.ts";
 import { MemoryInstantEvalJudgeChannel } from "../../channels/memory/memory.instant-eval-judge.channel.ts";
-import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
 import { InstantEvalClassifyService } from "../instant-eval-classify.service.ts";
 
 const question: InstantEvalQuestion = {

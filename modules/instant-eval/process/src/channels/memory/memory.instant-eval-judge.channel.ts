@@ -10,9 +10,9 @@ import {
   type InstantEvalQuestion,
   type InstantEvalVerdict,
   instantEvalSkipped,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
+import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
 
-import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
 import { estimateInstantEvalRequestTokens } from "../../rules/instant-eval-token-budget.rules.ts";
 import type {
   InstantEvalClassifyRequest,

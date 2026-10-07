@@ -1,9 +1,9 @@
 /**
  * What an Instant Eval costs us and what it costs the customer; only input
- * tokens are priced. @see modules/instant-eval/specs/instant-eval-cost.feature
+ * tokens are priced. @see modules/instant-eval-judge/specs/instant-eval-judge-pricing.feature
  */
 
-import type { InstantEvalPricing } from "@langwatch/instant-eval-contract";
+import type { InstantEvalPricing } from "./instant-eval-judge.api.ts";
 
 /** The shipped rate, measured September 2026. The markup applies to every plan. */
 export const INSTANT_EVAL_PRICING: InstantEvalPricing = {

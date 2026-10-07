@@ -9,7 +9,12 @@ import {
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   type InstantEvalJudgement,
   type InstantEvalVerdict,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
+import {
+  INSTANT_EVAL_PRICING,
+  instantEvalCostUsd,
+  instantEvalPriceUsd,
+} from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -18,11 +23,6 @@ import type {
   InstantEvalJudgeChannel,
 } from "../../channels/instant-eval-judge.channel.ts";
 import { MemoryInstantEvalBudgetReservationsRepository } from "../../repositories/memory/memory.instant-eval-budget-reservations.repository.ts";
-import {
-  INSTANT_EVAL_PRICING,
-  instantEvalCostUsd,
-  instantEvalPriceUsd,
-} from "../../rules/instant-eval-pricing.rules.ts";
 import type {
   InstantEvalPricedSpend,
   InstantEvalSpendRecord,

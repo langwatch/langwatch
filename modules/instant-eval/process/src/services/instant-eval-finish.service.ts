@@ -4,12 +4,13 @@
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
-import type { InstantEvalOutcome, InstantEvalPricing } from "@langwatch/instant-eval-contract";
+import type { InstantEvalOutcome } from "@langwatch/instant-eval-contract";
+import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
+import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import type { InstantEvalSpend } from "../eventing/instant-eval-processing.intent.ts";
-import { instantEvalCostUsd, instantEvalPriceUsd } from "../rules/instant-eval-pricing.rules.ts";
 import type { InstantEvalFreeBudgetService } from "./instant-eval-free-budget.service.ts";
 import type { InstantEvalSpendService } from "./instant-eval-spend.service.ts";
 

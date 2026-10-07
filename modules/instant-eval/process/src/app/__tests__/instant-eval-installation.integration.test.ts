@@ -24,6 +24,7 @@ import {
   InstantEvalMemoryJudgeInProductionError,
   type InstantEvalRunInput,
 } from "@langwatch/instant-eval-contract";
+import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp, type ModuleSecretsScope } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -39,7 +40,6 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantEvalProcessModule } from "../../instant-eval.module.ts";
-import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
 
 const PROJECT = "project-1";
 const ORGANIZATION = "organization-1";

@@ -7,7 +7,8 @@
 import {
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   type InstantEvalJudgement,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
+import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -15,7 +16,6 @@ import { instantEvalRunRow } from "../../__tests__/instant-eval.fixtures.ts";
 import type { InstantEvalJudgeChannel } from "../../channels/instant-eval-judge.channel.ts";
 import type { InstantEvalCancellationRepository } from "../../repositories/instant-eval-cancellation.repository.ts";
 import { MemoryInstantEvalRunRepository } from "../../repositories/memory/memory.instant-eval-run.repository.ts";
-import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
 import type {
   InstantEvalKeyPage,
   InstantEvalRowKey,

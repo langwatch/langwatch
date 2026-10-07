@@ -1,4 +1,4 @@
-import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "@langwatch/instant-eval-contract";
+import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
 import {

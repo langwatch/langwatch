@@ -5,6 +5,7 @@
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
+import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
@@ -29,7 +30,6 @@ import {
   pageStopReason,
   type InstantEvalPageStop,
 } from "../rules/instant-eval-page-stop.rules.ts";
-import { instantEvalCostUsd, instantEvalPriceUsd } from "../rules/instant-eval-pricing.rules.ts";
 import {
   instantEvalOwnedRows,
   type InstantEvalKeyPage,

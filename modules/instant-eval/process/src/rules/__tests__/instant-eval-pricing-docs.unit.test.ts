@@ -6,9 +6,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+import { INSTANT_EVAL_PRICING, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
-
-import { INSTANT_EVAL_PRICING, instantEvalPriceUsd } from "../instant-eval-pricing.rules.ts";
 
 const PRICING_PAGE = fileURLToPath(new URL("../../../../../../docs/pricing.mdx", import.meta.url));
 

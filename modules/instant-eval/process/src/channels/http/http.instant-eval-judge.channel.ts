@@ -3,13 +3,14 @@
  * key is never sent here. @see modules/instant-eval/specs/classifier.feature
  */
 
+import { InstantEvalClassifierUnavailableError } from "@langwatch/instant-eval-contract";
 import {
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   type InstantEvalClassifierLimits,
-  InstantEvalClassifierUnavailableError,
   type InstantEvalJudgement,
   instantEvalSkipped,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
+import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { type Dispatcher, Pool, fetch as undiciFetch } from "undici";
@@ -19,7 +20,6 @@ import {
   readClassifierVerdicts,
   toClassifierQuestions,
 } from "../../rules/instant-eval-judge-wire.rules.ts";
-import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
 import {
   cutInstantEvalTextForRetry,
   estimateJudgedTextTokens,

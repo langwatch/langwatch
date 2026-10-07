@@ -6,11 +6,11 @@
 
 import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
 import type { RestProjectCredentialPrincipal } from "@langwatch/authorization";
+import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "@langwatch/instant-eval-judge-contract";
 import { defineRestMiddleware } from "@langwatch/module";
 import { z } from "zod";
 
 import {
-  INSTANT_EVAL_CLASSIFIER_LIMITS,
   INSTANT_EVAL_JUDGMENT_STATUSES,
   INSTANT_EVAL_MAX_ROW_CAP,
   INSTANT_EVAL_MAX_SHORTHAND_QUESTIONS,

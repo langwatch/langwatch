@@ -8,10 +8,12 @@
 import {
   InstantEvalQueryBudgetExceededError,
   InstantEvalQuestionsTooLongError,
+} from "@langwatch/instant-eval-contract";
+import {
   type InstantEvalClassifierLimits,
   type InstantEvalQuestion,
   type InstantEvalVerdict,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
 
 import { instantEvalRowText } from "./instant-eval-row-keys.rules.ts";
 import type { InstantEvalRunQuestion } from "./instant-eval-run-questions.rules.ts";

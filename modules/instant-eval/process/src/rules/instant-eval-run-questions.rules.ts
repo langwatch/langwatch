@@ -11,7 +11,7 @@ import type {
 import type {
   InstantEvalQuestion,
   InstantEvalQuestionKind,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
 import { z } from "zod";
 
 /**

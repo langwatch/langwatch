@@ -1,12 +1,14 @@
 import type { RestCredentialPrincipal } from "@langwatch/authorization";
+import type {
+  InstantEvalJudgement,
+  InstantEvalQuestion,
+} from "@langwatch/instant-eval-judge-contract";
 import { moduleApi, defineTrpcContract } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
 import type {
-  InstantEvalJudgement,
   InstantEvalQueryJudging,
   InstantEvalQueryJudgingInput,
-  InstantEvalQuestion,
 } from "./instant-eval-judging.ts";
 import type { InstantEvalJudgmentStatus, InstantEvalTarget } from "./instant-eval-limits.ts";
 import type {

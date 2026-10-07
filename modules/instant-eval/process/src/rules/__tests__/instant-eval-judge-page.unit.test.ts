@@ -5,11 +5,13 @@
  */
 
 import {
-  INSTANT_EVAL_CLASSIFIER_LIMITS,
   InstantEvalQueryBudgetExceededError,
   InstantEvalQuestionsTooLongError,
-  type InstantEvalVerdict,
 } from "@langwatch/instant-eval-contract";
+import {
+  INSTANT_EVAL_CLASSIFIER_LIMITS,
+  type InstantEvalVerdict,
+} from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
 import {

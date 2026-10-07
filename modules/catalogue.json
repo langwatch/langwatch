@@ -162,6 +162,12 @@
       "restNamespaces": ["instant-evals"]
     },
     {
+      "id": "instant-eval-judge",
+      "root": "modules/instant-eval-judge",
+      "classification": "core",
+      "subjects": ["instant-eval-judge"]
+    },
+    {
       "id": "integration",
       "root": "modules/integration",
       "classification": "core",

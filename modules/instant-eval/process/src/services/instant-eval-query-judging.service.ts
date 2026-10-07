@@ -6,14 +6,14 @@
  */
 
 import type {
-  InstantEvalPricing,
   InstantEvalQueryJudging,
   InstantEvalQueryJudgingInput,
 } from "@langwatch/instant-eval-contract";
+import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
+import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import { instantEvalCostUsd, instantEvalPriceUsd } from "../rules/instant-eval-pricing.rules.ts";
 import { instantEvalRunQuestions } from "../rules/instant-eval-run-questions.rules.ts";
 import { instantEvalQueryReservationId } from "../rules/instant-eval-spend-outcome.rules.ts";
 import type { InstantEvalFreeBudgetService } from "./instant-eval-free-budget.service.ts";

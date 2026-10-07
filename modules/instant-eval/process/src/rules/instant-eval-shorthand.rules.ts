@@ -6,17 +6,19 @@
  */
 
 import {
-  INSTANT_EVAL_CLASSIFIER_LIMITS,
   INSTANT_EVAL_MAX_SHORTHAND_QUESTIONS,
   INSTANT_EVAL_SELECTION_PARAMETER,
   INSTANT_EVAL_DEFAULT_WINDOW_DAYS,
   INSTANT_EVAL_SHORTHAND_TEXT_BUDGET,
   InstantEvalQueryInvalidError,
-  type InstantEvalQuestion,
   type InstantEvalShorthandInput,
   type InstantEvalShorthandQuestion,
   type InstantEvalTarget,
 } from "@langwatch/instant-eval-contract";
+import {
+  INSTANT_EVAL_CLASSIFIER_LIMITS,
+  type InstantEvalQuestion,
+} from "@langwatch/instant-eval-judge-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 
 import {

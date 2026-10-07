@@ -5,7 +5,7 @@
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
-import type { InstantEvalPricing } from "@langwatch/instant-eval-contract";
+import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 

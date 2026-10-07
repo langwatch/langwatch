@@ -9,7 +9,7 @@ import {
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   type InstantEvalClassifierLimits,
   type InstantEvalQuestion,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
 import { cutToEstimatedTokensKeepingEnds } from "@langwatch/trace-contract";
 
 /** The one question a judge call asks; its verdict is read back by this id. */

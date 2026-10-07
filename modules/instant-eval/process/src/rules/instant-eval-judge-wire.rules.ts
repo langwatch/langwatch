@@ -9,7 +9,7 @@ import type {
   InstantEvalQuestion,
   InstantEvalScoreQuestion,
   InstantEvalVerdict,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
 import { z } from "zod";
 
 /** The levels a score question offers, low to high. */

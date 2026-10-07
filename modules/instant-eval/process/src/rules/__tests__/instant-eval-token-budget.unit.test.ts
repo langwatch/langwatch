@@ -6,7 +6,7 @@
 import {
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   type InstantEvalQuestion,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
 import {

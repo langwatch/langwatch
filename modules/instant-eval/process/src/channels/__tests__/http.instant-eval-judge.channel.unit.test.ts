@@ -5,11 +5,11 @@
  * @see modules/instant-eval/specs/classifier.feature
  */
 
+import { InstantEvalClassifierUnavailableError } from "@langwatch/instant-eval-contract";
 import {
   INSTANT_EVAL_CLASSIFIER_LIMITS,
-  InstantEvalClassifierUnavailableError,
   type InstantEvalQuestion,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
 import { MockAgent } from "undici";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

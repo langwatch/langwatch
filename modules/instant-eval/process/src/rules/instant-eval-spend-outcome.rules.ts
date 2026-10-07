@@ -5,14 +5,11 @@
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
-import {
-  INSTANT_EVAL_REQUEST_TYPE,
-  type InstantEvalPricing,
-} from "@langwatch/instant-eval-contract";
+import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";
+import { type InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
+import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
 import { generate } from "@langwatch/ksuid";
 import type { Instant } from "@langwatch/time";
-
-import { INSTANT_EVAL_PRICING } from "./instant-eval-pricing.rules.ts";
 
 /** The model the ledger names for a judgement: the shipped classifier. */
 export const INSTANT_EVAL_SPEND_MODEL = "jev";

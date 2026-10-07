@@ -4,10 +4,10 @@
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
+import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
 import type { InstantEvalSpendRecord } from "../../rules/instant-eval-spend-outcome.rules.ts";
 import { InstantEvalFinishService } from "../instant-eval-finish.service.ts";
 
