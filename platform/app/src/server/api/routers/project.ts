@@ -163,11 +163,27 @@ export const projectRouter = createTRPCRouter({
             "creating into an existing team asks that team; creating a team alongside, or an aggregate project anywhere, asks the organization",
           permissions: ["project:create", "organization:manage"],
         },
-        ({ ctx, input, next }) => {
+        async ({ ctx, input, next }) => {
           // An aggregate reads other people's personal projects, so whichever
           // team it attaches to, only someone who manages the organisation
-          // may create one (ADR-144 decision 5).
+          // may create one (ADR-144 decision 5). A member of the organisation
+          // who is not an admin is refused as admin only, the same way the
+          // rule edit refuses; someone outside it still gets the shared check.
           if (isAggregateProjectKind(input.kind)) {
+            const organizationRole =
+              await getApp().organizations.getUserOrgRole({
+                userId: ctx.session.user.id,
+                organizationId: input.organizationId,
+              });
+            if (
+              organizationRole &&
+              aggregateProjectRouteViolation({
+                kind: AGGREGATE_PROJECT_KIND,
+                organizationRole,
+              })
+            ) {
+              throw new AggregateProjectAdminOnlyError();
+            }
             return checkOrganizationPermission("organization:manage")({
               ctx,
               input,

@@ -146,6 +146,12 @@ Feature: An aggregate project reads its member projects
     And it is attached to a team like any other project
 
   @integration
+  Scenario: A member who is not an admin is refused when creating an aggregate project
+    When sam asks to create a project of kind aggregate on a team sam belongs to
+    Then the request is refused as forbidden, saying only organization admins can open an aggregate project
+    And no project is written
+
+  @integration
   Scenario: The rule may be narrowed to one department
     When ana creates an aggregate project with the rule "personal projects in department Engineering"
     Then only personal projects whose owner is in Engineering today are members

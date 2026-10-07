@@ -125,8 +125,8 @@ describe("Feature: an admin creates an aggregate project", () => {
   });
 
   describe("when a member who is not an admin asks to create one on their own team", () => {
-    /** @scenario "An admin creates an aggregate project from the new-project flow" */
-    it("is refused and nothing is written", async () => {
+    /** @scenario "A member who is not an admin is refused when creating an aggregate project" */
+    it("is refused as admin only with a 403 and nothing is written", async () => {
       const before = await prisma.project.count({
         where: { teamId: fixture.team.id },
       });
@@ -140,7 +140,10 @@ describe("Feature: an admin creates an aggregate project", () => {
           framework: "other",
           kind: AGGREGATE_PROJECT_KIND,
         }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        cause: { code: "aggregate_project_admin_only", httpStatus: 403 },
+      });
 
       expect(
         await prisma.project.count({ where: { teamId: fixture.team.id } }),
