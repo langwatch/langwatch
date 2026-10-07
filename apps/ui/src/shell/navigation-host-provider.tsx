@@ -12,10 +12,7 @@ import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
 import { UiPageFailure, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
 import { LangyMark, LangyMarkGradientDefs } from "@langwatch/design-system/langy-mark";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
-import type {
-  NavigationScopeWrite,
-  NavigationUser,
-} from "@langwatch/navigation-browser/navigation";
+import type { NavigationScopeWrite, NavigationUser } from "@langwatch/navigation-contract";
 import { useCallback, useMemo, type ReactNode } from "react";
 
 import { useLangyStore } from "./behavior/langy/langy.store.ts";

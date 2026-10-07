@@ -1,4 +1,6 @@
-import { useNavigationHost, type NavigationTeam } from "../model/navigation-host.ts";
+import type { NavigationTeam } from "@langwatch/navigation-contract";
+
+import { useNavigationHost } from "../model/navigation-host.ts";
 
 /** Which project LLM Ops opens; moved from platform/app, team access now delegated to host */
 export function resolveLlmOpsProjectSlug({

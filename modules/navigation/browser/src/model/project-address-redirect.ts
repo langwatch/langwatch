@@ -3,7 +3,7 @@
  * redirect, moved into the navigation shell. specs/navigation/project-address-redirect.feature
  */
 
-import type { NavigationOrganization, NavigationProject } from "./navigation-host.ts";
+import type { NavigationOrganization, NavigationProject } from "@langwatch/navigation-contract";
 
 export interface ProjectAddressInput {
   /** The raw `:project` segment, reserved words included. */

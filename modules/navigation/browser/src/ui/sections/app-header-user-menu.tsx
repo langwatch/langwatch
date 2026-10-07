@@ -7,6 +7,7 @@
 import { UserAvatar } from "@langwatch/design-system/avatar";
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, HStack, Portal } from "@langwatch/design-system/primitives";
+import type { NavigationUser } from "@langwatch/navigation-contract";
 import { Monitor, PanelsTopLeft } from "lucide-react";
 
 import {
@@ -18,11 +19,7 @@ import {
 import { useNavigationMode } from "../../behavior/use-navigation-mode.ts";
 import { usePersonalWorkspaceEntries } from "../../behavior/use-personal-workspace-entries.ts";
 import { useUserAvatarUrl } from "../../behavior/user/use-user-avatar-url.ts";
-import {
-  useNavigationHost,
-  type NavigationHost,
-  type NavigationUser,
-} from "../../model/navigation-host.ts";
+import { useNavigationHost, type NavigationHost } from "../../model/navigation-host.ts";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 
 const NAVIGATION_MODE_LABELS: Record<NavigationMode, string> = {

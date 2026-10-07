@@ -1,4 +1,4 @@
-import type { NavigationProject } from "./navigation-host.ts";
+import type { NavigationProject } from "@langwatch/navigation-contract";
 
 const PROJECT_PLACEHOLDER = "[project]";
 

@@ -16,7 +16,7 @@ import type {
   NavigationSupportChat,
   NavigationTeam,
   NavigationUser,
-} from "@langwatch/navigation-browser/navigation";
+} from "@langwatch/navigation-contract";
 import type { ReactNode } from "react";
 
 import { joinOffer, organizationMfaGate, teamAccessWaiting } from "./navigation-host-capabilities";
