@@ -475,6 +475,8 @@ function numberField<T extends EvaluatorTypes>(ctx: ZodFieldContext, field: ZodF
   const { register, variant } = ctx;
   const fullPath = fullPathOf(ctx, field.fieldName);
   const defaultValue = fieldDefaultValue(ctx, field);
+  // A cleared optional field stays unset; `+""` would stamp it as 0.
+  const isOptional = field.fieldSchema instanceof z.ZodOptional;
   return (
     <Input
       type="number"
@@ -482,7 +484,9 @@ function numberField<T extends EvaluatorTypes>(ctx: ZodFieldContext, field: ZodF
       step={
         typeof defaultValue === "number" && Math.round(defaultValue) !== defaultValue ? "0.01" : "1"
       }
-      {...register(fullPath, { setValueAs: (val) => +val })}
+      {...register(fullPath, {
+        setValueAs: (val) => (isOptional && val === "" ? undefined : +val),
+      })}
     />
   );
 }

@@ -1,3 +1,5 @@
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { NoModelsConfiguredCallout } from "@langwatch/design-system/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
@@ -85,10 +87,17 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
     model: llmConfig.model,
     mode: "chat",
   });
-  if (isLoading) {
+  // Instant Evals needs no provider, so a released project keeps the picker.
+  const { project, organization } = useOrganizationTeamProject();
+  const instantEvals = useFeatureFlag("release_instant_evals", {
+    projectId: project?.id,
+    organizationId: organization?.id,
+    enabled: !!project?.id && !!organization?.id,
+  });
+  if (isLoading || (isEmpty && instantEvals.isLoading)) {
     return <Skeleton width="full" height="40px" borderRadius="md" />;
   }
-  if (isEmpty) {
+  if (isEmpty && !instantEvals.enabled) {
     return <NoModelsConfiguredCallout size="sm" />;
   }
 
