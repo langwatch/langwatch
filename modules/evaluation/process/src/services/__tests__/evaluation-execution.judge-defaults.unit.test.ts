@@ -65,6 +65,11 @@ function buildService() {
         throw new Error("no workflow runs here");
       },
     },
+    judges: {
+      judge: () => {
+        throw new Error("no judge here is on Instant Evals");
+      },
+    },
     installEnvironment: {},
   };
   return {

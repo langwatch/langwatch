@@ -391,8 +391,8 @@ Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:82`. Even
 
 | Kind   | Leaf                             | Environment variable                 | Declared at                               |
 | ------ | -------------------------------- | ------------------------------------ | ----------------------------------------- |
-| secret | `openAi`                         | `OPENAI_API_KEY`                     | `src/app/evaluation.app.ts:288`           |
-| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`           | `src/app/evaluation.app.ts:289`           |
+| secret | `openAi`                         | `OPENAI_API_KEY`                     | `src/app/evaluation.app.ts:291`           |
+| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`           | `src/app/evaluation.app.ts:292`           |
 | config | `langevalsEndpoint`              | `LANGEVALS_ENDPOINT`                 | `../contract/src/evaluation.config.ts:26` |
 | config | `stagingThresholdBytes`          | `LANGEVALS_STAGING_THRESHOLD_BYTES`  | `../contract/src/evaluation.config.ts:27` |
 | config | `stagingTtlSeconds`              | `LANGEVALS_STAGING_TTL_SECONDS`      | `../contract/src/evaluation.config.ts:28` |

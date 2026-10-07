@@ -8,7 +8,12 @@
       "@langwatch/evaluation-process": ["./src/index.ts"]
     }
   },
-  "files": ["./src/index.ts", "src/services/workflow-evaluation.service.ts"],
+  "files": [
+    "./src/index.ts",
+    "./src/__tests__/testing.ts",
+    "./src/__tests__/support/instant-eval-guardrail-check.test-fakes.ts",
+    "src/services/workflow-evaluation.service.ts"
+  ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",

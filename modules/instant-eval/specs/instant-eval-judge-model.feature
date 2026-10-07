@@ -19,7 +19,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
 
   Rule: A judge with Instant Evals as its model is answered by Instant Evals
 
-    @unit @unimplemented
+    @unit
     Scenario: A boolean judge on Instant Evals is classified, not sent to the evaluator service
       Given a boolean judge whose model is Instant Evals
       When a trace is evaluated
@@ -27,14 +27,14 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       And the evaluator service is not called
       And no model provider is looked up
 
-    @unit @unimplemented
+    @unit
     Scenario: A judge on any other model is unchanged
       Given a boolean judge whose model is a provider model
       When a trace is evaluated
       Then the evaluator service answers it as today
       And Instant Evals is not called
 
-    @unit @unimplemented
+    @unit
     Scenario: A queued evaluation passes its retry key to the judge call
       Given a boolean judge on Instant Evals run from a queued evaluation command
       When the trace is evaluated
@@ -171,7 +171,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the result is skipped
       And Instant Evals is not called
 
-    @unit @unimplemented
+    @unit
     Scenario Outline: A refused judge is an error with the reason
       Given <refusal>
       When a trace is evaluated by a judge on Instant Evals
@@ -195,7 +195,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
         | free budget exhausted |
         | project unknown       |
 
-    @integration @unimplemented
+    @integration
     Scenario: A refused monitor evaluation is stored as an error naming its code
       Given a monitor whose judge is on Instant Evals
       And an organization whose free budget is spent
@@ -217,7 +217,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the error tip, the error message and the error copy the customer reads each never mention adding or setting a key
       And none of them names JEV_API_KEY
 
-    @unit @unimplemented
+    @unit
     Scenario: A guardrail check on the stream chunk direction is skipped
       Given a judge on Instant Evals
       When a guardrail check evaluates it on the stream chunk direction
@@ -230,7 +230,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When it is turned into an evaluation
       Then the evaluation carries the check's direction
 
-    @integration @unimplemented
+    @integration
     Scenario: A stream chunk sent through the gateway's guardrail check never reaches the classifier
       Given a fail-closed guardrail whose judge is on Instant Evals
       When the gateway's guardrail service checks a chunk of a streamed reply through the evaluation's guardrail check
@@ -238,7 +238,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       And the chunk is allowed
       And the classifier is never called
 
-    @unit @unimplemented
+    @unit
     Scenario Outline: A guardrail check on the request or response direction is judged
       Given a judge on Instant Evals
       When a guardrail check evaluates it on the <direction> direction
@@ -276,7 +276,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When each records its spend
       Then both spend rows carry the same request id
 
-    @unit @unimplemented
+    @unit
     Scenario: A redelivered evaluation is billed once
       Given an evaluation command whose judge call succeeded
       And recording its outcome failed once
@@ -289,7 +289,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When each records its spend
       Then the two spend rows carry different request ids
 
-    @unit @unimplemented
+    @unit
     Scenario: A guardrail check carries no retry key
       Given a guardrail whose judge is on Instant Evals
       When the gateway checks a request
@@ -301,7 +301,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When it finishes
       Then one spend row is recorded
 
-    @unit @unimplemented
+    @unit
     Scenario: A guardrail check writes one cost row
       Given a guardrail whose judge is on Instant Evals
       When the gateway checks a request

@@ -5,9 +5,10 @@
  */
 
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import type {
-  InstantEvalJudgement,
-  InstantEvalSkipReason,
+import {
+  INSTANT_EVAL_SKIP_REASONS,
+  type InstantEvalJudgeRefusalCode,
+  type InstantEvalJudgement,
 } from "@langwatch/instant-eval-judge-contract";
 
 import {
@@ -19,8 +20,24 @@ import {
 /** `passed` on a boolean judge: the probability of true against this. */
 const BOOLEAN_THRESHOLD = 0.5;
 
-/** Too large is the trace's own size, not an outage, so it does not fire alerts. */
-const SKIPPED_REASONS: ReadonlySet<InstantEvalSkipReason> = new Set(["classifier_input_too_large"]);
+/**
+ * Every reason Instant Evals answers a judge without a verdict: the classifier's own, plus the two
+ * the evaluation decides before calling it (nothing mapped, a guardrail's stream chunk).
+ */
+const INSTANT_EVAL_JUDGE_SKIP_REASONS = [
+  ...INSTANT_EVAL_SKIP_REASONS,
+  "nothing_to_judge",
+  "guardrail_stream_chunk",
+] as const;
+
+type InstantEvalJudgeSkipReason = (typeof INSTANT_EVAL_JUDGE_SKIP_REASONS)[number];
+
+/** The trace's own shape, never an outage, so these do not fire alerts. */
+const SKIPPED_REASONS: ReadonlySet<InstantEvalJudgeSkipReason> = new Set([
+  "classifier_input_too_large",
+  "nothing_to_judge",
+  "guardrail_stream_chunk",
+]);
 
 export function instantEvalJudgeResult({
   judge,
@@ -31,18 +48,18 @@ export function instantEvalJudgeResult({
   judgement: InstantEvalJudgement;
   priceUsd: number;
 }): SingleEvaluationResult {
-  if (judgement.skippedReason) return skipResultOf(judgement.skippedReason);
+  if (judgement.skippedReason) return instantEvalSkipResultOf(judgement.skippedReason);
   const verdict = judgement.verdicts.find(
     ({ questionId }) => questionId === INSTANT_EVAL_JUDGE_QUESTION_ID,
   );
-  if (!verdict) return skipResultOf("classifier_failed");
+  if (!verdict) return instantEvalSkipResultOf("classifier_failed");
   const cost = { currency: "USD", amount: priceUsd };
 
   switch (judge.evaluatorType) {
     case "langevals/llm_boolean": {
       // No probability is no answer, as runs read it; never a confident false.
       const { probability } = verdict;
-      if (probability === undefined) return skipResultOf("classifier_failed");
+      if (probability === undefined) return instantEvalSkipResultOf("classifier_failed");
       const passed = probability >= BOOLEAN_THRESHOLD;
       const confidence = passed ? probability : 1 - probability;
       return {
@@ -54,7 +71,7 @@ export function instantEvalJudgeResult({
       };
     }
     case "langevals/llm_score": {
-      if (verdict.score === undefined) return skipResultOf("classifier_failed");
+      if (verdict.score === undefined) return instantEvalSkipResultOf("classifier_failed");
       const score = scoreOnJudgeRange({ answer: verdict.score, range: judge.settings });
       return {
         status: "processed",
@@ -66,7 +83,7 @@ export function instantEvalJudgeResult({
     case "langevals/llm_category": {
       // The classifier names the most likely option itself.
       const { label } = verdict;
-      if (label === undefined) return skipResultOf("classifier_failed");
+      if (label === undefined) return instantEvalSkipResultOf("classifier_failed");
       const confidence = verdict.probabilities?.[label] ?? 0;
       return {
         status: "processed",
@@ -78,14 +95,39 @@ export function instantEvalJudgeResult({
   }
 }
 
-function skipResultOf(reason: InstantEvalSkipReason): SingleEvaluationResult {
+/** The one place a reason Instant Evals did not judge is worded: skipped, or an error that alerts. */
+export function instantEvalSkipResultOf(
+  reason: InstantEvalJudgeSkipReason,
+): SingleEvaluationResult {
   if (SKIPPED_REASONS.has(reason)) {
-    return { status: "skipped", details: `Instant Evals skipped this trace: ${reason}` };
+    return { status: "skipped", details: `Instant Evals skipped this evaluation: ${reason}` };
   }
+  return errorResultOf({ code: reason });
+}
+
+/** A refused judge call, returned as an error naming its code so it is never read as a skip. */
+export function instantEvalRefusalResultOf({
+  code,
+  message,
+}: {
+  code: InstantEvalJudgeRefusalCode;
+  message: string;
+}): SingleEvaluationResult {
+  return errorResultOf({ code, message });
+}
+
+function errorResultOf({
+  code,
+  message,
+}: {
+  code: string;
+  message?: string;
+}): SingleEvaluationResult {
+  const reason = `Instant Evals could not judge this trace: ${code}`;
   return {
     status: "error",
-    error_type: reason,
-    details: `Instant Evals could not judge this trace: ${reason}`,
+    error_type: code,
+    details: message ? `${reason}. ${message}` : reason,
     traceback: [],
   };
 }

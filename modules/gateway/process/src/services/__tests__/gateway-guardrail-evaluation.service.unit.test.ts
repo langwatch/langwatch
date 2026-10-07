@@ -210,7 +210,8 @@ describe("GatewayGuardrailEvaluationService", () => {
         runs: {
           judge: async () => ({
             status: "skipped",
-            details: "Instant Evals skipped this guardrail check: stream_chunk",
+            // As the evaluation's one skip wording writes it.
+            details: "Instant Evals skipped this evaluation: guardrail_stream_chunk",
           }),
         },
       });

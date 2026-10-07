@@ -76,6 +76,7 @@
     "@clickhouse/client": "catalog:",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
+    "@langwatch/evaluation-process": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@types/jsonwebtoken": "catalog:",

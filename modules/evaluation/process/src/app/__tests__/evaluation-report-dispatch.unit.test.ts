@@ -6,6 +6,7 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands, EventingCommandSender } from "@langwatch/eventing";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { createApp } from "@langwatch/process";
@@ -45,6 +46,7 @@ async function installed() {
       monitor: createApiFixture<MonitorApi>(),
       dataset: createApiFixture<DatasetApi>(),
       experiment: createApiFixture<ExperimentApi>(),
+      "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>(),
       analytics: createApiFixture<AnalyticsApi>(),
       project: createApiFixture<ProjectApi>(),
       "data-retention": createApiFixture<DataRetentionApi>(),

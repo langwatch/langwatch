@@ -66,6 +66,11 @@ function buildService(
         throw new Error("the judge path never runs an evaluation workflow");
       },
     },
+    judges: {
+      judge: () => {
+        throw new Error("no judge here is on Instant Evals");
+      },
+    },
     installEnvironment: {},
   };
 

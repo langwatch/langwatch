@@ -36,6 +36,7 @@ import {
 import type { EventingCommands } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
@@ -283,6 +284,8 @@ export class EvaluationModule implements EvaluationApiContract {
     datasets: DatasetApi,
     /** The experiment and run history SDK batches and dataset evaluations are written into. */
     experiments: ExperimentApi,
+    /** Answers a judge whose model is Instant Evals; a leaf, so no peer cycle (ADR-174 d. 13). */
+    judges: InstantEvalJudgeApi,
   };
   static readonly secrets = {
     openAi: openAiApiKey,
@@ -438,6 +441,7 @@ export class EvaluationModule implements EvaluationApiContract {
       workflows: dependencies.workflows,
       evaluators: dependencies.evaluators,
       workflowExecutor: WorkflowEvaluationService.create(dependencies.workflows),
+      judges: dependencies.judges,
       installEnvironment: environment.read(),
       telemetry,
     });

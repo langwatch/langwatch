@@ -8,6 +8,8 @@
 import type { GuardrailCheckDirection } from "@langwatch/evaluation-contract";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 
+import { instantEvalSkipResultOf } from "./instant-eval-judge-result.rules.ts";
+
 const SKIPPED_GUARDRAIL_DIRECTION: GuardrailCheckDirection = "stream_chunk";
 
 /** The skipped result for a check Instant Evals never judges, or null when the judge runs. */
@@ -18,8 +20,5 @@ export function instantEvalGuardrailSkipOf({
 }): SingleEvaluationResult | null {
   if (direction !== SKIPPED_GUARDRAIL_DIRECTION) return null;
 
-  return {
-    status: "skipped",
-    details: `Instant Evals skipped this guardrail check: ${SKIPPED_GUARDRAIL_DIRECTION}`,
-  };
+  return instantEvalSkipResultOf("guardrail_stream_chunk");
 }

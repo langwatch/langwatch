@@ -33,6 +33,6 @@ None: instant-eval-judge declares no peers.
 
 ## Who depends on instant-eval-judge
 
-[instant-eval](../instant-eval/README.md) (as a peer).
+[evaluation](../evaluation/README.md), [instant-eval](../instant-eval/README.md) (as a peer).
 
 <!-- readme:generated:end -->
