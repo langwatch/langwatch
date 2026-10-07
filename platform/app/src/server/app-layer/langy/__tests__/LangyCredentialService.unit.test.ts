@@ -1,7 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma } from "~/generated/prisma/client";
-import { AggregateProjectHasNoCredentialError } from "~/server/api-key/errors";
 
 vi.mock("~/utils/encryption", () => ({
   encrypt: vi.fn((value: string) => `enc:${value}`),
@@ -45,13 +44,6 @@ const { mintLangySessionApiKey, LangySessionKeyScopeError } = vi.hoisted(() => {
     LangySessionKeyScopeError,
   };
 });
-const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
-vi.mock("~/utils/posthogErrorCapture", () => ({
-  captureException,
-  toError: (error: unknown) =>
-    error instanceof Error ? error : new Error(String(error)),
-}));
-
 vi.mock("../langyApiKey", () => ({
   mintLangySessionApiKey,
   LangySessionKeyScopeError,
@@ -291,26 +283,6 @@ describe("LangyCredentialService", () => {
             message: expect.stringMatching(/permissions Langy needs/),
           }),
         );
-      });
-    });
-
-    describe("when the project is an aggregate, which accepts no key", () => {
-      it("passes the aggregate's own refusal through without reporting an exception", async () => {
-        captureException.mockClear();
-        mintLangySessionApiKey.mockRejectedValue(
-          new AggregateProjectHasNoCredentialError(),
-        );
-        const prisma = makePrisma();
-        const svc = new LangyCredentialService(prisma);
-
-        const refusal = await svc
-          .getOrProvision({ projectId: "p1", session: SESSION })
-          .catch((error: unknown) => error);
-
-        expect(HandledError.isHandled(refusal) ? refusal.code : refusal).toBe(
-          "aggregate_project_has_no_credential",
-        );
-        expect(captureException).not.toHaveBeenCalled();
       });
     });
 

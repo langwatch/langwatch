@@ -377,16 +377,6 @@ export class LangyCredentialService {
         // in this project) — surface it verbatim as the 409 body.
         throw new LangyCredentialResolutionError(error.message);
       }
-      if (
-        HandledError.isHandled(error) &&
-        error.code === "aggregate_project_has_no_credential"
-      ) {
-        // An aggregate (ADR-144) accepts no key, so Langy cannot act on it.
-        // An expected refusal with its own customer copy, not an incident:
-        // passed through as is, never reported, and never dressed as a
-        // sign-in problem.
-        throw error;
-      }
       logger.warn(
         { error, projectId, userId: actorUserId },
         "failed to mint Langy session key",
