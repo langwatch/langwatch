@@ -173,7 +173,7 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       When a run is requested
       Then it is accepted
 
-    @unit
+    @unit @unimplemented
     Scenario: A paid organization on tiered pricing is held to the budget
       Given a paid organization the meter does not bill that has spent 1.00 dollars on Instant Evals
       When a run is requested

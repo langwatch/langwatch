@@ -51,7 +51,7 @@ describe("given a free organization", () => {
 
 describe("given anything the allowance does not bound", () => {
   describe("when it asks where it stands", () => {
-    /** @scenario "The estimate tells a paid organization nothing about a free budget" */
+    /** @scenario "The estimate tells a usage-billed organization nothing about a free budget" */
     it("is told it has no budget at all", () => {
       expect(paidInstantEvalStanding()).toEqual({
         isFree: false,
