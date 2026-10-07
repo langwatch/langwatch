@@ -366,6 +366,7 @@ function testPresence(): PresenceApi {
     events: async function* () {},
     cursors: async function* () {},
     readHints: async function* () {},
+    upgradeReadHints: async function* () {},
     getTenantEmitter: () => new EventEmitter(),
     cleanupTenantEmitter: () => void 0,
   };
