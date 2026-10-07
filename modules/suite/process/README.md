@@ -517,16 +517,19 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `suite_run_processing` (aggregate `suite_run`)
 
-Declared at `src/eventing/suite-run-processing.pipeline.ts:68`. Events: `SuiteRunStartedEventSchema`, `SuiteRunItemStartedEventSchema`, `SuiteRunItemCompletedEventSchema`, `SuiteRunItemRegradedEventSchema`.
+Declared at `src/eventing/suite-run-processing.pipeline.ts:90`. Events: `SuiteRunStartedEventSchema`, `SuiteRunItemStartedEventSchema`, `SuiteRunItemCompletedEventSchema`, `SuiteRunItemRegradedEventSchema`.
 
-| Kind                       | Name                                                                            | Handles | Declared at                                         |
-| -------------------------- | ------------------------------------------------------------------------------- | ------- | --------------------------------------------------- |
-| command                    | `startSuiteRun`                                                                 | –       | `src/eventing/suite-run-processing.pipeline.ts:89`  |
-| command                    | `recordSuiteRunItemStarted`                                                     | –       | `src/eventing/suite-run-processing.pipeline.ts:95`  |
-| command                    | `completeSuiteRunItem`                                                          | –       | `src/eventing/suite-run-processing.pipeline.ts:101` |
-| command                    | `regradeSuiteRunItem`                                                           | –       | `src/eventing/suite-run-processing.pipeline.ts:107` |
-| ClickHouse fold projection | `≈ SuiteRunStateFoldProjection.create({ store: deps.suiteRunStateFoldStore, })` | –       | `src/eventing/suite-run-processing.pipeline.ts:80`  |
-| retention                  | `≈ deps.retention`                                                              | –       | `src/eventing/suite-run-processing.pipeline.ts:113` |
+| Kind                       | Name                                                                            | Handles                                                                 | Declared at                                         |
+| -------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------- |
+| command                    | `startSuiteRun`                                                                 | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:111` |
+| command                    | `recordSuiteRunItemStarted`                                                     | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:117` |
+| command                    | `completeSuiteRunItem`                                                          | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:123` |
+| command                    | `regradeSuiteRunItem`                                                           | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:129` |
+| peer subscriber            | `scenarioRunStarted`                                                            | `lw.simulation_run.started` from [scenario](../../scenario/README.md)   | `src/eventing/suite-run-processing.pipeline.ts:135` |
+| peer subscriber            | `scenarioRunFinished`                                                           | `lw.simulation_run.finished` from [scenario](../../scenario/README.md)  | `src/eventing/suite-run-processing.pipeline.ts:141` |
+| peer subscriber            | `scenarioRunEvaluated`                                                          | `lw.simulation_run.evaluated` from [scenario](../../scenario/README.md) | `src/eventing/suite-run-processing.pipeline.ts:147` |
+| ClickHouse fold projection | `≈ SuiteRunStateFoldProjection.create({ store: deps.suiteRunStateFoldStore, })` | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:102` |
+| retention                  | `≈ deps.retention`                                                              | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:153` |
 
 ## Configuration
 

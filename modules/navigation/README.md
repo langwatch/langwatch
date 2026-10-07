@@ -6,13 +6,13 @@ The application shell: the product registry, the landing redirect and the switch
 
 ## At a glance
 
-|                |                                 |
-| -------------- | ------------------------------- |
-| Classification | core (`modules/catalogue.json`) |
-| Subjects       | navigation                      |
-| Halves         | [browser](browser)              |
-| Api token      | none                            |
-| Installed by   | ui (browser)                    |
+|                |                                       |
+| -------------- | ------------------------------------- |
+| Classification | core (`modules/catalogue.json`)       |
+| Subjects       | navigation                            |
+| Halves         | [browser](browser) · [client](client) |
+| Api token      | none                                  |
+| Installed by   | ui (browser)                          |
 
 ## What navigation owns
 
