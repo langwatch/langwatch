@@ -23,10 +23,8 @@ import {
 } from "../constants";
 import { getPageCommands } from "../pageCommands";
 import type { Command } from "../types";
-import {
-  useCommandFeatureFlags,
-  useCommandProjectNavigation,
-} from "./useCommandFeatureFlags";
+import { useCommandFeatureFlags } from "./useCommandFeatureFlags";
+import { useCommandProjectNavigation } from "./useCommandProjectNavigation";
 
 export interface FilteredCommands {
   navigation: Command[];
