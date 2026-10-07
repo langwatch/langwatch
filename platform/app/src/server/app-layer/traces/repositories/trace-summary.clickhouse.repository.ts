@@ -332,6 +332,48 @@ export class TraceSummaryClickHouseRepository
   }
 
   /**
+   * The tenant that holds a trace, of those the proof reads. The table is
+   * `ORDER BY (TenantId, TraceId)`, so this is the same sort-key point seek
+   * as {@link resolveOccurredAtMs}, over one small column, instead of the
+   * heavy single-trace read that projects the computed input, output and
+   * attributes. Ordered by tenant, so when two members hold the id it picks
+   * the one {@link queryByTraceId} returns.
+   */
+  async findTenantIdByTraceId({
+    authorization,
+    traceId,
+  }: {
+    authorization: Authorization;
+    traceId: string;
+  }): Promise<string | null> {
+    try {
+      const result = await this.reader(authorization).query({
+        query: `
+          SELECT TenantId
+          FROM ${TABLE_NAME}
+          WHERE ${tenantScope("OccurredAt")}
+            AND TraceId = {traceId:String}
+          ORDER BY TenantId
+          LIMIT 1
+        `,
+        query_params: { traceId },
+        format: "JSONEachRow",
+      });
+      const rows = (await result.json()) as Array<{ TenantId: string }>;
+      return rows[0]?.TenantId ?? null;
+    } catch (error) {
+      logger.warn(
+        {
+          traceId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to resolve the tenant of a trace from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Resolve a trace's OccurredAt (the `PARTITION BY toYearWeek(...)` column)
    * so {@link findByTraceId} can prune partitions even when the caller never
    * threaded an `occurredAtMs` hint (or the hint window missed). The table is

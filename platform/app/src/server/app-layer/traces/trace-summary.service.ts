@@ -70,9 +70,11 @@ export class TraceSummaryService {
    * cost. One that spans several, an aggregate's, is narrowed to the project
    * that holds the trace: the one the caller names (the list row and the
    * header both carry it), else the one this summary read finds, the same
-   * pick the header's read makes for the same hint. Every read behind one
-   * detail page then stays on one member, even when two members hold the
-   * same trace id.
+   * pick the header's read makes. Every read behind one detail page then
+   * stays on one member, even when two members hold the same trace id. The
+   * member is found with a light seek on the summary's sort key, not the
+   * heavy read: this runs on every un-named per-trace call under an
+   * aggregate, every span tree page and live poll included.
    *
    * A named project the proof does not read returns null, for the route to
    * answer as not found. A trace no tenant holds keeps the proof as it is:
@@ -81,12 +83,10 @@ export class TraceSummaryService {
   async authorizationForTrace({
     authorization,
     traceId,
-    occurredAtMs,
     tenantId,
   }: {
     authorization: Authorization;
     traceId: string;
-    occurredAtMs?: number;
     /** The project that owns the trace, as the list row or header named it. */
     tenantId?: string;
   }): Promise<Authorization | null> {
@@ -96,13 +96,12 @@ export class TraceSummaryService {
     if (singleTenantOf({ authorization, reads: "traces" }) !== undefined) {
       return authorization;
     }
-    const found = await this.repository.findByTraceId({
+    const found = await this.repository.findTenantIdByTraceId({
       authorization,
       traceId,
-      ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
     });
-    if (!found) return authorization;
-    return narrowAuthorization({ authorization, projectId: found.tenantId });
+    if (found === null) return authorization;
+    return narrowAuthorization({ authorization, projectId: found });
   }
 
   async getByTraceId({

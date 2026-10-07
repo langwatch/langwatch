@@ -49,12 +49,11 @@ export async function traceDetailAuthorization({
   input,
 }: {
   ctx: RouteContext;
-  input: { traceId: string; occurredAtMs?: number; tenantId?: string };
+  input: { traceId: string; tenantId?: string };
 }): Promise<Authorization> {
   const authorization = await getApp().traces.summary.authorizationForTrace({
     authorization: requireRouteAuthorization(ctx),
     traceId: input.traceId,
-    ...occurredAtFromInput(input),
     ...(input.tenantId !== undefined ? { tenantId: input.tenantId } : {}),
   });
   if (!authorization) throw new TraceNotFoundError(input.traceId);

@@ -54,6 +54,15 @@ export interface TraceSummaryRepository {
     }>,
   ): Promise<void>;
   findByTraceId(params: FindByTraceIdParams): Promise<TraceSummaryRead | null>;
+  /**
+   * The tenant that holds a trace, of those the proof reads: the first by
+   * tenant id when several do, the same pick the heavy read makes. A light
+   * sort-key seek, for a caller that needs only whose trace it is.
+   */
+  findTenantIdByTraceId(params: {
+    authorization: Authorization;
+    traceId: string;
+  }): Promise<string | null>;
 }
 
 export class NullTraceSummaryRepository implements TraceSummaryRepository {
@@ -62,6 +71,13 @@ export class NullTraceSummaryRepository implements TraceSummaryRepository {
   async findByTraceId(
     _params: FindByTraceIdParams,
   ): Promise<TraceSummaryRead | null> {
+    return null;
+  }
+
+  async findTenantIdByTraceId(_params: {
+    authorization: Authorization;
+    traceId: string;
+  }): Promise<string | null> {
     return null;
   }
 }

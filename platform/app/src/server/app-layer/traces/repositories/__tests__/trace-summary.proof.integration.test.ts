@@ -324,6 +324,33 @@ afterAll(async () => {
 describe("trace summary, analytics and evaluation summaries through the proof", () => {
   describe("given a proof with own grant on the aggregate and shared grants on members A and B", () => {
     describe("when a fourth project holds rows under the same trace ids", () => {
+      it("finds the tenant that holds a trace with the light seek, the same one the heavy read picks", async () => {
+        const authorization = aggregateReadsAandB();
+
+        expect(
+          await summaries.findTenantIdByTraceId({
+            authorization,
+            traceId: A_TRACE,
+          }),
+        ).toBe(MEMBER_A);
+        expect(
+          await summaries.findTenantIdByTraceId({
+            authorization,
+            traceId: OUTSIDER_TRACE,
+          }),
+        ).toBeNull();
+        const heavy = await summaries.findByTraceId({
+          authorization,
+          traceId: SHARED_TRACE,
+        });
+        expect(
+          await summaries.findTenantIdByTraceId({
+            authorization,
+            traceId: SHARED_TRACE,
+          }),
+        ).toBe(heavy?.tenantId);
+      });
+
       // @scenario "A project outside the proof contributes nothing"
       it("reads the aggregate's and the members' summaries and never the outsider's", async () => {
         const authorization = aggregateReadsAandB();
