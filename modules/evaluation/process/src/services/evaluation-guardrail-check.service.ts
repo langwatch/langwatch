@@ -64,6 +64,7 @@ export class EvaluationGuardrailCheckService {
           data: { type: "default", data: input.data },
           settings: input.settings,
           signal,
+          guardrailDirection: input.direction,
         }),
       });
       void this.recordCost({ input, result });

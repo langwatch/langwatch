@@ -222,7 +222,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the result is skipped with the reason in its details
       And Instant Evals is not called
 
-    @unit @unimplemented
+    @unit
     Scenario: A guardrail passes its direction to the evaluation
       Given a guardrail check from the gateway
       When it is turned into an evaluation
