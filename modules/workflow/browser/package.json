@@ -41,6 +41,7 @@
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/trace-client": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@langwatch/workflow-client": "workspace:*",

@@ -85,6 +85,9 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
+      "path": "../../trace/client/tsconfig.build.json"
+    },
+    {
       "path": "../../workflow/client/tsconfig.build.json"
     },
     {

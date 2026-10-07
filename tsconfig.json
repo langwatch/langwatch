@@ -148,6 +148,9 @@
       "path": "modules/coding-agent/browser/tsconfig.json"
     },
     {
+      "path": "modules/coding-agent/client/tsconfig.json"
+    },
+    {
       "path": "modules/coding-agent/contract/tsconfig.json"
     },
     {
@@ -722,6 +725,9 @@
     },
     {
       "path": "modules/trace/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/trace/client/tsconfig.json"
     },
     {
       "path": "modules/trace/contract/tsconfig.json"

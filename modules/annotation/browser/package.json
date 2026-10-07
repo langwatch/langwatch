@@ -30,6 +30,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/trace-client": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "diff": "catalog:",
     "lucide-react": "catalog:",

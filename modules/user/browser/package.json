@@ -27,6 +27,7 @@
     "@langwatch/authorization": "workspace:*",
     "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/coding-agent-client": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",

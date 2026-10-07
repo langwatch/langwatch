@@ -40,6 +40,7 @@
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
+    "@langwatch/trace-client": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@monaco-editor/react": "catalog:",

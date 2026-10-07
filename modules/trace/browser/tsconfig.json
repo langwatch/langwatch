@@ -18,6 +18,9 @@
       "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
+      "path": "../../annotation/client/tsconfig.build.json"
+    },
+    {
       "path": "../../annotation/contract/tsconfig.build.json"
     },
     {
@@ -75,6 +78,9 @@
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
+      "path": "../../onboarding/client/tsconfig.build.json"
+    },
+    {
       "path": "../../presence/contract/tsconfig.build.json"
     },
     {
@@ -100,6 +106,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../client/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
