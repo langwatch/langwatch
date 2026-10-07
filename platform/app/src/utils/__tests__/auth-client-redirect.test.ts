@@ -41,10 +41,11 @@ vi.mock("~/utils/browserNavigation", () => ({
 
 import {
   BETTER_AUTH_CALLBACK_PATTERN,
+  betterAuthCallbackURL,
   consumeStoredReturnTo,
+  parkReturnTo,
   safeRedirectTarget,
   signIn,
-  toBetterAuthCallbackURL,
 } from "../auth-client";
 
 const ORIGIN = "https://app.example.com";
@@ -86,6 +87,19 @@ describe("safeRedirectTarget", () => {
 
     it("allows a single backslash inside an otherwise same-origin path", () => {
       expect(safeRedirectTarget("\\settings", ORIGIN)).toBe("/settings");
+    });
+  });
+
+  describe("when the path normalises to a protocol-relative URL", () => {
+    // Dot segments and encoded dots collapse after the same-origin check, so
+    // each of these is same-origin yet leaves a path browsers read as `//host`.
+    it.each([
+      "/.//evil.com",
+      "/a/..//evil.com",
+      "/./\\evil.com",
+      "/%2e//evil.com",
+    ])("blocks %s", (input) => {
+      expect(safeRedirectTarget(input, ORIGIN)).toBe("/");
     });
   });
 
@@ -166,14 +180,16 @@ beforeEach(() => {
   ssoSpy.mockResolvedValue({ error: null, data: {} });
 });
 
-describe("toBetterAuthCallbackURL", () => {
+describe("betterAuthCallbackURL and parkReturnTo", () => {
   describe("when the target already passes better-auth's check", () => {
     /** @scenario "An address better-auth already accepts is handed over unchanged" */
     it.each([
       "/dashboard",
       "/p/traces?x=1&y=2",
     ])("hands %s over unchanged and parks nothing", (target) => {
-      expect(toBetterAuthCallbackURL(target)).toBe(target);
+      parkReturnTo(target);
+
+      expect(betterAuthCallbackURL(target)).toBe(target);
       expect(consumeStoredReturnTo()).toBe("/");
     });
   });
@@ -186,7 +202,8 @@ describe("toBetterAuthCallbackURL", () => {
       "/a~b",
       "/a,b",
     ])("sends %s through the resume page and returns it once", (target) => {
-      const callbackURL = toBetterAuthCallbackURL(target);
+      parkReturnTo(target);
+      const callbackURL = betterAuthCallbackURL(target);
 
       expect(callbackURL).toBe("/auth/resume");
       expect(BETTER_AUTH_CALLBACK_PATTERN.test(callbackURL)).toBe(true);
@@ -210,7 +227,7 @@ describe("consumeStoredReturnTo", () => {
 describe("signIn", () => {
   describe("when signing in with a password from a page with a colon in its address", () => {
     /** @scenario "A password sign-in from a page with a colon in its address lands back on that page" */
-    it("hands better-auth the resume page and navigates straight to the page", async () => {
+    it("hands better-auth no callbackURL and navigates straight to the page", async () => {
       await signIn("credentials", {
         email: "someone@example.com",
         password: "correct horse",
@@ -218,11 +235,32 @@ describe("signIn", () => {
       });
 
       expect(emailSpy.mock.calls[0]![0]).toMatchObject({
-        callbackURL: "/auth/resume",
+        callbackURL: undefined,
       });
       expect(hardNavigateSpy).toHaveBeenCalledWith(AGENT_TESTING_PATH);
-      // Navigated directly, so nothing is left parked for a later landing.
+      // Navigated directly, so nothing is parked for a later landing.
       expect(consumeStoredReturnTo()).toBe("/");
+    });
+  });
+
+  describe("when signing in with a password from a page whose address better-auth accepts", () => {
+    /** @scenario "A password sign-in from a page better-auth accepts hands it over unchanged" */
+    it("hands better-auth the address and navigates to it", async () => {
+      await signIn("credentials", { callbackUrl: "/dashboard" });
+
+      expect(emailSpy.mock.calls[0]![0]).toMatchObject({
+        callbackURL: "/dashboard",
+      });
+      expect(hardNavigateSpy).toHaveBeenCalledWith("/dashboard");
+    });
+  });
+
+  describe("when the password sign-in address normalises to a protocol-relative URL", () => {
+    /** @scenario "A password sign-in never navigates off the site" */
+    it("navigates to the home page instead", async () => {
+      await signIn("credentials", { callbackUrl: "/.//evil.com" });
+
+      expect(hardNavigateSpy).toHaveBeenCalledWith("/");
     });
   });
 
@@ -238,6 +276,22 @@ describe("signIn", () => {
         callbackURL: "/auth/resume",
       });
       expect(consumeStoredReturnTo()).toBe(AGENT_TESTING_PATH);
+    });
+  });
+
+  describe("when a social sign-in from an accepted address follows an abandoned one", () => {
+    /** @scenario "An abandoned provider sign-in leaves nothing behind for the next one" */
+    it("clears the parked page", async () => {
+      await signIn("google", {
+        callbackUrl: AGENT_TESTING_PATH,
+        redirect: false,
+      });
+      await signIn("google", { callbackUrl: "/dashboard", redirect: false });
+
+      expect(socialSpy.mock.calls[1]![0]).toMatchObject({
+        callbackURL: "/dashboard",
+      });
+      expect(consumeStoredReturnTo()).toBe("/");
     });
   });
 

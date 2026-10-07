@@ -266,47 +266,78 @@ export const signIn = async (
   const target = options?.callbackUrl
     ? safeRedirectTarget(options.callbackUrl)
     : undefined;
-  const callbackURL =
-    target === undefined ? undefined : toBetterAuthCallbackURL(target);
   const shouldRedirect = options?.redirect !== false;
 
   if (provider === "credentials" || provider === "email") {
-    return signInWithCredentials({
-      options,
-      target,
-      callbackURL,
-      shouldRedirect,
-    });
+    return signInWithCredentials({ options, target, shouldRedirect });
   }
 
   // Organization connections are registered with the SSO plugin.
   if (looksLikeSsoConnectionId(provider)) {
-    const result = await client.signIn.sso({
-      providerId: provider,
-      callbackURL: callbackURL ?? "/",
-    });
-    if (result.error) {
-      return {
-        error: result.error.message ?? "OAuthSignin",
-        code: result.error.code,
-        status: result.error.status,
-        ok: false,
-      };
-    }
-    if (
-      shouldRedirect &&
-      result.data &&
-      typeof result.data === "object" &&
-      "url" in result.data
-    ) {
-      const url = (result.data as { url?: string }).url;
-      if (url) {
-        navigate(url);
-      }
-    }
-    return { ok: true };
+    return signInWithSso({ provider, target, shouldRedirect });
   }
 
+  return signInWithSocial({ provider, options, target, shouldRedirect });
+};
+
+/** Follows the provider URL ourselves where better-auth did not auto-navigate. */
+function followProviderUrl({
+  data,
+  shouldRedirect,
+}: {
+  data: unknown;
+  shouldRedirect: boolean;
+}): void {
+  if (shouldRedirect && data && typeof data === "object" && "url" in data) {
+    const url = (data as { url?: string }).url;
+    if (url) {
+      navigate(url);
+    }
+  }
+}
+
+function providerFailure(error: {
+  message?: string;
+  code?: string;
+  status?: number;
+}): SignInResult {
+  return {
+    error: error.message ?? "OAuthSignin",
+    code: error.code,
+    status: error.status,
+    ok: false,
+  };
+}
+
+async function signInWithSso({
+  provider,
+  target,
+  shouldRedirect,
+}: {
+  provider: string;
+  target: string | undefined;
+  shouldRedirect: boolean;
+}): Promise<SignInResult> {
+  const result = await client.signIn.sso({
+    providerId: provider,
+    callbackURL: parkAndHandOff(target) ?? "/",
+  });
+  if (result.error) return providerFailure(result.error);
+  followProviderUrl({ data: result.data, shouldRedirect });
+  return { ok: true };
+}
+
+async function signInWithSocial({
+  provider,
+  options,
+  target,
+  shouldRedirect,
+}: {
+  provider: string;
+  options: SignInOptions | undefined;
+  target: string | undefined;
+  shouldRedirect: boolean;
+}): Promise<SignInResult> {
   // Auth0 bridge buttons choose a connection; Azure uses BetterAuth's provider id.
   const bridgeConnection = auth0BridgeConnectionOf(provider);
   const mappedProvider =
@@ -317,50 +348,34 @@ export const signIn = async (
         : provider;
   const result = await client.signIn.social({
     provider: mappedProvider as "google",
-    callbackURL,
+    callbackURL: parkAndHandOff(target),
     disableRedirect: !shouldRedirect,
     ...(options?.loginHint ? { loginHint: options.loginHint } : {}),
     ...(bridgeConnection !== null
       ? { additionalParams: { connection: bridgeConnection } }
       : {}),
   });
-  if (result.error) {
-    return {
-      error: result.error.message ?? "OAuthSignin",
-      code: result.error.code,
-      status: result.error.status,
-      ok: false,
-    };
-  }
-  // For providers where BetterAuth returned a redirect URL but didn't
-  // auto-navigate (some fetch modes), follow it ourselves.
-  if (
-    shouldRedirect &&
-    result.data &&
-    typeof result.data === "object" &&
-    "url" in result.data
-  ) {
-    const url = (result.data as { url?: string }).url;
-    if (url) {
-      navigate(url);
-    }
-  }
+  if (result.error) return providerFailure(result.error);
+  followProviderUrl({ data: result.data, shouldRedirect });
   return { ok: true };
-};
+}
 
 async function signInWithCredentials({
   options,
   target,
-  callbackURL,
   shouldRedirect,
 }: {
   options: SignInOptions | undefined;
   /** Where the user goes on success; navigated to directly, never via better-auth. */
   target: string | undefined;
-  /** What better-auth is handed, which its callbackURL check accepts. */
-  callbackURL: string | undefined;
   shouldRedirect: boolean;
 }): Promise<SignInResult> {
+  // better-auth refuses some targets outright, and this path navigates to the
+  // target itself, so it is only handed one it accepts and otherwise none.
+  const callbackURL =
+    target !== undefined && BETTER_AUTH_CALLBACK_PATTERN.test(target)
+      ? target
+      : undefined;
   // Retry timing is carried by the response header, not the auth result.
   let retryAfterSeconds: number | undefined;
   const result = await client.signIn.email({
@@ -377,9 +392,6 @@ async function signInWithCredentials({
       },
     },
   });
-  // This path navigates to `target` itself, so a parked copy would only go
-  // stale and be picked up by some later, unrelated landing on the resume page.
-  consumeStoredReturnTo();
   if (result.error) {
     // Application refusals carry their code in the handled-error payload.
     const handled = readHandledError(result.error);
@@ -446,7 +458,11 @@ export const safeRedirectTarget = (
 ): string => {
   if (!callbackUrl || !isSameOrigin(callbackUrl, origin)) return "/";
   const url = new URL(callbackUrl, origin);
-  return url.pathname + url.search + url.hash;
+  const path = url.pathname + url.search + url.hash;
+  // Dot segments normalise away after the same-origin check, so `/.//evil.com`
+  // is same-origin yet leaves a path that browsers read as `//evil.com`.
+  if (path.startsWith("//") || path.startsWith("/\\")) return "/";
+  return path;
 };
 
 /**
@@ -454,40 +470,62 @@ export const safeRedirectTarget = (
  * as better-auth 1.7.1 `dist/auth/trusted-origins.mjs` (`matchesOriginPattern`,
  * `allowRelativePaths`), minus its redundant escapes. Its origin check
  * refuses any relative callbackURL outside this set with a 403 "Invalid
- * callbackURL". App paths routinely fall outside it (agent-testing results carry a `:` in the path; `#`, `~`, `,` and
- * `%` are refused too), and a refused callbackURL makes sign-in impossible
- * from that page. Re-check on every better-auth upgrade.
+ * callbackURL". App paths routinely fall outside it (agent-testing results
+ * carry a `:` in the path; `#`, `~`, `,` and `%` are refused too), and a
+ * refused callbackURL makes sign-in impossible from that page. Re-check on
+ * every better-auth upgrade.
  */
 export const BETTER_AUTH_CALLBACK_PATTERN =
   /^\/(?!\/|\\|%2f|%5c)[\w.+/@-]*(?:\?[\w.+/=&%@-]*)?$/;
 
 /** Landing page that reads the parked target back and continues to it. */
-export const AUTH_RESUME_PATH = "/auth/resume";
+const AUTH_RESUME_PATH = "/auth/resume";
 
 const RETURN_TO_STORAGE_KEY = "langwatch.auth.returnTo";
 
 /**
- * The callbackURL to hand better-auth for a same-origin `target`.
- *
- * A target better-auth would refuse is parked in sessionStorage instead and
- * better-auth is sent to the resume page, which always passes its check and
- * forwards to the parked target. sessionStorage, not a query parameter,
- * because a query parameter would have to carry the very characters the check
- * refuses.
+ * The callbackURL to hand better-auth for a same-origin `target`: the target
+ * itself when better-auth accepts it, otherwise the resume page, which always
+ * passes its check and forwards to the target parked by `parkReturnTo`.
  */
-export const toBetterAuthCallbackURL = (target: string): string => {
-  if (BETTER_AUTH_CALLBACK_PATTERN.test(target)) return target;
+export const betterAuthCallbackURL = (target: string): string =>
+  BETTER_AUTH_CALLBACK_PATTERN.test(target) ? target : AUTH_RESUME_PATH;
+
+/**
+ * Parks a target better-auth would refuse in sessionStorage for the resume
+ * page. sessionStorage, not a query parameter, because a query parameter would
+ * have to carry the very characters the check refuses. An accepted target
+ * clears the slot instead, so a value left by an abandoned provider sign-in
+ * never survives to hijack a later landing.
+ */
+export const parkReturnTo = (target: string): void => {
   try {
-    window.sessionStorage.setItem(RETURN_TO_STORAGE_KEY, target);
+    if (BETTER_AUTH_CALLBACK_PATTERN.test(target)) {
+      window.sessionStorage.removeItem(RETURN_TO_STORAGE_KEY);
+    } else {
+      window.sessionStorage.setItem(RETURN_TO_STORAGE_KEY, target);
+    }
   } catch {
     // Storage unavailable: the resume page falls back to "/", which still
     // beats a sign-in that can never succeed.
   }
-  return AUTH_RESUME_PATH;
 };
 
 /**
- * Reads and clears the target parked by `toBetterAuthCallbackURL`, returning
+ * Parks `target` and returns what to hand better-auth. No target clears the
+ * slot and hands over nothing, leaving better-auth to its own default.
+ */
+const parkAndHandOff = (target: string | undefined): string | undefined => {
+  if (target === undefined) {
+    parkReturnTo("/");
+    return undefined;
+  }
+  parkReturnTo(target);
+  return betterAuthCallbackURL(target);
+};
+
+/**
+ * Reads and clears the target parked by `parkReturnTo`, returning
  * "/" when there is none. Re-guarded because storage is writable by any
  * script on the origin and must not become an open redirect.
  */
@@ -546,9 +584,9 @@ export const linkAccount = async (
   provider: string,
   options?: { callbackUrl?: string },
 ): Promise<{ error?: string; ok?: boolean }> => {
-  const callbackURL = toBetterAuthCallbackURL(
-    safeRedirectTarget(options?.callbackUrl),
-  );
+  const target = safeRedirectTarget(options?.callbackUrl);
+  parkReturnTo(target);
+  const callbackURL = betterAuthCallbackURL(target);
   const mapped = provider === "azure-ad" ? "microsoft" : provider;
 
   const res = await fetch("/api/auth/link-social", {

@@ -5,7 +5,7 @@ import { replaceLocation } from "~/utils/browserNavigation";
 
 /**
  * Where better-auth returns a sign-in whose real destination its callbackURL
- * check would refuse (see `toBetterAuthCallbackURL`). Forwards to the parked
+ * check would refuse (see `betterAuthCallbackURL`). Forwards to the parked
  * destination, replacing this page so the back button skips it.
  */
 export default function AuthResume() {
