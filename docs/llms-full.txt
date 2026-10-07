@@ -37327,7 +37327,7 @@ prompts/
 
 ### 4. Deploy with Materialized Prompts
 
-Include the materialized prompts in your deployment package, together with `prompts.json` and `prompts-lock.json`, which the SDKs read to find them. Your application can now run completely offline.
+Include the materialized prompts in your deployment package, together with `prompts.json` and `prompts-lock.json`, which the SDKs read to find them. Your application can now run completely offline. The exception is a tagged prompt in the Python SDK, which the default fetch policy always requests from the server (see [Versions and Tags](#versions-and-tags)).
 
 ## Using Materialized Prompts in Code
 
@@ -37440,7 +37440,7 @@ Include these files in your deployment package:
 
 ### 3. Deploy to Air-Gapped Environment
 
-The application runs entirely offline, using only materialized prompts. No LangWatch API access required.
+The application runs entirely offline, using only materialized prompts, and needs no LangWatch API access. Don't pass a `tag` to the Python SDK there: the default fetch policy sends tagged prompts to the server, and `MATERIALIZED_ONLY` rejects them (see [Versions and Tags](#versions-and-tags)).
 
 ## Fetch Policies
 
