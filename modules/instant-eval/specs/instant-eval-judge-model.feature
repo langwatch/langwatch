@@ -183,7 +183,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
         | an organization whose free budget is spent              | free budget exhausted |
         | a project the Instant Evals judge has not learned yet   | project unknown       |
 
-    @unit @unimplemented
+    @unit
     Scenario Outline: The refusal's error code is kept in the reported result
       Given a judge result that is an error with the <code> code
       When the evaluation's outcome is reported
