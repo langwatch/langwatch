@@ -9,7 +9,7 @@ import { UserNotInOrganizationError } from "@langwatch/organization-contract";
  * @see specs/identity/org-session-lifetime.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { Temporal, type Instant } from "@langwatch/time";
+import { Temporal, toDate, type Instant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -112,24 +112,22 @@ describe("SignInSecuritySettingsService", () => {
     it("writes, then ends exactly the member sessions already past the new window", async () => {
       const { service, memory } = harness();
       for (const userId of ["sam", "kim", "lee"]) {
-        memory.sessions.set(`idle-${userId}`, {
+        memory.db.Session.push({
           id: `idle-${userId}`,
           userId,
           sessionToken: `token-${userId}`,
-          impersonation: null,
-          createdAt: minutesAgo(180),
-          updatedAt: minutesAgo(120),
-          lastSeenAt: minutesAgo(120),
+          createdAt: toDate(minutesAgo(180)),
+          updatedAt: toDate(minutesAgo(120)),
+          lastSeenAt: toDate(minutesAgo(120)),
         });
       }
-      memory.sessions.set("working-joe", {
+      memory.db.Session.push({
         id: "working-joe",
         userId: "joe",
         sessionToken: "token-joe",
-        impersonation: null,
-        createdAt: minutesAgo(180),
-        updatedAt: minutesAgo(5),
-        lastSeenAt: minutesAgo(5),
+        createdAt: toDate(minutesAgo(180)),
+        updatedAt: toDate(minutesAgo(5)),
+        lastSeenAt: toDate(minutesAgo(5)),
       });
 
       const result = await service.save({
@@ -139,7 +137,7 @@ describe("SignInSecuritySettingsService", () => {
       });
 
       expect(result).toEqual({ ok: true, sweptSessions: 3 });
-      expect([...memory.sessions.keys()]).toEqual(["working-joe"]);
+      expect(memory.db.Session.map((row) => row.id)).toEqual(["working-joe"]);
     });
   });
 

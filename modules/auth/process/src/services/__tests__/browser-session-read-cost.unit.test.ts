@@ -4,7 +4,7 @@
  * @see specs/identity/auth-read-caching.feature
  */
 import { NO_LOCKOUT, type VerifiedBrowserSession } from "@langwatch/auth-contract";
-import { Temporal, type Instant } from "@langwatch/time";
+import { Temporal, toDate, type Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -51,15 +51,17 @@ function harness() {
     now,
   });
   const signIn = (userId: string): VerifiedBrowserSession => {
-    memory.sessions.set(`session-${userId}`, {
-      id: `session-${userId}`,
-      userId,
-      sessionToken: `token-${userId}`,
-      impersonation: null,
-      createdAt: clock,
-      updatedAt: clock,
-      lastSeenAt: clock,
-    });
+    memory.db.Session = [
+      ...memory.db.Session.filter((row) => row.id !== `session-${userId}`),
+      {
+        id: `session-${userId}`,
+        userId,
+        sessionToken: `token-${userId}`,
+        createdAt: toDate(clock),
+        updatedAt: toDate(clock),
+        lastSeenAt: toDate(clock),
+      },
+    ];
     return {
       session: { id: `session-${userId}`, expiresAt: new Date("2030-01-01T00:00:00.000Z") },
       user: { id: userId, name: null, email: null, image: null },
@@ -109,7 +111,7 @@ describe("reading a browser session", () => {
       const verified = signIn("sam");
       await service.resolveBrowserSession({ verified });
 
-      memory.sessions.delete("session-sam");
+      memory.db.Session = memory.db.Session.filter((row) => row.id !== "session-sam");
 
       await expect(service.resolveBrowserSession({ verified })).resolves.toEqual({
         kind: "anonymous",
@@ -129,12 +131,16 @@ describe("reading a browser session", () => {
       });
       await service.resolveBrowserSession({ verified: signIn("sam") });
       const twoHoursAgo = SIGNED_IN_AT.subtract({ hours: 2 });
-      memory.sessions.set("session-sam", {
-        ...memory.sessions.get("session-sam")!,
-        createdAt: twoHoursAgo,
-        updatedAt: twoHoursAgo,
-        lastSeenAt: twoHoursAgo,
-      });
+      memory.db.Session = memory.db.Session.map((row) =>
+        row.id === "session-sam"
+          ? {
+              ...row,
+              createdAt: toDate(twoHoursAgo),
+              updatedAt: toDate(twoHoursAgo),
+              lastSeenAt: toDate(twoHoursAgo),
+            }
+          : row,
+      );
 
       await fixture.settings.save({
         organizationId: "acme",
@@ -145,7 +151,7 @@ describe("reading a browser session", () => {
       });
 
       await expect(service.endSessionsPastWindow({ userIds: ["sam"] })).resolves.toBe(1);
-      expect(memory.sessions.has("session-sam")).toBe(false);
+      expect(memory.db.Session.some((row) => row.id === "session-sam")).toBe(false);
     });
   });
 

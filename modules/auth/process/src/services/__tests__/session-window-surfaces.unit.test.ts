@@ -4,7 +4,7 @@
  * @see specs/identity/org-session-lifetime.feature
  */
 import { NO_LOCKOUT, type VerifiedBrowserSession } from "@langwatch/auth-contract";
-import { Temporal, type Instant } from "@langwatch/time";
+import { Temporal, toDate, type Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -62,14 +62,13 @@ async function worldWithAnIdleSessionPastItsWindow({
     sessionBound: { idleTimeoutMinutes, maxLifetimeMinutes: 0 },
     members: ["sam"],
   });
-  memory.sessions.set("session-sam", {
+  memory.db.Session.push({
     id: "session-sam",
     userId: "sam",
     sessionToken: "token-sam",
-    impersonation: null,
-    createdAt: clock,
-    updatedAt: clock,
-    lastSeenAt: clock,
+    createdAt: toDate(clock),
+    updatedAt: toDate(clock),
+    lastSeenAt: toDate(clock),
   });
   const verified: VerifiedBrowserSession = {
     session: { id: "session-sam", expiresAt: new Date("2030-01-01T00:00:00.000Z") },
@@ -122,11 +121,11 @@ describe("a session idle past its organization's window", () => {
       "is refused by the %s surface, and the row is gone",
       async (surface) => {
         const world = await worldWithAnIdleSessionPastItsWindow();
-        expect(world.memory.sessions.has("session-sam")).toBe(true);
+        expect(world.memory.db.Session.some((row) => row.id === "session-sam")).toBe(true);
 
         await expect(surfaces[surface](world)).resolves.toEqual(refusals[surface]);
 
-        expect(world.memory.sessions.has("session-sam")).toBe(false);
+        expect(world.memory.db.Session.some((row) => row.id === "session-sam")).toBe(false);
       },
     );
   });
@@ -174,7 +173,7 @@ describe("an organization that caps CLI sessions but sets no browser window", ()
         kind: "signed_in",
         session: { sessionId: "session-sam", user: { id: "sam" } },
       });
-      expect(world.memory.sessions.has("session-sam")).toBe(true);
+      expect(world.memory.db.Session.some((row) => row.id === "session-sam")).toBe(true);
     });
   });
 });
@@ -187,23 +186,25 @@ describe("sessions that record nothing about what they proved", () => {
         idleTimeoutMinutes: 0,
         idleForMinutes: 30 * 24 * 60,
       });
-      const at = world.memory.sessions.get("session-sam")!.createdAt;
+      const at = world.memory.db.Session.find((row) => row.id === "session-sam")!.createdAt;
       const people = [
         { id: "sam", amr: undefined },
         { id: "ana", amr: [] },
         { id: "bo", amr: ["pwd"] },
       ] as const;
       for (const { id, amr } of people) {
-        world.memory.sessions.set(`session-${id}`, {
-          id: `session-${id}`,
-          userId: id,
-          sessionToken: `token-${id}`,
-          impersonation: null,
-          createdAt: at,
-          updatedAt: at,
-          lastSeenAt: at,
-          ...(amr ? { amr } : {}),
-        });
+        world.memory.db.Session = [
+          ...world.memory.db.Session.filter((row) => row.id !== `session-${id}`),
+          {
+            id: `session-${id}`,
+            userId: id,
+            sessionToken: `token-${id}`,
+            createdAt: at,
+            updatedAt: at,
+            lastSeenAt: at,
+            ...(amr ? { amr } : {}),
+          },
+        ];
       }
 
       const resolved = await Promise.all(
@@ -222,11 +223,9 @@ describe("sessions that record nothing about what they proved", () => {
         "signed_in",
         "signed_in",
       ]);
-      expect(people.map(({ id }) => world.memory.sessions.has(`session-${id}`))).toEqual([
-        true,
-        true,
-        true,
-      ]);
+      expect(
+        people.map(({ id }) => world.memory.db.Session.some((row) => row.id === `session-${id}`)),
+      ).toEqual([true, true, true]);
       const shapes = resolved.map((answer) =>
         answer.kind === "signed_in"
           ? { expires: answer.session.expires, ...answer.session.user, id: "", email: "" }
