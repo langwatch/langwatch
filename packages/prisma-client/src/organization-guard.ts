@@ -240,6 +240,9 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   ScimSyncState: {
     extraBound: ({ clause }) => typeof clauseField(clause, "connectionId") === "string",
   },
+  // SCIM's peer fold of identity's SSO connection facts, one row per connection carrying its
+  // `organizationId`; written by the row id, read by organization.
+  ScimSsoConnectionView: {},
   // Trace's fold of governance's coding-assistant billing fact, one row per
   // (organizationId, sourceType); every read and write names its organization.
   TraceIngestSourceBilling: {},

@@ -69,7 +69,6 @@ import {
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender, EventingParticipation } from "@langwatch/eventing";
-import { IdentityApi } from "@langwatch/identity-contract";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -243,7 +242,6 @@ export class ScimModule implements ScimApiContract {
     users: UserApi,
     entitlements: EntitlementApi,
     auditLog: AuditLogApi,
-    identity: IdentityApi,
     organization: OrganizationApi,
   };
   static readonly config = scimConfig;
@@ -306,7 +304,7 @@ export class ScimModule implements ScimApiContract {
     });
     // The activity log arrives when scim_sync is built over its own store; see readScimSyncFrom.
     const syncs = ScimSyncReadsService.create({ syncs: repositories.scimSyncs, activity: null });
-    const connections = ScimConnectionsService.create(dependencies.identity);
+    const connections = ScimConnectionsService.create(repositories.scimSsoConnections);
     const costCenterFacts = ScimCostCenterFactsService.create();
     const scim = PostgresScimService.create({
       repository: repositories.scim,
@@ -330,7 +328,7 @@ export class ScimModule implements ScimApiContract {
         identities: repositories.scim,
       }),
       reconciliation: ScimReconciliationService.create({
-        identity: dependencies.identity,
+        connections,
         syncs,
         grants: dependencies.authorization,
         people: dependencies.users,

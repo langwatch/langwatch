@@ -15,6 +15,7 @@ import { defineProcessModule } from "@langwatch/process";
 import { ScimModule } from "./app/scim.app.ts";
 import { scimCostCenterEventing } from "./eventing/scim-cost-center.pipeline.ts";
 import { scimDirectoryEventing } from "./eventing/scim-directory.pipeline.ts";
+import { scimSsoConnectionEventing } from "./eventing/scim-sso-connection.pipeline.ts";
 import { scimSyncEventing } from "./eventing/scim-sync.pipeline.ts";
 import { scimEventing } from "./eventing/scim.pipeline.ts";
 import { scimRepositories } from "./repositories/scim-repositories.registry.ts";
@@ -66,4 +67,5 @@ export const scimProcessModule = defineProcessModule("scim")
   .withEventing(scimEventing)
   .withEventing(scimDirectoryEventing)
   .withEventing(scimSyncEventing)
-  .withEventing(scimCostCenterEventing);
+  .withEventing(scimCostCenterEventing)
+  .withEventing(scimSsoConnectionEventing);

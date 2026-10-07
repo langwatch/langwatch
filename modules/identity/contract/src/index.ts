@@ -112,6 +112,7 @@ export {
   ssoArrivalPolicySchema,
   ssoConnectionFactInputSchema,
   ssoConnectionSourceSchema,
+  ssoConnectionFoldedStateSchema,
   ssoConnectionStateSchema,
   ssoConnectionTypeSchema,
   ssoDomainProofStateSchema,

@@ -25,11 +25,9 @@ import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 import type { Instant } from "@langwatch/time";
 import { vi } from "vitest";
 
+import { foldedConnectionReads } from "../../../__tests__/support/folded-connections.ts";
 import { ScimModule } from "../../../app/scim.app.ts";
-import {
-  ScimConnectionsService,
-  type ScimConnectionReads,
-} from "../../../services/scim-connections.service.ts";
+import { ScimConnectionsService } from "../../../services/scim-connections.service.ts";
 import { ScimDirectoryExternalIdsService } from "../../../services/scim-directory-external-ids.service.ts";
 import type { ScimOversightService } from "../../../services/scim-oversight.service.ts";
 import { ScimReconciliationService } from "../../../services/scim-reconciliation.service.ts";
@@ -105,13 +103,7 @@ export function scimTestApp(
   );
   const scim = options.scim ?? new ScimServiceFake();
   const offered = options.connections ?? [];
-  const identity: ScimConnectionReads = {
-    ssoConnectionReads: () => ({
-      findForOrganization: () => Promise.resolve(offered),
-      getProvider: ({ connectionId }) => Promise.resolve({ connectionId, providerId: "oidc" }),
-      getOrganization: () => Promise.reject(new Error("the doors never ask")),
-    }),
-  };
+  const folded = foldedConnectionReads(offered);
   const audited: unknown[] = [];
   const entitlements: Pick<EntitlementApi, "getActivePlan"> = {
     getActivePlan: () => Promise.resolve(fakePlan(options.planType ?? "ENTERPRISE")),
@@ -122,7 +114,7 @@ export function scimTestApp(
       return Promise.resolve({ id: "audit", occurredAt: 0 });
     },
   };
-  const connections = ScimConnectionsService.create(identity);
+  const connections = ScimConnectionsService.create(folded);
   const app = ScimModule.createWithService({
     scim,
     connections,
@@ -135,7 +127,7 @@ export function scimTestApp(
       },
     }),
     reconciliation: ScimReconciliationService.create({
-      identity,
+      connections,
       syncs: {
         findForOrganization: () => Promise.resolve([]),
         findByConnection: () => Promise.resolve(null),

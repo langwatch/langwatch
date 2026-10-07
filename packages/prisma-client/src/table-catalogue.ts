@@ -38,6 +38,7 @@ export const prismaTableCatalogue = {
   "ScimUserResource": "ScimUserResource",
   "ScimDirectoryUser": "ScimDirectoryUser",
   "ScimSyncState": "ScimSyncState",
+  "ScimSsoConnectionView": "ScimSsoConnectionView",
   "Project": "Project",
   "Department": "Department",
   "DepartmentMembershipHistory": "DepartmentMembershipHistory",
@@ -800,6 +801,15 @@ export const prismaModelFieldCatalogue = {
     "occurredAt",
     "lastEventId",
     "acceptedAt",
+    "projectionVersion",
+    "createdAt",
+    "updatedAt"
+  ],
+  "ScimSsoConnectionView": [
+    "id",
+    "organizationId",
+    "folded",
+    "appliedEventIds",
     "projectionVersion",
     "createdAt",
     "updatedAt"
@@ -2960,6 +2970,7 @@ export const prismaRelationCatalogue = {
   },
   "ScimDirectoryUser": {},
   "ScimSyncState": {},
+  "ScimSsoConnectionView": {},
   "Project": {
     "team": "Team",
     "checks": "Monitor",

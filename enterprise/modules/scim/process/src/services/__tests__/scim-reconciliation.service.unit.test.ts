@@ -128,13 +128,7 @@ function createReads({
     findForOrganization,
     getProvider,
     findActivity,
-    identity: {
-      ssoConnectionReads: () => ({
-        findForOrganization,
-        getProvider,
-        getOrganization: () => Promise.reject(new Error("reconciliation never asks")),
-      }),
-    },
+    connections: { findHeldConnections: findForOrganization },
     syncs: {
       findForOrganization: async () => syncs,
       findByConnection: async () => null,

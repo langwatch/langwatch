@@ -175,6 +175,7 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("github_lifecycle");
       expect(pipelines).toContain("evaluator_lifecycle");
       expect(pipelines).toContain("monitor_evaluator_cleanup");
+      expect(pipelines).toContain("scim_sso_connections");
       expect(pipelines).toContain("topic_clustering_processing");
       expect(pipelines).toContain("automations");
       expect(pipelines).toContain("evaluation_processing");
