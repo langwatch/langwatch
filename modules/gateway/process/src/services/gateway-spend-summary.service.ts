@@ -16,7 +16,7 @@ import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budge
 
 type GatewayUsageTraces = Pick<
   TraceApi,
-  "findSpendByAttributeValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
+  "findSpendByProjectAndValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
 >;
 
 const VIRTUAL_KEY_ATTRIBUTE = "langwatch.virtual_key_id";
@@ -95,9 +95,9 @@ export class GatewayUsageService {
   }
 
   /**
-   * Spend per key over a window, for every key in an org, read across every project rather than
-   * one: a key's traces land in whichever project resolved as its trace destination, the
-   * governance project for org- and team-scoped keys.
+   * Spend per key over a window, read across every project of the org in one statement over its
+   * tenant set (ARCHITECTURE.md "Routing is folded into the `clickhouse` member"), as main read
+   * it: one read per project saturates the ClickHouse statement queue in a large organization.
    */
   async spendByVirtualKey(args: {
     organizationId: string;
@@ -108,17 +108,22 @@ export class GatewayUsageService {
     if (args.virtualKeyIds.length === 0) {
       return out;
     }
+    const projectIds = await this.projects.listIdsByOrganization({
+      organizationId: args.organizationId,
+    });
+    if (projectIds.length === 0) {
+      return out;
+    }
 
-    const rows = await this.acrossTenants(args.organizationId, (projectId) =>
-      this.traces.findSpendByAttributeValue({
-        projectId,
-        attributeKey: VIRTUAL_KEY_ATTRIBUTE,
-        values: args.virtualKeyIds,
-        window: spendWindow(args.window),
-      }),
-    );
+    const rows = await this.traces.findSpendByProjectAndValue({
+      projectIds,
+      valueKey: VIRTUAL_KEY_ATTRIBUTE,
+      window: spendWindow(args.window),
+    });
+    const wanted = new Set(args.virtualKeyIds);
     const byKey = new Map<string, { nano: bigint; requests: number }>();
     for (const row of rows) {
+      if (!wanted.has(row.value)) continue;
       const sum = byKey.get(row.value) ?? { nano: 0n, requests: 0 };
       byKey.set(row.value, {
         nano: sum.nano + usdToNanoUsd(row.spentUsd),

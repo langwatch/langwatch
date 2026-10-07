@@ -1,11 +1,12 @@
 import { Prisma } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import type {
   TraceApi,
   TraceAttributedTrace,
   TraceAttributeUsageBucket,
 } from "@langwatch/trace-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   GatewayUsageService,
@@ -47,12 +48,12 @@ function mockVirtualKeys(
   };
 }
 
-/** Trace's single-tenant reads over the stubs: each call answers one project only. */
+/** Trace's reads over the stubs: one project per call, or the tenant set for the spend rollup. */
 function mockTraces(
   traces: TraceStub[],
 ): Pick<
   TraceApi,
-  "findSpendByAttributeValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
+  "findSpendByProjectAndValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
 > {
   const rows = traces.map((t, i) => ({
     projectId: t.projectId ?? DEFAULT_PROJECT,
@@ -97,12 +98,16 @@ function mockTraces(
     return [...byKey.values()];
   };
   return {
-    findSpendByAttributeValue: async (input) =>
-      bucketsFor(inTenant(input)).map((b) => ({
-        value: b.value,
-        spentUsd: b.totalUsd,
-        requests: b.requests,
-      })),
+    findSpendByProjectAndValue: async ({ projectIds }) =>
+      projectIds.flatMap((projectId) =>
+        bucketsFor(inTenant({ projectId })).map((b) => ({
+          projectId,
+          value: b.value,
+          spentUsd: b.totalUsd,
+          requests: b.requests,
+          lastOccurredAtMs: 0,
+        })),
+      ),
     findAttributeUsageBuckets: async (input) => bucketsFor(inTenant(input)),
     findAttributedTraces: async (input) =>
       inTenant(input)
@@ -388,6 +393,53 @@ describe("GatewayUsageService across the org's projects", () => {
       expect(picked.recentDebits.map((d) => d.model)).toEqual(["claude-sonnet-4"]);
       expect(all.recentDebits).toHaveLength(2);
       expect({ ...picked, recentDebits: [] }).toEqual({ ...all, recentDebits: [] });
+    });
+  });
+});
+
+describe("GatewayUsageService.spendByVirtualKey", () => {
+  const at = Temporal.Instant.from("2026-04-02T10:00:00Z");
+
+  describe("when two keys have traces in the same project", () => {
+    /** @scenario "Spend of the organization's other keys is not counted against the key" */
+    it("sums only the asked key's traces", async () => {
+      const usage = service(
+        [{ id: "vk_01", name: "prod", displayPrefix: "lw_a" }],
+        [
+          { virtualKeyId: "vk_01", costUsd: "0.4", occurredAt: at },
+          { virtualKeyId: "vk_02", costUsd: "9", occurredAt: at },
+        ],
+      );
+
+      const spend = await usage.spendByVirtualKey({
+        organizationId: "org_01",
+        virtualKeyIds: ["vk_01"],
+        window,
+      });
+
+      expect([...spend.entries()]).toEqual([["vk_01", { spentUsd: "0.4", requests: 1 }]]);
+    });
+  });
+
+  describe("when the organization has no projects", () => {
+    /** @scenario "An organization with no projects reads no spend without asking trace" */
+    it("answers no spend and never asks trace", async () => {
+      const findSpendByProjectAndValue = vi.fn<TraceApi["findSpendByProjectAndValue"]>();
+      const usage = GatewayUsageService.create({
+        projects: { listIdsByOrganization: async () => [] },
+        virtualKeys: mockVirtualKeys([]),
+        chRepo: undefined,
+        traces: createApiFixture<TraceApi>({ findSpendByProjectAndValue }),
+      });
+
+      const spend = await usage.spendByVirtualKey({
+        organizationId: "org_01",
+        virtualKeyIds: ["vk_01"],
+        window,
+      });
+
+      expect(spend.size).toBe(0);
+      expect(findSpendByProjectAndValue).not.toHaveBeenCalled();
     });
   });
 });

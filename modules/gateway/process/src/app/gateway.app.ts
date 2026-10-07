@@ -747,10 +747,10 @@ type GatewayControlPlanePeers = Readonly<{
   monitors: MonitorApi;
   /** The deployment's own providers, which a license's managed key dispatches on. */
   platformProviders: GatewayPlatformProviders;
-  /** The per-virtual-key spend the usage surfaces read, one tenant at a time. */
+  /** The per-virtual-key spend the usage surfaces read. */
   traces: Pick<
     TraceApi,
-    "findSpendByAttributeValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
+    "findSpendByProjectAndValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
   >;
 }>;
 
