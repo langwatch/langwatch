@@ -44,8 +44,7 @@ Feature: The standalone API process serves its own metrics
       # not an invitation. Absent rather than refusing, because a route that
       # answers every caller with a refusal is a surface with no purpose.
 
-    # Gap: the boot does not name the absence (open question Q103).
-    @unit @unimplemented
+    @unit
     Scenario: In production an unset key is named at boot
       Given the API process runs in production with no metrics API key configured
       When it composes
@@ -69,3 +68,9 @@ Feature: The standalone API process serves its own metrics
       And a scrape still renders every sample the registry holds
       # Registering a collector twice is refused by the registry, so a process
       # that hosts a second composition would otherwise fail at boot.
+
+    @unit
+    Scenario: The scrape carries Node's default collectors
+      Given the API process serves its metrics endpoint
+      When a caller scrapes it
+      Then the response carries Node's default process and runtime series

@@ -2,7 +2,11 @@ import { createLogger } from "@langwatch/observability";
 
 import { EventNotFoundError } from "../../services/errorHandling.ts";
 import { compareOrdinal } from "../../utils/compareOrdinal.ts";
-import type { EventRecord, EventRepository } from "./eventRepository.types.ts";
+import type {
+  EventOccurredAtWindow,
+  EventRecord,
+  EventRepository,
+} from "./eventRepository.types.ts";
 
 const logger = createLogger("langwatch:event-sourcing:event-repository-memory");
 
@@ -40,12 +44,19 @@ export class EventRepositoryMemory implements EventRepository {
     aggregateType: string;
     aggregateId: string;
     eventId: string;
+    occurredAt?: EventOccurredAtWindow;
   }): Promise<EventRecord> {
-    const key = `${request.tenantId}:${request.aggregateType}:${request.aggregateId}`;
-    const record = this.eventsByKey.get(key)?.find((entry) => entry.EventId === request.eventId);
+    const { occurredAt, ...stream } = request;
+    const key = `${stream.tenantId}:${stream.aggregateType}:${stream.aggregateId}`;
+    const record = this.eventsByKey
+      .get(key)
+      ?.find(
+        (entry) =>
+          entry.EventId === stream.eventId && withinOccurredAt({ record: entry, occurredAt }),
+      );
 
     if (!record) {
-      throw new EventNotFoundError(request);
+      throw new EventNotFoundError(stream);
     }
 
     return { ...record };
@@ -259,4 +270,17 @@ export class EventRepositoryMemory implements EventRepository {
       this.eventsByKey.set(key, aggregateEvents);
     }
   }
+}
+
+/** The ClickHouse predicate's twin: a row with no occurred time is always kept. */
+function withinOccurredAt({
+  record,
+  occurredAt,
+}: {
+  record: EventRecord;
+  occurredAt: EventOccurredAtWindow | undefined;
+}): boolean {
+  const recorded = record.EventOccurredAt;
+  if (occurredAt === undefined || recorded === null || recorded === 0) return true;
+  return recorded >= occurredAt.fromMs && recorded <= occurredAt.toMs;
 }

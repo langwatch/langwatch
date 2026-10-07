@@ -9,6 +9,7 @@ import { PrismaIdentityBackfillRepository } from "./prisma.identity-backfill.rep
 import { PrismaIdentityHeadsRepository } from "./prisma.identity-heads.repository.ts";
 import { PrismaIdentityLatchRepository } from "./prisma.identity-latch.repository.ts";
 import { PrismaIdentityLookupRepository } from "./prisma.identity-lookup.repository.ts";
+import { PrismaIdentityMigrationRepository } from "./prisma.identity-migration.repository.ts";
 import { PrismaIdentityProjectionRepository } from "./prisma.identity-projection.repository.ts";
 import { PrismaIdentityReservationRepository } from "./prisma.identity-reservations.repository.ts";
 import { PrismaIdentitySecretCarryRepository } from "./prisma.identity-secret-carry.repository.ts";
@@ -93,6 +94,7 @@ export class PostgresIdentityRepositories {
       joinRequestProjection: PrismaJoinRequestProjectionRepository.create(database),
       ssoConnectionHeads: PrismaSsoConnectionProjectionRepository.create(database),
       secretCarry: PrismaIdentitySecretCarryRepository.create(database),
+      migration: PrismaIdentityMigrationRepository.create(database),
       joinRequestAudience: PrismaJoinRequestAudienceRepository.create(database),
       joinRequestNotificationContext:
         PrismaJoinRequestNotificationContextRepository.create(database),

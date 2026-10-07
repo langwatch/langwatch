@@ -634,7 +634,6 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
           eventId: string;
           field: string;
           tenantId: string;
-          aggregateType: string;
           aggregateId: string;
         }) => {
           if (field === attrA) return fullValue;

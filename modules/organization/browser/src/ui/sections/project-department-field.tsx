@@ -1,5 +1,5 @@
-import type { UiProjectDepartmentFieldProps } from "@langwatch/browser-host/declarations";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import type { ProjectDepartmentFieldProps } from "@langwatch/organization-client";
 
 import { useDepartmentColumn } from "../../behavior/use-department-column.ts";
 import { DepartmentPicker } from "./department-picker.tsx";
@@ -9,7 +9,7 @@ export function ProjectDepartmentField({
   organizationId,
   projectId,
   governanceEnabled,
-}: UiProjectDepartmentFieldProps) {
+}: ProjectDepartmentFieldProps) {
   const department = useDepartmentColumn(organizationId, governanceEnabled);
   if (!department.show) return null;
 

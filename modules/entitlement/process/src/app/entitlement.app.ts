@@ -23,7 +23,7 @@ import {
   type PricingModel,
   PlanLimitExceededError,
 } from "@langwatch/entitlement-contract";
-import type { StaticPipelineDefinition } from "@langwatch/eventing";
+import type { EventingCommands, StaticPipelineDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import {
@@ -41,12 +41,21 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 
 import { buildUsageWarningPipeline } from "../eventing/entitlement-usage-warning.pipeline.ts";
+import { CountMonthCommand } from "../eventing/usage.commands.ts";
+import {
+  buildUsagePipeline,
+  type UsagePipelineDefinition,
+  type UsageSenders,
+} from "../eventing/usage.pipeline.ts";
 import type { EntitlementRepositories } from "../repositories/entitlement.repositories.ts";
 import { coreBaselinePlan } from "../rules/plan-baseline.rules.ts";
+import { BillableEventsMeterAppendService } from "../services/billable-events-meter-append.service.ts";
 import { EntitlementService } from "../services/entitlement.service.ts";
 import { PlanNextStepService } from "../services/plan-next-step.service.ts";
 import { SelfServePlanCatalogueService } from "../services/self-serve-plan-catalogue.service.ts";
 import { SubscriptionPlanService } from "../services/subscription-plan.service.ts";
+import { TraceMeterAppendService } from "../services/trace-meter-append.service.ts";
+import { UsageCountingService } from "../services/usage-counting.service.ts";
 import { UsageService, type UsageCounter } from "../services/usage-enforcement.service.ts";
 import { UsageStatsService } from "../services/usage-stats.service.ts";
 import { UsageWarningService, type UsageWarning } from "../services/usage-warning.service.ts";
@@ -120,6 +129,12 @@ type EntitlementDependencies = EntitlementSetup["dependencies"];
  */
 type EntitlementCallerLookup = Pick<EntitlementDependencies, "users" | "organizations">;
 
+/** The repositories the app reads directly; the meters reach it only through its usage pipeline. */
+type EntitlementReadRepositories = Pick<EntitlementRepositories, "membership" | "spend">;
+
+/** The usage pipeline over the senders its process manager and subscriber call back through. */
+type UsagePipelineBuild = (send: () => UsageSenders) => UsagePipelineDefinition;
+
 /** What a plan allows, and what has been used and spent against it. */
 export class EntitlementModule implements EntitlementApiContract {
   static readonly contract = EntitlementApi;
@@ -142,17 +157,21 @@ export class EntitlementModule implements EntitlementApiContract {
   #users: UserApi;
   #organizations: OrganizationApi;
   #requestBoundOverrides: RequestBoundsOverrides;
+  #buildUsagePipeline: UsagePipelineBuild | undefined;
+  #usageSenders: UsageSenders | undefined;
 
   private constructor({
     repositories,
     infrastructure,
     dependencies,
     config,
+    usagePipeline,
   }: {
-    repositories: EntitlementRepositories;
+    repositories: EntitlementReadRepositories;
     infrastructure: EntitlementInfrastructure;
     dependencies: EntitlementCallerLookup;
     config: Pick<EntitlementConfig, "requestBounds">;
+    usagePipeline?: UsagePipelineBuild;
   }) {
     this.#plans = EntitlementService.create(infrastructure);
     this.#usage = UsageStatsService.create({
@@ -170,6 +189,7 @@ export class EntitlementModule implements EntitlementApiContract {
     this.#users = dependencies.users;
     this.#organizations = dependencies.organizations;
     this.#requestBoundOverrides = config.requestBounds ?? {};
+    this.#buildUsagePipeline = usagePipeline;
   }
 
   static create({ repositories, dependencies, config }: EntitlementSetup): EntitlementModule {
@@ -189,6 +209,7 @@ export class EntitlementModule implements EntitlementApiContract {
       isSaas: config.isSaas,
       planResolver: (organizationId) => plans.getActivePlan({ organizationId }),
       peers: dependencies,
+      meter: repositories.billableEvents,
     });
     const warnings = UsageWarningService.create({
       billing: dependencies.billing,
@@ -199,11 +220,38 @@ export class EntitlementModule implements EntitlementApiContract {
       logger: createLogger("langwatch:entitlement:usage-warning"),
     });
 
+    const counting = UsageCountingService.create({
+      meter: repositories.billableEvents,
+      traceMeter: repositories.traces,
+      plans,
+      billing: dependencies.billing,
+    });
+    // The meters are appended on Cloud only; the pipeline builds without them elsewhere.
+    const meterStores = config.isSaas
+      ? {
+          billableEvents: BillableEventsMeterAppendService.create({
+            meter: repositories.billableEvents,
+            projects: dependencies.projects,
+          }),
+          traces: TraceMeterAppendService.create({
+            meter: repositories.traces,
+            projects: dependencies.projects,
+          }),
+        }
+      : undefined;
+
     return new EntitlementModule({
       repositories,
       infrastructure: { ...sources, counter, warnings },
       dependencies,
       config,
+      usagePipeline: (send) =>
+        buildUsagePipeline({
+          countMonth: CountMonthCommand.create({ counting }),
+          meterStores,
+          projects: dependencies.projects,
+          send,
+        }),
     });
   }
 
@@ -213,7 +261,7 @@ export class EntitlementModule implements EntitlementApiContract {
    * production always goes through `create`, exercising every collaborator the same way.
    */
   static createForTesting(setup: {
-    repositories: EntitlementRepositories;
+    repositories: EntitlementReadRepositories;
     infrastructure: EntitlementInfrastructure;
     dependencies: EntitlementCallerLookup;
     config?: Pick<EntitlementConfig, "requestBounds">;
@@ -318,6 +366,27 @@ export class EntitlementModule implements EntitlementApiContract {
       sweep: () => this.#warnings.sweep(),
       deleteDispatchedBefore: deps.deleteDispatchedBefore,
     });
+  }
+
+  /** The metering pipeline: the meters, the month's count and the limit decisions. */
+  usagePipeline(): UsagePipelineDefinition {
+    const build = this.#buildUsagePipeline;
+    if (!build) throw new Error("Entitlement was composed without its usage pipeline.");
+    return build(() => {
+      if (!this.#usageSenders) {
+        throw new Error(
+          "Entitlement cannot send usage commands before its pipeline is registered.",
+        );
+      }
+      return this.#usageSenders;
+    });
+  }
+
+  connectUsageCommands(commands: EventingCommands<UsagePipelineDefinition>): void {
+    this.#usageSenders = {
+      countMonth: (data) => commands.countMonth.send(data),
+      recordLimitDecision: (data) => commands.recordLimitDecision.send(data),
+    };
   }
 
   /**

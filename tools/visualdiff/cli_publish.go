@@ -38,10 +38,14 @@ func publishCommand(ctx context.Context, args []string, streams Streams) int {
 		fmt.Fprintln(streams.Err, "visualdiff:", err)
 		return ExitOperational
 	}
+	outcome, _, err := ReadOutcome(parsed.runDir)
+	if err != nil {
+		fmt.Fprintln(streams.Err, "visualdiff:", err)
+	}
 	url, err := Publish(ctx, PublishRequest{
 		Run: execRunner, Root: parsed.root, RunDir: parsed.runDir, BaseRef: parsed.baseRef,
 		CandidateRef: parsed.candidateRef, Rows: rows, Findings: CountFindings(rows),
-		Config: parsed.config.Publish, Stderr: streams.Err, PR: parsed.pr, Link: parsed.link,
+		Config: parsed.config.Publish, Stderr: streams.Err, PR: parsed.pr, Link: parsed.link, Partial: outcome.Partial,
 	})
 	if err != nil {
 		fmt.Fprintln(streams.Err, err)

@@ -188,7 +188,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .withDocs({
     summary: "Create a project",
     description:
-      "Create a new project in the organization. Returns the project with its API key (sk-lw-...) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.",
+      "Create a new project in the organization. Returns the project with a newly minted service API key (serviceApiKey) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.",
     errors: [
       { status: 400, description: "Team does not belong to this organization" },
       PROJECT_INVALID_TOKEN,
@@ -226,7 +226,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .withOutput(projectRestDetailSchema)
   .withDocs({
     summary: "Get a project",
-    description: "Get a project by ID, including its API key. Requires project:view permission.",
+    description: "Get a project by ID. Requires project:view permission.",
     errors: [PROJECT_INVALID_TOKEN, PROJECT_INSUFFICIENT_PERMISSIONS, PROJECT_NOT_FOUND],
   })
   .handle(async ({ app, input, scope }) => {

@@ -12,7 +12,7 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { translateFilter } from "../trace-query.rules.ts";
+import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 
 const TENANT = "project-1";
 const WINDOW = { from: 1_700_000_000_000, to: 1_700_086_400_000 };
@@ -31,7 +31,7 @@ describe("given the published trace filter examples", () => {
       "[%s] parses, passes the save-time check and compiles",
       (_id, text) => {
         expect(describeAstProblem(parseTraceQuerySyntax(text))).toBeNull();
-        const compiled = translateFilter({
+        const compiled = traceQueryTranslation.translateFilter({
           queryText: text,
           tenantId: TENANT,
           timeRange: WINDOW,
@@ -48,7 +48,7 @@ describe("given the published trace filter examples", () => {
       const legacyOwned = /^(f\d+_|spanWindowStart$|spanWindowEnd$)/;
       const legacySharedValue = new Set(["tenantId"]);
       for (const example of TRACE_FILTER_EXAMPLES) {
-        const compiled = translateFilter({
+        const compiled = traceQueryTranslation.translateFilter({
           queryText: example.text,
           tenantId: TENANT,
           timeRange: WINDOW,

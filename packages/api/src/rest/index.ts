@@ -321,7 +321,7 @@ export {
   type RestKeyKinds,
 } from "./key-credential.ts";
 
-export type { RestDeclaredResult } from "./declaration.ts";
+export type { RestDeclaredResult, RestSharedPath } from "./declaration.ts";
 
 // Named by every declaration's inferred type, so a module's declaration emit can name them.
 export type {

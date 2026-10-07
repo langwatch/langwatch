@@ -10,6 +10,10 @@ import { traceFilterInputSchema, tracesTrpc } from "../traces.trpc.ts";
 
 const ENTERPRISE_PAGE_SIZE = resolveRequestBound("tracesPageSizeMax", "ENTERPRISE");
 const ENTERPRISE_IDS = resolveRequestBound("traceIdsMax", "ENTERPRISE");
+const ENTERPRISE_DOWNLOAD_PAGE_SIZE = resolveRequestBound(
+  "tracesDownloadPageSizeMax",
+  "ENTERPRISE",
+);
 
 const ids = (count: number) => Array.from({ length: count }, (_, index) => `trace-${index}`);
 
@@ -39,6 +43,17 @@ describe("traces request-bound schemas", () => {
         true,
       );
     });
+  });
+
+  it("bounds getAllForDownload's pageSize by the download ceiling, not the list one", () => {
+    const input = inputOf("getAllForDownload");
+    const download = { projectId: "p1", startDate: 1_000, endDate: 2_000, includeSpans: false };
+
+    expect(ENTERPRISE_DOWNLOAD_PAGE_SIZE).toBeGreaterThan(ENTERPRISE_PAGE_SIZE);
+    expect(input.validate({ ...download, pageSize: ENTERPRISE_DOWNLOAD_PAGE_SIZE })).toBe(true);
+    expect(input.validate({ ...download, pageSize: ENTERPRISE_DOWNLOAD_PAGE_SIZE + 1 })).toBe(
+      false,
+    );
   });
 
   it.each(["getEvaluationsMultiple", "getTracesWithSpans", "getFormattedSpansDigest"])(

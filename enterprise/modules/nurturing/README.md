@@ -11,7 +11,7 @@ Product analytics and lifecycle messaging: every owner tells nurturing through a
 | Classification | enterprise (`modules/catalogue.json`)                                                                          |
 | Subjects       | nurturing, product-milestone                                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md)                                                            |
-| Api token      | `NurturingApi` = `moduleApi<NurturingApi>()("nurturing")`, `contract/src/nurturing-types.ts:190` (1 operation) |
+| Api token      | `NurturingApi` = `moduleApi<NurturingApi>()("nurturing")`, `contract/src/nurturing-types.ts:188` (1 operation) |
 | Installed by   | api, worker, tasks (process)                                                                                   |
 
 ## What nurturing owns
@@ -23,7 +23,7 @@ Product analytics and lifecycle messaging: every owner tells nurturing through a
 | Stores required |                                                                                                                                               | `process/src/channels/http/http.customer-io.channel.ts:19`                     |
 | Stores required | prisma, redis                                                                                                                                 | `process/src/repositories/live/live.nurturing.repositories.ts:11`              |
 | Secrets         | CUSTOMER_IO_API_KEY                                                                                                                           | `process/src/app/nurturing.app.ts:32`                                          |
-| Config          | `customerIoRegion` (CUSTOMER_IO_REGION), `customerIoBaseUrl` (CUSTOMER_IO_BASE_URL), `posthogKey` (POSTHOG_KEY), `posthogHost` (POSTHOG_HOST) | `contract/src/nurturing-types.ts:195`                                          |
+| Config          | `customerIoRegion` (CUSTOMER_IO_REGION), `customerIoBaseUrl` (CUSTOMER_IO_BASE_URL), `posthogKey` (POSTHOG_KEY), `posthogHost` (POSTHOG_HOST) | `contract/src/nurturing.config.ts:7`                                           |
 
 Anything else nurturing needs belongs to another module and is reached through its `*Api`.
 

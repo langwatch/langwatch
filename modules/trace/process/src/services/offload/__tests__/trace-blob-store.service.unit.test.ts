@@ -311,7 +311,7 @@ describe("putSpool — given Azure storage whose orphan retention is unconfirmed
           ...spoolCoords,
           body: Buffer.from("payload", "utf-8"),
         }),
-      ).rejects.toThrow(/AZURE_BLOB_SPOOL_RETENTION_CONFIRMED/);
+      ).rejects.toThrow(/OBJECT_RETENTION_CONFIRMED/);
     });
   });
 });

@@ -271,6 +271,27 @@ describe("two-step verification", () => {
     });
   });
 
+  describe("given the flag is turned off after members set two-step verification up", () => {
+    /** @scenario "Turning the flag off leaves people who set one up signed in" */
+    it("stops enforcing without erasing factors or ending sessions", async () => {
+      const { service } = organizationService(accounts, { offered: false });
+      const saved = vi.spyOn(accounts, "saveOrganizationRequirement");
+      const factorBefore = await accounts.getAccountFactors({ userId: "user_ana" });
+
+      await expect(
+        service.getStanding({ userId: "user_ana", organizationId: "org_acme", sessionId: "s_ana" }),
+      ).resolves.toMatchObject({ required: false, satisfaction: { satisfied: true } });
+
+      await expect(accounts.getAccountFactors({ userId: "user_ana" })).resolves.toEqual(
+        factorBefore,
+      );
+      await expect(
+        accounts.getOrganizationSetting({ organizationId: "org_acme" }),
+      ).resolves.toMatchObject({ mfaRequired: true });
+      expect(saved).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given an administrator reads the requirement", () => {
     it("says there is no connection when the only one was torn down", async () => {
       store.putConnection({

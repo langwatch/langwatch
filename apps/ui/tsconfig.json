@@ -146,6 +146,9 @@
       "path": "../../modules/onboarding/browser/tsconfig.build.json"
     },
     {
+      "path": "../../modules/onboarding/client/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/ops/browser/tsconfig.build.json"
     },
     {

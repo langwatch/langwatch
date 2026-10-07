@@ -1,11 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryStripeSubscriptionsChannel } from "../channels/memory/memory.stripe-subscriptions.channel.ts";
 import { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 import {
   LicenseGenerator,
   LicensePurchaseDelivery,
   LicensePurchaseService,
 } from "../services/license-purchase.service.ts";
+
+/** The provider holding the four seats `checkout_1` bought. */
+function fourSeatsBought(): MemoryStripeSubscriptionsChannel {
+  const stripeSubscriptions = MemoryStripeSubscriptionsChannel.create();
+  stripeSubscriptions.seedCheckoutLineItems({
+    checkoutSessionId: "checkout_1",
+    lineItems: [{ priceId: null, quantity: 4 }],
+  });
+  return stripeSubscriptions;
+}
 
 class TestLicenseGenerator extends LicenseGenerator {
   readonly generate = vi.fn().mockResolvedValue({
@@ -34,13 +45,6 @@ describe("LicensePurchaseService", () => {
       delivery,
       generateLicense: generator,
     });
-    const stripe = {
-      checkout: {
-        sessions: {
-          listLineItems: vi.fn().mockResolvedValue({ data: [{ quantity: 4 }] }),
-        },
-      },
-    } as any;
 
     await service.handle({
       checkoutSession: {
@@ -48,8 +52,8 @@ describe("LicensePurchaseService", () => {
         customer_details: { email: "buyer@example.com", name: "Acme" },
         amount_total: 1200,
         currency: "eur",
-      } as any,
-      stripe,
+      },
+      stripeSubscriptions: fourSeatsBought(),
     });
 
     expect(generator.generate).toHaveBeenCalledWith({
@@ -128,8 +132,6 @@ async function purchase({
       amount_total: 1200,
       currency: "eur",
     },
-    stripe: {
-      checkout: { sessions: { listLineItems: async () => ({ data: [{ quantity: 4 }] }) } },
-    },
+    stripeSubscriptions: fourSeatsBought(),
   });
 }

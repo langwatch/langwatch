@@ -231,7 +231,10 @@ describe("the single sign-on setup page", () => {
   });
 
   describe("given the page inside the Authentication section", () => {
-    /** @scenario "The Authentication pages share main's rail" */
+    /**
+     * @scenario "The Authentication pages share main's rail"
+     * @scenario "Managing a live connection stays on the same page"
+     */
     it("frames it in main's rail with Identity provider as the current entry", () => {
       renderWithSsoHost(<SsoSetupScreen />);
 
@@ -403,6 +406,7 @@ describe("the single sign-on setup page", () => {
       expect(state.invalidated).toBe(1);
     });
 
+    /** @scenario "An administrator without sso:manage reads where setup stands and cannot change it" */
     it("offers a reader who may not manage it no way to change it", () => {
       renderWithSsoHost(<SsoSetupScreen />, new FakeSsoHost({ canManage: false }));
 

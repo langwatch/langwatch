@@ -1,3 +1,4 @@
+import { EventNotFoundError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-contract";
 
@@ -9,6 +10,7 @@ import type { TraceIOExtractionService } from "#services/trace-io-extraction.ser
  * identical refs to one fetch and streams the reads through a bounded pool; a failure warns.
  */
 import type { ResolveTraceSpansBatchFn } from "../repositories/trace-legacy-read.repository.ts";
+import { TraceEventPayloadFieldNotFoundError } from "../repositories/trace-payload-reader.repository.ts";
 import { hasEventRefs, parseSpanEventRefs } from "../rules/trace-event-ref-parsing.rules.ts";
 import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service.ts";
@@ -99,7 +101,12 @@ function warnResolutionFailure({
   attrKey: string;
   error: unknown;
 }): void {
-  if (error instanceof BlobNotFoundError || error instanceof BlobFieldNotFoundError) {
+  if (
+    error instanceof EventNotFoundError ||
+    error instanceof TraceEventPayloadFieldNotFoundError ||
+    error instanceof BlobNotFoundError ||
+    error instanceof BlobFieldNotFoundError
+  ) {
     logger.warn(
       {
         projectId,
@@ -154,7 +161,6 @@ export class TraceOffloadResolutionBatchService {
     blobStore,
     ioExtractionService,
     logger,
-    aggregateType = "trace",
     concurrency = EVENT_LOG_RESOLVE_CONCURRENCY,
   }: {
     projectId: string;
@@ -162,7 +168,6 @@ export class TraceOffloadResolutionBatchService {
     blobStore: TraceBlobStoreService;
     ioExtractionService: TraceIOExtractionService;
     logger: WarnLogger;
-    aggregateType?: string;
     concurrency?: number;
   }): Promise<ResolvedTraceSpans[]> {
     const fetchTasks = new Map<string, FetchTask>();
@@ -180,7 +185,6 @@ export class TraceOffloadResolutionBatchService {
             eventId: task.eventId,
             field: task.field,
             tenantId: projectId,
-            aggregateType,
             aggregateId: task.aggregateId,
           });
           fetchResults.set(fetchKey, { ok: true, value });

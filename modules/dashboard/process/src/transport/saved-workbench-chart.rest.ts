@@ -92,6 +92,13 @@ function chartResource(
   };
 }
 
+/** The project analytics paths stay in project's namespace for good (§8, ruling 2026-10-05). */
+const PROJECT_ANALYTICS = {
+  owner: "project",
+  reason: "dashboard serves the project's analytics sub-resource under its project path",
+  permanent: true,
+} as const;
+
 /**
  * The type is written out rather than inferred so the declaration emit
  * stays portable.
@@ -106,6 +113,7 @@ export const savedWorkbenchChartRest: Readonly<{
   .withAddressing("literal")
 
   .get("/api/v1/projects/:projectId/analytics/charts", "getApiV1ProjectsByProjectIdAnalyticsCharts")
+  .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartProjectParamsSchema)
   .withPermission("analytics:view")
   .withMiddleware(savedWorkbenchChartUrl)
@@ -134,6 +142,7 @@ export const savedWorkbenchChartRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/charts",
     "postApiV1ProjectsByProjectIdAnalyticsCharts",
   )
+  .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartProjectParamsSchema)
   .withInput(createSavedWorkbenchChartSchema)
   .withPermission("analytics:create")
@@ -169,6 +178,7 @@ export const savedWorkbenchChartRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/charts/:chartId",
     "getApiV1ProjectsByProjectIdAnalyticsChartsByChartId",
   )
+  .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:view")
   .withMiddleware(savedWorkbenchChartUrl)
@@ -198,6 +208,7 @@ export const savedWorkbenchChartRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/charts/:chartId",
     "patchApiV1ProjectsByProjectIdAnalyticsChartsByChartId",
   )
+  .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
   .withInput(updateSavedWorkbenchChartSchema)
   .withPermission("analytics:update")
@@ -234,6 +245,7 @@ export const savedWorkbenchChartRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/charts/:chartId",
     "deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId",
   )
+  .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:delete")
   .withOutput(z.void())
@@ -258,6 +270,7 @@ export const savedWorkbenchChartRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/charts/:chartId/placement",
     "putApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement",
   )
+  .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
   .withInput(placeSavedWorkbenchChartSchema)
   .withPermission("analytics:update")
@@ -289,6 +302,7 @@ export const savedWorkbenchChartRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/charts/:chartId/placement",
     "deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement",
   )
+  .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:update")
   .withOutput(z.void())

@@ -42,6 +42,7 @@ const rawQuestionOptionSchema = z
   .object({
     label: z.unknown().optional(),
     description: z.unknown().optional(),
+    quiet: z.unknown().optional(),
   })
   .loose();
 const rawQuestionSchema = z
@@ -51,6 +52,7 @@ const rawQuestionSchema = z
     options: z.unknown().optional(),
     multiple: z.unknown().optional(),
     custom: z.unknown().optional(),
+    bare: z.unknown().optional(),
   })
   .loose();
 const questionListSchema = z
@@ -100,7 +102,7 @@ function questionCardOptions(raw: RawQuestion): LangyDerivedChoicesCard["options
   return (parsedOptions.success ? parsedOptions.data : [])
     .flatMap((option) => {
       if (typeof option.label !== "string" || option.label.trim() === "") return [];
-      return [{ label: option.label, description: option.description }];
+      return [{ label: option.label, description: option.description, quiet: option.quiet }];
     })
     .map((option, optionIndex) => ({
       id: `opt-${optionIndex + 1}`,
@@ -108,6 +110,7 @@ function questionCardOptions(raw: RawQuestion): LangyDerivedChoicesCard["options
       ...(typeof option.description === "string" && option.description.trim() !== ""
         ? { description: option.description }
         : {}),
+      ...(option.quiet === true ? { quiet: true } : {}),
     }));
 }
 
@@ -140,9 +143,10 @@ function buildQuestionCardPart({
     question,
     options,
     ...(raw.multiple === true ? { multiSelect: true } : {}),
-    // The tool's TUI always accepts a typed answer; only an explicit
-    // `custom: false` closes that door here.
-    ...(raw.custom !== false ? { allowOther: true } : {}),
+    // `custom: false` closes the typed-answer door, and so does a bare
+    // question: its free-text route is the quiet option the ask provides.
+    ...(raw.custom !== false && raw.bare !== true ? { allowOther: true } : {}),
+    ...(raw.bare === true ? { bare: true } : {}),
   };
   return parseLangyCardPart({
     type: "langy-card",

@@ -10,7 +10,10 @@ import {
   PROJECT_MOVED_EVENT_VERSION,
   PROJECT_ARCHIVED_EVENT_TYPE,
   PROJECT_ARCHIVED_EVENT_VERSION,
+  PROJECT_DEPARTMENT_ASSIGNED_EVENT_TYPE,
+  PROJECT_DEPARTMENT_ASSIGNED_EVENT_VERSION,
   projectArchivedEventDataSchema,
+  projectDepartmentAssignedEventDataSchema,
   projectMovedEventDataSchema,
   projectCreatedEventDataSchema,
   projectLegacyKeyRevokedEventDataSchema,
@@ -94,3 +97,20 @@ export const projectArchivedEventSchema = z.object({
   data: projectArchivedEventDataSchema,
 });
 export type ProjectArchivedEvent = z.infer<typeof projectArchivedEventSchema>;
+
+export const RECORD_PROJECT_DEPARTMENT_ASSIGNED_COMMAND_TYPE =
+  "lw.project.record_department_assigned" as const;
+
+export const recordProjectDepartmentAssignedCommandDataSchema =
+  projectDepartmentAssignedEventDataSchema;
+export type RecordProjectDepartmentAssignedCommandData = z.infer<
+  typeof recordProjectDepartmentAssignedCommandDataSchema
+>;
+
+export const projectDepartmentAssignedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(PROJECT_DEPARTMENT_ASSIGNED_EVENT_TYPE),
+  version: z.literal(PROJECT_DEPARTMENT_ASSIGNED_EVENT_VERSION),
+  data: projectDepartmentAssignedEventDataSchema,
+});
+export type ProjectDepartmentAssignedEvent = z.infer<typeof projectDepartmentAssignedEventSchema>;

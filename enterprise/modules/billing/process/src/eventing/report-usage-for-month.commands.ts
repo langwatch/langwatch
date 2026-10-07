@@ -16,15 +16,15 @@ import type {
 import type { BillingOrganizationCacheRepository } from "../repositories/billing-organization-cache.repository.ts";
 import type { BillingReportOrganizationRepository } from "../repositories/billing-report-organization.repository.ts";
 import {
+  billingMonthDateRange,
+  type BillableEventsTotalResult,
+} from "../rules/billing-month.rules.ts";
+import {
   instantEvalMeterIdentifier,
   instantEvalMeterUnitsToUsd,
   INSTANT_EVAL_USD_EVENT_NAME,
 } from "../rules/instant-eval-meter.rules.ts";
 import { meterEventTimestampSeconds } from "../rules/meter-event-timestamp.rules.ts";
-import {
-  BillableEventsQueryService,
-  type BillableEventsTotalResult,
-} from "../services/billable-events-query.service.ts";
 import type { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 import type { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
 import type { UsageReportingService } from "../services/usage-reporting.service.ts";
@@ -132,7 +132,7 @@ function billableEventsIdentifier({
 
 /** When the billing month ended, in epoch milliseconds. */
 function billingMonthEndMs(billingMonth: string): number {
-  const [, end] = BillableEventsQueryService.billingMonthDateRange(billingMonth);
+  const [, end] = billingMonthDateRange({ billingMonth });
 
   return Temporal.Instant.from(`${end.replace(" ", "T")}Z`).epochMilliseconds;
 }

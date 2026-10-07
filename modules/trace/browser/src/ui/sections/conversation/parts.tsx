@@ -1,9 +1,9 @@
-import type {
-  UiConversationAudioPlayback,
-  UiRenderMediaPart,
-} from "@langwatch/browser-host/declarations";
 import { Box, Image, Text, VStack } from "@langwatch/design-system/primitives";
 import { getDisplayRoleVisuals } from "@langwatch/design-system/role-visuals";
+import type {
+  ConversationAudioPlayback,
+  RenderConversationMediaPart,
+} from "@langwatch/trace-client";
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
 import type { ReactNode } from "react";
 
@@ -179,7 +179,7 @@ export function ImagePart({
  * not an import: the component that probes a stored object and
  * coordinates playback belongs to the owning surface, unreachable here.
  */
-export type { UiRenderMediaPart as RenderMediaPart } from "@langwatch/browser-host/declarations";
+export type { RenderConversationMediaPart as RenderMediaPart } from "@langwatch/trace-client";
 
 export function MediaRow({
   part,
@@ -190,9 +190,9 @@ export function MediaRow({
 }: {
   part: Extract<DisplayPart, { kind: "media" }>;
   projectId: string;
-  audioPlayback?: UiConversationAudioPlayback;
+  audioPlayback?: ConversationAudioPlayback;
   roleMode?: ConversationRoleMode;
-  renderMediaPart: UiRenderMediaPart;
+  renderMediaPart: RenderConversationMediaPart;
 }) {
   const align = alignForRole({ role: part.role, roleMode });
   // Players stretch to the container; attachment chips hug the side the message

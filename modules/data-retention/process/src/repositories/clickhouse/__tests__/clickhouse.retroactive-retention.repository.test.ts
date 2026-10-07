@@ -1,8 +1,13 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import type { QueryRequest } from "@langwatch/clickhouse-client";
 import { RetroactiveMutationInProgressError } from "@langwatch/data-retention-contract";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
+import { MemoryRetroactiveRetentionRepository } from "../../memory/memory.retroactive-retention.repository.ts";
 import { ClickHouseRetroactiveRetentionRepository } from "../clickhouse.retroactive-retention.repository.ts";
 
 /**
@@ -192,6 +197,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
   });
 
   /** @scenario "Event-log category mutations can run in parallel" */
+  /** @scenario "A rewrite for another category does not block this one" */
   it("does not block a different category on an in-flight event_log mutation for another category", async () => {
     const tracesMarkedRow = {
       mutationId: "mut-traces",
@@ -220,6 +226,81 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
       .catch((cause: unknown) => cause);
     // Blocked: same category as the in-flight mutation's marker.
     expect(error).toBeInstanceOf(RetroactiveMutationInProgressError);
+
+    const unmarked = { ...tracesMarkedRow, mutationId: "mut-legacy", command: "ALTER TABLE x" };
+    // An unmarked (legacy) rewrite reads as the table's flat category, traces.
+    const legacyTraces = await createRepository([unmarked])
+      .repository.triggerUpdate({
+        projectId: "project-1",
+        category: "traces",
+        newRetentionDays: 63,
+      })
+      .catch((cause: unknown) => cause);
+    expect(legacyTraces).toBeInstanceOf(RetroactiveMutationInProgressError);
+    const legacyScenarios = await createRepository([unmarked]).repository.triggerUpdate({
+      projectId: "project-1",
+      category: "scenarios",
+      newRetentionDays: 63,
+    });
+    expect(legacyScenarios.tables).toContain("event_log");
+  });
+
+  /** @scenario "A rewrite for another category does not block this one" */
+  it("keeps the memory twin's event-log rewrites per category", async () => {
+    const memory = MemoryRetroactiveRetentionRepository.create();
+    await memory.triggerUpdate({
+      projectId: "project-1",
+      category: "scenarios",
+      newRetentionDays: 63,
+    });
+
+    const traces = await memory.triggerUpdate({
+      projectId: "project-1",
+      category: "traces",
+      newRetentionDays: 91,
+    });
+    expect(traces.tables).toContain("event_log");
+
+    const again = await memory
+      .triggerUpdate({ projectId: "project-1", category: "scenarios", newRetentionDays: 70 })
+      .catch((cause: unknown) => cause);
+    expect(again).toBeInstanceOf(RetroactiveMutationInProgressError);
+  });
+
+  /** @scenario "A category's retention change reaches the event log through eventing" */
+  it("rewrites the event log once, through eventing's marked statement, and names it nowhere itself", async () => {
+    const { commands, repository } = createRepository([]);
+    await repository.triggerUpdate({
+      projectId: "project-1",
+      category: "traces",
+      newRetentionDays: 91,
+    });
+    const eventLogCommands = commands.filter((command) => command.table === "event_log");
+    expect(eventLogCommands).toHaveLength(1);
+    expect(eventLogCommands[0]!.sql).toContain(
+      "length('langwatch:event-log-retention-category:traces') > 0",
+    );
+
+    const processSource = fileURLToPath(new URL("../../../", import.meta.url));
+    const naming = sourceFiles(processSource).filter((file) =>
+      /\bevent_log\b/.test(readFileSync(file, "utf8")),
+    );
+    expect(naming).toEqual([]);
+  });
+
+  /** @scenario "A category the classification does not name is refused before any rewrite" */
+  it("refuses an unknown category before any statement runs", async () => {
+    const { commands, repository } = createRepository([]);
+    const error = await repository
+      .triggerUpdate({
+        projectId: "project-1",
+        category: "audit" as never,
+        newRetentionDays: 91,
+      })
+      .catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(RetroactiveMutationInProgressError);
+    expect(commands).toHaveLength(0);
   });
 
   it("maps progress categories and escapes the tenant filter through query parameters", async () => {
@@ -275,3 +356,12 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     expect(command.sql).not.toContain("'mut-xyz'");
   });
 });
+
+/** Non-test TypeScript under `root`: the process half's own statements. */
+function sourceFiles(root: string): string[] {
+  return readdirSync(root).flatMap((name) => {
+    const path = join(root, name);
+    if (statSync(path).isDirectory()) return name === "__tests__" ? [] : sourceFiles(path);
+    return path.endsWith(".ts") ? [path] : [];
+  });
+}

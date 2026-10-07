@@ -142,6 +142,14 @@ Mints an account whose only sign-in method is the passkey about to be registered
 createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser>;
 ```
 
+#### `adoptUnconfirmedAccount`
+
+An address proof adopts the unfinished account on it: one transaction confirms the address and drops every sign-in method set before the proof; memberships stay (rulings 2026-10-06).
+
+```typescript
+adoptUnconfirmedAccount(input: UserEmailInput): Promise<AdoptUnconfirmedAccountOutcome>;
+```
+
 #### `registerCredentialAccount`
 
 The signup form's whole path: the mode gate, the throttle and the mint.
@@ -572,8 +580,8 @@ Declared at `src/eventing/user-lifecycle.pipeline.ts:23`. Events: `userDeactivat
 
 ## Configuration
 
-| Kind   | Leaf            | Environment variable | Declared at                       |
-| ------ | --------------- | -------------------- | --------------------------------- |
-| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/user.api.ts:224` |
+| Kind   | Leaf            | Environment variable | Declared at                        |
+| ------ | --------------- | -------------------- | ---------------------------------- |
+| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/user.config.ts:6` |
 
 <!-- readme:generated:end -->

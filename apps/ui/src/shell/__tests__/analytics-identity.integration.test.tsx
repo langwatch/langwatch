@@ -20,6 +20,7 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations } from "@langwatch/browser-host/declarations";
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
+import { FirstTouchAttributionToken } from "@langwatch/onboarding-client";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -142,12 +143,13 @@ function capabilities(
       {
         name: "onboarding",
         installation: {
-          capabilities: {
-            firstTouchAttribution: {
-              useCapture: () => void 0,
-              eventProperties: () => attribution,
+          capabilities: {},
+          lends: [
+            {
+              token: FirstTouchAttributionToken,
+              value: { useCapture: () => void 0, eventProperties: () => attribution },
             },
-          },
+          ],
         },
       },
     ]),

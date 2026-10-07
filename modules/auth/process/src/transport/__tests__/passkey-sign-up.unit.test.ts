@@ -5,11 +5,13 @@ import {
   PASSKEY_SIGNUP_ALREADY_SIGNED_IN,
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
+  PASSKEY_SIGNUP_NOT_LOCAL,
   PASSKEY_SIGNUP_RESTRICTED,
   PASSKEY_SIGNUP_VERIFICATION_REQUIRED,
   passkeySignUpRegistration,
   type PasskeyCeremonyCaller,
   type PasskeySignUpDirectory,
+  type PasskeySignUpEligibility,
   type PasskeySignUpPolicy,
   type SignUpVerification,
 } from "../../channels/http/http.passkey-sign-up.channel.ts";
@@ -27,8 +29,10 @@ const users: PasskeySignUpDirectory = { createPasskeyUser, findByEmail };
  *  store keeps them. */
 class ProofLedger implements SignUpVerification {
   readonly live = new Map<string, string>();
+  readonly checked: string[] = [];
 
   async validateAddressProof({ token, email }: { token: string; email: string }) {
+    this.checked.push(token);
     return this.live.get(token) === email;
   }
 
@@ -41,6 +45,17 @@ class ProofLedger implements SignUpVerification {
 }
 
 const verification = new ProofLedger();
+
+/** Addresses whose domain an identity provider now routes, so they no longer enrol here. */
+class LocalRoutes implements PasskeySignUpEligibility {
+  readonly routedAway = new Set<string>();
+
+  async enrolsLocally({ email }: { email: string; method: "passkey" }) {
+    return !this.routedAway.has(email);
+  }
+}
+
+const routes = new LocalRoutes();
 
 /** What the sign-up screen bakes into the challenge. */
 const signUp = (email: string, addressProof = "proof_1") => JSON.stringify({ email, addressProof });
@@ -88,6 +103,7 @@ const registration = passkeySignUpRegistration({
   users,
   verification,
   policy: { checkSignUp },
+  eligibility: routes,
   sessionOf: async () => signedInAs.current,
 });
 const resolveUser = registration.resolveUser;
@@ -99,11 +115,33 @@ describe("given passkey sign-up, which creates an account with no session", () =
     journal.length = 0;
     announcements.signedUp.length = 0;
     verification.live.clear();
+    verification.checked.length = 0;
+    routes.routedAway.clear();
     verification.live.set("proof_1", "someone@example.com");
     verification.live.set("proof_victim", "victim@corp.com");
     findByEmail.mockResolvedValue(null);
     checkSignUp.mockResolvedValue({ allowed: true, via: "open" });
     signedInAs.current = { signedIn: false };
+  });
+
+  describe("when the address became routed to single sign-on after its proof", () => {
+    beforeEach(() => routes.routedAway.add("someone@example.com"));
+
+    /** @scenario "An address that gained a single sign-on route after its proof is refused without spending anything" */
+    it("refuses both ends of the ceremony without checking or spending the proof", async () => {
+      const context = signUp("someone@example.com");
+
+      await expect(resolveUser({ ctx: fakeContext().ctx, context })).rejects.toMatchObject({
+        body: { code: PASSKEY_SIGNUP_NOT_LOCAL },
+      });
+      await expect(afterVerification({ ctx: fakeContext().ctx, context })).rejects.toMatchObject({
+        body: { code: PASSKEY_SIGNUP_NOT_LOCAL },
+      });
+      expect(verification.checked).toEqual([]);
+      expect(verification.live.get("proof_1")).toBe("someone@example.com");
+      expect(journal).toEqual([]);
+      expect(createPasskeyUser).not.toHaveBeenCalled();
+    });
   });
 
   describe("when the installation's sign-up policy refuses the address", () => {

@@ -34,6 +34,7 @@ import type {
   ServerRole,
 } from "./feature-installer.ts";
 import { LocalFeatureApis } from "./local-feature-api.ts";
+import { migrationStepsOf } from "./migration-steps.ts";
 import {
   commandsOf,
   buildModuleEventing,
@@ -85,6 +86,7 @@ export interface InstalledFeature<Provided, Rest, Trpc, Worker> {
 /** A booted application: everything constructed, nothing serving yet. */
 export class BootedRuntime<Members, Rest = never, Trpc = never> {
   private readonly lifecycle: RuntimeLifecycle;
+  private readonly services: readonly RuntimeService[];
   readonly name: string;
   readonly role: ServerRole;
   /** Members built: union of modules' required members, nothing else. */
@@ -138,6 +140,7 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
     this.declaredBy = declaredBy;
     this.handler = handler;
     this.lifecycle = new RuntimeLifecycle(services, scope);
+    this.services = services;
   }
 
   /**
@@ -165,6 +168,14 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
       );
     }
     return tasks;
+  }
+
+  /** The migration steps this process's modules declared, narrowed by the caller's guard. */
+  migrationSteps<Step extends { readonly id: string }>(
+    isMigrationStep: (contribution: unknown) => contribution is Step,
+  ): readonly Step[] {
+    const { name, role, installed } = this;
+    return migrationStepsOf({ process: name, role, installed, isMigrationStep });
   }
 
   /**
@@ -224,6 +235,11 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
 
   stop(): Promise<void> {
     return this.lifecycle.stop();
+  }
+
+  /** Pauses or resumes every service that can stop taking work (round 22: lapsed roster entry). */
+  async holdWork(held: boolean): Promise<void> {
+    for (const service of this.services) await (held ? service.pause?.() : service.resume?.());
   }
 }
 

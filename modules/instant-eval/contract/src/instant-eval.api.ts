@@ -2,7 +2,12 @@ import type { RestCredentialPrincipal } from "@langwatch/authorization";
 import { moduleApi, defineTrpcContract } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
-import type { InstantEvalJudgement, InstantEvalQuestion } from "./instant-eval-judging.ts";
+import type {
+  InstantEvalJudgement,
+  InstantEvalQueryJudging,
+  InstantEvalQueryJudgingInput,
+  InstantEvalQuestion,
+} from "./instant-eval-judging.ts";
 import type { InstantEvalJudgmentStatus, InstantEvalTarget } from "./instant-eval-limits.ts";
 import type {
   InstantEvalEstimateWire,
@@ -193,6 +198,13 @@ export interface InstantEvalApi {
     /** Aborts the judgement when the caller has gone, as a hosted call's request does. */
     signal?: AbortSignal;
   }): Promise<InstantEvalJudgement>;
+
+  /**
+   * One synchronous query's judged columns, their texts in place (Alex, 2026-10-06, "Judge
+   * cycle"): holds the query token budget's price, judges, records the spend once, then drops
+   * the hold. Refuses an exhausted budget or an oversized query before anything is judged.
+   */
+  judgeQuery(input: InstantEvalQueryJudgingInput): Promise<InstantEvalQueryJudging>;
 
   /** What judging these input tokens cost LangWatch and what the customer is charged, in USD. */
   priceOf(input: { inputTokens: number }): { costUsd: number; priceUsd: number };

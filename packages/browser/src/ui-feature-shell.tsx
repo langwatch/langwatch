@@ -318,6 +318,7 @@ export function createUiFeatureShell({
           rpc,
           scope: live.scope,
           copyTargets: live.copyTargets,
+          traceFilters: live.traceFilters,
           session: live.session,
         }),
       [documentTitle, navigation, route, rpc, live],

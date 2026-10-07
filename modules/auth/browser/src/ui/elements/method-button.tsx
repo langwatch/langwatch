@@ -32,7 +32,7 @@ export function MethodButton({
       position="relative"
       fontSize="14px"
       fontWeight={600}
-      borderRadius={SHAPE.action}
+      borderRadius={SHAPE.control}
       justifyContent="center"
       overflow="visible"
       borderColor="frontDoor.fieldBorder"

@@ -11,6 +11,7 @@ import { PipelineParticipation } from "../pipeline-selection.ts";
 const baseConfig: StoresConfig = {
   defaultRetentionDays: 30,
   shutdownDrainTimeoutMs: undefined,
+  clickhouseStatementLaneReserveShare: undefined,
   clickhousePool: {
     override: undefined,
     replicas: undefined,

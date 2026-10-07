@@ -10,7 +10,12 @@ import { gqJobsDroppedTotal } from "../metrics.ts";
 import { GroupStagingScripts } from "../scripts.ts";
 import { createTenantId } from "../storage.ts";
 import { TieredBlobStore } from "../tieredBlobStore.ts";
-import { InMemoryJobBlobStore, InMemoryObjectStore, incompressible } from "./blob-test-doubles.ts";
+import {
+  InMemoryJobBlobStore,
+  InMemoryObjectStore,
+  incompressible,
+  mintTestUri,
+} from "./blob-test-doubles.ts";
 import { seedDeadOwner as sharedSeedDeadOwner } from "./poison-guard-fixtures.ts";
 
 type TestPayload = {
@@ -98,6 +103,7 @@ describe("GroupQueueProcessor — a staged job id is identity, not state (ADR-08
     const queue = new GroupQueueProcessor<TestPayload>(definition, redis, {
       consumerEnabled,
       objectStoreFor: () => objectStore,
+      mintUri: mintTestUri,
       resolveStorageDestination: STORAGE_DESTINATION,
     });
     queues.push(queue);
@@ -161,6 +167,7 @@ describe("GroupQueueProcessor — a staged job id is identity, not state (ADR-08
     const tiered = new TieredBlobStore({
       redisBlobs: new InMemoryJobBlobStore(),
       objectStoreFor: () => objectStore,
+      mintUri: mintTestUri,
       resolveDestination: STORAGE_DESTINATION,
     });
     const envelope = await encodeJobEnvelope({

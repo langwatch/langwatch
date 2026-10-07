@@ -38,6 +38,11 @@ import { assetBaseOrigin, normalizeAssetBase } from "./transport/asset-base.ts";
 import { projectPublicConfig } from "./transport/bundle-config.ts";
 import { apiOwner, type ApiHostConfig } from "./transport/config-owner.ts";
 import { processSurface } from "./transport/process-surface.ts";
+import { type UpgradeGate, upgradeGateComponent, type UpgradeGatedRole } from "./upgrade-gate.ts";
+
+/** What `run` may be handed: a booted worker also pauses its work and lists its steps. */
+type RunnableApplication = ServedApplication &
+  Partial<Pick<BootedApplication, "holdWork" | "migrationSteps" | "role">>;
 
 type ParsedConfig = Readonly<Record<string, unknown>>;
 
@@ -76,6 +81,8 @@ export class ProcessServer implements ProcessBoot {
   readonly config: ParsedConfig;
   private readonly resolver: SecretsResolver;
   private readonly settings: z.infer<typeof processSettings>;
+  private upgradeGate: UpgradeGate | undefined;
+  private running: RunnableApplication | undefined;
 
   private constructor(deps: {
     server: Server;
@@ -252,8 +259,51 @@ export class ProcessServer implements ProcessBoot {
   serve(application: ServedApplication): Promise<void> {
     return this.server.serve(application);
   }
-  run(application: ServedApplication): Promise<void> {
-    return this.server.run(application);
+  run(application: RunnableApplication): Promise<void> {
+    this.running = application;
+    return this.server.run(this.withBackgroundSteps(application));
+  }
+
+  /** The serving gate (D5), hosted before boot's components; a lapse turns readiness off. */
+  hostUpgradeGate({
+    role,
+    gate,
+    logger,
+  }: {
+    role: UpgradeGatedRole;
+    gate: UpgradeGate;
+    logger: ServerLogger;
+  }): void {
+    this.upgradeGate = gate;
+    const onServingChange = async (serving: boolean) => {
+      this.server.recheckReadiness();
+      await this.running?.holdWork?.(!serving);
+    };
+    this.server.with(
+      upgradeGateComponent({ server: this.server.name, role, gate, logger, onServingChange }),
+    );
+  }
+
+  /** A gated worker runs its modules' background steps inside its runtime (round 14). */
+  private withBackgroundSteps(application: RunnableApplication): ServedApplication {
+    const background = this.upgradeGate?.backgroundSteps;
+    if (!background || application.role !== "worker" || !application.migrationSteps) {
+      return application;
+    }
+    const steps = application.migrationSteps(background.isStep);
+    let running: Readonly<{ stop: () => Promise<void> }> | undefined;
+    return {
+      name: application.name,
+      handler: application.handler,
+      start: async () => {
+        await application.start();
+        running = background.start(steps);
+      },
+      stop: async () => {
+        await running?.stop();
+        await application.stop();
+      },
+    };
   }
   close(): Promise<void> {
     return this.server.close();

@@ -69,6 +69,8 @@ const MAY_CONSTRUCT = new Set([
   "packages/clickhouse-migrations/src/ttl.reconciler.ts",
   // The tasks role reading goose versions for the upgrade ledger seed: untenanted, before serve.
   "apps/tasks/src/upgrade-ledger-seed.ts",
+  // The tasks role's `upgrade` applying ClickHouse steps per target: untenanted, before serve.
+  "apps/tasks/src/upgrade.ts",
   // The restricted LangWatchQL identity, whose limits are server-side.
   "modules/analytics/process/src/repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts",
   "modules/analytics/process/src/repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts",

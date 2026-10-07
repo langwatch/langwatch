@@ -19,15 +19,19 @@ import {
 import { createTenantId } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
 import { googleDlpChannels } from "../channels/google-dlp-channels.registry.ts";
 import { presidioChannels } from "../channels/presidio-channels.registry.ts";
+import {
+  buildDataPrivacyProjectScopePipeline,
+  type DataPrivacyProjectScopePipeline,
+} from "../eventing/data-privacy-project-scope.pipeline.ts";
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
 import { DataPrivacyPermissionsService } from "../services/data-privacy-permissions.service.ts";
+import { DataPrivacyProjectScopeService } from "../services/data-privacy-project-scope.service.ts";
 import { DataPrivacyScopeAuthorizationService } from "../services/data-privacy-scope-authorization.service.ts";
 import { DataPrivacySnapshotService } from "../services/data-privacy-snapshot.service.ts";
 import { DataPrivacyService } from "../services/data-privacy.service.ts";
@@ -94,7 +98,6 @@ type GoogleCredentialsUse = <Out>(build: (credential: string | undefined) => Out
 export class DataPrivacyModule implements DataPrivacyApi {
   static readonly contract = DataPrivacyApi;
   static readonly dependencies = {
-    projects: ProjectApi,
     featureFlags: FeatureFlagApi,
     permissions: AuthzApi,
   };
@@ -110,7 +113,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
   #scopeAuthorization: DataPrivacyScopeAuthorizationService;
   #contentDrop: ContentDropPolicyService;
   #spanContentDrop: OtlpSpanContentDropService;
-  #projects: ProjectApi;
+  #projectScopes: DataPrivacyProjectScopeService;
   #googleCredentials: GoogleCredentialsUse;
 
   private constructor(services: {
@@ -120,7 +123,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     scopeAuthorization: DataPrivacyScopeAuthorizationService;
     contentDrop: ContentDropPolicyService;
     spanContentDrop: OtlpSpanContentDropService;
-    projects: ProjectApi;
+    projectScopes: DataPrivacyProjectScopeService;
     googleCredentials: GoogleCredentialsUse;
   }) {
     this.#privacy = services.privacy;
@@ -129,7 +132,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     this.#scopeAuthorization = services.scopeAuthorization;
     this.#contentDrop = services.contentDrop;
     this.#spanContentDrop = services.spanContentDrop;
-    this.#projects = services.projects;
+    this.#projectScopes = services.projectScopes;
     this.#googleCredentials = services.googleCredentials;
   }
 
@@ -159,9 +162,12 @@ export class DataPrivacyModule implements DataPrivacyApi {
         metrics,
       }),
     });
+    const projectScopes = DataPrivacyProjectScopeService.create({
+      repository: repositories.projectScopes,
+    });
     const privacy = DataPrivacyService.create({
       repository: repositories.policies,
-      projects: dependencies.projects,
+      scopes: projectScopes,
       lineage: dependencies.permissions,
     });
     const permissions = DataPrivacyPermissionsService.create({ authz: dependencies.permissions });
@@ -191,13 +197,18 @@ export class DataPrivacyModule implements DataPrivacyApi {
         dataPrivacy: privacy,
         nativePolicyEnforced: config.enforcement !== "off",
       }),
-      projects: dependencies.projects,
+      projectScopes,
       googleCredentials,
     });
   }
 
   intoGoogleApplicationCredentials<Out>(build: (credential: string | undefined) => Out): Out {
     return this.#googleCredentials(build);
+  }
+
+  /** The pipeline whose peer subscribers fold where each project sits. */
+  projectScopePipeline(): DataPrivacyProjectScopePipeline {
+    return buildDataPrivacyProjectScopePipeline({ scopes: this.#projectScopes });
   }
 
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy> {
@@ -317,7 +328,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
   async #authorizeScopeWrite(
     input: { projectId: string; scope: DataPrivacyScope } & DataPrivacyCallerInput,
   ): Promise<string> {
-    await this.#scopeAuthorization.assertScopeBelongsToProjectOrganization({
+    const organizationId = await this.#scopeAuthorization.assertScopeBelongsToProjectOrganization({
       projectId: input.projectId,
       scope: input.scope,
     });
@@ -325,8 +336,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
       userId: input.userId,
       scope: input.scope,
     });
-    const project = await this.#projects.getWithTeam(input.projectId);
 
-    return project.team.organizationId;
+    return organizationId;
   }
 }

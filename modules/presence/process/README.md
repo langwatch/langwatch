@@ -90,6 +90,14 @@ The read hints of one user, organisation and project until the signal aborts.
 readHints(input: ReadHintsWatchInput): AsyncIterable<ReadHint>;
 ```
 
+#### `upgradeReadHints`
+
+The upgrade runner's platform-scoped hints, for the Ops Upgrades pages, until the abort.
+
+```typescript
+upgradeReadHints(input: UpgradeReadHintsWatchInput): AsyncIterable<ReadHint>;
+```
+
 ## REST transport
 
 None: this module declares no REST family.
@@ -98,7 +106,7 @@ None: this module declares no REST family.
 
 ### `presence`
 
-Contract `../contract/src/presence.trpc.ts:25`, router `src/transport/presence.trpc.ts:26`.
+Contract `../contract/src/presence.trpc.ts:26`, router `src/transport/presence.trpc.ts:26`.
 
 | Procedure                          | Kind         | Gate                           | Input                              | Output                       |
 | ---------------------------------- | ------------ | ------------------------------ | ---------------------------------- | ---------------------------- |
@@ -109,6 +117,7 @@ Contract `../contract/src/presence.trpc.ts:25`, router `src/transport/presence.t
 | `presence.onPresenceCursor`        | subscription | Permission `traces:view`       | `presenceCursorSubscriptionSchema` | `presenceCursorEventSchema`  |
 | `presence.onOrganizationReadHints` | subscription | Permission `organization:view` | `organizationReadHintsInputSchema` | `readHintSchema`             |
 | `presence.onProjectReadHints`      | subscription | Permission `project:view`      | `projectReadHintsInputSchema`      | `readHintSchema`             |
+| `presence.onUpgradeReadHints`      | subscription | Platform permission `ops:view` | inline                             | `readHintSchema`             |
 
 ## Sockets
 

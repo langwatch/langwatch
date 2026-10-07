@@ -22,6 +22,7 @@ import {
   type InviteWithRequester,
   type WriteInviteInput,
 } from "../organization-invite.repository.ts";
+import { PrismaOrganizationAuditStore } from "./prisma.organization-audit.store.ts";
 import {
   inviteFromRecord,
   organizationFromRecord,
@@ -39,13 +40,18 @@ function toInviteJson(value: unknown): Prisma.InputJsonValue | undefined {
 /** Private Prisma owner for an organization's invitations and what settles them. */
 export class PrismaOrganizationInviteRepository extends OrganizationInviteRepository {
   static create(options: { database: PrismaClient }): PrismaOrganizationInviteRepository {
-    return new PrismaOrganizationInviteRepository(options.database, options.database);
+    return new PrismaOrganizationInviteRepository(
+      options.database,
+      options.database,
+      PrismaOrganizationAuditStore.create({ database: options.database }),
+    );
   }
 
   private constructor(
     private readonly prisma: InviteClient,
     /** Absent on a transaction-scoped instance — only the root can open one. */
     private readonly root: PrismaClient | null,
+    private readonly audit: PrismaOrganizationAuditStore,
   ) {
     super();
   }
@@ -59,7 +65,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     }
 
     return this.root.$transaction(
-      (client) => write(new PrismaOrganizationInviteRepository(client, null)),
+      (client) => write(new PrismaOrganizationInviteRepository(client, null, this.audit)),
       options ? { timeout: options.timeoutMs, maxWait: options.maxWaitMs } : undefined,
     );
   }
@@ -417,26 +423,41 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     `;
   }
 
-  async addMembership({
-    userId,
-    organizationId,
-    role,
-    admission,
-  }: {
+  async addMembership(input: {
     userId: string;
     organizationId: string;
     role: OrganizationUserRole;
     admission?: { inviteId: string; actorUserId: string | null };
   }): Promise<void> {
-    const { count } = await this.prisma.organizationUser.createMany({
+    if (!this.root) return this.admit({ client: this.prisma, ...input });
+    await this.root.$transaction((client) => this.admit({ client, ...input }));
+  }
+
+  /** The seat and its admission audit intent commit together, or neither does. */
+  private async admit({
+    client,
+    userId,
+    organizationId,
+    role,
+    admission,
+  }: {
+    client: Prisma.TransactionClient;
+    userId: string;
+    organizationId: string;
+    role: OrganizationUserRole;
+    admission?: { inviteId: string; actorUserId: string | null };
+  }): Promise<void> {
+    const { count } = await client.organizationUser.createMany({
       data: [{ userId, organizationId, role }],
       skipDuplicates: true,
     });
     // A Developer gets no grant to audit, so its admission is recorded here (ADR-171).
     if (count === 0 || role !== OrganizationUserRole.DEVELOPER || !admission) return;
     const via: DeveloperAdmissionVia = "invite";
-    await this.prisma.auditLog.create({
-      data: {
+    await this.audit.append({
+      transaction: client,
+      fact: {
+        tenantId: organizationId,
         action: DEVELOPER_ADMISSION_AUDIT_ACTION,
         userId,
         actorUserId: admission.actorUserId,

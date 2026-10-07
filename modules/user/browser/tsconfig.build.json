@@ -39,6 +39,9 @@
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
+      "path": "../../coding-agent/client/tsconfig.build.json"
+    },
+    {
       "path": "../../coding-agent/contract/tsconfig.build.json"
     },
     {
@@ -67,6 +70,9 @@
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../onboarding/client/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

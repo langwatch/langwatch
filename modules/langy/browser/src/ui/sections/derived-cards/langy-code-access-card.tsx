@@ -1,3 +1,4 @@
+import { GitHubIcon } from "@langwatch/design-system/icons";
 import {
   Box,
   Button,
@@ -480,14 +481,14 @@ function AskingState({
           How should I reach your code?
         </Text>
         <OptionRow
-          icon={<FolderCode size={14} />}
+          icon={<FolderOpen size={15} strokeWidth={1.9} />}
           label={LOCAL_LABEL}
           subtitle={LOCAL_SUBTITLE}
           disabled={!onChoiceSelect}
           onClick={onPickLocal}
         />
         <OptionRow
-          icon={<GitPullRequest size={14} />}
+          icon={<GitHubIcon size={15} />}
           label={GITHUB_LABEL}
           subtitle={GITHUB_SUBTITLE}
           note={githubInstallNote({

@@ -5,6 +5,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { GuidedOnboardingToken } from "@langwatch/langy-client";
 
 import { langyApi } from "./behavior/langy-api.ts";
 import { langyGuidedOnboarding } from "./behavior/langy-guided-onboarding.capability.ts";
@@ -23,9 +24,8 @@ export const langyWeb = defineBrowserModule("langy")
     },
   })
   // All another module may do to the panel: dock it with a kickoff and hear
-  // the scope it entered. The shell wires this into the consumer's own
-  // `*HostApi`; nothing else reaches Langy's store.
-  .withCapabilities({ guidedOnboarding: langyGuidedOnboarding })
+  // the scope it entered, lent by token; nothing else reaches Langy's store.
+  .lends(GuidedOnboardingToken, { value: langyGuidedOnboarding })
   .withHosts({
     requires: ["LangyHostApi"],
     mounts: { LangyHostApi: { load: () => import("./behavior/langy-host-mount.tsx") } },

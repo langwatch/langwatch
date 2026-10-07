@@ -4,7 +4,12 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
 import type { ObjectStore } from "../tieredBlobStore.ts";
-import { FlakyObjectStore, InMemoryObjectStore, incompressible } from "./blob-test-doubles.ts";
+import {
+  FlakyObjectStore,
+  InMemoryObjectStore,
+  incompressible,
+  mintTestUri,
+} from "./blob-test-doubles.ts";
 
 type TestPayload = {
   id: string;
@@ -74,6 +79,7 @@ describe("GroupQueueProcessor — GQ2 offload", () => {
     const queue = new GroupQueueProcessor<TestPayload>(definition, redis, {
       consumerEnabled,
       objectStoreFor: () => objectStore,
+      mintUri: mintTestUri,
       resolveStorageDestination: async () => ({
         kind: "s3",
         bucket: "test-bucket",

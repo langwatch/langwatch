@@ -575,7 +575,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # callback returns the browser to wherever the sign-in was heading, and that
   # screen is never mounted again. The session fetch is the one thing every
   # landing passes through, so it is where the promotion belongs.
-  @unit
+  @integration
   Scenario: A social provider that got me in is badged, wherever the callback lands
     Given I dialled a social provider and it signed me in
     When the browser lands anywhere in the app holding a session
@@ -874,17 +874,34 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then the screen says the link expired and offers to send a fresh one
     And the answer never says whether that link was ever issued
 
-  # A link proves an ADDRESS. It never adopts an account, because an account
-  # that appeared after the link was sent may already hold a password or a
-  # passkey somebody else chose — and opening a session on it would hand that
-  # account to whoever happened to be holding the older link.
+  # A link proves an ADDRESS. An unfinished account on it (never confirmed, never
+  # signed into) is adopted by that proof alone: any password or passkey it holds
+  # was chosen before anybody proved the address, possibly by somebody else, so
+  # adoption drops them and the person who proved it adds their own afterwards
+  # (rulings 2026-10-05 Auth 32-36; 2026-10-06 Auth 32). Memberships stay.
   @unit
-  Scenario: A confirmation link never opens an account it did not create
-    Given a confirmation link was sent for an address with no account
-    And an account for that address exists by the time the link is opened
+  Scenario: A confirmation link adopts an unfinished account on its address
+    Given an account for my address awaits confirmation and was never signed into
+    And it holds a password and a passkey set before the address was proven
+    When I open my confirmation link
+    Then the address is confirmed and both of those sign-in methods are gone
+    And I am signed in to that account, to add a passkey or a password of my own
+
+  @unit
+  Scenario: A confirmation link never opens an account it cannot adopt
+    Given a confirmation link was sent for my address
+    And by the time it is opened the address's account is confirmed, or has been signed into
     When I open the link
     Then it is refused the way a dead link is, and nothing about that account changes
-    And a link issued for an address whose account was already awaiting confirmation is refused the same way
+
+  # The link was sent while the address could still sign up; an organization
+  # may have claimed its domain in the hour since.
+  @unit
+  Scenario: A confirmation link never adopts an account its organization's sign-in owns
+    Given an account for my address awaits confirmation
+    And my address now signs in through its organization's own connection
+    When I open my confirmation link
+    Then it is refused the way a dead link is, and nothing about that account changes
 
   # The identifier-verification LANDING never spends the link — a mail scanner
   # following it must consume nothing — so it cannot learn that a token is

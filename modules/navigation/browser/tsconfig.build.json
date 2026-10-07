@@ -54,7 +54,13 @@
       "path": "../../langy/contract/tsconfig.build.json"
     },
     {
+      "path": "../client/tsconfig.build.json"
+    },
+    {
       "path": "../../ops/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../organization/client/tsconfig.build.json"
     },
     {
       "path": "../../prompt/client/tsconfig.build.json"

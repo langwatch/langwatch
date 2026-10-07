@@ -119,6 +119,26 @@ describe("the liveness thread", () => {
       });
     });
   });
+
+  describe("given the main thread takes longer than the proxy timeout while its loop turns", () => {
+    describe("when a caller holds a long request, as the gateway change feed does", () => {
+      /** @scenario A slow answer from a turning main loop is not cut off */
+      it("serves the main thread's answer", async () => {
+        const heartbeat = startHeartbeat({ intervalMs: 5 });
+        const thread = await bootThread({
+          heartbeat: heartbeat.buffer,
+          proxyPort: await mainThreadListener((_request, response) => {
+            setTimeout(() => response.writeHead(204).end(), 900);
+          }),
+        });
+
+        const response = await fetch(urlOf(thread.address, "/api/long-poll"));
+        heartbeat.stop();
+
+        expect(response.status).toBe(204);
+      });
+    });
+  });
 });
 
 describe("Server", () => {

@@ -38,7 +38,7 @@ const QS_WRITE_OPTIONS: qs.IStringifyOptions & { allowEmptyArrays?: boolean } = 
  * `?evaluation_score.<evaluatorId>=0.8`, and only a dot/comma-aware parser
  * turns that into the two-level record the procedures take.
  */
-function parseQuery(query: Readonly<Record<string, string | undefined>>) {
+export function parseQuery(query: Readonly<Record<string, string | undefined>>) {
   const present = Object.entries(query).filter(
     (entry): entry is [string, string] => entry[1] !== void 0,
   );

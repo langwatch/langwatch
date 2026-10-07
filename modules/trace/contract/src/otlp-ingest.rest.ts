@@ -53,8 +53,4 @@ export type TraceOtlpIngestApi = Readonly<{
   otlpMarkCredentialUsed(input: { apiKeyId: string }): void;
   otlpUsageLimit(input: { project: OtlpIngestProject; customerTraceIds: string[] }): Promise<void>;
   otlpTraces(input: OtlpTracesInput): Promise<OtlpTraceCollectionResult>;
-  otlpReportError(
-    error: Error,
-    context: Readonly<{ projectId: string; customerTraceIds: string[] }>,
-  ): void;
 }>;

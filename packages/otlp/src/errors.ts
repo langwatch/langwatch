@@ -9,8 +9,9 @@ export class OtlpBodyTooLargeError extends HandledError {
   declare readonly code: "ERR_PAYLOAD_TOO_LARGE";
 
   /**
-   * `encoding` is the `Content-Encoding` the body arrived under, or null when
-   * the limit was hit reading the wire bytes rather than expanding them.
+   * `encoding` is the encoding the body was decoded as (its magic bytes, else
+   * its `Content-Encoding`), or null when the limit was hit reading the wire
+   * bytes rather than expanding them.
    */
   constructor({ maxBytes, encoding }: { maxBytes: number; encoding: string | null }) {
     super(
@@ -65,7 +66,7 @@ export class OtlpUnsupportedEncodingError extends HandledError {
       meta: { encoding },
       httpStatus: 400,
       fault: "customer",
-      tips: ["Send the body uncompressed, or with gzip, deflate or br encoding."],
+      tips: ["Send the body uncompressed, or with gzip, deflate, br or zstd encoding."],
     });
     this.name = "OtlpUnsupportedEncodingError";
   }

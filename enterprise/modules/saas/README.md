@@ -11,7 +11,7 @@ LangWatch Cloud's own surface. Every operation refuses on any other deployment.
 | Classification | enterprise (`modules/catalogue.json`)                                                   |
 | Subjects       | saas                                                                                    |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                |
-| Api token      | `SaasApi` = `moduleApi<SaasApi>()("saas")`, `contract/src/saas.api.ts:37` (1 operation) |
+| Api token      | `SaasApi` = `moduleApi<SaasApi>()("saas")`, `contract/src/saas.api.ts:36` (1 operation) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                              |
 
 ## What saas owns
@@ -19,7 +19,7 @@ LangWatch Cloud's own surface. Every operation refuses on any other deployment.
 | Kind            | Name               | Declared at                                                 |
 | --------------- | ------------------ | ----------------------------------------------------------- |
 | Stores required | rateLimiter        | `process/src/repositories/live/live.saas.repositories.ts:9` |
-| Config          | `isSaas` (IS_SAAS) | `contract/src/saas.api.ts:68`                               |
+| Config          | `isSaas` (IS_SAAS) | `contract/src/saas.config.ts:4`                             |
 
 Anything else saas needs belongs to another module and is reached through its `*Api`.
 

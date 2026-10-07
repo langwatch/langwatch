@@ -1,5 +1,6 @@
 import type { StateProjectionStore } from "@langwatch/eventing";
 
+import type { ProvisionalHeadsWriter } from "../eventing/identity-ledger.store.ts";
 import type { IdentityFoldState } from "../eventing/identity-state.projection.ts";
 import type { JoinRequestFoldState } from "../eventing/join-request-state.projection.ts";
 import type { MfaFoldState } from "../eventing/mfa-enrollment-state.projection.ts";
@@ -10,6 +11,7 @@ import type { IdentityBackfillRepository } from "./identity-backfill.repository.
 import type { IdentityHeadsRepository } from "./identity-heads.repository.ts";
 import type { IdentityLatchRepository } from "./identity-latch.repository.ts";
 import type { IdentityLookupRepository } from "./identity-lookup.repository.ts";
+import type { IdentityMigrationRepository } from "./identity-migration.repository.ts";
 import type { IdentityRateLimitRepository } from "./identity-rate-limit.repository.ts";
 import type { IdentityReservationRepository } from "./identity-reservations.repository.ts";
 import type { IdentitySignInAccountsRepository } from "./identity-signin-accounts.repository.ts";
@@ -81,12 +83,14 @@ export interface IdentityRepositories {
   readonly ssoRegistrants: SsoRegistrantReadRepository;
   readonly ssoMigrationEvidence: SsoMigrationEvidenceRepository;
   /** The folded heads each identity pipeline writes, under the queue's per-aggregate lock. */
-  readonly identityProjection: StateProjectionStore<IdentityFoldState>;
+  readonly identityProjection: StateProjectionStore<IdentityFoldState> & ProvisionalHeadsWriter;
   readonly mfaProjection: StateProjectionStore<MfaFoldState>;
   readonly joinRequestProjection: StateProjectionStore<JoinRequestFoldState>;
   readonly ssoConnectionHeads: StateProjectionStore<SsoConnectionFoldState>;
   /** The three backfill reads the D01 secret-carry pass writes through. */
   readonly secretCarry: IdentitySecretCarryRepository;
+  /** The frozen SQL behind identity's declared migration steps. */
+  readonly migration: IdentityMigrationRepository;
   /** Who a join-request or domain-proof notice reaches. */
   readonly joinRequestAudience: JoinRequestAudienceRepository;
   /** What a join-request mail says beyond names: intent, domain habit, personal teams. */

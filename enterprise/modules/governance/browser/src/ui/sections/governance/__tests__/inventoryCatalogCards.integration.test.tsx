@@ -101,6 +101,28 @@ describe("given an admin on the Inventory page", () => {
       expect(within(card).queryByText("Seats")).toBeNull();
     });
 
+    /** @scenario "the catalog renders cards with only the rows a tool has" */
+    it("draws each tool's card with the rows that tool has and no others", () => {
+      renderScreen();
+      for (const [id, name] of [
+        ["tool-claude-code", "Claude Code"],
+        ["tool-openai", "OpenAI"],
+        ["tool-support-desk", "Support Desk Assistant"],
+      ] as const) {
+        expect(screen.getByTestId(`tool-card-${id}`)).toHaveTextContent(name);
+      }
+      const claude = screen.getByTestId("tool-card-tool-claude-code");
+      expect(within(claude).getByText("Anthropic")).toBeInTheDocument();
+      expect(within(claude).getByText("Subscriptions")).toBeInTheDocument();
+      for (const absent of ["Seats", "License per month", "Tokens · 30 days"]) {
+        expect(within(claude).queryByText(absent)).toBeNull();
+      }
+      const openai = screen.getByTestId("tool-card-tool-openai");
+      expect(within(openai).getByText("Tokens · 30 days")).toBeInTheDocument();
+      expect(within(openai).queryByText("Subscriptions")).toBeNull();
+      expect(within(openai).queryByText("Seats")).toBeNull();
+    });
+
     /** @scenario "An environment a source points at is listed without being created" */
     it("lists a discovered environment badged with the source it came from", async () => {
       renderScreen();

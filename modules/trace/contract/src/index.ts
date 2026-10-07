@@ -160,8 +160,6 @@ export {
   TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
   TRACE_SUMMARY_PROJECTION_VERSIONS,
   isStorageAnchoredVersion,
-  traceConfig,
-  type TraceServerConfig,
   type TraceProcessingCommandType,
   type TraceProcessingEventType,
 } from "./trace.constants.ts";
@@ -201,6 +199,7 @@ export * from "./trace-rag-extraction.ts";
 export * from "./trace-pcm-to-wav.ts";
 export * from "./trace-metadata-editable-keys.ts";
 export * from "./trace-viewer-protections.contract.ts";
+export * from "./trace-visibility-teaser.ts";
 export * from "./trace-export.errors.ts";
 export * from "./trace-export.vocabulary.ts";
 export * from "./trace-legacy-read.types.ts";
@@ -219,3 +218,4 @@ export * from "./explorer/suggestion-items.ts";
 export * from "./trace-browser-slices.ts";
 export * from "./trace-lent-components.ts";
 export * from "./trace-lent-surfaces.ts";
+export { traceConfig, type TraceServerConfig } from "./trace.config.ts";

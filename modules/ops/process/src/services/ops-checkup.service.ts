@@ -29,10 +29,10 @@ import type { CheckupProbeChannel } from "../channels/checkup-probe.channel.ts";
 import type { UsageReportChannel } from "../channels/usage-report.channel.ts";
 import type {
   ClickHouseHealthRepository,
-  MigrationLedgerRow,
   PostgresHealthRepository,
   RedisHealthRepository,
 } from "../repositories/datastore-health.repository.ts";
+import type { UpgradeLedgerRepository } from "../repositories/upgrade-ledger.repository.ts";
 import { checkupVerdictsOnly } from "../rules/checkup-audience.rules.ts";
 import { CANARY_KEY_PERMISSIONS } from "../rules/checkup-canary-key.rules.ts";
 import {
@@ -89,6 +89,8 @@ interface OpsCheckupDependencies {
     readonly postgres: PostgresHealthRepository;
     readonly clickhouse: ClickHouseHealthRepository;
     readonly redis: RedisHealthRepository;
+    /** The upgrade ledger both migration rows read, as the Upgrades page reads it. */
+    readonly upgradeLedger: Pick<UpgradeLedgerRepository, "findStatus" | "findSteps">;
   };
   readonly channels: { usageReport: UsageReportChannel; probes: CheckupProbeChannel };
   /** The ops health the usage report carries; left out where the process composes none. */
@@ -169,7 +171,7 @@ export class OpsCheckupService {
       isSaas: facts.isSaas,
       now: nowInstant,
     });
-    const { postgres, clickhouse, redis } = repositories;
+    const { postgres, clickhouse, redis, upgradeLedger } = repositories;
 
     const factsFor = ({
       organizationId,
@@ -184,19 +186,15 @@ export class OpsCheckupService {
         processRole: facts.processRole,
         environment: facts.nodeEnvironment ?? "unknown",
       },
-      postgres: {
-        ping: () => postgres.findServerVersion(),
-        findMigrationState: async () => {
-          const onDisk = await postgres.findReleaseMigrationNames();
-          if (onDisk.length === 0) return [];
-          return [migrationState({ onDisk, ledger: await postgres.findMigrationLedger() })];
-        },
+      postgres: { ping: () => postgres.findServerVersion() },
+      upgrade: {
+        status: () => upgradeLedger.findStatus(),
+        listSteps: (filter) => upgradeLedger.findSteps(filter),
       },
       clickhouse: {
         // Ops reads the ClickHouse member, so a process that booted it has one.
         configured: true,
         ping: () => clickhouse.ping(),
-        migrationStatus: () => clickhouse.readMigrationStatus(),
         findAppFunctionsProvisionable: () => peers.lwql.findAppFunctionsProvisionable(),
       },
       redis: { target: redis.describeTarget(), ready: () => redis.ping() },
@@ -371,21 +369,6 @@ function extractControlPlaneUrl(body: unknown): string | undefined {
     return undefined;
   }
   return typeof body.control_plane_base_url === "string" ? body.control_plane_base_url : undefined;
-}
-
-/** The release's migrations the ledger has not finished, and those it started and never did. */
-function migrationState({
-  onDisk,
-  ledger,
-}: {
-  onDisk: readonly string[];
-  ledger: readonly MigrationLedgerRow[];
-}): { pending: string[]; failed: string[] } {
-  const finished = new Set(ledger.filter((row) => row.finished).map((row) => row.name));
-  return {
-    pending: onDisk.filter((name) => !finished.has(name)),
-    failed: ledger.filter((row) => !row.finished && !row.rolledBack).map((row) => row.name),
-  };
 }
 
 /** Where stored objects go, in the words the checkup row reads. */

@@ -1,5 +1,4 @@
-import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { SchedulerAuditEntryView, SchedulerControlAction } from "@langwatch/ops-contract";
+import type { SchedulerAuditEntryView } from "@langwatch/ops-contract";
 
 import { SchedulerAuditRepository } from "../ops-audit.repository.ts";
 
@@ -38,38 +37,16 @@ export type SchedulerAuditDatabase = {
 };
 
 export class PrismaSchedulerAuditRepository extends SchedulerAuditRepository {
-  private constructor(
-    private readonly database: SchedulerAuditDatabase,
-    private readonly auditLog: AuditLogApi,
-  ) {
+  private constructor(private readonly database: SchedulerAuditDatabase) {
     super();
   }
 
   static create({
     database,
-    auditLog,
   }: {
     database: SchedulerAuditDatabase;
-    auditLog: AuditLogApi;
   }): PrismaSchedulerAuditRepository {
-    return new PrismaSchedulerAuditRepository(database, auditLog);
-  }
-
-  async append(entry: {
-    actorUserId: string;
-    action: SchedulerControlAction;
-    scheduleId: string;
-    projectId: string;
-    slot: string | null;
-  }): Promise<void> {
-    await this.auditLog.record({
-      userId: entry.actorUserId,
-      projectId: entry.projectId,
-      action: entry.action,
-      targetKind: "scheduled_job",
-      targetId: entry.scheduleId,
-      metadata: { slot: entry.slot },
-    });
+    return new PrismaSchedulerAuditRepository(database);
   }
 
   async findRecent({ limit }: { limit: number }): Promise<SchedulerAuditEntryView[]> {

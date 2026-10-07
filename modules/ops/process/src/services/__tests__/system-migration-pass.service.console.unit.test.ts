@@ -153,7 +153,7 @@ describe("SystemMigrationPassService.runner", () => {
       const routes = new Map(
         clickhouseRoutesOf(family).map((route) => [route.organizationId, route.url]),
       );
-      const repositories = MemoryOpsRepositories.create();
+      const repositories = MemoryOpsRepositories.create({ eventing: { definitions: [] } });
       vi.spyOn(repositories.migrationEnrollments, "getOrganizationById").mockImplementation(
         async ({ organizationId }) => ({ id: organizationId, name: organizationId }),
       );

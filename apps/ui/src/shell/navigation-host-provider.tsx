@@ -6,6 +6,7 @@
 
 import { useUiAddress } from "@langwatch/browser-host/address";
 import { useUiCapabilities, useUiRpc, useUiScope } from "@langwatch/browser-host/capabilities";
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
 import { UiPageFailure, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
@@ -276,6 +277,10 @@ function useNavigationHostReading({
     },
     [openDrawer],
   );
+  const openDrawerByToken = useCallback(
+    <Props,>(drawer: UiDrawerToken<Props>, props?: Partial<Props>) => openDrawer(drawer, props),
+    [openDrawer],
+  );
 
   const host = useMemo(
     () =>
@@ -323,6 +328,7 @@ function useNavigationHostReading({
           signOut: () => void auth.signOutUi(),
           setDocumentTitle,
           openDrawer: openDrawerByName,
+          openDrawerByToken,
         },
       ),
     [
@@ -350,6 +356,7 @@ function useNavigationHostReading({
       scopeCapability,
       setDocumentTitle,
       openDrawerByName,
+      openDrawerByToken,
       navigationHost,
     ],
   );

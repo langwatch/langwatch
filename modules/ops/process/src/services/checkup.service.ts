@@ -13,6 +13,7 @@ import {
   getCheckDefinition,
 } from "@langwatch/ops-contract";
 import { type Instant, Temporal } from "@langwatch/time";
+import type { UpgradeReader, UpgradeStepView } from "@langwatch/upgrade/reader";
 
 /** What a control plane probe of the local gateway came back with. */
 export type ControlPlaneProbe =
@@ -89,14 +90,12 @@ export interface CheckupFacts {
   };
   readonly postgres: {
     readonly ping: () => Promise<string>;
-    /** Empty where the migration folder is not on this install. */
-    readonly findMigrationState: () => Promise<{ pending: string[]; failed: string[] }[]>;
   };
+  /** The upgrade ledger as the Upgrades page reads it; throws where it cannot be read. */
+  readonly upgrade: Pick<UpgradeReader, "status" | "listSteps">;
   readonly clickhouse: {
     readonly configured: boolean;
     readonly ping: () => Promise<void>;
-    /** Goose's own status output; throws where the binary is absent. */
-    readonly migrationStatus: () => Promise<string>;
     /** Empty where ClickHouse did not answer the settings the provisioning probe reads. */
     readonly findAppFunctionsProvisionable: () => Promise<boolean[]>;
   };
@@ -131,6 +130,36 @@ export interface CheckupFacts {
     provider: string;
   }) => Promise<ProviderTestOutcome>;
   readonly canary: (name: CanaryName, params: Record<string, string>) => Promise<CanaryAnswer>;
+}
+
+/** Statuses of a step with nothing left to do; any other status, known or not, is outstanding. */
+const SETTLED_STATUSES: ReadonlySet<string> = new Set(["done", "not-needed"]);
+
+/** How many step ids a row names before it counts the rest. */
+const NAMED_STEPS_LIMIT = 5;
+
+/** Each code sits beside a literal `code:` so the registry's dead-code scan sees it raised. */
+const PENDING = {
+  "postgres-schema": { code: "checkup_postgres_migrations_pending" },
+  "clickhouse-schema": { code: "checkup_clickhouse_migrations_pending" },
+} as const;
+
+/** Each engine's failed step has its own code (round 18, U3-a). */
+const FAILED = {
+  "postgres-schema": { code: "checkup_postgres_migration_failed" },
+  "clickhouse-schema": { code: "checkup_clickhouse_migration_failed" },
+} as const;
+
+const UPGRADE_FIX =
+  "Run `pnpm task upgrade` from the app image, then restart. Operators can follow it on /ops/upgrades.";
+
+const UPGRADE_STATUS_FIX =
+  "Run `pnpm task upgrade status` from the app image to read the ledger, or `pnpm task upgrade` to create it. Operators can read it on /ops/upgrades.";
+
+function nameSteps(steps: readonly UpgradeStepView[]): string {
+  const named = steps.slice(0, NAMED_STEPS_LIMIT).map((step) => step.id);
+  const rest = steps.length - named.length;
+  return rest > 0 ? `${named.join(", ")} and ${rest} more` : named.join(", ");
 }
 
 const NOT_ASKED_FOR: CheckVerdict = {
@@ -251,35 +280,8 @@ export class CheckupService {
     }
   }
 
-  private async postgresMigrations(): Promise<CheckVerdict> {
-    const [state] = await this.facts.postgres.findMigrationState();
-    if (!state) {
-      return {
-        outcome: "unchecked",
-        detail:
-          "The migration folder is not on this install, so pending migrations cannot be compared.",
-        docsPath: CHECKUP_DOCS.upgrade,
-      };
-    }
-    if (state.failed.length > 0) {
-      return {
-        outcome: "refused",
-        code: "checkup_postgres_migration_failed",
-        detail: `${state.failed.length} migration(s) started and never finished: ${state.failed.join(", ")}.`,
-        fix: "Resolve the failed migration with `prisma migrate resolve`, then run `prisma migrate deploy` and restart.",
-        docsPath: CHECKUP_DOCS.upgrade,
-      };
-    }
-    if (state.pending.length > 0) {
-      return {
-        outcome: "refused",
-        code: "checkup_postgres_migrations_pending",
-        detail: `${state.pending.length} migration(s) not applied: ${state.pending.join(", ")}.`,
-        fix: "Run `prisma migrate deploy` (the app does this at boot unless SKIP_PRISMA_MIGRATE is set) and restart.",
-        docsPath: CHECKUP_DOCS.upgrade,
-      };
-    }
-    return { outcome: "verified", detail: "Every migration is applied." };
+  private postgresMigrations(): Promise<CheckVerdict> {
+    return this.migrationsRow({ kind: "postgres-schema", engine: "Postgres" });
   }
 
   private async clickhouse(): Promise<CheckVerdict> {
@@ -310,28 +312,63 @@ export class CheckupService {
     if (!this.facts.clickhouse.configured) {
       return { outcome: "unchecked", detail: "ClickHouse is not configured." };
     }
-    let status: string;
+    return this.migrationsRow({ kind: "clickhouse-schema", engine: "ClickHouse" });
+  }
+
+  /** Both migration rows read the ledger the Upgrades page reads: one source, one answer. */
+  private async migrationsRow({
+    kind,
+    engine,
+  }: {
+    kind: "postgres-schema" | "clickhouse-schema";
+    engine: "Postgres" | "ClickHouse";
+  }): Promise<CheckVerdict> {
+    let steps: UpgradeStepView[];
+    let noUpgradeRecorded: boolean;
     try {
-      status = await this.facts.clickhouse.migrationStatus();
+      const [page, status] = await Promise.all([
+        this.facts.upgrade.listSteps({ mode: "blocking" }),
+        this.facts.upgrade.status(),
+      ]);
+      steps = page.items.filter((step) => step.kind === kind);
+      noUpgradeRecorded = status.reason === "no-upgrade-recorded";
     } catch (error) {
       return {
         outcome: "unchecked",
-        detail: `Migration status could not be read: ${reasonOf(error)}`,
-        fix: "Run `pnpm clickhouse:migrate` from the app image, where the goose binary is present, to see and apply pending migrations.",
+        detail: `The upgrade ledger could not be read: ${reasonOf(error)}`,
+        fix: UPGRADE_STATUS_FIX,
         docsPath: CHECKUP_DOCS.upgrade,
       };
     }
-    const pending = status.split("\n").filter((line) => /^\s*Pending\b/i.test(line));
-    if (pending.length > 0) {
+    if (steps.length === 0 && noUpgradeRecorded) {
+      return {
+        outcome: "unchecked",
+        detail: `No upgrade is recorded yet, so ${engine} migrations cannot be compared.`,
+        fix: UPGRADE_FIX,
+        docsPath: CHECKUP_DOCS.upgrade,
+      };
+    }
+    const failed = steps.filter((step) => step.status === "failed");
+    if (failed.length > 0) {
       return {
         outcome: "refused",
-        code: "checkup_clickhouse_migrations_pending",
-        detail: `${pending.length} ClickHouse migration(s) not applied.`,
-        fix: "Run `pnpm clickhouse:migrate` from the app image and restart.",
+        code: FAILED[kind].code,
+        detail: `${failed.length} ${engine} migration(s) failed: ${nameSteps(failed)}.`,
+        fix: `Read the error on /ops/upgrades or with \`pnpm task upgrade status\`, fix the cause, then run \`pnpm task upgrade\` again: it resumes where it stopped.`,
         docsPath: CHECKUP_DOCS.upgrade,
       };
     }
-    return { outcome: "verified", detail: "Every ClickHouse migration is applied." };
+    const outstanding = steps.filter((step) => !SETTLED_STATUSES.has(step.status));
+    if (outstanding.length > 0) {
+      return {
+        outcome: "refused",
+        code: PENDING[kind].code,
+        detail: `${outstanding.length} ${engine} migration(s) not applied: ${nameSteps(outstanding)}.`,
+        fix: UPGRADE_FIX,
+        docsPath: CHECKUP_DOCS.upgrade,
+      };
+    }
+    return { outcome: "verified", detail: `Every ${engine} migration is applied.` };
   }
 
   private async lwql(): Promise<CheckVerdict> {

@@ -1,8 +1,9 @@
-import { Button, Text } from "@langwatch/design-system/primitives";
+import { Text } from "@langwatch/design-system/primitives";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { signOut, useSession } from "../../behavior/auth-client.tsx";
 import { AuthCard } from "../elements/auth-card.tsx";
+import { FrontDoorPrimaryButton } from "../elements/front-door-primary-button.tsx";
 import { FrontDoorShell } from "./front-door-shell.tsx";
 
 /**
@@ -36,20 +37,9 @@ function SsoTestCompleteCard() {
         connection is not turned on, so there is nothing here for it to do. Sign back in as yourself
         to finish turning the connection on.
       </Text>
-      <Button
-        className="lw-front-door-primary"
-        width="full"
-        minHeight="44px"
-        fontSize="14px"
-        fontWeight={600}
-        backgroundColor="frontDoor.action"
-        color="frontDoor.onAction"
-        _hover={{ backgroundColor: "frontDoor.actionHover" }}
-        onClick={() => void signOut()}
-        data-testid="sso-test-complete-sign-out"
-      >
+      <FrontDoorPrimaryButton onClick={() => void signOut()} testId="sso-test-complete-sign-out">
         Sign back in as yourself
-      </Button>
+      </FrontDoorPrimaryButton>
     </AuthCard>
   );
 }

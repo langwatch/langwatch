@@ -475,6 +475,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     });
     const ledger = IdentityLedgerStore.create({
       projectionStore: setup.repositories.identityProjection,
+      heads: setup.repositories.heads,
       eventing: identityEventing,
     });
     const joinRequestLedger = JoinRequestLedgerStore.create({

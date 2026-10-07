@@ -1,7 +1,5 @@
 /** Trace UI lent by token to the modules that walk or correct a trace (§10, §10.1). */
 
-import { uiTokens } from "@langwatch/module";
-
 /** What annotation's queue walker hands the conversation trace lends it. */
 export type AnnotationQueueConversationProps = {
   /** The trace the queue item names; its turn is the one under review. */
@@ -17,9 +15,3 @@ export type TraceEditButtonProps = {
   occurredAtMs: number | null;
   disabled?: boolean;
 };
-
-export const AnnotationQueueConversationToken = uiTokens(
-  "trace",
-).component<AnnotationQueueConversationProps>("annotationQueueConversation");
-export const TraceEditButtonToken =
-  uiTokens("trace").component<TraceEditButtonProps>("traceEditButton");

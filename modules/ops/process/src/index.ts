@@ -15,7 +15,7 @@ export type {
   OpsReplayRunner,
 } from "./app/ops.app.ts";
 export type { BugReportRepository } from "./repositories/bug-report.repository.ts";
-export type { OpsOperationsOptions } from "./app/ops-composition.build.ts";
+export type { OpsOperationsOptions } from "./app/ops.app.ts";
 export type { ProcessControlAction } from "./repositories/ops-audit.repository.ts";
 export type { AdminAccess, AdminAccessServiceOptions } from "./services/admin-access.service.ts";
 export type { RedisCpuSample } from "./rules/ops-redis-engine-cpu.rules.ts";
@@ -77,6 +77,7 @@ export { opsOperatorFact } from "./transport/ops-operator.trpc.ts";
 // composition is published: a process that mounted a fragment on its own would
 // claim `ops` a second time.
 export { opsTrpcTransport } from "./transport/ops.trpc.ts";
+export { opsUpgradeTrpcTransport } from "./transport/ops-upgrade.trpc.ts";
 export { opsBugReportTrpcTransport } from "./transport/ops-bug-report.trpc.ts";
 
 // The operator-only ClickHouse EXPLAIN endpoint: the pure query guards and the

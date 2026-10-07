@@ -3,8 +3,6 @@
  * drive, and record the key the tour minted. Hooks, read during render (ARCHITECTURE.md §10).
  */
 
-import { uiTokens } from "@langwatch/module";
-
 /** What a page can lend the guided tour to drive while it is mounted. */
 export type GuidedTourActions = {
   expandGroup: (id: string) => void;
@@ -38,5 +36,3 @@ export type GuidedTourHooks = {
   /** Settles once the guided state has recorded the key and been refreshed; rejects if not. */
   useRecordVirtualKeyReveal: () => (input: GuidedTourKeyReveal) => Promise<void>;
 };
-
-export const GuidedTourToken = uiTokens("onboarding").hooks<GuidedTourHooks>("guidedTourActions");

@@ -3,6 +3,7 @@ import type { Instant } from "@langwatch/time";
 
 import type { CreateIngestionKeyInput } from "./api-key-rest.schemas.ts";
 import type { ApiKeyListEntry, NamedApiKeyBinding } from "./api-key.list.ts";
+import type { CliSessionRevocationCause } from "./api-key.revocation-cause.ts";
 import type { MintAgentSandboxKeyInput, MintRunKeyInput } from "./api-key.run-key.ts";
 import type {
   ApiKeyTokenResolutionInput,
@@ -174,11 +175,16 @@ export interface ApiKeyApi {
     exceptApiKeyId?: string;
     createdBefore?: Instant;
   }): Promise<void>;
-  /** A person revoking one of their own CLI sessions: main's `revokeSessionKey`, counted. */
+  /**
+   * Retires a CLI session's login key and the keys under it: main's `revokeSessionKey`, counted.
+   * `cause` defaults to `user` (a person revoking it); auth's refused refresh passes `expired` or
+   * `offboarded`.
+   */
   revokeCliSessionKey(input: {
     apiKeyId: string;
     userId: string;
     organizationId: string;
+    cause?: CliSessionRevocationCause;
   }): Promise<CliSessionKeyRevocation>;
   /**
    * Main's `applySessionCeiling`: one organization's live login keys brought

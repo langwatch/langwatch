@@ -11,7 +11,7 @@ Dashboards and the graphs and saved workbench charts on them.
 | Classification | core (`modules/catalogue.json`)                                                                                |
 | Subjects       | dashboard, graph, saved-workbench-chart                                                                        |
 | Halves         | [contract](contract) · [process](process/README.md)                                                            |
-| Api token      | `DashboardApi` = `moduleApi<DashboardApi>()("dashboard")`, `contract/src/dashboard.api.ts:230` (44 operations) |
+| Api token      | `DashboardApi` = `moduleApi<DashboardApi>()("dashboard")`, `contract/src/dashboard.api.ts:229` (44 operations) |
 | Installed by   | api, worker, tasks (process)                                                                                   |
 
 ## What dashboard owns
@@ -24,7 +24,7 @@ Dashboards and the graphs and saved workbench charts on them.
 | Postgres table | `Dashboard`                 | `process/src/repositories/prisma/prisma.dashboard.repository.ts:94`        |
 | Postgres table | `CustomGraph`               | `process/src/repositories/prisma/prisma.dashboard.repository.ts:94`        |
 | Postgres table | `SavedView`                 | `process/src/repositories/prisma/prisma.saved-view.repository.ts:20`       |
-| Config         | `publicBaseUrl` (BASE_HOST) | `contract/src/dashboard.api.ts:234`                                        |
+| Config         | `publicBaseUrl` (BASE_HOST) | `contract/src/dashboard.config.ts:5`                                       |
 
 Anything else dashboard needs belongs to another module and is reached through its `*Api`.
 

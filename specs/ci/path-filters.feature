@@ -130,3 +130,52 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
     Given every required check is a "-complete" aggregator on an always-run workflow
     When any combination of files is changed in a PR
     Then every required status check receives a result
+
+  # ============================================================================
+  # The gate never under-reports
+  # ============================================================================
+  #
+  # GitHub's list-files API stops at 3,000 files. On #7536 (42,596 files) it
+  # answered each workflow with a different subset: e2e saw app files on the
+  # same head where langwatch-app-ci saw none and skipped typecheck. A skipped
+  # job reports through its aggregator as a pass, so a short list is a silent
+  # green rather than a red check.
+
+  @unit
+  Scenario: A pull request's changed paths come from git, not the files API
+    Given a pull_request run of the change detector
+    When it chooses where to read the changed paths from
+    Then it diffs the pull request's base commit against the checked-out merge commit
+    And it does not ask the files API
+
+  @unit
+  Scenario: Git lists every changed path in the gate's lean checkout
+    Given a sparse, blobless, depth-one checkout of a pull request's merge commit
+    And the pull request changes more than 3,000 files, one of them renamed
+    When the base commit is fetched at depth one and diffed against the merge commit without renames
+    Then every changed path is listed, the renamed file under both its names
+    And no file content has to be downloaded to list them
+
+  @unit
+  Scenario: A pull_request_target run past the files API's cap runs everything
+    Given a pull_request_target run, which must not fetch the pull request's commits
+    When the pull request changes 3,000 files or more, or its file count is missing
+    Then every filter is forced true
+
+  @unit
+  Scenario: A pull_request_target run under the files API's cap reads the files API
+    Given a pull_request_target run
+    When the pull request changes fewer than 3,000 files
+    Then the change detector reads the files API, which lists all of them
+
+  @unit
+  Scenario: A push in diff mode is diffed with git and every other event runs everything
+    When a push arrives at a workflow that asked for push-strategy "diff"
+    Then the change detector diffs the push against its before-commit with git
+    And a push without that strategy, a merge queue entry, a schedule or a manual run forces every filter true
+
+  @unit
+  Scenario: A workflow that calls dorny/paths-filter directly reads pull requests with git
+    Given a workflow step uses dorny/paths-filter outside the change detector
+    When that step can run on a pull_request event
+    Then it passes an empty token, which makes the filter diff with git

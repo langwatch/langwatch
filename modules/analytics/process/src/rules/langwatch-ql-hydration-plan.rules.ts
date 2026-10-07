@@ -82,6 +82,18 @@ export function langWatchQLExtractionPlan(
 }
 
 /**
+ * The extraction calls of a plan, eval calls left as the database answered: what the
+ * synchronous query hydrates when nothing is wired to judge them.
+ */
+export function langWatchQLExtractionCalls(
+  calls: readonly LangWatchQLAppFunctionCall[],
+): readonly LangWatchQLAppFunctionCall[] {
+  return calls.filter(
+    (call) => findLangWatchQLAppFunctions(call.function)[0]?.kind === "extraction",
+  );
+}
+
+/**
  * The catalogue entry a plan names. Not a customer-facing condition: the
  * validator admits names from this same catalogue, so a plan naming something
  * else is our bug and degrades to "unknown" rather than wearing a code.

@@ -643,6 +643,7 @@ describe("ProjectService", () => {
         recordPresenceSettingChanged: { send: async () => undefined },
         recordProjectMoved: { send: async () => undefined },
         recordProjectArchived: { send: async () => undefined },
+        recordProjectDepartmentAssigned: { send: async () => undefined },
       });
 
       await createService(new StubRepository(), new StubOrganizationService(), created).create(
@@ -654,6 +655,39 @@ describe("ProjectService", () => {
           tenantId: applicationProject.id,
           projectId: applicationProject.id,
           organizationId: "org",
+        }),
+      );
+    });
+
+    /** @scenario "A new project's created fact carries its team and whether it is personal" */
+    it("records the new project's team and personal flag on its created fact", async () => {
+      const send = vi.fn(async (_payload: unknown) => undefined);
+      const created = ProjectCreatedNoticeService.create({
+        logger: { error: () => void 0 },
+        projects: {
+          findWithOrgAdmin: async () => null,
+          findIdsByOrganization: async () => [],
+          findWithTeam: async () => null,
+        },
+      });
+      created.connect({
+        recordProjectCreated: { send },
+        recordProjectLegacyKeyRevoked: { send: async () => undefined },
+        recordPresenceSettingChanged: { send: async () => undefined },
+        recordProjectMoved: { send: async () => undefined },
+        recordProjectArchived: { send: async () => undefined },
+        recordProjectDepartmentAssigned: { send: async () => undefined },
+      });
+
+      await createService(new StubRepository(), new StubOrganizationService(), created).create(
+        input,
+      );
+
+      expect(send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: applicationProject.id,
+          teamId: applicationProject.teamId,
+          isPersonal: applicationProject.isPersonal,
         }),
       );
     });
@@ -675,6 +709,7 @@ describe("ProjectService", () => {
         recordPresenceSettingChanged: { send: async () => undefined },
         recordProjectMoved: { send: async () => undefined },
         recordProjectArchived: { send: async () => undefined },
+        recordProjectDepartmentAssigned: { send: async () => undefined },
       });
 
       await expect(
@@ -1145,6 +1180,7 @@ describe("ProjectService lifecycle facts for authz's lineage", () => {
       recordPresenceSettingChanged: { send: async () => undefined },
       recordProjectMoved: { send: moved },
       recordProjectArchived: { send: archived },
+      recordProjectDepartmentAssigned: { send: async () => undefined },
     });
     const repository = new StubRepository();
     repository.findWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_alpha" }));
@@ -1246,6 +1282,85 @@ describe("ProjectService lifecycle facts for authz's lineage", () => {
         expect.objectContaining({ projectId: applicationProject.id }),
         expect.any(String),
       );
+    });
+  });
+});
+
+describe("ProjectService department facts for data privacy's fold", () => {
+  function recording({ assigned }: { assigned: boolean }) {
+    const departments = vi.fn(async (_payload: unknown) => undefined);
+    const created = ProjectCreatedNoticeService.create({
+      logger: { error: vi.fn() },
+      projects: {
+        findWithOrgAdmin: async () => null,
+        findIdsByOrganization: async () => [],
+        findWithTeam: async () => projectWithTeam({ teamId: "team_alpha", departmentId: "risk" }),
+      },
+    });
+    created.connect({
+      recordProjectCreated: { send: async () => undefined },
+      recordProjectLegacyKeyRevoked: { send: async () => undefined },
+      recordPresenceSettingChanged: { send: async () => undefined },
+      recordProjectMoved: { send: async () => undefined },
+      recordProjectArchived: { send: async () => undefined },
+      recordProjectDepartmentAssigned: { send: departments },
+    });
+    const repository = new StubRepository();
+    repository.assignProjectDepartment.mockResolvedValue(assigned);
+
+    return {
+      service: createService(repository, new StubOrganizationService(), created),
+      departments,
+    };
+  }
+
+  const assignment = {
+    organizationId: "org",
+    projectId: applicationProject.id,
+    departmentId: "risk",
+  };
+
+  /** @scenario "A project's department assignment is recorded as project's fact" */
+  it("records the department with the project's team and personal flag", async () => {
+    const { service, departments } = recording({ assigned: true });
+
+    await expect(service.assignProjectDepartment(assignment)).resolves.toBe(true);
+
+    expect(departments).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: applicationProject.id,
+        projectId: applicationProject.id,
+        organizationId: "org",
+        departmentId: "risk",
+        teamId: "team_alpha",
+        isPersonal: false,
+      }),
+    );
+    expect(departments.mock.calls[0]?.[0]).not.toHaveProperty("backfilled");
+  });
+
+  /** @scenario "Assigning a department to a project outside the organization records no fact" */
+  it("records nothing when no project in the organization was assigned", async () => {
+    const { service, departments } = recording({ assigned: false });
+
+    await expect(service.assignProjectDepartment(assignment)).resolves.toBe(false);
+
+    expect(departments).not.toHaveBeenCalled();
+  });
+});
+
+describe("ProjectService legacy key lookup", () => {
+  describe("when a caller presents a revoked legacy key", () => {
+    /** @scenario "Revoking the legacy key stops nothing the platform runs" */
+    it("resolves no project and never asks the store", async () => {
+      const repository = new StubRepository();
+      repository.findIdByLegacyApiKey.mockResolvedValue("project_alpha");
+      const service = createService(repository);
+
+      await expect(
+        service.findIdByLegacyApiKey({ token: "lw-revoked-project_alpha" }),
+      ).resolves.toBeNull();
+      expect(repository.findIdByLegacyApiKey).not.toHaveBeenCalled();
     });
   });
 });

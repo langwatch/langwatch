@@ -9,8 +9,8 @@ import {
   EditModelProviderFormToken,
   ModelDisplayToken,
   ModelSelectorToken,
-  modelProviderTrpc,
-} from "@langwatch/model-provider-contract";
+} from "@langwatch/model-provider-client";
+import { modelProviderTrpc } from "@langwatch/model-provider-contract";
 
 import { modelProviderApi } from "./behavior/model-provider-api.ts";
 import { reportModelFailure } from "./ui/sections/model-failure-interceptor/index.ts";

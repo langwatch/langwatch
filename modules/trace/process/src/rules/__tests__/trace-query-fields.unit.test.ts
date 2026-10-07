@@ -8,7 +8,7 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { FIELD_DEFS, KNOWN_FIELDS } from "../trace-query-fields.rules.ts";
+import { traceQueryFields } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 
 const summary = {
   traceId: "trace-1",
@@ -67,29 +67,34 @@ const minimalTrace: InMemoryTrace = {
 // the value/operator, never the field name, so one tag exercises every def.
 const tag = parseTraceQuerySyntax("field:1") as TagToken;
 
-const fieldDefs = FIELD_DEFS as Record<string, FieldDef>;
+const fieldDefs = traceQueryFields.fieldDefs as Record<string, FieldDef>;
 
 describe("FIELD_DEFS", () => {
   it("wires exactly the known fields with no extras or omissions", () => {
-    expect(new Set(Object.keys(FIELD_DEFS))).toEqual(new Set(KNOWN_FIELDS));
+    expect(new Set(Object.keys(traceQueryFields.fieldDefs))).toEqual(
+      new Set(traceQueryFields.knownFields),
+    );
   });
 
   describe("when every known field is evaluated on a minimal fixture", () => {
-    it.each(KNOWN_FIELDS)("[%s] returns a boolean or UNSUPPORTED without throwing", (field) => {
-      const def = fieldDefs[field];
-      expect(def).toBeDefined();
+    it.each(traceQueryFields.knownFields)(
+      "[%s] returns a boolean or UNSUPPORTED without throwing",
+      (field) => {
+        const def = fieldDefs[field];
+        expect(def).toBeDefined();
 
-      let result: boolean | typeof UNSUPPORTED | undefined;
-      expect(() => {
-        result = def!.evaluateInMemory(tag, false, minimalTrace);
-      }).not.toThrow();
+        let result: boolean | typeof UNSUPPORTED | undefined;
+        expect(() => {
+          result = def!.evaluateInMemory(tag, false, minimalTrace);
+        }).not.toThrow();
 
-      expect([true, false, UNSUPPORTED]).toContain(result);
-    });
+        expect([true, false, UNSUPPORTED]).toContain(result);
+      },
+    );
   });
 
   describe("when a field declares a ClickHouse compiler", () => {
-    it.each(KNOWN_FIELDS)("[%s] exposes a callable toClickHouse", (field) => {
+    it.each(traceQueryFields.knownFields)("[%s] exposes a callable toClickHouse", (field) => {
       expect(typeof fieldDefs[field]!.toClickHouse).toBe("function");
     });
   });

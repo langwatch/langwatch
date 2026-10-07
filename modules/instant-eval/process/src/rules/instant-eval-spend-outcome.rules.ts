@@ -69,6 +69,11 @@ export function instantEvalSpendRequestId({ runId }: { runId?: string }): string
     : generate(INSTANT_EVAL_QUERY_KSUID_RESOURCE).toString();
 }
 
+/** The hold a synchronous query takes on the free budget while it judges; one per query. */
+export function instantEvalQueryReservationId(): string {
+  return `query:${generate(INSTANT_EVAL_QUERY_KSUID_RESOURCE).toString()}`;
+}
+
 /**
  * The rate identity stamped on the outcome. A judgement has no model registry,
  * so it stamps the two published numbers it was priced with: a price change

@@ -106,6 +106,31 @@ Feature: Canonical user lifecycle
     And the bytes are stored with the user-avatar purpose
     And the User service stores the compatibility delivery URL
 
+  # Account adoption (rulings 2026-10-06, Auth 32): an address proof adopts an
+  # unfinished account. Every sign-in method on it was set before the proof, so
+  # all of them go; what an invitation gave it stays.
+  @integration
+  Scenario: Adopting an unfinished account confirms it and drops its pre-proof sign-in methods at once
+    Given an account awaiting confirmation that was never signed into
+    And it holds a password, another linked sign-in method and a passkey
+    And an invitation already made it a member of an organization
+    When an address proof adopts it
+    Then in one transaction the address is confirmed and every one of those sign-in methods is gone
+    And its organization membership is kept
+
+  @integration
+  Scenario: Adoption refuses an account that is confirmed or has been signed into
+    Given an account that is confirmed, or one awaiting confirmation that has been signed into
+    When an address proof asks to adopt it
+    Then the answer names why, and nothing about the account changes
+
+  @unit
+  Scenario: Adopting an account ends every session it held before the proof
+    Given an account awaiting confirmation
+    When an address proof adopts it
+    Then every browser session on that account is ended
+    And a refused adoption ends none
+
   Rule: Every backend the feature stores accounts in answers the same way
 
     @unit

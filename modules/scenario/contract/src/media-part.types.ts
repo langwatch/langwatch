@@ -1,4 +1,3 @@
-import { uiTokens } from "@langwatch/module";
 import type { MediaPartData } from "@langwatch/trace-contract";
 
 /** The stored-object existence probe the host runs for a media part. */
@@ -35,7 +34,3 @@ export interface MediaPartProps {
   /** Called once after a stored media element fails to load. */
   onProbeRequired?: (storedObjectId: string) => void;
 }
-
-/** Scenario's media renderer, lent by token to the modules that show media parts (§10, §10.1). */
-
-export const MediaPartToken = uiTokens("scenario").component<MediaPartProps>("mediaPart");

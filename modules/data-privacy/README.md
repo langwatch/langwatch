@@ -16,12 +16,13 @@ Data privacy: per-scope rules and the PII redaction level a project runs at.
 
 ## What data-privacy owns
 
-| Kind                           | Name                                                                                                                                                                           | Declared at                                                                      |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| Postgres table                 | `DataPrivacyPolicy`                                                                                                                                                            | `process/src/repositories/prisma/prisma.data-privacy.repository.ts:15`           |
-| Postgres, accessed not claimed | `Department`, `Group`, `Organization`, `Project`, `Team`                                                                                                                       | `process/src/repositories/prisma/prisma.data-privacy-directory.repository.ts:17` |
-| Secrets                        | `googleApplicationCredentials` (GOOGLE_APPLICATION_CREDENTIALS)                                                                                                                | `process/src/app/data-privacy.app.ts:104`                                        |
-| Config                         | `googleDlpDisabled` (LANGWATCH_DISABLE_GOOGLE_DLP), `enforcement` (LANGWATCH_DATA_PRIVACY_ENFORCEMENT), `nodeEnvironment` (NODE_ENV), `langevalsEndpoint` (LANGEVALS_ENDPOINT) | `contract/src/data-privacy.config.ts:11`                                         |
+| Kind                           | Name                                                                                                                                                                           | Declared at                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Postgres table                 | `DataPrivacyProjectScope`                                                                                                                                                      | `process/src/repositories/prisma/prisma.data-privacy-project-scope.repository.ts:16` |
+| Postgres table                 | `DataPrivacyPolicy`                                                                                                                                                            | `process/src/repositories/prisma/prisma.data-privacy.repository.ts:15`               |
+| Postgres, accessed not claimed | `Department`, `Group`, `Organization`, `Project`, `Team`                                                                                                                       | `process/src/repositories/prisma/prisma.data-privacy-directory.repository.ts:17`     |
+| Secrets                        | `googleApplicationCredentials` (GOOGLE_APPLICATION_CREDENTIALS)                                                                                                                | `process/src/app/data-privacy.app.ts:107`                                            |
+| Config                         | `googleDlpDisabled` (LANGWATCH_DISABLE_GOOGLE_DLP), `enforcement` (LANGWATCH_DATA_PRIVACY_ENFORCEMENT), `nodeEnvironment` (NODE_ENV), `langevalsEndpoint` (LANGEVALS_ENDPOINT) | `contract/src/data-privacy.config.ts:11`                                             |
 
 Anything else data-privacy needs belongs to another module and is reached through its `*Api`.
 
@@ -31,7 +32,6 @@ Anything else data-privacy needs belongs to another module and is reached throug
 | -------------- | ---------------- | ----------------------------------------- |
 | `featureFlags` | `FeatureFlagApi` | [feature-flag](../feature-flag/README.md) |
 | `permissions`  | `AuthzApi`       | [authz](../authz/README.md)               |
-| `projects`     | `ProjectApi`     | [project](../project/README.md)           |
 
 ## Who depends on data-privacy
 

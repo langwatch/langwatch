@@ -6,6 +6,10 @@
 import type { Readable } from "node:stream";
 
 import { TieredBlobStore } from "@langwatch/group-queue/operational";
+import {
+  mintStoredObjectUri,
+  type StoredObjectStorageDestination,
+} from "@langwatch/stored-object-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AzureStoredObjectBlobRepository } from "#repositories/azure/azure.stored-object-blob.repository";
@@ -94,7 +98,7 @@ describe("given a deployment whose object storage is Azure Blob and nothing else
     /** @scenario "The groupQueue durable blob tier works on an Azure-only install" */
     it("puts the bytes in Azure Blob under the durable tier and reads them back", async () => {
       const threshold = 64;
-      const store = new TieredBlobStore({
+      const store = new TieredBlobStore<StoredObjectStorageDestination>({
         redisBlobs: {
           put: vi.fn(async () => undefined),
           get: vi.fn(async () => null),
@@ -107,6 +111,7 @@ describe("given a deployment whose object storage is Azure Blob and nothing else
           accountName: ACCOUNT,
           container: CONTAINER,
         }),
+        mintUri: ({ destination, key }) => mintStoredObjectUri({ destination, objectPath: key }),
         s3ThresholdBytes: threshold,
       });
       const body = Buffer.from("x".repeat(threshold * 4));

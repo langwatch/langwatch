@@ -4,6 +4,7 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
@@ -41,6 +42,7 @@ async function appOver() {
       projects: createApiFixture<ProjectApi>(),
       plans: createApiFixture<EntitlementApi>(),
       traces: createApiFixture<TraceApi>({ translateLegacyFilters }),
+      instantEvals: createApiFixture<InstantEvalApi>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
     repositories: {

@@ -20729,7 +20729,11 @@ func (e PostApiV1QueryJSONBodyGranularitySeconds2) Valid() bool {
 
 // Defines values for PostApiV1Query200JSONResponseBodyDiagnosticsCode.
 const (
+	APPFUNCTIONRESULTTRUNCATED PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_RESULT_TRUNCATED"
+	APPFUNCTIONUNRESOLVEDKEYS  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_UNRESOLVED_KEYS"
+	APPFUNCTIONVALUETRUNCATED  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_VALUE_TRUNCATED"
 	INCOMPLETECOMPARISONPERIOD PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INCOMPLETE_COMPARISON_PERIOD"
+	INSTANTEVALSKIPPED         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INSTANT_EVAL_SKIPPED"
 	MISSINGTIMEBUCKETS         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MISSING_TIME_BUCKETS"
 	MULTIPROJECTRESULT         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MULTI_PROJECT_RESULT"
 	POSSIBLEFANOUT             PostApiV1Query200JSONResponseBodyDiagnosticsCode = "POSSIBLE_FANOUT"
@@ -20739,7 +20743,15 @@ const (
 // Valid indicates whether the value is a known member of the PostApiV1Query200JSONResponseBodyDiagnosticsCode enum.
 func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 	switch e {
+	case APPFUNCTIONRESULTTRUNCATED:
+		return true
+	case APPFUNCTIONUNRESOLVEDKEYS:
+		return true
+	case APPFUNCTIONVALUETRUNCATED:
+		return true
 	case INCOMPLETECOMPARISONPERIOD:
+		return true
+	case INSTANTEVALSKIPPED:
 		return true
 	case MISSINGTIMEBUCKETS:
 		return true
@@ -157616,6 +157628,7 @@ type PostApiSuitesByIdRunResponse struct {
 		} `json:"items"`
 		JobCount        float32 `json:"jobCount"`
 		PlanName        *string `json:"planName,omitempty"`
+		PlanSlug        string  `json:"planSlug"`
 		Scheduled       bool    `json:"scheduled"`
 		SetId           string  `json:"setId"`
 		SkippedArchived struct {
@@ -186973,6 +186986,7 @@ func ParsePostApiSuitesByIdRunResponse(rsp *http.Response) (*PostApiSuitesByIdRu
 			} `json:"items"`
 			JobCount        float32 `json:"jobCount"`
 			PlanName        *string `json:"planName,omitempty"`
+			PlanSlug        string  `json:"planSlug"`
 			Scheduled       bool    `json:"scheduled"`
 			SetId           string  `json:"setId"`
 			SkippedArchived struct {

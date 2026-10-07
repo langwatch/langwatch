@@ -70,6 +70,7 @@ function createFullModelProviderTestProjects(): ProjectApi {
     getWithTeam: async (id: string) => testProject(id),
     findWithTeam: async (id: string) => testProject(id),
     listIdsByOrganization: async () => [],
+    findLiveNonGovernanceIdsByOrganization: async () => [],
     listNamesByIds: async () => [],
   });
 }

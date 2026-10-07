@@ -21,6 +21,7 @@ import {
   RecordProjectPresenceSettingChangedCommand,
   RecordProjectMovedCommand,
   RecordProjectArchivedCommand,
+  RecordProjectDepartmentAssignedCommand,
 } from "./project-lifecycle.commands.ts";
 import {
   projectCreatedEventSchema,
@@ -28,6 +29,7 @@ import {
   projectPresenceSettingChangedEventSchema,
   projectMovedEventSchema,
   projectArchivedEventSchema,
+  projectDepartmentAssignedEventSchema,
 } from "./project-lifecycle.events.ts";
 
 function lifecycleCommands() {
@@ -41,12 +43,14 @@ function lifecycleCommands() {
       projectPresenceSettingChangedEventSchema,
       projectMovedEventSchema,
       projectArchivedEventSchema,
+      projectDepartmentAssignedEventSchema,
     ])
     .withCommand("recordProjectCreated", RecordProjectCreatedCommand)
     .withCommand("recordProjectLegacyKeyRevoked", RecordProjectLegacyKeyRevokedCommand)
     .withCommand("recordPresenceSettingChanged", RecordProjectPresenceSettingChangedCommand)
     .withCommand("recordProjectMoved", RecordProjectMovedCommand)
-    .withCommand("recordProjectArchived", RecordProjectArchivedCommand);
+    .withCommand("recordProjectArchived", RecordProjectArchivedCommand)
+    .withCommand("recordProjectDepartmentAssigned", RecordProjectDepartmentAssignedCommand);
 }
 
 type ProjectLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;

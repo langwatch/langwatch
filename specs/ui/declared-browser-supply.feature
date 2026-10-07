@@ -52,7 +52,7 @@ Feature: A browser cannot boot without what its web modules declared
       When a module carrying its own web settings is installed
       Then the composition is asked for a reader of the injected configuration
 
-    @unit @unimplemented
+    @unit
     Scenario: A module declaring no drawers contributes none
       Given an installed web module that declares screens and no drawers
       When the drawer registry is composed
@@ -128,7 +128,7 @@ Feature: A browser cannot boot without what its web modules declared
       Then the build fails, naming both modules and the drawer
       And the two declarations are not silently combined
 
-    @integration @unimplemented
+    @integration
     Scenario: Every declared drawer opens from its own address
       Given the composed drawer registry
       When each drawer name is put in the address bar

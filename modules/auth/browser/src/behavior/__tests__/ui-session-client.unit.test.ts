@@ -1,8 +1,9 @@
 /** The session read: BetterAuth's client, the impersonation-aware endpoint. */
 
+import type { UiAuthClient } from "@langwatch/auth-contract";
 import { describe, expect, it } from "vitest";
 
-import { readUiActor, toUiActor, UI_SESSION_PATH, type UiAuthClient } from "../ui-session-client";
+import { readUiActor, toUiActor, UI_SESSION_PATH } from "../ui-session-client";
 
 /**
  * An auth client that answers a read and refuses to end the session.

@@ -830,6 +830,37 @@ function traceSummaryRow({
 }
 
 /**
+ * Adds traces that carry a TopicId, so a join from `traces` to `topics` has something to count.
+ * Fresh trace ids keep them beside, not over, the baseline traces.
+ */
+export async function seedTracesOnTopics({
+  admin,
+  database,
+  assignments,
+}: {
+  admin: ClickHouseClient;
+  database: string;
+  assignments: readonly { tenantId: string; topicId: string; traces: number }[];
+}): Promise<void> {
+  await admin.insert({
+    table: `${database}.trace_summaries`,
+    format: "JSONEachRow",
+    values: assignments.flatMap(({ tenantId, topicId, traces }) =>
+      [...Array(traces).keys()].map((index) => ({
+        ...traceSummaryRow({
+          tenantId,
+          traceId: `${topicId}-trace-${index}`,
+          occurredAt: seedWeekStart(0),
+          updatedAt: seedWeekStart(0),
+          spanCount: 1,
+        }),
+        TopicId: topicId,
+      })),
+    ),
+  });
+}
+
+/**
  * Seeds both tenants into the real fact tables, across eight weekly partitions. Merges are
  * stopped first.
  */

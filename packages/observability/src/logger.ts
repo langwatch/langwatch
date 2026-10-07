@@ -5,7 +5,7 @@ import pino, {
   type SerializedError,
 } from "pino";
 
-import { DEFAULT_SERVICE_NAME, REQUEST_CAUSE_FIELD } from "./constants.ts";
+import { DEFAULT_SERVICE_NAME, ERROR_SUMMARY, REQUEST_CAUSE_FIELD } from "./constants.ts";
 import {
   resolveLoggerConfiguration,
   type LoggerConfiguration,
@@ -67,13 +67,20 @@ function jsonSafe(value: unknown, seen: WeakSet<object>): unknown {
   return out;
 }
 
+/** A request-log cause already cut to its bounded summary (`ERROR_SUMMARY`). */
+function isErrorSummary(value: unknown): value is object {
+  if (value === null || typeof value !== "object") return false;
+  return (value as Record<symbol, unknown>)[ERROR_SUMMARY] === true;
+}
+
 /**
- * Custom Error serializer: keeps pino's message/stack/cause handling and also
- * walks the error's own enumerable properties, so a `bigint` or nested
- * `Error` on a custom error class survives instead of being dropped.
+ * Custom Error serializer: keeps pino's message/stack/cause handling and walks
+ * the error's own enumerable properties. A branded summary passes untouched,
+ * since pino's err serializer would relabel it `type: "Object"`.
  */
-const errorSerializer = (error: unknown): SerializedError => {
+const errorSerializer = (error: unknown): SerializedError | object => {
   if (!(error instanceof Error)) {
+    if (isErrorSummary(error)) return error;
     return pino.stdSerializers.err(error as Error);
   }
 
@@ -123,7 +130,7 @@ function maskValues(text: unknown, values: string[]): unknown {
  * failed AUTH carries the password in `args` (and maybe the message). Returns
  * the serialized error with those values replaced; others pass unchanged.
  */
-function redactCommandCredentials<T extends object>(serialized: T): T {
+export function redactCommandCredentials<T extends object>(serialized: T): T {
   const command = (serialized as { command?: unknown }).command;
   if (!command || typeof command !== "object") return serialized;
   const { name, args } = command as { name?: unknown; args?: unknown };

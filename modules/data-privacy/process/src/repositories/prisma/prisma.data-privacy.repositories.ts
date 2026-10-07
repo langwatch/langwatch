@@ -2,10 +2,12 @@ import { prismaRepositories } from "@langwatch/prisma-client";
 
 import type { DataPrivacyRepositories } from "../data-privacy.repositories.ts";
 import { PrismaDataPrivacyDirectoryRepository } from "./prisma.data-privacy-directory.repository.ts";
+import { PrismaDataPrivacyProjectScopeRepository } from "./prisma.data-privacy-project-scope.repository.ts";
 import { PrismaDataPrivacyPolicyRepository } from "./prisma.data-privacy.repository.ts";
 
 const policyRepositories = prismaRepositories({
   policies: PrismaDataPrivacyPolicyRepository,
+  projectScopes: PrismaDataPrivacyProjectScopeRepository,
 });
 
 /**

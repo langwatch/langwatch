@@ -26,8 +26,8 @@ import {
 } from "#rules/trace-filter-hidden-origins.rules";
 import type * as projectionCompileRules from "#rules/trace-projection-compile.rules";
 import { compileProjection } from "#rules/trace-projection-compile.rules";
-import { translateFilter } from "#rules/trace-query.rules";
 
+import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
 
 vi.mock("#rules/trace-projection-compile.rules", async (importOriginal) => {
@@ -47,7 +47,7 @@ function compileExplorerTraceFilter(input: {
   originNamed?: boolean;
   dateField?: "occurred" | "updated";
 }): { sql: string; params: Record<string, unknown> } {
-  const compiled = translateFilter({
+  const compiled = traceQueryTranslation.translateFilter({
     queryText: input.query,
     tenantId: input.tenantId,
     timeRange: input.timeRange,
@@ -754,6 +754,20 @@ describe("POST /search with a trace filter", () => {
       });
       expect(res.status).toBe(200);
       expect(listTraces).toHaveBeenCalled();
+    });
+  });
+});
+
+describe("POST /search page size", () => {
+  describe("when pageSize is above every plan's page bound", () => {
+    /** @scenario "Public trace search clamps an oversized page instead of rejecting it" */
+    it("accepts the request and hands the size to the read, which clamps it", async () => {
+      const { send, listTraces } = mount();
+      const res = await send({ startDate: 1000, endDate: 5000, pageSize: 5000 });
+      expect(res.status).toBe(200);
+      expect(listTraces).toHaveBeenCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ pageSize: 5000 }) }),
+      );
     });
   });
 });

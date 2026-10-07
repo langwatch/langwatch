@@ -10,6 +10,12 @@
 export const REQUEST_CAUSE_FIELD = "requestError";
 
 /**
+ * Non-enumerable brand on a bounded error summary, so the logger's error
+ * serializer passes it untouched. Symbol.for survives duplicate module copies.
+ */
+export const ERROR_SUMMARY = Symbol.for("langwatch.errorSummary");
+
+/**
  * OpenTelemetry span attribute keys used across LangWatch services.
  */
 export const OTEL_ATTR = {

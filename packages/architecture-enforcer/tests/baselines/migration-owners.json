@@ -1,0 +1,26 @@
+{
+  "record": "D3 (Alex, 2026-10-06): SQL stays central and each migration is attributed to its tables' owner; one touching two owners is refused. These merged migrations predate the check and are never edited, so a key leaves only when its file does.",
+  "findings": {
+    "packages/clickhouse-migrations/migrations/00002_create_schema.sql": 1,
+    "packages/clickhouse-migrations/migrations/00015_add_last_event_occurred_at.sql": 1,
+    "packages/clickhouse-migrations/migrations/00022_mix_trace_summary_and_eval_runs_col_casing.sql": 1,
+    "packages/clickhouse-migrations/migrations/00032_add_retention_and_size_columns.sql": 1,
+    "packages/clickhouse-migrations/migrations/00034_add_query_pruning_indexes.sql": 1,
+    "packages/clickhouse-migrations/migrations/00049_create_canonical_metrics.sql": 1,
+    "packages/clickhouse-migrations/migrations/00050_create_canonical_logs.sql": 1,
+    "packages/clickhouse-migrations/migrations/00056_analytics_folds_read_back.sql": 1,
+    "packages/clickhouse-migrations/migrations/00057_array_column_defaults.sql": 1,
+    "packages/clickhouse-migrations/migrations/00088_aggregating_rollup_dimension_columns.sql": 1,
+    "packages/prisma-client/prisma/migrations/0_init/migration.sql": 1,
+    "packages/prisma-client/prisma/migrations/20250124130947_add_s3_endpoints/migration.sql": 1,
+    "packages/prisma-client/prisma/migrations/20251226114320_add_agent_evaluator_tables/migration.sql": 1,
+    "packages/prisma-client/prisma/migrations/20260118223738_add_slug_to_evaluators_and_evaluator_id_to_monitors/migration.sql": 1,
+    "packages/prisma-client/prisma/migrations/20260119102000_migrate_monitors_to_evaluators/migration.sql": 1,
+    "packages/prisma-client/prisma/migrations/20260410230000_better_auth_additive/migration.sql": 1,
+    "packages/prisma-client/prisma/migrations/20260410233000_better_auth_destructive/migration.sql": 1,
+    "packages/prisma-client/prisma/migrations/20260611120000_backfill_and_drop_legacy_privacy_columns/migration.sql": 1,
+    "packages/prisma-client/prisma/migrations/20260807120000_restore_ragas_evaluators_from_legacy/migration.sql": 1,
+    "packages/prisma-client/prisma/migrations/20260825020005_mfa_and_passkeys/migration.sql": 1,
+    "packages/prisma-client/prisma/migrations/20260913120001_identity_auth/migration.sql": 1
+  }
+}

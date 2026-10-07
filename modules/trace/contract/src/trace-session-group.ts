@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { canReadCapturedContent, type Protections } from "./trace-viewer-protections.contract.ts";
+
 /**
  * The Sessions lens read model (specs/traces-v2/sessions-lens.feature): one
  * row per `gen_ai.conversation.id`, rollups over every trace of the session.
@@ -70,3 +72,39 @@ export const sessionGroupsResultSchema = z.object({
 });
 
 export type SessionGroupsResult = z.infer<typeof sessionGroupsResultSchema>;
+
+/**
+ * Strip session title for viewers who cannot read captured content. `titleRedacted`
+ * set only when a title existed (mirrors redactV2Content).
+ */
+export function gateSessionTitle<T extends { codingAgent: { title: string | null } | null }>({
+  sessions,
+  protections,
+}: {
+  sessions: T[];
+  protections: Protections;
+}): (T & {
+  codingAgent: (NonNullable<T["codingAgent"]> & SessionTitleRedactionFlag) | null;
+})[] {
+  const contentVisible = canReadCapturedContent(protections);
+  return sessions.map((session) => {
+    const codingAgent = session.codingAgent as NonNullable<T["codingAgent"]> | null;
+    return {
+      ...session,
+      codingAgent:
+        codingAgent === null
+          ? null
+          : {
+              ...codingAgent,
+              title: contentVisible ? codingAgent.title : null,
+              titleRedacted: !contentVisible && codingAgent.title !== null,
+            },
+    };
+  });
+}
+
+/** What {@link gateSessionTitle} adds to a row's coding-agent enrichment. */
+export interface SessionTitleRedactionFlag {
+  /** True only when a title existed and this viewer may not read it. */
+  titleRedacted: boolean;
+}

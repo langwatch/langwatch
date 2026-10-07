@@ -126,6 +126,9 @@ function processConfigOf(options: {
             ...(urls.clickhouse ? { url: urls.clickhouse } : {}),
             ...(clickhouseRoutes.length > 0 ? { privateRoutes: clickhouseRoutes } : {}),
             poolSizing: config.clickhousePool,
+            ...(config.clickhouseStatementLaneReserveShare === undefined
+              ? {}
+              : { statementLaneReserveShare: config.clickhouseStatementLaneReserveShare }),
           },
         }
       : {};

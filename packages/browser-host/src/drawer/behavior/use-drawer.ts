@@ -8,6 +8,7 @@ import { createLogger } from "@langwatch/observability/browser";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 
+import { refuseUndeclaredDrawer } from "../model/drawer-declarations.ts";
 import type {
   DrawerCallbacksIn,
   UiDrawerMap,
@@ -207,6 +208,7 @@ function ancestorsForOpen({
  * mounted.
  */
 export const navigateToDrawer = (drawer: DrawerType, options: { resetStack?: boolean } = {}) => {
+  refuseUndeclaredDrawer(drawer);
   // Clear complex props since we're navigating fresh
   complexProps = {};
 
@@ -464,6 +466,7 @@ function openOn({
 }): void {
   const { replace, resetStack, replaceCurrentInStack } = options;
   const effectiveDrawer = drawerKey(drawer);
+  refuseUndeclaredDrawer(effectiveDrawer);
   const effectiveProps = props === undefined ? undefined : toRecord(props);
 
   // Extract urlParams and merge with props

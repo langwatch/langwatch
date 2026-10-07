@@ -3,6 +3,8 @@ import { Worker } from "node:worker_threads";
 
 /** The kubelet's path; answered in the thread from the heartbeat, never proxied. */
 export const LIVENESS_PATH = "/healthz";
+/** Answered in the thread once the main thread latched ready; until then the main thread says. */
+export const READINESS_PATH = "/readyz";
 
 /**
  * A saturated worker can pin its loop for over a minute of legitimate work, so the probe judges
@@ -11,7 +13,10 @@ export const LIVENESS_PATH = "/healthz";
  */
 export const HEARTBEAT_INTERVAL_MS = 1_000;
 export const HEARTBEAT_STALL_BUDGET_MS = 5 * 60 * 1000;
-/** How long a proxied request waits on the main thread before a stalled loop fails the scrape. */
+/**
+ * How long the main loop's heartbeat may stand still while a proxied request waits on it. A
+ * request on a turning loop waits as long as its handler takes (a long poll, a slow export).
+ */
 export const MAIN_THREAD_PROXY_TIMEOUT_MS = 10_000;
 
 const BIND_HANDOVER_MS = 10_000;
@@ -26,6 +31,7 @@ const http = require("node:http");
 const net = require("node:net");
 const { parentPort, workerData } = require("node:worker_threads");
 const heartbeat = new BigInt64Array(workerData.heartbeat);
+const readiness = new Int32Array(workerData.readiness);
 let lastBeat = Atomics.load(heartbeat, 0);
 let lastBeatSeenAt = Date.now();
 const stalledMs = () => {
@@ -38,6 +44,7 @@ const stalledMs = () => {
 };
 const target = { host: "127.0.0.1", port: workerData.proxyPort };
 const unavailable = (res, body) => {
+  if (res.destroyed || res.writableEnded) return;
   if (res.headersSent) return res.destroy();
   res.writeHead(503, { "Content-Type": "text/plain" }).end(body);
 };
@@ -51,18 +58,28 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
     return;
   }
+  if (req.url === workerData.readinessPath && Atomics.load(readiness, 0) === 1) {
+    res.writeHead(200, { "Content-Type": "text/plain" }).end("ready");
+    return;
+  }
   const upstream = http.request({ ...target, method: req.method, path: req.url, headers: req.headers, agent: false });
-  const timer = setTimeout(() => {
+  const timer = setInterval(() => {
+    if (stalledMs() < workerData.proxyTimeoutMs) return;
+    clearInterval(timer);
     upstream.destroy();
     unavailable(res, "main thread did not answer");
-  }, workerData.proxyTimeoutMs);
+  }, Math.min(1000, Math.max(10, workerData.proxyTimeoutMs / 4)));
+  res.on("close", () => {
+    clearInterval(timer);
+    if (!res.writableEnded) upstream.destroy();
+  });
   upstream.on("response", (reply) => {
-    clearTimeout(timer);
+    clearInterval(timer);
     res.writeHead(reply.statusCode ?? 502, reply.headers);
     reply.pipe(res);
   });
   upstream.on("error", () => {
-    clearTimeout(timer);
+    clearInterval(timer);
     unavailable(res, "main thread did not answer");
   });
   req.pipe(upstream);
@@ -141,6 +158,7 @@ export type LivenessThread = Readonly<{
 export async function startLivenessThread({
   port,
   heartbeat,
+  readiness,
   proxyPort,
   logger,
   stallBudgetMs = HEARTBEAT_STALL_BUDGET_MS,
@@ -148,6 +166,8 @@ export async function startLivenessThread({
 }: {
   port: number;
   heartbeat: SharedArrayBuffer;
+  /** One Int32 the main thread sets to 1 once ready and back to 0 when it drains. */
+  readiness?: SharedArrayBuffer;
   /** The main thread's loopback listener every non-liveness request is proxied to. */
   proxyPort: number;
   logger: LivenessLogger;
@@ -159,10 +179,13 @@ export async function startLivenessThread({
     workerData: {
       port,
       heartbeat,
+      // Absent, the thread never answers readiness itself: every probe reaches the main thread.
+      readiness: readiness ?? new SharedArrayBuffer(4),
       proxyPort,
       stallBudgetMs,
       proxyTimeoutMs,
       livenessPath: LIVENESS_PATH,
+      readinessPath: READINESS_PATH,
       handoverMs: BIND_HANDOVER_MS,
     },
   });

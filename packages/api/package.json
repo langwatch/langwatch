@@ -26,6 +26,10 @@
       "types": "./dist/dates.d.ts",
       "default": "./src/dates.ts"
     },
+    "./json-text-field": {
+      "types": "./dist/json-text-field.d.ts",
+      "default": "./src/json-text-field.ts"
+    },
     "./rest": {
       "types": "./dist/rest/index.d.ts",
       "default": "./src/rest/index.ts"

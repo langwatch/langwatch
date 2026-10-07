@@ -12,13 +12,13 @@ import {
   SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "@langwatch/coding-agent-contract";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
-import { TraceCanonicalisationService } from "@langwatch/trace-process/testing";
 import { describe, expect, it } from "vitest";
 
+import { ClaudeAnswersTraceCanonicalisation } from "../../__tests__/fixtures/trace-canonicalisation.fixture.ts";
 import { liftLogContribution } from "../coding-agent-log-facts.rules.ts";
 
 const WIRE_TRACE = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
-const traceCanonicalisation = TraceCanonicalisationService.create();
+const traceCanonicalisation = ClaudeAnswersTraceCanonicalisation.create();
 
 const BASE_LOG_RECORD: CanonicalLogRecord = {
   tenantId: "tenant-1",

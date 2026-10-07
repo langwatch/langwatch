@@ -5,6 +5,7 @@ import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
   TRACE_LIST_MAX_OFFSET_ROWS,
   PageTooDeepError,
+  teaserOf,
 } from "@langwatch/trace-contract";
 import type {
   DiscoverResult,
@@ -26,7 +27,6 @@ import {
   mapToTraceListItem,
   SORT_COLUMN_MAP,
 } from "../rules/trace-list-row.rules.ts";
-import { teaserOf } from "../rules/trace-visibility-teaser.rules.ts";
 import { TraceDiscoverService } from "./trace-discover.service.ts";
 import { TraceFacetValuesService } from "./trace-facet-values.service.ts";
 import { TraceTopicNamingService } from "./trace-topic-naming.service.ts";

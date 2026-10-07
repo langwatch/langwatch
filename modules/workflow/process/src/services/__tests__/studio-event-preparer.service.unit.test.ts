@@ -79,7 +79,10 @@ const evaluationEvent = () =>
   });
 
 describe("StudioEventPreparerService", () => {
-  /** @scenario "Workflow prepares a Studio event through typed runtime ports" */
+  /**
+   * @scenario "Workflow prepares a Studio event through typed runtime ports"
+   * @scenario "No internal caller reads the legacy key"
+   */
   it("enriches the event with project credentials before materializing its datasets", async () => {
     const order: string[] = [];
     const datasets = new TestDatasetService(savedDataset());

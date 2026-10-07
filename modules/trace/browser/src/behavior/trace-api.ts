@@ -115,22 +115,6 @@ export type TraceApiMap = {
       };
     };
 
-    /** The Sessions lens: one row per conversation, rolled up in ClickHouse. */
-    sessions: {
-      query: {
-        input: ProjectScope & {
-          timeRange: TimeRange;
-          sort?: TraceSort;
-          pageSize?: number;
-          cursor?: string;
-          query?: string | null;
-        };
-        output: Omit<SessionGroupsResult, "sessions"> & {
-          sessions: SessionGroupPayloadItem[];
-        };
-      };
-    };
-
     /** Event rollups for the list's Events column, keyed by trace id. */
     listEvents: {
       query: {
@@ -381,6 +365,22 @@ export type TraceApiMap = {
     /** The coding-agent transcript built from the trace's spans and logs. */
     transcript: {
       query: { input: TraceScope & SpanReadHint; output: CodingAgentTranscript };
+    };
+
+    /** The Sessions lens: one row per conversation, in ClickHouse (was `traces.sessions`). */
+    sessionGroups: {
+      query: {
+        input: ProjectScope & {
+          timeRange: TimeRange;
+          sort?: TraceSort;
+          pageSize?: number;
+          cursor?: string;
+          query?: string | null;
+        };
+        output: Omit<SessionGroupsResult, "sessions"> & {
+          sessions: SessionGroupPayloadItem[];
+        };
+      };
     };
   };
 

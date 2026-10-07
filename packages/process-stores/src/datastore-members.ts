@@ -8,6 +8,7 @@ import {
   type OperatorReadMint,
   PrismaConfigService,
   PrismaConnectionService,
+  PrismaReadinessService,
   PrismaShutdownService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
@@ -15,6 +16,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   RedisConfigService,
   RedisConnectionService,
+  RedisReadinessService,
   RedisShutdownService,
   type RedisConnection,
 } from "@langwatch/redis-client";
@@ -26,6 +28,8 @@ export interface BuiltMember<Value> {
   readonly value: Value;
   /** Absent where nothing was opened, so the disposer has nothing to record. */
   readonly close?: () => Promise<void>;
+  /** One cheap query against what was opened; rejects when it does not answer. */
+  readonly answer?: () => Promise<void>;
 }
 
 /**
@@ -50,6 +54,7 @@ export function buildPrisma(options: {
   return {
     value: connection.client,
     close: () => PrismaShutdownService.create().shutdown(connection),
+    answer: () => PrismaReadinessService.create().check({ connection }),
     // Declared operator reads are built over this same connection, never a second pool.
     operatorReads: connection.operatorReads,
   };
@@ -80,5 +85,6 @@ export function buildRedis(config: RedisConfig): BuiltMember<RedisConnection> {
   return {
     value: connection,
     close: () => RedisShutdownService.create().shutdown(connection),
+    answer: () => new RedisReadinessService().ping({ connection }),
   };
 }

@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type Stripe from "stripe";
 
+import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import {
   NullBillingErrorReporter,
   type BillingErrorReporter,
@@ -80,13 +81,7 @@ export type PurchasedCheckout = Pick<
 > & { customer_details: { email: string | null; name: string | null } | null };
 
 /** The one Stripe read the purchase makes: the seats bought. */
-type CheckoutLineItems = {
-  checkout: {
-    sessions: {
-      listLineItems(id: string): Promise<{ data: readonly { quantity: number | null }[] }>;
-    };
-  };
-};
+type CheckoutLineItems = Pick<StripeSubscriptionsChannel, "listCheckoutLineItems">;
 
 /** Generates and delivers a license purchased through Stripe Checkout. */
 export class LicensePurchaseService {
@@ -129,10 +124,10 @@ export class LicensePurchaseService {
 
   async handle({
     checkoutSession,
-    stripe,
+    stripeSubscriptions,
   }: {
     checkoutSession: PurchasedCheckout;
-    stripe: CheckoutLineItems;
+    stripeSubscriptions: CheckoutLineItems;
   }): Promise<void> {
     const email = checkoutSession.customer_details?.email;
     if (!email) {
@@ -140,8 +135,10 @@ export class LicensePurchaseService {
     }
 
     const businessName = checkoutSession.customer_details?.name ?? "";
-    const lineItems = await stripe.checkout.sessions.listLineItems(checkoutSession.id);
-    const quantity = lineItems.data[0]?.quantity ?? 1;
+    const lineItems = await stripeSubscriptions.listCheckoutLineItems({
+      checkoutSessionId: checkoutSession.id,
+    });
+    const quantity = lineItems[0]?.quantity ?? 1;
     const { licenseKey, licenseData } = await this.generateLicense.generate({
       organizationName: businessName,
       email,

@@ -87,6 +87,7 @@ export const prismaTableCatalogue = {
   "TraceIngestSourceBilling": "TraceIngestSourceBilling",
   "RetentionPolicy": "RetentionPolicy",
   "DataPrivacyPolicy": "DataPrivacyPolicy",
+  "DataPrivacyProjectScope": "DataPrivacyProjectScope",
   "CustomLLMModelCost": "CustomLLMModelCost",
   "Workflow": "Workflow",
   "WorkflowVersion": "WorkflowVersion",
@@ -151,6 +152,7 @@ export const prismaTableCatalogue = {
   "BugReport": "BugReport",
   "IdempotencyReceipt": "IdempotencyReceipt",
   "GatewayRealtimeSession": "GatewayRealtimeSession",
+  "GatewayRealtimeSessionReport": "GatewayRealtimeSessionReport",
   "SystemMigrationTenantState": "SystemMigrationTenantState",
   "SystemMigrationEnrollment": "SystemMigrationEnrollment",
   "StoredObject": "StoredObject",
@@ -1589,6 +1591,17 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "DataPrivacyProjectScope": [
+    "projectId",
+    "organizationId",
+    "teamId",
+    "isPersonal",
+    "departmentId",
+    "teamRecordedAt",
+    "departmentRecordedAt",
+    "archivedAt",
+    "updatedAt"
+  ],
   "CustomLLMModelCost": [
     "id",
     "organizationId",
@@ -2590,8 +2603,26 @@ export const prismaModelFieldCatalogue = {
     "closeReason",
     "traceId",
     "vendorCostRaw",
+    "kind",
+    "metering",
+    "credentialExpiresAt",
+    "transcriptionModel",
+    "endUserId",
+    "lastReportAt",
+    "reportedCostNanoUsd",
+    "reportCount",
     "createdAt",
     "updatedAt"
+  ],
+  "GatewayRealtimeSessionReport": [
+    "id",
+    "sessionId",
+    "reportKey",
+    "projectId",
+    "model",
+    "usage",
+    "costNanoUsd",
+    "createdAt"
   ],
   "SystemMigrationTenantState": [
     "migrationName",
@@ -3129,6 +3160,7 @@ export const prismaRelationCatalogue = {
   "TraceIngestSourceBilling": {},
   "RetentionPolicy": {},
   "DataPrivacyPolicy": {},
+  "DataPrivacyProjectScope": {},
   "CustomLLMModelCost": {},
   "Workflow": {
     "project": "Project",
@@ -3347,6 +3379,7 @@ export const prismaRelationCatalogue = {
   "BugReport": {},
   "IdempotencyReceipt": {},
   "GatewayRealtimeSession": {},
+  "GatewayRealtimeSessionReport": {},
   "SystemMigrationTenantState": {},
   "SystemMigrationEnrollment": {},
   "StoredObject": {},

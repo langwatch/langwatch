@@ -62,6 +62,7 @@ import {
 import type { CredentialSessionGuard } from "./http.credential-session-guard.channel.ts";
 import type { IdTokenIssuerRefusalChannel } from "./http.id-token-issuer-refusal.channel.ts";
 import {
+  type PasskeySignUpEligibility,
   passkeySignUpRegistration,
   type SignUpVerification,
 } from "./http.passkey-sign-up.channel.ts";
@@ -896,6 +897,8 @@ type BetterAuthTransportOptions = Readonly<{
   findGoverningConnections: FindGoverningConnections;
   /** Who the installation lets create an account. */
   signUpPolicy: SignUpPolicy;
+  /** Whether a proven address still enrols a passkey here, asked at both ends of the ceremony. */
+  passkeySignUpEligibility: PasskeySignUpEligibility;
   /** Identity's answer to what a session records at mint (D06). */
   mintClaims: Pick<IdentityApi, "claimsForMint">;
 }>;
@@ -923,6 +926,7 @@ const transportOptions = ({
   signInLockout,
   findGoverningConnections,
   signUpPolicy,
+  passkeySignUpEligibility,
   ssoMigration,
   storage,
   users,
@@ -970,6 +974,7 @@ const transportOptions = ({
                 users,
                 verification: signUpVerification,
                 policy: signUpPolicy,
+                eligibility: passkeySignUpEligibility,
               }),
             }),
           ]

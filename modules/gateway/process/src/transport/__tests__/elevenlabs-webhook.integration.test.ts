@@ -22,9 +22,11 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp } from "@langwatch/process";
 import { resolvedSecrets } from "@langwatch/process-stores";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -93,6 +95,10 @@ const modelProviders = createApiFixture<ModelProviderApi>({
   },
 });
 
+/** A closing session reads its project's team and records one span; neither is asserted here. */
+const projects = createApiFixture<ProjectApi>({ findTraceDestination: async () => null });
+const traces = createApiFixture<TraceApi>({ recordSpan: async () => {} });
+
 let sessions: GatewayRealtimeSessionCollaborators | undefined;
 
 function sessionCollaborators(): GatewayRealtimeSessionCollaborators {
@@ -128,6 +134,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
     sessions: PrismaGatewayRealtimeSessionRepository.create({ database: database() }),
     spendRating: ModelCatalogGatewaySpendRatingService.create(),
     spendConfirmation: new RecordingSpendConfirmation(),
+    spanIngestion: { ingestNormalizedSpan: async () => {} },
   };
   // The gateway resolves its secrets through the process chain; an empty one leaves each unset.
   const stores: Readonly<Record<string, unknown>> = {
@@ -165,14 +172,14 @@ async function mountWebhook(): Promise<MountableRestApp> {
       webhook: peer("webhook"),
       entitlement: peer("entitlement"),
       authz: peer("authz"),
-      project: peer("project"),
+      project: projects,
       evaluator: peer("evaluator"),
       evaluation: peer("evaluation"),
       monitor: peer("monitor"),
       organization: peer("organization"),
       "feature-flag": peer("feature flag"),
       "model-provider": modelProviders,
-      trace: peer("trace"),
+      trace: traces,
       secret: peer("secret"),
       "api-key": peer("api key"),
     })

@@ -1,7 +1,9 @@
 /**
- * The choices card — the one sanctioned UI for the decision that belongs to the user
- * (ADR-060 §6).
+ * The choices card, the one sanctioned UI for the decision that belongs to the user
+ * (ADR-060 §6). A question is an ask, not a view Langy composed, so it wears no
+ * derived frame. A bare card draws its question as reply prose above the options.
  */
+import { Markdown } from "@langwatch/browser-host/markdown";
 import { Box, Button, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type {
   LangyChoiceSelection,
@@ -12,7 +14,6 @@ import { Check, CircleSlash } from "lucide-react";
 import { useState } from "react";
 
 import type { ChoicesRefRow } from "../../../features/langy/behavior/derived-cards/use-choices-ref-rows.ts";
-import { LangyDerivedCardFrame } from "./langy-derived-card-frame.tsx";
 
 /**
  * An option's label is the answer, not a name for the thing it points at: a
@@ -42,6 +43,52 @@ function optionRowText({
 function choiceMarkColor({ marked, dead }: { marked: boolean; dead: boolean }) {
   if (marked) return "purple.fg";
   return dead ? "fg.subtle" : "fg.muted";
+}
+
+/** The tint a quiet link carries: picked, selectable, or settled. */
+function quietLinkColor({ marked, selectable }: { marked: boolean; selectable: boolean }) {
+  if (marked) return "purple.fg";
+  return selectable ? "fg.muted" : "fg.subtle";
+}
+
+/** A quiet option is the way out, not the way forward: a link that answers like a row. */
+function QuietChoiceOption({
+  option,
+  marked,
+  selectable,
+  onToggle,
+}: {
+  option: LangyDerivedChoicesCard["options"][number];
+  marked: boolean;
+  selectable: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      data-testid="langy-choice-option"
+      data-option-id={option.id}
+      data-quiet="true"
+      disabled={!selectable}
+      onClick={onToggle}
+      alignSelf="flex-start"
+      paddingX={2}
+      paddingTop={0.5}
+      textAlign="left"
+      textStyle="xs"
+      textDecoration="underline"
+      textUnderlineOffset="2px"
+      background="transparent"
+      color={quietLinkColor({ marked, selectable })}
+      cursor={selectable ? "pointer" : "default"}
+      aria-disabled={!selectable}
+      aria-pressed={marked}
+      _hover={selectable ? { color: "fg" } : undefined}
+      transition="color 120ms ease"
+    >
+      {option.label}
+    </chakra.button>
+  );
 }
 
 /** The glyph beside an option: struck out, ticked, or an empty box waiting. */
@@ -86,9 +133,21 @@ function ChoiceOption({
   const marked = isChosen || isPicked;
   const selectable = open && !dead;
   const { primary, secondary } = optionRowText({ option, refRow });
+  if (option.quiet === true) {
+    return (
+      <QuietChoiceOption
+        option={option}
+        marked={marked}
+        selectable={selectable}
+        onToggle={onToggle}
+      />
+    );
+  }
   return (
     <chakra.button
       type="button"
+      data-testid="langy-choice-option"
+      data-option-id={option.id}
       disabled={!selectable}
       onClick={onToggle}
       display="flex"
@@ -183,6 +242,31 @@ function togglePick(previous: Set<string>, optionId: string): Set<string> {
   return next;
 }
 
+/** The ask: a title, or for a bare card the reply's own prose (never inside a button). */
+function ChoicesQuestion({ card }: { card: LangyDerivedChoicesCard }) {
+  if (card.bare !== true) {
+    return (
+      <Text textStyle="xs" fontWeight="640" color="fg" lineHeight="1.3">
+        {card.question}
+      </Text>
+    );
+  }
+  return (
+    <Box
+      data-langy-choices-prose
+      paddingX="2px"
+      css={{
+        "& > div > :first-child": { marginTop: 0 },
+        "& > div > :last-child": { marginBottom: 0 },
+      }}
+    >
+      <Markdown fontSize="langyAnswer" linkVariant="langy" color="langy.answerFg">
+        {card.question}
+      </Markdown>
+    </Box>
+  );
+}
+
 export function LangyChoicesCard({
   card,
   lockState,
@@ -216,27 +300,15 @@ export function LangyChoicesCard({
   };
 
   return (
-    <LangyDerivedCardFrame
-      forming={forming}
-      superseded={superseded}
-      title={
-        <Text textStyle="xs" fontWeight="640" color="fg" lineHeight="1.3">
-          {card.question}
-        </Text>
-      }
-      actions={
-        open && multi ? (
-          <Button
-            size="xs"
-            colorPalette="orange"
-            disabled={picked.size === 0}
-            onClick={() => answer({ blockId: card.blockId, optionIds: [...picked] })}
-          >
-            <Check size={12} /> Answer
-          </Button>
-        ) : undefined
-      }
+    <VStack
+      align="stretch"
+      gap={1.5}
+      opacity={superseded ? 0.65 : 1}
+      data-langy-choices-card
+      data-choices-bare={card.bare === true ? "true" : undefined}
+      data-choices-forming={forming ? "true" : undefined}
     >
+      <ChoicesQuestion card={card} />
       <VStack align="stretch" gap={1}>
         {card.options.map((option) => (
           <ChoiceOption
@@ -259,7 +331,7 @@ export function LangyChoicesCard({
             </Text>
           </HStack>
         ) : null}
-        {open && card.allowOther === true ? (
+        {open && card.allowOther === true && card.bare !== true ? (
           <OtherAnswer blockId={card.blockId} answer={answer} />
         ) : null}
         {superseded ? (
@@ -268,6 +340,18 @@ export function LangyChoicesCard({
           </Text>
         ) : null}
       </VStack>
-    </LangyDerivedCardFrame>
+      {open && multi ? (
+        <HStack gap={2} align="center" flexWrap="wrap">
+          <Button
+            size="xs"
+            colorPalette="orange"
+            disabled={picked.size === 0}
+            onClick={() => answer({ blockId: card.blockId, optionIds: [...picked] })}
+          >
+            <Check size={12} /> Answer
+          </Button>
+        </HStack>
+      ) : null}
+    </VStack>
   );
 }

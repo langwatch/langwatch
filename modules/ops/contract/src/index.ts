@@ -113,6 +113,7 @@ export { opsPlatformTrpc } from "./ops-platform.trpc.ts";
 export { opsOperatorsTrpc } from "./ops-operators.trpc.ts";
 export { opsProcessTrpc } from "./ops-process.trpc.ts";
 export { opsQueueTrpc } from "./ops-queue.trpc.ts";
+export * from "./ops-upgrade.ts";
 export * from "./ops.config.ts";
 export * from "./usage-report.ts";
 export * from "./usage-report-docs.ts";

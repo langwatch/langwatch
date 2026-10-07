@@ -11,6 +11,7 @@ import { Temporal } from "@langwatch/time";
 import type Stripe from "stripe";
 
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
+import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "../repositories/billing-webhook-subscription.repository.ts";
 import { AnnualEventsBillingThresholdService } from "./annual-events-billing-threshold.service.ts";
@@ -36,7 +37,10 @@ export type InviteApprover = {
 type BillingCheckoutCompletionOptions = {
   subscriptionRepository: BillingWebhookSubscriptionRepository;
   organizationRepository: BillingWebhookOrganizationRepository;
-  stripe: Stripe;
+  stripeSubscriptions: Pick<
+    StripeSubscriptionsChannel,
+    "getSubscription" | "updateSubscription" | "cancelSubscription"
+  >;
   itemCalculator: Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
     prices: StripePriceMap;
   };
@@ -70,13 +74,13 @@ export class BillingCheckoutCompletionService {
     this.host = options.host;
     this.announcer = options.announcer;
     this.annualThreshold = AnnualEventsBillingThresholdService.create({
-      stripe: options.stripe,
+      subscriptions: options.stripeSubscriptions,
       prices: options.itemCalculator.prices,
     });
     this.lifecycle = BillingSubscriptionLifecycleService.create({
       subscriptionRepository: options.subscriptionRepository,
       organizationRepository: options.organizationRepository,
-      stripe: options.stripe,
+      stripeSubscriptions: options.stripeSubscriptions,
       itemCalculator: options.itemCalculator,
       host: options.host,
       retention: options.retention,

@@ -130,6 +130,19 @@ export const userPasswordRotationOutcomeSchema = z.enum([
 ]);
 export type UserPasswordRotationOutcome = z.infer<typeof userPasswordRotationOutcomeSchema>;
 
+/**
+ * What adopting an unfinished account did. Each refusal leaves the account as
+ * it was: `no_account`, an address that is `already_confirmed`, or one somebody
+ * has `signed_in` to.
+ */
+export const adoptUnconfirmedAccountOutcomeSchema = z.enum([
+  "adopted",
+  "no_account",
+  "already_confirmed",
+  "signed_in",
+]);
+export type AdoptUnconfirmedAccountOutcome = z.infer<typeof adoptUnconfirmedAccountOutcomeSchema>;
+
 /** What an unlink did. `last_account` is a refusal, not a failure. */
 export const unlinkUserAccountOutcomeSchema = z.enum(["unlinked", "last_account", "not_found"]);
 export type UnlinkUserAccountOutcome = z.infer<typeof unlinkUserAccountOutcomeSchema>;

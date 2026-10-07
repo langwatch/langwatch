@@ -1,12 +1,14 @@
 # Work board for #7536: signed-off work anyone can claim
 
 Every item here is ruled and needs no question: pick one, claim it, open a PR against
-`feat/strict-feature-layout-v0`. The board in the PR description is the live claim list; this file
-holds the full outlines.
+`feat/strict-feature-layout-v0`. Issue #8493 is the work ledger and its claim board is the live list;
+this file keeps the full outlines.
 
 ## How to claim
 
-1. Comment on #7536: `claim W-xx` (one item per agent at a time).
+Claim on issue #8493 (the ledger), not on the PR. The board there is live; this file keeps the outlines.
+
+1. Comment on #8493: `claim W-xx` (or a plan slice id from the ledger; one claim per agent at a time).
 2. Branch from `feat/strict-feature-layout-v0` as `feat/w-xx-<slug>` and open a **draft** PR against
    `feat/strict-feature-layout-v0` titled `[W-xx] <title>`.
 3. Stay inside the item's paths. If the work needs a path outside them, a new peer edge, a contract
@@ -92,12 +94,6 @@ Ruling: restore `collectDefaultMetrics` (main had it; a regression); an unconfig
 404 and boot names the missing token. Paths: the process metrics setup in `packages/observability` or
 `packages/process` (find where the registry is built), a scenario in `specs/server`.
 
-### W-04 Python SDK e2e against the branch stack (S)
-
-Ruling: point the Python SDK e2e job at this branch's own stack instead of production. The regenerated
-client calls `/api/v1/prompts/tags*`, which the branch serves and main does not. Paths: the Python SDK
-workflow in `.github/workflows/`; `go run ./cmd/ciguard` must pass.
-
 ### W-05 Permission sweeps, the remaining two (M)
 
 Ruling Q133: three sweeps; the synthetic-router sweep is ported. Build (a) an `apps/api` test sweeping the
@@ -171,6 +167,16 @@ Plan: `dev/docs/plans/migrations-rethink-2026-10-06.md` §8 S2 (S1 ledger landed
 The stamp generator in the release PR; manifests backfilled since the LTS; `upgrade status` and `plan`;
 the reader the ops page uses. S3 and S4 follow (claim separately once S2 merges). Paths:
 `packages/upgrade/**`, `apps/tasks/**`, the release workflow.
+
+## Done
+
+### W-04 Python SDK e2e against the branch stack (S)
+
+Done: landed in d1bfd81a40, plus prompt-tag seeding in 24fd9354a8.
+
+Ruling: point the Python SDK e2e job at this branch's own stack instead of production. The regenerated
+client calls `/api/v1/prompts/tags*`, which the branch serves and main does not. Paths: the Python SDK
+workflow in `.github/workflows/`; `go run ./cmd/ciguard` must pass.
 
 ## Opens when its dependency lands
 

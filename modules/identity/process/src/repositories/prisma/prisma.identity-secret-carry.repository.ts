@@ -145,6 +145,19 @@ export class PrismaIdentitySecretCarryRepository implements IdentitySecretCarryR
       data: { ...toCredentialColumns(secrets), updatedAt: new Date(updatedAtMs) },
     });
   }
+
+  async deleteCredentials({
+    userId,
+    accountIds,
+  }: {
+    userId: string;
+    accountIds: readonly string[];
+  }): Promise<number> {
+    const deleted = await this.prisma.accountCredential.deleteMany({
+      where: { userId, id: { in: [...accountIds] } },
+    });
+    return deleted.count;
+  }
 }
 
 function secretsOf(account: LegacyAccountRow): IdentityAccountSecrets {

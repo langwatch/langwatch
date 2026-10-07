@@ -17,7 +17,6 @@ import type { Protections } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { TraceLogRecordReadRow } from "../../app/trace.app.ts";
-import { TestCodingAgentService } from "../../services/__tests__/support/coding-agent.service.fake.ts";
 import { TraceTranscriptReadService } from "../../services/trace-transcript-read.service.ts";
 import {
   createTranscriptApp,
@@ -31,10 +30,9 @@ const USER_PROMPT_SECRET = "acme merger memo, do not disclose";
 const ASSISTANT_REPLY_SECRET = "the board vote is 7 to 2 against";
 const TOOL_ARGS_SECRET = "SELECT * FROM salaries WHERE level > 8";
 const TOOL_OUTPUT_SECRET = "cfo total compensation 1.4 million";
-const codingAgents = new TestCodingAgentService();
 const traceTranscriptReadService = TraceTranscriptReadService.create();
 
-const { app, getSpansByTraceId, getLogsByTraceId } = createTranscriptApp(codingAgents);
+const { app, getSpansByTraceId, getLogsByTraceId } = createTranscriptApp();
 const ports = createTranscriptReadPorts();
 
 /** The project the policy is stored against, as the resolution chain reads it. */

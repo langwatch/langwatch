@@ -8,6 +8,7 @@ import type { TraceAnalyticsFoldCacheRepository } from "./trace-analytics-fold-c
 import type { TraceAnalyticsProjectionRepository } from "./trace-analytics-projection.repository.ts";
 import type { TraceAnalyticsRollupRepository } from "./trace-analytics-rollup.repository.ts";
 import type { TraceAttributeSpendRepository } from "./trace-attribute-spend.repository.ts";
+import type { TraceAttributedRollupRepository } from "./trace-attributed-rollup.repository.ts";
 import type { TraceClusteringSampleRepository } from "./trace-clustering-sample.repository.ts";
 import type { TraceDerivationSpanReaderRepository } from "./trace-derivation-span-reader.repository.ts";
 import type { TraceEditOverlayRepository } from "./trace-edit-overlay.repository.ts";
@@ -51,6 +52,8 @@ export interface TraceRepositories {
   readonly usageCount: TraceUsageCountRepository;
   readonly modelSpend: TraceModelSpendRepository;
   readonly attributeSpend: TraceAttributeSpendRepository;
+  /** Other modules' rollups over attributed traces (Q207: they read through TraceApi). */
+  readonly attributedRollup: TraceAttributedRollupRepository;
   /** The ingestion doors' duplicate claim, so an SDK's retry is not a second span. */
   readonly spanDedup: TraceSpanDedupRepository;
   /** The export door's in-flight slots. */

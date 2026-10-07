@@ -12,10 +12,12 @@ import { ABSENT_UI_COPY_TARGETS, UiCopyTargets, type UiCopyTarget } from "./copy
 import { NO_UI_DECLARATIONS, type UiDeclarations } from "./declarations.ts";
 import { UiScope, type UiActiveScope } from "./scope.ts";
 import type { UiSessionSnapshot } from "./session.ts";
+import { UiTraceFilters, type UiTraceFilterReading } from "./trace-filters.ts";
 
 /** Scope is a capability of its own; this file stays the one ports barrel. */
 export { UiScope, type UiActiveScope };
 export { ABSENT_UI_COPY_TARGETS, UiCopyTargets, type UiCopyTarget };
+export { UiTraceFilters, type UiTraceFilterReading };
 
 /** The composition never filled this port, and something asked it to work. */
 export class UiCapabilityUnavailableError extends Error {
@@ -371,6 +373,8 @@ export type UiCapabilities = {
    */
   scope?: UiScope;
   session: UiSession;
+  /** The trace filters the reader applied. Absent reads as unfiltered. */
+  traceFilters?: UiTraceFilters;
 };
 
 /** What the composing application chose to answer itself. */
@@ -392,6 +396,8 @@ export type UiCapabilityResolution = {
   scope?: UiScope;
   /** The copy targets that same live host read, over the same organization graph. */
   copyTargets?: UiCopyTargets;
+  /** The trace filters that same live host read off the address. */
+  traceFilters?: UiTraceFilters;
   /**
    * The default only a live host can build — absent for a composition
    * that declared no session source, when the refusal below is the honest answer.
@@ -411,6 +417,7 @@ export function resolveUiCapabilities({
   rpc,
   scope,
   copyTargets,
+  traceFilters,
   session,
 }: UiCapabilityResolution): UiCapabilities {
   return {
@@ -425,6 +432,7 @@ export function resolveUiCapabilities({
     rpc: install.rpc ?? rpc ?? UNAVAILABLE_UI_RPC,
     scope: install.scope ?? scope ?? UNAVAILABLE_UI_SCOPE,
     session: install.session ?? session ?? UNAVAILABLE_UI_SESSION,
+    traceFilters: install.traceFilters ?? traceFilters,
   };
 }
 
@@ -483,6 +491,7 @@ export type UiSessionCapabilities = {
   session: UiSession;
   scope: UiScope;
   copyTargets?: UiCopyTargets;
+  traceFilters?: UiTraceFilters;
 };
 
 /**
@@ -516,4 +525,9 @@ export function useUiScope(): UiScope {
 /** Where this reader could replicate a thing to; absent where no lender is installed. */
 export function useUiCopyTargets(): UiCopyTargets {
   return useOptionalUiCapabilities()?.copyTargets ?? ABSENT_UI_COPY_TARGETS;
+}
+
+/** The trace filters this reader applied; undefined where no lender is installed. */
+export function useUiTraceFilters(): UiTraceFilters | undefined {
+  return useOptionalUiCapabilities()?.traceFilters;
 }

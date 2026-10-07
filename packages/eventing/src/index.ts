@@ -15,6 +15,20 @@ export type {
   ReadHintTarget,
 } from "./pipeline/feature-eventing.ts";
 export { PipelineEventStore, type OwnEventLog } from "./stores/pipelineEventStore.ts";
+export {
+  type EventUpcast,
+  type PipelineUpcasts,
+  type UpcastDeclaration,
+  type UpcastDrain,
+  upcastStepId,
+} from "./upcast/eventUpcast.ts";
+export {
+  type ActiveUpcast,
+  activeUpcastSchema,
+  EventUpcastReader,
+  type UpcastCoverageSource,
+} from "./upcast/eventUpcastReader.ts";
+export { pipelineUpcastsOf, upcastReplayEventSource } from "./upcast/upcastReplayEventSource.ts";
 
 // Commands
 export type { Command, CommandHandler, CommandHandlerResult } from "./commands/command.ts";
@@ -126,6 +140,12 @@ export type {
   EventStoreEventReadInput,
   EventStoreReadContext,
 } from "./stores/eventStore.types.ts";
+export {
+  EVENT_READ_WINDOW_MS,
+  EventLogReadSeat,
+  eventReadWindow,
+  type EventReadSeat,
+} from "./stores/eventReadSeat.ts";
 export type {
   ProjectionStore,
   ProjectionStoreReadContext,
@@ -138,6 +158,7 @@ export type {
   EventSubscriberOptions,
   PeerSubscriberContext,
   PeerSubscriberDefinition,
+  PeerSubscriberEnqueueOptions,
 } from "./subscribers/eventSubscriber.types.ts";
 export type { SubscriberDispatchDefinition } from "./subscribers/subscriber.types.ts";
 export { throttledPerWindow, throttledWindow } from "./subscribers/throttleWindow.ts";

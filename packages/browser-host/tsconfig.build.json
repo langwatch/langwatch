@@ -47,9 +47,6 @@
   ],
   "references": [
     {
-      "path": "../../modules/agent/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/annotation/contract/tsconfig.build.json"
     },
     {
@@ -86,9 +83,6 @@
       "path": "../handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../modules/langy/contract/tsconfig.build.json"
-    },
-    {
       "path": "../module/tsconfig.build.json"
     },
     {
@@ -101,13 +95,7 @@
       "path": "../react-rum/tsconfig.build.json"
     },
     {
-      "path": "../../modules/scenario/contract/tsconfig.build.json"
-    },
-    {
       "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/trace/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/workflow/contract/tsconfig.build.json"

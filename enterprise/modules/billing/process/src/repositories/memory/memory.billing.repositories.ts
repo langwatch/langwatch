@@ -4,7 +4,6 @@ import type { BillingOrganizationCacheRepository } from "../billing-organization
 import type { BillingReportOrganizationLookup } from "../billing-report-organization.repository.ts";
 import type { BillingRepositories } from "../billing.repositories.ts";
 import { OrganizationPricingRepository } from "../organization-pricing.repository.ts";
-import { MemoryBillableEventsRepository } from "./memory.billable-events.repository.ts";
 import { MemoryBillingOrganizationRepository } from "./memory.billing-account-facts.repository.ts";
 import { MemoryBillingCheckpointRepository } from "./memory.billing-checkpoint.repository.ts";
 import { MemoryBillingReportOrganizationRepository } from "./memory.billing-report-organization.repository.ts";
@@ -65,7 +64,6 @@ export class MemoryBillingRepositories {
     const subscriptions = MemoryBillingSubscriptionRepository.create(store);
 
     return {
-      billableEvents: MemoryBillableEventsRepository.create(store),
       checkpoints: MemoryBillingCheckpointRepository.create(store),
       connectedBilling: MemoryConnectedBillingRepository.create(store),
       duplicateSubscriptionsReports: MemoryDuplicateSubscriptionsReportRepository.create(store),

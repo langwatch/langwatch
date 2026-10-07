@@ -25,7 +25,7 @@ import {
   findHiddenOriginConditions,
   type TraceFilterWhere,
 } from "../../../rules/trace-filter-hidden-origins.rules.ts";
-import { translateFilter } from "../../../rules/trace-query.rules.ts";
+import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { TraceListService } from "../../../services/trace-list-read.service.ts";
 import {
   CLICKHOUSE_FACET_CATALOG,
@@ -105,7 +105,7 @@ function compiled({
   queryText: string;
   evalRuns?: ResolvedInstantEvalRun[];
 }): TraceFilterWhere {
-  const filter = translateFilter({
+  const filter = traceQueryTranslation.translateFilter({
     queryText,
     tenantId,
     timeRange,
@@ -399,7 +399,9 @@ async function sidebarCounts({
     timeRange,
     filterFor: createFacetFilterResolver({
       queryText: query,
-      compile: (text) => translateFilter({ queryText: text, tenantId, timeRange }) ?? undefined,
+      compile: (text) =>
+        traceQueryTranslation.translateFilter({ queryText: text, tenantId, timeRange }) ??
+        undefined,
       hide: explorerOriginExclusion({ hiddenOrigins: explorerHiddenOrigins(query) }),
     }),
   });

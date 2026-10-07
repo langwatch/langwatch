@@ -1,5 +1,6 @@
 import type { Instant } from "@langwatch/time";
 import type {
+  AdoptUnconfirmedAccountOutcome,
   CreateUserInput,
   CreateCredentialUserInput,
   CreatePasskeyUserInput,
@@ -54,6 +55,11 @@ export interface UserRepository {
   createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;
   hasPassword(id: string): Promise<boolean>;
   setFirstPassword(input: SetFirstUserPasswordRow): Promise<SetFirstUserPasswordResult>;
+  /**
+   * Confirms an unfinished account and drops every account row and passkey it holds, as ONE
+   * serializable transaction; refuses, changing nothing, once it is confirmed or signed into.
+   */
+  adoptUnconfirmed(input: { id: string }): Promise<AdoptUnconfirmedAccountOutcome>;
   findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus>;
   setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Instant }): Promise<void>;
   findJoinOfferDismissedDomains(id: string): Promise<string[]>;

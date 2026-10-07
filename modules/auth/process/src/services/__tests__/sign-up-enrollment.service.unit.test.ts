@@ -211,4 +211,45 @@ describe("SignUpEnrollmentService", () => {
       expect(asked.takenFor).toEqual(["sam@example.com"]);
     });
   });
+  describe("when a passkey ceremony asks whether the address still enrols here", () => {
+    const ROUTED: RoutingDecision = {
+      outcome: "redirect_to_connection",
+      connectionId: "conn_acme",
+      methodSet: [OKTA],
+      reasonCode: "domain_routed",
+    };
+
+    /** @scenario "An address that gained a single sign-on route after its proof is refused without spending anything" */
+    it("answers no for an address its organization's connection now governs", async () => {
+      const { service, asked } = enrollment({ decision: ROUTED, proofHolds: false });
+
+      await expect(
+        service.enrolsLocally({ email: "sam@acme.com", method: "passkey" }),
+      ).resolves.toBe(false);
+      expect(asked.policyFor).toEqual([]);
+    });
+
+    it("answers no where the offered methods hold no passkey", async () => {
+      const { service } = enrollment({ decision: UNKNOWN, defaults: [PASSWORD] });
+
+      await expect(
+        service.enrolsLocally({ email: "sam@example.com", method: "passkey" }),
+      ).resolves.toBe(false);
+    });
+
+    it("answers yes for a new address offered a passkey, leaving a taken one to the caller", async () => {
+      await expect(
+        enrollment({ decision: UNKNOWN }).service.enrolsLocally({
+          email: "sam@example.com",
+          method: "passkey",
+        }),
+      ).resolves.toBe(true);
+      await expect(
+        enrollment({ decision: UNKNOWN, taken: true }).service.enrolsLocally({
+          email: "sam@example.com",
+          method: "passkey",
+        }),
+      ).resolves.toBe(true);
+    });
+  });
 });

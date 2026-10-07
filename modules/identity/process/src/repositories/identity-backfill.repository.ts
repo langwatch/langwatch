@@ -7,6 +7,8 @@ export interface BackfillUserRow {
   emailVerified: boolean;
   createdAtMs: number;
   userHashKey: string | null;
+  /** Null for an account never signed into: with `emailVerified`, the unproven test. */
+  lastLoginAtMs: number | null;
 }
 
 /** A legacy `Account` row: one sign-in method the user already holds. */

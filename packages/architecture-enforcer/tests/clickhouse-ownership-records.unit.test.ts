@@ -1,0 +1,204 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+
+import { afterEach, describe, expect, it } from "vitest";
+
+import {
+  collectClickhouseOwnershipFindings,
+  DECLARED_OWNERSHIP,
+  type DeclaredOwnership,
+} from "../src/policies/persistence/clickhouse-table-ownership.ts";
+import type { FeatureCatalogueEntry } from "../src/types.ts";
+
+/**
+ * @see packages/architecture-enforcer/specs/clickhouse-ownership-records.feature
+ */
+
+const roots: string[] = [];
+
+const CATALOGUE: FeatureCatalogueEntry[] = [
+  { id: "trace", root: "modules/trace", classification: "core", subjects: ["trace"] },
+  {
+    id: "instant-eval",
+    root: "modules/instant-eval",
+    classification: "core",
+    subjects: ["instant-eval"],
+  },
+];
+
+const SUBQUERY_FILE = "modules/trace/process/src/rules/trace-query-subquery.rules.ts";
+
+const DECLARED: DeclaredOwnership = {
+  records: [
+    {
+      table: "event_log",
+      owner: "framework",
+      writer: "packages/eventing",
+      reason: "the event store",
+    },
+    { table: "stored_objects", owner: "legacy", writer: "none", reason: "read-only index" },
+  ],
+  exceptions: [
+    {
+      reader: "trace",
+      table: "instant_eval_judgments",
+      file: SUBQUERY_FILE,
+      reason: "one statement",
+    },
+  ],
+};
+
+function create(table: string): string {
+  return `-- +goose Up\nCREATE TABLE IF NOT EXISTS \${CLICKHOUSE_DATABASE}.${table} (TenantId String) ENGINE = MergeTree;\n`;
+}
+
+function writer(table: string): string {
+  return `export async function store(client: { insert: (options: unknown) => Promise<void> }) {
+  await client.insert({ table: "${table}", values: [], format: "JSONEachRow" });
+}
+`;
+}
+
+function reader(table: string): string {
+  return `export function query(): string {
+  return \`SELECT TenantId FROM ${table} WHERE TenantId = {tenantId:String}\`;
+}
+`;
+}
+
+function fixture(declared: DeclaredOwnership = DECLARED) {
+  const root = mkdtempSync(join(tmpdir(), "clickhouse-records-"));
+  roots.push(root);
+  const write = (file: string, content: string) => {
+    const path = join(root, file);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, content);
+  };
+  write("packages/clickhouse-migrations/migrations/00001_event_log.sql", create("event_log"));
+  write(
+    "packages/clickhouse-migrations/migrations/00002_stored_objects.sql",
+    create("stored_objects"),
+  );
+  write(
+    "packages/clickhouse-migrations/migrations/00003_judgments.sql",
+    create("instant_eval_judgments"),
+  );
+  write(
+    "modules/instant-eval/process/src/repositories/clickhouse/clickhouse.judgments.repository.ts",
+    writer("instant_eval_judgments"),
+  );
+  write(SUBQUERY_FILE, reader("instant_eval_judgments"));
+
+  return {
+    write,
+    messages: () =>
+      collectClickhouseOwnershipFindings(root, CATALOGUE, declared).map((item) => item.message),
+  };
+}
+
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
+
+describe("ClickHouse ownership records", () => {
+  describe("given tables no module writes", () => {
+    /** @scenario "A table recorded as framework owned is not an ownerless table" */
+    it("reports no ownerless event_log once it is recorded", () => {
+      expect(fixture().messages()).not.toContain("Table event_log has no module owner.");
+      expect(fixture({ ...DECLARED, records: [] }).messages()).toContain(
+        "Table event_log has no module owner.",
+      );
+    });
+
+    /** @scenario "A table recorded as legacy owned is not an ownerless table" */
+    it("reports no ownerless stored_objects once it is recorded", () => {
+      expect(fixture().messages()).not.toContain("Table stored_objects has no module owner.");
+    });
+  });
+
+  describe("given a module writes a recorded table", () => {
+    /** @scenario "A module writing a recorded table is reported" */
+    it("reports the module, the record and its reason", () => {
+      const world = fixture();
+      world.write(
+        "modules/trace/process/src/repositories/clickhouse/clickhouse.events.repository.ts",
+        writer("event_log"),
+      );
+
+      expect(world.messages()).toContain(
+        "trace writes event_log, recorded as framework owned (packages/eventing: the event store).",
+      );
+    });
+  });
+
+  describe("given a record naming a table no migration creates", () => {
+    /** @scenario "A record naming a table no migration creates is reported" */
+    it("reports the stale record", () => {
+      const declared: DeclaredOwnership = {
+        ...DECLARED,
+        records: [
+          ...DECLARED.records,
+          { table: "gone", owner: "legacy", writer: "none", reason: "x" },
+        ],
+      };
+
+      expect(fixture(declared).messages()).toContain(
+        "Table gone is recorded as legacy owned but no migration creates it. Delete the record.",
+      );
+    });
+  });
+
+  describe("given trace reads another module's table inside one statement", () => {
+    /** @scenario "A declared one-statement subquery passes" */
+    it("reports nothing for the declared reader, table and file", () => {
+      expect(fixture().messages()).toEqual([]);
+    });
+
+    /** @scenario "An undeclared foreign read still fails" */
+    it("reports the same read from a file the exception does not name", () => {
+      const world = fixture();
+      world.write(
+        "modules/trace/process/src/repositories/clickhouse/clickhouse.other.repository.ts",
+        reader("instant_eval_judgments"),
+      );
+
+      expect(world.messages()).toEqual([
+        "trace reads instant_eval_judgments, owned by instant-eval.",
+      ]);
+    });
+
+    /** @scenario "A named exception matching no read is reported" */
+    it("reports an exception the tree no longer needs", () => {
+      const declared: DeclaredOwnership = {
+        ...DECLARED,
+        exceptions: [
+          ...DECLARED.exceptions,
+          { reader: "trace", table: "stored_objects", file: "modules/trace/x.ts", reason: "x" },
+        ],
+      };
+
+      expect(fixture(declared).messages()).toEqual([
+        "The named exception for trace reading stored_objects in modules/trace/x.ts matches no read. Delete it.",
+      ]);
+    });
+  });
+
+  describe("given the declared records and exceptions", () => {
+    /** @scenario "Every record and named exception carries a reason" */
+    it("gives each one a reason", () => {
+      const entries = [...DECLARED_OWNERSHIP.records, ...DECLARED_OWNERSHIP.exceptions];
+
+      expect(entries.filter((entry) => entry.reason.trim() === "")).toEqual([]);
+      expect(DECLARED_OWNERSHIP.records.map((record) => record.table)).toEqual([
+        "event_log",
+        "stored_log_records",
+        "stored_metric_records",
+        "stored_objects",
+        "automation_audit",
+        "langy_messages",
+      ]);
+      expect(DECLARED_OWNERSHIP.exceptions).toHaveLength(5);
+    });
+  });
+});

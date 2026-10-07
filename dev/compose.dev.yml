@@ -272,8 +272,8 @@ services:
   # =============================================================================
   # API (tRPC + REST + SSE — mounted for hot reload)
   # =============================================================================
-  # It owns the schema: both stores are migrated here, once, before the process
-  # starts. The ui lane waits on this service, so a browser never loads the SPA
+  # The upgrade runs here (`start:prepare:db`: `pnpm task upgrade`, then the
+  # system-migrations pass), once, before the process starts. The ui lane waits on this service, so a browser never loads the SPA
   # against a half-migrated database.
 
   api:
@@ -305,8 +305,7 @@ services:
       sh -c "
         export PATH=/opt/goose-bin:$$PATH &&
         corepack enable &&
-        pnpm --filter @langwatch/prisma-client exec prisma migrate deploy &&
-        (cd /apps/tasks && pnpm run task clickhouse-migrate) &&
+        pnpm --silent run start:prepare:db &&
         pnpm run dev
       "
     ports:

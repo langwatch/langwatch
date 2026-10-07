@@ -1,9 +1,8 @@
-/** Workflow's clamped text, as workflow lends it (ARCHITECTURE.md §3.4, rule 7). */
+/** Workflow's clamped text, as workflow lends it by token (ARCHITECTURE.md §10.1). */
 
-import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
-import type { UiHoverableBigTextProps } from "@langwatch/browser-host/declarations";
+import { Lent } from "@langwatch/browser-host/lent";
 import { Box, type BoxProps } from "@langwatch/design-system/primitives";
-import { lazy, Suspense, useMemo } from "react";
+import { HoverableBigTextToken, type HoverableBigTextProps } from "@langwatch/workflow-client";
 
 /** The lent text in a box carrying this screen's type and width; plain text until it loads. */
 export function HoverableBigText({
@@ -12,26 +11,14 @@ export function HoverableBigText({
   expandedVersion,
   expandable,
   ...boxProps
-}: UiHoverableBigTextProps & Omit<BoxProps, keyof UiHoverableBigTextProps>) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("hoverableBigText")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  const lentProps = { lineClamp, expandedVersion, expandable };
+}: HoverableBigTextProps & Omit<BoxProps, keyof HoverableBigTextProps>) {
   return (
     <Box {...boxProps}>
-      {lent.length === 0
-        ? children
-        : lent.map(({ key, Lent }) => (
-            <Suspense key={key} fallback={children}>
-              <Lent {...lentProps}>{children}</Lent>
-            </Suspense>
-          ))}
+      <Lent
+        of={HoverableBigTextToken}
+        props={{ children, lineClamp, expandedVersion, expandable }}
+        fallback={children}
+      />
     </Box>
   );
 }

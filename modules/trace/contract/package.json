@@ -18,6 +18,10 @@
       "types": "./dist/conversation/index.d.ts",
       "default": "./src/conversation/index.ts"
     },
+    "./otlp-decoding": {
+      "types": "./dist/otlp-decoding/index.d.ts",
+      "default": "./src/otlp-decoding/index.ts"
+    },
     "./transcript": {
       "types": "./dist/transcript/index.d.ts",
       "default": "./src/transcript/index.ts"
@@ -34,11 +38,13 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/instant-eval-contract": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/otlp": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@opentelemetry/core": "catalog:",
     "@opentelemetry/otlp-transformer": "catalog:",
     "liqe": "catalog:",
     "ohm-js": "^17.5.0",

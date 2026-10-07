@@ -26,14 +26,14 @@ export interface SessionGroupsResult {
 }
 
 /**
- * Server page ceiling of `traces.sessions`, mirrored by the pagination chrome while
+ * Server page ceiling of `codingAgents.sessionGroups`, mirrored by the pagination chrome while
  * this lens is active so the range copy and the offered page sizes never claim more
  * rows than a page can hold.
  */
 export const SESSIONS_MAX_PAGE_SIZE = 100;
 
 /**
- * The `traces.sessions` input for the current lens state. Sorts the server
+ * The `codingAgents.sessionGroups` input for the current lens state. Sorts the server
  * does not understand are dropped rather than sent, so the read falls back to
  * its default order instead of erroring.
  */
@@ -78,7 +78,7 @@ const settledResult = (groups: ConversationGroup[]): SessionGroupsResult => ({
   error: null,
 });
 
-/** Sort dimensions `traces.sessions` understands (see SessionGroupsService). */
+/** Sort dimensions `codingAgents.sessionGroups` understands (see SessionGroupsService). */
 const SERVER_SORTABLE = new Set(["started", "lastTurn", "duration", "cost", "tokens", "turns"]);
 
 /**
@@ -125,7 +125,7 @@ export function useSessionGroups(): SessionGroupsResult {
     if (isActive && page > 1 && sessionCursor === undefined) setPage(1);
   }, [isActive, page, sessionCursor, setPage]);
 
-  const query = api.traces.sessions.useQuery(
+  const query = api.codingAgents.sessionGroups.useQuery(
     sessionsQueryInput({
       projectId: project?.id ?? "",
       timeRange,

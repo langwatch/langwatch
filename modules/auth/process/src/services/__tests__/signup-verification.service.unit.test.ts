@@ -1,7 +1,11 @@
 import type { RoutingDecision } from "@langwatch/identity-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
-import type { UserApi, UserProfile } from "@langwatch/user-contract";
+import type {
+  AdoptUnconfirmedAccountOutcome,
+  UserApi,
+  UserProfile,
+} from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemorySignUpVerificationMailChannel } from "../../channels/memory/memory.sign-up-verification-mail.channel.ts";
@@ -52,9 +56,12 @@ function makeService({
   budgetAllowed = true,
   emailUnconfigured = false,
   signUpRefused = false,
+  adoption = "adopted",
   mailer,
 }: {
   holder?: UserProfile | null;
+  /** What user's adoption answers for the account the address holds. */
+  adoption?: AdoptUnconfirmedAccountOutcome;
   decision?: RoutingDecision;
   budgetAllowed?: boolean;
   emailUnconfigured?: boolean;
@@ -65,6 +72,7 @@ function makeService({
   const mail = MemorySignUpVerificationMailChannel.create();
   const budgets: string[] = [];
   const lookups: string[] = [];
+  const adoptions: string[] = [];
   let clock = NOW;
   let minted = 0;
   let current = holder;
@@ -77,6 +85,10 @@ function makeService({
       findByEmail: async ({ email }) => {
         lookups.push(email);
         return current;
+      },
+      adoptUnconfirmedAccount: async ({ email }) => {
+        adoptions.push(email);
+        return adoption;
       },
     }),
     route: async () => decision,
@@ -101,6 +113,7 @@ function makeService({
     mail,
     budgets,
     lookups,
+    adoptions,
     advance: (milliseconds: number) => {
       clock = clock.add({ milliseconds });
     },
@@ -232,16 +245,52 @@ describe("given a sign-up address to confirm", () => {
     });
   });
 
-  describe("when the address gained an account before the link came back", () => {
-    /** @scenario "A confirmation link never opens an account it did not create" */
-    it("refuses rather than adopting the account", async () => {
+  describe("when the address holds an unfinished account", () => {
+    /** @scenario "A confirmation link adopts an unfinished account on its address" */
+    it("adopts it and answers an existing account for the door to sign in, with no proof", async () => {
       const harness = makeService();
+      await harness.service.requestVerification({ email: "sam@acme.com" });
+      harness.hold(account({ emailVerified: false }));
+
+      await expect(harness.service.completeVerification({ token: "token-1" })).resolves.toEqual({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: true,
+        addressProof: null,
+        freshClaim: true,
+      });
+      expect(harness.adoptions).toEqual(["sam@acme.com"]);
+    });
+  });
+
+  describe.each(["already_confirmed", "signed_in", "no_account"] as const)(
+    "when user refuses to adopt the account as %s",
+    (adoption) => {
+      /** @scenario "A confirmation link never opens an account it cannot adopt" */
+      it("refuses the way a dead link is, and hands out no proof", async () => {
+        const harness = makeService({ adoption });
+        await harness.service.requestVerification({ email: "sam@acme.com" });
+        harness.hold(account({ emailVerified: adoption === "already_confirmed" }));
+
+        await expect(
+          harness.service.completeVerification({ token: "token-1" }),
+        ).rejects.toMatchObject({ code: "identity_verification_expired" });
+        expect(harness.memory.verificationTokens.has("token-2")).toBe(false);
+      });
+    },
+  );
+
+  describe("when the unfinished account's address now routes to its organization", () => {
+    /** @scenario "A confirmation link never adopts an account its organization's sign-in owns" */
+    it("refuses the way a dead link is and never asks user to adopt", async () => {
+      const harness = makeService({ decision: DOMAIN_DECISION });
       await harness.service.requestVerification({ email: "sam@acme.com" });
       harness.hold(account({ emailVerified: false }));
 
       await expect(
         harness.service.completeVerification({ token: "token-1" }),
       ).rejects.toMatchObject({ code: "identity_verification_expired" });
+      expect(harness.adoptions).toEqual([]);
     });
   });
 

@@ -288,6 +288,7 @@ export const suiteRunResultSchema = z.object({
   // strips both from the body the caller was answered with on main.
   planName: z.string().optional(),
   created: z.boolean().optional(),
+  planSlug: z.string(),
 });
 
 export const suiteAliasIdParamsSchema = z.object({ id: z.string().min(1) });

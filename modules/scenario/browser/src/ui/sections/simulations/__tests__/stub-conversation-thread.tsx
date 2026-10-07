@@ -3,7 +3,7 @@
  * and this module's own media, audio playback and turn separators drawn as
  * handed in. How trace draws each part is covered by trace's own suite.
  */
-import type { UiConversationThreadProps } from "@langwatch/browser-host/declarations";
+import type { ConversationThreadProps } from "@langwatch/trace-client";
 import { type DisplayPart, groupIntoTurns } from "@langwatch/trace-contract/conversation";
 
 export function StubConversationThread({
@@ -14,7 +14,7 @@ export function StubConversationThread({
   renderMediaPart,
   renderTurnSeparator,
   audioPlaybackFor,
-}: UiConversationThreadProps) {
+}: ConversationThreadProps) {
   const drawPart = (part: DisplayPart) => {
     if (part.kind === "media") {
       return (

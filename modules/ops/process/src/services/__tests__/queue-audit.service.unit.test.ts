@@ -6,9 +6,12 @@ import type {
 } from "@langwatch/audit-log-contract";
 import { describe, expect, it } from "vitest";
 
-import { PrismaProcessAuditRepository } from "../../repositories/prisma/prisma.process-audit.repository.ts";
-import { PrismaSchedulerAuditRepository } from "../../repositories/prisma/prisma.scheduler-audit.repository.ts";
+import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
+import { MemoryProcessAuditRepository } from "../../repositories/memory/memory.process-audit.repository.ts";
+import { MemorySchedulerAuditRepository } from "../../repositories/memory/memory.scheduler-audit.repository.ts";
+import { ProcessAuditService } from "../process-audit.service.ts";
 import { QueueAuditService } from "../queue-audit.service.ts";
+import { SchedulerAuditService } from "../scheduler-audit.service.ts";
 
 class RecordingAuditLog implements AuditLogApi {
   readonly commands: RecordAuditLogCommand[] = [];
@@ -31,27 +34,12 @@ class RecordingAuditLog implements AuditLogApi {
   }
 }
 
-/** A client that fails every call, so a write reaching Prisma is a failure. */
-const refusingPrisma = new Proxy(
-  {},
-  {
-    get: () =>
-      new Proxy(
-        {},
-        {
-          get:
-            () =>
-            (...args: unknown[]) => {
-              throw new Error(`an operator write reached the audit table: ${JSON.stringify(args)}`);
-            },
-        },
-      ),
-  },
-) as never;
-
 describe("given the operator surfaces record through the audit-log port", () => {
   describe("when an operator drains a queue, wakes a process and runs a schedule", () => {
-    /** @scenario "Operator actions reach the audit log through its port" */
+    /**
+     * @scenario "Operator actions reach the audit log through its port"
+     * @scenario "Process and scheduler operator acts are recorded through the audit log"
+     */
     it("records each act on the port with its target and metadata", async () => {
       const auditLog = new RecordingAuditLog();
 
@@ -61,7 +49,11 @@ describe("given the operator surfaces record through the audit-log port", () => 
         queueName: "trace-ingest",
         metadata: { group: "project-1" },
       });
-      await PrismaProcessAuditRepository.create({ prisma: refusingPrisma, auditLog }).append({
+      const store = MemoryOpsStore.create();
+      await ProcessAuditService.create({
+        auditLog,
+        history: MemoryProcessAuditRepository.create({ store }),
+      }).append({
         actorUserId: "user-1",
         action: "process_wake_now",
         processName: "gateway_debits",
@@ -69,9 +61,9 @@ describe("given the operator surfaces record through the audit-log port", () => 
         processKey: "healthy",
         metadata: { previousWakeAt: 17 },
       });
-      await PrismaSchedulerAuditRepository.create({
-        database: refusingPrisma,
+      await SchedulerAuditService.create({
         auditLog,
+        history: MemorySchedulerAuditRepository.create({ store }),
       }).append({
         actorUserId: "user-1",
         action: "ops.scheduler.run_now",
@@ -103,6 +95,35 @@ describe("given the operator surfaces record through the audit-log port", () => 
           targetKind: "scheduled_job",
           targetId: "schedule-1",
           metadata: { slot: null },
+        },
+      ]);
+    });
+  });
+
+  describe("when an operator redrives a whole fleet's dead letters", () => {
+    /** @scenario "Process and scheduler operator acts are recorded through the audit log" */
+    it("names the fleet rather than a made-up instance and leaves the project out", async () => {
+      const auditLog = new RecordingAuditLog();
+
+      await ProcessAuditService.create({
+        auditLog,
+        history: MemoryProcessAuditRepository.create({ store: MemoryOpsStore.create() }),
+      }).append({
+        actorUserId: "user-1",
+        action: "process_redrive_dead_letters",
+        processName: "gateway_debits",
+        projectId: null,
+        processKey: null,
+        metadata: { moved: 12 },
+      });
+
+      expect(auditLog.commands).toEqual([
+        {
+          userId: "user-1",
+          action: "process_redrive_dead_letters",
+          targetKind: "process_instance",
+          targetId: "fleet",
+          metadata: { moved: 12 },
         },
       ]);
     });

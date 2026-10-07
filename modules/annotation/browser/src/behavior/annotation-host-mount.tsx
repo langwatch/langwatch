@@ -7,10 +7,12 @@
 import {
   useUiCapabilities,
   useUiScope,
+  useUiTraceFilters,
   type UiFeedback,
   type UiNavigation,
   type UiRoute,
   type UiSession,
+  type UiTraceFilters,
 } from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useMemo, type ReactNode } from "react";
@@ -23,6 +25,7 @@ import {
   type AnnotationHostUser,
   type AnnotationRouteReading,
   type AnnotationSuccessNotice,
+  type AnnotationTraceFilters,
 } from "../model/annotation-host.ts";
 import { isOwnPersonalWorkspace } from "../model/annotation-personal-workspace.ts";
 import { annotationApi } from "./annotation-api.ts";
@@ -38,6 +41,8 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
       navigation: UiNavigation;
       route: UiRoute;
       feedback: UiFeedback;
+      /** Undefined where no module lent it: no filters applied. */
+      traceFilters: UiTraceFilters | undefined;
       drawers: {
         openDrawer: (drawer: string, props?: Record<string, unknown>) => void;
         drawerOpen: (drawer: string) => boolean;
@@ -79,6 +84,11 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
     return { params: reading.params, query: reading.query };
   }
 
+  /** What analytics lends through the shell; undefined while nothing narrows the read. */
+  traceFilters(): AnnotationTraceFilters | undefined {
+    return this.deps.traceFilters?.applied();
+  }
+
   setQuery(
     next: Readonly<Record<string, string | undefined>>,
     options?: { replace?: boolean },
@@ -118,6 +128,7 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
 export default function AnnotationHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
   const uiScope = useUiScope();
+  const traceFilters = useUiTraceFilters();
   const { organizationId } = uiScope.activeScope();
   const scopeHost = uiScope.scopeHost();
   const hostProject = scopeHost?.project();
@@ -144,6 +155,7 @@ export default function AnnotationHostMount({ children }: { children?: ReactNode
         navigation,
         route,
         feedback,
+        traceFilters,
         drawers: { openDrawer, drawerOpen },
       }),
     [
@@ -155,6 +167,7 @@ export default function AnnotationHostMount({ children }: { children?: ReactNode
       navigation,
       route,
       feedback,
+      traceFilters,
       openDrawer,
       drawerOpen,
     ],

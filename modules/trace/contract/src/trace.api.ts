@@ -15,6 +15,8 @@ import type {
   ClassifyClaudeCallResult,
   CanonicalizeLogRecordInput,
   CanonicalizeLogRecordResult,
+  CanonicalizeSpanAttributesInput,
+  CanonicalizeSpanAttributesResult,
   DeriveClaudeResponseContentInput,
   DeriveClaudeResponseContentResult,
 } from "./trace-canonicalisation.ts";
@@ -38,14 +40,23 @@ import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { DiscoverResult, FacetValuesResult, TraceListPage } from "./trace-list-view.ts";
 import type { LogTraceContribution } from "./trace-log-contribution.ts";
 import type {
+  TraceAttributedRecency,
+  TraceAttributedSpendComparison,
+  TraceAttributedSpendSort,
   TraceAttributedTrace,
+  TraceAttributedTraceDetail,
+  TraceAttributedValueComparison,
+  TraceAttributedValueSpend,
   TraceAttributeMatch,
   TraceAttributeUsageBucket,
   TraceAttributeValueSpend,
+  TraceDailyGroupSpend,
   TraceDailySpend,
+  TraceDailySpendGroup,
   TraceModelRequests,
   TraceModelSpend,
   TraceModelSpendWindow,
+  TraceProjectValueSpend,
   TraceSpendSummary,
 } from "./trace-model-spend.ts";
 import type { CheckPreconditions } from "./trace-precondition.schemas.ts";
@@ -100,9 +111,14 @@ import type {
   TraceDerivedEventsInput,
   TraceSummaryLookupInput,
 } from "./trace.queries.ts";
-import type { DerivedTraceEvent, TracesConversationContext } from "./trace.responses.ts";
+import type {
+  DerivedTraceEvent,
+  TracesConversationContext,
+  TracesSessionsPage,
+} from "./trace.responses.ts";
 import type { NormalizedSpan } from "./trace.spans.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
+import type { TraceSessionGroupsInput } from "./traces.trpc.ts";
 
 /** A reviewer correction target owned by Trace, shared structurally with Annotation. */
 export type TraceSuggestionTarget =
@@ -211,6 +227,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
       scrollId?: string | null;
       /** The v1 REST search's compiled query-language filter, ANDed into the read. */
       filterWhere?: { sql: string; params: Record<string, unknown> };
+      /** Refuse above this plan bound instead of clamping to the list bound. */
+      refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
     };
   }): Promise<TracesForProjectResult>;
   /**
@@ -524,6 +542,70 @@ export interface TraceApi extends TraceOtlpIngestApi {
     model?: string;
     limit: number;
   }): Promise<TraceAttributedTrace[]>;
+  /** Current and previous window spend of the traces matching every attribute; distinct actors. */
+  getAttributedSpendComparison(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    actorKey: string;
+    previousStartMs: number;
+    currentStartMs: number;
+    endMs: number;
+  }): Promise<TraceAttributedSpendComparison>;
+  /** Spend per non-empty `valueKey` value of the matching traces, sorted and paged in the store. */
+  findAttributedSpendByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    window: TraceModelSpendWindow;
+    sortBy: TraceAttributedSpendSort;
+    sortDirection: "asc" | "desc";
+    limit: number;
+    offset: number;
+  }): Promise<TraceAttributedValueSpend[]>;
+  /** Per non-empty `valueKey` value, spend split at `currentStartMs`; unsorted. */
+  findAttributedSpendComparisonByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    previousStartMs: number;
+    currentStartMs: number;
+    endMs: number;
+  }): Promise<TraceAttributedValueComparison[]>;
+  /** Spend per (project, `valueKey` value) across one organisation's projects; unsorted. */
+  findSpendByProjectAndValue(input: {
+    projectIds: readonly string[];
+    valueKey: string;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceProjectValueSpend[]>;
+  /** Spend of the matching traces per UTC day and group value, oldest day first. */
+  findDailyAttributedSpend(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    groupBy: TraceDailySpendGroup;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceDailyGroupSpend[]>;
+  /** Matching traces since `sinceMs`, counted per `valueKey` value among `values`. */
+  countAttributedTracesByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    values: readonly string[];
+    sinceMs: number;
+  }): Promise<{ value: string; count: number }[]>;
+  /** The newest matching traces before `beforeMs`, at most `limit`, with the asked attributes. */
+  findAttributedTracesBefore(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    attributeKeys: readonly string[];
+    beforeMs: number;
+    limit: number;
+  }): Promise<TraceAttributedTraceDetail[]>;
+  /** Matching trace counts since each of `countSinceMs`, and their newest occurrence ever. */
+  getAttributedTraceRecency(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    countSinceMs: readonly number[];
+  }): Promise<TraceAttributedRecency>;
   readRecentSpansByModels(input: {
     projectId: string;
     models: string[];
@@ -620,7 +702,13 @@ export interface TraceApi extends TraceOtlpIngestApi {
     filterWhere?: { sql: string; params: Record<string, unknown> };
     visibilityCutoffMs?: number | null;
   }): Promise<TraceListPage>;
-  readSessionGroups(params: unknown): Promise<unknown>;
+  /**
+   * One page of the Sessions lens through the viewer's protections: content redacted and spend
+   * gated, with `codingAgent` left null for coding-agent, which serves the lens, to fill and gate.
+   */
+  readSessionGroups(
+    input: TraceSessionGroupsInput & { protections: Protections },
+  ): Promise<TracesSessionsPage>;
   /**
    * The sidebar's facets under the active query: descriptors counted in the
    * window the list reads, each facet exempt from its own terms (ADR-139).
@@ -783,6 +871,10 @@ export interface TraceApi extends TraceOtlpIngestApi {
   ): DeriveClaudeResponseContentResult;
   /** Lifts a log record's attributes into Trace's canonical names. */
   canonicalizeLogRecord(input: CanonicalizeLogRecordInput): CanonicalizeLogRecordResult;
+  /** Lifts a decoded span's attributes and events into Trace's canonical names, as ingest does. */
+  canonicalizeSpanAttributes(
+    input: CanonicalizeSpanAttributesInput,
+  ): CanonicalizeSpanAttributesResult;
   /** A log record's input and output, each cut to Trace's 64 KiB projection preview. */
   extractLogRecordIO(input: LogRecordReceivedEventData): {
     input: string | null;

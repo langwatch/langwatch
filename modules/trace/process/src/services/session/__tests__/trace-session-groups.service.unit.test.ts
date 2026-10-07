@@ -1,9 +1,3 @@
-import {
-  type CodingAgentSession,
-  type CodingAgentTracePullRequestLink,
-  type CodingAgentApi,
-} from "@langwatch/coding-agent-contract";
-import { codingAgentSessionFixture } from "@langwatch/coding-agent-contract/testing";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -13,118 +7,12 @@ import type {
 } from "../../../repositories/session-groups.repository.ts";
 /**
  * @see specs/traces-v2/sessions-lens.feature
- * Sessions lens service: cursor codec, DTO mapping, and the coding-agent enrichment overlay.
+ * Sessions lens service: cursor codec and DTO mapping; coding-agent enriches the page it serves.
  */
-import { teaserOf } from "../../../rules/trace-visibility-teaser.rules.ts";
 import {
   SessionGroupsService as TraceSessionGroupsCursorService,
   SessionGroupsService,
 } from "../../trace-session-groups.service.ts";
-
-/** Records the coding-agent lookups and rejects unexpected peer calls. */
-class TestCodingAgentApi {
-  static create(): TestCodingAgentApi {
-    return new TestCodingAgentApi();
-  }
-
-  readonly sessionsById = new Map<string, CodingAgentSession | null>();
-  readonly sessionLookupInputs: { projectId: string; sessionId: string }[] = [];
-  tracePullRequestLinks: CodingAgentTracePullRequestLink[] = [];
-  readonly tracePullRequestInputs: unknown[] = [];
-
-  findBySessionId(input: {
-    projectId: string;
-    sessionId: string;
-  }): Promise<CodingAgentSession | null> {
-    this.sessionLookupInputs.push(input);
-    return Promise.resolve(this.sessionsById.get(input.sessionId) ?? null);
-  }
-
-  linkTraceSessionsToPullRequests(input: unknown): Promise<CodingAgentTracePullRequestLink[]> {
-    this.tracePullRequestInputs.push(input);
-    return Promise.resolve(this.tracePullRequestLinks);
-  }
-
-  readSessionEventsPage(): never {
-    throw new Error("Not used by session group tests: readSessionEventsPage.");
-  }
-
-  findSessionForTrace(): never {
-    throw new Error("Not used by session group tests: findSessionForTrace.");
-  }
-
-  readTranscriptForViewer(): never {
-    throw new Error("Not used by session group tests: readTranscriptForViewer.");
-  }
-
-  recordPullRequestUsageRead(): never {
-    throw new Error("Not used by session group tests: recordPullRequestUsageRead.");
-  }
-
-  contributeSpanFacts(): never {
-    throw new Error("Not used by session group tests: contributeSpanFacts.");
-  }
-
-  contributeReceivedSpan(): never {
-    throw new Error("Not used by session group tests: contributeReceivedSpan.");
-  }
-
-  getSessionEvents(): never {
-    throw new Error("Not used by session group tests: getSessionEvents.");
-  }
-
-  getUsageTotals(): never {
-    throw new Error("Not used by session group tests: getUsageTotals.");
-  }
-
-  listRecent(): never {
-    throw new Error("Not used by session group tests: listRecent.");
-  }
-
-  backfillPullRequestMappings(): never {
-    throw new Error("Not used by session group tests: backfillPullRequestMappings.");
-  }
-
-  listForProject(): never {
-    throw new Error("Not used by session group tests: listForProject.");
-  }
-
-  githubWebBase(): never {
-    throw new Error("Not used by session group tests: githubWebBase.");
-  }
-
-  findOrganizationForProject(): never {
-    throw new Error("Not used by session group tests: findOrganizationForProject.");
-  }
-
-  getPullRequestUsage(): never {
-    throw new Error("Not used by session group tests: getPullRequestUsage.");
-  }
-
-  getOrganizationPullRequestUsage(): never {
-    throw new Error("Not used by session group tests: getOrganizationPullRequestUsage.");
-  }
-
-  getPullRequestDetail(): never {
-    throw new Error("Not used by session group tests: getPullRequestDetail.");
-  }
-
-  getPersonalProjectPullRequestUsage(): never {
-    throw new Error("Not used by session group tests: getPersonalProjectPullRequestUsage.");
-  }
-
-  githubConnection(): never {
-    throw new Error("Not used by session group tests: githubConnection.");
-  }
-
-  countUsage(): never {
-    throw new Error("Not used by session group tests: countUsage.");
-  }
-
-  asService(): TestCodingAgentApi & CodingAgentApi {
-    return this;
-  }
-}
 
 const TENANT = "project-1";
 
@@ -153,33 +41,6 @@ function makeRow(overrides: Partial<SessionGroupRow> = {}): SessionGroupRow {
   };
 }
 
-/**
- * The enrichment as the SESSION ROW carries it: a column nothing reported is
- * an empty string, and mapping those to null is the service's job.
- */
-function codingAgentRow(overrides: Partial<CodingAgentSession> = {}): CodingAgentSession {
-  return codingAgentSessionFixture({
-    repositoryHost: "",
-    repositoryOwner: "",
-    repositoryName: "",
-    gitBranch: "",
-    gitWorktree: "",
-    title: "",
-    ...overrides,
-  });
-}
-
-/** Git context as the DTO spells "nothing reported this". */
-const NO_GIT_CONTEXT = {
-  repositoryHost: null,
-  repositoryOwner: null,
-  repositoryName: null,
-  gitBranch: null,
-  gitWorktree: null,
-  title: null,
-  pullRequest: null,
-};
-
 class FakeRepository implements SessionGroupsRepository {
   lastQuery: SessionGroupsQuery | null = null;
   constructor(
@@ -193,16 +54,6 @@ class FakeRepository implements SessionGroupsRepository {
       totalHits: this.totalHits,
     };
   }
-}
-
-function lookupReturning(
-  bySessionId: Record<string, CodingAgentSession | null>,
-): TestCodingAgentApi & CodingAgentApi {
-  const service = TestCodingAgentApi.create();
-  for (const [sessionId, session] of Object.entries(bySessionId)) {
-    service.sessionsById.set(sessionId, session);
-  }
-  return service.asService();
 }
 
 const CURSOR_SORT = {
@@ -251,108 +102,9 @@ describe("session groups cursor codec", () => {
 
 describe("SessionGroupsService", () => {
   describe("given a page of rollup rows", () => {
-    /** @scenario Coding agent enrichment attaches model calls and compactions */
-    it("attaches coding-agent counters when a session row exists and leaves others null", async () => {
-      const codingAgents = lookupReturning({
-        "session-a": codingAgentRow({
-          modelCalls: 41,
-          compactions: 2,
-          peakContextTokens: 180_000,
-          subAgents: 3,
-        }),
-      });
-      const service = SessionGroupsService.create({
-        repository: new FakeRepository([makeRow(), makeRow({ conversationId: "session-b" })], 2),
-        codingAgentSessions: codingAgents,
-      });
-
-      const result = await service.getSessionGroups({
-        tenantId: TENANT,
-        timeRange: { from: 0, to: 2_000_000_000_000 },
-        pageSize: 10,
-      });
-
-      expect(codingAgents.sessionLookupInputs.map((input) => input.sessionId).toSorted()).toEqual([
-        "session-a",
-        "session-b",
-      ]);
-      expect(result.sessions[0]?.codingAgent).toEqual({
-        modelCalls: 41,
-        compactions: 2,
-        peakContextTokens: 180_000,
-        subAgents: 3,
-        ...NO_GIT_CONTEXT,
-      });
-      expect(result.sessions[1]?.codingAgent).toBeNull();
-    });
-
-    /** @scenario Coding agent enrichment carries repository, branch, worktree and title */
-    it("carries the repository, branch, worktree and title, empty where unreported", async () => {
-      const service = SessionGroupsService.create({
-        repository: new FakeRepository([makeRow(), makeRow({ conversationId: "session-b" })], 2),
-        codingAgentSessions: lookupReturning({
-          "session-a": codingAgentRow({
-            repositoryHost: "github.com",
-            repositoryOwner: "acme",
-            repositoryName: "widgets",
-            gitBranch: "feat/git-context",
-            gitWorktree: "widgets-feat",
-            title: "Add git context to the session row",
-          }),
-          // A session whose agent has no companion emitter: the row stores
-          // empty strings, and the lens reads them as nothing reported.
-          "session-b": codingAgentRow(),
-        }),
-      });
-
-      const result = await service.getSessionGroups({
-        tenantId: TENANT,
-        timeRange: { from: 0, to: 2_000_000_000_000 },
-        pageSize: 10,
-      });
-
-      expect(result.sessions[0]?.codingAgent).toMatchObject({
-        repositoryHost: "github.com",
-        repositoryOwner: "acme",
-        repositoryName: "widgets",
-        gitBranch: "feat/git-context",
-        gitWorktree: "widgets-feat",
-        title: "Add git context to the session row",
-      });
-      expect(result.sessions[1]?.codingAgent).toMatchObject({
-        repositoryHost: null,
-        repositoryOwner: null,
-        repositoryName: null,
-        gitBranch: null,
-        gitWorktree: null,
-        title: null,
-      });
-    });
-
-    it("keeps the list alive when an enrichment lookup throws", async () => {
-      const service = SessionGroupsService.create({
-        repository: new FakeRepository([makeRow()]),
-        codingAgentSessions: Object.assign(TestCodingAgentApi.create(), {
-          async findBySessionId(): Promise<never> {
-            throw new Error("clickhouse hiccup");
-          },
-        }),
-      });
-
-      const result = await service.getSessionGroups({
-        tenantId: TENANT,
-        timeRange: { from: 0, to: 2_000_000_000_000 },
-        pageSize: 10,
-      });
-
-      expect(result.sessions).toHaveLength(1);
-      expect(result.sessions[0]?.codingAgent).toBeNull();
-    });
-
     it("maps every rollup field onto the DTO", async () => {
       const service = SessionGroupsService.create({
         repository: new FakeRepository([makeRow()], 1),
-        codingAgentSessions: lookupReturning({}),
       });
 
       const result = await service.getSessionGroups({
@@ -389,7 +141,6 @@ describe("SessionGroupsService", () => {
     it("carries that trace id onto the session", async () => {
       const service = SessionGroupsService.create({
         repository: new FakeRepository([makeRow()], 1),
-        codingAgentSessions: lookupReturning({}),
       });
 
       const result = await service.getSessionGroups({
@@ -407,7 +158,6 @@ describe("SessionGroupsService", () => {
     it("reports an unnamed trace as absent", async () => {
       const service = SessionGroupsService.create({
         repository: new FakeRepository([makeRow({ lastTraceId: "" })], 1),
-        codingAgentSessions: lookupReturning({}),
       });
 
       const result = await service.getSessionGroups({
@@ -420,47 +170,6 @@ describe("SessionGroupsService", () => {
     });
   });
 
-  describe("given Coding Agent links a session to a pull request", () => {
-    it("applies the canonical link to the session row", async () => {
-      const codingAgents = lookupReturning({
-        "session-a": codingAgentRow({
-          repositoryHost: "GitHub.com",
-          repositoryOwner: "ACME",
-          repositoryName: "Widgets",
-          gitBranch: "feat/linkage",
-        }),
-      });
-      codingAgents.tracePullRequestLinks = [
-        {
-          sessionId: "session-a",
-          pullRequest: {
-            number: 7,
-            htmlUrl: "https://github.com/acme/widgets/pull/7",
-            title: "Link sessions to pull requests",
-          },
-        },
-      ];
-      const service = SessionGroupsService.create({
-        repository: new FakeRepository([makeRow()], 1),
-        codingAgentSessions: codingAgents,
-        resolveOrganizationId: async () => "org-1",
-      });
-
-      const result = await service.getSessionGroups({
-        tenantId: TENANT,
-        timeRange: { from: 0, to: 2_000_000_000_000 },
-        pageSize: 10,
-      });
-
-      expect(codingAgents.tracePullRequestInputs).toHaveLength(1);
-      expect(result.sessions[0]?.codingAgent?.pullRequest).toEqual({
-        number: 7,
-        htmlUrl: "https://github.com/acme/widgets/pull/7",
-        title: "Link sessions to pull requests",
-      });
-    });
-  });
-
   describe("when the repository returns one row past the page size", () => {
     it("emits a cursor carrying the last visible row's sort value", async () => {
       const rows = [
@@ -470,7 +179,6 @@ describe("SessionGroupsService", () => {
       ];
       const service = SessionGroupsService.create({
         repository: new FakeRepository(rows, 3),
-        codingAgentSessions: lookupReturning({}),
       });
 
       const result = await service.getSessionGroups({
@@ -499,7 +207,6 @@ describe("SessionGroupsService", () => {
       const repository = new FakeRepository(rows, 3);
       const service = SessionGroupsService.create({
         repository,
-        codingAgentSessions: lookupReturning({}),
       });
 
       const result = await service.getSessionGroups({
@@ -529,7 +236,6 @@ describe("SessionGroupsService", () => {
       const repository = new FakeRepository([makeRow()]);
       const service = SessionGroupsService.create({
         repository,
-        codingAgentSessions: lookupReturning({}),
       });
 
       await service.getSessionGroups({
@@ -552,7 +258,6 @@ describe("SessionGroupsService", () => {
       const repository = new FakeRepository([makeRow()]);
       const service = SessionGroupsService.create({
         repository,
-        codingAgentSessions: lookupReturning({}),
       });
       const cursor = TraceSessionGroupsCursorService.encodeSessionGroupsCursor({
         sortValue: 5,
@@ -579,7 +284,6 @@ describe("SessionGroupsService", () => {
       const repository = new FakeRepository([makeRow()]);
       const service = SessionGroupsService.create({
         repository,
-        codingAgentSessions: lookupReturning({}),
       });
       const cursor = TraceSessionGroupsCursorService.encodeSessionGroupsCursor({
         sortValue: 5,
@@ -612,7 +316,6 @@ describe("SessionGroupsService", () => {
             input: "a very long captured prompt that must not leak in full",
           }),
         ]),
-        codingAgentSessions: lookupReturning({}),
       });
 
       const result = await service.getSessionGroups({
@@ -626,38 +329,6 @@ describe("SessionGroupsService", () => {
       expect(session.input).not.toBe("a very long captured prompt that must not leak in full");
       expect(session.totalTokens).toBe(4200);
       expect(session.traceCount).toBe(3);
-    });
-
-    /** @scenario A session beyond the visibility window teases its title */
-    it("teases the generated title the same way, and leaves the git context whole", async () => {
-      const title = "Rebuild the flaky session fold test and its ClickHouse fixture";
-      const service = SessionGroupsService.create({
-        repository: new FakeRepository([makeRow({ lastActivityMs: 1000 })]),
-        codingAgentSessions: lookupReturning({
-          "session-a": codingAgentRow({
-            title,
-            repositoryOwner: "acme",
-            repositoryName: "widgets",
-            gitBranch: "feat/git-context",
-          }),
-        }),
-      });
-
-      const result = await service.getSessionGroups({
-        tenantId: TENANT,
-        timeRange: { from: 0, to: 2_000_000_000_000 },
-        pageSize: 10,
-        visibilityCutoffMs: 2000,
-      });
-
-      const codingAgent = result.sessions[0]!.codingAgent!;
-      expect(codingAgent.title).toBe(teaserOf(title));
-      expect(codingAgent.title).not.toBe(title);
-      // Where the session ran is operational metadata, not conversation
-      // content, so the window does not touch it.
-      expect(codingAgent.repositoryOwner).toBe("acme");
-      expect(codingAgent.repositoryName).toBe("widgets");
-      expect(codingAgent.gitBranch).toBe("feat/git-context");
     });
   });
 });

@@ -11,6 +11,7 @@ import type { UiPromptEditorDrawerProps, UiPromptListDrawerProps } from "./promp
 
 /** Entries land owner by owner; until a drawer has one, its props read as an open record. */
 export type UiDrawerMap = {
+  /** Until trace opens `AddOrEditDatasetRoutedDrawerToken` (r-lends-4). */
   addOrEditDataset: UiAddOrEditDatasetDrawerProps;
   promptEditor: UiPromptEditorDrawerProps;
   promptList: UiPromptListDrawerProps;

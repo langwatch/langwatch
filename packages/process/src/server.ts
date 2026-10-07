@@ -8,6 +8,7 @@ import { drainHttpServer } from "./http-drain.ts";
 import {
   HEARTBEAT_INTERVAL_MS,
   LIVENESS_PATH,
+  READINESS_PATH,
   startHeartbeat,
   startLivenessThread,
   type Heartbeat,
@@ -83,6 +84,11 @@ export type ServerComponent = Readonly<{
    */
   drain?: boolean;
   timeoutMs?: number;
+  /**
+   * Resolves when what this component opened answers; `/readyz` waits on every one.
+   * Spec: specs/server/process-readiness.feature.
+   */
+  ready?: () => Promise<void>;
 }>;
 
 /** Owns process signals, listeners and teardown order. */
@@ -128,6 +134,10 @@ export class Server {
   private heartbeat: Heartbeat | undefined;
   private upgrades: UpgradeDoor | undefined;
   private draining = false;
+  /** 1 once every component started and answered ready; shared with the liveness thread. */
+  private readonly readiness = new Int32Array(new SharedArrayBuffer(4));
+  private started = false;
+  private readinessCheck: Promise<boolean> | undefined;
   private disposeFatal: (() => void) | undefined;
   private disposeSignals: (() => void) | undefined;
   private listening: Promise<void> | undefined;
@@ -257,6 +267,7 @@ export class Server {
       const thread = await startLivenessThread({
         port,
         heartbeat: heartbeat.buffer,
+        readiness: this.readiness.buffer as SharedArrayBuffer,
         proxyPort: loopback.port,
         logger: this.logger,
       });
@@ -276,6 +287,10 @@ export class Server {
   private handleHealthRequest(request: IncomingMessage, response: ServerResponse): void {
     if (request.url === LIVENESS_PATH) {
       response.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
+      return;
+    }
+    if (request.url === READINESS_PATH) {
+      void this.answer("readiness", () => this.answerReadiness(response), response);
       return;
     }
 
@@ -301,6 +316,50 @@ export class Server {
     }
 
     void this.answer("application", () => application(request, response), response);
+  }
+
+  private async answerReadiness(response: ServerResponse): Promise<void> {
+    const ready = await this.checkReadiness();
+    response
+      .writeHead(ready ? 200 : 503, { "Content-Type": "text/plain" })
+      .end(ready ? "ready" : `${this.name} is not ready`);
+  }
+
+  /** Latches once passed until `recheckReadiness`; one check in flight however many probes ask. */
+  private checkReadiness(): Promise<boolean> {
+    if (this.draining || !this.started) return Promise.resolve(false);
+    if (Atomics.load(this.readiness, 0) === 1) return Promise.resolve(true);
+    this.readinessCheck ??= Promise.all(
+      this.components.map((component) => component.ready?.() ?? Promise.resolve()),
+    )
+      .then(
+        () => {
+          if (this.draining) return false;
+          Atomics.store(this.readiness, 0, 1);
+          this.logger.info({}, `${this.name} is ready`);
+          return true;
+        },
+        (error: unknown) => {
+          this.logger.info({ error }, `${this.name} is not ready: a component did not answer`);
+          return false;
+        },
+      )
+      .finally(() => {
+        this.readinessCheck = undefined;
+      });
+    return this.readinessCheck;
+  }
+
+  /** Drops the readiness latch so the next probe asks every component again (round 22). */
+  recheckReadiness(): void {
+    if (this.draining) return;
+    Atomics.store(this.readiness, 0, 0);
+  }
+
+  /** A draining door takes no new work and is no longer ready, on and off the loop. */
+  private refuseNewWork(): void {
+    this.draining = true;
+    Atomics.store(this.readiness, 0, 0);
   }
 
   private handleUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
@@ -395,9 +454,7 @@ export class Server {
     // by name while the graph behind it is still whole.
     this.graceful.phase({
       name: `${this.name} door`,
-      run: () => {
-        this.draining = true;
-      },
+      run: () => this.refuseNewWork(),
     });
     for (const component of [...this.components].reverse()) {
       this.graceful.phase({
@@ -408,6 +465,7 @@ export class Server {
       });
     }
     this.graceful.phase({ name: `${this.name} resources`, run: () => this.resources.close() });
+    this.started = true;
   }
 
   /** A door opened by `openLiveness` whose `listen` never came has no phase to close it. */
@@ -430,7 +488,7 @@ export class Server {
 
   /** Runs the teardown once, whoever asked. Signals call the same path. */
   close(): Promise<void> {
-    this.draining = true;
+    this.refuseNewWork();
     this.closing ??= Promise.resolve()
       .then(() => this.graceful.run())
       .then(() => this.closeUnlistened())

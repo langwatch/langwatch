@@ -4,8 +4,13 @@ import {
   UsageReportFailedError,
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
-import Stripe from "stripe";
+import type Stripe from "stripe";
 import { z } from "zod";
+
+import type {
+  StripeMeterEventSummary,
+  StripeMetersChannel,
+} from "../channels/stripe-meters.channel.ts";
 
 const logger = createLogger("langwatch:billing:usageReportingService");
 
@@ -82,15 +87,18 @@ export type UsageReportingService = {
 };
 
 export class StripeUsageReportingService implements UsageReportingService {
-  private readonly stripe: Stripe;
+  private readonly meters: StripeMetersChannel;
   private readonly meterId: string;
 
-  private constructor(deps: { stripe: Stripe; meterId: string }) {
-    this.stripe = deps.stripe;
+  private constructor(deps: { meters: StripeMetersChannel; meterId: string }) {
+    this.meters = deps.meters;
     this.meterId = deps.meterId;
   }
 
-  static create(deps: { stripe: Stripe; meterId: string }): StripeUsageReportingService {
+  static create(deps: {
+    meters: StripeMetersChannel;
+    meterId: string;
+  }): StripeUsageReportingService {
     return new StripeUsageReportingService(deps);
   }
 
@@ -110,12 +118,10 @@ export class StripeUsageReportingService implements UsageReportingService {
     identifier: string;
   }): Promise<MeterEventResult> {
     try {
-      await this.stripe.billing.meterEvents.create({
-        event_name: eventName,
-        payload: {
-          stripe_customer_id: stripeCustomerId,
-          value: formatMeterValue(value),
-        },
+      await this.meters.createMeterEvent({
+        eventName,
+        customerId: stripeCustomerId,
+        value: formatMeterValue(value),
         identifier,
         timestamp,
       });
@@ -269,12 +275,13 @@ export class StripeUsageReportingService implements UsageReportingService {
     stripeCustomerId: string;
     startTime: number;
     endTime: number;
-  }): Promise<Awaited<ReturnType<Stripe["billing"]["meters"]["listEventSummaries"]>>> {
+  }): Promise<StripeMeterEventSummary[]> {
     try {
-      return await this.stripe.billing.meters.listEventSummaries(this.meterId, {
-        customer: stripeCustomerId,
-        start_time: startTime,
-        end_time: endTime,
+      return await this.meters.listEventSummaries({
+        meterId: this.meterId,
+        customerId: stripeCustomerId,
+        startTime,
+        endTime,
       });
     } catch (error) {
       if (isStripeInvalidRequestError(error) || isStripeAuthenticationError(error)) {
@@ -293,9 +300,9 @@ export class StripeUsageReportingService implements UsageReportingService {
   async getUsageSummary(input: GetUsageSummaryInput): Promise<UsageSummary> {
     const validated = getUsageSummaryInputSchema.parse(input);
 
-    const response = await this.listEventSummaries(validated);
+    const summaries = await this.listEventSummaries(validated);
 
-    if (response.data.length === 0) {
+    if (summaries.length === 0) {
       logger.warn(
         {
           stripeCustomerId: validated.stripeCustomerId,
@@ -313,7 +320,7 @@ export class StripeUsageReportingService implements UsageReportingService {
       };
     }
 
-    const aggregatedValue = response.data.reduce((sum, s) => sum + s.aggregated_value, 0);
+    const aggregatedValue = summaries.reduce((sum, s) => sum + s.aggregatedValue, 0);
 
     logger.info(
       {
@@ -346,14 +353,6 @@ const isStripeAuthenticationError = (
   error instanceof Error &&
   (error as Stripe.errors.StripeError).type === "StripeAuthenticationError";
 
-/**
- * Stripe SDK policy frozen with AppStripeRuntime. API version must not drift
- * so clients see consistent meter event shapes.
- */
-const STRIPE_API_VERSION = "2024-04-10" as const;
-const STRIPE_MAX_NETWORK_RETRIES = 1;
-const STRIPE_TELEMETRY = true;
-
 /** A SaaS process that cannot reach Stripe has no usage to report through. */
 export class StripeUsageReportingUnavailable extends Error {
   readonly name = "StripeUsageReportingUnavailable";
@@ -365,30 +364,26 @@ export class StripeUsageReportingUnavailable extends Error {
 
 /**
  * Constructs meter-event sender. Meter id keyed by environment, same as App.
- * Refuses without key, like App does, to avoid silent revenue drift.
+ * Refuses without the meters channel (no key), like App does, to avoid silent revenue drift.
  */
 export class StripeUsageReportingBuilder {
   static create(options: {
-    secretKey: string | undefined;
+    meters: StripeMetersChannel | undefined;
     nodeEnvironment: string | undefined;
   }): StripeUsageReportingBuilder {
-    return new StripeUsageReportingBuilder(options.secretKey, options.nodeEnvironment);
+    return new StripeUsageReportingBuilder(options.meters, options.nodeEnvironment);
   }
 
   private constructor(
-    private readonly secretKey: string | undefined,
+    private readonly meters: StripeMetersChannel | undefined,
     private readonly nodeEnvironment: string | undefined,
   ) {}
 
   build(): UsageReportingService {
-    if (!this.secretKey) throw new StripeUsageReportingUnavailable();
+    if (!this.meters) throw new StripeUsageReportingUnavailable();
 
     return StripeUsageReportingService.create({
-      stripe: new Stripe(this.secretKey, {
-        apiVersion: STRIPE_API_VERSION,
-        maxNetworkRetries: STRIPE_MAX_NETWORK_RETRIES,
-        telemetry: STRIPE_TELEMETRY,
-      }),
+      meters: this.meters,
       meterId: BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(this.nodeEnvironment))
         .meters.BILLABLE_EVENTS,
     });

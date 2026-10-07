@@ -10,7 +10,7 @@ import type {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { traceMatchesQuery } from "../trace-query-evaluation.rules.ts";
+import { traceQueryEvaluation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 
 function makeEval(over: Partial<TraceQueryEvaluationRun>): TraceQueryEvaluationRun {
   return {
@@ -66,7 +66,7 @@ describe("an evaluator paired with its own result", () => {
       "evaluator:X AND evaluatorLabel:toxic",
       "evaluator:X AND NOT evaluatorVerdict:pass",
     ])("does not match %s", (query) => {
-      expect(traceMatchesQuery(query, xPassedYFailed)).toBe(false);
+      expect(traceQueryEvaluation.traceMatchesQuery(query, xPassedYFailed)).toBe(false);
     });
   });
 
@@ -77,7 +77,7 @@ describe("an evaluator paired with its own result", () => {
       "evaluator:X AND evaluatorScore:<0.5",
       "evaluator:X AND NOT evaluatorVerdict:pass",
     ])("matches %s", (query) => {
-      expect(traceMatchesQuery(query, xFailed)).toBe(true);
+      expect(traceQueryEvaluation.traceMatchesQuery(query, xFailed)).toBe(true);
     });
   });
 
@@ -87,16 +87,19 @@ describe("an evaluator paired with its own result", () => {
         makeEval({ evaluatorId: "X", passed: false }),
         makeEval({ evaluatorId: "Y", passed: true }),
       ]);
-      expect(traceMatchesQuery("evaluator:X AND NOT evaluatorVerdict:pass", xFailedYPassed)).toBe(
-        true,
-      );
+      expect(
+        traceQueryEvaluation.traceMatchesQuery(
+          "evaluator:X AND NOT evaluatorVerdict:pass",
+          xFailedYPassed,
+        ),
+      ).toBe(true);
     });
   });
 
   describe("when two verdicts are picked for the evaluator", () => {
     it("matches a run holding either of them", () => {
       expect(
-        traceMatchesQuery(
+        traceQueryEvaluation.traceMatchesQuery(
           "(evaluator:X AND evaluatorVerdict:pass AND evaluatorVerdict:fail)",
           xFailed,
         ),
@@ -107,20 +110,25 @@ describe("an evaluator paired with its own result", () => {
   describe("when the pairing sits next to other conditions", () => {
     it("keeps the pairing and still applies the rest", () => {
       expect(
-        traceMatchesQuery(
+        traceQueryEvaluation.traceMatchesQuery(
           "evaluator:Y AND evaluatorVerdict:fail AND evaluatorLabel:toxic",
           xPassedYFailed,
         ),
       ).toBe(true);
       expect(
-        traceMatchesQuery("(evaluator:X AND evaluatorVerdict:fail) OR evaluator:Z", xPassedYFailed),
+        traceQueryEvaluation.traceMatchesQuery(
+          "(evaluator:X AND evaluatorVerdict:fail) OR evaluator:Z",
+          xPassedYFailed,
+        ),
       ).toBe(false);
     });
   });
 
   describe("when no evaluator is named", () => {
     it("still matches a result from any evaluator", () => {
-      expect(traceMatchesQuery("evaluatorVerdict:fail", xPassedYFailed)).toBe(true);
+      expect(traceQueryEvaluation.traceMatchesQuery("evaluatorVerdict:fail", xPassedYFailed)).toBe(
+        true,
+      );
     });
   });
 
@@ -131,7 +139,7 @@ describe("an evaluator paired with its own result", () => {
       "evaluator:X AND evaluatorVerdict:fail AND evaluator:Y",
       "evaluatorVerdict:fail AND evaluator:X AND evaluator:Y",
     ])("ties the result to neither of them in %s", (query) => {
-      expect(traceMatchesQuery(query, xPassedYFailed)).toBe(true);
+      expect(traceQueryEvaluation.traceMatchesQuery(query, xPassedYFailed)).toBe(true);
     });
   });
 
@@ -142,9 +150,12 @@ describe("an evaluator paired with its own result", () => {
     ]);
 
     it("matches a kept result held by any of its runs", () => {
-      expect(traceMatchesQuery("evaluator:X AND evaluatorVerdict:pass", xPassedThenFailed)).toBe(
-        true,
-      );
+      expect(
+        traceQueryEvaluation.traceMatchesQuery(
+          "evaluator:X AND evaluatorVerdict:pass",
+          xPassedThenFailed,
+        ),
+      ).toBe(true);
     });
 
     it("needs one run to hold a verdict and a score together", () => {
@@ -161,7 +172,7 @@ describe("an evaluator paired with its own result", () => {
         }),
       ]);
       expect(
-        traceMatchesQuery(
+        traceQueryEvaluation.traceMatchesQuery(
           "(evaluator:X AND evaluatorVerdict:fail AND evaluatorScore:[0 TO 0.5])",
           failedHighPassedLow,
         ),
@@ -174,13 +185,13 @@ describe("an evaluator paired with its own result", () => {
         makeEval({ evaluatorId: "X", score: 0.9 }),
       ]);
       expect(
-        traceMatchesQuery(
+        traceQueryEvaluation.traceMatchesQuery(
           "evaluator:X AND evaluatorScore:>0.05 AND evaluatorScore:<0.2",
           scoredLowThenHigh,
         ),
       ).toBe(true);
       expect(
-        traceMatchesQuery(
+        traceQueryEvaluation.traceMatchesQuery(
           "evaluator:X AND evaluatorScore:>0.5 AND evaluatorScore:<0.2",
           scoredLowThenHigh,
         ),
@@ -189,7 +200,10 @@ describe("an evaluator paired with its own result", () => {
 
     it("drops the trace when any of its runs holds an excluded result", () => {
       expect(
-        traceMatchesQuery("evaluator:X AND NOT evaluatorVerdict:fail", xPassedThenFailed),
+        traceQueryEvaluation.traceMatchesQuery(
+          "evaluator:X AND NOT evaluatorVerdict:fail",
+          xPassedThenFailed,
+        ),
       ).toBe(false);
     });
   });

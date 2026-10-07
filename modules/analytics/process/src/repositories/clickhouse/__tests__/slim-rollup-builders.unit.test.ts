@@ -143,6 +143,17 @@ describe("buildSlimTimeseriesQuery", () => {
     expect(sql).toContain(TRACE_ANALYTICS_HAS_SIGNAL_SQL);
   });
 
+  /** @scenario Analytics' trace_analytics reader applies the has-signal predicate analytics owns */
+  it("applies analytics' predicate with every door the fold's signal test opens", () => {
+    expect(sql).toContain(TRACE_ANALYTICS_HAS_SIGNAL_SQL);
+    expect(TRACE_ANALYTICS_HAS_SIGNAL_SQL).toContain("SpanCount > 0");
+    expect(TRACE_ANALYTICS_HAS_SIGNAL_SQL).toContain("EarliestSpanStartMs > 0");
+    expect(TRACE_ANALYTICS_HAS_SIGNAL_SQL).toContain(
+      "Attributes['langwatch.reserved.log_record_count'] NOT IN ('', '0')",
+    );
+    expect(TRACE_ANALYTICS_HAS_SIGNAL_SQL).toContain("Version < '2026-07-27'");
+  });
+
   it("filters on the partition column OccurredAt for partition pruning", () => {
     expect(sql).toContain("OccurredAt >= {currentStart:DateTime64(3)}");
     expect(sql).toContain("OccurredAt >= {previousStart:DateTime64(3)}");

@@ -1,7 +1,8 @@
-/** What project lends this module through its declaration (ARCHITECTURE.md §3.4, rule 7). */
+/** What project lends this module by token (ARCHITECTURE.md §10.1). */
 
 import { Lent } from "@langwatch/browser-host/lent";
-import { HeroAskFieldToken, type HeroAskFieldProps } from "@langwatch/project-contract";
+import { HeroAskFieldToken } from "@langwatch/project-client";
+import type { HeroAskFieldProps } from "@langwatch/project-contract";
 
 /** Project's inline command palette, rendered as project lends it. */
 export function HeroAskField(props: HeroAskFieldProps) {

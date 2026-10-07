@@ -7,7 +7,7 @@ import {
   VersionBoxToken,
   type RunExperimentViaApiDialogProps,
   type VersionBoxProps,
-} from "@langwatch/workflow-contract";
+} from "@langwatch/workflow-client";
 
 /** The lent badge; an empty box of the same width until it loads. */
 export function VersionBox(props: VersionBoxProps) {

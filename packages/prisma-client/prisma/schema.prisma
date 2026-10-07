@@ -3496,6 +3496,22 @@ model DataPrivacyPolicy {
   @@index([scopeType, scopeId])
 }
 
+// Data privacy's fold of where each project sits, from project's lifecycle facts (record §5;
+// Alex, 2026-10-06). Each column group keeps its newest fact; no relation to Project.
+model DataPrivacyProjectScope {
+  projectId            String    @id
+  organizationId       String
+  teamId               String?
+  isPersonal           Boolean?
+  departmentId         String?
+  teamRecordedAt       DateTime?
+  departmentRecordedAt DateTime?
+  archivedAt           DateTime?
+  updatedAt            DateTime  @default(now()) @updatedAt
+
+  @@index([organizationId])
+}
+
 enum CustomLLMModelCostScopeType {
   ORGANIZATION
   TEAM
@@ -6231,6 +6247,34 @@ model GatewayRealtimeSession {
   // what the two are compared against when they disagree.
   vendorCostRaw Json?
 
+  // What the session is and so how it is priced: "realtime", "live",
+  // "convai", "tts_socket" or "stt_socket". NULL on a row an older gateway
+  // booked, which settles the way it did before the column existed.
+  kind String?
+
+  // Who measures the usage: "client" (the caller reports it) or "gateway"
+  // (the gateway relayed or observed the socket and reports every response).
+  metering String?
+
+  // When the minted credential stops opening a socket. With the mint time it
+  // bounds how long an unreported call can have run.
+  credentialExpiresAt DateTime?
+
+  // The catalog id that prices input transcription usage, when the session
+  // declared one.
+  transcriptionModel String?
+
+  // The end user the mint was attributed to. Every spend record of the
+  // session carries it, so a per-end-user budget is debited by voice usage.
+  endUserId String?
+
+  // The usage reports recorded while the session ran. Each one is its own
+  // spend record, so these three are a running total for reads and never the
+  // source the ledger is debited from.
+  lastReportAt        DateTime?
+  reportedCostNanoUsd BigInt    @default(0)
+  reportCount         Int       @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
@@ -6244,6 +6288,32 @@ model GatewayRealtimeSession {
   @@index([virtualKeyId, status, mintedAt])
   // The fallback match, and the expiry sweep.
   @@index([projectId, status, mintedAt])
+  // The settlement sweep: metered sessions past the window, across tenants.
+  @@index([status, metering, mintedAt])
+}
+
+// One usage report of a realtime voice session: a model response, a
+// transcription item, the closing report or the estimate for a session that
+// never reported. Each row is one spend record, `<sessionId>.<reportKey>`,
+// and the unique key is what makes a redelivered report count once.
+model GatewayRealtimeSessionReport {
+  id        String @id @default(nanoid())
+  sessionId String
+  reportKey String
+  projectId String
+
+  // The catalog id this report was priced under: the session's own model, or
+  // the transcription model for a transcription item.
+  model String
+
+  // The quantities as rated, in the spend usage vocabulary.
+  usage       Json
+  costNanoUsd BigInt
+
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, reportKey])
+  @@index([projectId])
 }
 
 // One record per (migration, tenant) for the in-place system migrations
@@ -6808,6 +6878,7 @@ model LangwatchUpgradeRun {
   outcome    String?
   plan       Json?
   report     Json?
+  floor      String?
 
   @@map("_langwatch_upgrade_run")
   @@ignore
@@ -6815,20 +6886,63 @@ model LangwatchUpgradeRun {
 
 /// One row per step of every kind the upgrade ledger knows; see LangwatchUpgradeRun.
 model LangwatchUpgradeStep {
-  id         String    @id
-  kind       String
-  release    String?
-  mode       String
-  status     String
-  inferred   Boolean   @default(false)
-  attempt    Int       @default(0)
-  lastError  String?   @map("last_error")
-  report     Json?
-  runId      String?   @map("run_id")
-  startedAt  DateTime? @map("started_at")
-  finishedAt DateTime? @map("finished_at")
-  updatedAt  DateTime  @map("updated_at")
+  id          String    @id
+  kind        String
+  release     String?
+  mode        String
+  status      String
+  inferred    Boolean   @default(false)
+  attempt     Int       @default(0)
+  lastError   String?   @map("last_error")
+  report      Json?
+  runId       String?   @map("run_id")
+  startedAt   DateTime? @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+  updatedAt   DateTime  @map("updated_at")
+  owner       String?
+  description String?
 
   @@map("_langwatch_upgrade_step")
+  @@ignore
+}
+
+/// One row per target of a step (one ClickHouse endpoint); the step row's status is the aggregate.
+model LangwatchUpgradeTarget {
+  stepId    String   @map("step_id")
+  target    String
+  status    String
+  version   String?
+  lastError String?  @map("last_error")
+  updatedAt DateTime @map("updated_at")
+
+  @@id([stepId, target])
+  @@map("_langwatch_upgrade_target")
+  @@ignore
+}
+
+/// The runner lease: one row per named lease, taken over only once expired.
+model LangwatchUpgradeLease {
+  name        String   @id
+  owner       String
+  image       String
+  host        String
+  heartbeatAt DateTime @map("heartbeat_at")
+  expiresAt   DateTime @map("expires_at")
+
+  @@map("_langwatch_upgrade_lease")
+  @@ignore
+}
+
+/// One row per serving process: its image and the step ids that image declares. No tenant data.
+model LangwatchUpgradePresence {
+  processId   String   @id @map("process_id")
+  role        String
+  image       String
+  release     String?
+  steps       Json     @default("[]")
+  startedAt   DateTime @map("started_at")
+  heartbeatAt DateTime @map("heartbeat_at")
+
+  @@map("_langwatch_upgrade_presence")
   @@ignore
 }

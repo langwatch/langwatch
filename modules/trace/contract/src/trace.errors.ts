@@ -174,6 +174,34 @@ export class TraceIdsTooManyError extends HandledError {
 }
 
 /**
+ * A trace page above the plan's bound, named by its registry key. Refused
+ * rather than clamped, so a caller learns its plan's page size instead of
+ * silently receiving fewer rows than it asked for.
+ */
+export class TracePageSizeTooLargeError extends HandledError {
+  declare readonly code: "trace_page_size_too_large";
+
+  constructor({
+    maxPageSize,
+    bound,
+  }: {
+    maxPageSize: number;
+    bound: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
+  }) {
+    super(
+      "trace_page_size_too_large",
+      `At most ${maxPageSize} traces can be read in one page under this plan. Ask for a smaller pageSize and page forward with scrollId.`,
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { maxPageSize, bound },
+      },
+    );
+    this.name = "TracePageSizeTooLargeError";
+  }
+}
+
+/**
  * This process refused the statement itself: concurrency slots all taken and the wait queue
  * full, so it never reached ClickHouse.
  */

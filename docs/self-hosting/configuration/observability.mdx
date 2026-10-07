@@ -123,7 +123,7 @@ histogram_quantile(0.95, sum by (le) (rate(clickhouse_query_duration_seconds_buc
 The Helm chart configures probes automatically. The app probes `/api/health` on port 5560:
 
 ```yaml
-# Startup probe (allows up to 40 minutes for migrations)
+# Startup probe (allows up to 40 minutes: on a first install the app runs the upgrade before it serves)
 startupProbe:
   httpGet:
     path: /api/health

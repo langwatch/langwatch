@@ -70,6 +70,7 @@ describe("given the presence declaration", () => {
       "onPresenceCursor",
       "onPresenceUpdate",
       "onProjectReadHints",
+      "onUpgradeReadHints",
       "update",
     ]);
   });
@@ -89,6 +90,11 @@ describe("given the presence declaration", () => {
       ["onPresenceCursor", "subscription", "traces:view"],
       ["onOrganizationReadHints", "subscription", "organization:view"],
       ["onProjectReadHints", "subscription", "project:view"],
+      [
+        "onUpgradeReadHints",
+        "subscription",
+        expect.objectContaining({ kind: "permission-platform", permission: "ops:view" }),
+      ],
     ]);
   });
 });

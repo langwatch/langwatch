@@ -1,7 +1,11 @@
 /** The dataset header's actions: pick a saved one, upload a CSV, edit, or save an inline one. */
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { datasetClient } from "@langwatch/dataset-client";
+import {
+  datasetClient,
+  SelectDatasetDrawerToken,
+  UploadCsvDrawerToken,
+} from "@langwatch/dataset-client";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import { useMemo } from "react";
 
@@ -59,13 +63,13 @@ export const useWorkbenchDatasetHandlers = ({
   return useMemo(
     () => ({
       onSelectExisting: () => {
-        openDrawer("selectDataset", {
+        openDrawer(SelectDatasetDrawerToken, {
           onSelect: ({ datasetId, name, columnTypes }: PendingDatasetLoad) =>
             loadSavedDataset({ datasetId, name, columnTypes }),
         });
       },
       onUploadCSV: () => {
-        openDrawer("uploadCSV", {
+        openDrawer(UploadCsvDrawerToken, {
           onSuccess: ({ datasetId, name, columnTypes }: PendingDatasetLoad) =>
             loadSavedDataset({ datasetId, name, columnTypes }),
         });

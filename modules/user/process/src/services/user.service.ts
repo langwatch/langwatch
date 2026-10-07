@@ -20,6 +20,7 @@ import {
   setUserNotificationPreferenceInputSchema,
   userLifecycleChangeInputSchema,
   userProfilesInputSchema,
+  type AdoptUnconfirmedAccountOutcome,
   type CreateUserInput,
   type CreateCredentialUserInput,
   type CreatePasskeyUserInput,
@@ -162,6 +163,20 @@ export class UserService {
     if (accounts.length > 1) throw new UserEmailAmbiguousError();
 
     return accounts[0] ?? null;
+  }
+
+  /**
+   * Adoption by an address proof (rulings 2026-10-06, Auth 32). A session opened before the
+   * proof is as untrusted as the methods it was opened with, so an adoption ends them all.
+   */
+  async adoptUnconfirmedAccount(input: UserEmailInput): Promise<AdoptUnconfirmedAccountOutcome> {
+    const account = await this.findByEmail(input);
+    if (!account) return "no_account";
+
+    const outcome = await this.repository.adoptUnconfirmed({ id: account.id });
+    if (outcome === "adopted") await this.auth.revokeAllBrowserSessions({ userId: account.id });
+
+    return outcome;
   }
 
   /** A case-twin beside a taken address would leave two accounts answering for one person. */

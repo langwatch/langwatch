@@ -195,6 +195,7 @@ describe("better-auth over the identity storage adapter", () => {
             emailVerified: true,
             createdAtMs: attachedAtMs,
             userHashKey: null,
+            lastLoginAtMs: null,
           },
           accounts: [
             {

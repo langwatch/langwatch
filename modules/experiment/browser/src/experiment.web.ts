@@ -9,7 +9,8 @@ import { defineBrowserModule } from "@langwatch/browser";
 import { batchRecordTrpc, datasetRecordTrpc, datasetTrpc } from "@langwatch/dataset-contract";
 import { evaluationTrpc } from "@langwatch/evaluation-contract";
 import { evaluatorTrpc } from "@langwatch/evaluator-contract";
-import { ComparisonConfigFormToken, experimentsTrpc } from "@langwatch/experiment-contract";
+import { ComparisonConfigFormToken } from "@langwatch/experiment-client";
+import { experimentsTrpc } from "@langwatch/experiment-contract";
 import { opsDashboardTrpc } from "@langwatch/ops-contract";
 import { promptTrpc } from "@langwatch/prompt-contract";
 

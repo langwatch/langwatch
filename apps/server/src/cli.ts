@@ -1,7 +1,9 @@
 import { existsSync, rmSync } from "node:fs";
+import { createConnection } from "node:net";
 
 import chalk from "chalk";
 import { Command } from "commander";
+import { execa } from "execa";
 import prompts from "prompts";
 
 import { printBanner } from "./animation/banner.ts";
@@ -17,6 +19,9 @@ import { detectConflicts } from "./port-conflict/detect.ts";
 import { resolvePortConflicts } from "./port-conflict/resolve.ts";
 import { inspectPredeps, printDoctorTable } from "./predeps/detect-only.ts";
 import { runPredeps } from "./predeps/runner.ts";
+import { readEnvFile } from "./services/env-file.ts";
+import { locateTasksDir, resolvePnpm } from "./services/node-deps.ts";
+import { appOfflineEnv, FORCED_ENV } from "./services/offline-defaults.ts";
 import { runtime as serviceRuntime } from "./services/runtime.ts";
 import { captureUserEnv } from "./shared/env.ts";
 import { paths } from "./shared/paths.ts";
@@ -55,6 +60,64 @@ function printDryRunAndExit(portBase: string): never {
   console.log(chalk.bold("paths:"));
   for (const [k, v] of Object.entries(paths)) console.log(`  ${k.padEnd(18)} ${v}`);
   process.exit(0);
+}
+
+const UPGRADE_STATUS_TIMEOUT_MS = 60_000;
+const DATABASE_PROBE_TIMEOUT_MS = 1_000;
+
+function acceptsConnections({ port }: { port: number }): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = createConnection({
+      host: "127.0.0.1",
+      port,
+      timeout: DATABASE_PROBE_TIMEOUT_MS,
+    });
+    const settle = (accepted: boolean) => {
+      socket.destroy();
+      resolve(accepted);
+    };
+    socket.once("connect", () => settle(true));
+    socket.once("timeout", () => settle(false));
+    socket.once("error", () => settle(false));
+  });
+}
+
+/**
+ * Prints what `pnpm task upgrade status` prints, so doctor and the Upgrades page read the
+ * ledger the same way. It reads and changes nothing, and never decides doctor's exit code.
+ */
+async function printUpgradeStatus({ postgresPort }: { postgresPort: number }): Promise<void> {
+  console.log(chalk.bold("Upgrade"));
+  const unavailable = (reason: string) =>
+    console.log(`  ${chalk.yellow("-")} status unavailable: ${reason}`);
+  if (!(await acceptsConnections({ port: postgresPort }))) {
+    unavailable("the database is not running (`npx @langwatch/server` starts it)");
+    return;
+  }
+  const tasksDir = locateTasksDir();
+  if (!tasksDir) {
+    unavailable("the tasks directory is not installed next to this CLI");
+    return;
+  }
+  const pnpm = await resolvePnpm(paths);
+  const result = await execa(pnpm.command, [...pnpm.args, "run", "task", "upgrade", "status"], {
+    cwd: tasksDir,
+    env: {
+      ...appOfflineEnv(paths),
+      ...process.env,
+      ...readEnvFile(paths.envFile),
+      ...FORCED_ENV,
+      DATABASE_URL: `postgresql://langwatch@127.0.0.1:${postgresPort}/langwatch_db?schema=langwatch_db&connection_limit=5`,
+    },
+    reject: false,
+    timeout: UPGRADE_STATUS_TIMEOUT_MS,
+  });
+  if (result.exitCode !== 0) {
+    const reason = (result.stderr || result.stdout).trim().split("\n").at(-1);
+    unavailable(reason || `\`pnpm task upgrade status\` exited ${result.exitCode}`);
+    return;
+  }
+  for (const line of result.stdout.trim().split("\n")) console.log(`  ${line}`);
 }
 
 const program = new Command();
@@ -211,6 +274,8 @@ program
         console.log(chalk.dim(`      held by pid ${conflict.pid}: ${conflict.command}`));
       }
     }
+    console.log("");
+    await printUpgradeStatus({ postgresPort: ports.postgres });
     console.log("");
     const missing = rows.filter((r) => !r.installed).length;
     const exitCode = missing === 0 && conflicts.conflicts.length === 0 ? 0 : 1;

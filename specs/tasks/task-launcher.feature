@@ -43,3 +43,17 @@ Feature: The task launcher
     When it is invoked locally as `pnpm --filter @langwatch/tasks task webhook-signature-vectors`
     And it is invoked inside the container as `pnpm -s task webhook-signature-vectors`
     Then both invocations resolve the same catalogue entry and run the same task
+
+  @unit
+  Scenario: A module task binds no port the serving processes use
+    Given API_PORT and WORKER_METRICS_PORT are free
+    When a module task runs
+    Then both ports stay free to bind while the task runs
+    And the task runs to completion
+
+  @unit
+  Scenario: A module task still runs while the api holds API_PORT
+    Given the api is already serving on API_PORT
+    When a module task runs
+    Then the task runs to completion
+    And the run does not fail with EADDRINUSE on API_PORT

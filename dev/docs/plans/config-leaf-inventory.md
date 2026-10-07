@@ -727,7 +727,8 @@ Config leaves:
 | field | env spelling | schema | default | source |
 | backend | STORED_OBJECTS_BACKEND | z.enum(["s3","azure"]).optional() | — | contract |
 | localFilesystemRoot | LANGWATCH_LOCAL_STORAGE_PATH | z.string().optional() | — | contract |
-| azureSpoolRetentionConfirmed | AZURE_BLOB_SPOOL_RETENTION_CONFIRMED | "1 or true, else off" | — | contract |
+| objectRetentionConfirmed | OBJECT_RETENTION_CONFIRMED | "1 or true, else off" | — | contract |
+| legacySpoolRetentionConfirmed | AZURE_BLOB_SPOOL_RETENTION_CONFIRMED | "1 or true, else off" | — | contract |
 | s3.bucket | S3_BUCKET_NAME | z.string().optional() | — | contract |
 | s3.endpoint | S3_ENDPOINT | z.string().optional() | — | contract |
 | s3.region | S3_REGION | z.string().optional() | — | contract |

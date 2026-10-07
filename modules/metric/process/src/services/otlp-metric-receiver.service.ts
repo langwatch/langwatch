@@ -23,10 +23,10 @@ import type { MetricRequestCollectionService } from "./metric-request-collection
 
 const CANONICAL_METRICS_PATH = "/api/otel/v1/metrics";
 
-/** Trace's share of the door: the key, the allowance, the key's clock and the failure report. */
+/** Trace's share of the door: the key, the allowance and the key's clock. */
 type MetricReceiverTraceSlice = Pick<
   TraceApi,
-  "otlpCredential" | "otlpUsageLimit" | "otlpMarkCredentialUsed" | "otlpReportError"
+  "otlpCredential" | "otlpUsageLimit" | "otlpMarkCredentialUsed"
 >;
 
 interface OtlpMetricReceiverDeps {
@@ -109,16 +109,21 @@ export class OtlpMetricReceiverService {
     const body = await decodeOtlpBody(request.body, header("content-encoding") ?? null);
     const parsed = parseOtlpMetrics(body, header("content-type"));
     if (!parsed.ok) {
-      span.setStatus({ code: SpanStatusCode.ERROR, message: "Failed to parse metrics" });
-      span.recordException(new Error(parsed.error));
-      this.#logger.error(
-        { error: parsed.error, projectId: project.id, ...otlpBodyForensics(body) },
+      // The client's fault (specs/otlp/client-parse-failures.feature): warn, no
+      // exception, span status left UNSET as for any customer fault.
+      span.setAttributes({
+        "langwatch.error.fault": "customer",
+        "langwatch.otel.parse_error": parsed.error,
+      });
+      this.#logger.warn(
+        {
+          handledErrorFault: "customer",
+          error: parsed.error,
+          projectId: project.id,
+          ...otlpBodyForensics(body),
+        },
         "error parsing metrics",
       );
-      traces.otlpReportError(new Error(parsed.error), {
-        projectId: project.id,
-        customerTraceIds: [],
-      });
       return { outcome: "parse-failed" };
     }
 

@@ -83,7 +83,7 @@ Runs the in-product assistant's workers. Internal only, reached by the App and W
 <Card title="Control Plane" icon="database">
 **PostgreSQL**
 
-Users, teams, projects, configurations, prompt versions. Managed via Prisma with auto-migrations.
+Users, teams, projects, configurations, prompt versions. Managed via Prisma; migrations are applied by the upgrade before the app starts.
 
 </Card>
 <Card title="Data Plane" icon="chart-bar">
@@ -165,7 +165,7 @@ The worker manager behind the in-product assistant (image `langwatch/langyagent`
 
 ### PostgreSQL: Control Plane
 
-Stores users, teams, projects, configurations, prompt versions, evaluator definitions. Managed via Prisma ORM with auto-migrations on startup.
+Stores users, teams, projects, configurations, prompt versions, evaluator definitions. Managed via Prisma ORM; `pnpm task upgrade` applies its migrations before the app and workers start, and they refuse to start until it has.
 
 ### ClickHouse: Data Plane
 

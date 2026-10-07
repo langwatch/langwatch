@@ -53,6 +53,21 @@ export interface LangWatchQLDiagnosticsInput {
    * instant always produces the same diagnostics.
    */
   readonly now: Instant;
+  /** What hydration did, when the statement called an app function; absent otherwise. */
+  readonly appFunctions?: LangWatchQLAppFunctionDiagnosticsInput;
+}
+
+/** The hydration stage's own report, as the app-function diagnostics read it. */
+export interface LangWatchQLAppFunctionDiagnosticsInput {
+  readonly isTruncatedByBytes: boolean;
+  /** The ceiling that cut it, so the caller can size the next request against it. */
+  readonly maxHydratedBytes: number;
+  /** Rows handed back after the cut. */
+  readonly rowsReturned: number;
+  readonly valueTruncations: readonly { column: string; function: string; values: number }[];
+  readonly unresolvedKeys: readonly { column: string; function: string; keys: number }[];
+  /** Texts the judge skipped, by reason; absent when the statement judged nothing. */
+  readonly skippedJudgements?: Readonly<Record<string, number>>;
 }
 
 /** One of a block's table references, resolved to the view it names. */

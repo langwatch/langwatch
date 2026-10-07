@@ -2,6 +2,7 @@ import type { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
+import { HttpStripeMetersChannel } from "../channels/http/http.stripe-meters.channel.ts";
 import { StripeUsageReportingService } from "../services/usage-reporting.service.ts";
 
 const createMockStripe = () => ({
@@ -44,7 +45,7 @@ describe("usageReportingService", () => {
   beforeEach(() => {
     stripe = createMockStripe();
     service = StripeUsageReportingService.create({
-      stripe: stripe as any,
+      meters: HttpStripeMetersChannel.create({ stripe: stripe as any }),
       meterId: "mtr_test_abc123",
     });
   });

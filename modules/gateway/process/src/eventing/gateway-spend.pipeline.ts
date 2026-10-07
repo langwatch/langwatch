@@ -174,6 +174,14 @@ class ProducerOnlyGatewaySpendEvents extends GatewaySpendEventsRepository {
     return Promise.reject(producerOnly(this.processName, "page the spend ledger"));
   }
 
+  readSpendEventsAcrossTenants(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, "page the spend ledger across tenants"));
+  }
+
+  findSpendEventAcrossTenants(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, "find a spend row across tenants"));
+  }
+
   walkSpendEvents(): Promise<never> {
     return Promise.reject(producerOnly(this.processName, "walk the spend ledger"));
   }
@@ -192,6 +200,14 @@ class ProducerOnlyGatewaySpendEvents extends GatewaySpendEventsRepository {
 
   sumDaysForOrganizationProjects(): Promise<never> {
     return Promise.reject(producerOnly(this.processName, "sum the spend ledger by day"));
+  }
+
+  sumWindowByModel(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, "sum the spend ledger by model"));
+  }
+
+  sumWindowByVirtualKey(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, "sum the spend ledger by virtual key"));
   }
 
   countUsage(): Promise<never> {

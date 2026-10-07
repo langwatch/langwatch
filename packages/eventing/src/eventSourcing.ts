@@ -47,7 +47,10 @@ import {
 } from "./services/handoff/failedHandoff.ts";
 import { JOB_ROUTING_FIELD, type JobTenants, readJobRouting } from "./services/queues/jobLane.ts";
 import type { JobRegistryEntry } from "./services/queues/queueManager.ts";
+import type { EventReadSeat } from "./stores/eventReadSeat.ts";
 import type { EventStore } from "./stores/eventStore.types.ts";
+import { EventUpcaster, type PipelineUpcasts } from "./upcast/eventUpcast.ts";
+import { upcastEventStore } from "./upcast/upcastEventStore.ts";
 
 const logger = createLogger("langwatch:event-sourcing");
 
@@ -57,6 +60,8 @@ const logger = createLogger("langwatch:event-sourcing");
 export interface EventSourcingOptions {
   enabled?: boolean;
   eventStore?: EventStore;
+  /** One event by id beside the event store, which may refuse reads (event-read-seat.feature). */
+  eventReadSeat?: EventReadSeat;
   queueFactory?: (
     definition: EventSourcedQueueDefinition<Record<string, unknown>>,
   ) => EventSourcedQueueProcessor<Record<string, unknown>>;
@@ -127,10 +132,16 @@ export class EventSourcing {
 
   // Infrastructure — lazily initialized
   private _eventStore?: EventStore;
+  private readonly _eventReadSeat?: EventReadSeat;
   private _globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   private readonly _globalJobRegistry = new Map<string, JobRegistryEntry>();
+  private readonly _upcastDrains = new Map<
+    string,
+    { pipeline: string; jobNames: ReadonlyMap<string, string> }
+  >();
   private _initialized = false;
   private _consumersHeld = false;
+  private _consumersPaused = false;
   private _loggedDisabledWarning = false;
 
   // Options
@@ -159,6 +170,7 @@ export class EventSourcing {
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;
     this._eventStore = options.eventStore;
+    this._eventReadSeat = options.eventReadSeat;
     this._queueFactory = options.queueFactory;
     this._queueName = options.queueName ?? "event-sourcing/jobs";
     this._consumersEnabled = options.consumersEnabled ?? true;
@@ -225,6 +237,7 @@ export class EventSourcing {
         consumersEnabled: this._consumersEnabled,
         held: this._consumersHeld,
       });
+      if (this._consumersPaused) this._processRuntimeInstance.pause();
     }
     return this._processRuntimeInstance;
   }
@@ -243,7 +256,22 @@ export class EventSourcing {
     if (!this._consumersHeld) return;
     this._consumersHeld = false;
     this._globalQueue?.start?.();
+    if (this._consumersPaused) this._globalQueue?.pause?.();
     this._processRuntimeInstance?.start();
+  }
+
+  /** Takes no new job, intent or wake; work already claimed finishes. Idempotent. */
+  pauseConsumers(): void {
+    this._consumersPaused = true;
+    this._globalQueue?.pause?.();
+    this._processRuntimeInstance?.pause();
+  }
+
+  /** Takes jobs, intents and wakes again after `pauseConsumers`. Idempotent. */
+  resumeConsumers(): void {
+    this._consumersPaused = false;
+    this._globalQueue?.resume?.();
+    this._processRuntimeInstance?.resume();
   }
 
   /** The process managers this runtime registered producer-only and will not run. */
@@ -254,6 +282,11 @@ export class EventSourcing {
   get eventStore(): EventStore | undefined {
     this.ensureInitialized();
     return this._eventStore;
+  }
+
+  /** The one-event read this process composed beside its store; absent where it composed none. */
+  get eventReadSeat(): EventReadSeat | undefined {
+    return this._eventReadSeat;
   }
 
   get globalQueue(): EventSourcedQueueProcessor<Record<string, unknown>> | undefined {
@@ -303,8 +336,10 @@ export class EventSourcing {
   private parseRegisteredEvent(value: unknown): Event {
     const type =
       typeof value === "object" && value !== null && "type" in value ? value.type : undefined;
-    const owner = this._definitions.find((definition) =>
-      definition.aggregate.events.some((event) => event.type === type),
+    const owner = this._definitions.find(
+      (definition) =>
+        definition.aggregate.events.some((event) => event.type === type) ||
+        definition.open((opened) => EventUpcaster.of(opened.upcasts).declaresFrom(type)),
     );
     if (!owner) {
       throw new ValidationError({
@@ -482,7 +517,12 @@ export class EventSourcing {
       return disabled as ReturnType;
     }
 
-    const eventStore = this.eventStore as EventStore<EventType>;
+    const eventStore = upcastEventStore({
+      store: this.eventStore as EventStore<EventType>,
+      upcaster: EventUpcaster.of(definition.upcasts),
+      parseEvent: definition.parseEvent,
+    });
+    this.registerUpcastDrain(definition.upcasts);
 
     const serviceOptions = buildServiceOptions(definition);
 
@@ -673,6 +713,32 @@ export class EventSourcing {
     return this._processStore;
   }
 
+  /** A former pipeline's queued jobs drain into the lanes of the pipeline that renamed it (§9). */
+  private registerUpcastDrain(upcasts: PipelineUpcasts | undefined): void {
+    const drain = upcasts?.drain;
+    if (!drain) return;
+    this._upcastDrains.set(drain.pipeline, {
+      pipeline: upcasts.pipeline,
+      jobNames: new Map(Object.entries(drain.jobNames ?? {})),
+    });
+  }
+
+  /** The current lane a job queued under a former pipeline's key drains into, if declared. */
+  private drainedEntry({
+    pipelineName,
+    jobType,
+    jobName,
+  }: {
+    pipelineName: string;
+    jobType: string;
+    jobName: string;
+  }): JobRegistryEntry | undefined {
+    const drain = this._upcastDrains.get(pipelineName);
+    if (!drain) return undefined;
+    const current = drain.jobNames.get(jobName) ?? jobName;
+    return this._globalJobRegistry.get(`${drain.pipeline}:${jobType}:${current}`);
+  }
+
   /**
    * Strips routing metadata and looks up the registry entry for a job payload,
    * returning null on no handler. Resolution runs several times per job, so a
@@ -691,7 +757,9 @@ export class EventSourcing {
     }
 
     const registryKey = `${pipelineName}:${jobType}:${jobName}`;
-    const entry = this._globalJobRegistry.get(registryKey);
+    const entry =
+      this._globalJobRegistry.get(registryKey) ??
+      this.drainedEntry({ pipelineName, jobType, jobName });
     if (!entry) {
       logger.debug({ registryKey }, "No handler registered for job");
       return null;
@@ -831,6 +899,7 @@ export class EventSourcing {
       ? this._queueFactory(definition)
       : new EventSourcedQueueProcessorMemory(definition);
     if (!this._consumersHeld) this._globalQueue.start?.();
+    if (this._consumersPaused) this._globalQueue.pause?.();
   }
 
   private globalQueueGroupKey(payload: Record<string, unknown>): string {

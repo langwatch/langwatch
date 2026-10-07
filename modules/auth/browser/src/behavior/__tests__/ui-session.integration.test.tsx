@@ -5,6 +5,7 @@
  * @vitest-environment jsdom
  */
 
+import type { UiAuthClient } from "@langwatch/auth-contract";
 import { UiFeedback } from "@langwatch/browser-host/capabilities";
 import type { UiActiveScopeReading } from "@langwatch/browser-host/session";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -12,7 +13,6 @@ import { render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { UiAuthClient } from "../../session";
 import { useBrowserUiSession, useUiSessionReading } from "../ui-session";
 import {
   UI_EFFECTIVE_PERMISSIONS_PROCEDURE,

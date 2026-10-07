@@ -5,11 +5,6 @@
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
-import {
-  InstantEvalClassifierUnavailableError,
-  type InstantEvalJudgement,
-  type InstantEvalVerdict,
-} from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
@@ -20,13 +15,6 @@ import type {
 } from "../eventing/instant-eval-processing.intent.ts";
 import type { InstantEvalCancellationRepository } from "../repositories/instant-eval-cancellation.repository.ts";
 import type { InstantEvalJudgmentsRepository } from "../repositories/instant-eval-judgments.repository.ts";
-import {
-  assertInstantEvalPageBudget,
-  instantEvalJudgedRows,
-  instantEvalJudgementUnits,
-  instantEvalPageTokenBudget,
-  type InstantEvalJudgementUnit,
-} from "../rules/instant-eval-judge-page.rules.ts";
 import {
   INSTANT_EVAL_PAGE_FAILURE_CEILING,
   instantEvalPageFailureRate,
@@ -50,6 +38,12 @@ import { instantEvalHydrationPlan } from "../rules/instant-eval-run-sizing.rules
 import type { InstantEvalTextSource } from "./instant-eval-estimate.service.ts";
 import type { InstantEvalFreeBudgetService } from "./instant-eval-free-budget.service.ts";
 import {
+  INSTANT_EVAL_JUDGE_CONCURRENCY,
+  InstantEvalJudgeRowsService,
+  type InstantEvalJudgeUsage,
+  type InstantEvalRowsJudgement,
+} from "./instant-eval-judge-rows.service.ts";
+import {
   InstantEvalReadAheadService,
   type InstantEvalReadPage,
 } from "./instant-eval-read-ahead.service.ts";
@@ -60,29 +54,6 @@ import type {
 } from "./instant-eval-run-context.service.ts";
 
 const logger = createLogger("langwatch:instant-eval:judge-page");
-
-/**
- * Classifications one page keeps in flight. High enough that the judge's own
- * token bucket, rather than the number of open requests, is what a page waits
- * on: at about 250 ms a call, thirty-two could never reach that rate.
- */
-const INSTANT_EVAL_PAGE_CONCURRENCY = 128;
-
-/** What one page's requests sent and what they cost it. */
-interface InstantEvalPageUsage {
-  requests: number;
-  inputTokens: number;
-  skipped: Record<string, number>;
-  limiterWaitMs: number;
-}
-
-/** One page, judged: the rows as they are written, and what they sent. */
-interface InstantEvalJudgedPage {
-  readonly rows: readonly Record<string, unknown>[];
-  readonly usage: InstantEvalPageUsage;
-  /** Present when a stop reached the page, naming the rows it left unjudged. */
-  readonly cancellation?: { readonly unjudgedRows: readonly number[] };
-}
 
 /** A page that judged nothing, which is also what a cancelled run answers. */
 const EMPTY_INSTANT_EVAL_PAGE: InstantEvalPageOutcome = {
@@ -109,7 +80,7 @@ export class InstantEvalJudgePageService {
   private readonly cancellation: InstantEvalCancellationRepository;
   private readonly budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
   private readonly readAhead: InstantEvalReadAheadService;
-  private readonly concurrency: number;
+  private readonly judgeRows: InstantEvalJudgeRowsService;
   private readonly now: () => number;
 
   private constructor(options: {
@@ -132,7 +103,10 @@ export class InstantEvalJudgePageService {
     this.cancellation = options.cancellation;
     this.budget = options.budget;
     this.readAhead = options.readAhead;
-    this.concurrency = options.concurrency;
+    this.judgeRows = InstantEvalJudgeRowsService.create({
+      judge: options.judge,
+      concurrency: options.concurrency,
+    });
     this.now = options.now;
   }
 
@@ -145,7 +119,7 @@ export class InstantEvalJudgePageService {
     cancellation,
     budget,
     readAhead = InstantEvalReadAheadService.create(),
-    concurrency = INSTANT_EVAL_PAGE_CONCURRENCY,
+    concurrency = INSTANT_EVAL_JUDGE_CONCURRENCY,
     now = () => nowInstant().epochMilliseconds,
   }: {
     context: InstantEvalRunContextService;
@@ -351,7 +325,7 @@ export class InstantEvalJudgePageService {
     loaded: InstantEvalLoadedRun;
     rows: readonly Record<string, unknown>[];
     input: InstantEvalJudgePageInput;
-  }): Promise<{ judged: InstantEvalJudgedPage; stop: InstantEvalPageStop | null }> {
+  }): Promise<{ judged: InstantEvalRowsJudgement; stop: InstantEvalPageStop | null }> {
     // Measured again after the reads, which spent part of the same lease.
     const deadlineMs = this.#leaseMsLeft(input);
     const deadline = Number.isFinite(deadlineMs) ? AbortSignal.timeout(deadlineMs) : null;
@@ -359,10 +333,10 @@ export class InstantEvalJudgePageService {
     const stops = [watch.signal, deadline].filter((candidate) => candidate !== null);
     const signal = stops.length > 0 ? AbortSignal.any(stops) : null;
     try {
-      const judged = await this.#judgeRows({
-        loaded,
-        rows,
+      const judged = await this.judgeRows.judgeRows({
         projectId: input.projectId,
+        rows,
+        questions: loaded.questions,
         signal,
       });
 
@@ -407,89 +381,6 @@ export class InstantEvalJudgePageService {
     });
   }
 
-  /** One request per text, at most {@link concurrency} of them in flight. */
-  async #judgeRows({
-    loaded,
-    rows,
-    projectId,
-    signal,
-  }: {
-    loaded: InstantEvalLoadedRun;
-    rows: readonly Record<string, unknown>[];
-    projectId: string;
-    signal: AbortSignal | null;
-  }): Promise<InstantEvalJudgedPage> {
-    const { limits } = this.judge;
-    const units = instantEvalJudgementUnits({ rows, questions: loaded.questions, limits });
-    assertInstantEvalPageBudget({
-      units,
-      budget: instantEvalPageTokenBudget({ rows: rows.length, limits }),
-      limits,
-    });
-
-    const usage: InstantEvalPageUsage = {
-      requests: 0,
-      inputTokens: 0,
-      skipped: {},
-      limiterWaitMs: 0,
-    };
-    const cells = new Map<number, Map<string, InstantEvalVerdict | null>>();
-    let failures = 0;
-    const isCancelled = await inParallel({
-      items: units,
-      limit: this.concurrency,
-      signal,
-      run: async (unit) => {
-        const judgement = await this.#classify({ projectId, unit, signal });
-        if (judgement === null) failures += 1;
-        record({ unit, judgement: judgement ?? LOST_JUDGEMENT, cells, usage });
-      },
-    });
-    // Every unit failing is not a row-level problem: it is the judge not
-    // answering at all, and a page of nulls would read as "nothing matched".
-    if (failures > 0 && failures === units.length) {
-      throw new InstantEvalClassifierUnavailableError();
-    }
-
-    const judged = instantEvalJudgedRows({ rows, questions: loaded.questions, cells });
-
-    return {
-      rows: judged.rows,
-      usage,
-      ...(isCancelled ? { cancellation: { unjudgedRows: judged.unjudgedRows } } : {}),
-    };
-  }
-
-  /**
-   * One unit's judgement, or null when the judge could not be used. A stop is
-   * rethrown rather than counted: swallowing it would turn an abandoned page
-   * into a page of nulls and let the remaining units keep spending.
-   */
-  async #classify({
-    projectId,
-    unit,
-    signal,
-  }: {
-    projectId: string;
-    unit: InstantEvalJudgementUnit;
-    signal: AbortSignal | null;
-  }): Promise<InstantEvalJudgement | null> {
-    try {
-      return await this.judge.classify(
-        {
-          projectId,
-          text: unit.text,
-          questions: unit.questions.map((question) => question.question),
-        },
-        signal ?? undefined,
-      );
-    } catch (error) {
-      if (signal?.aborted || isAbortError(error)) throw error;
-
-      return null;
-    }
-  }
-
   /** An abort signal that fires once the run has been asked to stop. */
   #watchForCancellation({ projectId, runId }: InstantEvalJudgePageInput): {
     signal: AbortSignal;
@@ -531,7 +422,7 @@ export class InstantEvalJudgePageService {
   }: {
     loaded: InstantEvalLoadedRun;
     input: InstantEvalJudgePageInput;
-    judged: InstantEvalJudgedPage;
+    judged: InstantEvalRowsJudgement;
     rows: readonly Record<string, unknown>[];
     keys: Parameters<typeof mapInstantEvalPage>[0]["keys"];
     unjudgedRows?: Parameters<typeof mapInstantEvalPage>[0]["unjudgedRows"];
@@ -561,45 +452,6 @@ export class InstantEvalJudgePageService {
   }
 }
 
-/** What a unit the judge lost is recorded as: a skip, with the reason. */
-const LOST_JUDGEMENT: InstantEvalJudgement = {
-  verdicts: [],
-  skippedReason: "classifier_failed",
-  inputTokens: 0,
-  isTextTruncated: false,
-};
-
-/**
- * One answer, filed. Every question of the unit gets a cell — null where the
- * judgement carries no verdict for it — because a question that was asked and
- * declined is a null the page explains, not one a stop left behind.
- */
-function record({
-  unit,
-  judgement,
-  cells,
-  usage,
-}: {
-  unit: InstantEvalJudgementUnit;
-  judgement: InstantEvalJudgement;
-  cells: Map<number, Map<string, InstantEvalVerdict | null>>;
-  usage: InstantEvalPageUsage;
-}): void {
-  usage.requests += 1;
-  usage.inputTokens += judgement.inputTokens;
-  usage.limiterWaitMs += judgement.limiterWaitMs ?? 0;
-  if (judgement.skippedReason) {
-    usage.skipped[judgement.skippedReason] = (usage.skipped[judgement.skippedReason] ?? 0) + 1;
-  }
-
-  const byQuestion = new Map(judgement.verdicts.map((verdict) => [verdict.questionId, verdict]));
-  const row = cells.get(unit.rowIndex) ?? new Map<string, InstantEvalVerdict | null>();
-  for (const question of unit.questions) {
-    row.set(question.id, byQuestion.get(question.id) ?? null);
-  }
-  cells.set(unit.rowIndex, row);
-}
-
 /**
  * Where the next page starts and whether there is one. A page cut short ends
  * where its judging did; one that judged nothing stays where it started, so
@@ -617,7 +469,7 @@ function outcomeFor({
   cut: ReturnType<typeof cutPageAtStop>;
   keyPage: InstantEvalKeyPage;
   counters: InstantEvalPageCounters;
-  usage: InstantEvalPageUsage;
+  usage: InstantEvalJudgeUsage;
   stop: InstantEvalPageStop | null;
 }): InstantEvalPageOutcome {
   const resumeFrom = cut.last ?? (cut.isCutShort ? null : keyPage.keys.at(-1));
@@ -646,81 +498,4 @@ function pageStopFor({ watch, deadline }: { watch: AbortSignal; deadline: AbortS
   if (watch.aborted) return { stop: "cancelled" };
 
   return { stop: deadline?.aborted ? "deadline" : null };
-}
-
-/** Whether a thrown value is a stop rather than a failure. */
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
-}
-
-/**
- * Runs the units with a fixed number in flight, answering whether a stop ended
- * the scheduling. A stop settles what is in flight rather than throwing: a
- * unit already answered was paid for, and its verdict is kept.
- */
-async function inParallel<T>({
-  items,
-  limit,
-  run,
-  signal,
-}: {
-  items: readonly T[];
-  limit: number;
-  run: (item: T) => Promise<void>;
-  signal: AbortSignal | null;
-}): Promise<boolean> {
-  let next = 0;
-  const take = () => items[next++];
-  await Promise.all(
-    Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, () =>
-      drain({ take, run, signal }),
-    ),
-  );
-
-  return signal?.aborted === true;
-}
-
-/**
- * One worker: takes units until there are none, or until the signal fires.
- * Checked between units as well as inside the request, so a page the caller
- * walked away from stops before the next classification.
- */
-async function drain<T>({
-  take,
-  run,
-  signal,
-}: {
-  take: () => T | undefined;
-  run: (item: T) => Promise<void>;
-  signal: AbortSignal | null;
-}): Promise<void> {
-  while (!signal?.aborted) {
-    const item = take();
-    if (item === undefined) return;
-    if (await runOrStop({ item, run, signal })) return;
-  }
-}
-
-/**
- * Runs one unit; true when the stop ended it, which ends the worker too. Only
- * the page's own signal is a stop: an abort the judge raised on its own is a
- * failed unit, and swallowing it would read as a judge answering nulls.
- */
-async function runOrStop<T>({
-  item,
-  run,
-  signal,
-}: {
-  item: T;
-  run: (item: T) => Promise<void>;
-  signal: AbortSignal | null;
-}): Promise<boolean> {
-  try {
-    await run(item);
-
-    return false;
-  } catch (error) {
-    if (signal?.aborted) return true;
-    throw error;
-  }
 }

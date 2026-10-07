@@ -111,7 +111,7 @@ function useRefetchOnRunProgress(runs: Record<string, ExplorerInstantEvalProgres
     if (due.list) {
       lastListAt.current = now;
       void trpcUtils.traces.list.invalidate(undefined, undefined, options);
-      void trpcUtils.traces.sessions.invalidate(undefined, undefined, options);
+      void trpcUtils.codingAgents.sessionGroups.invalidate(undefined, undefined, options);
     }
     if (due.facets) {
       lastFacetsAt.current = now;
@@ -137,7 +137,7 @@ function useSettleQuietRuns(): void {
       settling.current.add(runId);
       void Promise.allSettled([
         trpcUtils.traces.list.invalidate(),
-        trpcUtils.traces.sessions.invalidate(),
+        trpcUtils.codingAgents.sessionGroups.invalidate(),
         trpcUtils.traces.facetValues.invalidate(),
       ]).then(() => {
         settling.current.delete(runId);

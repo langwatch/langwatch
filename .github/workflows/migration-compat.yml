@@ -1,0 +1,522 @@
+name: migration-compat
+
+# Runs old code against the new schema: the direct test of ADR-155 rules 1 to 4,
+# which migration-safety only checks syntactically (ADR-155 "Still to land",
+# migrations rethink 6.12 point 4, migrations blitz plan 3.3 and D7).
+#
+# - n-minus-one (per PR): head's tasks migrate fresh databases, then base's live
+#   api suites run on them. On cloud the base build is the one still serving
+#   while a deploy rolls, so this is "safe side by side" proved by running.
+# - prisma-drift (per PR): the drift between the migrations and schema.prisma,
+#   judged only on what the PR adds; base's drift is the baseline.
+# - lts-floor (nightly, and on dispatch): the LTS floor's published image boots
+#   on a schema head migrated. Scheduled runs use the default branch's copy of
+#   this file, so the nightly starts once this workflow is on main.
+#
+# Filtered by path, so these checks must not be required ones: a required check
+# that never reports leaves a PR waiting forever (see migration-order.yml).
+# The trigger is pull_request, never pull_request_target: both checkouts run
+# code from the PR.
+#
+# Spec: specs/ci/migration-compat.feature
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "packages/prisma-client/prisma/migrations/**"
+      - "packages/prisma-client/prisma/schema.prisma"
+      - "packages/clickhouse-migrations/migrations/**"
+      - "modules/*/process/src/**/migrations/**"
+      - "enterprise/modules/*/process/src/**/migrations/**"
+      - ".github/workflows/migration-compat.yml"
+  schedule:
+    - cron: "37 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migration-compat-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # apps/tasks refuses to boot without one (tasks.nodeEnvironment), as in langwatch-app-ci.yml.
+  NODE_ENV: "test"
+  DATABASE_URL: "postgresql://prisma:prisma@localhost:5433/langwatch"
+  REDIS_URL: "redis://localhost:6380"
+  CLICKHOUSE_BASE_URL: "http://default:ci_password@localhost:8123"
+  SKIP_ENV_VALIDATION: "true"
+
+jobs:
+  n-minus-one:
+    name: base code on head schema
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        ports:
+          - 5433:5432
+        env:
+          POSTGRES_DB: langwatch
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+        options: >-
+          --health-cmd "pg_isready -U prisma"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:alpine
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.10.2.65
+        ports:
+          - 8123:8123
+        env:
+          CLICKHOUSE_DB: default
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ci_password
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      # The merge commit GitHub builds is what lands; its first parent is the
+      # base it was built against. Taking base from it, not from the event's
+      # base.sha, keeps head a superset of base, so base's goose run over
+      # head's ClickHouse finds nothing missing.
+      - name: Checkout head (the merge commit)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          path: head
+          fetch-depth: 2
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve base
+        id: base
+        run: |
+          set -euo pipefail
+          echo "sha=$(git -C head rev-parse HEAD^1)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout base (the merge commit's first parent)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ steps.base.outputs.sha }}
+          path: base
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+
+      # The base suites' fixture migrates ClickHouse database
+      # test_analytics_migrated_schema itself; head migrates that one first,
+      # so base's own goose run finds it current and changes nothing.
+      - name: Can the base be judged
+        id: layout
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+        run: |
+          set -euo pipefail
+          tests=base/apps/api/src/__tests__
+          suites=()
+          for suite in api-executable api-trpc-record; do
+            if [ -f "${tests}/${suite}.integration.test.ts" ]; then
+              suites+=("src/__tests__/${suite}.integration.test.ts")
+            fi
+          done
+          if [ ! -f "${tests}/api-live.fixture.ts" ] || [ "${#suites[@]}" -eq 0 ]; then
+            echo "::warning title=migration-compat::base ${BASE_SHA} has no live api suite, so its code on head's schema cannot be judged here"
+            echo "judged=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! grep -q 'MIGRATED_ENDPOINT_SUITE = "analytics-migrated"' "${tests}/monitor-performance.fixture.ts"; then
+            echo "::error title=migration-compat::base's live fixture no longer provisions test_analytics_migrated_schema; update the database this job migrates with head"
+            exit 1
+          fi
+          echo "judged=true" >> "$GITHUB_OUTPUT"
+          echo "suites=${suites[*]}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.6.0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+          cache-dependency-path: |
+            head/pnpm-lock.yaml
+            base/pnpm-lock.yaml
+
+      # node-pty's postinstall rebuilds with pnpm's vendored node-gyp, whose
+      # gyp_main.py ships without the execute bit; e2e-ci.yml explains it.
+      - name: Install node-gyp (for node-pty postinstall)
+        run: |
+          set -euo pipefail
+          npm install -g node-gyp@12.3.0
+          gyp="$(npm root -g)/node-gyp/bin/node-gyp.js"
+          test -f "$gyp"
+          echo "npm_config_node_gyp=$gyp" >> "$GITHUB_ENV"
+
+      - name: Install goose
+        run: bash head/.github/scripts/install-goose.sh
+
+      # The same install e2e-ci.yml proves start:prepare:files on.
+      - name: Install and prepare head
+        working-directory: head
+        run: |
+          set -euo pipefail
+          CI=true pnpm install --frozen-lockfile \
+            --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." \
+            --filter "@langwatch/ui..." --filter "@langwatch/tasks..." --filter "@langwatch/workspace"
+          pnpm start:prepare:files
+          pnpm ensure:built
+
+      # Head's upgrade, as its pre-roll Job runs it: the schema plus the ledger a
+      # gated base api reads before it serves (specs/upgrade/entry-points.feature).
+      # It boots the module tree for code steps, so it gets the Job's shared env.
+      - name: Migrate with head's tasks
+        working-directory: head
+        env:
+          CLICKHOUSE_URL: ${{ env.CLICKHOUSE_BASE_URL }}/test_analytics_migrated_schema
+          BASE_HOST: http://localhost:5560
+          NEXTAUTH_URL: http://localhost:5560
+        run: |
+          set -euo pipefail
+          for name in NEXTAUTH_SECRET CREDENTIALS_SECRET API_TOKEN_JWT_SECRET LW_VIRTUAL_KEY_PEPPER \
+            LW_GATEWAY_INTERNAL_SECRET LW_GATEWAY_JWT_SECRET; do
+            export "${name}=$(openssl rand -hex 32)"
+          done
+          pnpm --filter @langwatch/tasks task upgrade
+
+      - name: Install and prepare base
+        if: steps.layout.outputs.judged == 'true'
+        working-directory: base
+        run: |
+          set -euo pipefail
+          CI=true pnpm install --frozen-lockfile \
+            --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." \
+            --filter "@langwatch/ui..." --filter "@langwatch/tasks..." --filter "@langwatch/workspace"
+          pnpm start:prepare:files
+          pnpm ensure:built
+
+      # CI is unset for this step only: with CI set, the test harness starts
+      # ClickHouse containers instead of using this job's service
+      # (packages/clickhouse-client/src/clickhouse-test-endpoints.ts).
+      - name: Base's live api suites on head's schema
+        if: steps.layout.outputs.judged == 'true'
+        working-directory: base/apps/api
+        env:
+          LANGWATCH_TEST_DATABASE_URL: ${{ env.DATABASE_URL }}
+          LANGWATCH_TEST_REDIS_URL: ${{ env.REDIS_URL }}
+          LANGWATCH_TEST_CLICKHOUSE_URL: ${{ env.CLICKHOUSE_BASE_URL }}
+          NO_PROXY: "127.0.0.1,localhost"
+          VITEST_MAX_WORKERS: "2"
+          SUITES: ${{ steps.layout.outputs.suites }}
+        run: |
+          set -euo pipefail
+          read -ra files <<< "${SUITES}"
+          env -u CI pnpm test "${files[@]}" \
+            --reporter=default --reporter=json --outputFile.json="${RUNNER_TEMP}/n-minus-one.json"
+
+      # The live suites skip themselves when they cannot see the stores, and a
+      # skipped suite proves nothing.
+      - name: Every base suite passed a test
+        if: steps.layout.outputs.judged == 'true'
+        run: |
+          set -euo pipefail
+          report="${RUNNER_TEMP}/n-minus-one.json"
+          test -s "$report"
+          silent="$(jq -r '.testResults[] | select([.assertionResults[] | select(.status == "passed")] | length == 0) | .name' "$report")"
+          if [ -n "$silent" ]; then
+            echo "::error title=migration-compat::these base suites passed no test, so they proved nothing on head's schema"
+            echo "$silent"
+            exit 1
+          fi
+          jq -r '.testResults[] | "\(.name): \([.assertionResults[] | select(.status == "passed")] | length) passed"' "$report"
+
+  prisma-drift:
+    name: prisma drift
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        ports:
+          - 5433:5432
+        env:
+          POSTGRES_DB: langwatch
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+        options: >-
+          --health-cmd "pg_isready -U prisma"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout head (the merge commit)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          path: head
+          fetch-depth: 2
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve base
+        id: base
+        run: |
+          set -euo pipefail
+          echo "sha=$(git -C head rev-parse HEAD^1)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout base's Prisma directory
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ steps.base.outputs.sha }}
+          path: base
+          persist-credentials: false
+          sparse-checkout: |
+            /packages/prisma-client/prisma/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.6.0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+          cache-dependency-path: head/pnpm-lock.yaml
+
+      - name: Install head's Prisma CLI
+        working-directory: head
+        run: CI=true pnpm install --frozen-lockfile --filter "@langwatch/prisma-client"
+
+      # Prisma 7 takes the shadow database from a config file, not a flag, so
+      # each run writes one. Historic drift (relationMode "prisma" foreign keys,
+      # raw-SQL tables) is on base too and cancels out; only new lines fail.
+      - name: Drift the PR adds
+        working-directory: head/packages/prisma-client
+        env:
+          SHADOW_URL: "postgresql://prisma:prisma@localhost:5433/shadow"
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+        run: |
+          set -euo pipefail
+          export LC_ALL=C
+          psql "postgresql://prisma:prisma@localhost:5433/langwatch" -qc "CREATE DATABASE shadow"
+          drift() {
+            local tree="$1" out="$2" status
+            printf 'export default { schema: "%s/packages/prisma-client/prisma/schema.prisma", migrations: { path: "%s/packages/prisma-client/prisma/migrations" }, datasource: { url: process.env.SHADOW_URL, shadowDatabaseUrl: process.env.SHADOW_URL } };\n' \
+              "$tree" "$tree" > "${RUNNER_TEMP}/drift.config.mjs"
+            set +e
+            pnpm exec prisma migrate diff --config "${RUNNER_TEMP}/drift.config.mjs" \
+              --from-migrations "$tree/packages/prisma-client/prisma/migrations" \
+              --to-schema "$tree/packages/prisma-client/prisma/schema.prisma" \
+              --script --exit-code > "$out"
+            status=$?
+            set -e
+            if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+              echo "::error title=prisma-drift::prisma migrate diff failed for ${tree} (exit ${status})"
+              cat "$out"
+              exit 1
+            fi
+          }
+          statements() { grep -v -E '^[[:space:]]*(--.*)?$' "$1" | sort -u || true; }
+
+          drift "${GITHUB_WORKSPACE}/head" "${RUNNER_TEMP}/head.sql"
+          if [ ! -f "${GITHUB_WORKSPACE}/base/packages/prisma-client/prisma/schema.prisma" ]; then
+            echo "::warning title=prisma-drift::base ${BASE_SHA} has no packages/prisma-client, so the drift the PR adds cannot be told from what base carries"
+            exit 0
+          fi
+          drift "${GITHUB_WORKSPACE}/base" "${RUNNER_TEMP}/base.sql"
+
+          added="$(comm -13 <(statements "${RUNNER_TEMP}/base.sql") <(statements "${RUNNER_TEMP}/head.sql"))"
+          if [ -n "$added" ]; then
+            echo "::error title=prisma-drift::this PR makes the migrations and schema.prisma disagree; a migration is missing or schema.prisma is ahead of it"
+            echo "$added"
+            exit 1
+          fi
+          echo "No drift added: base $(statements "${RUNNER_TEMP}/base.sql" | wc -l) statement lines, head $(statements "${RUNNER_TEMP}/head.sql" | wc -l)."
+
+  lts-floor:
+    name: lts floor image on head schema
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16
+        ports:
+          - 5433:5432
+        env:
+          POSTGRES_DB: langwatch
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+        options: >-
+          --health-cmd "pg_isready -U prisma"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:alpine
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.10.2.65
+        ports:
+          - 8123:8123
+        env:
+          CLICKHOUSE_DB: default
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ci_password
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+
+      - name: Read the LTS floor
+        id: floor
+        run: |
+          set -euo pipefail
+          release="$(jq -r '.release' packages/upgrade/releases/lts-floor.json)"
+          if ! [[ "$release" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error title=lts-floor::packages/upgrade/releases/lts-floor.json names no release (${release})"
+            exit 1
+          fi
+          echo "release=${release}" >> "$GITHUB_OUTPUT"
+          docker pull "langwatch/langwatch:${release}"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.6.0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install node-gyp (for node-pty postinstall)
+        run: |
+          set -euo pipefail
+          npm install -g node-gyp@12.3.0
+          gyp="$(npm root -g)/node-gyp/bin/node-gyp.js"
+          test -f "$gyp"
+          echo "npm_config_node_gyp=$gyp" >> "$GITHUB_ENV"
+
+      - name: Install goose
+        run: bash .github/scripts/install-goose.sh
+
+      - name: Install and prepare head
+        run: |
+          set -euo pipefail
+          CI=true pnpm install --frozen-lockfile \
+            --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." \
+            --filter "@langwatch/ui..." --filter "@langwatch/tasks..." --filter "@langwatch/workspace"
+          pnpm start:prepare:files
+          pnpm ensure:built
+
+      - name: Migrate with head's tasks
+        env:
+          CLICKHOUSE_URL: ${{ env.CLICKHOUSE_BASE_URL }}/langwatch
+        run: |
+          set -euo pipefail
+          pnpm prisma:migrate
+          cd apps/tasks
+          pnpm task clickhouse-migrate
+
+      # The floor image runs its own start-up migrations first, as an old pod
+      # restarting mid-rollout would: on a schema head already migrated they
+      # must find nothing to do.
+      - name: Start the floor image on head's schema
+        env:
+          RELEASE: ${{ steps.floor.outputs.release }}
+        run: |
+          set -euo pipefail
+          docker run -d --name floor --network host \
+            -e NODE_ENV=production -e INSTALL_METHOD=docker -e SKIP_ENV_VALIDATION=true \
+            -e DATABASE_URL="${DATABASE_URL}" -e REDIS_URL="${REDIS_URL}" \
+            -e CLICKHOUSE_URL="${CLICKHOUSE_BASE_URL}/langwatch" -e CLICKHOUSE_BACKUP_METRICS_ENABLED=false \
+            -e BASE_HOST=http://localhost:5560 -e NEXTAUTH_URL=http://localhost:5560 \
+            -e NEXTAUTH_SECRET="$(openssl rand -hex 32)" -e CREDENTIALS_SECRET="$(openssl rand -hex 32)" \
+            -e API_TOKEN_JWT_SECRET="$(openssl rand -hex 32)" -e LW_VIRTUAL_KEY_PEPPER="$(openssl rand -hex 32)" \
+            -e LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" -e LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)" \
+            "langwatch/langwatch:${RELEASE}"
+
+      - name: The floor image answers and names nothing missing
+        env:
+          RELEASE: ${{ steps.floor.outputs.release }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 120); do
+            if [ "$(docker inspect -f '{{.State.Running}}' floor)" != "true" ]; then
+              echo "::error title=lts-floor::the ${RELEASE} image exited on head's schema"
+              exit 1
+            fi
+            if curl -fsS -o /dev/null http://localhost:5560/api/health; then
+              echo "healthy after ${attempt} probes"
+              break
+            fi
+            if [ "$attempt" -eq 120 ]; then
+              echo "::error title=lts-floor::the ${RELEASE} image never answered /api/health on head's schema"
+              exit 1
+            fi
+            sleep 5
+          done
+          # A minute of background work reads and writes the tables it knows.
+          sleep 60
+          missing="$(docker logs floor 2>&1 | grep -E '(column|relation) "[^"]+" does not exist|P2021|P2022|Code: (47|60)\.' || true)"
+          if [ -n "$missing" ]; then
+            echo "::error title=lts-floor::the ${RELEASE} image reads something head's schema no longer has"
+            echo "$missing"
+            exit 1
+          fi
+
+      - name: Floor image log
+        if: always()
+        run: docker logs floor 2>&1 | tail -n 300 || true

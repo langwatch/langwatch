@@ -12,6 +12,7 @@ import {
   type AnnotationHostUser,
   type AnnotationRouteReading,
   type AnnotationSuccessNotice,
+  type AnnotationTraceFilters,
 } from "./model/annotation-host.ts";
 
 export type StubAnnotationHostOptions = {
@@ -22,6 +23,8 @@ export type StubAnnotationHostOptions = {
   isLiteMember?: boolean;
   isOwnPersonalWorkspace?: boolean;
   route?: AnnotationRouteReading;
+  /** The trace filters the shell passes in; absent means the list is unfiltered. */
+  traceFilters?: AnnotationTraceFilters;
   /** The drawer the address bar has open, if any. */
   openDrawer?: string;
 };
@@ -73,6 +76,10 @@ export class StubAnnotationHost extends AnnotationHostApi {
 
   route(): AnnotationRouteReading {
     return this.options.route ?? { params: {}, query: {} };
+  }
+
+  traceFilters(): AnnotationTraceFilters | undefined {
+    return this.options.traceFilters;
   }
 
   setQuery(next: Readonly<Record<string, string | undefined>>): void {

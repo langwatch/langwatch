@@ -6,7 +6,7 @@ The server half of [audit-log](../README.md). The audit log: every module record
 
 ## Installation
 
-`defineProcessModule("audit-log").withRepositories(auditLogRepositories).withApi(AuditLogModule).withTransports(homeTrpcTransport).withTasks(…)`, `src/audit-log.module.ts:9`.
+`defineProcessModule("audit-log").withRepositories(auditLogRepositories).withApi(AuditLogModule).withTransports(homeTrpcTransport).withEventing(auditLogEventing).withTasks(…)`, `src/audit-log.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -55,6 +55,14 @@ Contract `../contract/src/recent-items.ts:35`, router `src/transport/home.trpc.t
 None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
+
+### Pipeline `audit_log` (aggregate `global`)
+
+Declared at `src/eventing/audit-log.pipeline.ts:49`.
+
+| Kind            | Name                        | Handles                                                                            | Declared at                             |
+| --------------- | --------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------- |
+| peer subscriber | `auditLogOrganizationAudit` | `lw.organization.audit_recorded` from [organization](../../organization/README.md) | `src/eventing/audit-log.pipeline.ts:55` |
 
 ### Tasks
 

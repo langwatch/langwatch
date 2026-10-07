@@ -12,8 +12,10 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { FIELD_DEFS } from "../trace-query-fields.rules.ts";
-import { translateFilter } from "../trace-query.rules.ts";
+import {
+  traceQueryFields,
+  traceQueryTranslation,
+} from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 
 const TENANT = "project-1";
 const WINDOW = { from: 1_000, to: 2_000 };
@@ -28,7 +30,7 @@ const run = (overrides: Partial<ResolvedInstantEvalRun> = {}): ResolvedInstantEv
 });
 
 const compile = (queryText: string, evalRuns?: ResolvedInstantEvalRun[]) =>
-  translateFilter({
+  traceQueryTranslation.translateFilter({
     queryText,
     tenantId: TENANT,
     timeRange: WINDOW,
@@ -111,7 +113,7 @@ describe("given a trigger evaluating an eval chip in memory", () => {
     /** @scenario "The eval field cannot be evaluated in memory" */
     it("answers unsupported for a forcing spelling", () => {
       const tag = parseTraceQuerySyntax('eval.trace:"the user is annoyed"') as TagToken;
-      const verdict = FIELD_DEFS["eval.trace"].evaluateInMemory(tag, false, {
+      const verdict = traceQueryFields.fieldDefs["eval.trace"].evaluateInMemory(tag, false, {
         summary: {} as never,
       });
       expect(verdict).toBe(UNSUPPORTED);
@@ -125,7 +127,9 @@ describe("given the search field registry", () => {
     it("lists the eval field and its three target spellings under the eval group", () => {
       for (const field of ["eval", "eval.trace", "eval.conversation", "eval.llm"]) {
         expect(SEARCH_FIELDS[field]?.group).toBe("eval");
-        expect(FIELD_DEFS[field as keyof typeof FIELD_DEFS]).toBeDefined();
+        expect(
+          traceQueryFields.fieldDefs[field as keyof typeof traceQueryFields.fieldDefs],
+        ).toBeDefined();
       }
     });
   });

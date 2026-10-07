@@ -33,6 +33,8 @@ type Input struct {
 	// branch carrying it is porting history, not adding a migration, and it
 	// must keep the name.
 	Released []string
+	// ReleasedRefs name the release lines Released was read from, for findings.
+	ReleasedRefs []string
 	// Diverged are released entries the branch head carries with contents that
 	// differ from the release line's copy. The name alone does not make a port
 	// history: databases that ran the release recorded that name for its SQL.
@@ -124,6 +126,10 @@ func Check(in Input) []Finding {
 	// a migration the branch adds may not share that key either.
 	portedKeys, highestPorted := keysOf(portedEntries(in), in.Set)
 
+	// Every key on a release line, ported or not: where the set's database
+	// keeps one row per key, none of them is free (Set.ReleaseKeysTaken).
+	releasedKeys, highestReleased := keysOf(in.Released, in.Set)
+
 	var added []migration
 	for _, entry := range slices.Sorted(slices.Values(in.Head)) {
 		if existing[entry] {
@@ -147,6 +153,9 @@ func Check(in Input) []Finding {
 	// branch already numbered — so a suggestion never lands on a key that is
 	// itself taken, and two clashing migrations get two different answers.
 	free := max(highest, highestPorted)
+	if in.Set.ReleaseKeysTaken {
+		free = max(free, highestReleased)
+	}
 	for _, m := range added {
 		free = max(free, m.key)
 	}
@@ -184,6 +193,14 @@ func Check(in Input) []Finding {
 				Entry:   m.entry,
 				Problem: fmt.Sprintf("shares key %d with %s, a released migration this branch ports", m.key, portedKeys[m.key]),
 				Fix:     suggest(m.entry),
+			})
+		case in.Set.ReleaseKeysTaken && releasedKeys[m.key] != "":
+			findings = append(findings, Finding{
+				Set:   in.Set.Name,
+				Entry: m.entry,
+				Problem: fmt.Sprintf("takes key %d, which %s already took on %s, released or not, and one database cannot record two migrations at one version",
+					m.key, releasedKeys[m.key], strings.Join(in.ReleasedRefs, ", ")),
+				Fix: suggest(m.entry),
 			})
 		case twin:
 			findings = append(findings, Finding{

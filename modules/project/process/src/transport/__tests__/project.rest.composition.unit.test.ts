@@ -217,6 +217,21 @@ describe("the projects REST family over the application the composition builds",
       const body = (await response.json()) as { data: { id: string }[] };
       expect(body.data.map((row) => row.id)).toEqual(["project_1"]);
     });
+
+    /** @scenario "The hidden Governance Project never appears in /api/v1/projects responses" */
+    it("carries no trace of the hidden governance project, in a row or in a count", async () => {
+      const { send } = mountProjectRestApplication(application().app);
+
+      const response = await send("/api/projects");
+
+      const text = JSON.stringify(await response.json());
+      expect(text).not.toContain(GOVERNANCE_PROJECT_ID);
+      expect(text).not.toContain("Governance (internal)");
+      expect(text).not.toContain("internal_governance");
+      expect(JSON.parse(text)).toMatchObject({
+        pagination: { total: 1 },
+      });
+    });
   });
 
   describe("when one project is read", () => {
@@ -258,6 +273,7 @@ describe("the projects REST family over the application the composition builds",
         recordPresenceSettingChanged: { send: async () => undefined },
         recordProjectMoved: { send: async () => undefined },
         recordProjectArchived: { send: async () => undefined },
+        recordProjectDepartmentAssigned: { send: async () => undefined },
       });
     });
 

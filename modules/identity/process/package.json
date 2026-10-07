@@ -48,6 +48,7 @@
     "@langwatch/secrets": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@slack/webhook": "catalog:",
     "better-auth": "catalog:",

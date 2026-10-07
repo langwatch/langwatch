@@ -57,6 +57,10 @@ import {
   type VirtualKeyApiApplicableBudgetsInput,
   type VirtualKeySpendThisMonth,
   type GatewaySpendEventsPageQuery,
+  type GatewaySpendEventsAcrossTenantsQuery,
+  type GatewaySpendEventsAcrossTenantsPage,
+  type GatewaySpendEventAcrossTenantsQuery,
+  type SpendEventRow,
   type gatewayInternalBucketSpendAnswers,
   type gatewayInternalChangesAnswers,
   type gatewayInternalCodexRefreshAnswers,
@@ -140,7 +144,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { gatewayInternalSecret, Secret, virtualKeyPepper } from "@langwatch/secrets";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
-import { TraceApi } from "@langwatch/trace-contract";
+import { recordSpanCommandDataSchema, TraceApi } from "@langwatch/trace-contract";
 // The billing envelope is the webhook platform's, and a reconciliation pull has
 // to answer the same bytes a push delivers, so it ARRIVES from that contract.
 import {
@@ -743,10 +747,10 @@ type GatewayControlPlanePeers = Readonly<{
   monitors: MonitorApi;
   /** The deployment's own providers, which a license's managed key dispatches on. */
   platformProviders: GatewayPlatformProviders;
-  /** The per-virtual-key spend the usage surfaces read, one tenant at a time. */
+  /** The per-virtual-key spend the usage surfaces read. */
   traces: Pick<
     TraceApi,
-    "findSpendByAttributeValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
+    "findSpendByProjectAndValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
   >;
 }>;
 
@@ -1186,6 +1190,27 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
           const sender = spend.commands.confirmSpend;
           if (!sender) throw new Error("gateway_spend registered no confirmSpend sender here");
           await sender.send(data);
+        },
+      },
+      attribution: {
+        findSessionAttribution: async ({ virtualKeyId, projectId }) => {
+          const [[key], project] = await Promise.all([
+            repositories.internalStore.findVirtualKeysForAttribution([virtualKeyId]),
+            setup.dependencies.projects.findTraceDestination(projectId),
+          ]);
+          return { principalUserId: key?.principalUserId ?? null, teamId: project?.teamId ?? null };
+        },
+      },
+      budgets: controlPlane.budgetDecisions,
+      // The settled span rides the trace module's ingress command, like any collected span.
+      spanIngestion: {
+        ingestNormalizedSpan: async (input) => {
+          await setup.dependencies.traces.recordSpan(
+            recordSpanCommandDataSchema.parse({
+              ...input,
+              occurredAt: nowInstant().epochMilliseconds,
+            }),
+          );
         },
       },
     };
@@ -1652,7 +1677,13 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   }
 
   /** One voice reconciliation tick, what the reconcile process manager's intent runs. */
-  reconcileRealtimeSessions(): Promise<{ examined: number; confirmed: number; expired: number }> {
+  reconcileRealtimeSessions(): Promise<{
+    examined: number;
+    confirmed: number;
+    expired: number;
+    settled: number;
+    estimated: number;
+  }> {
     return this.#voice.reconciliation.poll();
   }
 
@@ -2002,6 +2033,30 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     const service = this.#dependencies.spendEvents;
     if (!service) return [];
     return service.findSpendDaysForOrganizationProjects(input);
+  }
+
+  async listSpendEventsAcrossTenants(
+    input: GatewaySpendEventsAcrossTenantsQuery,
+  ): Promise<GatewaySpendEventsAcrossTenantsPage> {
+    const service = this.#dependencies.spendEvents;
+    if (!service) return { rows: [], nextCursor: null };
+    return service.getSpendEventsAcrossTenants({
+      ...input,
+      tenantIds: [...input.tenantIds],
+      statuses: [...input.statuses],
+    });
+  }
+
+  async findSpendEventAcrossTenants(
+    input: GatewaySpendEventAcrossTenantsQuery,
+  ): Promise<SpendEventRow | null> {
+    const service = this.#dependencies.spendEvents;
+    if (!service) return null;
+    return service.findSpendEventAcrossTenants({
+      ...input,
+      tenantIds: [...input.tenantIds],
+      statuses: [...input.statuses],
+    });
   }
 
   async listSpendEventsPage(input: GatewaySpendEventsPageQuery): Promise<GatewaySpendEventPage> {

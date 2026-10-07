@@ -177,7 +177,7 @@ images:
 app:
   ## @param app.migrations.preRoll [default: true] Apply this release's migrations in a
   ## pre-upgrade Job on the new image, before any Deployment rolls (ADR-155). Fail-closed.
-  ## Off means the containers migrate on boot, as before.
+  ## Off means you run `pnpm task upgrade` yourself first; the containers never migrate.
   ## @param app.migrations.preRollTimeoutSeconds [default: 2100] activeDeadlineSeconds for that Job.
   migrations:
     preRoll: true
@@ -415,7 +415,7 @@ app:
           value: ""
           ## @param app.dataplane.providers.azureBlob.container.secretKeyRef [object] Secret ref for the Azure Blob container name.
           secretKeyRef: { name: "", key: "" }
-        ## @param app.dataplane.providers.azureBlob.spoolRetentionConfirmed [boolean] Confirms the container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3 days. The ADR-022 trace spool refuses to write to Azure until this is true, because a crash between the spool write and its delete is bounded only by that rule and the app cannot verify a management-plane policy with a data-plane key. Leave false unless you have created the policy.
+        ## @param app.dataplane.providers.azureBlob.spoolRetentionConfirmed [boolean] Earlier spelling of `app.dataplane.objectRetentionConfirmed`, still honoured: either one confirms. Retired at the LTS floor.
         spoolRetentionConfirmed: false
         # Optional. Override the blob endpoint for sovereign clouds
         # (*.usgovcloudapi.net, *.chinacloudapi.cn), private endpoints, or an
@@ -471,6 +471,29 @@ app:
     # that lands.
     ## @param app.dataplane.legacyAzureRead [default: false] Keep Azure settings for reads after moving writes back to S3.
     legacyAzureRead: false
+
+    # Object-storage lifecycle table (ADR-172). The app writes transient or
+    # oversized payloads under these prefixes and relies on a lifecycle rule on
+    # the bucket or container to expire whatever is left behind. Create one rule
+    # per row: expire after the stated days, and do not shorten it.
+    #
+    #   Prefix                           Written by                    Eager delete  Lifecycle rule
+    #   trace-blobs/spool/               trace spool (ADR-022)         yes           expire after 3 days
+    #   langevals-staging/               evaluation, langevals bodies  yes           expire after 3 days
+    #   studio-staging/                  workflow studio payloads      yes           expire after 3 days
+    #   group-queue/                     group-queue S3 tier           no            expire after 7 days
+    #   evaluation-inputs/r<days>/       evaluation inputs             no            one rule per class: r90 after 90
+    #                                                                                days, r180 after 180, r365 after
+    #                                                                                365, r730 after 730
+    #   evaluation-inputs/r-indefinite/  evaluation inputs             no            none (kept for ever)
+    #
+    # S3 and compatible stores accept oversized writes. Azure needs you to
+    # confirm the rules below exist (today the trace spool refuses until then;
+    # other kinds follow), because the app holds a data-plane key
+    # and cannot read a management-plane policy back. The local filesystem
+    # refuses them always. A refused payload stays bounded: a preview or inline.
+    ## @param app.dataplane.objectRetentionConfirmed [boolean, default: false] Confirms the Azure container has a lifecycle rule for every prefix in the table above. Emitted as `OBJECT_RETENTION_CONFIRMED`.
+    objectRetentionConfirmed: false
 
   # Stored Objects - externalized byte content (audio, image, PDF, document).
   # By default, uses a local-filesystem PVC so the chart works plug-and-play
@@ -2305,10 +2328,12 @@ gateway:
   ## @param gateway.security.blockLocalHTTPCalls [default: false] Reject tenant-supplied provider endpoints resolving to local/private networks. Keep false for local/self-hosted installs that intentionally use private services; set true for SaaS together with a restrictive gateway NetworkPolicy.
   ## @param gateway.security.requireHTTPSCustomEndpoints [default: false] Require HTTPS for customer-configured provider endpoints. Hosted-cloud hardening; disabled by default for self-hosted compatibility.
   ## @param gateway.security.allowedProxyHosts [array, default: []] Exact private endpoint hostnames allowed when blockLocalHTTPCalls is enabled. Cloud metadata remains blocked.
+  ## @param gateway.security.corsAllowedOrigins [array, default: []] Browser origins allowed to call the gateway /v1 routes directly (CORS). Exact origins such as https://app.example.com, or a single "*". Empty sends no CORS headers.
   security:
     blockLocalHTTPCalls: false
     requireHTTPSCustomEndpoints: false
     allowedProxyHosts: []
+    corsAllowedOrigins: []
 
   # Trace export is OFF by default to keep the chart safe to install
   # without out-of-band auth-token plumbing. Earlier defaults pointed

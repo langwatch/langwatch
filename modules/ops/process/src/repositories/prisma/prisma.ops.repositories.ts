@@ -9,11 +9,14 @@ import { PrismaPostgresHealthRepository } from "./prisma.datastore-health.reposi
 import { PrismaAdminBackofficeRepository } from "./prisma.instance-admin.repository.ts";
 import { PrismaMigrationMembershipRepository } from "./prisma.migration-membership.repository.ts";
 import { PrismaOrganizationTenantSourceRepository } from "./prisma.organization-tenant-source.repository.ts";
+import { PrismaProcessAuditRepository } from "./prisma.process-audit.repository.ts";
 import { PrismaProcessManagerPurgeRepository } from "./prisma.process-manager-purge.repository.ts";
 import { ProcessOpsPrismaRepository } from "./prisma.process-ops.repository.ts";
 import { PrismaProjectTenantSourceRepository } from "./prisma.project-tenant-source.repository.ts";
+import { PrismaSchedulerAuditRepository } from "./prisma.scheduler-audit.repository.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "./prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "./prisma.system-migration-state.repository.ts";
+import { PrismaUpgradeLedgerRepository } from "./prisma.upgrade-ledger.repository.ts";
 import {
   PrismaOrganizationMemberTenantSourceRepository,
   PrismaUserTenantSourceRepository,
@@ -31,9 +34,14 @@ type NotPostgres =
   | "queues"
   | "blobStore"
   | "replay"
+  | "replayRuntimes"
+  | "pipelineDefinitions"
+  | "clickhouseRoutes"
   | "anomalyState"
+  | "rateTracker"
   | "storageReadings"
   | "redisHealth"
+  | "clickhouseHealth"
   | "events"
   | "storageFootprint";
 
@@ -62,7 +70,10 @@ export const PostgresOpsRepositories = {
       instanceAdmin: PrismaAdminBackofficeRepository.create(prisma),
       impersonation: PrismaImpersonationRepository.create(prisma),
       processFleet: ProcessOpsPrismaRepository.create({ prisma }),
+      processAudit: PrismaProcessAuditRepository.create({ prisma }),
+      schedulerAudit: PrismaSchedulerAuditRepository.create({ database: prisma }),
       postgresHealth: PrismaPostgresHealthRepository.create(prisma),
+      upgradeLedger: PrismaUpgradeLedgerRepository.create({ prisma }),
     };
   },
 };

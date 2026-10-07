@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
+    "@langwatch/annotation-client": "workspace:*",
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/browser": "workspace:*",
@@ -29,6 +30,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/trace-client": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "diff": "catalog:",
     "lucide-react": "catalog:",

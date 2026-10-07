@@ -47,6 +47,7 @@ const projectId = "project-1";
 const storesConfig: StoresConfig = {
   defaultRetentionDays: 30,
   shutdownDrainTimeoutMs: undefined,
+  clickhouseStatementLaneReserveShare: undefined,
   clickhousePool: {
     override: undefined,
     replicas: undefined,

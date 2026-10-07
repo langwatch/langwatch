@@ -3,6 +3,7 @@ import {
   HandledError,
   handledErrorFaultSchema,
   type HandledErrorFault,
+  isTransientRefusal,
   isZodLikeError,
   type SerializedReason,
   ValidationError,
@@ -803,10 +804,35 @@ export function canonicalErrorFor(
   };
 }
 
+/** Main's `error` for any 5xx whose body it masked. */
+const MAIN_INTERNAL_ERROR = "Internal server error";
+
+/**
+ * Main's root `error` for a refusal answered as `code` at `status` (origin/main error-handler.ts,
+ * `determineErrorResponse`): a handled error's code, a sentence error's sentence, "Conflict" for
+ * an unchecked unique violation, and main's internal sentence wherever a 5xx is masked.
+ */
+export function legacyErrorOf({
+  failure,
+  code,
+  status,
+}: {
+  failure: unknown;
+  code: string;
+  status: number;
+}): string {
+  if (status >= 500 && code === FALLBACK_ERROR_CODE) return MAIN_INTERNAL_ERROR;
+  if (HandledError.isHandled(failure)) return code;
+  if (isUniqueViolation(failure)) return "Conflict";
+  if (isStatusCarryingError(failure)) return failure.error;
+
+  return code;
+}
+
 /**
  * The envelope for a handled error: its own code, status, meta and reason chain, except a
  * 5xx whose class does not declare the fault the caller's, which answers the opaque body
- * (ruling 2026-10-05). A handled message is customer-safe by construction (ADR-045).
+ * (ruling 2026-10-05) unless it is a transient refusal (rulings 2026-10-06, round 9, CH-1).
  */
 function handledErrorEnvelope(
   error: HandledError,
@@ -818,7 +844,7 @@ function handledErrorEnvelope(
     isValidation ? VALIDATION_ERROR_STATUS : (error.httpStatus ?? 500)
   ) as ContentfulStatusCode;
 
-  if (status >= 500 && error.fault !== "customer") {
+  if (status >= 500 && error.fault !== "customer" && !isTransientRefusal(error)) {
     return {
       status,
       body: apiErrorBody({

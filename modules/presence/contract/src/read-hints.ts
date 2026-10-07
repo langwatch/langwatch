@@ -25,6 +25,9 @@ export const projectReadHintsInputSchema = z.object({
 });
 export type ProjectReadHintsInput = z.infer<typeof projectReadHintsInputSchema>;
 
+/** The platform upgrade stream needs no tenant: only its portable abort (round 8, U2-LIVE). */
+export type UpgradeReadHintsWatchInput = { signal?: unknown };
+
 /** The tenants one stream listens on, and the portable abort that ends it. */
 export type ReadHintsWatchInput = OrganizationReadHintsInput & {
   userId: string;

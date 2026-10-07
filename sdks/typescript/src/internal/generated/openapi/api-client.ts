@@ -2074,7 +2074,7 @@ export interface paths {
         };
         /**
          * List provider bindings
-         * @description Retired. Gateway provider bindings are model-provider rows now; list them at GET /api/gateway/v1/model-providers.
+         * @description Retired. Gateway provider bindings are model-provider rows now; list them at GET /api/model-providers.
          */
         get: operations["getApiGatewayV1Providers"];
         put?: never;
@@ -3569,7 +3569,7 @@ export interface paths {
         put?: never;
         /**
          * Create a project
-         * @description Create a new project in the organization. Returns the project with its API key (sk-lw-...) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.
+         * @description Create a new project in the organization. Returns the project with a newly minted service API key (serviceApiKey) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.
          */
         post: operations["createProject"];
         delete?: never;
@@ -3587,7 +3587,7 @@ export interface paths {
         };
         /**
          * Get a project
-         * @description Get a project by ID, including its API key. Requires project:view permission.
+         * @description Get a project by ID. Requires project:view permission.
          */
         get: operations["getProject"];
         put?: never;
@@ -8385,7 +8385,7 @@ export interface operations {
                         };
                         readonly diagnostics: {
                             /** @enum {string} */
-                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
+                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS" | "APP_FUNCTION_RESULT_TRUNCATED" | "INSTANT_EVAL_SKIPPED";
                             message: string;
                             meta?: {
                                 [key: string]: unknown;
@@ -37231,6 +37231,7 @@ export interface operations {
                         }[];
                         planName?: string;
                         created?: boolean;
+                        planSlug: string;
                     };
                 };
             };

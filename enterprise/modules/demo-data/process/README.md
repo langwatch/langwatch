@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The demo instance's seeding: one run over an allowlisted demo organization.
 
-Peers call these through the token, declared at `../contract/src/demo-data-report.ts:37`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/demo-data-report.ts:36`; nothing else in this package is public.
 
 #### `runSeedDemo`
 
@@ -54,8 +54,8 @@ Run by the tasks process, before serve.
 
 ## Configuration
 
-| Kind   | Leaf         | Environment variable | Declared at                              |
-| ------ | ------------ | -------------------- | ---------------------------------------- |
-| config | `demoOrgIds` | `DEMO_ORG_IDS`       | `../contract/src/demo-data-report.ts:45` |
+| Kind   | Leaf         | Environment variable | Declared at                             |
+| ------ | ------------ | -------------------- | --------------------------------------- |
+| config | `demoOrgIds` | `DEMO_ORG_IDS`       | `../contract/src/demo-data.config.ts:9` |
 
 <!-- readme:generated:end -->

@@ -80,12 +80,6 @@ Feature: Enterprise billing compatibility
     And an operator impersonating a customer gets the adding limitations lifted
 
   @unit
-  Scenario: Billable events are counted per named project
-    Given an organization metered in events whose second project sent nothing this month
-    When its billable events are counted for both projects
-    Then the first project reports its events and the second reports zero
-
-  @unit
   Scenario: LangWatch Cloud detects the currency a reader's prices are shown in
     Given LangWatch Cloud and a request that names no country
     When the plans page asks which currency to show
@@ -117,3 +111,59 @@ Feature: Enterprise billing compatibility
     When they read a customer's connected-billing overview
     Then the overview answers
     And onboard, add commit, renew, complete renewal and mark paid out of band are each refused with permission_denied
+
+  @unit
+  Scenario: A Stripe customer reads alike over the provider and its memory twin
+    Given the Stripe customers channel over the provider and over its memory twin
+    When a customer is created, read back, deleted and read again
+    Then each tier answers the created customer with no fixed currency, then answers it deleted
+    And each tier answers a customer whose currency is fixed with that currency
+    And each tier refuses a read of a customer it never held with resource_missing
+
+  @unit
+  Scenario: A Stripe subscription changes alike over the provider and its memory twin
+    Given the Stripe subscriptions channel over the provider and over its memory twin, each holding an active subscription
+    When the subscription is read, updated and cancelled, an invoice preview is asked for, and a checkout and a billing portal session are opened
+    Then each tier answers the subscription in billing's own shape with its items, then answers it cancelled
+    And each tier cancels a superseded subscription with proration when asked to prorate
+    And each tier answers the preview and each session with a url
+    And each tier answers a completed checkout session's line items with their quantities
+    And each tier refuses a read of a subscription it never held with resource_missing
+    And each tier refuses the line items of a checkout session it never held with resource_missing
+
+  @unit
+  Scenario: Billing's subscription shapes reach Stripe as the same requests
+    Given the Stripe subscriptions channel over the provider
+    When a subscription is read, and a seat change, a billing threshold, a preview and a checkout are sent in billing's own shapes
+    Then the subscription is answered with each item's price, unit amount and interval, its cancellation instant and its billing threshold
+    And the change, the threshold and the preview reach Stripe as the same parameters the services sent before
+    And the preview is answered from the invoice's total and amount due, however many lines it carries
+    And every checkout is raised as a subscription with automatic tax, a required billing address, tax id collection, the customer's address and name updated, and adaptive pricing off
+    And a completed checkout's line items are answered with their price and quantity, a line with no price answered with none
+
+  @unit
+  Scenario: A Stripe customer's invoices list alike over the provider and its memory twin
+    Given the Stripe invoices channel over the provider and over its memory twin, each holding five invoices for one customer and one for another
+    When the customer's invoices are listed with a limit of four
+    Then each tier answers that customer's four newest invoices in billing's own shape, newest first
+    And each tier answers an empty list for a customer with no invoices
+    And each tier passes a refused listing through as the provider's own error
+    And the provider's invoice is answered with its number, amount due, status and links, a customer held as an object answered by its id
+
+  @unit
+  Scenario: Stripe prices page alike over the provider and its memory twin
+    Given the Stripe prices channel over the provider and over its memory twin, each holding three prices
+    When the prices are listed two to a page, the second page starting after the first page's last price
+    Then each tier answers two prices in billing's price shape and says more remain, then the third and says none remain
+    And each tier maps a product held as an object to its id and a one-time price to no recurrence
+    And each tier passes a refused listing through as the provider's own error
+
+  @unit
+  Scenario: Stripe usage meters record and summarise alike over the provider and its memory twin
+    Given the Stripe meters channel over the provider and over its memory twin, each holding two meters and one meter's summaries for a customer
+    When a meter event is recorded, the meters are listed one to a page, and a customer's summaries are read for a window
+    Then each tier records the event with its name, customer, value, identifier and timestamp
+    And each tier answers each meter with its event name and status, a page at a time
+    And each tier answers that customer's summarised values for the window and none for another customer
+    And each tier refuses a second event with the same identifier with resource_already_exists
+    And each tier passes a refused meter event through as the provider's own error

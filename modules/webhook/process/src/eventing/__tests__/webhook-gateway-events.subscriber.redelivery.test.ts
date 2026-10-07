@@ -10,6 +10,7 @@ import { EventStoreMemory } from "@langwatch/eventing/testing";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+  type GatewayApi,
 } from "@langwatch/gateway-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -70,6 +71,7 @@ function worker(eventStore: EventStoreMemory) {
         getActivePlan: async () => entitledPlan,
         requestBound: async () => 10,
       }),
+      gateway: createApiFixture<GatewayApi>({}),
       project: createApiFixture<ProjectApi>({ listIdsByOrganization: async () => [] }),
     });
 }

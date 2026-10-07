@@ -33,6 +33,7 @@
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/onboarding-client": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",

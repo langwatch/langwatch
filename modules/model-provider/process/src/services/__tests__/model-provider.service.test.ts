@@ -393,6 +393,7 @@ function createProjects(): ProjectApi {
           },
         ]),
       listIdsByOrganization: () => Promise.resolve([project.id]),
+      findLiveNonGovernanceIdsByOrganization: () => Promise.resolve([project.id]),
     },
     "ProjectApi",
   );

@@ -321,7 +321,7 @@ export class SuiteService {
     });
   }
 
-  async run(input: SuiteRunInput): Promise<SuiteRunResult> {
+  async run(input: SuiteRunInput): Promise<SuiteRunResult & { planSlug: string }> {
     return this.runs.run(input);
   }
 

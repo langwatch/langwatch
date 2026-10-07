@@ -7,7 +7,6 @@ import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
@@ -109,7 +108,6 @@ function bootTraceApp(options: {
       cleanupTenantEmitter: () => void 0,
     },
     evaluations: {} as EvaluationApi,
-    codingAgents: {} as CodingAgentApi,
     share: {} as ShareApi,
     projects: {
       getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,

@@ -1,6 +1,6 @@
+import { TEASER_ELLIPSIS, TEASER_MAX_CHARS } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { TEASER_ELLIPSIS, TEASER_MAX_CHARS } from "../../rules/trace-visibility-teaser.rules.ts";
 import { TraceSummaryService } from "../trace-summary-read.service.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;

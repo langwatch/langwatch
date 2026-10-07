@@ -20,8 +20,8 @@ LangWatch is configured through environment variables. How you set them depends 
 | Variable                          | Description                                                                                                                             | Required | Default                       |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------- |
 | `DATABASE_URL`                    | PostgreSQL connection string                                                                                                            | Yes      | -                             |
-| `CLICKHOUSE_URL`                  | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`)                                                         | Yes      | -                             |
-| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Seconds the boot migrations wait for ClickHouse to accept connections before failing. `0` fails on the first refused connection         | No       | `180`                         |
+| `CLICKHOUSE_URL`                  | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`). Without it the app and workers refuse to start| Yes      | -                             |
+| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Seconds `pnpm task upgrade` waits for ClickHouse to accept connections before failing. `0` fails on the first refused connection     | No       | `180`                         |
 | `REDIS_URL`                       | Redis connection string                                                                                                                 | Yes      | -                             |
 | `NODE_ENV`                        | Environment (`production`, `development`)                                                                                               | No       | `production`                  |
 | `BASE_HOST`                       | Public URL of the application, used in invite links, emails and the links the app hands out                                             | Yes      | -                             |
@@ -157,6 +157,8 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 | `AZURE_BLOB_TOKEN_AUDIENCE` | Token audience override. Sovereign clouds only | `https://storage.azure.com` |
 | `AZURE_BLOB_CONTAINER` | Azure Blob container name | - |
 | `AZURE_BLOB_ENDPOINT` | Blob endpoint base URL. Optional on the Azure public cloud; required for sovereign clouds (`*.usgovcloudapi.net`, `*.chinacloudapi.cn`), private endpoints, and the Azurite emulator | `https://{accountName}.blob.core.windows.net` |
+| `OBJECT_RETENTION_CONFIRMED` | Set to `true` to confirm that the container has a lifecycle rule for every prefix in the [lifecycle table](/self-hosting/configuration/object-storage-lifecycle). Azure refuses oversized writes until it is set; the local filesystem always refuses them | `false` |
+| `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED` | Earlier, spool-only spelling of `OBJECT_RETENTION_CONFIRMED`. Still confirms when `OBJECT_RETENTION_CONFIRMED` is unset | `false` |
 
 <Warning>
 When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must be absent (see below).
@@ -335,11 +337,15 @@ Model providers for evaluators, including Azure OpenAI, are configured per proje
 | `VOICE_TUNNEL` | Set to `true` to have the worker open a cloudflared quick tunnel at boot and use its URL when `VOICE_PUBLIC_BASE_URL` is unset. The tunnel calls Cloudflare. Phone runs fail when `VOICE_PUBLIC_BASE_URL` is unset and no tunnel is open. | `false` when `NODE_ENV=production` (a self-hosted install). Unset, it is on for LangWatch Cloud and when `NODE_ENV` is not `production`, for example local development |
 | `VOICE_WS_PORT` | Port the voice worker listens on for phone audio. Route your public origin to it. | `3300` |
 
-## Feature Flags
+## Upgrade
 
-| Variable              | Description                                     | Default |
-| --------------------- | ----------------------------------------------- | ------- |
-| `SKIP_PRISMA_MIGRATE` | `true` skips PostgreSQL migrations on startup | `false` |
+The app and the workers never migrate on startup: `pnpm task upgrade` does, before they start, and they refuse to start until it has run. See [Run the upgrade](/self-hosting/upgrade#run-the-upgrade).
+
+| Variable                  | Description                                                                                                         | Default |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------- |
+| `SKIP_PRISMA_MIGRATE`     | `true` makes `pnpm task upgrade` leave PostgreSQL alone. The app and workers refuse to start until an upgrade runs without it | `false` |
+| `SKIP_CLICKHOUSE_MIGRATE` | `true` makes `pnpm task upgrade` leave ClickHouse alone, with the same consequence                                    | `false` |
+| `SKIP_LWQL_PROVISION`     | `true` makes `pnpm task upgrade` skip LangWatchQL provisioning                                                        | `false` |
 
 ## Cloud admin
 
@@ -403,6 +409,8 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `global.serviceAccount.create` / `.name` / `.annotations` | ServiceAccount the cloud identity binds to (also enables AWS IRSA) |
 | `app.dataplane.providers.azureBlob.container.value` | `AZURE_BLOB_CONTAINER` |
 | `app.dataplane.providers.azureBlob.endpoint.value` | `AZURE_BLOB_ENDPOINT` (sovereign clouds, private endpoints, emulator) |
+| `app.dataplane.objectRetentionConfirmed` | `OBJECT_RETENTION_CONFIRMED`. Confirms the lifecycle rules in the [lifecycle table](/self-hosting/configuration/object-storage-lifecycle) |
+| `app.dataplane.providers.azureBlob.spoolRetentionConfirmed` | Earlier spelling; either value sets `OBJECT_RETENTION_CONFIRMED=true` |
 | `app.dataplane.providers.azureBlob.authorityHost.value` | `AZURE_BLOB_AUTHORITY_HOST`. Required alongside a sovereign endpoint in a token-based mode |
 | `app.dataplane.providers.azureBlob.tokenAudience.value` | `AZURE_BLOB_TOKEN_AUDIENCE`. Sovereign storage audience override |
 | `app.dataplane.legacyS3ReadBucket` | Keeps persisted `s3://` stored-object URIs and true legacy bucket/key consumers readable after moving writes to Azure. It does not route provider-derived dataset chunks or GroupQueue durable payloads; run the migration and drain GroupQueue before switching |

@@ -89,8 +89,8 @@ deterministic summary, or the machine report with `-json` (optionally to
   (`~/.langwatch/portless/logs/<slug>.log`) so a `haven logs` command that
   itself fails does not blank out the failure.
 - The paths below describe `-no-haven`. Each worktree boots through a detected profile: `apps/api`
-  (`@langwatch/platform-api`) is the **modular** layout (root migrate/seed
-  scripts, `API_PORT` on process env — node `--env-file` never overrides it);
+  (`@langwatch/platform-api`) is the **modular** layout (root `start:prepare:db`
+  then the seed script, since its api and worker never migrate; `API_PORT` on process env — node `--env-file` never overrides it);
   `platform/app` (`@langwatch/web`) is the **monolith** layout (ClickHouse
   migration via `pnpm --filter @langwatch/web clickhouse:migrate`, start via
   `start:app:dev`, `PORT`+`LANGWATCH_API_PORT` pinned to the allocated port).

@@ -71,7 +71,8 @@
     "langwatch": "workspace:*",
     "pino": "catalog:",
     "pino-opentelemetry-transport": "catalog:",
-    "pino-pretty": "catalog:"
+    "pino-pretty": "catalog:",
+    "prom-client": "catalog:"
   },
   "devDependencies": {
     "@opentelemetry/sdk-trace-node": "catalog:",

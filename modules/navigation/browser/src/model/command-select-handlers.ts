@@ -1,3 +1,6 @@
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
+import { InviteMemberDrawerToken } from "@langwatch/organization-client";
+
 import type { Command, CommandDrawerName, RecentItem, SearchResult } from "./command-bar-types.ts";
 
 /**
@@ -19,6 +22,12 @@ export type AddRecentItem = (item: Omit<RecentItem, "accessedAt">) => void;
  * Drawer opening helper.
  */
 export type OpenDrawer = (drawer: CommandDrawerName, params?: Record<string, string>) => void;
+
+/** Opens another module's drawer by its client token. */
+export type OpenDrawerByToken = <Props>(
+  drawer: UiDrawerToken<Props>,
+  props?: Partial<Props>,
+) => void;
 
 /**
  * Create a navigation helper that handles tab behavior.
@@ -43,12 +52,14 @@ export function handleCommandSelect({
   ctx,
   addRecentItem,
   openDrawer,
+  openDrawerByToken,
 }: {
   cmd: Command;
   projectSlug: string;
   ctx: NavigationContext;
   addRecentItem: AddRecentItem;
   openDrawer: OpenDrawer;
+  openDrawerByToken: OpenDrawerByToken;
 }) {
   const navigate = createNavigate(ctx);
 
@@ -112,7 +123,7 @@ export function handleCommandSelect({
       break;
     case "action-invite-member":
       ctx.close();
-      openDrawer("inviteMember");
+      openDrawerByToken(InviteMemberDrawerToken);
       break;
   }
 }

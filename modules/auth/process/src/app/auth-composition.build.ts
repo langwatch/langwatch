@@ -49,7 +49,10 @@ import {
 import { CredentialSessionGuard } from "../channels/http/http.credential-session-guard.channel.ts";
 import type { IdTokenIssuerRefusalChannel } from "../channels/http/http.id-token-issuer-refusal.channel.ts";
 import type { OAuthProfileEmailChannel } from "../channels/http/http.oauth-profile-email.channel.ts";
-import type { SignUpVerification } from "../channels/http/http.passkey-sign-up.channel.ts";
+import type {
+  PasskeySignUpEligibility,
+  SignUpVerification,
+} from "../channels/http/http.passkey-sign-up.channel.ts";
 import { SignInRouterShadow } from "../channels/http/http.sign-in-router-shadow.channel.ts";
 import type { SignUpAddressConfirmation } from "../channels/http/http.sign-up-confirmation.channel.ts";
 import type { PasswordResetMailChannel } from "../channels/password-reset-mail.channel.ts";
@@ -371,6 +374,8 @@ type BuildBetterAuthOptions = Readonly<{
   /** The mailbox proofs passkey sign-up checks and spends, or `null` where this
    *  process composed no sign-up ceremony — then passkey sign-up refuses. */
   signUpProofs: (SignUpVerification & SignUpAddressConfirmation) | null;
+  /** Whether a proven address still enrols a passkey here; the proof is not read. */
+  passkeySignUpEligibility: PasskeySignUpEligibility;
   /** Where an address signs in, or `null` where this process composed no
    *  routing directory - then no connection governs a credential sign-in. */
   signInRouting:
@@ -526,6 +531,7 @@ export async function buildBetterAuth(
       );
     },
     signUpPolicy: options.organizations,
+    passkeySignUpEligibility: options.passkeySignUpEligibility,
     credentialGuard: CredentialSessionGuard.create(
       CredentialSignInPolicyService.create({
         routing: signInRouting === null ? null : { route: signInRouting },

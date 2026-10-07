@@ -8,7 +8,6 @@ export {
   UI_SESSION_PATH,
   UI_SESSION_QUERY_KEY,
   uiAuthClient,
-  type UiAuthClient,
   type UiSessionReading,
 } from "./behavior/ui-session-client.ts";
 export { useRefreshUiSession } from "./behavior/ui-session-refresh.ts";

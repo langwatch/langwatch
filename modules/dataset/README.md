@@ -11,7 +11,7 @@ Datasets and their records: creating, naming, mapping and reading them by slug o
 | Classification | core (`modules/catalogue.json`)                                                                        |
 | Subjects       | dataset, dataset-record                                                                                |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)            |
-| Api token      | `DatasetApi` = `moduleApi<DatasetApi>()("dataset")`, `contract/src/dataset.api.ts:174` (38 operations) |
+| Api token      | `DatasetApi` = `moduleApi<DatasetApi>()("dataset")`, `contract/src/dataset.api.ts:173` (38 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                             |
 
 ## What dataset owns
@@ -29,7 +29,7 @@ Datasets and their records: creating, naming, mapping and reading them by slug o
 | Postgres table  | `Dataset`                   | `process/src/repositories/prisma/prisma.dataset.repository.ts:24`               |
 | Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset.repository.ts:24`               |
 | Stores required | prisma, objectStorage       | `process/src/repositories/prisma/prisma.dataset.repositories.ts:25`             |
-| Config          | `publicBaseUrl` (BASE_HOST) | `contract/src/dataset.api.ts:178`                                               |
+| Config          | `publicBaseUrl` (BASE_HOST) | `contract/src/dataset.config.ts:5`                                              |
 
 Anything else dataset needs belongs to another module and is reached through its `*Api`.
 

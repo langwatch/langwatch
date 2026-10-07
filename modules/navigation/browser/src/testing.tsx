@@ -1,5 +1,6 @@
 /** Stub host for tests; built from partial reading with fail-closed defaults */
 
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import type { ReactNode } from "react";
 
 import {
@@ -59,6 +60,7 @@ export type StubNavigationActions = {
   signOut?: () => void;
   setDocumentTitle?: (title: string) => void;
   openDrawer?: (drawer: string, params?: Record<string, string>) => void;
+  openDrawerByToken?: (drawer: UiDrawerToken<never>, props?: object) => void;
 };
 
 const SELF_HOSTED_PRODUCTION: NavigationDeployment = {
@@ -191,6 +193,10 @@ export class StubNavigationHost extends NavigationHost {
 
   openDrawer(drawer: string, params?: Record<string, string>): void {
     this.actions.openDrawer?.(drawer, params);
+  }
+
+  openDrawerByToken<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+    this.actions.openDrawerByToken?.(drawer, props);
   }
 
   langy(): NavigationLangy | null {

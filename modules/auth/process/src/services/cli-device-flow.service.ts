@@ -5,6 +5,7 @@ import {
   type ApiKeyApi,
   type CliKeyScopeSummary,
   type CliKeySelection,
+  type CliSessionRevocationCause,
 } from "@langwatch/api-key-contract";
 import type { clientInfoSchema, lookupQuerySchema } from "@langwatch/auth-contract";
 import {
@@ -100,6 +101,7 @@ export interface CliDeviceFlowCollaborators {
     | "validateCliSelection"
     | "findDefaultCliSelection"
     | "revokeCliLoginKeyForLogout"
+    | "revokeCliSessionKey"
     | "extendCliLoginKeyExpiry"
   >;
   /** Resolves or creates the caller's personal workspace. */
@@ -533,6 +535,36 @@ async function rotateRefreshToken({
 }
 
 /** The rotation a held claim buys: re-proves the session, then rotates or forks it. */
+/**
+ * A refused refresh ends the session, so its login key and the ingest keys under it go now
+ * (main's `retireExpiredSessionKey`); best effort, the hourly reaper is the backstop.
+ */
+async function retireSessionKey({
+  flow,
+  record,
+  cause,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  record: CliRefreshTokenRecord;
+  cause: CliSessionRevocationCause;
+}): Promise<void> {
+  if (!record.cli_api_key_id) return;
+
+  try {
+    await flow.apiKeys().revokeCliSessionKey({
+      apiKeyId: record.cli_api_key_id,
+      userId: record.user_id,
+      organizationId: record.organization_id,
+      cause,
+    });
+  } catch (error) {
+    logger.warn(
+      { error, apiKeyId: record.cli_api_key_id, userId: record.user_id },
+      "[auth-cli] could not revoke the CLI login key of a refused refresh",
+    );
+  }
+}
+
 async function rotateClaimed({
   flow,
   refreshToken: refresh_token,
@@ -546,6 +578,7 @@ async function rotateClaimed({
 }): Promise<CliRotatedSession> {
   if (nowInstant().epochMilliseconds > record.expires_at) {
     await flow.sessions().dropRefreshToken(refresh_token);
+    await retireSessionKey({ flow, record, cause: "expired" });
 
     throw refused("invalid_grant", "Refresh token has expired", 401);
   }
@@ -564,6 +597,7 @@ async function rotateClaimed({
       // Reject AND invalidate the old refresh token, so no further rotation is
       // attempted. The CLI gets 401 and wipes local state.
       await flow.sessions().dropRefreshToken(refresh_token);
+      await retireSessionKey({ flow, record, cause: "expired" });
       logger.info(
         {
           userId: record.user_id,
@@ -592,6 +626,8 @@ async function rotateClaimed({
 
   if (!activeMembership) {
     await flow.sessions().dropRefreshToken(refresh_token);
+    // Not `expired`: the session had time left and lost its person instead.
+    await retireSessionKey({ flow, record, cause: "offboarded" });
     logger.info(
       { userId: record.user_id, organizationId: record.organization_id },
       "rejecting refresh: caller is not an active member of the organization",

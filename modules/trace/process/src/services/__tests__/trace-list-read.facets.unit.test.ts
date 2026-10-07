@@ -24,8 +24,8 @@ import {
   HIDDEN_ORIGINS_PARAM,
   type TraceFilterWhere,
 } from "../../rules/trace-filter-hidden-origins.rules.ts";
-import { translateFilter } from "../../rules/trace-query.rules.ts";
 import { TraceListService } from "../trace-list-read.service.ts";
+import { traceQueryTranslation } from "./fixtures/trace-query-services.fixtures.ts";
 
 const TENANT = "tenant-1";
 const timeRange = { from: 1_700_000_000_000, to: 1_700_086_400_000 };
@@ -93,7 +93,11 @@ async function facetsFor({
     filterFor: createFacetFilterResolver({
       queryText: query,
       compile: (text) =>
-        translateFilter({ queryText: text, tenantId: TENANT, timeRange: window }) ?? undefined,
+        traceQueryTranslation.translateFilter({
+          queryText: text,
+          tenantId: TENANT,
+          timeRange: window,
+        }) ?? undefined,
       hide: explorerOriginExclusion({ hiddenOrigins: explorerHiddenOrigins(query) }),
     }),
   });
@@ -109,7 +113,8 @@ function carrying(calls: readonly BatchCall[], key: string): BatchCall {
 }
 
 const compiled = (query: string) =>
-  translateFilter({ queryText: query, tenantId: TENANT, timeRange })?.sql ?? "";
+  traceQueryTranslation.translateFilter({ queryText: query, tenantId: TENANT, timeRange })?.sql ??
+  "";
 
 describe("the sidebar's facet counts", () => {
   describe("given a query naming two facet fields", () => {

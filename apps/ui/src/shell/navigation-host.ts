@@ -4,6 +4,7 @@
  * mount's readings, extending the port class the caller hands in.
  */
 
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import type {
   NavigationAccountMenu,
   NavigationCommandBar,
@@ -63,6 +64,7 @@ export type BrowserNavigationActions = {
   signOut: () => void;
   setDocumentTitle: (title: string) => () => void;
   openDrawer: (drawer: string, params?: Record<string, string>) => void;
+  openDrawerByToken: <Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>) => void;
 };
 
 /** Builds a host over the shell's readings and actions. */
@@ -220,6 +222,10 @@ export function browserNavigationHosts(port: typeof NavigationHost): BrowserNavi
 
     openDrawer(drawer: string, params?: Record<string, string>): void {
       this.actions.openDrawer(drawer, params);
+    }
+
+    openDrawerByToken<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+      this.actions.openDrawerByToken(drawer, props);
     }
 
     override joinOffer(input: { currentOrganizationId: string | null | undefined }): ReactNode {

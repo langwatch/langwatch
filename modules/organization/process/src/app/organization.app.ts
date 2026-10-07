@@ -8,7 +8,7 @@ import {
   type AuthzGrantCaller,
 } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender } from "@langwatch/eventing";
+import type { EventingCommandSender, ProcessStore } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
@@ -135,6 +135,12 @@ import { UserApi } from "@langwatch/user-contract";
 
 import { organizationInviteMailChannels } from "../channels/organization-invite-mail-channels.registry.ts";
 import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
+import type { RecordAuditCommandData } from "../eventing/organization-audit.commands.ts";
+import type { OrganizationAuditSender } from "../eventing/organization-audit.intent.ts";
+import {
+  buildOrganizationAuditPipeline,
+  type OrganizationAuditDefinition,
+} from "../eventing/organization-audit.pipeline.ts";
 import {
   buildOrganizationLifecyclePipeline,
   type OrganizationLifecycleDefinition,
@@ -566,6 +572,8 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #initialization!: OrganizationInitializationService;
   /** Who may sign up and found an organization; absent only in a test's app, which is open. */
   #signUpPolicy: SignUpPolicyService | null = null;
+  /** organization_audit's sender, once registration answers with it. */
+  #auditSender: OrganizationAuditSender | undefined;
 
   /** The invitation ceremony; a deployment without one refuses by name. */
   #invitations(): OrganizationInvitationDoorService {
@@ -1602,6 +1610,20 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   connectLifecycle(senders: OrganizationLifecycleSenders): void {
     this.#infrastructure.lifecycle.connect(senders);
+  }
+
+  /** organization_audit: audit facts committed with their change; audit-log reacts (§9). */
+  auditPipeline({ processStore }: { processStore: ProcessStore }): OrganizationAuditDefinition {
+    return buildOrganizationAuditPipeline({
+      sender: () => this.#auditSender,
+      retention: processStore,
+    });
+  }
+
+  connectAudit(
+    commands: Readonly<{ recordAudit: EventingCommandSender<RecordAuditCommandData> }>,
+  ): void {
+    this.#auditSender = commands.recordAudit;
   }
 
   connectSeatLimit(

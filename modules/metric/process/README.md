@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`MetricApi`)
 
-Peers call these through the token, declared at `../contract/src/metric.api.ts:52`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/metric.api.ts:51`; nothing else in this package is public.
 
 #### `prepareMetricDataPoints`
 
@@ -73,7 +73,7 @@ Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI docu
 Answers at `/:otlpBase{.+}/v1/metrics`.
 
 ```typescript
-type Params = z.infer<typeof otlpMetricAliasParamsSchema>; // ../contract/src/metric.api.ts:42
+type Params = z.infer<typeof otlpMetricAliasParamsSchema>; // ../contract/src/metric.api.ts:41
 // Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:57)
 // Response: "protocol" (inline, src/transport/otlp-metrics.rest.ts:60)
 ```
@@ -85,7 +85,7 @@ Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI docu
 Answers at `/:otlpBase{.+}/v1/metrics/`.
 
 ```typescript
-type Params = z.infer<typeof otlpMetricAliasParamsSchema>; // ../contract/src/metric.api.ts:42
+type Params = z.infer<typeof otlpMetricAliasParamsSchema>; // ../contract/src/metric.api.ts:41
 // Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:76)
 // Response: "protocol" (inline, src/transport/otlp-metrics.rest.ts:79)
 ```
@@ -97,7 +97,7 @@ Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI docu
 Answers at `/:otlpBase{.+}/v1//metrics`.
 
 ```typescript
-type Params = z.infer<typeof otlpMetricAliasParamsSchema>; // ../contract/src/metric.api.ts:42
+type Params = z.infer<typeof otlpMetricAliasParamsSchema>; // ../contract/src/metric.api.ts:41
 // Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:96)
 // Response: "protocol" (inline, src/transport/otlp-metrics.rest.ts:99)
 ```
@@ -148,8 +148,8 @@ Declared at `src/eventing/metric.pipeline.ts:61`. Events: `metricDataPointReceiv
 
 ## Configuration
 
-| Kind   | Leaf               | Environment variable       | Declared at                        |
-| ------ | ------------------ | -------------------------- | ---------------------------------- |
-| config | `processingShards` | `METRIC_PROCESSING_SHARDS` | `../contract/src/metric.api.ts:76` |
+| Kind   | Leaf               | Environment variable       | Declared at                           |
+| ------ | ------------------ | -------------------------- | ------------------------------------- |
+| config | `processingShards` | `METRIC_PROCESSING_SHARDS` | `../contract/src/metric.config.ts:10` |
 
 <!-- readme:generated:end -->

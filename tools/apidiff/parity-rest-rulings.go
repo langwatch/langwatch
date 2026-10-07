@@ -9,7 +9,22 @@ const (
 	rulingConnectRedesign = "deliberate: the connect protocol was redesigned on the branch (r39 triage)"
 	rulingFlattening      = "artifact: the branch documents a union main flattened; the wire shape matches (r39 triage)"
 	rulingPhantomField    = "phantom: main documents a field its handler never answers or accepts (r39 triage)"
+	rulingRootPrompts     = "documentation only: main's document published prompts at the root path"
+	rulingInstanceToken   = "documentation correction: the wire still uses the instance token, as on main"
+	rulingRetiredRoute    = "ruled retired: the operation's path is ruled out of the branch (RetiredRestOperation)"
 )
+
+// ruledSpecKindOnly rules one spec change kind on one operation, for a
+// difference that is documentation only. It sits beside ruledBreakingRest
+// because an operation may carry a kind ruling and a ruling of its own.
+var ruledSpecKindOnly = map[string]map[string]string{
+	"GET /":  {"removed": rulingRootPrompts},
+	"POST /": {"removed": rulingRootPrompts},
+
+	"POST /api/langy/control/connect/frames":   {"security_changed": rulingInstanceToken},
+	"GET /api/langy/control/connect/poll":      {"security_changed": rulingInstanceToken},
+	"POST /api/langy/control/connect/register": {"security_changed": rulingInstanceToken},
+}
 
 // ruledBreakingRest names the operations whose breaking rows were triaged
 // and ruled not defects; they still render, under their ruling.
@@ -54,14 +69,31 @@ func ruledSpecChange(method, path, kind string) string {
 	if !found {
 		return ""
 	}
-	ruling := ruledBreakingRest[strings.ToUpper(method)+" "+path]
+	if field == "removed" && RetiredRestOperation(path) {
+		return rulingRetiredRoute
+	}
+	key := strings.ToUpper(method) + " " + path
+	pairing := strings.ToUpper(method) + " " + PairingPath(path)
+	ruling := ruledBreakingRest[key]
 	if ruling == "" {
-		ruling = ruledBreakingByPairing()[strings.ToUpper(method)+" "+PairingPath(path)]
+		ruling = ruledBreakingByPairing()[pairing]
 	}
-	if !slices.Contains(rulingSpecKinds[ruling], field) {
-		return ""
+	if slices.Contains(rulingSpecKinds[ruling], field) {
+		return ruling
 	}
-	return ruling
+	if reason := ruledSpecKindOnly[key][field]; reason != "" {
+		return reason
+	}
+	return ruledSpecKindByPairing()[pairing][field]
+}
+
+func ruledSpecKindByPairing() map[string]map[string]string {
+	paired := make(map[string]map[string]string, len(ruledSpecKindOnly))
+	for key, kinds := range ruledSpecKindOnly {
+		method, path, _ := strings.Cut(key, " ")
+		paired[method+" "+PairingPath(path)] = kinds
+	}
+	return paired
 }
 
 func ruledBreakingByPairing() map[string]string {

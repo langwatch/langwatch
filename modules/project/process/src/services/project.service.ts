@@ -66,12 +66,15 @@ export class ProjectService {
     return this.repository.findProjectsWithDepartments(input);
   }
 
-  assignProjectDepartment(input: {
+  /** A saved assignment is recorded as project's fact, best effort, for data privacy to fold. */
+  async assignProjectDepartment(input: {
     organizationId: string;
     projectId: string;
     departmentId: string | null;
   }): Promise<boolean> {
-    return this.repository.assignProjectDepartment(input);
+    const assigned = await this.repository.assignProjectDepartment(input);
+    if (assigned) await this.created.departmentAssigned({ projectId: input.projectId });
+    return assigned;
   }
 
   private readonly metadata: ProjectMetadataService;
@@ -79,6 +82,7 @@ export class ProjectService {
   private readonly repository: ProjectRepository;
   private readonly credentials: ProjectCredentials;
   private readonly organizations: OrganizationApi;
+  private readonly created: ProjectCreatedNoticeService;
 
   private constructor({
     metadata,
@@ -86,18 +90,21 @@ export class ProjectService {
     repository,
     credentials,
     organizations,
+    created,
   }: {
     metadata: ProjectMetadataService;
     writes: ProjectWriteService;
     repository: ProjectRepository;
     credentials: ProjectCredentials;
     organizations: OrganizationApi;
+    created: ProjectCreatedNoticeService;
   }) {
     this.metadata = metadata;
     this.writes = writes;
     this.repository = repository;
     this.credentials = credentials;
     this.organizations = organizations;
+    this.created = created;
   }
 
   static create(options: {
@@ -117,6 +124,7 @@ export class ProjectService {
       repository: options.repository,
       credentials: options.credentials,
       organizations: options.organizations,
+      created: options.created,
     });
   }
 

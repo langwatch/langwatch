@@ -1,3 +1,4 @@
+import { type EventReadSeat, EventSourcing } from "@langwatch/eventing";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { nowInstant, Temporal } from "@langwatch/time";
@@ -180,7 +181,7 @@ describe("given the closed member list", () => {
 
     it("names no audit member: the sink is the audit-log module's app", () => {
       expect([...MEMBER_NAMES]).not.toContain("audit");
-      expect(MEMBER_NAMES).toHaveLength(15);
+      expect(MEMBER_NAMES).toHaveLength(16);
     });
   });
 });
@@ -240,6 +241,44 @@ describe("given a process that builds its stores from config", () => {
       const members = buildProcessStores({ config: config() }).members;
 
       expect(members.tier).toBe("live");
+    });
+  });
+});
+
+describe("given the event read seat member", () => {
+  const seatRead = {
+    tenantId: "project-1",
+    aggregateType: "trace",
+    aggregateId: "trace-1",
+    eventId: "event-1",
+  } as Parameters<EventReadSeat["getEvent"]>[0];
+
+  describe("when the role's eventing reads the event log", () => {
+    /** @scenario "A registry is handed the role's event read seat like any store" */
+    it("hands eventing's own seat", () => {
+      const eventReadSeat: EventReadSeat = { getEvent: vi.fn() };
+      const eventing = new EventSourcing({ enabled: false, eventReadSeat });
+
+      const members = buildProcessStores({ config: config(), members: { eventing } }).members;
+
+      expect(members.read("eventReadSeat")).toBe(eventReadSeat);
+    });
+  });
+
+  describe("when the role reads no event log", () => {
+    /** @scenario "A role that reads no event log hands a seat that refuses by name" */
+    it.each([
+      ["eventing without an event log", { eventing: new EventSourcing({ enabled: false }) }],
+      ["no eventing at all", {}],
+    ])("hands a seat whose read refuses naming the member, given %s", async (_, supplied) => {
+      const members = buildProcessStores({ config: config(), members: supplied }).members;
+
+      const seat = members.read("eventReadSeat");
+
+      await expect(seat.getEvent(seatRead)).rejects.toMatchObject({
+        name: "MemberNotConfiguredError",
+        member: "eventReadSeat",
+      });
     });
   });
 });

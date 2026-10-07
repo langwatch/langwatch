@@ -14,9 +14,13 @@ import type {
   MountableTransport,
 } from "../hosting/transport-hosts.ts";
 import type { RateLimiter } from "../ports.ts";
-import type { MountableRestApp } from "./addressing.ts";
+import { canonicalV1Path, middlewareScopesOf, type MountableRestApp } from "./addressing.ts";
 import { CliTokenIdentity } from "./cli-token-identity.ts";
-import type { RestDoorCredential, RestTransportDeclaration } from "./declaration.ts";
+import type {
+  RestDoorCredential,
+  RestSharedPath,
+  RestTransportDeclaration,
+} from "./declaration.ts";
 import type { IdempotentRunner } from "./idempotency.ts";
 import {
   isRestCredentialBinding,
@@ -80,6 +84,10 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
 
   /** Which module claims each prefixed namespace mounted so far. */
   private readonly claims = new Map<string, string>();
+
+  /** The prefixes claimed and the literal addresses served so far, each with its module. */
+  private readonly prefixes: ClaimedPrefix[] = [];
+  private readonly literals: LiteralAddress[] = [];
 
   private constructor(private readonly options: Parameters<typeof RestHost.create>[0]) {}
 
@@ -150,9 +158,17 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
    * run its middleware ahead of the first's routes: it declares a shared path instead (§8, R10).
    */
   private claimNamespace(declaration: RestTransportDeclaration<unknown>): void {
-    if (declaration.addressing === "literal") return;
-
     const serving = declaration.api.name;
+
+    if (declaration.addressing === "literal") {
+      const addresses = literalAddressesOf(declaration);
+      for (const address of addresses) {
+        for (const claim of this.prefixes) assertSharedPathAdmitted({ address, claim });
+      }
+      this.literals.push(...addresses);
+      return;
+    }
+
     const claimant = this.claims.get(declaration.namespace);
 
     if (claimant !== void 0 && claimant !== serving) {
@@ -162,6 +178,14 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       );
     }
 
+    const claims = middlewareScopesOf(declaration).map((scope) => ({
+      prefix: scope.replace(/\/\*$/, ""),
+      module: serving,
+    }));
+    for (const claim of claims) {
+      for (const address of this.literals) assertSharedPathAdmitted({ address, claim });
+    }
+    this.prefixes.push(...claims);
     this.claims.set(declaration.namespace, serving);
   }
 
@@ -176,6 +200,60 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       session_key: SessionKeyIdentity.unbound(declaration.namespace),
       cli_token: CliTokenIdentity.unbound(declaration.namespace),
     };
+  }
+}
+
+type ClaimedPrefix = { prefix: string; module: string };
+
+type LiteralAddress = {
+  method: string;
+  path: string;
+  module: string;
+  sharedPath: RestSharedPath | undefined;
+};
+
+/** Each address a literal family's routes answer at, its v1 twin included. */
+function literalAddressesOf(declaration: RestTransportDeclaration<unknown>): LiteralAddress[] {
+  return declaration.routes.flatMap((route) => {
+    const alias = declaration.v1Twin ? canonicalV1Path(route.path) : null;
+
+    return [route.path, ...(alias ? [alias] : [])].map((path) => ({
+      method: route.method.toUpperCase(),
+      path,
+      module: declaration.api.name,
+      sharedPath: route.sharedPath,
+    }));
+  });
+}
+
+/**
+ * A literal route under a prefix another module's family claims runs that family's
+ * middleware: it says so with `.withSharedPath`, naming the claimant (§8, R10).
+ */
+function assertSharedPathAdmitted({
+  address,
+  claim,
+}: {
+  address: LiteralAddress;
+  claim: ClaimedPrefix;
+}): void {
+  const under = address.path === claim.prefix || address.path.startsWith(`${claim.prefix}/`);
+  if (!under || address.module === claim.module) return;
+
+  const where = `REST ${address.method} ${address.path} of ${address.module} sits under ${claim.prefix}, which ${claim.module} claims`;
+
+  if (address.sharedPath === void 0) {
+    throw new Error(
+      `${where}; declare .withSharedPath({ owner: "${claim.module}", reason, deprecate }) on the route, ` +
+        `or serve it under a prefix ${address.module} owns`,
+    );
+  }
+
+  if (address.sharedPath.owner !== claim.module) {
+    throw new Error(
+      `${where}, but its shared path names ${address.sharedPath.owner}; ` +
+        `declare .withSharedPath({ owner: "${claim.module}", ... }) instead`,
+    );
   }
 }
 

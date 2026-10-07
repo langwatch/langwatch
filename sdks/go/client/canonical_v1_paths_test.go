@@ -115,3 +115,47 @@ func TestGeneratedClientRequestPathsAreCanonical(t *testing.T) {
 	assert.Greater(t, paths, 100)
 	assert.Empty(t, offenders)
 }
+
+var v1PathPattern = regexp.MustCompile(`/api/v1((?:/[a-zA-Z0-9_%{}-]+)+)`)
+
+// bareOnlyV1Paths lists the hand-written /api/v1 paths in source that name a
+// route the document keeps bare, which has no /api/v1 twin to answer them.
+func bareOnlyV1Paths(source, file string) []string {
+	var offenders []string
+	for _, match := range v1PathPattern.FindAllStringSubmatchIndex(source, -1) {
+		path := "/api" + source[match[2]:match[3]]
+		if bareOnly.MatchString(path) {
+			line := strings.Count(source[:match[0]], "\n") + 1
+			offenders = append(offenders, fmt.Sprintf("%s:%d %s", file, line, source[match[0]:match[1]]))
+		}
+	}
+	return offenders
+}
+
+func TestHandWrittenPathsNameNoV1AddressForABareOnlyRoute(t *testing.T) {
+	entries, err := os.ReadDir(".")
+	require.NoError(t, err)
+
+	var offenders []string
+	files := 0
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		source, err := os.ReadFile(name)
+		require.NoError(t, err)
+		files++
+		offenders = append(offenders, bareOnlyV1Paths(string(source), name)...)
+	}
+
+	// A guard that read no files would pass while proving nothing.
+	assert.Greater(t, files, 5)
+	assert.Empty(t, offenders)
+}
+
+func TestBareOnlyGuardFlagsAV1AddressForABareOnlyRoute(t *testing.T) {
+	source := "url := base + \"/api/v1/trace/\" + id + \"/share\"\npath := \"/api/v1/trace/abc/share\"\n"
+
+	assert.Equal(t, []string{"x.go:2 /api/v1/trace/abc/share"}, bareOnlyV1Paths(source, "x.go"))
+}

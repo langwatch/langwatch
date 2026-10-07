@@ -81,9 +81,7 @@ export class MemoryUserDatabase {
   deleteUser(id: string): void {
     this.#users.delete(id);
     for (const account of this.accountsOf(id)) this.#accounts.delete(account.id);
-    for (const [passkeyId, passkey] of this.#passkeys) {
-      if (passkey.userId === id) this.#passkeys.delete(passkeyId);
-    }
+    this.deletePasskeysOf(id);
   }
 
   accountsOf(userId: string): MemoryUserAccountRow[] {
@@ -112,5 +110,11 @@ export class MemoryUserDatabase {
 
   writePasskey(row: MemoryUserPasskeyRow): void {
     this.#passkeys.set(row.id, row);
+  }
+
+  deletePasskeysOf(userId: string): void {
+    for (const [passkeyId, passkey] of this.#passkeys) {
+      if (passkey.userId === userId) this.#passkeys.delete(passkeyId);
+    }
   }
 }

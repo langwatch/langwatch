@@ -9,6 +9,7 @@ import { isLiveIdentifierState, LIVE_IDENTIFIER_STATES } from "@langwatch/identi
 import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
+import type { ProvisionalHeadsWriter } from "../../eventing/identity-ledger.store.ts";
 import type { IdentityFoldState } from "../../eventing/identity-state.projection.ts";
 import { issuerForProviderId } from "../../rules/better-auth-account-queries.rules.ts";
 import type { IdentityReservationRepository } from "../identity-reservations.repository.ts";
@@ -35,7 +36,9 @@ function linkedIdentifiers(state: IdentityFoldState): LinkedIdentifier[] {
  * the queue's per-user lock.
  * The identity pipeline's projection store (ADR-101 §3, ADR-116): the
  */
-export class PrismaIdentityProjectionRepository implements StateProjectionStore<IdentityFoldState> {
+export class PrismaIdentityProjectionRepository
+  implements StateProjectionStore<IdentityFoldState>, ProvisionalHeadsWriter
+{
   static create({
     prisma,
     reservations,
@@ -124,6 +127,17 @@ export class PrismaIdentityProjectionRepository implements StateProjectionStore<
         projectionVersion: projection.version,
       },
     });
+  }
+
+  /**
+   * A newborn's heads before its first fold, written the way the fold writes them and nothing
+   * else: no cursor, no lock release, no `Account` linkage. The missing cursor marks them
+   * provisional.
+   */
+  async writeProvisionalHeads({ facts }: { facts: IdentifierFact[] }): Promise<void> {
+    for (const fact of facts) {
+      await this.writeIdentifier(fact);
+    }
   }
 
   /**

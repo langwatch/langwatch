@@ -134,6 +134,16 @@ describe("given no folder and nothing remembered", () => {
     expect(screen.getByText("Installed on acme")).toBeDefined();
   });
 
+  /** @scenario "The code access card shows the folder and GitHub actions" */
+  it("draws a folder icon on the local action and the GitHub mark on the other", () => {
+    renderCard();
+
+    const options = screen.getAllByTestId("langy-code-access-option");
+    expect(options).toHaveLength(2);
+    expect(options[0]!.querySelector("svg.lucide-folder-open")).not.toBeNull();
+    expect(options[1]!.querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 98 96");
+  });
+
   /** @scenario "A code access call without the offer shows no describe option" */
   it("offers no describe link unless the tool asked for it", () => {
     renderCard();

@@ -6,7 +6,7 @@ export const PROJECT_AGGREGATE_TYPE = "project" as const;
 export const PROJECT_CREATED_EVENT_TYPE = "lw.project.created" as const;
 export const PROJECT_CREATED_EVENT_VERSION = "2026-09-30" as const;
 
-/** Ids only: a peer reads anything else it needs through `ProjectApi`, never from the event. */
+/** Ids and placement only: a peer reads anything else through `ProjectApi`, never the event. */
 export const projectCreatedEventDataSchema = z.object({
   tenantId: z.string().min(1),
   projectId: z.string().min(1),
@@ -16,6 +16,9 @@ export const projectCreatedEventDataSchema = z.object({
   adminUserId: z.string().min(1).nullish(),
   /** The person who created it; absent for a personal workspace's project and a backfill. */
   createdByUserId: z.string().min(1).nullish(),
+  /** Where the project sits when created; absent on facts recorded before 2026-10-06. */
+  teamId: z.string().min(1).optional(),
+  isPersonal: z.boolean().optional(),
   /** Set by project's backfill: the project existed before its creation was recorded. */
   backfilled: z.boolean().optional(),
 });
@@ -81,3 +84,22 @@ export const projectArchivedEventDataSchema = z.object({
   occurredAt: z.number().int().nonnegative(),
 });
 export type ProjectArchivedEventData = z.infer<typeof projectArchivedEventDataSchema>;
+
+export const PROJECT_DEPARTMENT_ASSIGNED_EVENT_TYPE = "lw.project.department_assigned" as const;
+export const PROJECT_DEPARTMENT_ASSIGNED_EVENT_VERSION = "2026-10-06" as const;
+
+/** A project's department, with its team and personal flag as they stood when it was recorded. */
+export const projectDepartmentAssignedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  organizationId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  departmentId: z.string().min(1).nullable(),
+  teamId: z.string().min(1),
+  isPersonal: z.boolean(),
+  /** Set by project's backfill: the stored department, recorded before any change was. */
+  backfilled: z.boolean().optional(),
+});
+export type ProjectDepartmentAssignedEventData = z.infer<
+  typeof projectDepartmentAssignedEventDataSchema
+>;

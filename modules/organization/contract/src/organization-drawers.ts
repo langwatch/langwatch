@@ -1,6 +1,4 @@
-/** Organization's drawers, by token: the one way a caller opens them (ARCHITECTURE.md §10.1). */
-
-import { uiTokens } from "@langwatch/module";
+/** What a caller hands organization's drawers; the tokens live in organization-client (§10.1). */
 
 /** What a caller hands the create-project drawer. */
 export type UiCreateProjectDrawerProps = {
@@ -38,11 +36,3 @@ export type UiPersonDrawerProps = {
   open?: boolean;
   userId?: string;
 };
-
-const drawers = uiTokens("organization");
-
-export const CreateProjectDrawerToken = drawers.drawer<UiCreateProjectDrawerProps>("createProject");
-export const EditProjectDrawerToken = drawers.drawer<UiEditProjectDrawerProps>("editProject");
-export const CreateTeamDrawerToken = drawers.drawer<UiCreateTeamDrawerProps>("createTeam");
-export const InviteMemberDrawerToken = drawers.drawer<UiInviteMemberDrawerProps>("inviteMember");
-export const PersonDrawerToken = drawers.drawer<UiPersonDrawerProps>("person");

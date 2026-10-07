@@ -1,6 +1,5 @@
+import { OtlpAttributeFlatteningService } from "@langwatch/trace-contract/otlp-decoding";
 import { describe, expect, it } from "vitest";
-
-import { OtlpAttributeFlatteningService } from "../otlp-attribute-flattening.service.ts";
 
 const { parseJsonStringValues, sanitizeInvalidJsonEscapes } = OtlpAttributeFlatteningService;
 

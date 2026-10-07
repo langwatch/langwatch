@@ -9,7 +9,7 @@ import {
   MediaPartToken,
   ParameterLineFieldToken,
   TalkToItPanelToken,
-} from "@langwatch/scenario-contract";
+} from "@langwatch/scenario-client";
 
 export const scenarioWeb = defineBrowserModule("scenario")
   .withHosts({

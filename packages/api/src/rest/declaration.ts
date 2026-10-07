@@ -180,14 +180,25 @@ export type RestDeprecation = Readonly<{
   readonly notice?: string;
 }>;
 
-/** A path in another module's namespace, served for the migration only (§8, R10). */
-export type RestSharedPath = Readonly<{
-  /** The module whose namespace the path sits in. */
-  readonly owner: ModuleName;
-  readonly reason: string;
-  /** The plan or release that retires the shared path. */
-  readonly deprecate: string;
-}>;
+/** A path in another module's namespace: retired by its `deprecate` plan, or `permanent` (§8). */
+export type RestSharedPath = Readonly<
+  {
+    /** The module whose namespace the path sits in. */
+    readonly owner: ModuleName;
+    readonly reason: string;
+  } & (
+    | {
+        /** The plan or release that retires the shared path. */
+        readonly deprecate: string;
+        readonly permanent?: never;
+      }
+    | {
+        /** Ruled to stay: a nested sub-resource the owner's namespace carries for good. */
+        readonly permanent: true;
+        readonly deprecate?: never;
+      }
+  )
+>;
 
 /**
  * The credentials a declaration may choose a door for. `public` is absent on
@@ -1148,13 +1159,13 @@ class RouteBuilder<Api, S extends RouteShape> {
   }
 
   /**
-   * Serves this path in another module's namespace, for the migration only (§8, R10):
-   * names the owner, why, and the plan that retires it. Only a literal family may.
+   * Serves this path in another module's namespace (§8, R10): names the owner, why, and
+   * the plan that retires it, or that it is permanent. Only a literal family may.
    */
   withSharedPath(sharedPath: RestSharedPath): RouteBuilder<Api, S> {
     for (const [field, value] of Object.entries({
       reason: sharedPath.reason,
-      deprecate: sharedPath.deprecate,
+      ...(sharedPath.permanent ? {} : { deprecate: sharedPath.deprecate }),
     })) {
       if (value.trim() === "") {
         throw new Error(

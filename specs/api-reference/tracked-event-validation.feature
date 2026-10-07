@@ -75,10 +75,13 @@ Feature: Tracked-event validation answers the caller
     And the event is not recorded
 
   @integration
-  Scenario: Neither URL is served without a recorder to send the event to
+  Scenario: Both tracked-event URLs refuse by name when the process has no recorder
     Given a process that registered no trace command queue
-    When the mounted paths are enumerated
-    Then neither tracked-event URL is served
+    When a valid event is posted to either tracked-event URL
+    Then the response status is 503
+    And the response code is "service_unavailable"
+    And the response is not the "Event tracked" confirmation
+    And the event is not recorded
 
   # A metric key survives into the event drilldown's composite-key encoding
   # (`<key>\x1F<value>`). A key carrying that separator itself makes the

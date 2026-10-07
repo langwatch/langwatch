@@ -10,6 +10,7 @@ import {
   UserNotFoundError,
   USER_ACCOUNT_KSUID_RESOURCE,
   USER_KSUID_RESOURCE,
+  type AdoptUnconfirmedAccountOutcome,
   type CreateUserInput,
   type CreatedUser,
   type SetFirstUserPasswordResult,
@@ -150,6 +151,21 @@ export class MemoryUserRepository implements UserRepository {
     });
 
     return "set";
+  }
+
+  async adoptUnconfirmed(input: { id: string }): Promise<AdoptUnconfirmedAccountOutcome> {
+    const row = this.#database.usersById([input.id])[0];
+    if (!row) return "no_account";
+    if (row.emailVerified) return "already_confirmed";
+    if (row.lastLoginAt) return "signed_in";
+
+    for (const account of this.#database.accountsOf(input.id)) {
+      this.#database.deleteAccount(account.id);
+    }
+    this.#database.deletePasskeysOf(input.id);
+    this.#database.writeUser({ ...row, emailVerified: true });
+
+    return "adopted";
   }
 
   async findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus> {

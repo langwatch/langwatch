@@ -1,7 +1,7 @@
 import { ConfigParseError, parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
-import { agentServerConfig } from "../agent.api.ts";
+import { agentServerConfig } from "../agent.config.ts";
 
 const read = (environment: Record<string, string | undefined>) =>
   parseProcessConfig({ owners: [{ name: "agent", config: agentServerConfig }], environment }).agent;

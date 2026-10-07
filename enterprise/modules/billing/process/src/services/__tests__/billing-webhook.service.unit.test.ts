@@ -7,11 +7,16 @@ import { traced } from "@langwatch/observability/node";
 import { Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
+import { MemoryStripeSubscriptionsChannel } from "../../channels/memory/memory.stripe-subscriptions.channel.ts";
 import type { RecordSubscriptionStartedCommandData } from "../../eventing/billing-lifecycle.events.ts";
 import { type BillingWebhookHost, type SubscriptionWithOrg } from "../../index.ts";
 import { type BillingWebhookOrganizationRepository } from "../../repositories/billing-webhook-organization.repository.ts";
 import { type BillingWebhookSubscriptionRepository } from "../../repositories/billing-webhook-subscription.repository.ts";
 import { type BillingSubscriptionRecord } from "../../repositories/subscription.repository.ts";
+import type {
+  BillingSubscription,
+  BillingSubscriptionItem,
+} from "../../rules/billing-stripe-shapes.rules.ts";
 import { ANNUAL_EVENTS_BILLING_THRESHOLD } from "../annual-events-billing-threshold.service.ts";
 import { BillingLifecycleAnnouncerService } from "../billing-lifecycle-announcer.service.ts";
 import { EEWebhookService } from "../billing-stripe-webhook.service.ts";
@@ -130,25 +135,38 @@ const makeSubscriptionWithOrg = (
   };
 };
 
-const createMockStripe = (overrides: Record<string, unknown> = {}) => ({
-  subscriptions: {
-    retrieve: vi.fn().mockResolvedValue({
-      id: "sub_stripe_1",
-      status: "active",
-      billing_thresholds: null,
-      items: { data: [] },
-    }),
-    update: vi.fn().mockResolvedValue({}),
-    cancel: vi.fn().mockResolvedValue({}),
-  },
+/** Stripe's subscription as the webhook path reads it: active, no threshold, no items. */
+const stripeSubscription = (overrides: Partial<BillingSubscription> = {}): BillingSubscription => ({
+  id: "sub_stripe_1",
+  status: "active",
+  canceledAt: null,
+  billingThreshold: null,
+  items: [],
   ...overrides,
 });
+
+/** A subscription line billing the given price. */
+const itemFor = (priceId: string): BillingSubscriptionItem => ({
+  id: `si_${priceId}`,
+  priceId,
+  unitAmount: null,
+  interval: null,
+});
+
+/** The subscriptions twin holding the given subscriptions, or the default active one. */
+const subscriptionsTwin = (...held: BillingSubscription[]) => {
+  const twin = MemoryStripeSubscriptionsChannel.create();
+  for (const subscription of held.length > 0 ? held : [stripeSubscription()]) {
+    twin.seed({ subscription });
+  }
+  return twin;
+};
 
 describe("EEWebhookService", () => {
   let subRepo: ReturnType<typeof createMockBillingSubscription>;
   let orgRepo: ReturnType<typeof createMockOrganizationRepository>;
   let itemCalculator: ReturnType<typeof createMockItemCalculator>;
-  let mockStripeInstance: ReturnType<typeof createMockStripe>;
+  let stripeSubscriptions: MemoryStripeSubscriptionsChannel;
   let host: ReturnType<typeof createMockHost>;
   let service: EEWebhookService;
 
@@ -158,12 +176,12 @@ describe("EEWebhookService", () => {
     subRepo = createMockBillingSubscription();
     orgRepo = createMockOrganizationRepository();
     itemCalculator = createMockItemCalculator();
-    mockStripeInstance = createMockStripe();
+    stripeSubscriptions = subscriptionsTwin();
     host = createMockHost();
     service = EEWebhookService.create({
       subscriptionRepository: subRepo,
       organizationRepository: orgRepo,
-      stripe: mockStripeInstance as any,
+      stripeSubscriptions,
       itemCalculator,
       host: host,
       retention,
@@ -292,7 +310,7 @@ describe("EEWebhookService", () => {
             EEWebhookService.create({
               subscriptionRepository: subRepo,
               organizationRepository: orgRepo,
-              stripe: mockStripeInstance as any,
+              stripeSubscriptions,
               itemCalculator,
               host: host,
               retention,
@@ -343,7 +361,7 @@ describe("EEWebhookService", () => {
         service = EEWebhookService.create({
           subscriptionRepository: subRepo,
           organizationRepository: orgRepo,
-          stripe: mockStripeInstance as any,
+          stripeSubscriptions,
           itemCalculator,
           host: host,
           retention,
@@ -408,22 +426,18 @@ describe("EEWebhookService", () => {
         });
       };
 
-      const annualStripeSubscription = () => ({
-        id: "sub_stripe_1",
-        status: "active",
-        billing_thresholds: null,
-        items: {
-          data: [
-            { price: { id: itemCalculator.prices.GROWTH_SEAT_USD_ANNUAL } },
-            { price: { id: itemCalculator.prices.GROWTH_EVENTS_USD_ANNUAL } },
+      const annualStripeSubscription = () =>
+        stripeSubscription({
+          items: [
+            itemFor(itemCalculator.prices.GROWTH_SEAT_USD_ANNUAL),
+            itemFor(itemCalculator.prices.GROWTH_EVENTS_USD_ANNUAL),
           ],
-        },
-      });
+        });
 
       /** @scenario An annual subscription gets a billing threshold after checkout completes */
       it("sets the billing threshold on the Stripe subscription", async () => {
         setupLinkedCheckout();
-        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(annualStripeSubscription());
+        stripeSubscriptions.seed({ subscription: annualStripeSubscription() });
 
         const promise = service.handleCheckoutCompleted({
           subscriptionId: "sub_stripe_1",
@@ -433,20 +447,28 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(mockStripeInstance.subscriptions.update).toHaveBeenCalledWith("sub_stripe_1", {
-          billing_thresholds: {
-            amount_gte: ANNUAL_EVENTS_BILLING_THRESHOLD,
-            reset_billing_cycle_anchor: false,
+        expect(stripeSubscriptions.updates).toEqual([
+          {
+            subscriptionId: "sub_stripe_1",
+            change: {
+              billingThreshold: {
+                amountGte: ANNUAL_EVENTS_BILLING_THRESHOLD,
+                resetBillingCycleAnchor: false,
+              },
+            },
           },
-        });
+        ]);
       });
 
       /** @scenario "A best-effort side effect that throws does not abandon the webhook" */
       /** @scenario A failure setting the threshold never fails the checkout */
       it("still links and activates when the threshold update fails", async () => {
         setupLinkedCheckout();
-        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(annualStripeSubscription());
-        mockStripeInstance.subscriptions.update.mockRejectedValue(new Error("stripe down"));
+        stripeSubscriptions.seed({ subscription: annualStripeSubscription() });
+        stripeSubscriptions.refuse({
+          operation: "updateSubscription",
+          error: new Error("stripe down"),
+        });
 
         const promise = service.handleCheckoutCompleted({
           subscriptionId: "sub_stripe_1",
@@ -464,8 +486,11 @@ describe("EEWebhookService", () => {
       /** @scenario A threshold failure raises an alert for manual follow-up */
       it("alerts on Slack when the threshold update fails", async () => {
         setupLinkedCheckout();
-        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(annualStripeSubscription());
-        mockStripeInstance.subscriptions.update.mockRejectedValue(new Error("stripe down"));
+        stripeSubscriptions.seed({ subscription: annualStripeSubscription() });
+        stripeSubscriptions.refuse({
+          operation: "updateSubscription",
+          error: new Error("stripe down"),
+        });
 
         const promise = service.handleCheckoutCompleted({
           subscriptionId: "sub_stripe_1",
@@ -484,7 +509,7 @@ describe("EEWebhookService", () => {
       /** @scenario An annual subscription gets a billing threshold after checkout completes */
       it("does not alert when the threshold is applied successfully", async () => {
         setupLinkedCheckout();
-        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(annualStripeSubscription());
+        stripeSubscriptions.seed({ subscription: annualStripeSubscription() });
 
         const promise = service.handleCheckoutCompleted({
           subscriptionId: "sub_stripe_1",
@@ -500,8 +525,11 @@ describe("EEWebhookService", () => {
       /** @scenario A threshold failure raises an alert for manual follow-up */
       it("still completes checkout when the alert itself fails", async () => {
         setupLinkedCheckout();
-        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(annualStripeSubscription());
-        mockStripeInstance.subscriptions.update.mockRejectedValue(new Error("stripe down"));
+        stripeSubscriptions.seed({ subscription: annualStripeSubscription() });
+        stripeSubscriptions.refuse({
+          operation: "updateSubscription",
+          error: new Error("stripe down"),
+        });
         mockSendSlackBillingThresholdFailureAlert.mockRejectedValueOnce(new Error("slack down"));
 
         const promise = service.handleCheckoutCompleted({
@@ -527,18 +555,13 @@ describe("EEWebhookService", () => {
           outcome: "activated",
           subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
         });
-        mockStripeInstance.subscriptions.retrieve.mockResolvedValue({
-          id: "sub_stripe_1",
-          status: "active",
-          billing_thresholds: null,
-          items: {
-            data: [
-              { price: { id: itemCalculator.prices.GROWTH_SEAT_USD_MONTHLY } },
-              {
-                price: { id: itemCalculator.prices.GROWTH_EVENTS_USD_MONTHLY },
-              },
+        stripeSubscriptions.seed({
+          subscription: stripeSubscription({
+            items: [
+              itemFor(itemCalculator.prices.GROWTH_SEAT_USD_MONTHLY),
+              itemFor(itemCalculator.prices.GROWTH_EVENTS_USD_MONTHLY),
             ],
-          },
+          }),
         });
 
         const promise = service.handleCheckoutCompleted({
@@ -549,7 +572,7 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(mockStripeInstance.subscriptions.update).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.updates).toEqual([]);
       });
     });
   });
@@ -637,11 +660,15 @@ describe("EEWebhookService", () => {
     describe("when subscription is a growth seat-event plan", () => {
       /** @scenario Upgrade to a seat-event plan migrates old subscriptions */
       it("migrates tiered subscriptions and cancels old Stripe subs", async () => {
-        const localStripe = createMockStripe();
+        const localStripe = subscriptionsTwin(
+          stripeSubscription(),
+          stripeSubscription({ id: "sub_old_1" }),
+          stripeSubscription({ id: "sub_old_2" }),
+        );
         service = EEWebhookService.create({
           subscriptionRepository: subRepo,
           organizationRepository: orgRepo,
-          stripe: localStripe as any,
+          stripeSubscriptions: localStripe,
           itemCalculator,
           host: host,
           retention,
@@ -676,21 +703,23 @@ describe("EEWebhookService", () => {
           organizationId: "org_123",
           excludeSubscriptionId: "sub_db_1",
         });
-        expect(localStripe.subscriptions.cancel).toHaveBeenCalledWith("sub_old_1", {
+        expect(localStripe.cancellations).toContainEqual({
+          subscriptionId: "sub_old_1",
           prorate: true,
         });
-        expect(localStripe.subscriptions.cancel).toHaveBeenCalledWith("sub_old_2", {
+        expect(localStripe.cancellations).toContainEqual({
+          subscriptionId: "sub_old_2",
           prorate: true,
         });
       });
 
       it("logs but does not fail when Stripe cancellation fails", async () => {
-        const localStripe = createMockStripe();
-        localStripe.subscriptions.cancel.mockRejectedValue(new Error("Stripe error"));
+        const localStripe = subscriptionsTwin();
+        localStripe.refuse({ operation: "cancelSubscription", error: new Error("Stripe error") });
         service = EEWebhookService.create({
           subscriptionRepository: subRepo,
           organizationRepository: orgRepo,
-          stripe: localStripe as any,
+          stripeSubscriptions: localStripe,
           itemCalculator,
           host: host,
           retention,
@@ -889,10 +918,7 @@ describe("EEWebhookService", () => {
     describe("when subscription is already CANCELLED in DB and Stripe subscription is canceled", () => {
       /** @scenario $0 invoice on cancellation does not reactivate a cancelled subscription */
       it("does not reactivate a cancelled subscription", async () => {
-        mockStripeInstance.subscriptions.retrieve.mockResolvedValue({
-          id: "sub_stripe_1",
-          status: "canceled",
-        });
+        stripeSubscriptions.seed({ subscription: stripeSubscription({ status: "canceled" }) });
 
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({
@@ -916,10 +942,7 @@ describe("EEWebhookService", () => {
     describe("when subscription is ACTIVE in DB but Stripe subscription is canceled", () => {
       /** @scenario $0 invoice on cancellation does not reactivate a cancelling subscription */
       it("does not reactivate when Stripe status is canceled", async () => {
-        mockStripeInstance.subscriptions.retrieve.mockResolvedValue({
-          id: "sub_stripe_1",
-          status: "canceled",
-        });
+        stripeSubscriptions.seed({ subscription: stripeSubscription({ status: "canceled" }) });
 
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({
@@ -942,9 +965,10 @@ describe("EEWebhookService", () => {
 
     describe("when Stripe subscription status check fails", () => {
       it("proceeds with activation (fail-open)", async () => {
-        mockStripeInstance.subscriptions.retrieve.mockRejectedValue(
-          new Error("Stripe API unreachable"),
-        );
+        stripeSubscriptions.refuse({
+          operation: "getSubscription",
+          error: new Error("Stripe API unreachable"),
+        });
 
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
@@ -974,9 +998,10 @@ describe("EEWebhookService", () => {
       });
 
       it("skips activation when DB status is CANCELLED", async () => {
-        mockStripeInstance.subscriptions.retrieve.mockRejectedValue(
-          new Error("Stripe API unreachable"),
-        );
+        stripeSubscriptions.refuse({
+          operation: "getSubscription",
+          error: new Error("Stripe API unreachable"),
+        });
 
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({
@@ -1616,7 +1641,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
     service = EEWebhookService.create({
       subscriptionRepository: subRepo,
       organizationRepository: createMockOrganizationRepository(),
-      stripe: createMockStripe() as any,
+      stripeSubscriptions: subscriptionsTwin(),
       itemCalculator: createMockItemCalculator(),
       host: createMockHost(),
       retention,

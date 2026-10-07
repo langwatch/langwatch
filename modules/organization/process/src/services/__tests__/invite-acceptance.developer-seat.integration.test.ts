@@ -69,10 +69,15 @@ describe.skipIf(!DB_URL)("accepting an invitation on a seat (Postgres)", () => {
       .then((row) => row?.role);
   }
 
-  function admissionAudits(userId: string) {
-    return prisma.auditLog.findMany({
-      where: { organizationId, userId, action: "organization.member.admitted" },
+  async function admissionAudits(userId: string) {
+    const intents = await prisma.processManagerOutbox.findMany({
+      where: { processName: "organizationAudit", projectId: organizationId },
     });
+    return intents
+      .map((intent) => intent.payload as { userId?: string; action?: string })
+      .filter(
+        (payload) => payload.userId === userId && payload.action === "organization.member.admitted",
+      );
   }
 
   beforeAll(async () => {
@@ -95,6 +100,7 @@ describe.skipIf(!DB_URL)("accepting an invitation on a seat (Postgres)", () => {
   });
 
   afterAll(async () => {
+    await prisma.processManagerOutbox.deleteMany({ where: { projectId: organizationId } });
     await prisma.auditLog.deleteMany({ where: { organizationId } });
     await prisma.organizationInvite.deleteMany({ where: { organizationId } });
     await prisma.organizationUser.deleteMany({ where: { organizationId } });

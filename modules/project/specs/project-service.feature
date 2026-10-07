@@ -104,8 +104,8 @@ Feature: Shared project service
   Scenario: A project is born with packaged credentials
     Given a process composes the project service
     When the service creates a project
-    Then the feature package mints the project identifier and the ingestion key
-    And the ingestion key keeps the prefixed 54-byte alphanumeric shape the onboarding snippets are sized against
+    Then the feature package mints the project identifier
+    And the legacy key column holds a value that never authenticates
     And no composition root describes either format
 
   @unit
@@ -179,4 +179,30 @@ Feature: Shared project service
     Given an organization with two projects whose presence settings were stored before project recorded them
     When the backfill-project-presence-setting task runs twice
     Then each run records each project's stored presence setting once, marked backfilled, with no changer
+    And each project's fact is keyed alike on both runs, so the second run records nothing new
+
+  @unit
+  Scenario: A new project's created fact carries its team and whether it is personal
+    Given an organization with a shared team
+    When a member creates a project in that team
+    Then project's created fact names the project's team and that it is not personal
+
+  @unit
+  Scenario: A project's department assignment is recorded as project's fact
+    Given a project in team "alpha" of its organization
+    When a department is assigned to it
+    Then project records a department-assigned fact naming the department, team "alpha" and that it is not personal
+    And it is not marked as backfilled
+
+  @unit
+  Scenario: Assigning a department to a project outside the organization records no fact
+    Given a project the assignment does not reach in the named organization
+    When a department is assigned to it
+    Then no department-assigned fact is recorded
+
+  @unit
+  Scenario: Existing projects' departments and teams are recorded by the backfill, idempotently
+    Given an organization with two projects stored before project recorded their departments
+    When the backfill-project-department-assigned task runs twice
+    Then each run records each project's department, team and personal flag once, marked backfilled
     And each project's fact is keyed alike on both runs, so the second run records nothing new

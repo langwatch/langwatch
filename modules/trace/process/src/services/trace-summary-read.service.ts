@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { TraceNotFoundError } from "@langwatch/trace-contract";
+import { teaserOf, TraceNotFoundError } from "@langwatch/trace-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
 import type { SpanStorageRepository } from "../repositories/span-storage.repository.ts";
@@ -7,7 +7,6 @@ import type {
   FindByTraceIdOptions,
   TraceSummaryRepository,
 } from "../repositories/trace-summary.repository.ts";
-import { teaserOf } from "../rules/trace-visibility-teaser.rules.ts";
 import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service.ts";
 import { TraceOffloadResolutionService } from "./trace-offload-resolution.service.ts";

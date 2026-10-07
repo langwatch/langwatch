@@ -364,6 +364,15 @@ const presentations = {
         : "Split the request into smaller batches.";
     },
   },
+  trace_page_size_too_large: {
+    title: "Too many traces requested in one page",
+    describe: (error) => {
+      const maxPageSize = str(error, "maxPageSize", "");
+      return maxPageSize
+        ? `This plan reads at most ${maxPageSize} traces in one page. Ask for a smaller page and page forward.`
+        : "Ask for a smaller page and page forward.";
+    },
+  },
   span_not_found: {
     title: "Span not found",
     describe: () => "It may have been deleted along with its trace.",
@@ -627,6 +636,12 @@ const presentations = {
   broadcaster_not_active: {
     title: "Live updates disconnected",
     describe: () => "Refresh the page to reconnect.",
+  },
+  // A link or button named a drawer no installed module declares (ADR-148 §8).
+  browser_drawer_undeclared: {
+    title: "That panel isn't available here",
+    describe: () =>
+      "The link points to a panel this deployment doesn't have. Carry on from the page.",
   },
 
   // ---- workflows ----
@@ -4808,6 +4823,14 @@ const presentations = {
     title: "That request was sent in the wrong format",
     describe: () => "Send the body with the Content-Type this endpoint reads, then try again.",
   },
+  upgrade_not_found: {
+    title: "That upgrade record wasn't found",
+    describe: () => "The step or run may be from another installation. Reload the upgrades page.",
+  },
+  upgrade_invalid_cursor: {
+    title: "That page of upgrade runs couldn't be read",
+    describe: () => "Reload the upgrades page to start from the newest run.",
+  },
   // ==========================================================================
   // Codes raised by the Go services (generated into `goErrorCodes` by
   // cmd/herrgen). They reach the browser whenever the control plane proxies a
@@ -4907,6 +4930,12 @@ const presentations = {
     // Saying so is what stops them looking for one.
     title: "Couldn't start the voice session",
     describe: () => "No session was created. Try again in a moment.",
+  },
+  voice_broker_unavailable: {
+    // No call was created. This instance is full or shutting down, and
+    // another one answers the retry.
+    title: "Couldn't start the voice call",
+    describe: () => "No call was created. Try again in a few seconds.",
   },
   guardrail_blocked: {
     title: "Blocked by a guardrail",
@@ -5018,6 +5047,11 @@ const presentations = {
   request_abandoned: {
     title: "The request was cancelled before the provider answered",
     describe: () => "Send it again if you still need the answer.",
+  },
+  checkup_clickhouse_migration_failed: {
+    title: "A ClickHouse migration failed",
+    describe: () =>
+      "A ClickHouse migration failed on at least one target. Fix the cause it names, then run the upgrade again.",
   },
   checkup_clickhouse_migrations_pending: {
     title: "ClickHouse migrations are pending",

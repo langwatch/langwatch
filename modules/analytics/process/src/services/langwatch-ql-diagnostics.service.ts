@@ -44,6 +44,56 @@ function multiProjectDiagnostics({
   ];
 }
 
+/**
+ * What hydration has to say about the values it put in the result: one diagnostic per
+ * condition rather than per column, the columns riding in `meta`.
+ */
+function appFunctionDiagnostics({
+  appFunctions,
+}: LangWatchQLDiagnosticsInput): LangWatchQLDiagnostic[] {
+  if (!appFunctions) return [];
+  const diagnostics: LangWatchQLDiagnostic[] = [];
+  if (appFunctions.valueTruncations.length > 0) {
+    diagnostics.push({
+      code: "APP_FUNCTION_VALUE_TRUNCATED",
+      message:
+        "Some values were cut because a single conversation or trace was larger than one value may be. Ask for a smaller token budget to choose what is kept.",
+      meta: { columns: appFunctions.valueTruncations },
+    });
+  }
+  if (appFunctions.isTruncatedByBytes) {
+    diagnostics.push({
+      code: "APP_FUNCTION_RESULT_TRUNCATED",
+      message:
+        "Trailing rows were dropped because the extracted values reached this API's response ceiling. Ask for a smaller token budget per call, or narrow the query, to see the whole answer.",
+      meta: {
+        maxHydratedBytes: appFunctions.maxHydratedBytes,
+        rowsReturned: appFunctions.rowsReturned,
+      },
+    });
+  }
+  if (appFunctions.unresolvedKeys.length > 0) {
+    diagnostics.push({
+      code: "APP_FUNCTION_UNRESOLVED_KEYS",
+      message:
+        "Some rows are null because their conversation, trace or span key matched nothing. Check the ids, and that the rows are inside the retention window.",
+      meta: { columns: appFunctions.unresolvedKeys },
+    });
+  }
+  const skipped = appFunctions.skippedJudgements ?? {};
+  const skippedTexts = Object.values(skipped).reduce((total, count) => total + count, 0);
+  if (skippedTexts > 0) {
+    diagnostics.push({
+      code: "INSTANT_EVAL_SKIPPED",
+      message:
+        "Some rows are null because their text could not be judged. Run the query again, ask for less text per row, or check that judging is switched on for this project.",
+      meta: { texts: skippedTexts, reasons: skipped },
+    });
+  }
+
+  return diagnostics;
+}
+
 function unboundedTimeRangeDiagnostics({
   validation,
   database,
@@ -113,6 +163,7 @@ export class LangWatchQLDiagnosticsService {
    */
   diagnose(input: LangWatchQLDiagnosticsInput): readonly LangWatchQLDiagnostic[] {
     return [
+      ...appFunctionDiagnostics(input),
       ...multiProjectDiagnostics(input),
       ...this.fanout.diagnose(input),
       ...unboundedTimeRangeDiagnostics(input),

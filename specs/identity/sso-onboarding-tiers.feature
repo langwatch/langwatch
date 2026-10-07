@@ -430,11 +430,11 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
     And only a grant across the whole organization is accepted
 
   @integration
-  Scenario: An administrator without the permission is not offered setup, and cannot reach it
-    Given "ana" may administer "acme" but may not manage single sign-on
-    When she opens organization settings
-    Then no single sign-on setup entry is offered
-    And opening the address directly is refused
+  Scenario: An administrator without sso:manage reads where setup stands and cannot change it
+    Given "ana" may read single sign-on for "acme" but may not manage it
+    When she opens the single sign-on setup page
+    Then the page shows where the setup stands, with no control that would change it
+    And every setup step she attempts is refused
 
   @unit
   Scenario: Approving somebody else's domain claim is an operator's act, not an administrator's

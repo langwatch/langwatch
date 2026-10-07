@@ -6,7 +6,11 @@ import type { EventBus } from "./event-bus.ts";
 import { locateTasksDir, resolvePnpm } from "./node-deps.ts";
 import { appOfflineEnv, FORCED_ENV } from "./offline-defaults.ts";
 
-// Run Prisma and ClickHouse goose migrations through apps/tasks launcher.
+/**
+ * The npx server's one upgrade, before any service starts (specs/upgrade/entry-points.feature):
+ * `upgrade` (Postgres, ClickHouse, LangWatchQL), then the system-migrations pass, from apps/tasks.
+ * The app and the workers it starts afterwards never migrate.
+ */
 export async function runMigrations(
   ctx: RuntimeContext,
   bus: EventBus,
@@ -28,11 +32,8 @@ export async function runMigrations(
     ...process.env,
     ...envFromFile,
     ...FORCED_ENV,
-    // Prepend ~/.langwatch/bin so the clickhouse-migrate task (which
-    // shells out to `which goose`) finds the predep-installed goose binary.
-    // Postgres + redis don't need this — they're spawned by absolute path
-    // from the supervisor — but goose is the one tool the langwatch app
-    // discovers via PATH.
+    // ~/.langwatch/bin first: the upgrade finds the predep-installed goose on
+    // PATH (Postgres and Redis are spawned by absolute path).
     PATH: `${ctx.paths.bin}:${process.env.PATH ?? ""}`,
     DATABASE_URL: `postgresql://langwatch@127.0.0.1:${ctx.ports.postgres}/langwatch_db?schema=langwatch_db&connection_limit=5`,
     CLICKHOUSE_URL: `http://127.0.0.1:${ctx.ports.clickhouseHttp}/langwatch`,
@@ -40,26 +41,21 @@ export async function runMigrations(
     SKIP_CLICKHOUSE_MIGRATE: "false",
   };
 
-  // resolvePnpm(paths) prefers the bundled <bin>/pnpm (installed by the
-  // pnpm predep), so both the OUTER `pnpm run task prisma-migrate` AND the
-  // INNER `pnpm exec prisma migrate deploy` (inside PrismaMigrateTask's spawn)
-  // resolve to the same binary — the inner one finds it via PATH, which
-  // the env block above already prepends with ctx.paths.bin.
+  // resolvePnpm(paths) prefers the bundled <bin>/pnpm, and the upgrade's own
+  // Prisma and goose children find it and goose through the PATH set above.
   const pnpm = await resolvePnpm(ctx.paths);
-  await execAndPipe({
-    bus,
-    service: "migrate:prisma",
-    bin: pnpm.command,
-    args: [...pnpm.args, "run", "task", "prisma-migrate"],
-    options: { cwd: tasksDir, env },
-  });
-  await execAndPipe({
-    bus,
-    service: "migrate:clickhouse",
-    bin: pnpm.command,
-    args: [...pnpm.args, "run", "task", "clickhouse-migrate"],
-    options: { cwd: tasksDir, env },
-  });
+  for (const [service, task] of [
+    ["migrate:upgrade", "upgrade"],
+    ["migrate:system-migrations", "system-migrations-pass"],
+  ] as const) {
+    await execAndPipe({
+      bus,
+      service,
+      bin: pnpm.command,
+      args: [...pnpm.args, "run", "task", task],
+      options: { cwd: tasksDir, env },
+    });
+  }
 
   bus.emit({
     type: "healthy",

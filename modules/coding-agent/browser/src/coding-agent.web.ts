@@ -7,7 +7,7 @@ import { defineBrowserModule } from "@langwatch/browser";
 import {
   CodingAgentPullRequestsTableToken,
   CodingAgentSessionsTableToken,
-} from "@langwatch/coding-agent-contract";
+} from "@langwatch/coding-agent-client";
 
 /** The pull requests and sessions tables, lent to user by token (§10.1). */
 export const codingAgentWeb = defineBrowserModule("coding-agent")

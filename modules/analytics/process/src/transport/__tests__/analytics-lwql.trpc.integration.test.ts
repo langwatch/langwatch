@@ -4,6 +4,7 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
@@ -40,6 +41,7 @@ async function callerFor({ switchOn, held }: { switchOn: boolean; held: readonly
       projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "org-1" }),
       plans: createApiFixture<EntitlementApi>(),
       traces: createApiFixture<TraceApi>(),
+      instantEvals: createApiFixture<InstantEvalApi>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
     repositories: MemoryAnalyticsRepositories.create(),

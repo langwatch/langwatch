@@ -1,7 +1,8 @@
 /** @vitest-environment node */
 
 // Ported from main's sourceHealthHistory.integration.test.ts: a historical import
-// counts nothing in the recent windows yet still reports its newest event.
+// counts nothing in the recent windows yet still reports its newest event. Trace's
+// side of the same rule is clickhouse.trace-attributed-rollup.repository's recency test.
 import { randomUUID } from "node:crypto";
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
@@ -31,7 +32,7 @@ function rowFor({
   id,
   time,
 }: {
-  kind: "pulled" | "traced" | "logged";
+  kind: "pulled" | "logged";
   tenant: string;
   source: string;
   id: string;
@@ -41,7 +42,7 @@ function rowFor({
   if (kind === "pulled") {
     return { ...base, SourceId: source, EventId: id, EventTime: timestamp(time) };
   }
-  const shared = {
+  return {
     ...base,
     ProjectionId: id,
     Attributes: {
@@ -50,10 +51,8 @@ function rowFor({
     },
     CreatedAt: timestamp(time),
     UpdatedAt: timestamp(time),
+    TimeUnixMs: timestamp(time),
   };
-  return kind === "traced"
-    ? { ...shared, OccurredAt: timestamp(time), Version: "v1" }
-    : { ...shared, TimeUnixMs: timestamp(time) };
 }
 
 describe("source health during a historical provider import", () => {
@@ -100,7 +99,6 @@ describe("source health during a historical provider import", () => {
 
   it.each([
     ["pulled", "governance_ocsf_events"],
-    ["traced", "trace_summaries"],
     ["logged", "stored_log_records"],
   ] as const)(
     "keeps %s counts at zero while reporting the newest historical event, scoped to this source and tenant",
@@ -126,6 +124,9 @@ describe("source health during a historical provider import", () => {
       const repository = createActivityMonitorTestService({
         prisma: prismaDouble({ project: { findFirst: async () => ({ id: tenantId }) } }),
         clickhouse: { getClient: async () => clickhouse },
+        traces: {
+          getAttributedTraceRecency: async () => ({ counts: [0, 0, 0], lastOccurredAtMs: 0 }),
+        },
       });
 
       try {

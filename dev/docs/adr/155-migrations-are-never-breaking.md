@@ -37,9 +37,11 @@ Concretely, and each of these is a rule a reviewer can apply:
 1. **Adding a column**: it is nullable or it has a `DEFAULT`. An `INSERT` from
    the image still serving does not name it.
 2. **Removing a column, a table or a field**: only after the code stopped
-   reading and writing it, and only in a migration shipped **one full release
-   later** than that code. A rollback of the newest release must still find its
-   schema. Until then the thing stays, documented as retired.
+   reading and writing it. A column, table, view or type may be dropped, and a
+   column type changed, only when the release named in the
+   `-- contract: retired in <release>` note is at or below the LTS floor in
+   `packages/upgrade/releases/lts-floor.json`; until then the thing stays,
+   documented as retired.
 3. **Renaming**: never in place. Add the new name, backfill, dual-write or read
    both, switch the readers, then retire the old name under rule 2. There is a
    way back at every step.
@@ -57,6 +59,19 @@ Concretely, and each of these is a rule a reviewer can apply:
    live events for an aggregate until its replay has passed them — and the
    readers switch only once it has caught up. The old projection is retired under
    rule 2.
+7. **Lock and floor rules the scanner also applies**, each failing by name:
+   - `retirement-note-above-floor`: the note names a release above the LTS floor.
+   - `set-not-null-on-populated-column`: any `SET NOT NULL` on a table the
+     migration does not create.
+   - `enum-recreated`: an enum renamed, or dropped and created again.
+   - unique or validated constraint on an existing table.
+   - plain index on an existing table (needs the ops pre-build note).
+   - `alter-column-type`.
+   - ClickHouse: `ddl-without-if-exists` and `view-replaced-in-place`.
+
+   Tables a migration creates are exempt from the lock rules. The baseline stays
+   frozen; the floor and lock rules start above `NEW_RULES_FROM` in the Prisma
+   test, and `BASELINE_FROZEN_AT` must name a migration on disk.
 
 A contract step says so in the SQL, above the statement:
 

@@ -10,11 +10,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryDataPrivacyDirectoryRepository } from "../../repositories/memory/memory.data-privacy-directory.repository.ts";
-import {
-  createDataPrivacyTestProjects,
-  createDataPrivacyTestApp,
-  dataPrivacyTestGraph,
-} from "./data-privacy.fixture.ts";
+import { createDataPrivacyTestApp, dataPrivacyTestGraph } from "./data-privacy.fixture.ts";
 
 const { projectId, teamId, organizationId } = dataPrivacyTestGraph;
 const USER_ID = "user-1";
@@ -45,7 +41,6 @@ async function bootWith(scopeOrganizationId: string | null): Promise<DataPrivacy
   return createDataPrivacyTestApp({
     directory,
     dependencies: {
-      projects: createDataPrivacyTestProjects(),
       permissions: permittedAuthz,
       featureFlags: createApiFixture<FeatureFlagApi>(),
     },

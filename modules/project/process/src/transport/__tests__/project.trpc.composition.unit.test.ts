@@ -192,6 +192,7 @@ function application(
     recordPresenceSettingChanged: { send: async () => undefined },
     recordProjectMoved: { send: async () => undefined },
     recordProjectArchived: { send: async () => undefined },
+    recordProjectDepartmentAssigned: { send: async () => undefined },
   });
 
   return { app, database, asked, logged: reported.entries };

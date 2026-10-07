@@ -72,6 +72,18 @@ export const opsWeb = defineBrowserModule("ops")
       requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-migrations.screen.tsx"),
     },
+    "pages/ops/upgrades": {
+      requires: "ops:view",
+      load: () => import("./features/upgrades/ui/sections/upgrades.screen.tsx"),
+    },
+    "pages/ops/upgrades/releases/[release]": {
+      requires: "ops:view",
+      load: () => import("./features/upgrades/ui/sections/upgrade-release.screen.tsx"),
+    },
+    "pages/ops/upgrades/runs/[runId]": {
+      requires: "ops:view",
+      load: () => import("./features/upgrades/ui/sections/upgrade-run.screen.tsx"),
+    },
     "pages/ops/projections/[runId]": {
       requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-replay-progress.screen.tsx"),

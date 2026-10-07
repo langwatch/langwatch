@@ -28,6 +28,9 @@
       "path": "modules/agent/browser/tsconfig.json"
     },
     {
+      "path": "modules/agent/client/tsconfig.json"
+    },
+    {
       "path": "modules/agent/contract/tsconfig.json"
     },
     {
@@ -38,6 +41,9 @@
     },
     {
       "path": "modules/analytics/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/analytics/client/tsconfig.json"
     },
     {
       "path": "modules/analytics/contract/tsconfig.test.json"
@@ -53,6 +59,9 @@
     },
     {
       "path": "modules/annotation/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/annotation/client/tsconfig.json"
     },
     {
       "path": "modules/annotation/contract/tsconfig.json"
@@ -137,6 +146,9 @@
     },
     {
       "path": "modules/coding-agent/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/coding-agent/client/tsconfig.json"
     },
     {
       "path": "modules/coding-agent/contract/tsconfig.json"
@@ -250,6 +262,9 @@
       "path": "enterprise/modules/managed-provider/browser/tsconfig.json"
     },
     {
+      "path": "enterprise/modules/managed-provider/client/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/managed-provider/contract/tsconfig.json"
     },
     {
@@ -329,6 +344,9 @@
     },
     {
       "path": "modules/experiment/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/experiment/client/tsconfig.json"
     },
     {
       "path": "modules/experiment/contract/tsconfig.json"
@@ -415,6 +433,9 @@
       "path": "modules/langy/browser/tsconfig.json"
     },
     {
+      "path": "modules/langy/client/tsconfig.json"
+    },
+    {
       "path": "modules/langy/contract/tsconfig.json"
     },
     {
@@ -448,6 +469,9 @@
       "path": "modules/model-provider/browser/tsconfig.json"
     },
     {
+      "path": "modules/model-provider/client/tsconfig.json"
+    },
+    {
       "path": "modules/model-provider/contract/tsconfig.json"
     },
     {
@@ -469,6 +493,9 @@
       "path": "modules/navigation/browser/tsconfig.json"
     },
     {
+      "path": "modules/navigation/client/tsconfig.json"
+    },
+    {
       "path": "modules/notification/browser/tsconfig.json"
     },
     {
@@ -482,6 +509,9 @@
     },
     {
       "path": "modules/onboarding/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/onboarding/client/tsconfig.json"
     },
     {
       "path": "modules/onboarding/contract/tsconfig.json"
@@ -500,6 +530,9 @@
     },
     {
       "path": "modules/organization/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/organization/client/tsconfig.json"
     },
     {
       "path": "modules/organization/contract/tsconfig.json"
@@ -548,6 +581,9 @@
     },
     {
       "path": "modules/project/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/project/client/tsconfig.json"
     },
     {
       "path": "modules/project/contract/tsconfig.json"
@@ -691,6 +727,9 @@
       "path": "modules/trace/browser/tsconfig.json"
     },
     {
+      "path": "modules/trace/client/tsconfig.json"
+    },
+    {
       "path": "modules/trace/contract/tsconfig.json"
     },
     {
@@ -701,12 +740,6 @@
     },
     {
       "path": "packages/upgrade/tsconfig.test.json"
-    },
-    {
-      "path": "modules/usage/contract/tsconfig.json"
-    },
-    {
-      "path": "modules/usage/process/tsconfig.json"
     },
     {
       "path": "modules/user/browser/tsconfig.json"
@@ -740,6 +773,9 @@
     },
     {
       "path": "modules/workflow/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/workflow/client/tsconfig.json"
     },
     {
       "path": "modules/workflow/contract/tsconfig.json"

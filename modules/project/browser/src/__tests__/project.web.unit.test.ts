@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { createUi } from "@langwatch/browser";
-import { HeroAskFieldToken, ProjectSwitcherToken } from "@langwatch/project-contract";
+import { HeroAskFieldToken, ProjectSwitcherToken } from "@langwatch/project-client";
 import { describe, expect, it } from "vitest";
 
 import { projectWeb } from "../project.web.ts";

@@ -28,7 +28,7 @@ Feature: The checkup page of a self-hosted install
 
   @unit
   Scenario: A failed check names the fix and the page that explains it
-    Given Postgres answers but a migration is still pending
+    Given Postgres answers but a blocking migration step is not done
     When the checkup runs
     Then the migrations row reads fail
     And the row names the command that applies the migration
@@ -70,18 +70,17 @@ Feature: The checkup page of a self-hosted install
     And the row never shows the password
 
   @unit
-  Scenario: A ClickHouse install where the goose binary is absent leaves migrations not checked
-    Given ClickHouse answers a ping
-    And the goose binary is not on this install
+  Scenario: A ClickHouse install that is not configured leaves its migrations row not checked
+    Given ClickHouse is not configured
     When the checkup runs
-    Then the ClickHouse row reads pass
-    And the ClickHouse migrations row reads not checked
+    Then the ClickHouse migrations row reads not checked
 
   @unit
-  Scenario: The ClickHouse migrations row asks goose about the ClickHouse this process uses
-    Given the process is configured with a ClickHouse URL
-    When the checkup reads the ClickHouse migration status
-    Then goose is asked for its status on that same ClickHouse
+  Scenario: The migration rows read the upgrade ledger
+    Given the upgrade ledger holds a blocking step that is not done
+    When the checkup runs
+    Then the migrations row of that engine is refused and names the step
+    And its fix names "pnpm task upgrade" and "/ops/upgrades"
 
   @unit
   Scenario: The usage report row reads the last report and its refusal

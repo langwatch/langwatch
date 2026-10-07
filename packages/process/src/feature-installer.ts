@@ -18,6 +18,7 @@ import { ScopedSecrets, type SecretHandle } from "@langwatch/secrets";
 
 import { FeatureSecretsUnavailableError } from "./boot-errors.ts";
 /** One feature installer. A feature declares its config, the contract services */
+import { buildsMigrationSteps } from "./migration-steps.ts";
 import { withAnotherPipeline } from "./module-eventing.ts";
 import { snapshotRepositories, type FeatureRepositories } from "./repository-ownership.ts";
 import {
@@ -173,6 +174,15 @@ export type ModuleTaskBinder<
   setup: ModuleTaskSetup<Dependencies, Members, Repositories, App, Config>,
 ) => readonly unknown[] | Promise<readonly unknown[]>;
 
+/** Builds a module's migration steps over its booted App, at install in tasks and worker. */
+export type ModuleMigrationBinder<
+  Dependencies extends TokenMap,
+  Members,
+  Repositories,
+  App,
+  Config = unknown,
+> = ModuleTaskBinder<Dependencies, Members, Repositories, App, Config>;
+
 /** The parsed slice a declaration's phantom `configType` names; nothing where it declared none. */
 type DeclaredConfigOf<Declaration> = Declaration extends { readonly configType?: infer Config }
   ? Exclude<Config, undefined>
@@ -271,6 +281,8 @@ export interface InstalledFeatureState {
   readonly facts?: readonly TransportFactBinding[];
   /** The tasks this module's binders built over its App, in the tasks role only. */
   readonly tasks?: readonly unknown[];
+  /** The migration steps this module's binders built over its App, in tasks and worker only. */
+  readonly migrationSteps?: readonly unknown[];
   /** Bound contribution readers; absent where the feature declared none. */
   readonly rest: (() => unknown) | undefined;
   readonly trpc: (() => unknown) | undefined;
@@ -1350,6 +1362,20 @@ class RepositoryAppBuilder<
     >({ declaration: this.build(), workers: [], tasks });
   }
 
+  /** Migration steps this module declares, built in the tasks and worker roles only. */
+  withMigrations(...steps: readonly unknown[]) {
+    return withContributions<
+      ReturnType<
+        RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
+      >,
+      ModuleRepositories<Live, Memory>,
+      App,
+      Dependencies,
+      Members,
+      Created
+    >({ declaration: bindingMigrations(this.build(), () => steps), workers: [], tasks: [] });
+  }
+
   build(): ServerFeatureDeclaration<
     Config,
     Members,
@@ -1558,6 +1584,15 @@ class ConfiguredAppBuilder<
     return withContributions({ declaration: this.build(), workers: [], tasks });
   }
 
+  /** Migration steps this module declares, built in the tasks and worker roles only. */
+  withMigrations(...steps: readonly unknown[]) {
+    return withContributions({
+      declaration: bindingMigrations(this.build(), () => steps),
+      workers: [],
+      tasks: [],
+    });
+  }
+
   /** This module's event sourcing, built over the app above. */
   withEventing<Definition>(eventing: FeatureEventing<undefined, App, unknown, Definition>) {
     return withContributions({
@@ -1664,6 +1699,15 @@ class UnconfiguredAppBuilder<
     return withContributions({ declaration: this.build(), workers: [], tasks });
   }
 
+  /** Migration steps this module declares, built in the tasks and worker roles only. */
+  withMigrations(...steps: readonly unknown[]) {
+    return withContributions({
+      declaration: bindingMigrations(this.build(), () => steps),
+      workers: [],
+      tasks: [],
+    });
+  }
+
   /** This module's event sourcing, built over the app above. */
   withEventing<Definition>(eventing: FeatureEventing<undefined, App, unknown, Definition>) {
     return withContributions({
@@ -1744,6 +1788,18 @@ export type ModuleContributions<
     withTasks(
       ...tasks: readonly unknown[]
     ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
+    withMigrations(
+      bind: ModuleMigrationBinder<
+        Dependencies,
+        Members,
+        Repositories,
+        Created,
+        DeclaredConfigOf<Declaration>
+      >,
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
+    withMigrations(
+      ...steps: readonly unknown[]
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
     /** What this module binds for the facts its own declarations name. */
     withTransportFacts(
       bind: ModuleTransportFacts<Dependencies, Members, App>,
@@ -1817,6 +1873,35 @@ function bindingTasks<Declaration extends object>(
   };
 }
 
+/** Build migration steps at install (tasks and worker roles), over the App just installed. */
+function bindingMigrations<Declaration extends object>(
+  declaration: Declaration,
+  bind: ModuleMigrationBinder<TokenMap, never, unknown, never>,
+): Declaration {
+  const installable = declaration as Declaration & InstallableDeclaration;
+
+  return {
+    ...declaration,
+    install: async (args: FeatureInstallArguments<never>): Promise<InstalledFeatureState> => {
+      const state = await installable.install(args);
+      if (!buildsMigrationSteps(args.role)) return state;
+
+      const built = await bind({
+        app: state.provided as never,
+        repositories: state.repositories,
+        dependencies: resolveTokens(
+          installable.dependencies,
+          args.resolve,
+        ) as ResolvedTokens<TokenMap>,
+        members: args.members,
+        config: declaredConfig(args.config),
+        secrets: args.secrets ?? undeclaredSecrets(installable.name),
+      });
+      return { ...state, migrationSteps: [...(state.migrationSteps ?? []), ...built] };
+    },
+  };
+}
+
 /** Adds the worker, task, facts and eventing halves to a built declaration. */
 function withContributions<
   Declaration extends object,
@@ -1854,6 +1939,16 @@ function withContributions<
         });
       }
       return withContributions({ declaration, workers, tasks: [...tasks, ...next], eventing });
+    },
+    withMigrations: (...next: readonly unknown[]) => {
+      const [bind] = next;
+      const binder = next.length === 1 && isTaskBinder(bind) ? bind : () => next;
+      return withContributions({
+        declaration: bindingMigrations(declaration, binder),
+        workers,
+        tasks,
+        eventing,
+      });
     },
     withTransportFacts: (bind: ModuleTransportFacts<TokenMap, never, never>) =>
       withContributions({

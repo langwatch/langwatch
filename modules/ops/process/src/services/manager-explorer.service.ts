@@ -15,8 +15,8 @@ import type {
 import { nowInstant } from "@langwatch/time";
 
 import type { OpsEventingIntrospection } from "../app/ops.app.ts";
-import type { ProcessAuditRepository } from "../repositories/ops-audit.repository.ts";
 import type { ProcessOpsRepository } from "../repositories/process-ops.repository.ts";
+import type { ProcessAuditService } from "./process-audit.service.ts";
 
 /**
  * One global knob each: wake past due means the worker is starved/dead,
@@ -36,14 +36,14 @@ const logger = createLogger("langwatch:ops:manager-explorer");
 export class ManagerExplorerService {
   private readonly store: ProcessStore;
   private readonly fleet: ProcessOpsRepository;
-  private readonly audit: ProcessAuditRepository;
+  private readonly audit: Pick<ProcessAuditService, "append" | "findRecent">;
   /** The live pipeline surface, supplied by the process composition. */
   private readonly introspection: OpsEventingIntrospection;
 
   static create(params: {
     store: ProcessStore;
     fleet: ProcessOpsRepository;
-    audit: ProcessAuditRepository;
+    audit: Pick<ProcessAuditService, "append" | "findRecent">;
     introspection: OpsEventingIntrospection;
   }): ManagerExplorerService {
     return new ManagerExplorerService(params);
@@ -52,7 +52,7 @@ export class ManagerExplorerService {
   private constructor(params: {
     store: ProcessStore;
     fleet: ProcessOpsRepository;
-    audit: ProcessAuditRepository;
+    audit: Pick<ProcessAuditService, "append" | "findRecent">;
     introspection: OpsEventingIntrospection;
   }) {
     this.store = params.store;

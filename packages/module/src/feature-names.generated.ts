@@ -49,7 +49,6 @@ export const FEATURE_NAMES = [
   "suite",
   "topic",
   "trace",
-  "usage",
   "user",
   "webhook",
   "workflow",

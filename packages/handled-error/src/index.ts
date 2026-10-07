@@ -23,6 +23,7 @@ export {
   serializedHandledErrorSchema,
   serializedReasonSchema,
 } from "./serialized-handled-error.ts";
+export { TRANSIENT_REFUSAL_CODES, isTransientRefusal } from "./transient-refusal.ts";
 export type {
   HandledErrorOptions,
   HerrEnvelope,

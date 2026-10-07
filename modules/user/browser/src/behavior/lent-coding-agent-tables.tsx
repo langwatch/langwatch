@@ -4,7 +4,7 @@ import { Lent } from "@langwatch/browser-host/lent";
 import {
   CodingAgentPullRequestsTableToken,
   CodingAgentSessionsTableToken,
-} from "@langwatch/coding-agent-contract";
+} from "@langwatch/coding-agent-client";
 
 import { usePersonalWorkspaceHost } from "../model/personal-workspace-host.ts";
 

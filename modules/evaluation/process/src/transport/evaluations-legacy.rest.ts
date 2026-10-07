@@ -188,6 +188,20 @@ const EVALUATE_RESPONSES = {
  */
 let evaluatorCatalogue: Record<string, unknown> | undefined;
 
+/** The legacy SDK doors kept their paths when experiment took `/api/evaluations` (§8, R10). */
+const EXPERIMENT_NAMESPACE = {
+  owner: "experiment",
+  reason: "released SDKs call the legacy evaluation doors at their original paths",
+  deprecate: "move under a namespace evaluation owns in the next API version",
+} as const;
+
+/** The dataset evaluation door kept its path in dataset's namespace (§8, R10). */
+const DATASET_NAMESPACE = {
+  owner: "dataset",
+  reason: "released SDKs call the dataset evaluation door at its original path",
+  deprecate: "move under a namespace evaluation owns in the next API version",
+} as const;
+
 /**
  * NOTE: every credentialed route here asks for `evaluations:manage` on what are
  * append/create actions, so a key holding only `evaluations:create` is refused.
@@ -202,6 +216,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withAddressing("literal", { v1Twin: true })
 
   .get("/api/evaluations/list", "getApiEvaluationsList")
+  .withSharedPath(EXPERIMENT_NAMESPACE)
   .withAccess(
     publicRoute({
       reason: "static evaluator catalogue; the same list for every caller, no project data",
@@ -229,6 +244,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   })
 
   .post("/api/evaluations/batch/log_results", "postApiEvaluationsBatchLogResults")
+  .withSharedPath(EXPERIMENT_NAMESPACE)
   .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: BATCH_LOG_MAX_BYTES, onExceeded: batchLogTooLarge })
@@ -274,6 +290,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   )
 
   .post("/api/evaluations/:evaluator/evaluate", "postApiEvaluationsByEvaluatorEvaluate")
+  .withSharedPath(EXPERIMENT_NAMESPACE)
   .withParams(evaluatorParamsSchema)
   .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
@@ -307,6 +324,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     "/api/evaluations/:evaluator/:subpath/evaluate",
     "postApiEvaluationsByEvaluatorBySubpathEvaluate",
   )
+  .withSharedPath(EXPERIMENT_NAMESPACE)
   .withParams(namespacedEvaluatorParamsSchema)
   .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
@@ -367,6 +385,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   )
 
   .post("/api/dataset/evaluate", "postApiDatasetEvaluate")
+  .withSharedPath(DATASET_NAMESPACE)
   .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES, onExceeded: payloadTooLarge })

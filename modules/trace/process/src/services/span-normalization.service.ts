@@ -12,16 +12,9 @@ import type {
   NormalizedSpan,
 } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
+import { decodeOtlpSpan, normalizeOtlpId } from "@langwatch/trace-contract/otlp-decoding";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-
-import {
-  convertUnixNanoToUnixMs,
-  normalizeOtlpId,
-  normalizeOtlpUnixNano,
-} from "../rules/otlp-span-identity.rules.ts";
-import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
-import { SpanRecordIdentityService } from "./span-record-identity.service.ts";
 
 export interface TraceSpanNormalization {
   normalizeSpanReceived(params: {
@@ -33,8 +26,6 @@ export interface TraceSpanNormalization {
 
   enrichRagContextIds(span: NormalizedSpan): void;
 }
-
-const spanRecordIdentityService = SpanRecordIdentityService.create();
 
 export class SpanNormalizationPipelineService implements TraceSpanNormalization {
   static create(
@@ -79,7 +70,7 @@ export class SpanNormalizationPipelineService implements TraceSpanNormalization 
           "SpanNormalizationPipelineService.normalizeSpanReceived",
         );
 
-        const normalizedSpan = this.decodeOtlpSpan({
+        const normalizedSpan = decodeOtlpSpan({
           tenantId,
           otlpSpan,
           otlpResource,
@@ -107,102 +98,6 @@ export class SpanNormalizationPipelineService implements TraceSpanNormalization 
         return normalizedSpan;
       },
     );
-  }
-
-  private decodeOtlpSpan({
-    tenantId,
-    otlpSpan,
-    otlpResource,
-    otlpInstrumentationScope,
-  }: {
-    tenantId: string;
-    otlpSpan: OtlpSpan;
-    otlpResource: OtlpResource | null;
-    otlpInstrumentationScope: OtlpInstrumentationScope | null;
-  }): NormalizedSpan {
-    // decode span data
-    const { traceId, spanId } = OtlpTraceRequestService.normalizeOtlpSpanIds(otlpSpan);
-    const startTimeUnixNano = normalizeOtlpUnixNano(otlpSpan.startTimeUnixNano);
-    const endTimeUnixNano = normalizeOtlpUnixNano(otlpSpan.endTimeUnixNano);
-    const startTimeUnixMs = convertUnixNanoToUnixMs(startTimeUnixNano);
-    const endTimeUnixMs = convertUnixNanoToUnixMs(endTimeUnixNano);
-    const durationMs = Math.max(0, endTimeUnixMs - startTimeUnixMs);
-    const parentAndTraceContext = OtlpTraceRequestService.normalizeOtlpParentAndTraceContext(
-      otlpSpan.parentSpanId,
-      otlpSpan.traceState,
-      otlpSpan.flags,
-    );
-
-    return {
-      id: spanRecordIdentityService.generateDeterministicSpanRecordIdFromData({
-        tenantId,
-        traceId,
-        spanId,
-        startTimeUnixMs,
-      }),
-      tenantId,
-      traceId,
-      spanId,
-      parentSpanId: parentAndTraceContext.spanId,
-      parentTraceId: parentAndTraceContext.traceId,
-      parentIsRemote: parentAndTraceContext.isRemote,
-      // sampled: default to true, as we are on the collector end
-      sampled: parentAndTraceContext.isSampled ?? true,
-
-      startTimeUnixMs,
-      endTimeUnixMs,
-      durationMs,
-
-      name: otlpSpan.name,
-      kind: OtlpTraceRequestService.normalizeOtlpSpanKind(otlpSpan.kind),
-
-      instrumentationScope: {
-        name: otlpInstrumentationScope?.name ?? "unknown",
-        version: otlpInstrumentationScope?.version ?? null,
-      },
-
-      statusCode: OtlpTraceRequestService.normalizeOtlpStatusCode(otlpSpan.status.code),
-      statusMessage: otlpSpan.status.message ?? null,
-
-      resourceAttributes: OtlpTraceRequestService.normalizeOtlpAttributes(
-        otlpResource?.attributes ?? [],
-      ),
-      spanAttributes: OtlpTraceRequestService.normalizeOtlpAttributes(otlpSpan.attributes),
-
-      events: this.decodeEvents(otlpSpan),
-      links: this.decodeLinks(otlpSpan),
-
-      droppedAttributesCount: 0,
-      droppedEventsCount: 0,
-      droppedLinksCount: 0,
-
-      // Cost is derived later (in the span-storage projection) from this span's
-      // tokens × pricing — normalization has no pricing context. Initialise to
-      // null so the span is schema-valid the moment it's built; the projection
-      // overwrites both before the span is stored.
-      cost: null,
-      nonBilledCost: null,
-    };
-  }
-
-  private decodeEvents(otlpSpan: OtlpSpan): NormalizedEvent[] {
-    return otlpSpan.events
-      .filter((event) => Boolean(event))
-      .map((event) => ({
-        name: event.name,
-        timeUnixMs: convertUnixNanoToUnixMs(normalizeOtlpUnixNano(event.timeUnixNano)),
-        attributes: OtlpTraceRequestService.normalizeOtlpAttributes(event.attributes),
-      }));
-  }
-
-  private decodeLinks(otlpSpan: OtlpSpan): NormalizedSpan["links"] {
-    return otlpSpan.links
-      .filter((link) => Boolean(link))
-      .map((link) => ({
-        traceId: normalizeOtlpId(link.traceId),
-        spanId: normalizeOtlpId(link.spanId),
-        attributes: OtlpTraceRequestService.normalizeOtlpAttributes(link.attributes),
-      }));
   }
 
   private canonicalizeSpanAttributes(normalizedSpan: NormalizedSpan): {

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Agent application.
 
-Peers call these through the token, declared at `../contract/src/agent.api.ts:45`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/agent.api.ts:43`; nothing else in this package is public.
 
 #### `listWorkflowConfigs`
 
@@ -573,10 +573,10 @@ Run by the tasks process, before serve.
 
 ## Configuration
 
-| Kind   | Leaf                | Environment variable                   | Declared at                        |
-| ------ | ------------------- | -------------------------------------- | ---------------------------------- |
-| config | `replicaCount`      | `LANGWATCH_APP_REPLICAS`               | `../contract/src/agent.api.ts:180` |
-| config | `relayMaxPayloadMb` | `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB` | `../contract/src/agent.api.ts:181` |
-| config | `publicBaseUrl`     | `BASE_HOST`                            | `../contract/src/agent.api.ts:185` |
+| Kind   | Leaf                | Environment variable                   | Declared at                          |
+| ------ | ------------------- | -------------------------------------- | ------------------------------------ |
+| config | `replicaCount`      | `LANGWATCH_APP_REPLICAS`               | `../contract/src/agent.config.ts:6`  |
+| config | `relayMaxPayloadMb` | `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB` | `../contract/src/agent.config.ts:7`  |
+| config | `publicBaseUrl`     | `BASE_HOST`                            | `../contract/src/agent.config.ts:11` |
 
 <!-- readme:generated:end -->

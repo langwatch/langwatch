@@ -682,8 +682,13 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/authorization run test
 
+      # This job has no Postgres service. The repository contract suite runs
+      # its postgres leg wherever a database URL is set, so the URL is blanked
+      # here; package-suites runs that leg against a real database.
       - name: Run @langwatch/authz-process unit tests
         if: matrix.app == 'platform-api'
+        env:
+          DATABASE_URL: ""
         run: pnpm --filter @langwatch/authz-process run test
 
       # @langwatch/identity-contract is the pure identity core (ADR-115) and
@@ -1103,7 +1108,7 @@ jobs:
         run: >-
           pnpm --filter @langwatch/architecture-enforcer lint --
           --no-declarations
-          --policies application-boundaries,declaration-project-references,default-test-lane,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams,teaching-citations,deleted-spellings-in-teaching,lint-rule-skill-pointers,feature-configuration
+          --policies application-boundaries,declaration-project-references,default-test-lane,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams,teaching-citations,deleted-spellings-in-teaching,lint-rule-skill-pointers,feature-configuration,rest-namespace-owners
 
       # THE GATE. Oxlint over the whole governed tree, and a non-zero exit
       # fails the job. A config error and a lint violation both surface here.
@@ -1481,6 +1486,9 @@ jobs:
 
       - name: Test check-added-images.sh
         run: bash .github/scripts/__tests__/check-added-images.test.sh
+
+      - name: Test detect-changes-source.sh
+        run: bash .github/scripts/__tests__/detect-changes-source.test.sh
 
       # Lives here rather than in deployment-impact-check.yml because that
       # workflow filters `on.paths` down to deployment surface, which

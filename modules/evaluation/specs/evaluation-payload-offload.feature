@@ -107,7 +107,7 @@ Feature: Evaluation payload offload
     And the event payload carries a preview-only marker naming the failed offload
     And the evaluation still records its result
 
-  # Gap: the Azure confirmation is the objectRetentionConfirmed flag, which lands with the operator surface of ADR-172; until then an Azure destination is not refused.
+  # Gap: the Azure confirmation is isObjectRetentionConfirmed, which lands with the operator surface of ADR-172; until then an Azure destination is not refused.
   @unit @unimplemented
   Scenario: an Azure container whose retention rules are unconfirmed keeps the inputs as a preview marker
     Given a project whose object storage is an Azure container the operator has not confirmed

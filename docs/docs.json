@@ -647,6 +647,7 @@
               "ai-gateway/billing-events",
               "features/webhooks",
               "ai-gateway/cookbooks/metering-and-rebilling",
+              "ai-gateway/cookbooks/consumer-voice-app",
               "ai-gateway/demo-agent-platform"
             ]
           },
@@ -1000,6 +1001,7 @@
               "self-hosting/configuration/environment-variables",
               "self-hosting/configuration/sizing-and-scaling",
               "self-hosting/configuration/backups",
+              "self-hosting/configuration/object-storage-lifecycle",
               "self-hosting/configuration/sso",
               "self-hosting/configuration/email",
               "self-hosting/configuration/observability",
@@ -1730,7 +1732,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1791197095",
+      "source": "/ci/cache/busted/1791330629",
       "destination": "/introduction"
     },
     {

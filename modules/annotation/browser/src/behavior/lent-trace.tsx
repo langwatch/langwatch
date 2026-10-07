@@ -1,11 +1,10 @@
-/** What trace lends this module through its declaration (ARCHITECTURE.md §3.4, rule 7). */
+/** What trace lends this module by token (ARCHITECTURE.md §10.1). */
 
 import { Lent } from "@langwatch/browser-host/lent";
-import {
-  AnnotationQueueConversationToken,
-  TraceEditButtonToken,
-  type AnnotationQueueConversationProps,
-  type TraceEditButtonProps,
+import { AnnotationQueueConversationToken, TraceEditButtonToken } from "@langwatch/trace-client";
+import type {
+  AnnotationQueueConversationProps,
+  TraceEditButtonProps,
 } from "@langwatch/trace-contract";
 
 /** Trace's conversation for one queue item, rendered as trace lends it. */

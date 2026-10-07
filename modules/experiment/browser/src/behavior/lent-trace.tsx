@@ -1,44 +1,18 @@
-/** What trace lends this module through its declaration (ARCHITECTURE.md §3.4, rule 7). */
+/** What trace lends this module by token (ARCHITECTURE.md §10.1). */
 
-import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
-import {
-  type UiRenderInputOutputProps,
-  type UiTraceIdPeekProps,
-} from "@langwatch/browser-host/declarations";
-import { lazy, Suspense, useMemo } from "react";
+import type { UiComponentToken } from "@langwatch/browser-host/declarations";
+import { Lent } from "@langwatch/browser-host/lent";
+import { RenderInputOutputToken, TraceIdPeekToken } from "@langwatch/trace-client";
+
+/** A lent component's props, read off its token so this module needs no trace-contract edge. */
+type PropsOf<Token> = Token extends UiComponentToken<infer Props> ? Props : never;
 
 /** Trace's input/output viewer, rendered as trace lends it. */
-export function RenderInputOutput(props: UiRenderInputOutputProps) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("renderInputOutput")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function RenderInputOutput(props: PropsOf<typeof RenderInputOutputToken>) {
+  return <Lent of={RenderInputOutputToken} props={props} />;
 }
 
 /** Trace's eye-icon peek at one trace, rendered as trace lends it. */
-export function TraceIdPeek(props: UiTraceIdPeekProps) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("traceIdPeek")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function TraceIdPeek(props: PropsOf<typeof TraceIdPeekToken>) {
+  return <Lent of={TraceIdPeekToken} props={props} />;
 }

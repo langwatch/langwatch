@@ -6,7 +6,7 @@ import { Lent } from "@langwatch/browser-host/lent";
 import {
   EvaluatorSettingsFormToken,
   type EvaluatorSettingsFormProps,
-} from "@langwatch/evaluator-contract";
+} from "@langwatch/evaluator-client";
 import { lazy, Suspense, useMemo } from "react";
 
 /** Evaluator's editor for one saved evaluator node. */

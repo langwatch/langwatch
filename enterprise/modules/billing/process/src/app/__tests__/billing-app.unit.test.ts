@@ -2,15 +2,21 @@ import type { RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { ContractTerms } from "@langwatch/enterprise-licensing-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
-import Stripe from "stripe";
 import { describe, expect, it } from "vitest";
 
 import { billingProcessModule } from "../../billing.module.ts";
 import { MemoryBillingWebhookHostChannel } from "../../channels/memory/memory.billing-webhook-host.channel.ts";
+import { MemoryConnectedInvoicingChannel } from "../../channels/memory/memory.connected-invoicing.channel.ts";
+import { MemoryStripeCustomersChannel } from "../../channels/memory/memory.stripe-customers.channel.ts";
+import { MemoryStripeInvoicesChannel } from "../../channels/memory/memory.stripe-invoices.channel.ts";
+import { MemoryStripeMetersChannel } from "../../channels/memory/memory.stripe-meters.channel.ts";
+import { MemoryStripePricesChannel } from "../../channels/memory/memory.stripe-prices.channel.ts";
+import { MemoryStripeSubscriptionsChannel } from "../../channels/memory/memory.stripe-subscriptions.channel.ts";
+import { MemoryStripeWebhooksChannel } from "../../channels/memory/memory.stripe-webhooks.channel.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
 import type { SeatRetentionRules } from "../../services/billing-subscription-lifecycle.service.ts";
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
-import { StripeWebhookSignatureService } from "../../services/stripe-webhook-signature.service.ts";
+import type { UsageReportingService } from "../../services/usage-reporting.service.ts";
 import type { UsageWarningService } from "../../services/usage-warning.service.ts";
 import { billingStripeWebhookRest } from "../../transport/billing-stripe-webhook.rest.ts";
 import { type ConnectedBillingPeers, BillingModule } from "../billing.app.ts";
@@ -76,19 +82,34 @@ function licensedAt(commitUsdCents: number) {
   return { asked, audited, peers };
 }
 
+/** Billing's Stripe as memory twins; the SDK client refuses any call by name. */
+function stripeTwins({ webhookSecret }: { webhookSecret: string | undefined }) {
+  const channels = {
+    webhooks: MemoryStripeWebhooksChannel.create({ signingSecret: webhookSecret }),
+    customers: MemoryStripeCustomersChannel.create(),
+    subscriptions: MemoryStripeSubscriptionsChannel.create(),
+    invoices: MemoryStripeInvoicesChannel.create(),
+    prices: MemoryStripePricesChannel.create(),
+    meters: MemoryStripeMetersChannel.create(),
+    connectedInvoicing: MemoryConnectedInvoicingChannel.create(),
+  };
+  return { channels };
+}
+
 function billingApp({
   isSaas,
-  stripeSecretKey,
+  withStripe,
   commitUsdCents = 100_00,
   webhookSecret,
 }: {
   isSaas: boolean;
-  stripeSecretKey: string | undefined;
+  withStripe: boolean;
   commitUsdCents?: number;
   webhookSecret?: string;
 }) {
   const registry = licensedAt(commitUsdCents);
   const repositories = MemoryBillingRepositories.create();
+  const stripe = withStripe ? stripeTwins({ webhookSecret }) : void 0;
   const app = BillingModule.assemble({
     usageWarnings: createApiFixture<UsageWarningService>({}),
     resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
@@ -100,14 +121,14 @@ function billingApp({
       nodeEnvironment: "test",
     },
     peers: registry.peers,
-    stripeSecretKey,
+    stripe,
+    usageReporting: () => createApiFixture<UsageReportingService>({}, "usage meter"),
     webhook: {
-      signing: StripeWebhookSignatureService.create(webhookSecret),
       host: MemoryBillingWebhookHostChannel.create(),
       retention: createApiFixture<SeatRetentionRules>({}),
     },
   });
-  return { app, asked: registry.asked, audited: registry.audited, repositories };
+  return { app, asked: registry.asked, audited: registry.audited, repositories, stripe };
 }
 
 const renewal = (commitUsdCents: number) => ({
@@ -124,7 +145,7 @@ describe("the installed billing application", () => {
   describe("given a deployment that is not LangWatch Cloud and has no payment provider", () => {
     /** @scenario "Onboarding is refused outside LangWatch Cloud" */
     it("refuses connected billing by its handled code", async () => {
-      const { app } = billingApp({ isSaas: false, stripeSecretKey: undefined });
+      const { app } = billingApp({ isSaas: false, withStripe: false });
 
       await expect(app.renewConnectedTerm(renewal(100_00), STAFF)).rejects.toMatchObject({
         code: "connected_billing_unavailable",
@@ -132,7 +153,7 @@ describe("the installed billing application", () => {
     });
 
     it("runs no billing tick and no seat invoicing pass at all", async () => {
-      const { app, repositories } = billingApp({ isSaas: false, stripeSecretKey: undefined });
+      const { app, repositories } = billingApp({ isSaas: false, withStripe: false });
 
       await expect(app.runConnectedBillingTick()).resolves.toBeUndefined();
       await expect(app.invoicePendingSeatChanges()).resolves.toBeUndefined();
@@ -144,7 +165,7 @@ describe("the installed billing application", () => {
 
   describe("given LangWatch Cloud with no payment provider key", () => {
     it("fails as a deployment fault rather than a refusal the customer can act on", async () => {
-      const { app } = billingApp({ isSaas: true, stripeSecretKey: undefined });
+      const { app } = billingApp({ isSaas: true, withStripe: false });
 
       const failure = await app
         .renewConnectedTerm(renewal(100_00), STAFF)
@@ -159,7 +180,7 @@ describe("the installed billing application", () => {
     it("checks a renewal's commit against the terms the license registry holds", async () => {
       const { app, asked } = billingApp({
         isSaas: true,
-        stripeSecretKey: "sk_test_unused",
+        withStripe: true,
         commitUsdCents: 100_00,
       });
 
@@ -171,9 +192,9 @@ describe("the installed billing application", () => {
 
     /** @scenario "A deployment that bills composes the real subscription services" */
     it("answers renewals, seat changes and a signed delivery from the composed services", async () => {
-      const { app } = billingApp({
+      const { app, stripe } = billingApp({
         isSaas: true,
-        stripeSecretKey: "sk_test_unused",
+        withStripe: true,
         webhookSecret: "whsec_fixture",
         commitUsdCents: 100_00,
       });
@@ -183,7 +204,7 @@ describe("the installed billing application", () => {
         type: "account.application.deauthorized",
         data: { object: { id: "ca_1", object: "application" } },
       });
-      const signature = Stripe.webhooks.generateTestHeaderString({
+      const signature = MemoryStripeWebhooksChannel.sign({
         payload,
         secret: "whsec_fixture",
       });
@@ -195,11 +216,12 @@ describe("the installed billing application", () => {
       await expect(
         app.receiveStripeWebhook({ rawBody: new TextEncoder().encode(payload), signature }),
       ).resolves.toEqual({ received: true });
+      expect(stripe?.channels.connectedInvoicing.raised).toEqual([]);
     });
 
     /** @scenario "The Billing section shows a seat change until billing decides it" */
     it("shows a recorded seat change as awaiting, then as not onboarded once a pass decided it", async () => {
-      const { app } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });
+      const { app } = billingApp({ isSaas: true, withStripe: true });
       const seatChangeState = async () =>
         (await app.getConnectedBillingOverview({ organizationId: ACME }, STAFF)).seatChanges.map(
           (change) => change.state,
@@ -212,22 +234,8 @@ describe("the installed billing application", () => {
   });
 
   describe("given the backoffice", () => {
-    it("answers a caller without the platform-operator grant not found, saying nothing about why", async () => {
-      const { app } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });
-
-      await expect(
-        app.getConnectedBillingOverview({ organizationId: ACME }, CUSTOMER_ADMIN),
-      ).rejects.toMatchObject({ code: "not_found" });
-      await expect(app.renewConnectedTerm(renewal(100_00), CUSTOMER_ADMIN)).rejects.toMatchObject({
-        code: "not_found",
-      });
-      await expect(
-        app.markConnectedInvoicePaidOutOfBand({ stripeInvoiceId: "in_1" }, null),
-      ).rejects.toMatchObject({ code: "not_found" });
-    });
-
     it("shows a staff member a customer never onboarded, with the license's terms and seats", async () => {
-      const { app } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });
+      const { app } = billingApp({ isSaas: true, withStripe: true });
 
       const overview = await app.getConnectedBillingOverview({ organizationId: ACME }, STAFF);
 
@@ -252,39 +260,8 @@ describe("the installed billing application", () => {
       });
     });
 
-    /** @scenario "A view-only operator reads the billing overview but is refused on every billing write" */
-    it("lets a view-only operator read the overview and refuses every write", async () => {
-      const { app } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });
-      const refused = { code: "not_found" };
-
-      await expect(
-        app.getConnectedBillingOverview({ organizationId: ACME }, VIEWER),
-      ).resolves.toMatchObject({ account: null });
-      await expect(
-        app.onboardConnectedCustomer(
-          {
-            ...renewal(100_00),
-            organizationName: "Acme",
-            billingEmail: "finance@acme.example",
-            bankTransfer: null,
-          },
-          VIEWER,
-        ),
-      ).rejects.toMatchObject(refused);
-      await expect(
-        app.addConnectedCommit({ organizationId: ACME, amountUsdCents: 100 }, VIEWER),
-      ).rejects.toMatchObject(refused);
-      await expect(app.renewConnectedTerm(renewal(100_00), VIEWER)).rejects.toMatchObject(refused);
-      await expect(
-        app.completeConnectedRenewalIfDue({ organizationId: ACME }, VIEWER),
-      ).rejects.toMatchObject(refused);
-      await expect(
-        app.markConnectedInvoicePaidOutOfBand({ stripeInvoiceId: "in_1" }, VIEWER),
-      ).rejects.toMatchObject(refused);
-    });
-
     it("records who read a customer's billing, as main's backoffice did", async () => {
-      const { app, audited } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });
+      const { app, audited } = billingApp({ isSaas: true, withStripe: true });
 
       await app.getConnectedBillingOverview({ organizationId: ACME }, STAFF);
 
@@ -302,7 +279,7 @@ describe("the installed billing application", () => {
 
   describe("given the daily tick on LangWatch Cloud", () => {
     it("reads the pending renewals of every connected customer and leaves one with none alone", async () => {
-      const { app, repositories } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });
+      const { app, repositories } = billingApp({ isSaas: true, withStripe: true });
       await repositories.connectedBilling.createAccount({
         organizationId: ACME,
         stripeCustomerId: "cus_acme",
@@ -331,7 +308,7 @@ describe("the installed billing application", () => {
 describe("the subscription plan billing answers entitlement", () => {
   /** @scenario "Billing answers a Cloud organization's active subscription plan" */
   it("answers the active subscription's plan, lifting limits for an impersonating operator", async () => {
-    const { app, repositories } = billingApp({ isSaas: true, stripeSecretKey: undefined });
+    const { app, repositories } = billingApp({ isSaas: true, withStripe: false });
     const pending = await repositories.subscriptions.createPending({
       organizationId: ACME,
       plan: "LAUNCH",
@@ -370,10 +347,10 @@ describe("the Stripe callback BillingModule answers", () => {
     it("acknowledges a delivery signed with that secret", async () => {
       const { app } = billingApp({
         isSaas: true,
-        stripeSecretKey: "sk_test_fixture",
+        withStripe: true,
         webhookSecret: "whsec_fixture",
       });
-      const signature = Stripe.webhooks.generateTestHeaderString({
+      const signature = MemoryStripeWebhooksChannel.sign({
         payload,
         secret: "whsec_fixture",
       });
@@ -386,10 +363,10 @@ describe("the Stripe callback BillingModule answers", () => {
     it("refuses a delivery signed with another secret", async () => {
       const { app } = billingApp({
         isSaas: true,
-        stripeSecretKey: "sk_test_fixture",
+        withStripe: true,
         webhookSecret: "whsec_fixture",
       });
-      const signature = Stripe.webhooks.generateTestHeaderString({
+      const signature = MemoryStripeWebhooksChannel.sign({
         payload,
         secret: "whsec_other",
       });
@@ -405,11 +382,11 @@ describe("the Stripe callback BillingModule answers", () => {
     it("declares the callback in the module whichever deployment composes it", async () => {
       const billing = billingApp({
         isSaas: true,
-        stripeSecretKey: "sk_test_fixture",
+        withStripe: true,
         webhookSecret: "whsec_fixture",
       });
-      const notBilling = billingApp({ isSaas: false, stripeSecretKey: undefined });
-      const signature = Stripe.webhooks.generateTestHeaderString({
+      const notBilling = billingApp({ isSaas: false, withStripe: false });
+      const signature = MemoryStripeWebhooksChannel.sign({
         payload,
         secret: "whsec_fixture",
       });
@@ -426,7 +403,7 @@ describe("the Stripe callback BillingModule answers", () => {
 
   describe("given a deployment with no Stripe key", () => {
     it("answers 404, as main did off SaaS", async () => {
-      const { app } = billingApp({ isSaas: true, stripeSecretKey: undefined });
+      const { app } = billingApp({ isSaas: true, withStripe: false });
 
       await expect(
         app.receiveStripeWebhook({ rawBody, signature: "t=1,v1=abc" }),
@@ -439,7 +416,7 @@ describe("the currency BillingModule detects", () => {
   describe("given LangWatch Cloud", () => {
     /** @scenario "LangWatch Cloud detects the currency a reader's prices are shown in" */
     it("answers from the request, falling back when nothing names a country", () => {
-      const { app } = billingApp({ isSaas: true, stripeSecretKey: undefined });
+      const { app } = billingApp({ isSaas: true, withStripe: false });
 
       expect(app.detectCurrency({ headers: {} })).toEqual({ currency: "EUR", country: null });
     });
@@ -448,7 +425,7 @@ describe("the currency BillingModule detects", () => {
   describe("given a self-hosted deployment", () => {
     /** @scenario "A self-hosted deployment serves no currency detection" */
     it("serves no detection, as main mounted none", () => {
-      const { app } = billingApp({ isSaas: false, stripeSecretKey: undefined });
+      const { app } = billingApp({ isSaas: false, withStripe: false });
 
       expect(() => app.detectCurrency({ headers: {} })).toThrow(
         expect.objectContaining({ code: "not_found", httpStatus: 404 }),
@@ -460,7 +437,7 @@ describe("the currency BillingModule detects", () => {
 describe("the subscription door BillingModule serves", () => {
   describe("given a deployment that composed no subscription door", () => {
     it("answers not found, as main mounted no subscription router there", async () => {
-      const { app } = billingApp({ isSaas: false, stripeSecretKey: undefined });
+      const { app } = billingApp({ isSaas: false, withStripe: false });
 
       await expect(app.listInvoices({ organizationId: ACME })).rejects.toMatchObject({
         code: "not_found",

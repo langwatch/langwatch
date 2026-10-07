@@ -84,8 +84,16 @@ export interface PeerSubscriberDefinition<Data extends z.ZodType> {
   eventType: string;
   data: Data;
   handle: (data: z.output<Data>, context: PeerSubscriberContext) => Promise<void>;
-  /** Enqueue shaping as an event subscriber declares it: delay, dedup and group lane. */
-  options?: Pick<EventSubscriberOptions, "delay" | "deduplication" | "groupKeyFn">;
+  /** Enqueue shaping as an event subscriber declares it: delay, dedup, group lane and filter. */
+  options?: Pick<EventSubscriberOptions, "delay" | "deduplication" | "groupKeyFn"> & {
+    enqueue?: PeerSubscriberEnqueueOptions<Data>;
+  };
+}
+
+/** A peer subscriber's enqueue-time filter, over the data its handler would be handed. */
+export interface PeerSubscriberEnqueueOptions<Data extends z.ZodType> {
+  /** False mints no job. Data the schema refuses is staged, so the handler's parse reports it. */
+  filter?: (data: z.output<Data>) => boolean;
 }
 
 /**

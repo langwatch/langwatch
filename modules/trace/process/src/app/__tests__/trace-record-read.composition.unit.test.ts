@@ -6,7 +6,6 @@
  */
 import { AnnotationApi } from "@langwatch/annotation-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type DataPrivacyApi,
@@ -94,7 +93,6 @@ function compose({
   for (const token of [
     AnnotationApi,
     AuthzApi,
-    CodingAgentApi,
     DataRetentionApi,
     EvaluationApi,
     LogApi,
@@ -122,7 +120,6 @@ function compose({
     canonicalisation: TraceCanonicalisationService.create(),
     blobStore: TraceBlobStoreService.create({
       legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: refuse }),
-      resolveClickHouseClient: refuse,
     }),
     dedup: MemoryTraceSpanDedupRepository.create(),
     commands: {
@@ -147,7 +144,6 @@ function compose({
       fallbackVisibilityDays: 14,
     },
     annotations: apis.reference(AnnotationApi),
-    codingAgents: apis.reference(CodingAgentApi),
     dataRetention: apis.reference(DataRetentionApi),
     evaluations: apis.reference(EvaluationApi),
     logs: apis.reference(LogApi),

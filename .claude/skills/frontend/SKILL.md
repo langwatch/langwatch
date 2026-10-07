@@ -100,11 +100,13 @@ There are no kits and no shared browser packages. Where the piece goes:
 | client state                        | the one global UI store, namespaced per module (§10.2)          |
 
 A `<name>-client` holds the hooks `createModuleApi` derives from its own
-contract and at most a few thin convenience hooks, never a component. It
-imports only its contract and `@langwatch/api/web`, never another client; a hook
-combining two modules lives in the screen that needs it. A component that
-fetches a peer's data or reads a `*HostApi` is lent by its owner's token and the
-consumer renders what it is handed. `architecture-enforcer lint` checks the
+contract, at most a few thin convenience hooks and the module's lent tokens,
+never a component. It imports only its contract, `@langwatch/api/web`,
+`@langwatch/browser-host` and React, never another client; a hook combining two
+modules lives in the screen that needs it. A component that fetches a peer's
+data or reads a `*HostApi` is lent by its owner's token, declared in the
+owner's `<name>-client` (§10.1, round 7b), and the consumer renders what it is
+handed. `architecture-enforcer lint` checks the
 boundaries; a violation there is the finding, not a judgement call.
 
 ## Creating a new browser module, end to end

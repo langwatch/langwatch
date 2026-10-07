@@ -321,12 +321,13 @@ None: stored-object declares no pipeline, process manager, subscriber or task.
 
 ## Configuration
 
-| Kind   | Leaf                           | Environment variable                   | Declared at                                  |
-| ------ | ------------------------------ | -------------------------------------- | -------------------------------------------- |
-| config | `azureSpoolRetentionConfirmed` | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED` | `../contract/src/stored-object.config.ts:14` |
-| config | `blockLocalHttpCalls`          | `BLOCK_LOCAL_HTTP_CALLS`               | `../contract/src/stored-object.config.ts:19` |
-| config | `allowedProxyHosts`            | `ALLOWED_PROXY_HOSTS`                  | `../contract/src/stored-object.config.ts:20` |
-| config | `isSaas`                       | `IS_SAAS`                              | `../contract/src/stored-object.config.ts:22` |
-| config | `publicBaseUrl`                | `BASE_HOST`                            | `../contract/src/stored-object.config.ts:24` |
+| Kind   | Leaf                            | Environment variable                   | Declared at                                  |
+| ------ | ------------------------------- | -------------------------------------- | -------------------------------------------- |
+| config | `objectRetentionConfirmed`      | `OBJECT_RETENTION_CONFIRMED`           | `../contract/src/stored-object.config.ts:25` |
+| config | `legacySpoolRetentionConfirmed` | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED` | `../contract/src/stored-object.config.ts:27` |
+| config | `blockLocalHttpCalls`           | `BLOCK_LOCAL_HTTP_CALLS`               | `../contract/src/stored-object.config.ts:29` |
+| config | `allowedProxyHosts`             | `ALLOWED_PROXY_HOSTS`                  | `../contract/src/stored-object.config.ts:30` |
+| config | `isSaas`                        | `IS_SAAS`                              | `../contract/src/stored-object.config.ts:32` |
+| config | `publicBaseUrl`                 | `BASE_HOST`                            | `../contract/src/stored-object.config.ts:34` |
 
 <!-- readme:generated:end -->

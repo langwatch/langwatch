@@ -30,3 +30,29 @@ Feature: The ClickHouse member bounds what it sends to the server
     Given a module writing a row whose DateTime64 columns hold ISO timestamps
     When the statement reaches the server
     Then it carries date_time_input_format best_effort, as main's managed client did
+
+  # Main refused a statement that could not get a slot in time rather than leave it waiting past
+  # its caller (origin/main statementLimit.ts): a wait of at most 20 seconds, a queue of
+  # max(64, slots x 8). The refusal is the 503 clickhouse_overloaded, which the event-sourcing
+  # classifier reads as transient. Its HTTP body follows the 5xx rule in transport-conventions.
+  Rule: A statement that cannot get a slot is refused as overloaded, as main refused it
+
+    @integration
+    Scenario: A statement that waits past the deadline for a slot is refused as overloaded
+      Given a process bounded at 1 statement in flight, with one statement holding the slot
+      When another statement waits 20 seconds without a slot freeing
+      Then it is refused with clickhouse_overloaded at 503, a platform fault marked retryable
+      And it never reaches the server
+      And the statement holding the slot still completes
+
+    @integration
+    Scenario: A statement beyond a full wait queue is refused at once
+      Given a process bounded at 1 statement in flight, whose wait queue of 64 is full
+      When one more statement is sent
+      Then it is refused at once with clickhouse_overloaded and never reaches the server
+
+    @integration
+    Scenario: An overloaded refusal is transient, so a job re-stages it rather than dropping it
+      Given a statement the process refused as overloaded
+      When the event-sourcing error classifier reads it
+      Then it is recoverable

@@ -110,6 +110,11 @@ trace's contracts import `@langwatch/api/dates` and gateway's `@langwatch/api/ho
   client. Only a `<name>-client` package and a screen's behaviour import it; design-system components
   fetch nothing. The client types are
   derived from contracts by `@langwatch/api/web`; the browser calls no REST.
+- **`<name>-client`** holds the web row's share (Alex, 2026-10-06, rounds 4 and 7b): the hooks
+  `createModuleApi` derives from the owner's contract and the owner's lent tokens (§10.1). It may
+  depend on its own contract, `@langwatch/module`, `@langwatch/api`, `@langwatch/browser-host` and
+  React. Browser packages and apps/ui may depend on it and nothing else may: a process, a contract
+  or another client calls the owner's `*Api`. The linters know it as the `client` role (§17).
 - **`@langwatch/design-system`** — components (Chakra v3 underneath). Only this package imports
   `@chakra-ui/*` or `@emotion/*` (Alex, 2026-10-01): feature browsers, apps and tests import
   `@langwatch/design-system/<subpath>`; `./primitives` re-exports Chakra's primitives and raw parts
@@ -173,17 +178,18 @@ on entitlement; a core caller never re-checks (Alex, 2026-09-29). Operator views
 Enterprise-licensed subjects moving to their owner land in that owner's enterprise module
 (`enterprise-gateway` owns routing policy and personal virtual keys), never relicensed into core (Alex, 2026-09-25).
 Enterprise modules mirror the shape exactly under `enterprise/modules/`.
-Usage is a module of its own and owns all counting: the counters, their enforcement, the warning
-thresholds, the billable-events meter (SaaS only; a projection and its table), and the trace count it takes itself.
-Entitlement keeps plans and features only. Usage is events (Alex, 2026-10-01): limits travel as
-`limit_reached` and `limit_cleared`, the month's total as `month_counted`, and no module asks `UsageApi`
-for either, so no trace-usage or billing-usage cycle forms (Alex, 2026-09-29). `UsageApi` exists with zero
-operations. Billing peer-subscribes to `month_counted`; a lower corrected total goes to Stripe as a negative
+Entitlement is one core module and owns plans, limits and all counting: the counters, their enforcement,
+the warning thresholds, the billable-events meter (SaaS only; a projection and its table), and the trace
+count it takes itself; usage merged into it with one Api, `EntitlementApi` (Alex, 2026-10-06). Counting is
+events (Alex, 2026-10-01): limits travel as `limit_reached` and `limit_cleared`, the month's total as
+`month_counted`, and no module asks entitlement to count, so no trace-usage or billing-usage cycle forms
+(Alex, 2026-09-29). Billing peer-subscribes to `month_counted`; a lower corrected total goes to Stripe as a negative
 meter event (Alex, 2026-10-01). Per-entity periodic work is a keyed process manager (§9, "Per-entity calendar
 work"), never `.schedule`. Every limit is soft:
 eventual and fail-open, with a documented enforcement lag and overshoot (Alex, 2026-10-01).
 Not built yet (Alex, 2026-09-30): `entitlement -> trace` and `trace -> entitlement` are peer cycle edges
-the peer-cycle test refuses until usage lands (the allowed list is gone, §5; Alex, 2026-10-05).
+the peer-cycle test refuses until entitlement counts from its own meters (the allowed list is gone, §5;
+Alex, 2026-10-05).
 Slack is a module of its own (Alex, 2026-09-30; supersedes ADR-093 §5a on ownership). `modules/slack`
 owns the Slack connection subjects: the `SlackIntegration` table, its repositories and services,
 `SlackApi` (main's list, create, update and delete of a connection, plus the reads delivery needs), the
@@ -207,7 +213,7 @@ modules/trace/
 ├── contract/       @langwatch/trace-contract       shared by everyone
 ├── process/        @langwatch/trace-process        the half createApp installs
 ├── browser/        @langwatch/trace-browser        PRIVATE — the half createUi installs
-└── client/         @langwatch/trace-client         the data other browsers read, never a component
+└── client/         @langwatch/trace-client         the data other browsers read and trace's lent tokens
 ```
 
 No module has a `feature.json` at its root, and nothing reads one. Five modules still carry
@@ -220,10 +226,19 @@ the rest stays contained, flattened, in its module (Alex, 2026-09-29).
 contract imports no framework and no other half. Another module imports only
 the owner's **contract** and names the owner's `*Api` token; nobody imports
 another module's service, repository, or browser package.
+A `<name>-client` sits beside the browser half: browser packages and apps/ui import it, it imports
+only its own contract and the web framework (§2), and no process or contract imports one (Alex,
+2026-10-06, rounds 4 and 7b).
 A declared dependency is an edge even when nothing imports it: a contract's `package.json` names no raw
 client or process runtime (`eventing`, `group-queue`, `prisma-client`, `clickhouse-client`, `redis-client`,
 `process-*`), and the package-cycle check walks every workspace package, `packages/*` included. The
 `manifests` and `cycles` policies refuse both (2026-09-30).
+
+**Shell-facing types live in the module's contract, and no package opens a test door** (Alex,
+2026-10-06, round 4, Q208). A type the shell names is exported by its owning module's contract and
+imported type-only by apps/ui; auth's `./session` and `./auth` and navigation's `./chrome` and
+`./navigation` browser subpaths go (§3.4). No module package exports `./testing`: a fixture another
+module's tests need lives in that consumer, so trace's and gateway's `./testing` exports go (§13).
 
 ### 3.1 The contract
 
@@ -477,8 +492,9 @@ packages. Code repeated within one module stays in that module; repeated across 
 the design system, which takes props or a query RESULT (never a hook, never fetches); pure domain
 logic goes to the owner's contract; framework hooks go to `browser-host`. Modules share data, not code: every
 module with tRPC has a `<name>-client` package (`modules/<name>/client`) holding the hooks
-`createModuleApi` derives from its own contract and at most a few thin convenience hooks, never a
-component. A client imports only its contract and `@langwatch/api/web`, never another client; a
+`createModuleApi` derives from its own contract, at most a few thin convenience hooks and the
+module's lent tokens (§10.1; Alex, 2026-10-06, round 7b), never a component. A client imports only
+its contract, `@langwatch/api/web`, `@langwatch/browser-host` and React, never another client; a
 hook combining two modules lives in the screen that needs it. Kits and their law existed until
 2026-10-01 and are gone; what remains of them is that browser packages are closed.
 
@@ -1297,17 +1313,22 @@ the tier the value states: opened stores state `live`, `memoryStores()` states `
 repositories whose tier nobody stated refuses boot by name (Alex, 2026-10-05). Production and dev open
 live stores; a test or dev harness hands `memoryStores()` directly and never touches env.
 
-**Migrations are not the api's job.** They are tasks —
-`pnpm --filter @langwatch/tasks task prisma-migrate clickhouse-migrate` — run
-before serve by the start script and the deploy pipeline. Prisma migrations
+**Migrations are not the api's job.** They run through `pnpm task upgrade` (apps/api
+`start:prepare:db`: upgrade, then the system-migrations pass), before serve, from every entry
+point (ADR-173). Prisma migrations
 live with the schema; ClickHouse migrations are goose SQL files. A serving
 process holding DDL locks is how deploys die. Because they run before any module boots, apps/tasks'
 migration-runner files (`src/*migrat*.ts`) may name process packages (Alex, 2026-09-27), and
 so may `lwql-provision.ts` and `lwql-render-access-config.ts`: LangWatchQL provisioning reads
 both schemas under the same migration lock, before serve, and the access-config render runs from
 env alone in its Helm job (Alex, 2026-09-28).
+SQL migrations stay central, and each is attributed to the owner of the table it touches; a check
+refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3).
 
-**In-place system migrations belong to their subject; the runner belongs to ops.** Identity,
+**In-place system migrations belong to their subject; the framework runs, ops reads and requests**
+(Alex, 2026-10-06, round 14, Q-U8 and UP-3, amending "the runner belongs to ops"). The upgrade run
+registers every declared step in the ledger, background steps run on the worker under their declaring
+module, and ops builds the upgrade and event-upcast readers over its own Postgres handle. Identity,
 authz and automation each answer the migrations they own through their `*Api` (`registeredMigrations()`, with
 identity's user-rooted `userMigrations()` beside it), and ops composes the migrations page,
 enrolment, the targeted run and the pass over its own `SystemMigration*` tables and Redis lease,
@@ -1316,8 +1337,23 @@ in-request, as main did; passes run on a worker (§9); apps/tasks keeps the star
 (Alex, 2026-09-28). Automation's Slack connection migration is one such pass per organization, with
 no manual task (Alex, 2026-09-30).
 
+**Upgrades run on deploy** (ADR-173, which carries every ruling of rounds 8 to 17). One ledger keyed by
+step id (and target) serves cloud and self-hosted, and presence says when old writers are gone. A
+serving process stops serving once its last good presence write is older than the 60 s stale bound; a
+rollback is detected from presence, an older image's live row after the last run reopening
+level-triggered background steps (Alex, 2026-10-06, round 9). The runner writes the run's phases into
+its run report and raises a read hint the api relays, so the Upgrades page refreshes on it and never
+polls (Alex, 2026-10-06, rounds 8 and 9).
+
+**A framework package takes module values by injection, never by import** (Alex, 2026-10-06, rounds 5
+and 6, Q211). `packages/group-queue` takes a `mintUri` function and a generic destination type for its
+tiered blob store and imports no module contract; `ClickHouseMigrateTask` takes the managed-table list
+through its constructor from apps/tasks, and its data-retention dependency goes.
+
 **Clients appear in exactly one place: the chain.** From there only registry
-and channel factories touch them. There is no second path.
+and channel factories touch them. There is no second path. Two named, linted exceptions hold raw
+clients, each with its written reason: Better Auth's storage adapter and ops' event replay; ops'
+memory registry may require eventing (Alex, 2026-10-06, round 5, Q212).
 
 **A read across organizations is declared, never exempted** (Alex, 2026-09-28). The guarded
 client stays strict for every model. The module that owns the table declares
@@ -1423,6 +1459,18 @@ calling module. The `eventing-table-access` policy reports raw access by module 
 SQL naming a table, a Prisma delegate over one, the table named as a literal, or a direct
 `storeEvents`/`getEventStore` call. Today's findings are a shrink-only list with a count per file,
 `tests/baselines/eventing-table-access.json`, held by the shrink-only ratchet in `tests/boundary-ratchets.unit.test.ts`.
+Eventing exposes a retention operation, which data-retention calls instead of rewriting the event
+tables, and declares its own LWQL catalogue entries for the event-table views, which analytics
+composes (Alex, 2026-10-06, round 4, Q205). One stored event's payload (trace's offloaded fields) is
+read through a narrow single-event read seat beside the producer-only store, within main's 2-day
+window; the producer-only rule stands for everything else (Alex, 2026-10-06, round 3, Q209).
+
+**A ClickHouse table has one owner, and others read it through that owner** (Alex, 2026-10-06,
+round 3, Q207). A plain read of another module's table is a query operation on its owner's `*Api`
+(trace's and gateway's); a read only one statement can answer (a subquery over an owner's table) is a
+named exception in the table-ownership policy, with its reason. Analytics owns the trace analytics
+tables, and trace drops its copy of the has-signal predicate. The policy records `event_log` as
+framework owned and the six legacy tables with no TypeScript writer as legacy owned; nothing is dropped.
 
 A check that holds a summary against the facts it was folded from keeps its own record of those
 facts, a projection over the same events on its own pipeline, and never reads `event_log`:
@@ -1458,6 +1506,9 @@ when })`), so authz never asks entitlement. `/api/role-bindings`, `/api/organiza
 { feature, when })`; the framework asks after access, only when `when(input)` holds, and refuses 402
 `enterprise_plan_required` with `meta.feature`. The process composes the `entitlements` port from
 EntitlementApi (api-surface.ts); a module never hand-rolls a plan middleware.
+**Trace read bounds are per plan** (Alex, 2026-10-06, round 2, P8484-R1 and R2): the plan registry holds
+each plan's trace list page bound and a per-plan `tracesDownloadPageSizeMax`; a trace list or download
+read above its plan's bound is refused by name, never clamped, and paid plans keep their larger pages.
 **Grants are the only read** (Alex, 2026-10-01): main's genesis import made Grant complete, so no module reads
 the RoleBinding compatibility table; access is read through `AuthzApi` listings, ended grants excluded.
 **Platform operators are a grant** (Alex, 2026-10-01; ADR-092): `ADMIN_EMAILS` is gone. A built-in
@@ -1511,12 +1562,15 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   apidiff's to catch, not a frozen copy's (Alex, 2026-09-29).
 - `/api/<x>` is the main path; `/v1` is optional; `/latest/` and `/<version>/` are supported but hidden from the
   published docs (Alex, 2026-09-25).
-- A REST path is served by its namespace's owner. For the migration only, another module may serve one
-  by declaring it on the route, `.withSharedPath({ owner, reason, deprecate })`, in a literal family (a
-  family claiming `/api/<x>` would run its middleware ahead of the owner's routes); every such route is
-  planned for deprecation and the route registry lists it (`RegisteredRoute.sharedPath`). A second
-  module mounting a family on a namespace another module claims is refused at mount (Alex, 2026-10-06,
-  R10; `packages/api/specs/shared-path.feature`).
+- A REST namespace (the first segment after `/api/` or `/api/v1/`) has one owner, named in
+  `modules/catalogue.json` `restNamespaces`; the category prefixes otel, internal, export, webhooks,
+  connect, auth and scenario stay unowned. Another module serves a path in an owned namespace only by
+  declaring it on the route, `.withSharedPath({ owner, reason, deprecate })`, in a literal family;
+  every such route is planned for deprecation except `/api/projects/:projectId/analytics/*`, declared
+  `permanent: true`, and the route registry lists them (`RegisteredRoute.sharedPath`). A literal
+  route under a prefix another module's family claims, undeclared or naming the wrong owner, is
+  refused at mount; the `rest-namespace-owners` policy holds every route to the map (Alex,
+  2026-10-05 night and 2026-10-06, R10; `packages/architecture-enforcer/specs/rest-namespace-owners.feature`).
 - A handler never sets a header to refuse: a `HandledError` carrying `meta.retryAfterMs` is rendered by
   the REST runtime with `Retry-After` (2026-09-23).
 - An action that takes no body declares an empty input schema from its contract; the runtime reads an
@@ -1706,6 +1760,11 @@ sync-all-openapi` regenerates all four, and the `openapi-clients` CI job fails o
   refuses them with 422 `monitor_parameters_unused` at every door, so the UI create form must not send them
   (Alex, 2026-10-05).
 
+**A field that travels as JSON text is a framework field** (Alex, 2026-10-06, round 7, Q39): a tRPC
+field carried as JSON text (dashboard's graph) is declared with `packages/api`'s JSON-text field
+helper, never parsed by a transform inside the contract schema, so the browser's inferred types stay
+stable.
+
 ---
 
 ## 9. Eventing
@@ -1786,6 +1845,18 @@ parsing with its own schema at the queue boundary — never `any`, never a rule 
 Per-payload routing (group key, score, coalesce size, dedup id) travels in one reserved `__routing` field on
 the job envelope; `withEvents([])` types a pipeline's events as `never`; a command's lane parse is its only
 validation, handed to `processCommand` (Alex, 2026-09-27).
+A renamed or reshaped event type is upcast, never rewritten first (Alex, 2026-10-06): the owning
+pipeline declares `.withUpcasts({ events: [{ from: { type, aggregateType? }, to, version?, data? }],
+drain? })` after `.withEvents`, `to` one of its declared types and `data` a pure payload transform.
+Its queued-event parse, its event-store reads (the renamed aggregate type read beside its own) and
+replay apply it, so consumers and type filters see only the current type; `drain: { pipeline,
+jobNames? }` routes jobs a previous release queued under the former pipeline's keys into the current
+lanes for one release. Each upcast is an `event-upcast` background step in the upgrade ledger, and
+`EventUpcastReader` answers the stored events it still covers (`packages/eventing/specs/event-upcast.feature`).
+An upcast's step id is `upcast:<pipeline>:<stored type>`; its optional rewrite copies corrected events into
+`event_log`, and a renamed aggregate's originals are deleted only by a contract step at the LTS floor; a
+lint names any drain older than one release; a fresh install plans upcast steps by their mode (Alex,
+2026-10-06, rounds 15 and 16).
 A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and
 registers with `.on(eventSchema, handler)` (or reads its `.toPayload(schema, map)` view); no cast (Alex, 2026-09-27).
 Per-entity calendar work (a report's cron) is a keyed process manager on its owner's pipeline, arming
@@ -1857,7 +1928,8 @@ throws to be retried. Analytics writes a new project's LangWatchQL key-map row f
 records that project as created from its own side. A peer subscriber writes its own read-model row
 directly; it sends its own command only when the reaction is a fact others react to, since the
 lane already gives retry safety (Alex, 2026-09-30). A peer subscriber may declare its own enqueue
-shaping (`options`: delay, dedup, group lane) and is handed the event's `occurredAt`. Automation
+shaping (`options`: delay, dedup, group lane, and `enqueue.filter` over the parsed data, so a
+declined event mints no job; Alex, 2026-10-06) and is handed the event's `occurredAt`. Automation
 reacts to trace's span and origin events and evaluation's completed and reported events this way,
 keeping main's settle windows and reading fold state through `TraceApi.findSummary` and
 `EvaluationApi.findRunByEvaluationId`; neither owner knows automation (Alex, 2026-10-01).
@@ -2340,9 +2412,15 @@ invented:
   one any module may lend, read as a list. `createUi` refuses two lenders of any other token, naming
   both. `withCapabilities` keeps only what the composition root installs.
 
-  **A token lives in its owner's contract**: props naming a framework type, or a contract whose
-  graph reaches the owner's, are not allowed in it, so the owner makes the props data-only. A drawer only its owner opens keeps
-  its token in its own `model/`; an extension token lives with the page that hosts it.
+  **A token lives in its owner's `<name>-client`** (Alex, 2026-10-06, round 7b; this supersedes round
+  6b, which kept tokens in the contract with data-only props). A lent component, hooks object, drawer
+  or extension token another module reads is declared in its owner's client, and readers' browser
+  packages import it from there. Its props may name React and the owner's own types; a prop naming
+  another module's type is restated as a portable structural shape, adding no edge (round 6). A lent
+  object of methods or hooks is a hooks token read through `useLentHooks`, as `GuidedTourToken` is
+  (round 7). A reader's edge to an owner's client is allowed when it closes no cycle; a cyclic one
+  goes back to Alex (round 7b). A drawer only its owner opens keeps its token in its own `model/`; an
+  extension token is owned by the module whose page hosts it, and lives in that module's client.
 
   **Release flags are a host service feature-flag provides.** browser-host holds `UiFlags` (on, off
   or not yet answered, for the current scope) and `useFeatureFlag(flag, { projectId | organizationId })`,
@@ -2524,13 +2602,13 @@ peer), so its members refused every call and `checkLimit` answered 500.
 A seat limit reached is organization's event; billing learns it through §9's subscriber, which lives
 in billing on organization's events (Alex, 2026-09-28; placement Alex, 2026-09-29).
 
-**Usage warnings: usage decides, billing only sends** (Alex, 2026-09-29). Usage owns all counting
-(§3): it takes billing's billable-events meter projection and its table, and counts traces itself.
-It counts the month once per project in the organization's meter, decides the crossed threshold and
-records it as a usage event with the per-project counts; billing learns the warning from that event,
-resolves the admins and project names, sends once per threshold a month and records it. Billing
-counts nothing, learns the month's total from usage's `month_counted` event and holds no `TraceApi` peer
-for usage; no trace-usage or billing-usage cycle forms (Alex, 2026-09-29). Billing applies explicit
+**Usage warnings: entitlement decides, billing only sends** (Alex, 2026-09-29; usage merged into
+entitlement, Alex, 2026-10-06). Entitlement owns all counting (§3): it takes billing's billable-events
+meter projection and its table, and counts traces itself. It counts the month once per project in the
+organization's meter, decides the crossed threshold and records it as an event with the per-project
+counts; billing learns the warning from that event, resolves the admins and project names, sends once
+per threshold a month and records it. Billing counts nothing, learns the month's total from
+entitlement's `month_counted` event and holds no `TraceApi` peer for counting; no trace-usage or billing-usage cycle forms (Alex, 2026-09-29). Billing applies explicit
 adjustments, so a lower corrected total is never dropped as a stale reading, and `limit_cleared` reaches
 the doors promptly after an upgrade (Alex, 2026-10-01).
 
@@ -2584,6 +2662,9 @@ at error, reported, retryable where that applies, and its body masked. Below 5xx
 clients gain the value, and anything parsing our responses (the MCP server, module envelope readers)
 accepts it. A class declaring `fault: "customer"` at a 5xx keeps its body, in `packages/api` as everywhere
 (agent connect's `replica_count_unsupported`); undeclared server errors stay masked (Alex, 2026-10-05).
+Transient 503 refusals keep their code: `clickhouse_overloaded` and `service_unavailable` go on the wire
+unmasked, so a caller can tell a retryable refusal from a fault (Alex, 2026-10-06, round 9, CH-1,
+amending the masking ruling).
 A relayed herr error with no fault and no status stays `customer`: `presumed_platform` applies only when a
 status of 500 or more is known (coordinator, citing the ruling's "at a 5xx status", 2026-10-05).
 `LangWatchQLFilterRefusal` is a trace contract error (coordinator, citing Alex's ingestion-key approval,
@@ -2614,6 +2695,8 @@ with its reason, in the stand-in-cast rule's audited boundaries (Alex, 2026-09-2
 A stand-in a test needs is a real fixture or builder, never a new contract type: types do not change
 for tests (Alex, 2026-09-29). A test never `vi.spyOn`s a real service; it drives memory twins and
 fixtures instead (Alex, 2026-09-29).
+A module exports no `./testing` subpath: a fixture another module's tests need lives in that consumer
+(Alex, 2026-10-06, round 4, Q208; §3).
 A scenario bound from a package's tests counts toward feature parity like one bound from a module's
 (Alex, 2026-09-29).
 **Feature parity binds every scenario** (Alex, 2026-10-05): every scenario is bound and its tests written
@@ -2795,6 +2878,8 @@ host-supplied gating for agents, authz, tenancy and eventing in the api process;
 empty (no module exports `./declaration` yet — the browser serves chrome
 only); the ClickHouse resolver ruling (§7); background loops main runs that this
 branch never starts, each to become a scheduled process manager.
+Lent tokens in contracts → each owner's `<name>-client` (§10.1; Alex, 2026-10-06, round 7b): the four
+conversions `r-lends-1` to `r-lends-4`; §15 gains nothing until they finish.
 
 **Open for Alex** (2026-10-05; proposals, not rulings): the E1 to E8 open questions (§8), which Alex answers
 by number. Answered that evening (Alex, 2026-10-05): the usage-named files are renamed `annotation-count`,
@@ -2841,6 +2926,9 @@ Every finding prints what, a one-line why, and fix; `defineRule` refuses a rule 
 multi-line why (Alex, 2026-10-05). The `feature-configuration` policy demands no `*ServerConfigSchema`
 (deleted, §15), and `langwatch/package-boundaries` names the peer lend, not `withCapabilities` (Alex,
 2026-10-05: the tree follows the record).
+`modules/<name>/client` and `enterprise/modules/<name>/client` have the `client` role in the enforcer
+(`manifests`, `application-boundaries`, `browser-node-leak`) and in `langwatch/package-boundaries`
+(`clientRuntime`, `clientConsumer`), not the portable library's (Alex, 2026-10-06, round 4, Q208).
 
 **House rules are strict; a disable is very rare** (Alex, 2026-10-05). Most `langwatch/*` rules must not be
 ignored: a disable directive naming one is itself an error (`langwatch/suppression-states-why`). Only a few

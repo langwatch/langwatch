@@ -30,6 +30,7 @@ import { PROJECT_KIND, ProjectApi, type ProjectIdentity } from "@langwatch/proje
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type {
+  AdoptUnconfirmedAccountOutcome,
   ChangeOwnPasswordInput,
   CreateCredentialUserInput,
   CreatePasskeyUserInput,
@@ -429,6 +430,11 @@ export class UserModule implements UserApi {
   async createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser> {
     const { id } = await this.#users.createCredentialUser(input);
     return { id };
+  }
+
+  /** Confirms an unfinished account and drops its pre-proof sign-in methods, as one step. */
+  adoptUnconfirmedAccount(input: UserEmailInput): Promise<AdoptUnconfirmedAccountOutcome> {
+    return this.#users.adoptUnconfirmedAccount(input);
   }
 
   /** Mints the account a passkey ceremony is about to register its key against. */

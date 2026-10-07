@@ -100,7 +100,7 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("query")
   .withPermission("analytics:view")
-  .handle(async ({ app, input, actor }) => {
+  .handle(async ({ app, input, actor, signal }) => {
     await assertWorkbenchEnabled(app, input.projectId);
 
     const { project, protections } = await app.resolveRunCaller({
@@ -117,6 +117,7 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
       ...(input.granularitySeconds === undefined
         ? {}
         : { granularitySeconds: input.granularitySeconds }),
+      ...(signal ? { signal } : {}),
     });
   })
   .build();

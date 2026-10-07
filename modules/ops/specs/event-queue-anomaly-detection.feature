@@ -79,7 +79,7 @@ Feature: Per-tenant rate anomaly detection
     Then the tenant IS evaluated (PostHog outage must not silently disable observability)
 
   @unit @anomaly-detection @kill-switch
-  Scenario: Kill-switch FF makes the rate tracker record() a no-op on the hot path
+  Scenario: Kill-switch FF keeps a killed tenant's backlog out of the rate tracker
     Given the PostHog flag is enabled for tenant "proj_killed"
     When the rate tracker records waiting jobs for tenant "proj_killed"
     Then no Redis write is issued and the tenant does not appear in the active-tenants index

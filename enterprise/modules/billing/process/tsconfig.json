@@ -26,9 +26,6 @@
       "path": "../../../../modules/authz/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/clickhouse-client/tsconfig.build.json"
-    },
-    {
       "path": "../../../../modules/data-retention/contract/tsconfig.build.json"
     },
     {
@@ -105,9 +102,6 @@
     },
     {
       "path": "../../../../modules/trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/usage/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/test-harness/tsconfig.build.json"

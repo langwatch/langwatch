@@ -12,6 +12,8 @@ import {
   PROJECT_MOVED_EVENT_VERSION,
   PROJECT_ARCHIVED_EVENT_TYPE,
   PROJECT_ARCHIVED_EVENT_VERSION,
+  PROJECT_DEPARTMENT_ASSIGNED_EVENT_TYPE,
+  PROJECT_DEPARTMENT_ASSIGNED_EVENT_VERSION,
 } from "@langwatch/project-contract";
 
 import {
@@ -20,6 +22,10 @@ import {
   RECORD_PROJECT_PRESENCE_SETTING_CHANGED_COMMAND_TYPE,
   RECORD_PROJECT_MOVED_COMMAND_TYPE,
   RECORD_PROJECT_ARCHIVED_COMMAND_TYPE,
+  RECORD_PROJECT_DEPARTMENT_ASSIGNED_COMMAND_TYPE,
+  type ProjectDepartmentAssignedEvent,
+  type RecordProjectDepartmentAssignedCommandData,
+  recordProjectDepartmentAssignedCommandDataSchema,
   type ProjectMovedEvent,
   type ProjectArchivedEvent,
   type RecordProjectMovedCommandData,
@@ -252,6 +258,55 @@ export class RecordProjectArchivedCommand implements CommandHandler<
 
   static getSpanAttributes(
     payload: RecordProjectArchivedCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.project.id": payload.projectId,
+      "payload.organization.id": payload.organizationId,
+    };
+  }
+}
+
+/**
+ * Records a project's department with its team. A change is keyed on its moment; a backfill once
+ * per project, so a re-run collapses onto the first.
+ */
+export class RecordProjectDepartmentAssignedCommand implements CommandHandler<
+  Command<RecordProjectDepartmentAssignedCommandData>,
+  ProjectDepartmentAssignedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_DEPARTMENT_ASSIGNED_COMMAND_TYPE,
+    recordProjectDepartmentAssignedCommandDataSchema,
+    "Record a project's department assignment",
+  );
+
+  async handle(
+    command: Command<RecordProjectDepartmentAssignedCommandData>,
+  ): Promise<ProjectDepartmentAssignedEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectDepartmentAssignedEvent>({
+        aggregateType: PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_DEPARTMENT_ASSIGNED_EVENT_TYPE,
+        version: PROJECT_DEPARTMENT_ASSIGNED_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: data.backfilled
+          ? `${data.projectId}:department-assigned:backfilled`
+          : `${data.projectId}:department-assigned:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectDepartmentAssignedCommandData): string {
+    return payload.projectId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordProjectDepartmentAssignedCommandData,
   ): Record<string, string | number | boolean> {
     return {
       "payload.project.id": payload.projectId,

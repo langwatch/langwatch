@@ -15,7 +15,7 @@ import {
 } from "../jobEnvelope.ts";
 import { createTenantId } from "../storage.ts";
 import { TieredBlobStore } from "../tieredBlobStore.ts";
-import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.ts";
+import { InMemoryJobBlobStore, InMemoryObjectStore, mintTestUri } from "./blob-test-doubles.ts";
 
 describe("jobEnvelope", () => {
   // GROUP_QUEUE_ENVELOPE_WRITES_ENABLED (bare-JSON fallback for encode/decode)
@@ -204,6 +204,7 @@ describe("jobEnvelope", () => {
       const tieredBlobs = new TieredBlobStore({
         redisBlobs,
         objectStoreFor: () => new InMemoryObjectStore(),
+        mintUri: mintTestUri,
         resolveDestination: async () => ({ kind: "s3", bucket: "test-bucket" }),
         s3ThresholdBytes: 256 * 1024,
       });
@@ -240,6 +241,7 @@ describe("jobEnvelope", () => {
       const tieredBlobs = new TieredBlobStore({
         redisBlobs,
         objectStoreFor: () => objectStore,
+        mintUri: mintTestUri,
         resolveDestination: async () => ({ kind: "s3", bucket: "test-bucket" }),
         s3ThresholdBytes,
       });

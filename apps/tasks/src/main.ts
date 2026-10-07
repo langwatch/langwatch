@@ -33,12 +33,19 @@ const tasks = new Map<string, () => Promise<TaskRun>>([
   ],
   ["storage-seed", async () => (await import("./storage-seed/storage-seed.ts")).storageSeed],
   ["upgrade-ledger-seed", async () => (await import("./upgrade-ledger-seed.ts")).upgradeLedgerSeed],
+  ["upgrade", async () => (await import("./upgrade.ts")).upgrade],
 ]);
 
 /** Tasks that never touch the migration database, so never wait on its advisory lock. */
-const LOCK_FREE_TASKS = new Set(["system-migrations-pass", "lwql-render-access-config"]);
+const LOCK_FREE_TASKS = new Set(["system-migrations-pass", "lwql-render-access-config", "upgrade"]);
 
 export async function runTasks(argv: readonly string[], input: TaskInput): Promise<void> {
+  if (argv[0] === "upgrade" && argv.length > 1) {
+    const { runUpgradeCommand } = await import("./upgrade.ts");
+    const exitCode = await runUpgradeCommand({ args: argv.slice(1), input });
+    if (exitCode !== 0) process.exitCode = exitCode;
+    return;
+  }
   if (argv.length === 0 || argv.some((name) => !tasks.has(name))) {
     throw new Error(`Pass task names in order. Available tasks: ${[...tasks.keys()].join(", ")}`);
   }

@@ -80,6 +80,7 @@ import {
   keyCredentialOfDoor,
   type RestKeyCredential,
 } from "./key-credential.ts";
+import { legacyErrorScopes, withLegacyError } from "./legacy-error.ts";
 import {
   CREDENTIAL_CLASS_BY_DOOR as CREDENTIAL_CLASS,
   deprecatedAlias,
@@ -323,7 +324,7 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
 
       if (dated) mountVersionGuards({ app, basePath, declaration, ports, options, facts });
 
-      app.onError(withRetryAfter(protocolRefusals(options.onError)));
+      app.onError(withRetryAfter(protocolRefusals(withLegacyError(options.onError))));
 
       return app;
     },
@@ -705,6 +706,7 @@ function routeStack<Api>({
       : [];
 
   return [
+    ...legacyErrorScopes(route),
     ...(refusal ? [protocolRefusalScope({ route, refusal })] : []),
     versionContext({ route, family, version, status }),
     ...(documents

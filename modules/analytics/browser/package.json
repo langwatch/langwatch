@@ -25,6 +25,7 @@
     "@dnd-kit/core": "catalog:",
     "@dnd-kit/sortable": "catalog:",
     "@dnd-kit/utilities": "catalog:",
+    "@langwatch/analytics-client": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/analytics-filters": "workspace:*",
     "@langwatch/api": "workspace:*",

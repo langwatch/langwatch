@@ -8,6 +8,7 @@ import type Stripe from "stripe";
 import { describe, expect, it, vi } from "vitest";
 
 import type { BillingWebhookHost } from "../../channels/billing-webhook-host.channel.ts";
+import { MemoryStripeSubscriptionsChannel } from "../../channels/memory/memory.stripe-subscriptions.channel.ts";
 import type { BillingWebhookOrganizationRepository } from "../../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "../../repositories/billing-webhook-subscription.repository.ts";
 import {
@@ -31,7 +32,7 @@ function buildService(events: ConnectedBillingInvoiceEvents): EEWebhookService {
   return EEWebhookService.create({
     subscriptionRepository: createApiFixture<BillingWebhookSubscriptionRepository>(),
     organizationRepository: createApiFixture<BillingWebhookOrganizationRepository>(),
-    stripe: createApiFixture<Stripe>(),
+    stripeSubscriptions: MemoryStripeSubscriptionsChannel.create(),
     itemCalculator: createApiFixture<WebhookOptions["itemCalculator"]>(),
     host: createApiFixture<BillingWebhookHost>(),
     retention: createApiFixture<WebhookOptions["retention"]>(),

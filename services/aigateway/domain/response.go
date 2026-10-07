@@ -1,6 +1,9 @@
 package domain
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Response is the provider-agnostic representation of a completed API response.
 type Response struct {
@@ -22,6 +25,15 @@ type Response struct {
 	// before the socket exists, which is what makes the match exact instead
 	// of a guess over open sessions. Empty on every other lane.
 	RealtimeConversationID string
+
+	// RealtimeCredentialExpiresAt is when the credential a session mint
+	// returned stops opening a socket, when the vendor states it. Zero on
+	// every other lane.
+	RealtimeCredentialExpiresAt time.Time
+
+	// VoiceRelay is set when the request booked a relayed voice socket. The
+	// HTTP layer dials the vendor and relays with it. Nil on every other lane.
+	VoiceRelay *VoiceRelayTicket
 }
 
 // StreamIterator provides pull-based iteration over streaming response chunks.

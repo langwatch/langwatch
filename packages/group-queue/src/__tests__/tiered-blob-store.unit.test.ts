@@ -9,7 +9,7 @@ import {
   TieredBlobStore,
   TransientBlobStoreError,
 } from "../tieredBlobStore.ts";
-import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.ts";
+import { InMemoryJobBlobStore, InMemoryObjectStore, mintTestUri } from "./blob-test-doubles.ts";
 
 const PROJECT = createTenantId("project-abc");
 
@@ -19,6 +19,7 @@ function makeStore(s3ThresholdBytes = 256 * 1024) {
   const store = new TieredBlobStore({
     redisBlobs,
     objectStoreFor: () => objectStore,
+    mintUri: mintTestUri,
     resolveDestination: async () => ({ kind: "s3", bucket: "test-bucket" }),
     s3ThresholdBytes,
   });
@@ -115,6 +116,7 @@ describe("TieredBlobStore", () => {
       const store = new TieredBlobStore({
         redisBlobs,
         objectStoreFor: () => objectStore,
+        mintUri: mintTestUri,
         resolveDestination: async () => ({
           kind: "azure",
           accountName: "lwacct",
@@ -322,6 +324,7 @@ describe("TieredBlobStore", () => {
         const store = new TieredBlobStore({
           redisBlobs: new InMemoryJobBlobStore(),
           objectStoreFor: () => flaky,
+          mintUri: mintTestUri,
           resolveDestination: async () => ({
             kind: "s3",
             bucket: "test-bucket",
@@ -345,6 +348,7 @@ describe("TieredBlobStore", () => {
         const store = new TieredBlobStore({
           redisBlobs: new InMemoryJobBlobStore(),
           objectStoreFor: () => new InMemoryObjectStore(),
+          mintUri: mintTestUri,
           resolveDestination: async () => {
             // Even a NotFound-shaped resolve error must be transient, not missing.
             const err = new Error("resolve not-found");

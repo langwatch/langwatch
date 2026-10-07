@@ -56,8 +56,8 @@ Presets — pass as the first arg or pick interactively:
                   `pnpm dev:ui` instead.
 
   migration       postgres + clickhouse on HOST ports (5432 / 8123). Run
-                  `pnpm prisma:migrate` and `pnpm clickhouse:migrate` from your
-                  host shell. No applications, no workers.
+                  `pnpm start:prepare:db` (the upgrade) from your host shell.
+                  No applications, no workers.
 
   full-local      Kitchen-sink local: all-local-nlp + a dedicated workers
                   container. Slowest boot.
@@ -445,10 +445,9 @@ run_migration() {
 Postgres: localhost:5432  Clickhouse: localhost:8123
 DATABASE_URL and CLICKHOUSE_URL pinned to localhost in .env.dev-up.
 
-Run migrations from your host shell:
+Apply migrations from your host shell (the api and worker refuse until it ran):
 
-  pnpm prisma:migrate      # for postgres schema changes
-  pnpm clickhouse:migrate  # for clickhouse schema changes
+  pnpm start:prepare:db    # the upgrade: Postgres, ClickHouse, then the system-migrations pass
 
 Stop with: dev/scripts/dev.sh down
 EOF

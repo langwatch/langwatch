@@ -1,10 +1,12 @@
-import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
+import type { DataPrivacyApi, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import type { ModuleSecretsScope } from "@langwatch/process";
-import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
+import { PROJECT_DEPARTMENT_ASSIGNED_EVENT_TYPE, type Team } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { vi } from "vitest";
 
+import type { ProjectFact } from "../../eventing/__tests__/data-privacy-project-scope.fixture.ts";
 import type { MemoryDataPrivacyDirectoryRepository } from "../../repositories/memory/memory.data-privacy-directory.repository.ts";
+import { MemoryDataPrivacyProjectScopeRepository } from "../../repositories/memory/memory.data-privacy-project-scope.repository.ts";
 import { MemoryDataPrivacyRepositories } from "../../repositories/memory/memory.data-privacy.repositories.ts";
 import type { DataPrivacyResolutionService } from "../../services/data-privacy-resolution.service.ts";
 import { DataPrivacyModule } from "../data-privacy.app.ts";
@@ -45,44 +47,45 @@ export function dataPrivacyTestTeam(): Team {
   };
 }
 
-/** The project row the cascade reads its organization, team and department off. */
-export function dataPrivacyTestProject(): ProjectWithTeam {
-  return {
-    id: dataPrivacyTestGraph.projectId,
-    name: "Acme production",
-    slug: "acme-production",
-    apiKey: "key",
-    lwqlKey: "lwql-key",
+/** Data privacy's own fold, holding the one test project as project's facts would leave it. */
+export async function createDataPrivacyTestScopes(): Promise<MemoryDataPrivacyProjectScopeRepository> {
+  const repository = MemoryDataPrivacyProjectScopeRepository.create();
+  await repository.recordTeam({
+    projectId: dataPrivacyTestGraph.projectId,
+    organizationId: dataPrivacyTestGraph.organizationId,
     teamId: dataPrivacyTestGraph.teamId,
-    language: "python",
-    framework: "openai",
-    kind: "default",
-    firstMessage: false,
-    integrated: true,
-    createdAt: EPOCH,
-    updatedAt: EPOCH,
-    userLinkTemplate: null,
-    traceSharingEnabled: false,
-    presenceEnabled: false,
-    s3Endpoint: null,
-    s3AccessKeyId: null,
-    s3SecretAccessKey: null,
-    s3Bucket: null,
-    archivedAt: null,
     isPersonal: false,
-    ownerUserId: null,
-    personalFeatures: null,
-    departmentId: null,
-    langyEgressAllowlist: null,
-    lastCodingAgentSessionAt: null,
-    lastCodingAgentPullRequestAt: null,
-    team: dataPrivacyTestTeam(),
-  };
+    recordedAtMs: 1,
+  });
+  return repository;
 }
 
-/** The project directory the cascade reads, and nothing else configured. */
-export function createDataPrivacyTestProjects(): ProjectApi {
-  return createApiFixture<ProjectApi>({ getWithTeam: async () => dataPrivacyTestProject() });
+/** The test project as project records it, appended and waited on until data privacy folds it. */
+export async function foldDataPrivacyTestProject({
+  append,
+  app,
+}: {
+  append: (fact: ProjectFact, id: string) => Promise<unknown>;
+  app: Pick<DataPrivacyApi, "getResolvedForProject">;
+}): Promise<void> {
+  const { projectId, organizationId, teamId } = dataPrivacyTestGraph;
+  await append(
+    {
+      type: PROJECT_DEPARTMENT_ASSIGNED_EVENT_TYPE,
+      data: {
+        tenantId: projectId,
+        projectId,
+        organizationId,
+        occurredAt: 10,
+        departmentId: null,
+        teamId,
+        isPersonal: false,
+        backfilled: true,
+      },
+    },
+    "event-department-assigned",
+  );
+  await vi.waitFor(() => app.getResolvedForProject({ projectId }));
 }
 
 /** `createApp` composes no secrets chain, so the module's one secret is answered here. */
@@ -93,7 +96,7 @@ export function dataPrivacyTestSecrets({
 }
 
 /** The app built directly over memory repositories, for a case that seeds the directory. */
-export function createDataPrivacyTestApp({
+export async function createDataPrivacyTestApp({
   directory,
   dependencies,
 }: {
@@ -101,7 +104,11 @@ export function createDataPrivacyTestApp({
   dependencies: Parameters<typeof DataPrivacyModule.create>[0]["dependencies"];
 }): Promise<DataPrivacyModule> {
   return DataPrivacyModule.create({
-    repositories: { ...MemoryDataPrivacyRepositories.create(), directory },
+    repositories: {
+      ...MemoryDataPrivacyRepositories.create(),
+      directory,
+      projectScopes: await createDataPrivacyTestScopes(),
+    },
     dependencies,
     config: {
       googleDlpDisabled: undefined,

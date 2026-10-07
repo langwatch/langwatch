@@ -42,12 +42,18 @@ import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import { ConfigurationError, ValidationError } from "../services/errorHandling.ts";
 import type {
   EventSubscriberDefinition,
+  EventSubscriberOptions,
   PeerSubscriberDefinition,
 } from "../subscribers/eventSubscriber.types.ts";
 import type {
   SubscriberDispatchDefinition,
   SubscriberDispatchOptions,
 } from "../subscribers/subscriber.types.ts";
+import {
+  assertUpcastsDeclarable,
+  EventUpcaster,
+  type UpcastDeclaration,
+} from "../upcast/eventUpcast.ts";
 import { buildProcessManager, type ProcessManagerApplier } from "./processBuilder.ts";
 import type {
   ProcessManagerDefinition,
@@ -108,6 +114,7 @@ export class PipelineBuilder<
   private eventSubscribers = new Map<string, EventSubscriberDefinition<EventType>>();
   private prepareEventForProjection?: (event: EventType) => EventType;
   private retentionPolicyResolver?: RetentionPolicyResolver;
+  private upcastDeclaration?: UpcastDeclaration;
   private readonly globalProjections: GlobalProjection[] = [];
   constructor(
     private readonly name: string,
@@ -136,6 +143,20 @@ export class PipelineBuilder<
    */
   withRetention(resolver: RetentionPolicyResolver): this {
     this.retentionPolicyResolver = resolver;
+    return this;
+  }
+
+  /**
+   * Stored event types this pipeline reads as its current ones, and the former pipeline whose
+   * queued jobs drain into its lanes (§9; Alex, 2026-10-06). Spec: specs/event-upcast.feature.
+   */
+  withUpcasts(declaration: UpcastDeclaration<EventType["type"]>): this {
+    assertUpcastsDeclarable({
+      pipeline: this.name,
+      declaredTypes: new Set(this.events.eventSchemas.keys()),
+      events: declaration.events,
+    });
+    this.upcastDeclaration = declaration;
     return this;
   }
 
@@ -188,7 +209,7 @@ export class PipelineBuilder<
               eventId: event.id,
               ...(event.idempotencyKey && { idempotencyKey: event.idempotencyKey }),
             }),
-          options: subscriber.options,
+          options: peerSubscriberOptions(subscriber),
         }),
     });
     return this;
@@ -602,10 +623,20 @@ export class PipelineBuilder<
       })),
     };
 
+    const upcasts = this.upcastDeclaration && {
+      pipeline: this.name,
+      aggregateType: aggregate.type,
+      ...this.upcastDeclaration,
+    };
+    const upcaster = EventUpcaster.of(upcasts);
+    const parseEvent = this.events.parseEvent;
     return {
       aggregate,
       eventSchemas: this.events.eventSchemas,
-      parseEvent: this.events.parseEvent,
+      parseEvent: upcaster.active
+        ? (value: unknown) => parseEvent(upcaster.applyToPayload(value))
+        : parseEvent,
+      ...(upcasts === undefined ? {} : { upcasts }),
       metadata,
       prepareEventForProjection: this.prepareEventForProjection,
       ...(this.retentionPolicyResolver === undefined
@@ -664,6 +695,24 @@ export class PipelineDeclaration {
     };
     return new PipelineBuilder(this.name, this.aggregate, { eventSchemas, parseEvent });
   }
+}
+
+/** A peer subscriber's options on its lane, its data filter lifted to the staged event. */
+function peerSubscriberOptions<Data extends z.ZodType>(
+  subscriber: PeerSubscriberDefinition<Data>,
+): EventSubscriberOptions | undefined {
+  const { enqueue, ...options } = subscriber.options ?? {};
+  const filter = enqueue?.filter;
+  if (!filter) return subscriber.options && options;
+  return {
+    ...options,
+    enqueue: {
+      filter: (event) => {
+        const parsed = subscriber.data.safeParse(event.data);
+        return parsed.success ? filter(parsed.data) : true;
+      },
+    },
+  };
 }
 
 /** The `type` a queued event claims, read before the schema for that type parses it. */

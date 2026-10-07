@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`GatewayApi`)
 
-Peers call these through the token, declared at `../contract/src/gateway.api.ts:481`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/gateway.api.ts:544`; nothing else in this package is public.
 It extends `GatewayInternalProtocol`.
 
 #### `internalDoor`
@@ -679,6 +679,22 @@ One page of the spend-event ledger for a project, newest first, with virtual-key
 listSpendEventsPage(input: GatewaySpendEventsPageQuery): Promise<GatewaySpendEventPage>;
 ```
 
+#### `listSpendEventsAcrossTenants`
+
+Spend events across these tenants in these statuses, newest first by occurrence then request id; an empty page where this deployment has no spend source.
+
+```typescript
+listSpendEventsAcrossTenants(input: GatewaySpendEventsAcrossTenantsQuery): Promise<GatewaySpendEventsAcrossTenantsPage>;
+```
+
+#### `findSpendEventAcrossTenants`
+
+One request's spend row across these tenants, null when none holds it.
+
+```typescript
+findSpendEventAcrossTenants(input: GatewaySpendEventAcrossTenantsQuery): Promise<SpendEventRow | null>;
+```
+
 #### `findSpendDaysForOrganizationProjects`
 
 The metered lane per UTC day across these tenants' ledgers, inclusive days, oldest first; none for no tenants or no ledger. Main's governance `sumDaysForOrganizationProjects`, served by the ledger's owner.
@@ -828,7 +844,7 @@ Answers at `/api/internal/gateway/resolve-key`.
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:130)
-type Headers = z.infer<typeof gatewayInternalHeadersSchema>; // ../contract/src/gateway-internal.schemas.ts:230
+type Headers = z.infer<typeof gatewayInternalHeadersSchema>; // ../contract/src/gateway-internal.schemas.ts:267
 ```
 
 #### `POST /api/internal/gateway/codex/refresh` · `gatewayInternalCodexRefresh`
@@ -849,7 +865,7 @@ Answers at `/api/internal/gateway/config/:vk_id`.
 
 ```typescript
 type Params = z.infer<typeof gatewayInternalConfigParamsSchema>; // ../contract/src/gateway-internal.schemas.ts:25
-type Headers = z.infer<typeof gatewayInternalHeadersSchema>; // ../contract/src/gateway-internal.schemas.ts:230
+type Headers = z.infer<typeof gatewayInternalHeadersSchema>; // ../contract/src/gateway-internal.schemas.ts:267
 ```
 
 #### `GET /api/internal/gateway/changes` · `gatewayInternalChanges`
@@ -859,7 +875,7 @@ Authenticated: the Go data plane signs every call with the deployment's own gate
 Answers at `/api/internal/gateway/changes`.
 
 ```typescript
-type Query = z.infer<typeof gatewayInternalChangesQuerySchema>; // ../contract/src/gateway-internal.schemas.ts:234
+type Query = z.infer<typeof gatewayInternalChangesQuerySchema>; // ../contract/src/gateway-internal.schemas.ts:271
 ```
 
 #### `POST /api/internal/gateway/guardrail/check` · `gatewayInternalGuardrailCheck`
@@ -879,7 +895,7 @@ Authenticated: the Go data plane signs every call with the deployment's own gate
 Answers at `/api/internal/gateway/budget-bucket-spend`.
 
 ```typescript
-type Query = z.infer<typeof gatewayInternalBucketQuerySchema>; // ../contract/src/gateway-internal.schemas.ts:239
+type Query = z.infer<typeof gatewayInternalBucketQuerySchema>; // ../contract/src/gateway-internal.schemas.ts:276
 ```
 
 #### `POST /api/internal/gateway/spend-commands` · `gatewayInternalSpendCommands`
@@ -909,7 +925,7 @@ Authenticated: the Go data plane signs every call with the deployment's own gate
 Answers at `/api/internal/gateway/realtime-sessions/:session_id`.
 
 ```typescript
-type Params = z.infer<typeof gatewayInternalSessionParamsSchema>; // ../contract/src/gateway-internal.schemas.ts:123
+type Params = z.infer<typeof gatewayInternalSessionParamsSchema>; // ../contract/src/gateway-internal.schemas.ts:147
 // Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:202)
 ```
 
@@ -920,7 +936,7 @@ Authenticated: the Go data plane signs every call with the deployment's own gate
 Answers at `/api/internal/gateway/realtime-sessions/:session_id/usage`.
 
 ```typescript
-type Params = z.infer<typeof gatewayInternalSessionParamsSchema>; // ../contract/src/gateway-internal.schemas.ts:123
+type Params = z.infer<typeof gatewayInternalSessionParamsSchema>; // ../contract/src/gateway-internal.schemas.ts:147
 // Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:216)
 ```
 
@@ -1443,9 +1459,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1128`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1129`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1130`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1132`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1133`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1134`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:25` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:27` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:29` |

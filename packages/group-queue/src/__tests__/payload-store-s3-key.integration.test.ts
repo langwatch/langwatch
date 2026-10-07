@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
-import { InMemoryObjectStore, incompressible } from "./blob-test-doubles.ts";
+import { InMemoryObjectStore, incompressible, mintTestUri } from "./blob-test-doubles.ts";
 
 type TestPayload = { id: string; groupId: string; value: string };
 
@@ -54,6 +54,7 @@ describe("GroupQueueProcessor — S3-tier key layout (ADR-172)", () => {
         const queue = new GroupQueueProcessor<TestPayload>(definition, redis, {
           consumerEnabled: true,
           objectStoreFor: () => objectStore,
+          mintUri: mintTestUri,
           resolveStorageDestination: async () => ({ kind: "s3" as const, bucket: BUCKET }),
         });
         queues.push(queue);

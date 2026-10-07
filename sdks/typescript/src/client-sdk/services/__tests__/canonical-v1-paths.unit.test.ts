@@ -3,7 +3,8 @@
  *
  * specs/typescript-sdk/canonical-v1-request-paths.feature
  */
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
@@ -30,6 +31,7 @@ const V1_FAMILIES = new Set(
 );
 
 const BARE_PATH = /\/api\/([a-zA-Z0-9_-]+)((?:\/(?:\$\{[^}]*\}|[a-zA-Z0-9_{}.-]+))*)/g;
+const V1_PATH = /\/api\/v1((?:\/(?:\$\{[^}]*\}|[a-zA-Z0-9_{}.-]+))+)/g;
 const VERSION_SEGMENT = /^v\d+$/;
 
 /** Routes the document keeps bare because they have no `/api/v1` twin. */
@@ -67,6 +69,21 @@ function bareFamilyPaths(files: string[]): string[] {
   return offenders;
 }
 
+/** Hand-written `/api/v1` URLs for routes the document keeps bare. */
+function v1BareOnlyPaths(files: string[]): string[] {
+  const offenders: string[] = [];
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    for (const match of source.matchAll(V1_PATH)) {
+      const path = `/api${match[1]!.replace(/\$\{[^}]*\}/g, "x")}`;
+      if (!BARE_ONLY.some((bare) => bare.test(path))) continue;
+      const line = source.slice(0, match.index).split("\n").length;
+      offenders.push(`${file.slice(SDK_SRC.length + 1)}:${line} ${match[0]}`);
+    }
+  }
+  return offenders;
+}
+
 describe("given the request paths the TypeScript SDK builds", () => {
   describe("when the client services and CLI commands are read", () => {
     /** @scenario "Hand-written service request paths are v1-form" */
@@ -79,6 +96,17 @@ describe("given the request paths the TypeScript SDK builds", () => {
       expect(files.length).toBeGreaterThan(200);
 
       expect(bareFamilyPaths(files)).toEqual([]);
+      // The inverse offence: a route with no `/api/v1` twin addressed under it.
+      expect(v1BareOnlyPaths(files)).toEqual([]);
+    });
+
+    it("flags a /api/v1 address for a route the document keeps bare", () => {
+      const dir = mkdtempSync(join(tmpdir(), "v1-bare-only-"));
+      const file = join(dir, "share.ts");
+      const shared = ["/api", "v1", "trace", "${id}", "share"].join("/");
+      writeFileSync(file, `const url = \`\${endpoint}${shared}\`;\n`);
+
+      expect(v1BareOnlyPaths([file]).map((hit) => hit.split(" ")[1])).toEqual([shared]);
     });
   });
 

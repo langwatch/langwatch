@@ -49,6 +49,7 @@ import {
   isLastAdmin,
 } from "../../rules/organization-membership.rules.ts";
 import { PrismaEffectiveTeamAdminsRepository } from "./prisma.effective-team-admins.repository.ts";
+import { PrismaOrganizationAuditStore } from "./prisma.organization-audit.store.ts";
 import {
   customRoleFromRecord,
   organizationFromRecord,
@@ -880,6 +881,14 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     private readonly cipher: OrganizationSettingsCipher,
   ) {}
 
+  #audit: PrismaOrganizationAuditStore | undefined;
+
+  /** Organization's audit outbox, over this repository's own client. */
+  private get audit(): PrismaOrganizationAuditStore {
+    this.#audit ??= PrismaOrganizationAuditStore.create({ database: this.prisma });
+    return this.#audit;
+  }
+
   findPersonalTeamsInScopes(params: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
   }): Promise<{ name: string }[]> {
@@ -1708,8 +1717,10 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         });
         // A Developer gets no grant, so its admission is audited here (ADR-171).
         if (seat === "DEVELOPER") {
-          await tx.auditLog.create({
-            data: {
+          await this.audit.append({
+            transaction: tx,
+            fact: {
+              tenantId: organizationId,
               action: DEVELOPER_ADMISSION_AUDIT_ACTION,
               userId,
               organizationId,

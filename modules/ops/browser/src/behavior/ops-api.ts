@@ -14,6 +14,7 @@ import type {
   opsPlatformTrpc,
   opsProcessTrpc,
   opsQueueTrpc,
+  opsUpgradeTrpc,
   selfHostedInstancesTrpc,
 } from "@langwatch/ops-contract";
 import type { promptTrpc } from "@langwatch/prompt-contract";
@@ -82,6 +83,7 @@ export type OpsApiMap = ContractApiMap<typeof opsDashboardTrpc> &
   ContractApiMap<typeof opsOperatorsTrpc> &
   ContractApiMap<typeof opsProcessTrpc> &
   ContractApiMap<typeof opsQueueTrpc> &
+  ContractApiMap<typeof opsUpgradeTrpc> &
   ContractApiMap<typeof licenseRegistryTrpc> &
   ContractApiMap<typeof selfHostedInstancesTrpc> &
   ContractApiMap<typeof promptTrpc> &

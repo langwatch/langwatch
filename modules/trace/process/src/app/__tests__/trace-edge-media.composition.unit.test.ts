@@ -5,7 +5,6 @@
  */
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -47,7 +46,6 @@ function compose({
   const plans = createApiFixture<EntitlementApi>();
   const blobStore = TraceBlobStoreService.create({
     legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: refuse }),
-    resolveClickHouseClient: refuse,
   });
   const deps = TraceModule.composeDependencies({
     repositories: MemoryTraceRepositories.create(),
@@ -79,7 +77,6 @@ function compose({
       fallbackVisibilityDays: 14,
     },
     annotations: createApiFixture<AnnotationApi>(),
-    codingAgents: createApiFixture<CodingAgentApi>(),
     dataRetention: createApiFixture<DataRetentionApi>(),
     evaluations: createApiFixture<EvaluationApi>(),
     logs: createApiFixture<LogApi>(),

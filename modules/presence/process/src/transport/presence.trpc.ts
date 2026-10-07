@@ -85,4 +85,9 @@ export const presenceTrpcTransport: TrpcRouterDeclaration<PresenceApi, typeof pr
         ...(signal === undefined ? {} : { signal }),
       }),
     )
+
+    // Platform-scoped: no tenant in the input, the door asks the operator view grant.
+    .procedure("onUpgradeReadHints")
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, signal }) => app.upgradeReadHints(signal === undefined ? {} : { signal }))
     .build();

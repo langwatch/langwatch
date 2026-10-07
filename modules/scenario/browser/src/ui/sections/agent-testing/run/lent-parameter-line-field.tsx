@@ -1,6 +1,6 @@
 /** The parameter line as scenario lends it to agent's test panel (§3.4 rule 7). */
 
-import type { ParameterLineFieldProps } from "@langwatch/scenario-contract";
+import type { ParameterLineFieldProps } from "@langwatch/scenario-client";
 
 import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
 import { ParameterLineField } from "./parameter-line-field.tsx";

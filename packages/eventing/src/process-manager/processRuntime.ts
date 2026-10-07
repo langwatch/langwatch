@@ -272,6 +272,9 @@ export class ProcessRuntime {
   private readonly consumersEnabled: boolean;
   /** Whether workers start as they register; a held runtime starts them in `start()`. */
   private running: boolean;
+  /** Set by `pause()`: no outbox drain or wake scan starts until `resume()`. */
+  private paused = false;
+  private readonly armedSchedules = new Set<string>();
   private readonly managers = new Map<string, RegisteredProcessManager>();
   private readonly wakeManagers: Record<string, ProcessWakeHandler> = {};
   private readonly hostedOutboxes: ProcessOutboxWorker[] = [];
@@ -294,9 +297,45 @@ export class ProcessRuntime {
   start(): void {
     if (this.running || !this.consumersEnabled) return;
     this.running = true;
+    if (!this.paused) this.startWorkers();
+  }
+
+  /** Starts no further drain or scan; the ones running settle. Idempotent and synchronous. */
+  pause(): void {
+    if (this.paused) return;
+    this.paused = true;
+    if (!this.running) return;
+    void this.stopWorkers().catch((error: unknown) => {
+      this.logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        "A process worker failed to settle while pausing",
+      );
+    });
+  }
+
+  /** Drains and scans again after `pause()`. Idempotent. */
+  resume(): void {
+    if (!this.paused) return;
+    this.paused = false;
+    if (this.running) this.startWorkers();
+  }
+
+  private get active(): boolean {
+    return this.running && !this.paused;
+  }
+
+  private startWorkers(): void {
     this.wakeWorker?.start();
     for (const registered of this.managers.values()) this.startManager(registered);
     for (const outboxWorker of this.hostedOutboxes) outboxWorker.start();
+  }
+
+  private async stopWorkers(): Promise<void> {
+    await Promise.all([
+      this.wakeWorker?.stop(),
+      ...Array.from(this.managers.values(), (manager) => manager.outboxWorker.stop()),
+      ...this.hostedOutboxes.map((outboxWorker) => outboxWorker.stop()),
+    ]);
   }
 
   registerPipeline<E extends Event>(params: {
@@ -423,15 +462,11 @@ export class ProcessRuntime {
       stuckDrainTimeoutMs: stuckDrainTimeoutMs(undefined),
     });
     this.hostedOutboxes.push(outboxWorker);
-    if (this.running) outboxWorker.start();
+    if (this.active) outboxWorker.start();
   }
 
   async stop(): Promise<void> {
-    await Promise.all([
-      this.wakeWorker?.stop(),
-      ...Array.from(this.managers.values(), (manager) => manager.outboxWorker.stop()),
-      ...this.hostedOutboxes.map((outboxWorker) => outboxWorker.stop()),
-    ]);
+    await this.stopWorkers();
   }
 
   private registerProcessManager(definition: ProcessManagerDefinition): RegisteredProcessManager {
@@ -473,11 +508,11 @@ export class ProcessRuntime {
           logger: this.logger,
           notifyOutbox: (processName) => this.notifyOutbox(processName),
         });
-        if (this.running) this.wakeWorker.start();
+        if (this.active) this.wakeWorker.start();
       }
     }
 
-    if (this.running) this.startManager(registered);
+    if (this.active) this.startManager(registered);
     return registered;
   }
 
@@ -486,11 +521,14 @@ export class ProcessRuntime {
     if (registered.definition.config.schedule) this.armSchedule({ registered });
   }
 
+  /** Arms once per runtime: a resume restarts the outbox, not the schedule. */
   private armSchedule({ registered }: { registered: RegisteredProcessManager }): void {
+    const processName = registered.definition.config.name;
+    if (this.armedSchedules.has(processName)) return;
+    this.armedSchedules.add(processName);
     const instant = nowInstant();
     const now = instant.epochMilliseconds;
     const day = instant.toString({ fractionalSecondDigits: 3 }).slice(0, 10);
-    const processName = registered.definition.config.name;
     void registered.manager
       .handleEvent({
         envelope: {

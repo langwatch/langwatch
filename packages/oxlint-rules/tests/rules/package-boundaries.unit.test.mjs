@@ -201,7 +201,7 @@ describe("given package-boundaries", () => {
       expect(ids(client, 'import { useMemo } from "react";')).toEqual([]);
       expect(ids(LIBRARY, 'import { useMemo } from "react";')).toEqual(["libraryRuntime"]);
       for (const specifier of ["react-dom", "@chakra-ui/react", "@langwatch/browser"]) {
-        expect(ids(client, `import { x } from "${specifier}";`)).toEqual(["libraryRuntime"]);
+        expect(ids(client, `import { x } from "${specifier}";`)).toEqual(["clientRuntime"]);
       }
     });
 

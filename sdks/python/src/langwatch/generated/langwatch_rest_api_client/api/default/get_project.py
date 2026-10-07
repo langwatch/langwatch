@@ -70,7 +70,7 @@ def sync_detailed(
 ) -> Response[Any | GetProjectResponse200]:
     """Get a project
 
-     Get a project by ID, including its API key. Requires project:view permission.
+     Get a project by ID. Requires project:view permission.
 
     Args:
         id (str):
@@ -101,7 +101,7 @@ def sync(
 ) -> Any | GetProjectResponse200 | None:
     """Get a project
 
-     Get a project by ID, including its API key. Requires project:view permission.
+     Get a project by ID. Requires project:view permission.
 
     Args:
         id (str):
@@ -127,7 +127,7 @@ async def asyncio_detailed(
 ) -> Response[Any | GetProjectResponse200]:
     """Get a project
 
-     Get a project by ID, including its API key. Requires project:view permission.
+     Get a project by ID. Requires project:view permission.
 
     Args:
         id (str):
@@ -156,7 +156,7 @@ async def asyncio(
 ) -> Any | GetProjectResponse200 | None:
     """Get a project
 
-     Get a project by ID, including its API key. Requires project:view permission.
+     Get a project by ID. Requires project:view permission.
 
     Args:
         id (str):

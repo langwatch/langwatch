@@ -2,6 +2,7 @@ import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/
 import { defineProcessModule } from "@langwatch/process";
 
 import { OrganizationModule } from "./app/organization.app.ts";
+import { organizationAuditEventing } from "./eventing/organization-audit.pipeline.ts";
 import { organizationLifecycleEventing } from "./eventing/organization-lifecycle.pipeline.ts";
 import { seatLimitEventing } from "./eventing/seat-limit.pipeline.ts";
 import { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
@@ -45,4 +46,5 @@ export const organizationProcessModule = defineProcessModule("organization")
   ])
   .withEventing(seatLimitEventing)
   .withEventing(organizationLifecycleEventing)
+  .withEventing(organizationAuditEventing)
   .withTasks(({ app }) => [OrganizationPresenceSettingBackfillTask.create({ organizations: app })]);

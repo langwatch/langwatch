@@ -5,8 +5,9 @@ import type { PlanInfo, PricingModel } from "@langwatch/entitlement-contract";
  */
 import { OrganizationNotFoundForTeamError } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { BillableEventsMeterRepository } from "../../repositories/billable-events-meter.repository.ts";
 import {
   type EntitlementUsagePeers,
   USAGE_UNKNOWN,
@@ -268,15 +269,14 @@ describe("UsageService.checkLimit against the plan's allowance", () => {
     it("refuses to answer and reads no plan and no count", async () => {
       const planResolver = vi.fn().mockResolvedValue(plan(1_000));
       const countTracesByProjects = vi.fn().mockResolvedValue([]);
-      const countBillableEventsByProjects = vi.fn().mockResolvedValue([]);
+      const countByProjects = vi.fn().mockResolvedValue([]);
       const service = UsageService.overPeers({
         isSaas: true,
         planResolver,
+        meter: { countByProjects },
         peers: {
           traces: { countTracesByProjects },
-          billing: createApiFixture<EntitlementUsagePeers["billing"]>({
-            countBillableEventsByProjects,
-          }),
+          billing: createApiFixture<EntitlementUsagePeers["billing"]>({}),
           organizations: createApiFixture<EntitlementUsagePeers["organizations"]>({
             getOrganizationIdByTeamId: async ({ teamId }) => {
               throw new OrganizationNotFoundForTeamError(teamId);
@@ -291,7 +291,111 @@ describe("UsageService.checkLimit against the plan's allowance", () => {
       });
       expect(planResolver).not.toHaveBeenCalled();
       expect(countTracesByProjects).not.toHaveBeenCalled();
-      expect(countBillableEventsByProjects).not.toHaveBeenCalled();
+      expect(countByProjects).not.toHaveBeenCalled();
+    });
+  });
+});
+
+/** An organization off Cloud on a free plan, so it is metered in events, over a given meter. */
+function eventsServiceOver({
+  meter,
+  projectIds = ["project-1", "project-2"],
+}: {
+  meter: Pick<BillableEventsMeterRepository, "countByProjects">;
+  projectIds?: string[];
+}) {
+  return UsageService.overPeers({
+    isSaas: false,
+    planResolver: async () => ({ ...plan(1_000), free: true }),
+    meter,
+    peers: {
+      traces: createApiFixture<EntitlementUsagePeers["traces"]>({}),
+      billing: createApiFixture<EntitlementUsagePeers["billing"]>({
+        getPricingModel: async () => ({ pricingModel: null }),
+      }),
+      organizations: createApiFixture<EntitlementUsagePeers["organizations"]>({}),
+      projects: { listIdsByOrganization: async () => projectIds },
+    },
+  });
+}
+
+describe("UsageService.overPeers counting events", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("given projects with events in entitlement's meter this month", () => {
+    /** @scenario "Enforcement counts events from entitlement's own meter" */
+    it("counts the meter's events across the projects and asks billing for none", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-02-10T00:00:00Z"));
+      const countByProjects = vi.fn<BillableEventsMeterRepository["countByProjects"]>(async () => [
+        { projectId: "project-1", count: 600 },
+        { projectId: "project-2", count: 500 },
+      ]);
+      const service = eventsServiceOver({ meter: { countByProjects } });
+
+      await expect(
+        service.checkLimitForOrganization({ organizationId: "org-1" }),
+      ).resolves.toMatchObject({ exceeded: true, count: 1_100, usageUnit: "events" });
+      expect(countByProjects).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        projectIds: ["project-1", "project-2"],
+        window: { startDate: "2026-02-01 00:00:00.000", endDate: "2026-03-01 00:00:00.000" },
+      });
+    });
+  });
+
+  describe("given a second project that sent nothing this month", () => {
+    /** @scenario "A project with no metered events this month counts zero" */
+    it("reports the first project's events and zero for the second", async () => {
+      const service = eventsServiceOver({
+        meter: { countByProjects: async () => [{ projectId: "project-1", count: 7 }] },
+      });
+
+      await expect(
+        service.getCountByProjects({
+          organizationId: "org-1",
+          projectIds: ["project-1", "project-2"],
+        }),
+      ).resolves.toEqual([
+        { projectId: "project-1", count: 7 },
+        { projectId: "project-2", count: 0 },
+      ]);
+    });
+  });
+
+  describe("given an organization that owns no projects", () => {
+    /** @scenario "An organization with no projects reads no meter" */
+    it("reports no project and never reads the meter", async () => {
+      const countByProjects = vi.fn<BillableEventsMeterRepository["countByProjects"]>();
+      const service = eventsServiceOver({ meter: { countByProjects }, projectIds: [] });
+
+      await expect(
+        service.getCountByProjects({ organizationId: "org-1", projectIds: [] }),
+      ).resolves.toEqual([]);
+      expect(countByProjects).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a meter that cannot be read", () => {
+    /** @scenario "A meter that cannot answer fails the count rather than reading zero" */
+    it("fails with the meter's error instead of reporting zeros", async () => {
+      const outage = Object.assign(new Error("ClickHouse is down"), { code: "meter_unavailable" });
+      const service = eventsServiceOver({
+        meter: {
+          countByProjects: async () => {
+            throw outage;
+          },
+        },
+      });
+
+      await expect(
+        service.getCountByProjects({
+          organizationId: "org-1",
+          projectIds: ["project-1", "project-2"],
+        }),
+      ).rejects.toMatchObject({ code: "meter_unavailable" });
     });
   });
 });

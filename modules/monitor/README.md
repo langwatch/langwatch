@@ -11,7 +11,7 @@ Monitors: the checks that run an evaluator over incoming traces, their definitio
 | Classification | core (`modules/catalogue.json`)                                                                       |
 | Subjects       | monitor                                                                                               |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                              |
-| Api token      | `MonitorApi` = `moduleApi<MonitorApi>()("monitor")`, `contract/src/monitor.api.ts:76` (22 operations) |
+| Api token      | `MonitorApi` = `moduleApi<MonitorApi>()("monitor")`, `contract/src/monitor.api.ts:75` (22 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                            |
 
 ## What monitor owns
@@ -19,7 +19,7 @@ Monitors: the checks that run an evaluator over incoming traces, their definitio
 | Kind           | Name                        | Declared at                                                       |
 | -------------- | --------------------------- | ----------------------------------------------------------------- |
 | Postgres table | `Monitor`                   | `process/src/repositories/prisma/prisma.monitor.repository.ts:69` |
-| Config         | `publicBaseUrl` (BASE_HOST) | `contract/src/monitor.api.ts:80`                                  |
+| Config         | `publicBaseUrl` (BASE_HOST) | `contract/src/monitor.config.ts:5`                                |
 
 Anything else monitor needs belongs to another module and is reached through its `*Api`.
 

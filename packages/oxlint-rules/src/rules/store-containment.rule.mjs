@@ -30,7 +30,29 @@ const STORES = [
   },
 ];
 
-const MODULE_ROLES = new Set(["contract", "process", "browser", "library"]);
+const MODULE_ROLES = new Set(["contract", "process", "browser", "library", "client"]);
+
+// Named exceptions: the file, the stores it may name, and why (Alex, 2026-10-06, Q212).
+// A third-party library takes the raw client itself; each moves with its code.
+const NAMED_EXCEPTIONS = [
+  {
+    path: /^modules\/auth\/process\/src\/app\/auth-composition\.build\.ts$/,
+    stores: new Set(["Prisma", "Redis"]),
+    reason:
+      "Better Auth's storage adapter takes the raw Prisma client and a Redis secondary storage",
+  },
+  {
+    path: /^modules\/ops\/process\/src\/repositories\/live\/live\.replay-runtime\.repository\.ts$/,
+    stores: new Set(["ClickHouse", "Redis"]),
+    reason: "ops' event replay reads the event log over ClickHouse and locks on a duplicated Redis",
+  },
+];
+
+function isNamedException({ file, row }) {
+  return NAMED_EXCEPTIONS.some(
+    (exception) => exception.path.test(file.workspacePath) && exception.stores.has(row.store),
+  );
+}
 const REPOSITORY_REGISTRY = new RegExp(`^${FEATURE_PREFIX}repositories/[^/]+\\.registry\\.ts$`);
 
 function isGoverned(file) {
@@ -86,7 +108,7 @@ function isProcessSeam({ file, row, values }) {
 
 function isAllowed({ file, node, row }) {
   const values = valueNamesOf(node);
-  if (isProcessSeam({ file, row, values })) return true;
+  if (isProcessSeam({ file, row, values }) || isNamedException({ file, row })) return true;
 
   return row.typesTravel && values.length === 0;
 }

@@ -42,13 +42,28 @@
       "path": "../../langy/contract/tsconfig.build.json"
     },
     {
+      "path": "../../navigation/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../onboarding/client/tsconfig.build.json"
+    },
+    {
       "path": "../../onboarding/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../organization/client/tsconfig.build.json"
+    },
+    {
+      "path": "../client/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/client/tsconfig.build.json"
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"

@@ -38,6 +38,8 @@ export interface ClickHouseConfig {
   readonly requestTimeoutMs?: number;
   /** Statements allowed in flight at once. Absent means the resolved pool size. */
   readonly maxConcurrentStatements?: number;
+  /** Share of those statements each of reads and inserts keeps from the other. */
+  readonly statementLaneReserveShare?: number;
   /** Settings applied to every statement, before a statement's own. */
   readonly settings?: Readonly<Record<string, string>>;
   /** How many tenant-to-organization answers the router keeps. */

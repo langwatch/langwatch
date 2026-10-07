@@ -3,6 +3,7 @@ import { buildChartFrameDocument } from "@langwatch/analytics-contract/chart-fra
 import { CHART_FRAME_PATH } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server, type ProcessServer } from "@langwatch/process";
+import { servingUpgradeGate } from "@langwatch/upgrade/gate";
 
 import { apiHealthRoute } from "./api-health-route.ts";
 import { processEnvironment } from "./config.ts";
@@ -25,7 +26,8 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
     .withSecrets((config, secrets) =>
       secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
     )
-    .withProcessOwnership(options.ownsProcess ?? true);
+    .withProcessOwnership(options.ownsProcess ?? true)
+    .withUpgradeGate({ role: "api", gate: servingUpgradeGate });
   const server = await (
     (options.ownsTelemetry ?? true)
       ? preamble

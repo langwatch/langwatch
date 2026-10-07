@@ -10,7 +10,6 @@ import {
   type DataPrivacyScope,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { overBroadSecretPatternProbe } from "@langwatch/redaction";
 import safe from "safe-regex2";
 
@@ -20,41 +19,44 @@ import {
   withPiiRedactionLevel,
 } from "../rules/pii-redaction-level.rules.ts";
 import { DataPrivacyPolicyCacheService } from "./data-privacy-cache.service.ts";
+import type { DataPrivacyProjectScopeService } from "./data-privacy-project-scope.service.ts";
 import { DataPrivacyResolutionService } from "./data-privacy-resolution.service.ts";
 
 /** The door's own lineage check (`packages/api` access), asked of a nested scope (Q151 Q1). */
 type ScopeLineage = Pick<AuthzApi, "checkScopeLineage">;
 
+type ScopeFacts = Pick<DataPrivacyProjectScopeService, "getScopeFacts">;
+
 export class DataPrivacyService {
   private readonly repository: DataPrivacyPolicyRepository;
   private readonly cache: DataPrivacyPolicyCacheService;
   private readonly resolution: DataPrivacyResolutionService;
-  private readonly projects: ProjectApi;
+  private readonly scopes: ScopeFacts;
   private readonly lineage: ScopeLineage;
 
   private constructor({
     repository,
     cache,
     resolution,
-    projects,
+    scopes,
     lineage,
   }: {
     repository: DataPrivacyPolicyRepository;
     cache: DataPrivacyPolicyCacheService;
     resolution: DataPrivacyResolutionService;
-    projects: ProjectApi;
+    scopes: ScopeFacts;
     lineage: ScopeLineage;
   }) {
     this.repository = repository;
     this.cache = cache;
     this.resolution = resolution;
-    this.projects = projects;
+    this.scopes = scopes;
     this.lineage = lineage;
   }
 
   static create(options: {
     repository: DataPrivacyPolicyRepository;
-    projects: ProjectApi;
+    scopes: ScopeFacts;
     lineage: ScopeLineage;
     ttlMs?: number;
     now?: () => number;
@@ -70,10 +72,10 @@ export class DataPrivacyService {
       cache,
       resolution: DataPrivacyResolutionService.create({
         repository: options.repository,
-        projects: options.projects,
+        scopes: options.scopes,
         cache,
       }),
-      projects: options.projects,
+      scopes: options.scopes,
       lineage: options.lineage,
     });
   }
@@ -116,10 +118,10 @@ export class DataPrivacyService {
     projectId: string;
     level: DataPrivacyPiiRedactionLevel;
   }): Promise<void> {
-    const project = await this.projects.getWithTeam(input.projectId);
+    const { organizationId } = await this.scopes.getScopeFacts(input);
     await this.repository.mergeConfigForScope({
-      organizationId: project.team.organizationId,
-      scope: { scopeType: "PROJECT", scopeId: project.id },
+      organizationId,
+      scope: { scopeType: "PROJECT", scopeId: input.projectId },
       personalOnly: false,
       merge: (config) => this.validated(withPiiRedactionLevel({ config, level: input.level })),
     });

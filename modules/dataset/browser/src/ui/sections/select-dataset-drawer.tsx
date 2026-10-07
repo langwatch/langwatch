@@ -4,7 +4,7 @@
 
 import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
 import { datasetClient } from "@langwatch/dataset-client";
-import type { UiSelectDatasetDrawerProps } from "@langwatch/dataset-contract";
+import type { UiSelectDatasetDrawerProps } from "@langwatch/dataset-client";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { Database } from "lucide-react";

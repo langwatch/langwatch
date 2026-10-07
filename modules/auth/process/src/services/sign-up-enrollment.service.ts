@@ -55,7 +55,35 @@ export class SignUpEnrollmentService {
     throw new NoAddressToConfirmError();
   }
 
+  /**
+   * Whether this address may still enrol `method` here, asked again at a ceremony's two ends. The
+   * proof is neither checked nor spent; an existing account is left to the caller's own refusal.
+   */
+  async enrolsLocally({
+    email,
+    method,
+  }: {
+    email: string;
+    method: SignInMethod["kind"];
+  }): Promise<boolean> {
+    const decision = await this.localDecision({ email });
+    if (decision.outcome === "existing_account") return true;
+    return (
+      decision.outcome === "enroll" && decision.methodSet.some((offered) => offered.kind === method)
+    );
+  }
+
   private async decide({ email }: { email: string }): Promise<SignUpEnrollment> {
+    const decision = await this.localDecision({ email });
+    if (decision.outcome !== "enroll") return decision;
+
+    const verdict = await this.deps.checkSignUp({ email });
+    if (!verdict.allowed) throw new SignUpRestrictedError(verdict.reason);
+
+    return decision;
+  }
+
+  private async localDecision({ email }: { email: string }): Promise<SignUpEnrollment> {
     const decision = await this.deps.route({ identifier: email, breakGlass: false });
     if (decision.outcome === "redirect_to_connection") {
       return {
@@ -77,9 +105,6 @@ export class SignUpEnrollmentService {
       ? offered
       : offered.filter((method) => method.kind !== "password");
     if (methodSet.length === 0) return unavailable(decision.reasonCode);
-
-    const verdict = await this.deps.checkSignUp({ email });
-    if (!verdict.allowed) throw new SignUpRestrictedError(verdict.reason);
 
     return { outcome: "enroll", methodSet, reasonCode: decision.reasonCode };
   }

@@ -16,6 +16,7 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { type CheckupConnectView, type CheckupFacts, CheckupService } from "../checkup.service.ts";
+import { ledgerOf, statusOf, stepOf } from "./support/upgrade-ledger.ts";
 
 /** What the reach probe throws for a host it could not open a connection to. */
 class UnreachableHostError extends HandledError {
@@ -60,13 +61,14 @@ function healthyDeps(overrides: Partial<CheckupFacts> = {}): CheckupFacts {
     },
     postgres: {
       ping: async () => "18.1",
-      findMigrationState: async () => [{ pending: [], failed: [] }],
     },
+    upgrade: ledgerOf([
+      stepOf({ id: "prisma:20260901000000_x" }),
+      stepOf({ id: "clickhouse:00001", kind: "clickhouse-schema" }),
+    ]),
     clickhouse: {
       configured: true,
       ping: async () => undefined,
-      migrationStatus: async () =>
-        "    Applied At    Migration\n    2026-09-01    -- 00001_x.sql\n",
       findAppFunctionsProvisionable: async () => [true],
     },
     redis: { target: "redis://redis:6379", ready: async () => undefined },
@@ -214,21 +216,19 @@ describe("CheckupService", () => {
     /** @scenario "A failed check names the fix and the page that explains it" */
     it("fails the migrations row with the command and a docs page", async () => {
       const deps = healthyDeps({
-        postgres: {
-          ping: async () => "18.1",
-          findMigrationState: async () => [
-            {
-              pending: ["20260921170000_instance_identity_startup_notice"],
-              failed: [],
-            },
-          ],
-        },
+        upgrade: ledgerOf([
+          stepOf({
+            id: "prisma:20260921170000_instance_identity_startup_notice",
+            status: "pending",
+            recorded: false,
+          }),
+        ]),
       });
       const { rows } = await CheckupService.create(deps).cheap();
       const verdict = rowOf(rows, "postgres_migrations");
 
       expect(verdict.outcome).toBe("refused");
-      expect(verdict.fix).toContain("prisma migrate deploy");
+      expect(verdict.fix).toContain("pnpm task upgrade");
       expect(verdict.docsPath).toMatch(/^\/self-hosting\//);
       expect(rowOf(rows, "postgres").outcome).toBe("verified");
     });
@@ -327,25 +327,203 @@ describe("CheckupService", () => {
     });
   });
 
-  describe("when the goose binary is absent", () => {
-    /** @scenario "A ClickHouse install where the goose binary is absent leaves migrations not checked" */
-    it("passes ClickHouse and leaves its migrations not checked", async () => {
+  describe("when ClickHouse is not configured", () => {
+    /** @scenario "A ClickHouse install that is not configured leaves its migrations row not checked" */
+    it("leaves its migrations row not checked and never reads the ledger for it", async () => {
+      const listSteps = vi.fn(async () => ({ items: [], cursor: null }));
       const deps = healthyDeps({
+        upgrade: { status: async () => statusOf(), listSteps },
         clickhouse: {
-          configured: true,
+          configured: false,
           ping: async () => undefined,
-          migrationStatus: async () => {
-            throw new Error("Goose binary not found");
-          },
           findAppFunctionsProvisionable: async () => [true],
         },
       });
       const { rows } = await CheckupService.create(deps).cheap();
 
-      expect(rowOf(rows, "clickhouse").outcome).toBe("verified");
-      const migrations = rowOf(rows, "clickhouse_migrations");
-      expect(migrations.outcome).toBe("unchecked");
-      expect(migrations.detail).toContain("Goose binary not found");
+      expect(rowOf(rows, "clickhouse_migrations").outcome).toBe("unchecked");
+      expect(listSteps).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the migration rows read the upgrade ledger", () => {
+    const postgresPending = stepOf({ id: "prisma:20260922_a", status: "pending" });
+    const clickhouseDone = stepOf({ id: "clickhouse:00002", kind: "clickhouse-schema" });
+
+    /** @scenario "The checkup's migration rows agree with upgrade status" */
+    it("agrees with the status of the same steps", async () => {
+      const steps = [postgresPending, clickhouseDone];
+      const upgrade = ledgerOf(steps, statusOf({ counts: { pending: 1, done: 1 } }));
+      const { rows } = await CheckupService.create(healthyDeps({ upgrade })).cheap();
+      const outstanding = (await upgrade.listSteps({ mode: "blocking" })).items.filter(
+        (step) => step.status !== "done",
+      );
+
+      expect(rowOf(rows, "postgres_migrations").outcome).toBe("refused");
+      expect(rowOf(rows, "postgres_migrations").detail).toContain(outstanding[0]?.id);
+      expect(rowOf(rows, "clickhouse_migrations").outcome).toBe("verified");
+    });
+
+    /** @scenario "A Postgres row with every blocking step settled is verified" */
+    it("verifies when every blocking step is done or not needed", async () => {
+      const upgrade = ledgerOf([
+        stepOf({ id: "prisma:a" }),
+        stepOf({ id: "prisma:b", status: "not-needed" }),
+      ]);
+      const { rows } = await CheckupService.create(healthyDeps({ upgrade })).cheap();
+
+      expect(rowOf(rows, "postgres_migrations").outcome).toBe("verified");
+    });
+
+    /** @scenario "A pending blocking step refuses the row and names the command and the page" */
+    it("names the pending step, the command and the page", async () => {
+      const upgrade = ledgerOf([postgresPending]);
+      const { rows } = await CheckupService.create(healthyDeps({ upgrade })).cheap();
+      const verdict = rowOf(rows, "postgres_migrations");
+
+      expect(verdict).toMatchObject({
+        outcome: "refused",
+        code: "checkup_postgres_migrations_pending",
+      });
+      expect(verdict.detail).toContain("prisma:20260922_a");
+      expect(verdict.fix).toContain("pnpm task upgrade");
+      expect(verdict.fix).toContain("/ops/upgrades");
+      expect(verdict.docsPath).toBe("/self-hosting/upgrade");
+    });
+
+    /** @scenario "A failed blocking step refuses the row with the failed code" */
+    it("refuses a failed step with the failed code", async () => {
+      const upgrade = ledgerOf([stepOf({ id: "prisma:broken", status: "failed" })]);
+      const { rows } = await CheckupService.create(healthyDeps({ upgrade })).cheap();
+      const verdict = rowOf(rows, "postgres_migrations");
+
+      expect(verdict).toMatchObject({
+        outcome: "refused",
+        code: "checkup_postgres_migration_failed",
+      });
+      expect(verdict.detail).toContain("prisma:broken");
+      expect(verdict.fix).toContain("pnpm task upgrade");
+      expect(verdict.fix).toContain("/ops/upgrades");
+    });
+
+    /** @scenario "A failed ClickHouse step refuses the ClickHouse row with its own failed code" */
+    it("refuses a failed ClickHouse step with the ClickHouse failed code", async () => {
+      const upgrade = ledgerOf([
+        stepOf({ id: "prisma:a" }),
+        stepOf({ id: "clickhouse:00099", kind: "clickhouse-schema", status: "failed" }),
+      ]);
+      const { rows } = await CheckupService.create(healthyDeps({ upgrade })).cheap();
+      const verdict = rowOf(rows, "clickhouse_migrations");
+
+      expect(verdict).toMatchObject({
+        outcome: "refused",
+        code: "checkup_clickhouse_migration_failed",
+      });
+      expect(verdict.detail).toContain("clickhouse:00099");
+      expect(rowOf(rows, "postgres_migrations").outcome).toBe("verified");
+    });
+
+    /** @scenario "A pending ClickHouse step refuses only the ClickHouse row" */
+    it("refuses only the ClickHouse row for a pending ClickHouse step", async () => {
+      const upgrade = ledgerOf([
+        stepOf({ id: "prisma:a" }),
+        stepOf({ id: "clickhouse:00099", kind: "clickhouse-schema", status: "pending" }),
+      ]);
+      const { rows } = await CheckupService.create(healthyDeps({ upgrade })).cheap();
+      const verdict = rowOf(rows, "clickhouse_migrations");
+
+      expect(verdict).toMatchObject({
+        outcome: "refused",
+        code: "checkup_clickhouse_migrations_pending",
+      });
+      expect(verdict.detail).toContain("clickhouse:00099");
+      expect(verdict.fix).toContain("/ops/upgrades");
+      expect(rowOf(rows, "postgres_migrations").outcome).toBe("verified");
+    });
+
+    /** @scenario "A long list of outstanding steps names the first few and counts the rest" */
+    it("names the first few steps and counts the rest", async () => {
+      const upgrade = ledgerOf(
+        Array.from({ length: 40 }, (_, index) =>
+          stepOf({ id: `prisma:${String(index).padStart(2, "0")}`, status: "pending" }),
+        ),
+      );
+      const { rows } = await CheckupService.create(healthyDeps({ upgrade })).cheap();
+      const detail = rowOf(rows, "postgres_migrations").detail ?? "";
+
+      expect(detail).toContain("40 Postgres migration(s)");
+      expect(detail).toContain("prisma:00");
+      expect(detail).toContain("and 35 more");
+      expect(detail).not.toContain("prisma:39");
+    });
+
+    /** @scenario "A background or operator step that is still pending does not refuse a migration row" */
+    it("ignores pending background and operator steps", async () => {
+      const upgrade = ledgerOf([
+        stepOf({ id: "prisma:a" }),
+        stepOf({ id: "clickhouse:00001", kind: "clickhouse-schema" }),
+        stepOf({ id: "trace:backfill", kind: "data", mode: "background", status: "pending" }),
+        stepOf({ id: "trace:cleanup", kind: "procedure", mode: "operator", status: "pending" }),
+      ]);
+      const { rows } = await CheckupService.create(healthyDeps({ upgrade })).cheap();
+
+      expect(rowOf(rows, "postgres_migrations").outcome).toBe("verified");
+      expect(rowOf(rows, "clickhouse_migrations").outcome).toBe("verified");
+    });
+
+    /** @scenario "A step status the checkup does not know counts as outstanding" */
+    it("treats an unknown status as outstanding", async () => {
+      const upgrade = ledgerOf([stepOf({ id: "prisma:strange", status: "quarantined" })]);
+      const { rows } = await CheckupService.create(healthyDeps({ upgrade })).cheap();
+      const verdict = rowOf(rows, "postgres_migrations");
+
+      expect(verdict.outcome).toBe("refused");
+      expect(verdict.detail).toContain("prisma:strange");
+    });
+
+    /** @scenario "An install whose ledger records nothing and declares no step reads as not checked" */
+    it("reads as not checked when nothing is recorded or declared", async () => {
+      const upgrade = ledgerOf(
+        [],
+        statusOf({
+          state: "behind",
+          reason: "no-upgrade-recorded",
+          installed: null,
+          origin: "none",
+        }),
+      );
+      const { rows } = await CheckupService.create(healthyDeps({ upgrade })).cheap();
+      const verdict = rowOf(rows, "postgres_migrations");
+
+      expect(verdict.outcome).toBe("unchecked");
+      expect(verdict.fix).toContain("pnpm task upgrade");
+    });
+
+    /** @scenario "A ledger that cannot be read leaves the migration rows not checked" */
+    it("leaves both rows not checked and says why when the ledger cannot be read", async () => {
+      const unreadable = async () => {
+        throw new Error("connection terminated");
+      };
+      const upgrade = { status: unreadable, listSteps: unreadable };
+      const { rows } = await CheckupService.create(healthyDeps({ upgrade })).cheap();
+
+      for (const id of ["postgres_migrations", "clickhouse_migrations"] as const) {
+        const verdict = rowOf(rows, id);
+        expect(verdict.outcome).toBe("unchecked");
+        expect(verdict.detail).toContain("connection terminated");
+        expect(verdict.fix).toContain("pnpm task upgrade status");
+      }
+      expect(rowOf(rows, "postgres").outcome).toBe("verified");
+    });
+
+    /** @scenario "The migration rows keep their ids and the checkup keeps its shape" */
+    it("keeps both row ids in the checkup, in definition order", async () => {
+      const { rows } = await CheckupService.create(healthyDeps()).cheap();
+      const ids = rows.map((row) => row.id);
+
+      expect(ids).toEqual(CHECK_DEFINITIONS.map((definition) => definition.id));
+      expect(ids).toContain("postgres_migrations");
+      expect(ids).toContain("clickhouse_migrations");
     });
   });
 

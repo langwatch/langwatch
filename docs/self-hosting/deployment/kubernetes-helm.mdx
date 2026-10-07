@@ -475,8 +475,8 @@ clickhouse:
 The chart-managed ClickHouse is pinned to a version the release is tested
 against. An external instance is yours, so the version is your choice.
 LangWatch supports ClickHouse 25.8 and later, including 26.x and ClickHouse
-Cloud. The app runs its ClickHouse migrations at startup, so the version has to
-accept every migration in the release you deploy.
+Cloud. The upgrade applies the release's ClickHouse migrations before the app
+starts, so the version has to accept every migration in the release you deploy.
 
 ### Auto-Tuning
 
@@ -521,7 +521,9 @@ helm upgrade langwatch langwatch/langwatch \
   --wait --timeout 10m
 ```
 
-Database migrations run automatically on startup. Set `SKIP_PRISMA_MIGRATE=true` to disable PostgreSQL migrations if needed.
+A pre-upgrade Job runs `pnpm task upgrade` on the new image before any pod rolls; on a first install the app runs it once on its first boot. If the upgrade fails, the Job fails the `helm upgrade` and the previous version keeps serving.
+
+Follow it on **Ops > Upgrades** or with `pnpm task upgrade status`. To run the upgrade from your own pipeline instead, set `app.migrations.preRoll: false` and run it before `helm upgrade`; until then the new pods refuse to start.
 
 See [Upgrade Guide](/self-hosting/upgrade) for version-specific instructions.
 

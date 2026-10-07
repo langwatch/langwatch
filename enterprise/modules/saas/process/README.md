@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 LangWatch Cloud's own surface. Every operation refuses on any other deployment.
 
-Peers call these through the token, declared at `../contract/src/saas.api.ts:33`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/saas.api.ts:32`; nothing else in this package is public.
 
 #### `receiveUsageReport`
 
@@ -40,9 +40,9 @@ Public: anonymous product telemetry: a self-hosted install presents no credentia
 Answers at `/api/track_usage`.
 
 ```typescript
-type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:8
-type Headers = z.infer<typeof senderAddressHeadersSchema>; // ../contract/src/saas.api.ts:14
-type Response = z.infer<typeof usageReportReceiptSchema>; // ../contract/src/saas.api.ts:22
+type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:7
+type Headers = z.infer<typeof senderAddressHeadersSchema>; // ../contract/src/saas.api.ts:13
+type Response = z.infer<typeof usageReportReceiptSchema>; // ../contract/src/saas.api.ts:21
 ```
 
 #### `POST /api/connect/v1/stats` · `receiveConnectUsageReport`
@@ -52,9 +52,9 @@ Public: anonymous product telemetry: a self-hosted install presents no credentia
 Answers at `/api/connect/v1/stats`.
 
 ```typescript
-type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:8
-type Headers = z.infer<typeof senderAddressHeadersSchema>; // ../contract/src/saas.api.ts:14
-type Response = z.infer<typeof usageReportReceiptSchema>; // ../contract/src/saas.api.ts:22
+type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:7
+type Headers = z.infer<typeof senderAddressHeadersSchema>; // ../contract/src/saas.api.ts:13
+type Response = z.infer<typeof usageReportReceiptSchema>; // ../contract/src/saas.api.ts:21
 ```
 
 ## tRPC transport
@@ -71,8 +71,8 @@ None: saas declares no pipeline, process manager, subscriber or task.
 
 ## Configuration
 
-| Kind   | Leaf     | Environment variable | Declared at                      |
-| ------ | -------- | -------------------- | -------------------------------- |
-| config | `isSaas` | `IS_SAAS`            | `../contract/src/saas.api.ts:68` |
+| Kind   | Leaf     | Environment variable | Declared at                        |
+| ------ | -------- | -------------------- | ---------------------------------- |
+| config | `isSaas` | `IS_SAAS`            | `../contract/src/saas.config.ts:4` |
 
 <!-- readme:generated:end -->

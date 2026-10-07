@@ -220,6 +220,13 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     return this.#lifecycle.recordExisting(input);
   }
 
+  /** Records one organization's projects' stored departments and teams, for the backfill task. */
+  recordExistingDepartmentAssignments(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<number> {
+    return this.#lifecycle.recordExistingDepartmentAssignments(input);
+  }
+
   /** Records one organization's projects' stored presence settings, for the backfill task. */
   recordExistingPresenceSettings(input: Readonly<{ organizationId: string }>): Promise<number> {
     return this.#lifecycle.recordExistingPresenceSettings(input);

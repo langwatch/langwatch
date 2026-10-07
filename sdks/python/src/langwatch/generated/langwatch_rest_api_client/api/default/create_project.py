@@ -83,9 +83,9 @@ def sync_detailed(
 ) -> Response[Any | CreateProjectResponse201]:
     """Create a project
 
-     Create a new project in the organization. Returns the project with its API key (sk-lw-...) for
-    sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires
-    project:create permission.
+     Create a new project in the organization. Returns the project with a newly minted service API key
+    (serviceApiKey) for sending traces. Provide either teamId (existing team) or newTeamName (creates a
+    new team). Requires project:create permission.
 
     Args:
         body (CreateProjectBody):
@@ -116,9 +116,9 @@ def sync(
 ) -> Any | CreateProjectResponse201 | None:
     """Create a project
 
-     Create a new project in the organization. Returns the project with its API key (sk-lw-...) for
-    sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires
-    project:create permission.
+     Create a new project in the organization. Returns the project with a newly minted service API key
+    (serviceApiKey) for sending traces. Provide either teamId (existing team) or newTeamName (creates a
+    new team). Requires project:create permission.
 
     Args:
         body (CreateProjectBody):
@@ -144,9 +144,9 @@ async def asyncio_detailed(
 ) -> Response[Any | CreateProjectResponse201]:
     """Create a project
 
-     Create a new project in the organization. Returns the project with its API key (sk-lw-...) for
-    sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires
-    project:create permission.
+     Create a new project in the organization. Returns the project with a newly minted service API key
+    (serviceApiKey) for sending traces. Provide either teamId (existing team) or newTeamName (creates a
+    new team). Requires project:create permission.
 
     Args:
         body (CreateProjectBody):
@@ -175,9 +175,9 @@ async def asyncio(
 ) -> Any | CreateProjectResponse201 | None:
     """Create a project
 
-     Create a new project in the organization. Returns the project with its API key (sk-lw-...) for
-    sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires
-    project:create permission.
+     Create a new project in the organization. Returns the project with a newly minted service API key
+    (serviceApiKey) for sending traces. Provide either teamId (existing team) or newTeamName (creates a
+    new team). Requires project:create permission.
 
     Args:
         body (CreateProjectBody):

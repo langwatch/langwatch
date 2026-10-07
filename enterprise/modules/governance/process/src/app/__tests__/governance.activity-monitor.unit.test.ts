@@ -13,7 +13,7 @@ import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
-import type { ProjectApi } from "@langwatch/project-contract";
+import type { InternalProject, ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
@@ -51,6 +51,7 @@ function planOfType(type: string): Plan {
 async function buildApp(
   planType: string,
   seed: Record<string, Partial<ActivityMonitorSnapshot>> = {},
+  traces: Partial<TraceApi> = {},
 ) {
   const plansAsked: unknown[] = [];
   const activity = MemoryActivityMonitorRepository.create({ seed });
@@ -59,7 +60,10 @@ async function buildApp(
     repositories: { ...MemoryGovernanceRepositories.create(), activityMonitor: activity },
     dependencies: {
       agents: createApiFixture<AgentApi>(),
-      projects: createApiFixture<ProjectApi>({ findInternal: async () => null }),
+      projects: createApiFixture<ProjectApi>({
+        findInternal: async () =>
+          traces.findAttributedSpendByValue ? ({ id: "gov-project" } as InternalProject) : null,
+      }),
       auth: createApiFixture<AuthApi>(),
       entitlements: createApiFixture<EntitlementApi>({
         getActivePlan: async (input) => {
@@ -71,7 +75,7 @@ async function buildApp(
       permissions: createApiFixture<AuthzApi>(),
       scim: createApiFixture<ScimApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
-      traces: createApiFixture<TraceApi>(),
+      traces: createApiFixture<TraceApi>(traces),
       apiKeys: createApiFixture<ApiKeyApi>(),
       gateway: createApiFixture<GatewayApi>(),
       enterpriseGateway: createApiFixture<EnterpriseGatewayApi>(),
@@ -88,21 +92,27 @@ async function buildApp(
 }
 
 const user = (actor: string) => ({
-  actor,
-  spendUsd: "1.00",
+  value: actor,
+  spentUsd: "1.00",
   requests: 1,
-  lastActivityIso: "2026-09-01T00:00:00.000Z",
-  trendVsPreviousPct: 0,
-  hasPriorBaseline: false,
-  mostUsedTarget: null,
+  lastOccurredAtMs: Date.parse("2026-09-01T00:00:00.000Z"),
+  firstModel: "",
 });
 
 describe("the activity monitor", () => {
   describe("given an organization on the Enterprise plan", () => {
-    it("pages its spend by user, resolving the plan as the signed-in person", async () => {
-      const { app, plansAsked } = await buildApp("ENTERPRISE", {
-        "org-1": { spendByUser: [user("a"), user("b"), user("c")] },
-      });
+    it("pages its spend by user through trace, resolving the plan as the signed-in person", async () => {
+      const pagesAsked: unknown[] = [];
+      const { app, plansAsked } = await buildApp(
+        "ENTERPRISE",
+        {},
+        {
+          findAttributedSpendByValue: async (input) => {
+            pagesAsked.push({ limit: input.limit, offset: input.offset });
+            return [user("b")];
+          },
+        },
+      );
 
       const rows = await app.activitySpendByUser(
         { organizationId: "org-1", windowDays: 30, limit: 1, offset: 1 },
@@ -110,6 +120,7 @@ describe("the activity monitor", () => {
       );
 
       expect(rows.map((row) => row.actor)).toEqual(["b"]);
+      expect(pagesAsked).toEqual([{ limit: 1, offset: 1 }]);
       expect(plansAsked).toEqual([{ organizationId: "org-1", operator: { id: "user-1" } }]);
     });
 

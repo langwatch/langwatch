@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ApiKeyApi`)
 
-Peers call these through the token, declared at `../contract/src/api-key.api.ts:83`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/api-key.api.ts:84`; nothing else in this package is public.
 
 #### `create`
 
@@ -240,10 +240,10 @@ revokeCliLoginKeysForDevice(input: { userId: string; organizationId: string; dev
 
 #### `revokeCliSessionKey`
 
-A person revoking one of their own CLI sessions: main's `revokeSessionKey`, counted.
+Retires a CLI session's login key and the keys under it: main's `revokeSessionKey`, counted. `cause` defaults to `user` (a person revoking it); auth's refused refresh passes `expired` or `offboarded`.
 
 ```typescript
-revokeCliSessionKey(input: { apiKeyId: string; userId: string; organizationId: string; }): Promise<CliSessionKeyRevocation>;
+revokeCliSessionKey(input: { apiKeyId: string; userId: string; organizationId: string; cause?: CliSessionRevocationCause; }): Promise<CliSessionKeyRevocation>;
 ```
 
 #### `applySessionCeiling`
@@ -490,9 +490,9 @@ Declared at `src/eventing/api-key.pipeline.ts:85`.
 
 | Kind   | Leaf                 | Environment variable          | Declared at                  |
 | ------ | -------------------- | ----------------------------- | ---------------------------- |
-| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:161` |
-| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:162` |
-| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:163` |
-| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:165` |
+| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:162` |
+| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:163` |
+| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:164` |
+| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:166` |
 
 <!-- readme:generated:end -->

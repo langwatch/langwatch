@@ -7,7 +7,9 @@
 import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
 import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
 import { useLent } from "@langwatch/browser-host/lent";
-import { ProjectSwitcherToken, type ProjectSwitcherProps } from "@langwatch/project-contract";
+import { ProjectSwitcherToken } from "@langwatch/project-client";
+import type { ProjectSwitcherProps } from "@langwatch/project-contract";
+import type { Instant } from "@langwatch/time";
 import { Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
@@ -44,7 +46,7 @@ class CapabilityAuthorizeHost extends AuthorizeHostApi {
       query: Readonly<Record<string, string | undefined>>;
       navigate: (to: string) => void;
       replace: (to: string) => void;
-      mintProjectToken: () => Promise<string | undefined>;
+      mintProjectToken: (input: { expiresAt: Instant | undefined }) => Promise<string | undefined>;
       Switcher: ComponentType<ProjectSwitcherProps> | undefined;
       succeeded: (notice: AuthorizeSuccessNotice) => void;
       failed: (failure: AuthorizeFailureNotice) => void;
@@ -78,8 +80,8 @@ class CapabilityAuthorizeHost extends AuthorizeHostApi {
     if (typeof window !== "undefined") window.location.assign(url);
   }
 
-  mintProjectToken(): Promise<string | undefined> {
-    return this.deps.mintProjectToken();
+  mintProjectToken(input: { expiresAt: Instant | undefined }): Promise<string | undefined> {
+    return this.deps.mintProjectToken(input);
   }
 
   /** The switcher project lends by token (ARCHITECTURE §10), drawn inside the card. */
@@ -149,7 +151,7 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
         query: Object.fromEntries(new URLSearchParams(location.search).entries()),
         navigate: (to) => navigation.navigate(to),
         replace: (to) => navigation.replace(to),
-        mintProjectToken: async () => {
+        mintProjectToken: async ({ expiresAt }) => {
           const { organizationId, projectId } = activeScope;
           if (!organizationId || !projectId) return void 0;
           const held = (standing.data ?? (await refetchStanding()).data)?.permissions ?? [];
@@ -160,8 +162,11 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
             );
           }
           try {
-            return (await mintToken(projectTokenInput({ organizationId, projectId, permissions })))
-              .token;
+            return (
+              await mintToken(
+                projectTokenInput({ organizationId, projectId, permissions, expiresAt }),
+              )
+            ).token;
           } finally {
             resetMint();
           }

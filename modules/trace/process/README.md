@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Public Trace operations shared by process peers after boot composition.
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:145`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:161`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -166,7 +166,7 @@ findSummary(input: TraceSummaryLookupInput): Promise<TraceSummaryData | null>;
 #### `listTraces`
 
 ```typescript
-listTraces(input: { query: TraceLegacyListInput; protections: unknown; options?: { dateField?: TraceDateField; downloadMode?: boolean; includeSpans?: boolean; resolveBlobs?: boolean; scrollId?: string | null; /** The v1 REST search's compiled query-language filter, ANDed into the read. */ filterWhere?: { sql: string; params: Record<string, unknown> }; }; }): Promise<TracesForProjectResult>;
+listTraces(input: { query: TraceLegacyListInput; protections: unknown; options?: { dateField?: TraceDateField; downloadMode?: boolean; includeSpans?: boolean; resolveBlobs?: boolean; scrollId?: string | null; /** The v1 REST search's compiled query-language filter, ANDed into the read. */ filterWhere?: { sql: string; params: Record<string, unknown> }; /** Refuse above this plan bound instead of clamping to the list bound. */ refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax"; }; }): Promise<TracesForProjectResult>;
 ```
 
 #### `listTraceSummaries`
@@ -533,6 +533,70 @@ The project's newest traces carrying the attribute, at most `limit`; `model` is 
 findAttributedTraces(input: { projectId: string; attributeKey: string; window: TraceModelSpendWindow; values?: string[]; model?: string; limit: number; }): Promise<TraceAttributedTrace[]>;
 ```
 
+#### `getAttributedSpendComparison`
+
+Current and previous window spend of the traces matching every attribute; distinct actors.
+
+```typescript
+getAttributedSpendComparison(input: { projectId: string; matches: readonly TraceAttributeMatch[]; actorKey: string; previousStartMs: number; currentStartMs: number; endMs: number; }): Promise<TraceAttributedSpendComparison>;
+```
+
+#### `findAttributedSpendByValue`
+
+Spend per non-empty `valueKey` value of the matching traces, sorted and paged in the store.
+
+```typescript
+findAttributedSpendByValue(input: { projectId: string; matches: readonly TraceAttributeMatch[]; valueKey: string; window: TraceModelSpendWindow; sortBy: TraceAttributedSpendSort; sortDirection: "asc" | "desc"; limit: number; offset: number; }): Promise<TraceAttributedValueSpend[]>;
+```
+
+#### `findAttributedSpendComparisonByValue`
+
+Per non-empty `valueKey` value, spend split at `currentStartMs`; unsorted.
+
+```typescript
+findAttributedSpendComparisonByValue(input: { projectId: string; matches: readonly TraceAttributeMatch[]; valueKey: string; previousStartMs: number; currentStartMs: number; endMs: number; }): Promise<TraceAttributedValueComparison[]>;
+```
+
+#### `findSpendByProjectAndValue`
+
+Spend per (project, `valueKey` value) across one organisation's projects; unsorted.
+
+```typescript
+findSpendByProjectAndValue(input: { projectIds: readonly string[]; valueKey: string; window: TraceModelSpendWindow; }): Promise<TraceProjectValueSpend[]>;
+```
+
+#### `findDailyAttributedSpend`
+
+Spend of the matching traces per UTC day and group value, oldest day first.
+
+```typescript
+findDailyAttributedSpend(input: { projectId: string; matches: readonly TraceAttributeMatch[]; groupBy: TraceDailySpendGroup; window: TraceModelSpendWindow; }): Promise<TraceDailyGroupSpend[]>;
+```
+
+#### `countAttributedTracesByValue`
+
+Matching traces since `sinceMs`, counted per `valueKey` value among `values`.
+
+```typescript
+countAttributedTracesByValue(input: { projectId: string; matches: readonly TraceAttributeMatch[]; valueKey: string; values: readonly string[]; sinceMs: number; }): Promise<{ value: string; count: number }[]>;
+```
+
+#### `findAttributedTracesBefore`
+
+The newest matching traces before `beforeMs`, at most `limit`, with the asked attributes.
+
+```typescript
+findAttributedTracesBefore(input: { projectId: string; matches: readonly TraceAttributeMatch[]; attributeKeys: readonly string[]; beforeMs: number; limit: number; }): Promise<TraceAttributedTraceDetail[]>;
+```
+
+#### `getAttributedTraceRecency`
+
+Matching trace counts since each of `countSinceMs`, and their newest occurrence ever.
+
+```typescript
+getAttributedTraceRecency(input: { projectId: string; matches: readonly TraceAttributeMatch[]; countSinceMs: readonly number[]; }): Promise<TraceAttributedRecency>;
+```
+
 #### `readRecentSpansByModels`
 
 ```typescript
@@ -637,8 +701,10 @@ readTraceList(params: { tenantId: string; timeRange: { from: number; to: number 
 
 #### `readSessionGroups`
 
+One page of the Sessions lens through the viewer's protections: content redacted and spend gated, with `codingAgent` left null for coding-agent, which serves the lens, to fill and gate.
+
 ```typescript
-readSessionGroups(params: unknown): Promise<unknown>;
+readSessionGroups(input: TraceSessionGroupsInput & { protections: Protections }): Promise<TracesSessionsPage>;
 ```
 
 #### `readFilteredFacets`
@@ -877,6 +943,14 @@ Lifts a log record's attributes into Trace's canonical names.
 canonicalizeLogRecord(input: CanonicalizeLogRecordInput): CanonicalizeLogRecordResult;
 ```
 
+#### `canonicalizeSpanAttributes`
+
+Lifts a decoded span's attributes and events into Trace's canonical names, as ingest does.
+
+```typescript
+canonicalizeSpanAttributes(input: CanonicalizeSpanAttributesInput): CanonicalizeSpanAttributesResult;
+```
+
 #### `extractLogRecordIO`
 
 A log record's input and output, each cut to Trace's 64 KiB projection preview.
@@ -1001,66 +1075,66 @@ Answers at `/api/collector`.
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/otlp-ingest.rest.ts:318` |
+| Declared at | `src/transport/otlp-ingest.rest.ts:328` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | project                                 |
 
 #### `POST /api/otel/v1/traces` · `ingestOtlpTraces`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:323`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:333`.
 
 Answers at `/api/otel/v1/traces`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:324)
-// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:327)
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:334)
+// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:337)
 ```
 
 #### `POST /:otlpBase{.+}/v1/traces` · `ingestOtlpTracesAlias`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:345`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:355`.
 
 Answers at `/:otlpBase{.+}/v1/traces`.
 
 ```typescript
 type Params = z.infer<typeof otlpTraceAliasParamsSchema>; // ../contract/src/otlp-ingest.rest.ts:11
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:347)
-// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:350)
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:357)
+// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:360)
 ```
 
 #### `POST /:otlpBase{.+}/v1/traces/` · `ingestOtlpTracesAliasSlash`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:360`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:370`.
 
 Answers at `/:otlpBase{.+}/v1/traces/`.
 
 ```typescript
 type Params = z.infer<typeof otlpTraceAliasParamsSchema>; // ../contract/src/otlp-ingest.rest.ts:11
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:362)
-// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:365)
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:372)
+// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:375)
 ```
 
 #### `POST /v1/traces` · `ingestOtlpTracesRootV1`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:375`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:385`.
 
 Answers at `/v1/traces`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:376)
-// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:379)
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:386)
+// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:389)
 ```
 
 #### `POST /v1/traces/` · `ingestOtlpTracesRootV1Slash`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:389`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:399`.
 
 Answers at `/v1/traces/`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:390)
-// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:393)
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:400)
+// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:403)
 ```
 
 ### `traceExportRest`
@@ -1291,7 +1365,7 @@ Contract `../contract/src/export-progress.trpc.ts:20`, router `src/transport/exp
 
 ### `sharedTrace`
 
-Contract `../contract/src/traces.trpc.ts:601`, router `src/transport/shared-trace.trpc.ts:30`.
+Contract `../contract/src/traces.trpc.ts:608`, router `src/transport/shared-trace.trpc.ts:30`.
 
 | Procedure         | Kind  | Gate                                                                                                                                                | Input                       | Output                 |
 | ----------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ---------------------- |
@@ -1299,7 +1373,7 @@ Contract `../contract/src/traces.trpc.ts:601`, router `src/transport/shared-trac
 
 ### `spans`
 
-Contract `../contract/src/traces.trpc.ts:610`, router `src/transport/spans.trpc.ts:10`.
+Contract `../contract/src/traces.trpc.ts:617`, router `src/transport/spans.trpc.ts:10`.
 
 | Procedure                  | Kind  | Gate                     | Input              | Output                   |
 | -------------------------- | ----- | ------------------------ | ------------------ | ------------------------ |
@@ -1331,7 +1405,7 @@ Contract `../contract/src/traces-instant-eval.trpc.ts:20`, router `src/transport
 
 ### `traces`
 
-Contract `../contract/src/traces.trpc.ts:144`, router `src/transport/traces.trpc.ts:51`.
+Contract `../contract/src/traces.trpc.ts:159`, router `src/transport/traces.trpc.ts:47`.
 
 | Procedure                              | Kind         | Gate                       | Input                               | Output                             |
 | -------------------------------------- | ------------ | -------------------------- | ----------------------------------- | ---------------------------------- |
@@ -1352,7 +1426,6 @@ Contract `../contract/src/traces.trpc.ts:144`, router `src/transport/traces.trpc
 | `traces.getAllForDownload`             | mutation     | Permission `traces:view`   | inline                              | `tracesForProjectResultSchema`     |
 | `traces.onTraceUpdate`                 | subscription | Permission `traces:view`   | inline                              | inline                             |
 | `traces.list`                          | query        | Permission `traces:view`   | inline                              | `tracesListPageSchema`             |
-| `traces.sessions`                      | query        | Permission `traces:view`   | inline                              | `tracesSessionsPageSchema`         |
 | `traces.listEvents`                    | query        | Permission `traces:view`   | inline                              | `tracesListEventsSchema`           |
 | `traces.newCount`                      | query        | Permission `traces:view`   | inline                              | `tracesNewCountSchema`             |
 | `traces.suggest`                       | query        | Permission `traces:view`   | inline                              | `tracesSuggestSchema`              |
@@ -1426,11 +1499,11 @@ Declared at `src/eventing/trace-project-milestones.pipeline.ts:21`. Events: `fir
 
 ## Configuration
 
-| Kind   | Leaf                       | Environment variable           | Declared at                              |
-| ------ | -------------------------- | ------------------------------ | ---------------------------------------- |
-| config | `spanProcessingShards`     | `TRACE_SPAN_PROCESSING_SHARDS` | `../contract/src/trace.constants.ts:193` |
-| config | `tokenizer.bpeDirectory`   | `TIKTOKENS_PATH`               | `../contract/src/trace.constants.ts:195` |
-| config | `tokenizer.fetchTimeoutMs` | `TIKTOKEN_FETCH_TIMEOUT_MS`    | `../contract/src/trace.constants.ts:196` |
-| config | `publicBaseUrl`            | `BASE_HOST`                    | `../contract/src/trace.constants.ts:201` |
+| Kind   | Leaf                       | Environment variable           | Declared at                          |
+| ------ | -------------------------- | ------------------------------ | ------------------------------------ |
+| config | `spanProcessingShards`     | `TRACE_SPAN_PROCESSING_SHARDS` | `../contract/src/trace.config.ts:9`  |
+| config | `tokenizer.bpeDirectory`   | `TIKTOKENS_PATH`               | `../contract/src/trace.config.ts:11` |
+| config | `tokenizer.fetchTimeoutMs` | `TIKTOKEN_FETCH_TIMEOUT_MS`    | `../contract/src/trace.config.ts:12` |
+| config | `publicBaseUrl`            | `BASE_HOST`                    | `../contract/src/trace.config.ts:17` |
 
 <!-- readme:generated:end -->

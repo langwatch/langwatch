@@ -1,6 +1,7 @@
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -65,6 +66,7 @@ function worker() {
         getActivePlan: async () => entitledPlan,
         requestBound: async () => 10,
       }),
+      gateway: createApiFixture<GatewayApi>({}),
       project: createApiFixture<ProjectApi>({ listIdsByOrganization: async () => [] }),
     });
 }

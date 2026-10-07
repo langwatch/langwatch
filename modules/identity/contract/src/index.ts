@@ -4,6 +4,7 @@
  * just the vocabulary, shapes, reducer and refusal errors both must agree on.
  */
 export {
+  accountLivenessKey,
   type BackfillDiff,
   type BackfillIdentifierRow,
   backfillParityDiffs,

@@ -1,57 +1,50 @@
 {{/*
-  The pre-roll migration gate (ADR-155).
+  The pre-roll upgrade (ADR-155; specs/upgrade/entry-points.feature).
 
   Why. A migration is never breaking: it is applied to the live database while
   the PREVIOUS image is still serving, and the new image must work on the old
-  schema until its own migration has run. That contract only buys anything if
-  the order is actually fixed, and until this hook it was not. Both the app and
-  the workers container run `start:prepare:db` themselves on boot, so on a helm
-  upgrade the migration ran inside whichever new pod won the advisory lock,
-  concurrently with the old pods still serving and with each other. Three
-  consequences, all of them things operators have hit:
+  schema until its own migration has run. The api and the workers never
+  migrate: at boot they read the upgrade ledger and refuse by name, naming the
+  outstanding steps and `pnpm task upgrade`, when a blocking step of their
+  image is not done. Something has to run the upgrade before they roll, once,
+  and this Job is that something.
 
-    - a migration that fails takes the new pod into CrashLoopBackOff rather
-      than stopping the upgrade, and the error is one line inside a restarting
-      container's log;
-    - the app and the workers race for the lock, so the loser's startupProbe
-      budget is spent waiting on the winner's DDL;
-    - nothing in the release says when the schema changed, so "was the schema
-      already migrated when that request failed?" cannot be answered.
-
-  What this does. One Job, on the NEW image, running only the migration tasks,
-  before helm applies any Deployment. It is fail-closed: a migration that fails
-  stops the upgrade with the new image never rolled and the old one still
-  serving the old schema, which is the state an operator can reason about. The
-  containers' own `start:prepare:db` stays exactly as it was and becomes a
-  no-op second pass — that is what keeps a first install, a non-helm install
-  and `docker compose` working unchanged.
+  What this does. One Job, on the NEW image, running only the upgrade (the
+  api's `start:prepare:db`: `pnpm task upgrade`, then the system-migrations
+  pass), before helm applies any Deployment. It is fail-closed: an upgrade that
+  fails stops the helm upgrade with the new image never rolled and the old one
+  still serving the old schema, which is the state an operator can reason
+  about. `upgrade` takes its own lease, so a second runner waits, then exits
+  naming the holder.
 
   Scope. pre-upgrade only, deliberately:
     - not pre-install: helm applies hook resources before the rest of the
       manifests, so on a first install the Secrets this Job reads do not exist
-      yet. The app container migrates on first boot, as it always has.
+      yet. On a first install the api's first boot finds an empty ledger on an
+      empty schema and runs the upgrade once itself (Q10); the workers refuse
+      and restart until it is done.
     - not pre-rollback: a rollback must never run migrations. Rolling back to
       the previous image on the migrated schema is precisely what the
       expand/contract rules guarantee, and a "down" migration is not how the
       way back works here.
 
   ArgoCD and Flux map pre-upgrade to PreSync and will run this on every sync,
-  including the first. Both migration runners are idempotent (prisma keeps its
-  applied-checksum table, goose its version table) and hold an advisory lock,
-  so a redundant run is a no-op that exits 0.
+  including the first. `upgrade` is idempotent, so a redundant run is a no-op
+  that exits 0.
 
-  Opt out with `app.migrations.preRoll: false`, for an operator who applies
-  migrations themselves as a separate pipeline step. They then still run inside
-  the containers on boot, so nothing is skipped by turning this off.
+  Opt out with `app.migrations.preRoll: false`, for an operator who runs the
+  upgrade as a separate pipeline step. Nothing else runs it on an upgrade then:
+  until the operator runs `pnpm task upgrade` from the new image, the new pods
+  refuse to start, by name.
 */}}
 {{- $preRoll := dig "migrations" "preRoll" true .Values.app }}
 {{- if $preRoll }}
 {{- $name := printf "%s-migrate-pre-roll" .Release.Name }}
-{{/* The migration sequence can legitimately take a long time on a large
-     installation, and a deadline shorter than the work turns a slow migration
-     into a failed upgrade half way through the DDL. The app's own startupProbe
-     budget is 40 minutes for the same sequence plus a boot, so this default
-     sits just under it. */}}
+{{/* The upgrade can legitimately take a long time on a large installation,
+     and a deadline shorter than the work turns a slow migration into a failed
+     upgrade half way through the DDL. The app's startupProbe budget is 40
+     minutes, which a first install spends on the same upgrade plus a boot, so
+     this default sits just under it. */}}
 {{- $deadline := dig "migrations" "preRollTimeoutSeconds" 2100 .Values.app }}
 apiVersion: batch/v1
 kind: Job
@@ -104,10 +97,10 @@ spec:
             {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 12 }}
           image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
           imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
-          # The migration half of the app's own start script, and nothing else:
-          # no listener, no queues, no projections. A serving process holding
-          # DDL locks is how deploys die (ARCHITECTURE.md §7). The image has no
-          # workspace root package.json, so it runs from the api like the app.
+          # The upgrade and nothing else: no listener, no queues, no
+          # projections. A serving process holding DDL locks is how deploys
+          # die (ARCHITECTURE.md §7). The image has no workspace root
+          # package.json, so it runs the api's one preparation script.
           workingDir: /app/apps/api
           command: ["pnpm"]
           args: ["-s", "run", "start:prepare:db"]

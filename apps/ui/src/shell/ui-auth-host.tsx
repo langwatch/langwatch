@@ -8,7 +8,7 @@ import type {
   AuthFailureNotice,
   AuthPublicEnvironment,
   AuthRouteReading,
-} from "@langwatch/auth-browser/auth";
+} from "@langwatch/auth-contract";
 import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
 import { readPublicAppConfig } from "@langwatch/browser/public-config";
 import { UiRouteOutlet } from "@langwatch/browser/route-objects";

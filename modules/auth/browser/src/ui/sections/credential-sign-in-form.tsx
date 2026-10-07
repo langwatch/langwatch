@@ -1,16 +1,16 @@
 import "../../model/ambient.d.ts";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "@langwatch/browser-host/link";
-import { Alert, Box, Button, Input, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Box, Input, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 
 import { attemptCredentialSignIn } from "../../behavior/attempt-credential-sign-in.ts";
 import { authApi as api } from "../../behavior/auth-api.ts";
+import { useFocusWhenSettled } from "../../behavior/use-focus-when-settled.ts";
 
 import "../elements/auth-front-door.css";
-import { useFocusWhenSettled } from "../../behavior/use-focus-when-settled.ts";
 import { useRetryCountdown } from "../../behavior/use-retry-countdown.ts";
 import { forgotPasswordHref } from "../../model/carried-email.ts";
 import { describeRemainingWait } from "../../model/credential-sign-in.ts";
@@ -19,6 +19,7 @@ import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
 import { startTwoStepChallenge } from "../../model/two-step-challenge.ts";
 import { EmailPill } from "../elements/email-pill.tsx";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../elements/front-door-field.tsx";
+import { FrontDoorPrimaryButton } from "../elements/front-door-primary-button.tsx";
 import { PasswordInput } from "../elements/password-input.tsx";
 
 const credentialSchema = z.object({
@@ -233,21 +234,13 @@ export function CredentialSignInForm({
             </Alert.Content>
           </Alert.Root>
         ) : null}
-        <Button
-          className="lw-front-door-primary"
+        <FrontDoorPrimaryButton
           type="submit"
-          width="full"
-          minHeight="44px"
-          fontWeight={600}
-          borderRadius={SHAPE.action}
-          backgroundColor={"frontDoor.action"}
-          color={"frontDoor.onAction"}
-          _hover={{ backgroundColor: "frontDoor.actionHover" }}
-          loading={isSubmitting}
-          disabled={secondsToWait !== null}
+          isBusy={isSubmitting}
+          isDisabled={secondsToWait !== null}
         >
           Log in
-        </Button>
+        </FrontDoorPrimaryButton>
       </VStack>
     </form>
   );

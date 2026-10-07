@@ -62,15 +62,35 @@ type TrpcParity struct {
 var acceptedNamespaceMoves = map[string]string{"tracesV2": "traces"}
 
 // acceptedProcedureMoves are single procedures ruled onto a new path: record
-// §3 (5bcdf4ee97) moved the coding-agent reads to their owner's namespace.
+// §3 (5bcdf4ee97) moved the coding-agent reads to their owner's namespace;
+// 26fe096afb (Alex) renamed role bindings to grants and moved them to authz;
+// rulings-2026-10-05 T1 D1 (5c57a04c5f) moved the Sessions lens to coding-agent.
 var acceptedProcedureMoves = map[string]string{
 	"tracesV2.codingAgentSession":    "codingAgents.session",
 	"tracesV2.codingAgentTranscript": "codingAgents.transcript",
+	"tracesV2.sessions":              "codingAgents.sessionGroups",
+
+	"roleBinding.listForOrg":          "authz.listManagedGrants",
+	"roleBinding.listForUser":         "authz.listMemberGrants",
+	"roleBinding.create":              "authz.createGrant",
+	"roleBinding.update":              "authz.changeGrantRole",
+	"roleBinding.delete":              "authz.revokeGrant",
+	"roleBinding.applyMemberBindings": "authz.applyMemberGrants",
+	"group.addBinding":                "group.addGrant",
+	"group.removeBinding":             "group.removeGrant",
+	"team.getTeamsWithRoleBindings":   "team.getTeamsWithGrants",
 }
 
-// retiredProcedures are main procedures ruled out of the branch (Alex,
-// 2026-09-25: the browser's public config is injected into the HTML).
-var retiredProcedures = map[string]bool{"publicEnv": true}
+// retiredProcedures are main procedures ruled out of the branch: publicEnv
+// (Alex, 2026-09-25: the browser's public config is injected into the HTML),
+// the project key reads (api-key ADR-002:58) and getMyAccessBreakdown (no
+// tRPC successor; main's browser never called it, only a REST handler did).
+var retiredProcedures = map[string]bool{
+	"publicEnv":                        true,
+	"project.getProjectAPIKey":         true,
+	"project.regenerateApiKey":         true,
+	"roleBinding.getMyAccessBreakdown": true,
+}
 
 // movedPath is where an accepted namespace move put a main procedure path.
 func movedPath(path string) (string, bool) {

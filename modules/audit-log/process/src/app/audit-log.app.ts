@@ -16,6 +16,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import { type AuditLogPipeline, buildAuditLogPipeline } from "../eventing/audit-log.pipeline.ts";
 import type { AuditLogRepositories } from "../repositories/audit-log.repositories.ts";
 import { AuditLogService } from "../services/audit-log.service.ts";
 import { RecentItemsService } from "../services/recent-items.service.ts";
@@ -72,6 +73,11 @@ export class AuditLogModule implements AuditLogApi, AuditLogHomeApi {
         owners: dependencies,
       }),
     });
+  }
+
+  /** The pipeline whose peer subscribers write organization's audit facts as rows. */
+  factsPipeline(): AuditLogPipeline {
+    return buildAuditLogPipeline({ entries: this.#entries });
   }
 
   record(command: RecordAuditLogCommand): Promise<RecordedAuditLogEntry> {

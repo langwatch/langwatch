@@ -69,6 +69,8 @@ describe("given a module that declares other modules' Apis as peers", () => {
      * @scenario "A process installing agent without the modules it needs refuses to boot"
      * @scenario "A module whose collaborating module is not installed refuses to boot"
      * @scenario "A process installing a module that needs authorization without the authz module refuses to boot"
+     * @scenario "A process missing a module the record needs refuses to boot by name"
+     * @scenario "A deployment that did not install a needed module refuses to boot by name"
      */
     it("refuses the boot naming the module and the peer, and constructs nothing", async () => {
       const constructed: string[] = [];

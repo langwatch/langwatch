@@ -1,3 +1,5 @@
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import Redis from "ioredis";
 import { describe, expect, it, vi } from "vitest";
 
@@ -5,6 +7,7 @@ import { MemoryAnomalyRateTrackerRepository } from "../../repositories/memory/me
 import { MemoryAnomalyStateRepository } from "../../repositories/memory/memory.anomaly-state.repository.ts";
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
 import { RedisOpsMetricsRepository } from "../../repositories/redis/redis.ops-metrics.repository.ts";
+import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules.ts";
 import { AnomalyDetectorService } from "../anomaly-detector.service.ts";
 import { OpsMetricsCollectorService } from "../ops-metrics-collector.service.ts";
 import { OpsMetricsTestAdapter } from "./ops-metrics.fixture.ts";
@@ -25,7 +28,7 @@ function metricsRedis(): Redis {
 }
 
 /** The writer and the detector over one memory store, on a clock the test moves. */
-function fleet() {
+function fleet(featureFlags?: Pick<FeatureFlagApi, "isEnabled">) {
   const clock = { now: Date.UTC(2026, 8, 23, 12, 0, 0) };
   const store = MemoryOpsStore.create();
   const rateTracker = MemoryAnomalyRateTrackerRepository.create({ store, now: () => clock.now });
@@ -35,6 +38,7 @@ function fleet() {
     metrics: RedisOpsMetricsRepository.create({ redis: metricsRedis() }),
     ops,
     rateTracker,
+    featureFlags,
     snapshots: null,
   });
   const detector = AnomalyDetectorService.create({
@@ -114,6 +118,45 @@ describe("the queue-metrics writer feeding anomaly detection", () => {
         expect(store.anomalies.get("rate_breaker:proj_runaway")?.tier).toBe("surface");
         expect(store.anomalies.get("rate_breaker:proj_quiet")).toBeUndefined();
       });
+    });
+  });
+
+  describe("given the anomaly kill switch is on for one tenant", () => {
+    /**
+     * @scenario "Kill-switch FF keeps a killed tenant's backlog out of the rate tracker"
+     * @scenario "A killed tenant's backlog is not counted by the rate tracker"
+     */
+    it("counts only the tenant whose switch is off", async () => {
+      const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>(
+        async (_key, target) => target.kind === "project" && target.projectId === "proj_killed",
+      );
+      const { writer, rateTracker, scanOnce } = fleet(
+        createApiFixture<FeatureFlagApi>({ isEnabled }, "writer flags"),
+      );
+      await writer.discoverQueues();
+
+      await scanOnce({ proj_killed: 4, proj_open: 9 });
+
+      expect(await rateTracker.findActiveTenants()).toEqual(["proj_open"]);
+      expect(isEnabled).toHaveBeenCalledWith(ANOMALY_DETECTION_KILL_SWITCH_FLAG, {
+        kind: "project",
+        projectId: "proj_killed",
+      });
+    });
+
+    /** @scenario "A killed tenant's backlog is not counted by the rate tracker" */
+    it("counts the tenant when the flag lookup fails", async () => {
+      const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>(async () => {
+        throw new Error("flags down");
+      });
+      const { writer, rateTracker, scanOnce } = fleet(
+        createApiFixture<FeatureFlagApi>({ isEnabled }, "writer flags"),
+      );
+      await writer.discoverQueues();
+
+      await scanOnce({ proj_open: 3 });
+
+      expect(await rateTracker.findActiveTenants()).toEqual(["proj_open"]);
     });
   });
 });

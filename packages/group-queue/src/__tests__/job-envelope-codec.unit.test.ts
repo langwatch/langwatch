@@ -4,7 +4,7 @@ import { detectCompression, MSGPACK_MIN_BYTES } from "../bodyCodec.ts";
 import { decodeJobEnvelope, encodeJobEnvelope, splitEnvelope } from "../jobEnvelope.ts";
 import { createTenantId } from "../storage.ts";
 import { TieredBlobStore } from "../tieredBlobStore.ts";
-import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.ts";
+import { InMemoryJobBlobStore, InMemoryObjectStore, mintTestUri } from "./blob-test-doubles.ts";
 
 const PROJECT = createTenantId("project-codec");
 
@@ -14,6 +14,7 @@ function makeTiered(s3ThresholdBytes = 256 * 1024) {
   const tieredBlobs = new TieredBlobStore({
     redisBlobs,
     objectStoreFor: () => objectStore,
+    mintUri: mintTestUri,
     resolveDestination: async () => ({ kind: "s3", bucket: "test-bucket" }),
     s3ThresholdBytes,
   });

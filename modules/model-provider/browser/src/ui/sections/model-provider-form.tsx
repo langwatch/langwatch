@@ -13,9 +13,9 @@ import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Switch } from "@langwatch/design-system/switch";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import type { EditModelProviderFormProps } from "@langwatch/model-provider-client";
 import {
   skipListToInput,
-  type EditModelProviderFormProps,
   type ModelProviderEditorValue,
   modelProviders as modelProvidersRegistry,
 } from "@langwatch/model-provider-contract";

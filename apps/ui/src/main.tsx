@@ -47,6 +47,7 @@ import { loadUiRootCapabilities, type UiRootCapabilities } from "./shell/ui-root
 import { uiRouteTable } from "./shell/ui-route-table";
 import { uiShellLayouts } from "./shell/ui-shell-layouts";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
+import { lentFirstTouchAttribution } from "./shell/use-analytics-identity";
 import {
   parseUiFeatureConfig,
   uiDeploymentOf,
@@ -70,8 +71,7 @@ const NO_ATTRIBUTION_CAPTURE = () => void 0;
  * reads every landing URL before a navigation can drop its query string.
  */
 const useAttributionCapture =
-  installedUiDeclarations.declared("firstTouchAttribution")[0]?.capability.useCapture ??
-  NO_ATTRIBUTION_CAPTURE;
+  lentFirstTouchAttribution(installedUiDeclarations)?.useCapture ?? NO_ATTRIBUTION_CAPTURE;
 
 function UiAttributionCapture({ children }: { children: ReactNode }) {
   useAttributionCapture();
@@ -113,6 +113,7 @@ function browserUiCapabilitiesHook({
   session: auth,
   scope: organization,
   copyTargets: lending,
+  traceFilters: filtering,
 }: UiRootCapabilities) {
   return function useBrowserUiCapabilities({
     transport,
@@ -121,7 +122,7 @@ function browserUiCapabilitiesHook({
     transport: UiFeatureApiTransport;
     feedback: UiFeedback;
   }): UiSessionCapabilities {
-    const { pathname } = useLocation();
+    const { pathname, search } = useLocation();
     const isPublicRoute = organization.isUiPublicRoute(pathname);
     const sessionReading = auth.useUiSessionReading({ feedback, isPublicRoute });
     const scopeReading = organization.useUiScopeReading({ transport, session: sessionReading });
@@ -138,10 +139,17 @@ function browserUiCapabilitiesHook({
       userId: sessionReading.user?.id,
     });
 
+    const scope = organization.createBrowserUiScope({ reading: scopeReading, session });
+    const traceFilters = filtering.useUiTraceFiltersReading({
+      search,
+      projectId: scope.activeScope().projectId ?? void 0,
+    });
+
     return {
       session,
-      scope: organization.createBrowserUiScope({ reading: scopeReading, session }),
+      scope,
       copyTargets: lending.createBrowserUiCopyTargets({ reading: copyTargets }),
+      traceFilters: filtering.createBrowserUiTraceFilters({ reading: traceFilters }),
     };
   };
 }

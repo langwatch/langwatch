@@ -38,7 +38,9 @@ import { LWQL_CLEAN_DIAGNOSTICS_MEANING } from "../rules/langwatch-ql-diagnostic
  */
 export interface AnalyticsQueryApi {
   runLangWatchQLForKey(
-    input: Readonly<{ reach: LangWatchQLKeyReach } & LangWatchQLStatementRequest>,
+    input: Readonly<
+      { reach: LangWatchQLKeyReach; signal?: AbortSignal } & LangWatchQLStatementRequest
+    >,
   ): Promise<LangWatchQLQueryResult>;
   describeLangWatchQLSchemaForKey(
     input: Readonly<{ reach: LangWatchQLKeyReach }>,
@@ -129,7 +131,9 @@ export const queryRest: Readonly<{
       },
     },
   })
-  .handle(({ app, input }, reach) => app.runLangWatchQLForKey({ reach, ...input }))
+  .handle(({ app, input, signal }, reach) =>
+    app.runLangWatchQLForKey({ reach, ...input, ...(signal ? { signal } : {}) }),
+  )
 
   /**
    * `GET /api/v1/query/schema` — describe what may be queried. A GET, because

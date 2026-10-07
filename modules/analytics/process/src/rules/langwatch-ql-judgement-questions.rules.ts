@@ -8,6 +8,7 @@
 import type {
   LangWatchQLAppFunctionCall,
   LangWatchQLAppFunctionOption,
+  LangWatchQLColumn,
   LangWatchQLJudgementAsked,
   LangWatchQLJudgementCall,
 } from "@langwatch/analytics-contract";
@@ -144,4 +145,27 @@ export function langWatchQLJudgementCalls(
   }
 
   return judgements;
+}
+
+/**
+ * The result's columns with every judged one typed as its eval function answers, not as the
+ * text it was read from: the verdict is what the cell holds once the query has judged.
+ */
+export function langWatchQLJudgedColumns({
+  columns,
+  appFunctions,
+}: {
+  columns: readonly LangWatchQLColumn[];
+  appFunctions: readonly LangWatchQLAppFunctionCall[];
+}): readonly LangWatchQLColumn[] {
+  const judgedTypes = new Map<string, string>();
+  for (const call of appFunctions) {
+    const [definition] = findLangWatchQLAppFunctions(call.function);
+    if (definition?.kind === "eval") judgedTypes.set(call.column, definition.returns);
+  }
+
+  return columns.map((column) => {
+    const type = judgedTypes.get(column.name);
+    return type === undefined ? column : { ...column, type };
+  });
 }
