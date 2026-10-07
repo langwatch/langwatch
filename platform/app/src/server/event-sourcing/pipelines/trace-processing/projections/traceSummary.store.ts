@@ -102,7 +102,7 @@ export class TraceSummaryStore
     // retries a windowed miss without the window, which lands on the
     // repository's resolve-OccurredAt path — so correctness never depends on
     // the width, and no layer runs a second recovery ladder.
-    return await this.repo.findByTraceId({
+    const read = await this.repo.findByTraceId({
       authorization: await this.authorize({
         projectId: String(context.tenantId),
         purpose: foldReadPurpose({ context, entry: "TraceSummaryStore.get" }),
@@ -112,6 +112,10 @@ export class TraceSummaryStore
         ? { window: context.readWindow }
         : {}),
     });
+    if (!read) return null;
+    // The fold state is the summary alone; its tenant is the context's.
+    const { tenantId: _tenantId, ...state } = read;
+    return state;
   }
 }
 

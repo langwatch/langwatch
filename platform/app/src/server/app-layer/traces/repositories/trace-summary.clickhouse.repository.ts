@@ -24,6 +24,7 @@ import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
 import type {
   FindByTraceIdParams,
+  TraceSummaryRead,
   TraceSummaryRepository,
 } from "./trace-summary.repository";
 
@@ -203,7 +204,7 @@ export class TraceSummaryClickHouseRepository
     authorization,
     traceId,
     ...options
-  }: FindByTraceIdParams): Promise<TraceSummaryData | null> {
+  }: FindByTraceIdParams): Promise<TraceSummaryRead | null> {
     // Fold read-back path (ADR-066): an explicit window is applied verbatim
     // with NO internal fallback — the caller (the fold executor) owns the miss
     // retry, so a second recovery ladder here would re-run the resolve seek on
@@ -215,7 +216,7 @@ export class TraceSummaryClickHouseRepository
     if (options.window) {
       const { fromMs, toMs } = options.window;
       try {
-        return await queryWindowed<TraceSummaryData | null>({
+        return await queryWindowed<TraceSummaryRead | null>({
           table: TABLE_NAME,
           hintMs: (fromMs + toMs) / 2,
           windowMs: (toMs - fromMs) / 2,
@@ -267,7 +268,7 @@ export class TraceSummaryClickHouseRepository
     const hasHint = options.occurredAtMs !== undefined;
 
     try {
-      return await queryWindowed<TraceSummaryData | null>({
+      return await queryWindowed<TraceSummaryRead | null>({
         table: TABLE_NAME,
         hintMs: options.occurredAtMs ?? null,
         fallback: "unbounded",
@@ -406,7 +407,7 @@ export class TraceSummaryClickHouseRepository
     authorization: Authorization;
     traceId: string;
     window?: { fromMs: number; toMs: number };
-  }): Promise<TraceSummaryData | null> {
+  }): Promise<TraceSummaryRead | null> {
     const outerTimeFilter = window
       ? "AND t.OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
         "AND t.OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
@@ -492,7 +493,7 @@ export class TraceSummaryClickHouseRepository
     const rows = await result.json<ClickHouseSummaryRecord>();
     const row = rows[0];
     if (!row) return null;
-    return this.fromClickHouseRecord(row);
+    return { ...this.fromClickHouseRecord(row), tenantId: row.TenantId };
   }
 
   private fromClickHouseRecord(

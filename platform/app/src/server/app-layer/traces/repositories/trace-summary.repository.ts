@@ -32,6 +32,14 @@ export type FindByTraceIdParams = {
   traceId: string;
 } & FindByTraceIdOptions;
 
+/**
+ * A summary as one read found it, with the tenant it was read from. A proof
+ * may span several tenants (an aggregate's members), and two of them may
+ * hold the same trace id, so the row says whose it is; the reads that follow
+ * it on a detail page are narrowed to that tenant (ADR-144 block F).
+ */
+export type TraceSummaryRead = TraceSummaryData & { tenantId: string };
+
 export interface TraceSummaryRepository {
   upsert(
     data: TraceSummaryData,
@@ -45,7 +53,7 @@ export interface TraceSummaryRepository {
       retentionDays?: number;
     }>,
   ): Promise<void>;
-  findByTraceId(params: FindByTraceIdParams): Promise<TraceSummaryData | null>;
+  findByTraceId(params: FindByTraceIdParams): Promise<TraceSummaryRead | null>;
 }
 
 export class NullTraceSummaryRepository implements TraceSummaryRepository {
@@ -53,7 +61,7 @@ export class NullTraceSummaryRepository implements TraceSummaryRepository {
 
   async findByTraceId(
     _params: FindByTraceIdParams,
-  ): Promise<TraceSummaryData | null> {
+  ): Promise<TraceSummaryRead | null> {
     return null;
   }
 }
