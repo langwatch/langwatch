@@ -14,6 +14,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import {
   AuthorizedClickHouse,
+  ClickHouseClientUnavailableError,
   expandFragment,
   expandStatement,
   fenceExpression,
@@ -414,6 +415,26 @@ describe("AuthorizedClickHouse", () => {
         });
         expect(sql).toBe("Status = {p0:String}");
         expect(params).toEqual({ p0: "error" });
+      });
+    });
+  });
+
+  describe("given a project whose ClickHouse client cannot be resolved", () => {
+    describe("when a statement is read through the proof", () => {
+      it("fails with the client-unavailable error and sends nothing", async () => {
+        const resolveClient = vi
+          .fn()
+          .mockRejectedValue(new Error("no ClickHouse configured"));
+        const clickhouse = new AuthorizedClickHouse({
+          resolveClient,
+          now: () => NOW,
+        });
+
+        await expect(
+          clickhouse.as(proof(), { reads: "traces" }).query({
+            query: `SELECT 1 FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
+          }),
+        ).rejects.toBeInstanceOf(ClickHouseClientUnavailableError);
       });
     });
   });

@@ -16,7 +16,9 @@ import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import {
   type AuthorizedClickHouse,
+  ClickHouseClientUnavailableError,
   tenantScope,
+  tenantScopeKey,
 } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { safeJsonParse } from "~/utils/safeJsonParse";
@@ -223,9 +225,10 @@ export class TraceEvaluationsClickHouseRepository
    * prunes to the matching granule(s) and the read stays bounded. Grouped by
    * tenant and ordered by it, so on an aggregate the read names one project,
    * the same one every time. Returns null when no project the proof reads
-   * holds the evaluation, or the (already-pruned) read still hits the memory
-   * ceiling: both are "nothing to show", not errors worth failing the caller
-   * over.
+   * holds the evaluation, the project's ClickHouse client cannot be resolved,
+   * or the (already-pruned) read still hits the memory ceiling: all three are
+   * "nothing to show", not errors worth failing the caller over. Any other
+   * query failure still throws.
    */
   async findInputsByEvaluationId({
     authorization,
@@ -257,6 +260,17 @@ export class TraceEvaluationsClickHouseRepository
         inputs: asPlainObject(safeJsonParse(row.Inputs ?? null)),
       };
     } catch (error) {
+      if (error instanceof ClickHouseClientUnavailableError) {
+        logger.warn(
+          {
+            evaluationId,
+            scope: tenantScopeKey({ authorization, reads: "traces" }),
+            error: error.message,
+          },
+          "ClickHouse client unavailable for evaluation inputs read",
+        );
+        return null;
+      }
       if (isMemoryLimitError(error)) {
         logger.warn(
           { evaluationId },

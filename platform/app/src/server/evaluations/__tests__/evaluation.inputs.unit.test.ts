@@ -115,10 +115,29 @@ describe("EvaluationService.getEvaluationInputs", () => {
 
   describe("given ClickHouse is not enabled for the project", () => {
     describe("when its inputs are requested", () => {
-      it("fails the read like any other read that cannot reach ClickHouse", async () => {
+      it("returns null without querying", async () => {
         const service = serviceOverUnavailable(
           new Error("ClickHouse not available for tenant project_test"),
         );
+
+        const result = await service.getEvaluationInputs({
+          protections: CONTENT_VISIBLE,
+          authorization: ownProof({ projectId: "project_test" }),
+          evaluationId: "eval-1",
+        });
+
+        expect(result).toBeNull();
+      });
+    });
+  });
+
+  describe("given a reachable ClickHouse whose query fails", () => {
+    describe("when its inputs are requested", () => {
+      it("fails the read", async () => {
+        const query = vi.fn(async () => {
+          throw new Error("Code: 62. Syntax error");
+        });
+        const service = serviceOver({ query });
 
         await expect(
           service.getEvaluationInputs({
