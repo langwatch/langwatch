@@ -68,6 +68,8 @@ export type AggregateReconcileTrigger =
   | "rule-edited"
   | "personal-workspace"
   | "department-assigned"
+  | "member-offboarded"
+  | "member-project-archived"
   | "nightly-sweep";
 
 const NOTHING: AggregateReconcileResult = {

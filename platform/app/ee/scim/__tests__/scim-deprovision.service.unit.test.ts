@@ -46,16 +46,21 @@ function createSyncLifecycle() {
 describe("ScimDeprovisionService", () => {
   let grants: ReturnType<typeof createGrants>;
   let syncLifecycle: ReturnType<typeof createSyncLifecycle>;
+  let aggregateMembers: { reconcileOrganizationOrLog: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     grants = createGrants();
     syncLifecycle = createSyncLifecycle();
+    aggregateMembers = {
+      reconcileOrganizationOrLog: vi.fn().mockResolvedValue(undefined),
+    };
   });
 
   function service() {
     return new ScimDeprovisionService({
       grants: grants as never,
       syncLifecycle: syncLifecycle as never,
+      aggregateMembers,
     });
   }
 
@@ -73,6 +78,19 @@ describe("ScimDeprovisionService", () => {
         userId: USER,
         organizationId: ORGANIZATION,
       });
+    });
+
+    it("re-reads the organisation's aggregate projects once the removal stands", async () => {
+      await service().removeAccess({
+        userId: USER,
+        organizationId: ORGANIZATION,
+        connectionId: CONNECTION,
+        op: "delete_user",
+      });
+
+      expect(aggregateMembers.reconcileOrganizationOrLog).toHaveBeenCalledWith(
+        { organizationId: ORGANIZATION, trigger: "member-offboarded" },
+      );
     });
   });
 
@@ -117,6 +135,19 @@ describe("ScimDeprovisionService", () => {
         code: "offboard_incomplete",
         httpStatus: 500,
       });
+    });
+
+    it("leaves the aggregate projects alone when the removal is refused", async () => {
+      await service()
+        .removeAccess({
+          userId: USER,
+          organizationId: ORGANIZATION,
+          connectionId: CONNECTION,
+          op: "delete_user",
+        })
+        .catch(() => undefined);
+
+      expect(aggregateMembers.reconcileOrganizationOrLog).not.toHaveBeenCalled();
     });
 
     it("surfaces it as a dead letter naming the person and the operation", async () => {

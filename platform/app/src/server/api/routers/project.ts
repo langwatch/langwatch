@@ -588,7 +588,11 @@ export const projectRouter = createTRPCRouter({
 
       const target = await prisma.project.findUnique({
         where: { id: input.projectToArchiveId },
-        select: { isPersonal: true, kind: true },
+        select: {
+          isPersonal: true,
+          kind: true,
+          team: { select: { organizationId: true } },
+        },
       });
       assertNotGovernanceProject(target?.kind);
       const archiveViolation = personalWorkspaceArchiveViolation(
@@ -602,9 +606,10 @@ export const projectRouter = createTRPCRouter({
         where: { id: input.projectToArchiveId, archivedAt: null },
         data: { archivedAt: new Date() },
       });
-      if (result.count > 0 && isAggregateProjectKind(target?.kind)) {
-        await getApp().projects.stopAggregate({
-          aggregateProjectId: input.projectToArchiveId,
+      if (result.count > 0 && target) {
+        await getApp().projects.afterArchive({
+          project: { id: input.projectToArchiveId, kind: target.kind },
+          organizationId: target.team.organizationId,
         });
       }
       return { success: true, alreadyArchived: result.count === 0 };

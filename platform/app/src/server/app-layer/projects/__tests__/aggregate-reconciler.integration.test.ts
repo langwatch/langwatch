@@ -21,7 +21,7 @@ import {
 import { NullLwqlKeyMapRepository } from "~/server/analytics/lwql/lwqlKeyMap.repository";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { AuthorizationService } from "~/server/app-layer/authz/authorization.service";
 import {
   GrantsLedgerWriter,
@@ -390,6 +390,103 @@ describe("Feature: the reconciler keeps members current", () => {
         expect(after).toEqual(before);
         const live = after.filter((row) => row.revokedAt === null);
         expect(new Set(live.map((row) => row.scopeId)).size).toBe(live.length);
+      });
+    });
+  });
+
+  describe("given aggregate projects that read a member's personal project", () => {
+    /** A member with a personal workspace of their own, as sign-up leaves one. */
+    const memberWithWorkspace = async (handle: string) => {
+      const user = await fixture.makeUser({
+        handle,
+        organizationRole: OrganizationUserRole.MEMBER,
+      });
+      const team = await prisma.team.create({
+        data: {
+          name: `${handle} workspace ${fixture.ns}`,
+          slug: `--test-personal-${handle}-${fixture.ns}`,
+          organizationId: fixture.organizationId,
+          isPersonal: true,
+          ownerUserId: user.id,
+        },
+      });
+      const project = await prisma.project.create({
+        data: {
+          name: `${handle} personal ${fixture.ns}`,
+          slug: `--test-personal-project-${handle}-${fixture.ns}`,
+          apiKey: `test-key-${handle}-${fixture.ns}`,
+          teamId: team.id,
+          language: "python",
+          framework: "openai",
+          isPersonal: true,
+          ownerUserId: user.id,
+        },
+      });
+      return { user, project };
+    };
+
+    describe("when an admin removes that member from the organisation", () => {
+      it("revokes their personal project's read from every aggregate", async () => {
+        const leaver = await memberWithWorkspace("leaver");
+        const everyone = await createAggregate({ kind: "all-personal" });
+        const named = await createAggregate({
+          kind: "explicit",
+          projectIds: [leaver.project.id, fixture.shared.id],
+        });
+        expect(await liveMembersOf(everyone.id)).toContain(leaver.project.id);
+        expect(await liveMembersOf(named.id)).toContain(leaver.project.id);
+
+        await callerFor(fixture.admin.id).organization.deleteMember({
+          organizationId: fixture.organizationId,
+          userId: leaver.user.id,
+        });
+
+        expect(await liveMembersOf(everyone.id)).not.toContain(
+          leaver.project.id,
+        );
+        expect(await liveMembersOf(named.id)).toEqual([fixture.shared.id]);
+      });
+    });
+  });
+
+  describe("given an aggregate project with an explicit list of team projects", () => {
+    describe("when one of those projects is archived from the projects page", () => {
+      it("revokes the archived project's read", async () => {
+        const archived = await fixture.makeTeamProject(
+          `archived-from-page-${nanoid(6)}`,
+        );
+        const aggregate = await createAggregate({
+          kind: "explicit",
+          projectIds: [archived.id, fixture.shared.id],
+        });
+        expect(await liveMembersOf(aggregate.id)).toContain(archived.id);
+
+        await callerFor(fixture.admin.id).project.archiveById({
+          projectId: fixture.shared.id,
+          projectToArchiveId: archived.id,
+        });
+
+        expect(await liveMembersOf(aggregate.id)).toEqual([fixture.shared.id]);
+      });
+    });
+
+    describe("when one of those projects is archived through the project service", () => {
+      it("revokes the archived project's read", async () => {
+        const archived = await fixture.makeTeamProject(
+          `archived-by-service-${nanoid(6)}`,
+        );
+        const aggregate = await createAggregate({
+          kind: "explicit",
+          projectIds: [archived.id, fixture.shared.id],
+        });
+        expect(await liveMembersOf(aggregate.id)).toContain(archived.id);
+
+        await getApp().projects.archive({
+          id: archived.id,
+          organizationId: fixture.organizationId,
+        });
+
+        expect(await liveMembersOf(aggregate.id)).toEqual([fixture.shared.id]);
       });
     });
   });

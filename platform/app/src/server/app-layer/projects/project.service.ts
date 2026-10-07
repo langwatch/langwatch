@@ -668,10 +668,32 @@ export class ProjectService {
 
     const project = await this.repo.archive({ id, organizationId });
     if (!project) throw new ProjectNotFoundError("Project not found");
+    await this.afterArchive({ project, organizationId });
+    return project;
+  }
+
+  /**
+   * ADR-144 block E, what archiving a project means for aggregates. Both
+   * archive paths call this once the row is archived, the tRPC router
+   * included. An archived aggregate stops; any other project may have been
+   * an aggregate's member, which an archived project never is, so the
+   * organisation is reconciled. Never throws: the archive stands.
+   */
+  async afterArchive({
+    project,
+    organizationId,
+  }: {
+    project: Pick<Project, "id" | "kind">;
+    organizationId: string;
+  }): Promise<void> {
     if (isAggregateProjectKind(project.kind)) {
       await this.stopAggregate({ aggregateProjectId: project.id });
+      return;
     }
-    return project;
+    await this.aggregateReconciler?.reconcileOrganizationOrLog({
+      organizationId,
+      trigger: "member-project-archived",
+    });
   }
 
   /**
@@ -681,7 +703,7 @@ export class ProjectService {
    * Never throws: a sweep left running on an archived aggregate reconciles
    * nothing, which is noise, not harm.
    */
-  async stopAggregate({
+  private async stopAggregate({
     aggregateProjectId,
   }: {
     aggregateProjectId: string;
