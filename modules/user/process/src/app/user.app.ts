@@ -2,12 +2,7 @@
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
-import {
-  type CliBootstrapResult,
-  type GovernanceBudgetOverviewForUser,
-  GovernanceRestApi,
-  type PersonalUsageRollup,
-} from "@langwatch/enterprise-governance-contract";
+import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { GatewayApi, type GatewayBudgetCheckResult } from "@langwatch/gateway-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
@@ -77,8 +72,6 @@ import type {
   UserNotificationTopicInput,
   SetUserNotificationPreferenceInput,
   UpdateUserProfileInput,
-  UserApiBudgetOverviewInput,
-  UserApiPersonalUsageInput,
   UserUsageCount,
   UserAvatarRestParams,
   UserAvatarUrl,
@@ -159,10 +152,8 @@ interface UserAppDependencies {
   >;
   /** The budget pre-check the /me banner runs at a projected cost of zero. */
   gateway: Pick<GatewayApi, "checkBudget">;
-  governance: Pick<
-    GovernanceRestApi,
-    "personalUsageDashboard" | "personalBudgetOverview" | "cliBootstrap" | "personalUsage"
-  >;
+  /** The rollup behind /api/me/usage, whose door has yet to move (peer-cycle-cuts B4 U). */
+  governance: Pick<GovernanceRestApi, "personalUsage">;
   organizations: OrganizationApi;
   projects: ProjectApi;
   /** Where avatar bytes are kept, as user-owned objects in a personal project. */
@@ -1002,44 +993,6 @@ export class UserModule implements UserApi {
     ]);
 
     return { lastHomePath, firstProjectSlug };
-  }
-
-  /**
-   * Main checked membership before reading; the window applies only when both
-   * ends are given, otherwise governance defaults to this month.
-   */
-  async getPersonalUsageRollup({
-    userId,
-    organizationId,
-    windowStartMs,
-    windowEndMs,
-  }: UserApiPersonalUsageInput & { userId: string }): Promise<PersonalUsageRollup> {
-    await this.#assertMember({ userId, organizationId });
-
-    return this.#peers.governance.personalUsageDashboard(
-      windowStartMs && windowEndMs
-        ? { organizationId, window: { startMs: windowStartMs, endMs: windowEndMs } }
-        : { organizationId },
-      { id: userId },
-    );
-  }
-
-  /** Membership is re-checked by the gateway itself, answering `no_membership`. */
-  getBudgetOverview({
-    userId,
-    ...input
-  }: UserApiBudgetOverviewInput & { userId: string }): Promise<GovernanceBudgetOverviewForUser> {
-    return this.#peers.governance.personalBudgetOverview(input, { id: userId });
-  }
-
-  getCliBootstrap({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<CliBootstrapResult> {
-    return this.#peers.governance.cliBootstrap({ organizationId }, { id: userId });
   }
 
   // -- the two REST doors ----------------------------------------------------

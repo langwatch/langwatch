@@ -214,33 +214,6 @@ Feature: Canonical user lifecycle
     Then the gateway checks the budget against that key at no projected cost
     And the personal budget answers a warning with the spend and the limit
 
-  # main's user.personalUsage, budgetOverview and cliBootstrap, served from
-  # Enterprise governance. personalUsage checked membership before reading.
-  @unit
-  Scenario: A caller outside the organization cannot read a personal usage rollup
-    Given a user who is not a member of the organization
-    When they read their personal usage in that organization
-    Then the read is refused as not a member of the organization
-    And no usage is read
-
-  @unit
-  Scenario: A member's personal usage reads their own rollup over the window they gave
-    Given a member of the organization
-    When they read their personal usage with a window start and end
-    Then governance reads the rollup for that member over that window
-
-  @unit
-  Scenario: A member's budget overview lists their own budgets with top models when asked
-    Given a member of the organization
-    When they read their budget overview asking for top models
-    Then governance reads the overview for that member with top models
-
-  @unit
-  Scenario: The CLI login ceremony reads the caller's own bootstrap
-    Given a member of the organization
-    When the CLI asks for its bootstrap
-    Then governance resolves the bootstrap for that member
-
   # main's handler passed scope, scope id, limit, spend and period through
   # unchecked, and its mail rendered each one blank rather than refusing.
   @unit

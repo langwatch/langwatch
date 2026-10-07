@@ -1,6 +1,6 @@
 /**
  * The wire shapes the two REST doors publish. The `/api/me/usage` fields
- * mirror the `user.personalUsage` tRPC payload the /me dashboard consumes
+ * mirror the `governance.personalUsage` tRPC payload the /me dashboard consumes
  * one-to-one, camelCase included, so the two entrypoints cannot drift.
  */
 import { z } from "zod";

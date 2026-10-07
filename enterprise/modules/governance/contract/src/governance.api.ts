@@ -431,6 +431,7 @@ export interface GovernanceRestApi {
   }): Promise<void>;
   /** One person's own usage against a tenant the caller resolved, as main's `/api/me/usage`. */
   personalUsage(input: PersonalUsageQueryInput): Promise<PersonalUsageRollup>;
+  /** The caller's own /me rollup; `user_not_in_organization` (403) outside the organization. */
   personalUsageDashboard(
     input: { organizationId: string; window?: PersonalUsageWindow },
     by: GovernanceCaller,

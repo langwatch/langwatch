@@ -17,7 +17,7 @@ export function usePersonalSpaceInUse(): boolean | null {
     { organizationId: orgId, targetUserId: userId ?? "" },
     { enabled: !!organization && !!userId, refetchOnWindowFocus: false },
   );
-  const usage = api.user.personalUsage.useQuery(
+  const usage = api.governance.personalUsage.useQuery(
     { organizationId: orgId },
     { enabled: !!organization, refetchOnWindowFocus: false },
   );
