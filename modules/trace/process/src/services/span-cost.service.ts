@@ -29,6 +29,11 @@ export class SpanCostService {
     return new SpanCostService(options.modelCosts);
   }
 
+  /** The price a span adds to the trace's running cost: none when it skips token accumulation. */
+  estimateAccumulatedSpanCost(span: NormalizedSpan): number {
+    return isSpanTokenAccumulationSkipped(span) ? 0 : this.estimateSpanCost(span);
+  }
+
   /** The span's own cost (USD) from its token counts, model and any custom rates it carries. */
   estimateSpanCost(span: NormalizedSpan): number {
     const { promptTokens, completionTokens } = extractSpanTokenCounts(span);
@@ -93,7 +98,7 @@ export class SpanCostService {
     span: NormalizedSpan;
     totalDurationMs: number;
   }): SpanTokenAccumulation {
-    const spanCost = isSpanTokenAccumulationSkipped(span) ? 0 : this.estimateSpanCost(span);
+    const spanCost = this.estimateAccumulatedSpanCost(span);
 
     return accumulateSpanTokens({ state, span, spanCost, totalDurationMs });
   }
