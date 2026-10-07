@@ -11,8 +11,8 @@ import {
   RICH_ARRIVAL_TRACE_ID,
 } from "../onboarding/data/samplePreviewTraces";
 import { useDrawerStore } from "../stores/drawerStore";
-import { memberTenantOf, traceDrawerParams } from "../utils/traceDrawerParams";
 import type { TraceListItem } from "../types/trace";
+import { memberTenantOf, traceDrawerParams } from "../utils/traceDrawerParams";
 import { spanTreeQueryFn, spanTreeQueryKey } from "./spanTreePagedQuery";
 
 function listItemToHeader(item: TraceListItem): TraceHeader {

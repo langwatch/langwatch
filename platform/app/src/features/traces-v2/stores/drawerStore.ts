@@ -358,6 +358,15 @@ function persistLastVizTab(tab: VizTab): void {
 }
 
 /**
+ * The member a drawer link names, on an aggregate. Written only when the
+ * trace's member is not the drawer's project, so a reload of an aggregate's
+ * drawer reopens the member it was on; an empty value names none.
+ */
+function tenantIdFromParams(params: URLSearchParams): string | null {
+  return params.get("drawer.tenantId") || null;
+}
+
+/**
  * Read drawer state out of the URL synchronously at module load. Without
  * this, a hard reload onto `?drawer.open=traceV2Details&drawer.traceId=…`
  * would render the drawer once with `traceId === null` and any consumer
@@ -388,9 +397,7 @@ function readInitialFromURL(): InitialFromURL {
     const isOpen = params.get("drawer.open") === "traceV2Details";
     const traceId = params.get("drawer.traceId");
     const projectId = params.get("drawer.projectId");
-    // Written only when the trace's member is not the drawer's project, so a
-    // reload of an aggregate's drawer reopens the member it was on.
-    const tenantId = params.get("drawer.tenantId") || null;
+    const tenantId = tenantIdFromParams(params);
     const tRaw = params.get("drawer.t");
     const t = tRaw ? Number(tRaw) : NaN;
     const occurredAtMs = Number.isFinite(t) && t > 0 ? t : null;

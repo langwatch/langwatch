@@ -53,36 +53,8 @@ export function TerminalTab({
   sessionName,
   conversationId,
 }: TerminalTabProps) {
-  // On an aggregate every read names the member the drawer is on, so the
-  // transcript, its tools and the banner come from the same member as the
-  // header (ADR-144 block F).
-  const { tenantId } = useTraceQueryArgs();
-  const input = {
-    projectId,
-    traceId,
-    occurredAtMs,
-    ...(tenantId !== null ? { tenantId } : {}),
-  };
-  const transcriptQuery = api.tracesV2.codingAgentTranscript.useQuery(input, {
-    refetchOnWindowFocus: false,
-    staleTime: 60_000,
-  });
-
-  const spansQuery = api.tracesV2.spansFull.useQuery(input, {
-    refetchOnWindowFocus: false,
-    staleTime: 60_000,
-  });
-  const eventsQuery = api.tracesV2.traceEvents.useQuery(input, {
-    refetchOnWindowFocus: false,
-    staleTime: 60_000,
-  });
-  // The version/model/repo Claude Code itself would print above the prompt,
-  // off the resource attributes (the session fold deliberately carries no
-  // identity strings, ADR-041).
-  const resourceQuery = api.tracesV2.resourceInfo.useQuery(input, {
-    refetchOnWindowFocus: false,
-    staleTime: 60_000,
-  });
+  const { transcriptQuery, spansQuery, eventsQuery, resourceQuery } =
+    useTurnReads({ projectId, traceId, occurredAtMs });
   const sessionCostUsd = useSessionCostUsd({ projectId, traceId });
 
   const toolSpans = useMemo(
@@ -168,6 +140,39 @@ function TranscriptError() {
  * — stating this total beside it is what keeps a position-scoped number from
  * passing for the session total.
  */
+/**
+ * The opened turn's reads: its transcript, the spans and events that carry
+ * what its tools did, and the resource attributes behind the banner. On an
+ * aggregate every one names the member the drawer is on, so all of them come
+ * from the same member as the header (ADR-144 block F).
+ */
+function useTurnReads({
+  projectId,
+  traceId,
+  occurredAtMs,
+}: Pick<TerminalTabProps, "projectId" | "traceId" | "occurredAtMs">) {
+  const { tenantId } = useTraceQueryArgs();
+  const input = {
+    projectId,
+    traceId,
+    occurredAtMs,
+    ...(tenantId !== null ? { tenantId } : {}),
+  };
+  const options = { refetchOnWindowFocus: false, staleTime: 60_000 };
+  return {
+    transcriptQuery: api.tracesV2.codingAgentTranscript.useQuery(
+      input,
+      options,
+    ),
+    spansQuery: api.tracesV2.spansFull.useQuery(input, options),
+    eventsQuery: api.tracesV2.traceEvents.useQuery(input, options),
+    // The version/model/repo Claude Code itself would print above the
+    // prompt, off the resource attributes (the session fold deliberately
+    // carries no identity strings, ADR-041).
+    resourceQuery: api.tracesV2.resourceInfo.useQuery(input, options),
+  };
+}
+
 function useSessionCostUsd({
   projectId,
   traceId,

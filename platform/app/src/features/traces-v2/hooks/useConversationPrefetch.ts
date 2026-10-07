@@ -49,6 +49,8 @@ export function useConversationPrefetch(
     );
     if (order.length === 0) return;
 
+    // A conversation's turns belong to the member the drawer is on.
+    const tenantArg = tenantId !== null ? { tenantId } : {};
     const timer = setTimeout(() => {
       for (const i of order) {
         const turn = turns[i];
@@ -64,7 +66,7 @@ export function useConversationPrefetch(
           projectId,
           traceId: turn.traceId,
           occurredAtMs: turn.timestamp,
-          ...(tenantId !== null ? { tenantId } : {}),
+          ...tenantArg,
           full: Math.abs(i - idx) <= NEAR_RADIUS,
         });
       }

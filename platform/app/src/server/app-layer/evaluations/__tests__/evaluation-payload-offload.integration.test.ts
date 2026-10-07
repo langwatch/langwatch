@@ -26,8 +26,8 @@ import path from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { AuthorizedClickHouse } from "~/server/app-layer/clients/clickhouse/authorized-reads";
+import type { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { TraceEvaluationsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
@@ -46,11 +46,11 @@ import { StoredObjectsRepository } from "~/server/stored-objects/stored-objects.
 import type { MintStorageUri } from "~/server/stored-objects/stored-objects.service";
 import { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
 import { mintFileUri } from "~/server/stored-objects/uri";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
-import { ownProof } from "~/test-utils/authorizationProofs";
 import { evaluationRunRepositoryFor } from "~/test-utils/evaluationRunRepository";
 import { getTestClickHouseClient } from "../../../event-sourcing/__tests__/integration/testContainers";
 import {

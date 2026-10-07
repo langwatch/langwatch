@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { api } from "~/utils/api";
-import { useTraceQueryArgs } from "../../../hooks/useTraceQueryArgs";
 import {
   type ConversationTurn,
   useConversationContext,
 } from "../../../hooks/useConversationContext";
+import { useTraceQueryArgs } from "../../../hooks/useTraceQueryArgs";
 import {
   type LoadedTurn,
   mergeSessionTurns,
@@ -214,15 +214,18 @@ async function loadTurnIntoLedger({
  * resolving after the reader moved to another trace.
  */
 function useTurnLedger({
-  key,
   projectId,
-  tenantId,
+  traceId,
+  conversationId,
 }: {
-  key: string;
   projectId: string;
-  tenantId: string | null;
+  traceId: string;
+  conversationId: string | null | undefined;
 }): { current: Ledger; loadTurn: (target: TurnTarget) => void } {
   const utils = api.useUtils();
+  // On an aggregate the session's turns are the member's the drawer is on.
+  const { tenantId } = useTraceQueryArgs();
+  const key = ledgerKeyOf({ projectId, traceId, conversationId, tenantId });
   const [ledger, setLedger] = useState<Ledger>(() => ({
     key,
     turns: [],
@@ -420,6 +423,26 @@ function useSessionBaseline({
 }
 
 /**
+ * Which trace of which session, on which member, a ledger is built for. The
+ * member is appended only on an aggregate, so a plain project's key is as it
+ * was.
+ */
+function ledgerKeyOf({
+  projectId,
+  traceId,
+  conversationId,
+  tenantId,
+}: {
+  projectId: string;
+  traceId: string;
+  conversationId: string | null | undefined;
+  tenantId: string | null;
+}): string {
+  const base = `${projectId}|${traceId}|${conversationId ?? ""}`;
+  return tenantId === null ? base : `${base}|${tenantId}`;
+}
+
+/**
  * The session behind the opened turn, read backwards on demand.
  *
  * The opened turn is always the newest thing on screen and is never re-read
@@ -438,9 +461,8 @@ export function useSessionScrollback({
     conversationId,
     traceId,
   );
-  const { tenantId } = useTraceQueryArgs();
-  const key = `${projectId}|${traceId}|${conversationId ?? ""}${tenantId !== null ? `|${tenantId}` : ""}`;
-  const { current, loadTurn } = useTurnLedger({ key, projectId, tenantId });
+  const ledger = useTurnLedger({ projectId, traceId, conversationId });
+  const { current, loadTurn } = ledger;
 
   const { openedIndex, hasSession, oldestLoadedIndex } = useSessionPosition({
     turns,

@@ -183,19 +183,25 @@ export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({
   );
 };
 
-function PeekPopoverContent({
-  traceId,
-  occurredAtMs,
-  ownerProjectId,
-}: {
+interface PeekPopoverContentProps {
   traceId: string;
   occurredAtMs?: number;
   ownerProjectId?: string;
-}) {
+}
+
+/**
+ * The peeked trace's header, read from the member that owns it on an
+ * aggregate (ADR-144 block F).
+ */
+function usePeekHeader({
+  traceId,
+  occurredAtMs,
+  ownerProjectId,
+}: PeekPopoverContentProps) {
   const { project } = useOrganizationTeamProject();
   const tenantId = memberTenantOf({ ownerProjectId, projectId: project?.id });
 
-  const { data: trace, isLoading } = api.tracesV2.header.useQuery(
+  return api.tracesV2.header.useQuery(
     {
       projectId: project?.id ?? "",
       traceId,
@@ -207,6 +213,10 @@ function PeekPopoverContent({
     },
     { enabled: !!project?.id, staleTime: 300_000 },
   );
+}
+
+function PeekPopoverContent(props: PeekPopoverContentProps) {
+  const { data: trace, isLoading } = usePeekHeader(props);
 
   if (isLoading || !trace) {
     return (
@@ -320,7 +330,7 @@ function PeekPopoverContent({
       {/* Footer */}
       <HStack padding={2} paddingX={3} justify="space-between">
         <Text textStyle="2xs" color="fg.subtle">
-          {traceId.slice(0, 16)}...
+          {props.traceId.slice(0, 16)}...
         </Text>
         <Text textStyle="2xs" color="fg.subtle">
           {trace.serviceName}
