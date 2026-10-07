@@ -448,6 +448,43 @@ describe("trace summary, analytics and evaluation summaries through the proof", 
     });
   });
 
+  describe("given a member grant with an end as well as a start", () => {
+    describe("when the aggregate reads a member trace inside that window", () => {
+      it("returns it, the window applied to the stored time and not its projected alias", async () => {
+        const bounded = aggregateProof({
+          projectId: AGGREGATE,
+          members: [
+            {
+              projectId: MEMBER_B,
+              from: TODAY - 60_000,
+              until: TODAY + 60_000,
+            },
+          ],
+          now: NOW,
+        });
+
+        const inside = await summaries.findByTraceId({
+          authorization: bounded,
+          traceId: B_TODAY_TRACE,
+        });
+        const hinted = await summaries.findByTraceId({
+          authorization: bounded,
+          traceId: B_TODAY_TRACE,
+          occurredAtMs: TODAY,
+        });
+
+        expect(inside?.tenantId).toBe(MEMBER_B);
+        expect(hinted?.tenantId).toBe(MEMBER_B);
+        expect(
+          await summaries.findByTraceId({
+            authorization: bounded,
+            traceId: B_YESTERDAY_TRACE,
+          }),
+        ).toBeNull();
+      });
+    });
+  });
+
   describe("given a plain project with no shared grants", () => {
     describe("when it reads its rows through an own-only proof", () => {
       // @scenario "A plain project reads the same rows as before"

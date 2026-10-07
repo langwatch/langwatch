@@ -15,6 +15,7 @@ import {
   type AuthorizedClickHouse,
   type TenantScopedReader,
   tenantScope,
+  tenantSet,
 } from "../../clients/clickhouse/authorized-reads";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
@@ -423,6 +424,13 @@ export class TraceSummaryClickHouseRepository
     // latest version, then the outer SELECT pulls the heavy columns
     // (ComputedInput, ComputedOutput, Attributes, etc.) for that one row.
     // See dev/docs/best_practices/clickhouse-queries.md.
+    //
+    // The windowed fence sits in the inner SELECT only. The outer one
+    // projects `toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAt`, so a bare
+    // `OccurredAt` there is that integer, which ClickHouse compares against a
+    // DateTime64 bound as seconds: every `>= from` passed and every `< until`
+    // failed, dropping a member's trace from a grant with an end. The outer
+    // scope takes the tenant set, and the IN-tuple carries the window.
     const result = await client.query({
       query: `
         SELECT
@@ -470,7 +478,7 @@ export class TraceSummaryClickHouseRepository
           t.HasAnnotation AS HasAnnotation,
           t.TraceName AS TraceName
         FROM ${TABLE_NAME} AS t
-        WHERE ${tenantScope("OccurredAt")}
+        WHERE ${tenantSet()}
           AND t.TraceId = {traceId:String}
           ${outerTimeFilter}
           AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
