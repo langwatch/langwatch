@@ -173,7 +173,7 @@ Feature: Unified Audit Log
     Then she is told what organisation-wide audit logs cover and how to obtain them
     And no table is rendered at all
 
-  @integration
+  @unit
   Scenario: Only an organization administrator may open the audit trail
     Given bob holds "organization:view" and not "organization:manage"
     When he opens `/settings/audit-log`

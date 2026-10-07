@@ -125,6 +125,15 @@ describe("given the pages main guarded", () => {
     expect(accessFor({ page, grants, flagsOn: true })).toEqual({ kind: "open" });
   });
 
+  /** @scenario "Only an organization administrator may open the audit trail" */
+  it("refuses the audit trail to a reader holding organization:view without organization:manage", () => {
+    const page = "pages/settings/audit-log";
+    expect(
+      accessFor({ page, grants: ["organization:view", "auditLog:view"], flagsOn: true }),
+    ).toEqual({ kind: "forbidden", permission: "organization:manage" });
+    expect(declared[page]?.within).toBe("settings");
+  });
+
   /** @scenario "A page behind a release flag that is off does not exist" */
   it.each(flagged)("$page is not found while its flag is off", ({ page, permission }) => {
     const grants = permission === void 0 ? [] : [permission];
