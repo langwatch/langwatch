@@ -52,6 +52,7 @@ vi.mock("../use-show-comparison-leaderboard.ts", () => ({
   useShowComparisonLeaderboard: () => false,
 }));
 
+import { WHOLE_RUN_COMPLETENESS } from "../../../__tests__/run-completeness.fixture.ts";
 import {
   type ComparisonRunData,
   transformBatchEvaluationData,
@@ -68,6 +69,7 @@ const runWithTargets = (targets: { name: string; promptId?: string }[]): Compari
     experimentId: "exp-1",
     runId: "run-1",
     projectId: "proj-1",
+    completeness: WHOLE_RUN_COMPLETENESS,
     targets: targets.map((target, index) => ({
       id: `target-${index + 1}`,
       name: target.name,
