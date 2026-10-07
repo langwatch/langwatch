@@ -188,6 +188,10 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       },
       // This surface re-raises no cause with a code of its own.
       causes: { translate: () => void 0 },
+      // Main's refusal budget counts against the process limiter the throttle already holds.
+      refusalAudit: options.throttle
+        ? { limiter: options.throttle.limiter, logger: this.#logger }
+        : undefined,
     });
 
     this.#runtime = createTrpcRuntime<TrpcRequestContext>({
