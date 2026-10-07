@@ -51,6 +51,8 @@ import {
   type GatewaySpendSummariesPage,
   type GatewaySpendSummariesQuery,
   type GatewaySpendByRequestTypeQuery,
+  type GatewayConfirmedSpendPage,
+  type GatewayConfirmedSpendQuery,
   type GatewaySpendEventPage,
   type GatewayCaller,
   GatewayWindow,
@@ -2035,6 +2037,18 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     if (!service) return 0;
 
     return service.sumSpendNanoUsdByRequestType({
+      ...input,
+      tenantIds: [...input.tenantIds],
+    });
+  }
+
+  async listConfirmedSpendByRequestType(
+    input: GatewayConfirmedSpendQuery,
+  ): Promise<GatewayConfirmedSpendPage> {
+    const service = this.#dependencies.spendEvents;
+    // No ledger means nothing was ever recorded on it, so there is nothing to copy.
+    if (!service) return { rows: [], nextCursor: null };
+    return service.listConfirmedSpendByRequestType({
       ...input,
       tenantIds: [...input.tenantIds],
     });

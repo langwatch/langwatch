@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { EventingCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 import {
   buildBillingLifecyclePipeline,
@@ -26,6 +26,8 @@ type BillingLifecycleAnnouncerDeps = Readonly<{
   planLimitAlerts: BuildBillingLifecyclePipelineInput["planLimitAlerts"];
   /** The meter's own read of an organization, uncached, for the usage-billing fact. */
   billingOrganizations: Pick<BillingReportOrganizationRepository, "getOrganizationForBilling">;
+  /** The clock a usage-billing fact is stamped by; a test names its own. */
+  now?: () => Instant;
 }>;
 
 /**
@@ -92,16 +94,41 @@ export class BillingLifecycleAnnouncerService {
    * read: a later change's fact always out-stamps it (ADR-174 decision 17).
    */
   async usageBillingChanged({ organizationId }: { organizationId: string }): Promise<void> {
-    await this.#record(organizationId, async (commands) => {
-      const occurredAt = nowInstant().epochMilliseconds;
-      const lookup = await this.deps.billingOrganizations.getOrganizationForBilling(organizationId);
-      await commands.recordUsageBillingChanged.send({
-        tenantId: organizationId,
-        occurredAt,
-        organizationId,
-        usageBilled: usageBilledOf({ lookup }).usageBilled,
-        fromCatchUp: false,
-      });
+    await this.#record(organizationId, (commands) =>
+      this.#sendUsageBilling({ commands, organizationId, fromCatchUp: false }),
+    );
+  }
+
+  /**
+   * The usage-billing catch-up's fact for one organization, stamped when it reads billing and
+   * keyed by that read, so a re-run is a new fact (ADR-174 decision 17). Throws, unlike the
+   * real fact, so the hand-run task stops on the organization it could not record.
+   */
+  async usageBillingCaughtUp({ organizationId }: { organizationId: string }): Promise<void> {
+    if (!this.#commands) {
+      throw new Error("billing_lifecycle pipeline senders are not connected yet");
+    }
+    await this.#sendUsageBilling({ commands: this.#commands, organizationId, fromCatchUp: true });
+  }
+
+  /** Stamped before billing is read, and answered by the meter's one rule. */
+  async #sendUsageBilling({
+    commands,
+    organizationId,
+    fromCatchUp,
+  }: {
+    commands: EventingCommands<BillingLifecyclePipeline>;
+    organizationId: string;
+    fromCatchUp: boolean;
+  }): Promise<void> {
+    const occurredAt = (this.deps.now ?? nowInstant)().epochMilliseconds;
+    const lookup = await this.deps.billingOrganizations.getOrganizationForBilling(organizationId);
+    await commands.recordUsageBillingChanged.send({
+      tenantId: organizationId,
+      occurredAt,
+      organizationId,
+      usageBilled: usageBilledOf({ lookup }).usageBilled,
+      fromCatchUp,
     });
   }
 

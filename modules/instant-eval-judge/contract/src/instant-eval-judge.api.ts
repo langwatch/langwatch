@@ -35,6 +35,11 @@ export interface InstantEvalJudgeApi {
    * fact cannot be stored, so a run's finish retries onto the same request id.
    */
   recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void>;
+  /**
+   * Copies one confirmed Instant Evals row of the gateway ledger into the judge's own spend, for
+   * the spend catch-up (ADR-174 decision 17). A request the judge already holds is kept as it is.
+   */
+  copyLedgerSpend(input: InstantEvalJudgeLedgerSpend): Promise<InstantEvalJudgeLedgerSpendCopy>;
 }
 
 export const InstantEvalJudgeApi = moduleApi<InstantEvalJudgeApi>()("instant-eval-judge");
@@ -74,6 +79,21 @@ export interface InstantEvalJudgeSpendRecord {
   /** Epoch milliseconds. */
   readonly occurredAt: number;
 }
+
+/** One confirmed ledger row, as the spend catch-up hands it to the judge. */
+export interface InstantEvalJudgeLedgerSpend {
+  /** The organization whose projects the ledger row was read under. */
+  readonly organizationId: string;
+  /** The ledger row's request id, which the judge keeps one row for. */
+  readonly requestId: string;
+  /** The row's customer price, in integer nano USD. */
+  readonly spendNanoUsd: number;
+  /** Epoch milliseconds. */
+  readonly occurredAt: number;
+}
+
+/** Whether the row was copied, or the judge already held that request. */
+export type InstantEvalJudgeLedgerSpendCopy = Readonly<{ outcome: "copied" | "already_held" }>;
 
 /** Why a judge call was refused before the classifier was called (ADR-174 decision 7). */
 export const INSTANT_EVAL_JUDGE_REFUSAL_CODES = [

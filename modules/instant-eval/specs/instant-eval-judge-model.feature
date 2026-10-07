@@ -424,7 +424,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
 
   Rule: Catch-up jobs fill the judge's copies right after the rollout
 
-    @integration @unimplemented
+    @integration
     Scenario: The project catch-up teaches the judge every existing project
       Given projects created before the judge existed
       And a project whose created fact failed to write
@@ -444,7 +444,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When the same project created fact is folded again
       Then the judge holds one row for that project
 
-    @integration @unimplemented
+    @integration
     Scenario: The usage-billing catch-up gives every organization's answer
       Given an organization the meter bills today
       And an organization the meter does not bill
@@ -472,14 +472,14 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
         | after  | real fact first     |
         | after  | catch-up fact first |
 
-    @integration @unimplemented
+    @integration
     Scenario: A re-run usage-billing catch-up fixes a change the judge missed
       Given the judge reads an organization as usage billed from a real billing fact
       And billing stopped billing it while the judge's subscriber was not running
       When the usage-billing catch-up runs again
       Then the judge reads it as not usage billed
 
-    @integration @unimplemented
+    @integration
     Scenario: The judge refuses calls until the project catch-up has run, then judges them
       Given the judge was just deployed and holds no projects
       And a project created before the deploy with Instant Evals released
@@ -489,21 +489,21 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       And the same judge call arrives again
       Then it is classified
 
-    @integration @unimplemented
+    @integration
     Scenario: The spend catch-up copies every ledger row once
       Given an organization with $0.40 of Instant Evals spend in the gateway ledger over two requests
       When the spend catch-up runs twice
       Then the judge's spend for it is $0.40
       And the judge holds one spend row for each request
 
-    @integration @unimplemented
+    @integration
     Scenario: A re-run spend catch-up copies the spend old pods wrote during a rollback
       Given the judge holds $0.40 of spend for an organization
       And old pods wrote $0.20 more to the gateway ledger only, during a rollback
       When the spend catch-up runs again
       Then the judge's spend for it is $0.60
 
-    @integration @unimplemented
+    @integration
     Scenario Outline: A request in both the ledger and the judge is counted once
       Given the gateway ledger holds a $0.10 Instant Evals request
       And the judge's priced event for the same request is folded <when> the spend catch-up runs

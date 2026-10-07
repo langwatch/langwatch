@@ -1,3 +1,8 @@
+import type {
+  InstantEvalJudgeLedgerSpend,
+  InstantEvalJudgeLedgerSpendCopy,
+} from "@langwatch/instant-eval-judge-contract";
+
 import type { InstantEvalJudgeProjectPlacement } from "../repositories/instant-eval-judge-project.repository.ts";
 import type {
   InstantEvalJudgeSpendRow,
@@ -67,6 +72,25 @@ export class InstantEvalJudgeFactsService {
   /** One row per request; a request already recorded keeps its first row. */
   recordSpend(row: InstantEvalJudgeSpendRow): Promise<InstantEvalJudgeSpendWrite> {
     return this.repositories.spend.create(row);
+  }
+
+  /**
+   * The spend catch-up's copy of one confirmed ledger row (ADR-174 decision 17). It goes straight
+   * to the spend table, since the ledger already holds the row a priced fact would write.
+   */
+  async copyLedgerSpend({
+    organizationId,
+    requestId,
+    spendNanoUsd,
+    occurredAt,
+  }: InstantEvalJudgeLedgerSpend): Promise<InstantEvalJudgeLedgerSpendCopy> {
+    const { outcome } = await this.repositories.spend.create({
+      organizationId,
+      requestId,
+      spendNanoUsd: BigInt(spendNanoUsd),
+      occurredAtMs: occurredAt,
+    });
+    return { outcome: outcome === "recorded" ? "copied" : "already_held" };
   }
 
   getProjectPlacement({

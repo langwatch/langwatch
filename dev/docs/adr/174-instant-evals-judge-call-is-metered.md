@@ -125,7 +125,7 @@
 | Catch-up jobs are safe to re-run     | A second run adds no spend and changes no billing answer        | Integration tests: copying twice gives one row per request; a re-run of the usage-billed task keeps the answer         |
 | Copied and live spend never overlap  | A request in both the ledger and the leaf is counted once       | Integration test: the live priced event folded before and after the copy, one row each time                            |
 | One request, one leaf row            | Two priced events for one request add one row                   | Integration test: two events with different ids and one request id, live and on rebuild, give one row                  |
-| One run, one request id              | Every finish attempt of a run records under the same request id | Unit test: a retried finish records under `instanteval_<runId>`                                                                |
+| One run, one request id              | Every finish attempt of a run records under the same request id | Unit test: a retried finish records under `instanteval_<runId>`                                                        |
 | Newest billing fact wins             | A catch-up read before a change never overrides it              | Integration tests: catch-up read before or after a real change, folded in either order; a re-run fixes a missed change |
 
 ## Assumptions
@@ -136,31 +136,31 @@
 | Every project has an organization                       | The leaf cannot place the project, so it refuses it (decision 15) and the project can never judge                                                                                                                                                                                                                                                                                                             |
 | The langevals service port is internal in production    | Anyone reaching it runs judges with no app in between. It never reaches Instant Evals, so it is not a billing hole                                                                                                                                                                                                                                                                                            |
 | The three judge settings shapes stay as generated today | The builder maps the wrong field. Its tests read the generated schemas                                                                                                                                                                                                                                                                                                                                        |
-| The gateway ledger holds all Instant Evals spend so far | Main records Instant Evals spend there today. The spend job copies it into the leaf (decision 17). Spend recorded anywhere else is missed, and those organizations get headroom back                                                                                                                                                                                                                           |
+| The gateway ledger holds all Instant Evals spend so far | Main records Instant Evals spend there today. The spend job copies it into the leaf (decision 17). Spend recorded anywhere else is missed, and those organizations get headroom back                                                                                                                                                                                                                          |
 
 ## Gates
 
-| Path                         | Reversible?                             | Blast radius                              | Gate                                                                                                                   |
-| ---------------------------- | --------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Spend row per judge call     | No, it feeds the existing monthly meter | Large                                     | Human review of the judge method and the redelivery test before merge                                                  |
-| Budget check                 | Yes                                     | Large                                     | Unit tests that a refusal happens before the classifier is called and becomes an `error` result                        |
-| Judge cap reads `isUsageBilled` | Yes                                  | Large, paying tiered customers' judge calls stop at $1 | Unit tests for usage billed, tiered and free organizations, and the monthly report reading the same rule  |
-| Builder and result mapping   | Yes                                     | Large for guardrails                      | Unit tests against the generated schemas, plus the polarity check                                                      |
-| Picker entry                 | Yes                                     | Large, customer-visible                   | Ships with wave 1 behind `release_instant_evals`. Reviewer confirms the bounded flag in the deploy config before merge |
-| Judge leaf                   | Yes                                     | Medium                                    | The peer-cycle policy shows no new finding and no removed edge before merge                                            |
-| Leaf tables migration        | No, it is a schema migration            | Medium, new tables only                   | Human review of the migration. It only creates tables, so rollback is dropping them                                    |
-| Catch-up jobs                | Yes, each is safe to re-run             | Large, they set every organization's cap  | Re-run tests, then a dry run on staging that prints counts before production                                           |
-| Catch-up after rollout       | Yes                                     | Large, customer-visible                   | Run the three jobs right after the rollout, projects last. Judge calls are refused as unknown projects until then       |
+| Path                            | Reversible?                             | Blast radius                                           | Gate                                                                                                                   |
+| ------------------------------- | --------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| Spend row per judge call        | No, it feeds the existing monthly meter | Large                                                  | Human review of the judge method and the redelivery test before merge                                                  |
+| Budget check                    | Yes                                     | Large                                                  | Unit tests that a refusal happens before the classifier is called and becomes an `error` result                        |
+| Judge cap reads `isUsageBilled` | Yes                                     | Large, paying tiered customers' judge calls stop at $1 | Unit tests for usage billed, tiered and free organizations, and the monthly report reading the same rule               |
+| Builder and result mapping      | Yes                                     | Large for guardrails                                   | Unit tests against the generated schemas, plus the polarity check                                                      |
+| Picker entry                    | Yes                                     | Large, customer-visible                                | Ships with wave 1 behind `release_instant_evals`. Reviewer confirms the bounded flag in the deploy config before merge |
+| Judge leaf                      | Yes                                     | Medium                                                 | The peer-cycle policy shows no new finding and no removed edge before merge                                            |
+| Leaf tables migration           | No, it is a schema migration            | Medium, new tables only                                | Human review of the migration. It only creates tables, so rollback is dropping them                                    |
+| Catch-up jobs                   | Yes, each is safe to re-run             | Large, they set every organization's cap               | Re-run tests, then a dry run on staging that prints counts before production                                           |
+| Catch-up after rollout          | Yes                                     | Large, customer-visible                                | Run the three jobs right after the rollout, projects last. Judge calls are refused as unknown projects until then      |
 
 ## Schema
 
 Three new Postgres tables, owned by the judge leaf. Each holds a copy of facts the judge needs before each call, folded from another module's events or from the leaf's own priced events. None of them is a meter: the monthly report still reads the gateway ledger. They ship in one migration under `packages/prisma-client/prisma/migrations/`, claimed in the table catalogue.
 
-| Table                          | Key              | Columns                       | Fed by                                  |
-| ------------------------------ | ---------------- | ----------------------------- | --------------------------------------- |
-| `InstantEvalJudgeProject`      | `projectId`      | `organizationId`, `createdAt` | project's `lw.project.created`          |
-| `InstantEvalJudgeUsageBilling` | `organizationId` | `usageBilled`, `occurredAt`, `fromCatchUp` | billing's new usage-billed event, plus catch-up |
-| `InstantEvalJudgeSpend`        | `organizationId`, `requestId` | `spendNanoUsd`, `occurredAt` | the leaf's own priced events and the spend catch-up, one row per request |
+| Table                          | Key                           | Columns                                    | Fed by                                                                   |
+| ------------------------------ | ----------------------------- | ------------------------------------------ | ------------------------------------------------------------------------ |
+| `InstantEvalJudgeProject`      | `projectId`                   | `organizationId`, `createdAt`              | project's `lw.project.created`                                           |
+| `InstantEvalJudgeUsageBilling` | `organizationId`              | `usageBilled`, `occurredAt`, `fromCatchUp` | billing's new usage-billed event, plus catch-up                          |
+| `InstantEvalJudgeSpend`        | `organizationId`, `requestId` | `spendNanoUsd`, `occurredAt`               | the leaf's own priced events and the spend catch-up, one row per request |
 
 The score judge's settings gain an optional `min` and `max` in the langevals settings definition, regenerated into `evaluators.generated.ts`. Old settings without them read as 0 to 1.
 
@@ -283,3 +283,8 @@ The score judge's settings gain an optional `min` and `max` in the langevals set
 - v15, 2026-10-07, after the picker entry was built. Captain: Sergio Esteban.
   - The picker shows Instant Evals when the flag is on or the organization opted in, the same answer the access check gives. The flag alone hid it from organizations that opted in (decisions 11 and 13).
   - The score range fields show only while Instant Evals is the judge's model, since no other model reads them (decision 4).
+- v16, 2026-10-07, after the three catch-up jobs were built. Captain: Sergio Esteban.
+  - The jobs are `usage-billing-catch-up` (billing), `instant-eval-judge-spend-catch-up` (Instant Evals) and project's existing `backfill-project-created`, run in that order (decision 17).
+  - The usage-billing catch-up stops on an organization whose fact it cannot record, unlike a real fact, which is logged. A hand-run job that skipped an organization silently would leave it capped (decision 17).
+  - The spend catch-up writes each ledger row straight into the leaf's spend table under its request id. It sends no priced fact, since the ledger already holds the row a priced fact would write (decision 17).
+  - Gateway reads the ledger's confirmed rows of one request type a page at a time, the rows its request-type sum already counts, filtered by the organization's projects (decision 17).

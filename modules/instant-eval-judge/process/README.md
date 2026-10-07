@@ -48,6 +48,14 @@ Prices and records what an Instant Evals run or judged query spent, under the or
 recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void>;
 ```
 
+#### `copyLedgerSpend`
+
+Copies one confirmed Instant Evals row of the gateway ledger into the judge's own spend, for the spend catch-up (ADR-174 decision 17). A request the judge already holds is kept as it is.
+
+```typescript
+copyLedgerSpend(input: InstantEvalJudgeLedgerSpend): Promise<InstantEvalJudgeLedgerSpendCopy>;
+```
+
 ## REST transport
 
 None: this module declares no REST family.
@@ -84,7 +92,7 @@ Declared at `src/eventing/instant-eval-judge-spend.pipeline.ts:41`. Events: `ins
 
 | Kind   | Leaf                    | Environment variable                    | Declared at                                       |
 | ------ | ----------------------- | --------------------------------------- | ------------------------------------------------- |
-| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:57`            |
+| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:59`            |
 | config | `classifierBaseUrl`     | `JEV_BASE_URL`                          | `../contract/src/instant-eval-judge.config.ts:10` |
 | config | `classifierModel`       | `JEV_MODEL`                             | `../contract/src/instant-eval-judge.config.ts:18` |
 | config | `globalTokensPerSecond` | `INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND` | `../contract/src/instant-eval-judge.config.ts:20` |

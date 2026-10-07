@@ -59,10 +59,17 @@ export class MemoryInstantEvalJudgeProjectRepository extends InstantEvalJudgePro
 
 /** In-memory twin of the judge's usage-billing copy; it keeps a fact by the shared rule. */
 export class MemoryInstantEvalJudgeUsageBillingRepository extends InstantEvalJudgeUsageBillingRepository {
-  private readonly rows = new Map<string, InstantEvalJudgeUsageBillingFact>();
+  private constructor(private readonly rows: Map<string, InstantEvalJudgeUsageBillingFact>) {
+    super();
+  }
 
-  static create(): MemoryInstantEvalJudgeUsageBillingRepository {
-    return new MemoryInstantEvalJudgeUsageBillingRepository();
+  /** A test may hand in the map, to see how many rows the folds left. */
+  static create({
+    rows = new Map<string, InstantEvalJudgeUsageBillingFact>(),
+  }: {
+    rows?: Map<string, InstantEvalJudgeUsageBillingFact>;
+  } = {}): MemoryInstantEvalJudgeUsageBillingRepository {
+    return new MemoryInstantEvalJudgeUsageBillingRepository(rows);
   }
 
   async getUsageBilling({
@@ -85,10 +92,17 @@ export class MemoryInstantEvalJudgeUsageBillingRepository extends InstantEvalJud
 
 /** In-memory twin of the judge's spend rows, keyed by organization and request. */
 export class MemoryInstantEvalJudgeSpendRepository extends InstantEvalJudgeSpendRepository {
-  private readonly rows = new Map<string, InstantEvalJudgeSpendRow>();
+  private constructor(private readonly rows: Map<string, InstantEvalJudgeSpendRow>) {
+    super();
+  }
 
-  static create(): MemoryInstantEvalJudgeSpendRepository {
-    return new MemoryInstantEvalJudgeSpendRepository();
+  /** A test may hand in the map, to see how many rows the copies left. */
+  static create({
+    rows = new Map<string, InstantEvalJudgeSpendRow>(),
+  }: {
+    rows?: Map<string, InstantEvalJudgeSpendRow>;
+  } = {}): MemoryInstantEvalJudgeSpendRepository {
+    return new MemoryInstantEvalJudgeSpendRepository(rows);
   }
 
   async create(row: InstantEvalJudgeSpendRow): Promise<InstantEvalJudgeSpendWrite> {

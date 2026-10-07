@@ -5,6 +5,8 @@ import {
   type InstantEvalJudgeAnswer,
   InstantEvalJudgeApi,
   type InstantEvalJudgeCall,
+  type InstantEvalJudgeLedgerSpend,
+  type InstantEvalJudgeLedgerSpendCopy,
   type InstantEvalJudgeServerConfig,
   type InstantEvalJudgeSpendRecord,
   type InstantEvalJudgement,
@@ -143,6 +145,10 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
 
   recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void> {
     return this.#judge.recordSpend(input);
+  }
+
+  copyLedgerSpend(input: InstantEvalJudgeLedgerSpend): Promise<InstantEvalJudgeLedgerSpendCopy> {
+    return this.#facts.copyLedgerSpend(input);
   }
 
   factsPipeline(): InstantEvalJudgeFactsPipeline {

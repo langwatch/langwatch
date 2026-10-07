@@ -455,6 +455,30 @@ export type GatewaySpendByRequestTypeQuery = {
   toMs?: number;
 };
 
+/** One page of these tenants' confirmed rows of one request type, oldest change first. */
+export type GatewayConfirmedSpendQuery = {
+  tenantIds: readonly string[];
+  requestType: string;
+  cursor?: string | null;
+  limit: number;
+};
+
+/** One confirmed ledger row, as much of it as a copy of its spend needs. */
+export type GatewayConfirmedSpendRow = {
+  /** The project the row was written under. */
+  tenantId: string;
+  requestId: string;
+  /** Integer nano USD, the row's customer price. */
+  costNanoUsd: number;
+  /** Epoch milliseconds. */
+  occurredAt: number;
+};
+
+export type GatewayConfirmedSpendPage = {
+  rows: GatewayConfirmedSpendRow[];
+  nextCursor: string | null;
+};
+
 /** One page of a project's spend-event ledger, newest first. */
 export type GatewaySpendEventsPageQuery = {
   projectId: string;
@@ -935,6 +959,14 @@ export interface GatewayApi extends GatewayInternalProtocol {
    * deployment has no spend source: an absent ledger was never written to.
    */
   sumSpendNanoUsdByRequestType(input: GatewaySpendByRequestTypeQuery): Promise<number>;
+
+  /**
+   * The confirmed rows `sumSpendNanoUsdByRequestType` sums, one page at a time, for a copy that
+   * needs each request (ADR-174 decision 17). An empty page where there is no spend source.
+   */
+  listConfirmedSpendByRequestType(
+    input: GatewayConfirmedSpendQuery,
+  ): Promise<GatewayConfirmedSpendPage>;
 
   /**
    * One page of the spend-event ledger for a project, newest first, with

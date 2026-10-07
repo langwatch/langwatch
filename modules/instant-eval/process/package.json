@@ -43,6 +43,7 @@
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
+    "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "hono": "catalog:",
@@ -51,6 +52,7 @@
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
+    "@langwatch/instant-eval-judge-process": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",

@@ -1,4 +1,5 @@
 import type {
+  GatewayConfirmedSpendPage,
   GatewaySpendDay,
   GatewayUsageCount,
   SpendBucket,
@@ -84,6 +85,35 @@ export class GatewaySpendEventsService {
     toMs?: number;
   }): Promise<number> {
     return this.repository.sumCostNanoUsdByRequestType(input);
+  }
+
+  /** The rows the sum above counts: confirmed, of one request type, under these tenants. */
+  async listConfirmedSpendByRequestType({
+    tenantIds,
+    requestType,
+    cursor,
+    limit,
+  }: {
+    tenantIds: string[];
+    requestType: string;
+    cursor?: string | null;
+    limit: number;
+  }): Promise<GatewayConfirmedSpendPage> {
+    const page = await this.repository.walkSpendEvents({
+      tenantIds,
+      cursor,
+      limit,
+      filters: { requestTypes: [requestType], status: "confirmed" },
+    });
+    return {
+      rows: page.rows.map((row) => ({
+        tenantId: row.tenantId,
+        requestId: row.gatewayRequestId,
+        costNanoUsd: row.costNanoUsd,
+        occurredAt: row.occurredAt.epochMilliseconds,
+      })),
+      nextCursor: page.nextCursor,
+    };
   }
 
   /** Main's governance metered-lane read, served by the ledger's owner. */

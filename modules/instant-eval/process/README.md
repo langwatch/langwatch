@@ -6,7 +6,7 @@ The server half of [instant-eval](../README.md). Instant evaluations: the opt-in
 
 ## Installation
 
-`defineProcessModule("instant-eval").withRepositories(instantEvalRepositories).withApi(InstantEvalModule).withTransports(instantEvalRest).withTransportFacts(…).withEventing(instantEvalEventing)`, `src/instant-eval.module.ts:14`.
+`defineProcessModule("instant-eval").withRepositories(instantEvalRepositories).withApi(InstantEvalModule).withTransports(instantEvalRest).withTransportFacts(…).withEventing(instantEvalEventing).withTasks(…)`, `src/instant-eval.module.ts:15`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -284,6 +284,14 @@ Declared at `src/eventing/instant-eval-processing.pipeline.ts:60`. Events: `inst
 | command             | `recordFinished`                                                        | –                                              | `src/eventing/instant-eval-processing.pipeline.ts:83` |
 | process manager     | `instantEval`                                                           | intents `finish`, `judgePage`, `plan` (outbox) | `src/eventing/instant-eval-processing.pipeline.ts:84` |
 | Postgres projection | `≈ createInstantEvalRunProjection({ store: deps.instantEvalRunStore })` | –                                              | `src/eventing/instant-eval-processing.pipeline.ts:73` |
+
+### Tasks
+
+Run by the tasks process, before serve.
+
+| Task                                | Class                              | Declared at                                              |
+| ----------------------------------- | ---------------------------------- | -------------------------------------------------------- |
+| `instant-eval-judge-spend-catch-up` | `InstantEvalJudgeSpendCatchUpTask` | `src/tasks/instant-eval-judge-spend-catch-up.task.ts:19` |
 
 ## Configuration
 

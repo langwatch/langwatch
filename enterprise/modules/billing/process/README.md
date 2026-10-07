@@ -6,7 +6,7 @@ The server half of [billing](../README.md). Billing: subscriptions, invoices and
 
 ## Installation
 
-`defineProcessModule("billing").withRepositories(billingRepositories).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withTasks(…)`, `src/billing.module.ts:33`.
+`defineProcessModule("billing").withRepositories(billingRepositories).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withTasks(…)`, `src/billing.module.ts:34`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -210,9 +210,10 @@ Declared at `src/eventing/connected-billing.pipeline.ts:52`.
 
 Run by the tasks process, before serve.
 
-| Task                 | Class                  | Declared at                                |
-| -------------------- | ---------------------- | ------------------------------------------ |
-| `stripe-prices-sync` | `StripePricesSyncTask` | `src/tasks/stripe-prices-sync.task.ts:467` |
+| Task                     | Class                     | Declared at                                   |
+| ------------------------ | ------------------------- | --------------------------------------------- |
+| `usage-billing-catch-up` | `UsageBillingCatchUpTask` | `src/tasks/usage-billing-catch-up.task.ts:20` |
+| `stripe-prices-sync`     | `StripePricesSyncTask`    | `src/tasks/stripe-prices-sync.task.ts:467`    |
 
 ## Configuration
 

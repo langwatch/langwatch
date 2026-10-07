@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`GatewayApi`)
 
-Peers call these through the token, declared at `../contract/src/gateway.api.ts:544`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/gateway.api.ts:568`; nothing else in this package is public.
 It extends `GatewayInternalProtocol`.
 
 #### `internalDoor`
@@ -669,6 +669,14 @@ What one request type has cost these tenants, in integer nano-USD, over the whol
 
 ```typescript
 sumSpendNanoUsdByRequestType(input: GatewaySpendByRequestTypeQuery): Promise<number>;
+```
+
+#### `listConfirmedSpendByRequestType`
+
+The confirmed rows `sumSpendNanoUsdByRequestType` sums, one page at a time, for a copy that needs each request (ADR-174 decision 17). An empty page where there is no spend source.
+
+```typescript
+listConfirmedSpendByRequestType(input: GatewayConfirmedSpendQuery): Promise<GatewayConfirmedSpendPage>;
 ```
 
 #### `listSpendEventsPage`
@@ -1467,9 +1475,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1137`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1138`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1139`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1139`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1140`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1141`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:25` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:27` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:29` |

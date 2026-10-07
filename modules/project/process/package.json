@@ -55,6 +55,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/instant-eval-judge-process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/test-harness": "workspace:*",

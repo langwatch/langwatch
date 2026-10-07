@@ -61,6 +61,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/instant-eval-judge-process": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",

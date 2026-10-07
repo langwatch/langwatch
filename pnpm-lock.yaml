@@ -3161,6 +3161,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/instant-eval-judge-process':
+        specifier: workspace:*
+        version: link:../../../../modules/instant-eval-judge/process
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../../packages/test-harness
@@ -9881,6 +9884,9 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
+      '@langwatch/task':
+        specifier: workspace:*
+        version: link:../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -9900,6 +9906,9 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
+      '@langwatch/instant-eval-judge-process':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/process
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -12773,6 +12782,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/instant-eval-judge-process':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores

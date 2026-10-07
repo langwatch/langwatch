@@ -815,6 +815,14 @@ export class BillingModule
     return this.#lifecycle.pipeline;
   }
 
+  /** The usage-billing catch-up for one organization, for its hand-run task (ADR-174 decision 17). */
+  async catchUpUsageBilling({ organizationId }: { organizationId: string }): Promise<void> {
+    if (!this.#lifecycle) {
+      throw new Error("This billing app was composed without a lifecycle pipeline");
+    }
+    await this.#lifecycle.usageBillingCaughtUp({ organizationId });
+  }
+
   /** Binds the lifecycle pipeline's own senders. */
   connectLifecycleCommands(commands: EventingCommands<BillingLifecyclePipeline>): void {
     if (!this.#lifecycle) {

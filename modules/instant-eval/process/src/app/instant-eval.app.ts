@@ -74,6 +74,10 @@ import { InstantEvalFreeBudgetService } from "../services/instant-eval-free-budg
 import { InstantEvalJudgeChoiceService } from "../services/instant-eval-judge-choice.service.ts";
 import { InstantEvalJudgePageService } from "../services/instant-eval-judge-page.service.ts";
 import { InstantEvalJudgeRowsService } from "../services/instant-eval-judge-rows.service.ts";
+import {
+  type InstantEvalJudgeSpendCatchUp,
+  InstantEvalJudgeSpendCatchUpService,
+} from "../services/instant-eval-judge-spend-catch-up.service.ts";
 import { InstantEvalJudgedSpendService } from "../services/instant-eval-judged-spend.service.ts";
 import { InstantEvalOptInService } from "../services/instant-eval-opt-in.service.ts";
 import { InstantEvalPlanService } from "../services/instant-eval-plan.service.ts";
@@ -155,6 +159,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
   private readonly pipeline: InstantEvalProcessingPipelineDefinition;
   private readonly hostedSpend: InstantEvalSpendService;
   private readonly queries: InstantEvalQueryJudgingService;
+  private readonly spendCatchUp: InstantEvalJudgeSpendCatchUpService;
 
   private constructor(options: {
     access: InstantEvalAccessService;
@@ -166,6 +171,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
     pipeline: InstantEvalProcessingPipelineDefinition;
     hostedSpend: InstantEvalSpendService;
     queries: InstantEvalQueryJudgingService;
+    spendCatchUp: InstantEvalJudgeSpendCatchUpService;
   }) {
     this.access = options.access;
     this.optIns = options.optIns;
@@ -176,6 +182,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
     this.pipeline = options.pipeline;
     this.hostedSpend = options.hostedSpend;
     this.queries = options.queries;
+    this.spendCatchUp = options.spendCatchUp;
   }
 
   static async create(setup: InstantEvalSetup): Promise<InstantEvalModule> {
@@ -268,6 +275,14 @@ export class InstantEvalModule implements InstantEvalApiContract {
     return new InstantEvalModule({
       hostedSpend,
       queries,
+      spendCatchUp: InstantEvalJudgeSpendCatchUpService.create({
+        peers: {
+          listProjectIds: ({ organizationId }) =>
+            projects.listIdsByOrganization({ organizationId }),
+          ledger: gateway,
+          judges: setup.dependencies.judges,
+        },
+      }),
       access,
       optIns,
       classifications: InstantEvalClassifyService.create({ judge }),
@@ -437,6 +452,14 @@ export class InstantEvalModule implements InstantEvalApiContract {
         return finishes.finish(input);
       },
     };
+  }
+
+  /** The spend catch-up for one organization, for its hand-run task (ADR-174 decision 17). */
+  copyLedgerSpendToJudge(input: {
+    organizationId: string;
+    signal?: AbortSignal;
+  }): Promise<InstantEvalJudgeSpendCatchUp> {
+    return this.spendCatchUp.copyLedgerSpend(input);
   }
 
   /** The pipeline this module registers, built once by {@link create}. */
