@@ -19,6 +19,7 @@ import {
   mockGetUsage,
   mockOrganizationMembers,
   resetMocks,
+  setMockOrganization,
 } from "./subscription-test-setup";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -170,7 +171,7 @@ const givenMembers = (
   });
 };
 
-const givenSeatLimitExceeded = (message: string, membersCount?: number) => {
+const givenSeatLimitExceeded = (message: string, membersCount = 3) => {
   mockGetUsage.mockReturnValue({
     data: { seatLimitInfo: { status: "exceeded", message }, membersCount },
     isLoading: false,
@@ -195,6 +196,11 @@ const invite = ({
 describe("<SubscriptionPage/> seat limit", () => {
   beforeEach(() => {
     resetMocks();
+    mockGetUsage.mockReturnValue({
+      data: { seatLimitInfo: { status: "ok", message: "" }, membersCount: 2 },
+      isLoading: false,
+      refetch: vi.fn(),
+    });
     mockGetActivePlan.mockReturnValue({
       data: createMockPlan({ maxMembers: 2, maxMembersLite: 0 }),
       isLoading: false,
@@ -275,6 +281,13 @@ describe("<SubscriptionPage/> seat limit", () => {
 
   describe("when an invite has expired", () => {
     beforeEach(() => {
+      // Before the usage query answers, the page counts members and invites
+      // itself.
+      mockGetUsage.mockReturnValue({
+        data: undefined,
+        isLoading: true,
+        refetch: vi.fn(),
+      });
       mockGetPendingInvites.mockReturnValue({
         data: [invite({ id: "expired-1", displayStatus: "EXPIRED" })],
         isLoading: false,
@@ -302,6 +315,9 @@ describe("<SubscriptionPage/> seat limit", () => {
         ],
         isLoading: false,
       });
+      givenSeatLimitExceeded(
+        "Your organization uses 3 member seats and your plan includes 2 member seats.",
+      );
     });
 
     /** @scenario "Expired invites are not billed when upgrading" */
@@ -414,6 +430,56 @@ describe("<SubscriptionPage/> seat limit", () => {
       await waitFor(() => {
         expect(screen.getByTestId("user-count-link")).toHaveTextContent("3/2");
       });
+    });
+
+    it("checks out for at least the seats the server counts", async () => {
+      const user = userEvent.setup();
+      const mutateAsync = vi.fn().mockResolvedValue({ url: null });
+      mockCreateSubscription.mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync,
+        isLoading: false,
+        isPending: false,
+      });
+      renderSubscriptionPage();
+
+      await user.click(
+        await screen.findByRole("button", { name: /Upgrade now/i }),
+      );
+
+      await waitFor(() => {
+        expect(mutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ membersToAdd: 3 }),
+        );
+      });
+    });
+  });
+
+  describe("when a legacy tiered organization upgrades while the server counts more seats", () => {
+    beforeEach(() => {
+      setMockOrganization({
+        id: "test-org-id",
+        name: "Test Org",
+        currency: "EUR",
+        pricingModel: "TIERED",
+      });
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          planSource: "subscription",
+          type: "ACCELERATE",
+          name: "Accelerate",
+          free: false,
+          maxMembers: 2,
+          maxMembersLite: 9999,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      givenMembers([{ id: "editor-1", role: "EXTERNAL" }]);
+      givenSeatLimitExceeded(
+        "Your organization uses 3 member seats and your plan includes 2 member seats.",
+        3,
+      );
     });
 
     it("checks out for at least the seats the server counts", async () => {

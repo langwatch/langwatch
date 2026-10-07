@@ -254,7 +254,7 @@ export function SubscriptionPage() {
   // For tiered legacy plans upgrading to seat-based, use actual member count
   // (not the old plan's maxMembers capacity which is irrelevant for the new model)
   const upgradeBillingSeats = isTieredLegacyPaidPlan
-    ? Math.max(1, totalFullMembers)
+    ? Math.max(1, totalFullMembers, seatUsageN)
     : billingSeats;
 
   const billingPriceCents = billingSeats * seatPricePerPeriodCents;
